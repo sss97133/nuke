@@ -22,7 +22,8 @@ from pathlib import Path
 
 from build123d import Color, Compound, GeomType, Location, export_step
 
-BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "photo": "#7b3fa0", "design": "#2e7d32", "assumed": "#b3261e"}
+BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "photo": "#7b3fa0", "design": "#2e7d32", "assumed": "#b3261e",
+               "vendor": "#00838f"}   # vendor: a number only a distributor page states, not the maker
 
 
 @dataclass
@@ -273,7 +274,7 @@ class Sheet:
         if text is None:
             val = v(dimv) if dimv is not None else meas
             text = f"{val:.2f}".rstrip("0").rstrip(".")
-        if basis in ("scaled", "photo"):
+        if basis in ("scaled", "photo", "vendor"):
             text = "≈" + text
         text = prefix + text
         mid = ((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)
@@ -395,7 +396,8 @@ def meta_for(mod, bodies):
                          "basis": "branding, redrawn from photo: text and shapes sized off the maker's product photo; fonts "
                                   "are stand-ins; cosmetic, never used for fit; no maker artwork used",
                          "source": A.get("photo_short", "")} if A.get("branding") else {},
-            "unknowns": A.get("unknowns", []), "cross_checks": A.get("cross_checks", []), "notes": A.get("notes", [])}
+            "unknowns": A.get("unknowns", []), "cross_checks": A.get("cross_checks", []), "notes": A.get("notes", []),
+            **{k: A[k] for k in ("kind", "family", "mates", "pieces", "missing", "cavities", "numbering", "option") if k in A}}
 
 
 def _extent(view, shapes):
@@ -427,7 +429,7 @@ def auto_drawing(mod, bodies, extra, meta, path):
     rw, th_ = rh[0] - rl[0], th[1] - tl[1]
     avail_w, avail_h = 230.0, 230.0
     scale = 1.0
-    for s in (1.0, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05):
+    for s in (3.0, 2.0, 1.0, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05):     # small parts (connectors) draw enlarged
         if (fw + rw) * s + 60 <= avail_w and (fhh + th_) * s + 70 <= avail_h:
             scale = s
             break
@@ -436,7 +438,7 @@ def auto_drawing(mod, bodies, extra, meta, path):
     FX = 30 + (-fl[0]) * scale + 10
     FY = 40 + th_ * scale + 25 + fh[1] * scale
     RX = FX + fh[0] * scale + 35 + (-rl[0]) * scale
-    TY = FY - fh[1] * scale - 22 - th[1] * scale
+    TY = FY - fh[1] * scale - 22 + tl[1] * scale      # the top view's lower edge sits 22 above the front view
     S = Sheet(480, 272, A["pid"])
     front = S.view("front", solid + mated, (FX, FY), hidden=False, viewset=vs, scale=scale)
     right = S.view("right", solid + mated + ko, (RX, FY), hidden=True, viewset=vs, scale=scale)
@@ -447,14 +449,16 @@ def auto_drawing(mod, bodies, extra, meta, path):
     if hasattr(mod, "annotate"):
         mod.annotate(S, {"front": front, "right": right, "top": top})
     tx, ty = 272, 18
-    ratio = {1.0: "1:1", 0.5: "1:2", 0.4: "1:2.5", 0.25: "1:4", 0.2: "1:5", 0.1: "1:10", 0.05: "1:20"}[scale]
+    ratio = {3.0: "3:1", 2.0: "2:1", 1.0: "1:1", 0.5: "1:2", 0.4: "1:2.5", 0.25: "1:4", 0.2: "1:5", 0.1: "1:10",
+             0.05: "1:20"}[scale]
     S.text((tx, ty), A["title"], size=5.0, anchor="start", weight="bold")
     S.text((tx, ty + 6), f"K5 harness reference model (build123d) · mm · {ratio} · third-angle projection", size=2.8, anchor="start")
     S.text((tx, ty + 10.5), f"Redrawn from {A['maker']}'s published numbers, not a {A['maker']} drawing. Endpoints "
                             f"{', '.join(A['endpoints'])}.", size=2.8, anchor="start")
     S.text((tx, ty + 15), "Origin: " + A["frame"][:120], size=2.6, anchor="start")
     S.text((tx, ty + 21), "blue = printed by the maker · orange ≈ scaled off the maker's drawing · purple ≈ sized off a photo · "
-                          "green = our clearance · red = assumed", size=2.6, anchor="start", weight="bold")
+                          "teal ≈ a distributor's number · green = our clearance · red = assumed", size=2.6, anchor="start",
+           weight="bold")
     y = S.table(mod.P, tx, ty + 28, A["refs"])
     S.text((tx, y + 2), "Colours: " + ", ".join(f"{k} {c[0]}" for k, c in mod.COLORS.items())[:150], size=2.3, anchor="start")
     yy = y + 5.5
@@ -527,13 +531,16 @@ def glb_dir(d):
 
 def write_pins(mod, out):
     """<id>.pins.json for a part whose ends are studs or terminals: mod.terminals() -> [{pin, name, at, dir,
-    endpoint, match (regex on the registry termination's cavity text)}]."""
+    endpoint, match (regex on the registry termination's cavity text), part_prefix (optional: only terminations whose
+    contact part number starts with it, e.g. '0460' pins vs '0462' sockets on the two halves of a Deutsch pair)}]."""
     A = mod.PART
     rows = []
     terms = registry()["terminations"]
     for tm in mod.terminals():
         rx = re.compile(tm["match"], re.I)
-        ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))]
+        pref = tm.get("part_prefix")
+        ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
+               and (not pref or str(x.get("part") or "").startswith(pref))]
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
                      "exit_dir_glb": glb_dir(tm["dir"]), "wires": wire_rows(ids)})

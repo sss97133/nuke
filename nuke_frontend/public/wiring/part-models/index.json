@@ -1,6 +1,185 @@
 {
  "generated": "2026-09-29",
  "source": "docs/wiring/calc-data/catalog/part_models.yaml",
+ "ends": {
+  "ACC-BATT": {
+   "models": [
+    "ACC-BATT"
+   ],
+   "complete": true
+  },
+  "DCDC": {
+   "models": [
+    "DCDC"
+   ],
+   "complete": true
+  },
+  "DOOR-L-PASS": {
+   "models": [
+    "DOOR-L-PASS",
+    "DT04-08PA",
+    "DT06-08SA"
+   ],
+   "complete": true
+  },
+  "DOOR-L-PASS-P": {
+   "models": [
+    "DOOR-L-PASS-P",
+    "DTP04-4P",
+    "DTP06-4S"
+   ],
+   "complete": true
+  },
+  "DOOR-R-PASS": {
+   "models": [
+    "DOOR-R-PASS",
+    "DT04-08PA",
+    "DT06-08SA"
+   ],
+   "complete": true
+  },
+  "DOOR-R-PASS-P": {
+   "models": [
+    "DOOR-R-PASS-P",
+    "DTP04-4P",
+    "DTP06-4S"
+   ],
+   "complete": true
+  },
+  "FIREWALL-BODY-A": {
+   "models": [
+    "DT04-12PA-L012",
+    "DT06-12SA",
+    "DT12-L012-GKT",
+    "FIREWALL-BODY-A"
+   ],
+   "complete": true
+  },
+  "FIREWALL-BODY-B": {
+   "models": [
+    "DT04-12PB-L012",
+    "DT06-12SB",
+    "DT12-L012-GKT",
+    "FIREWALL-BODY-B"
+   ],
+   "complete": true
+  },
+  "FIREWALL-BODY-C": {
+   "models": [
+    "DT04-6P-L012",
+    "DT06-6S",
+    "FIREWALL-BODY-C"
+   ],
+   "complete": true
+  },
+  "FIREWALL-BODY-P": {
+   "models": [
+    "DTP04-4P-L012",
+    "DTP06-4S",
+    "DTP4P-L012-GKT",
+    "FIREWALL-BODY-P"
+   ],
+   "complete": true
+  },
+  "FUEL-LEVEL": {
+   "models": [
+    "DT04-2P",
+    "DT06-2S",
+    "FUEL-LEVEL"
+   ],
+   "complete": false,
+   "missing": [
+    "QFS-BKCN-GM bulkhead",
+    "QFS-H882 hanger and level sender"
+   ]
+  },
+  "FUEL-PUMP": {
+   "models": [
+    "DTP04-2P",
+    "DTP06-2S",
+    "FUEL-PUMP"
+   ],
+   "complete": false,
+   "missing": [
+    "QFS-BKCN-GM bulkhead",
+    "QFS-H882 hanger and P367 pump"
+   ]
+  },
+  "IBST-DIAG": {
+   "models": [
+    "DTM04-4P",
+    "DTM06-4S",
+    "IBST-DIAG"
+   ],
+   "complete": true
+  },
+  "M130-A": {
+   "models": [
+    "M130-A"
+   ],
+   "complete": true
+  },
+  "M130-B": {
+   "models": [
+    "M130-A"
+   ],
+   "complete": true
+  },
+  "ODYSSEY": {
+   "models": [
+    "ODYSSEY"
+   ],
+   "complete": true
+  },
+  "PDM15-A": {
+   "models": [
+    "PDM15-A"
+   ],
+   "complete": true
+  },
+  "PDM15-B": {
+   "models": [
+    "PDM15-A"
+   ],
+   "complete": true
+  },
+  "PDM15-STUD": {
+   "models": [
+    "PDM15-A"
+   ],
+   "complete": true
+  },
+  "PDM30-A": {
+   "models": [
+    "PDM30-A"
+   ],
+   "complete": true
+  },
+  "PDM30-B": {
+   "models": [
+    "PDM30-A"
+   ],
+   "complete": true
+  },
+  "PDM30-STUD": {
+   "models": [
+    "PDM30-A"
+   ],
+   "complete": true
+  },
+  "WIDEBAND": {
+   "models": [
+    "DTM04-4P",
+    "DTM06-4S",
+    "WIDEBAND"
+   ],
+   "complete": false,
+   "missing": [
+    "2 x Bosch LSU 4.9 sensors and their plugs",
+    "MoTeC LTCD 61301 box"
+   ]
+  }
+ },
  "parts": {
   "ACC-BATT": {
    "endpoints": [
@@ -1013,6 +1192,5959 @@
     "budget_mm": 80.0,
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
+  },
+  "DT04-2P": {
+   "endpoints": [
+    "FUEL-LEVEL"
+   ],
+   "what": "Deutsch DT 2-way receptacle (pins)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-2P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 43.38,
+    "w": 17.15,
+    "h": 17.02
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#79716e",
+     "from": "customconnectorkits.com/products/dt04-2p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#b14229",
+     "from": "customconnectorkits.com/products/dt04-2p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#75b995",
+     "from": "customconnectorkits.com/products/w2p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      2.73,
+      0.0,
+      -43.38
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      -2.73,
+      0.0,
+      -43.38
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT06-2S"
+  },
+  "DT04-6P-L012": {
+   "endpoints": [
+    "FIREWALL-BODY-C"
+   ],
+   "what": "Deutsch DT 6-way receptacle (pins), welded flange",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-6P-L012",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 45.92,
+    "w": 20.83,
+    "h": 24.16
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#9c9793",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#b54a33",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#ade4c6",
+     "from": "customconnectorkits.com/products/w6p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#9c9793",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): grey flange (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      0.0,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      -4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      -4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      0.0,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -12.0,
+      -22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -12.0,
+      22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      12.0,
+      -22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      12.0,
+      22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT06-6S"
+  },
+  "DT04-08PA": {
+   "endpoints": [
+    "DOOR-L-PASS",
+    "DOOR-R-PASS"
+   ],
+   "what": "Deutsch DT 8-way receptacle (pins)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-08PA",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 45.67,
+    "w": 36.45,
+    "h": 25.4
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#958e8c",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#bf482e",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#8cd8b1",
+     "from": "customconnectorkits.com/products/w8p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav5",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav6",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav7",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav8",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT06-08SA"
+  },
+  "DT04-12PA-L012": {
+   "endpoints": [
+    "FIREWALL-BODY-A"
+   ],
+   "what": "Deutsch DT 12-way receptacle (pins), welded flange, A key",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-12PA-L012",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 45.92,
+    "w": 40.56,
+    "h": 22.25
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#da5637",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#91d9b3",
+     "from": "customconnectorkits.com/products/w12p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): grey welded flange (grey on the black B-key part too) (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav7",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav8",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav9",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav10",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav11",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav12",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT06-12SA"
+  },
+  "DT04-12PB-L012": {
+   "endpoints": [
+    "FIREWALL-BODY-B"
+   ],
+   "what": "Deutsch DT 12-way receptacle (pins), welded flange, B key",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-12PB-L012",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 45.92,
+    "w": 40.56,
+    "h": 22.25
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1e1f21",
+     "from": "maker's stated colour, TE: 'Black' (the studio photos read about #555052 under their light)"
+    },
+    "grommet_seal": {
+     "hex": "#da5637",
+     "from": "customconnectorkits.com/products/dt04-12pb-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#91d9b3",
+     "from": "customconnectorkits.com/products/w12p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pb-l012 product photos (fetched 2026-09-29): grey welded flange (grey on the black B-key part too) (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav7",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav8",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav9",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav10",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav11",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    },
+    {
+     "n": "cav12",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 16 pin"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT06-12SB"
+  },
+  "DTP04-2P": {
+   "endpoints": [
+    "FUEL-PUMP"
+   ],
+   "what": "Deutsch DTP 2-way receptacle (pins)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-2P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 47.27,
+    "w": 22.1,
+    "h": 22.07
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#98908d",
+     "from": "customconnectorkits.com/products/dtp04-2p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#c24a2d",
+     "from": "customconnectorkits.com/products/dtp04-2p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fa9360",
+     "from": "customconnectorkits.com/products/wp-2p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FUEL-PUMP",
+     "at": [
+      3.355,
+      0.0,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FUEL-PUMP",
+     "at": [
+      -3.355,
+      0.0,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtp",
+   "mates": "DTP06-2S"
+  },
+  "DTP04-4P": {
+   "endpoints": [
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P"
+   ],
+   "what": "Deutsch DTP 4-way receptacle (pins)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-4P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 47.27,
+    "w": 26.9,
+    "h": 27.15
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#9d9c97",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#d65433",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fc7a3b",
+     "from": "customconnectorkits.com/products/wp-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtp",
+   "mates": "DTP06-4S"
+  },
+  "DTP04-4P-L012": {
+   "endpoints": [
+    "FIREWALL-BODY-P"
+   ],
+   "what": "Deutsch DTP 4-way receptacle (pins), welded flange",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-4P-L012",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 47.27,
+    "w": 26.9,
+    "h": 27.15
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#b6b0ad",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#d65433",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fc7a3b",
+     "from": "customconnectorkits.com/products/wp-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#b6b0ad",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): grey flange (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 12 pin"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch dtp",
+   "mates": "DTP06-4S"
+  },
+  "DTM04-4P": {
+   "endpoints": [
+    "IBST-DIAG",
+    "WIDEBAND"
+   ],
+   "what": "Deutsch DTM 4-way receptacle (pins); MoTeC #68055 (DTM 4pin (M)), LTC user manual p.32",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM04-4P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 43.7,
+    "w": 19.2,
+    "h": 19.6
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#9e9c98",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#c93a20",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fa8444",
+     "from": "customconnectorkits.com/products/wm-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 20 pin"
+    },
+    {
+     "n": "cav2",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 20 pin"
+    },
+    {
+     "n": "cav3",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 20 pin"
+    },
+    {
+     "n": "cav4",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "size 20 pin"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtm",
+   "mates": "DTM06-4S"
+  },
+  "DTM04-3P": {
+   "endpoints": [],
+   "what": "Deutsch DTM 3-way receptacle (pins)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM04-3P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 41.1,
+    "w": 20.7,
+    "h": 16.2
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "+Z",
+     "wires": "-Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#8e8684",
+     "from": "customconnectorkits.com/products/dtm04-3p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#b8452c",
+     "from": "customconnectorkits.com/products/dtm04-3p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#f3845a",
+     "from": "customconnectorkits.com/products/wm-3p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtm",
+   "mates": "DTM06-3S"
+  },
+  "DT06-2S": {
+   "endpoints": [
+    "FUEL-LEVEL"
+   ],
+   "what": "Deutsch DT 2-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-2S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 28.4,
+    "w": 15.01,
+    "h": 15.95
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#756b67",
+     "from": "customconnectorkits.com/products/dt06-2s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#aa4025",
+     "from": "customconnectorkits.com/products/dt06-2s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fd9352",
+     "from": "customconnectorkits.com/products/w2s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      2.73,
+      0.0,
+      17.04
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      -2.73,
+      0.0,
+      17.04
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT04-2P"
+  },
+  "DT06-6S": {
+   "endpoints": [
+    "FIREWALL-BODY-C"
+   ],
+   "what": "Deutsch DT 6-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-6S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 30.94,
+    "w": 18.19,
+    "h": 22.63
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#948d88",
+     "from": "customconnectorkits.com/products/dt06-6s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#ae3f27",
+     "from": "customconnectorkits.com/products/dt06-6s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fb9b63",
+     "from": "customconnectorkits.com/products/w6s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      0.0,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      -4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      -4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      0.0,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT04-6P-L012"
+  },
+  "DT06-08SA": {
+   "endpoints": [
+    "DOOR-L-PASS",
+    "DOOR-R-PASS"
+   ],
+   "what": "Deutsch DT 8-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-08SA",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 30.91,
+    "w": 37.21,
+    "h": 19.71
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#b1aaa9",
+     "from": "customconnectorkits.com/products/dt06-08sa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#da583b",
+     "from": "customconnectorkits.com/products/dt06-08sa product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fca56c",
+     "from": "customconnectorkits.com/products/w8s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav5",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav6",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav7",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav8",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT04-08PA"
+  },
+  "DT06-12SA": {
+   "endpoints": [
+    "FIREWALL-BODY-A"
+   ],
+   "what": "Deutsch DT 12-way plug (sockets), A key",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-12SA",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 30.94,
+    "w": 40.56,
+    "h": 18.19
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#afa8a7",
+     "from": "customconnectorkits.com/products/dt06-12sa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#db563a",
+     "from": "customconnectorkits.com/products/dt06-12sa product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fda16f",
+     "from": "customconnectorkits.com/products/w12s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav7",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav8",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav9",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav10",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav11",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav12",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT04-12PA-L012"
+  },
+  "DT06-12SB": {
+   "endpoints": [
+    "FIREWALL-BODY-B"
+   ],
+   "what": "Deutsch DT 12-way plug (sockets), B key",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-12SB",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 30.94,
+    "w": 40.56,
+    "h": 18.19
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1e1f21",
+     "from": "maker's stated colour, TE: 'Black' (the studio photos read about #555052 under their light)"
+    },
+    "grommet_seal": {
+     "hex": "#b54732",
+     "from": "customconnectorkits.com/products/dt06-12sb product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fda16f",
+     "from": "customconnectorkits.com/products/w12s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav5",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav6",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav7",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav8",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav9",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav10",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav11",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    },
+    {
+     "n": "cav12",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 16 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dt",
+   "mates": "DT04-12PB-L012"
+  },
+  "DTP06-2S": {
+   "endpoints": [
+    "FUEL-PUMP"
+   ],
+   "what": "Deutsch DTP 2-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP06-2S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 34.65,
+    "w": 18.59,
+    "h": 18.06
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#8c8380",
+     "from": "customconnectorkits.com/products/dtp06-2s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#c84d2f",
+     "from": "customconnectorkits.com/products/dtp06-2s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fb9961",
+     "from": "customconnectorkits.com/products/wp-2s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "FUEL-PUMP",
+     "at": [
+      3.355,
+      0.0,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "FUEL-PUMP",
+     "at": [
+      -3.355,
+      0.0,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtp",
+   "mates": "DTP04-2P"
+  },
+  "DTP06-4S": {
+   "endpoints": [
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P",
+    "FIREWALL-BODY-P"
+   ],
+   "what": "Deutsch DTP 4-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP06-4S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 34.65,
+    "w": 22.05,
+    "h": 24.38
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#93908c",
+     "from": "customconnectorkits.com/products/dtp06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#bc4424",
+     "from": "customconnectorkits.com/products/dtp06-4s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fc9662",
+     "from": "customconnectorkits.com/products/wp-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 12 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtp",
+   "mates": "DTP04-4P"
+  },
+  "DTM06-4S": {
+   "endpoints": [
+    "IBST-DIAG",
+    "WIDEBAND"
+   ],
+   "what": "Deutsch DTM 4-way plug (sockets); MoTeC #68054 (DTM 4pin (F)), LTC user manual p.32",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM06-4S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 30.1,
+    "w": 15.2,
+    "h": 17.6
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#87817d",
+     "from": "customconnectorkits.com/products/dtm06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#af4027",
+     "from": "customconnectorkits.com/products/dtm06-4s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#f8a175",
+     "from": "customconnectorkits.com/products/wm-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 20 socket"
+    },
+    {
+     "n": "cav2",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 20 socket"
+    },
+    {
+     "n": "cav3",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 20 socket"
+    },
+    {
+     "n": "cav4",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "size 20 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtm",
+   "mates": "DTM04-4P"
+  },
+  "DTM06-3S": {
+   "endpoints": [],
+   "what": "Deutsch DTM 3-way plug (sockets)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM06-3S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 27.6,
+    "w": 16.3,
+    "h": 14.0
+   },
+   "frame": "origin at the centre of the mating plane (the receptacle's shroud mouth); +Z toward the plug; +Y the latch side; from the receptacle's wire side (-Z) +X is on the left",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "mating": "-Z",
+     "wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#776d69",
+     "from": "customconnectorkits.com/products/dtm06-3s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommet_seal": {
+     "hex": "#af4023",
+     "from": "customconnectorkits.com/products/dtm06-3s product photos (fetched 2026-09-29): orange-red grommet and seal (k-means of the photos, dominant cluster)"
+    },
+    "wedgelock": {
+     "hex": "#fc9a71",
+     "from": "customconnectorkits.com/products/wm-3s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch dtm",
+   "mates": "DTM04-3P"
+  },
+  "DT12-L012-GKT": {
+   "endpoints": [
+    "FIREWALL-BODY-A",
+    "FIREWALL-BODY-B"
+   ],
+   "what": "flange gasket for DT04-12PA-L012, DT04-12PB-L012 (neoprene / closed-cell sponge)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT12-L012-GKT",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 3.175,
+    "w": 55.12,
+    "h": 35.56
+   },
+   "frame": "the receptacle's frame: the gasket sits on the flange's wire-side face, toward -Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "flange": "+Z",
+     "panel": "-Z"
+    }
+   },
+   "colors": {
+    "gasket": {
+     "hex": "#3a3d36",
+     "from": "customconnectorkits.com/products/dt12-l012-gkt product photos (fetched 2026-09-29): dark grey sponge (k-means); TE: 'Black, Closed Cell Sponge'"
+    }
+   },
+   "attach": [
+    {
+     "n": "flange_face_FIREWALL-BODY-A",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      0.0,
+      0.0,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "gasket face on the flange (no wires)"
+    },
+    {
+     "n": "flange_face_FIREWALL-BODY-B",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      0.0,
+      0.0,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "gasket face on the flange (no wires)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch gasket",
+   "mates": "DT04-12PA-L012"
+  },
+  "DTP4P-L012-GKT": {
+   "endpoints": [
+    "FIREWALL-BODY-P"
+   ],
+   "what": "flange gasket for DTP04-4P-L012 (neoprene / closed-cell sponge)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP4P-L012-GKT",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 3.175,
+    "w": 53.3,
+    "h": 38.1
+   },
+   "frame": "the receptacle's frame: the gasket sits on the flange's wire-side face, toward -Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "flange": "+Z",
+     "panel": "-Z"
+    }
+   },
+   "colors": {
+    "gasket": {
+     "hex": "#363932",
+     "from": "customconnectorkits.com/products/dtp4p-l012-gkt product photos (fetched 2026-09-29): dark grey sponge (k-means); TE: black gasket"
+    }
+   },
+   "attach": [
+    {
+     "n": "flange_face_FIREWALL-BODY-P",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      0.0,
+      0.0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "gasket face on the flange (no wires)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    }
+   ],
+   "kind": "piece",
+   "family": "deutsch gasket",
+   "mates": "DTP04-4P-L012"
+  },
+  "FIREWALL-BODY-A": {
+   "endpoints": [
+    "FIREWALL-BODY-A"
+   ],
+   "what": "FIREWALL-BODY-A connector pair, mated: DT04-12PA-L012 receptacle and DT06-12SA plug, DT12-L012-GKT gasket",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-12PA-L012 + DT06-12SA + DT12-L012-GKT",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 64.48,
+    "w": 55.12,
+    "h": 35.56
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-12PA-L012 housing": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DT06-12SA housing": {
+     "hex": "#afa8a7",
+     "from": "customconnectorkits.com/products/dt06-12sa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#da5637",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W12P": {
+     "hex": "#91d9b3",
+     "from": "customconnectorkits.com/products/w12p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W12S": {
+     "hex": "#fda16f",
+     "from": "customconnectorkits.com/products/w12s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pa-l012 product photos (fetched 2026-09-29): grey welded flange (grey on the black B-key part too) (k-means of the photos, dominant cluster)"
+    },
+    "DT12-L012-GKT": {
+     "hex": "#3a3d36",
+     "from": "customconnectorkits.com/products/dt12-l012-gkt product photos (fetched 2026-09-29): dark grey sponge (k-means); TE: 'Black, Closed Cell Sponge'"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav5",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav6",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav7",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav8",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav9",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav10",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav11",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "rec_cav12",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PA-L012 pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav5",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav6",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav7",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav8",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav9",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      -2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav10",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav11",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    },
+    {
+     "n": "plug_cav12",
+     "ep": "FIREWALL-BODY-A",
+     "at": [
+      11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SA socket"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    }
+   ],
+   "keepout": "the panel cutout (drawn as a keep-out plate outline where the maker prints it)",
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT04-12PA-L012",
+    "DT06-12SA",
+    "DT12-L012-GKT"
+   ],
+   "missing": []
+  },
+  "FIREWALL-BODY-B": {
+   "endpoints": [
+    "FIREWALL-BODY-B"
+   ],
+   "what": "FIREWALL-BODY-B connector pair, mated: DT04-12PB-L012 receptacle and DT06-12SB plug, DT12-L012-GKT gasket",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-12PB-L012 + DT06-12SB + DT12-L012-GKT",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 64.48,
+    "w": 55.12,
+    "h": 35.56
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-12PB-L012 housing": {
+     "hex": "#1e1f21",
+     "from": "maker's stated colour, TE: 'Black' (the studio photos read about #555052 under their light)"
+    },
+    "DT06-12SB housing": {
+     "hex": "#1e1f21",
+     "from": "maker's stated colour, TE: 'Black' (the studio photos read about #555052 under their light)"
+    },
+    "grommets and seals": {
+     "hex": "#da5637",
+     "from": "customconnectorkits.com/products/dt04-12pb-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W12P": {
+     "hex": "#91d9b3",
+     "from": "customconnectorkits.com/products/w12p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W12S": {
+     "hex": "#fda16f",
+     "from": "customconnectorkits.com/products/w12s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#a9a39f",
+     "from": "customconnectorkits.com/products/dt04-12pb-l012 product photos (fetched 2026-09-29): grey welded flange (grey on the black B-key part too) (k-means of the photos, dominant cluster)"
+    },
+    "DT12-L012-GKT": {
+     "hex": "#3a3d36",
+     "from": "customconnectorkits.com/products/dt12-l012-gkt product photos (fetched 2026-09-29): dark grey sponge (k-means); TE: 'Black, Closed Cell Sponge'"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav5",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav6",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      -4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav7",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav8",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav9",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav10",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav11",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "rec_cav12",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      4.56,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-12PB-L012 pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav5",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav6",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      -4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav7",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav8",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav9",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      -2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav10",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      2.22,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav11",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      6.66,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    },
+    {
+     "n": "plug_cav12",
+     "ep": "FIREWALL-BODY-B",
+     "at": [
+      11.1,
+      4.56,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-12SB socket"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      22.48,
+      -11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      22.48,
+      11.94,
+      -24.89
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.29,
+     "note": "the panel sits on the flange's wire-side face (z = -24.89); 6-32 [M4], 20-25 in-lb [2.26-2.82 Nm] (DT04-12PX-L012 sheet 1 note 6)"
+    }
+   ],
+   "keepout": "the panel cutout (drawn as a keep-out plate outline where the maker prints it)",
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT04-12PB-L012",
+    "DT06-12SB",
+    "DT12-L012-GKT"
+   ],
+   "missing": []
+  },
+  "FIREWALL-BODY-C": {
+   "endpoints": [
+    "FIREWALL-BODY-C"
+   ],
+   "what": "FIREWALL-BODY-C connector pair, mated: DT04-6P-L012 receptacle and DT06-6S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-6P-L012 + DT06-6S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 64.48,
+    "w": 35.5,
+    "h": 55.0
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-6P-L012 housing": {
+     "hex": "#9c9793",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DT06-6S housing": {
+     "hex": "#948d88",
+     "from": "customconnectorkits.com/products/dt06-6s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#b54a33",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W6P": {
+     "hex": "#ade4c6",
+     "from": "customconnectorkits.com/products/w6p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W6S": {
+     "hex": "#fb9b63",
+     "from": "customconnectorkits.com/products/w6s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#9c9793",
+     "from": "customconnectorkits.com/products/dt04-6p-l012 product photos (fetched 2026-09-29): grey flange (k-means of the photos, dominant cluster)"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      0.0,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      -4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      -4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "rec_cav5",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      0.0,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "rec_cav6",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      4.45,
+      -45.92
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-6P-L012 pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      0.0,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      4.55,
+      -4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      -4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    },
+    {
+     "n": "plug_cav5",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      0.0,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    },
+    {
+     "n": "plug_cav6",
+     "ep": "FIREWALL-BODY-C",
+     "at": [
+      -4.55,
+      4.45,
+      18.56
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-6S socket"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -12.0,
+      -22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      -12.0,
+      22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_3",
+     "at": [
+      12.0,
+      -22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    },
+    {
+     "n": "flange_hole_4",
+     "at": [
+      12.0,
+      22.5,
+      -24.35
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.49,
+     "note": "the panel sits on the flange's wire-side face (z = -24.35); screw per the maker"
+    }
+   ],
+   "keepout": "the panel cutout (drawn as a keep-out plate outline where the maker prints it)",
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT04-6P-L012",
+    "DT06-6S"
+   ],
+   "missing": []
+  },
+  "FIREWALL-BODY-P": {
+   "endpoints": [
+    "FIREWALL-BODY-P"
+   ],
+   "what": "FIREWALL-BODY-P connector pair, mated: DTP04-4P-L012 receptacle and DTP06-4S plug, DTP4P-L012-GKT gasket",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-4P-L012 + DTP06-4S + DTP4P-L012-GKT",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 68.06,
+    "w": 53.3,
+    "h": 38.1
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTP04-4P-L012 housing": {
+     "hex": "#b6b0ad",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTP06-4S housing": {
+     "hex": "#93908c",
+     "from": "customconnectorkits.com/products/dtp06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#d65433",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WP-4P": {
+     "hex": "#fc7a3b",
+     "from": "customconnectorkits.com/products/wp-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WP-4S": {
+     "hex": "#fc9662",
+     "from": "customconnectorkits.com/products/wp-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    },
+    "flange": {
+     "hex": "#b6b0ad",
+     "from": "customconnectorkits.com/products/dtp04-4p-l012 product photos (fetched 2026-09-29): grey flange (k-means of the photos, dominant cluster)"
+    },
+    "DTP4P-L012-GKT": {
+     "hex": "#363932",
+     "from": "customconnectorkits.com/products/dtp4p-l012-gkt product photos (fetched 2026-09-29): dark grey sponge (k-means); TE: black gasket"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P-L012 pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P-L012 pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P-L012 pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P-L012 pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "FIREWALL-BODY-P",
+     "at": [
+      -5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_hole_1",
+     "at": [
+      -20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    },
+    {
+     "n": "flange_hole_2",
+     "at": [
+      20.32,
+      0,
+      -22.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.93,
+     "note": "the panel sits on the flange's wire-side face (z = -22.90); screw per the maker"
+    }
+   ],
+   "keepout": "the panel cutout (drawn as a keep-out plate outline where the maker prints it)",
+   "kind": "assembly",
+   "family": "deutsch dtp",
+   "pieces": [
+    "DTP04-4P-L012",
+    "DTP06-4S",
+    "DTP4P-L012-GKT"
+   ],
+   "missing": []
+  },
+  "DOOR-L-PASS": {
+   "endpoints": [
+    "DOOR-L-PASS"
+   ],
+   "what": "DOOR-L-PASS connector pair, mated: DT04-08PA receptacle and DT06-08SA plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-08PA + DT06-08SA",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 64.22,
+    "w": 36.45,
+    "h": 25.4
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-08PA housing": {
+     "hex": "#958e8c",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DT06-08SA housing": {
+     "hex": "#b1aaa9",
+     "from": "customconnectorkits.com/products/dt06-08sa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#bf482e",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W8P": {
+     "hex": "#8cd8b1",
+     "from": "customconnectorkits.com/products/w8p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W8S": {
+     "hex": "#fca56c",
+     "from": "customconnectorkits.com/products/w8s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav5",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav6",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav7",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav8",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav5",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav6",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav7",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav8",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT04-08PA",
+    "DT06-08SA"
+   ],
+   "missing": []
+  },
+  "DOOR-R-PASS": {
+   "endpoints": [
+    "DOOR-R-PASS"
+   ],
+   "what": "DOOR-R-PASS connector pair, mated: DT04-08PA receptacle and DT06-08SA plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT04-08PA + DT06-08SA",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 64.22,
+    "w": 36.45,
+    "h": 25.4
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-08PA housing": {
+     "hex": "#958e8c",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DT06-08SA housing": {
+     "hex": "#b1aaa9",
+     "from": "customconnectorkits.com/products/dt06-08sa product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#bf482e",
+     "from": "customconnectorkits.com/products/dt04-08pa product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W8P": {
+     "hex": "#8cd8b1",
+     "from": "customconnectorkits.com/products/w8p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W8S": {
+     "hex": "#fca56c",
+     "from": "customconnectorkits.com/products/w8s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav5",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav6",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav7",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      2.71,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "rec_cav8",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      7.15,
+      4.56,
+      -45.67
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-08PA pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -2.71,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -7.15,
+      -4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav5",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav6",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      -2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav7",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      2.71,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    },
+    {
+     "n": "plug_cav8",
+     "ep": "DOOR-R-PASS",
+     "at": [
+      7.15,
+      4.56,
+      18.55
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-08SA socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT04-08PA",
+    "DT06-08SA"
+   ],
+   "missing": []
+  },
+  "DOOR-L-PASS-P": {
+   "endpoints": [
+    "DOOR-L-PASS-P"
+   ],
+   "what": "DOOR-L-PASS-P connector pair, mated: DTP04-4P receptacle and DTP06-4S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-4P + DTP06-4S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 68.06,
+    "w": 26.9,
+    "h": 27.15
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTP04-4P housing": {
+     "hex": "#9d9c97",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTP06-4S housing": {
+     "hex": "#93908c",
+     "from": "customconnectorkits.com/products/dtp06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#d65433",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WP-4P": {
+     "hex": "#fc7a3b",
+     "from": "customconnectorkits.com/products/wp-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WP-4S": {
+     "hex": "#fc9662",
+     "from": "customconnectorkits.com/products/wp-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dtp",
+   "pieces": [
+    "DTP04-4P",
+    "DTP06-4S"
+   ],
+   "missing": []
+  },
+  "DOOR-R-PASS-P": {
+   "endpoints": [
+    "DOOR-R-PASS-P"
+   ],
+   "what": "DOOR-R-PASS-P connector pair, mated: DTP04-4P receptacle and DTP06-4S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP04-4P + DTP06-4S",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 68.06,
+    "w": 26.9,
+    "h": 27.15
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTP04-4P housing": {
+     "hex": "#9d9c97",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTP06-4S housing": {
+     "hex": "#93908c",
+     "from": "customconnectorkits.com/products/dtp06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#d65433",
+     "from": "customconnectorkits.com/products/dtp04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WP-4P": {
+     "hex": "#fc7a3b",
+     "from": "customconnectorkits.com/products/wp-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WP-4S": {
+     "hex": "#fc9662",
+     "from": "customconnectorkits.com/products/wp-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-4P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      -5.1,
+      -3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "DOOR-R-PASS-P",
+     "at": [
+      -5.1,
+      3.35,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-4S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dtp",
+   "pieces": [
+    "DTP04-4P",
+    "DTP06-4S"
+   ],
+   "missing": []
+  },
+  "IBST-DIAG": {
+   "endpoints": [
+    "IBST-DIAG"
+   ],
+   "what": "IBST-DIAG connector pair, mated: DTM04-4P receptacle and DTM06-4S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM06-4S + DTM04-4P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 61.76,
+    "w": 19.2,
+    "h": 19.6
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTM04-4P housing": {
+     "hex": "#9e9c98",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTM06-4S housing": {
+     "hex": "#87817d",
+     "from": "customconnectorkits.com/products/dtm06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#c93a20",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WM-4P": {
+     "hex": "#fa8444",
+     "from": "customconnectorkits.com/products/wm-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WM-4S": {
+     "hex": "#f8a175",
+     "from": "customconnectorkits.com/products/wm-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "IBST-DIAG",
+     "at": [
+      2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "IBST-DIAG",
+     "at": [
+      -2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dtm",
+   "pieces": [
+    "DTM06-4S",
+    "DTM04-4P"
+   ],
+   "missing": []
+  },
+  "FUEL-LEVEL": {
+   "endpoints": [
+    "FUEL-LEVEL"
+   ],
+   "what": "FUEL-LEVEL connector pair, mated: DT04-2P receptacle and DT06-2S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DT06-2S + DT04-2P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 60.42,
+    "w": 17.15,
+    "h": 17.02
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DT04-2P housing": {
+     "hex": "#79716e",
+     "from": "customconnectorkits.com/products/dt04-2p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DT06-2S housing": {
+     "hex": "#756b67",
+     "from": "customconnectorkits.com/products/dt06-2s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#b14229",
+     "from": "customconnectorkits.com/products/dt04-2p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "W2P": {
+     "hex": "#75b995",
+     "from": "customconnectorkits.com/products/w2p product photos (fetched 2026-09-29): green wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "W2S": {
+     "hex": "#fd9352",
+     "from": "customconnectorkits.com/products/w2s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      2.73,
+      0.0,
+      -43.38
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-2P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      -2.73,
+      0.0,
+      -43.38
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DT04-2P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      2.73,
+      0.0,
+      17.04
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-2S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      -2.73,
+      0.0,
+      17.04
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DT06-2S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dt",
+   "pieces": [
+    "DT06-2S",
+    "DT04-2P"
+   ],
+   "missing": [
+    "QFS-H882 hanger and level sender",
+    "QFS-BKCN-GM bulkhead"
+   ]
+  },
+  "FUEL-PUMP": {
+   "endpoints": [
+    "FUEL-PUMP"
+   ],
+   "what": "FUEL-PUMP connector pair, mated: DTP04-2P receptacle and DTP06-2S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTP06-2S + DTP04-2P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 68.06,
+    "w": 22.1,
+    "h": 22.07
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTP04-2P housing": {
+     "hex": "#98908d",
+     "from": "customconnectorkits.com/products/dtp04-2p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTP06-2S housing": {
+     "hex": "#8c8380",
+     "from": "customconnectorkits.com/products/dtp06-2s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#c24a2d",
+     "from": "customconnectorkits.com/products/dtp04-2p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WP-2P": {
+     "hex": "#fa9360",
+     "from": "customconnectorkits.com/products/wp-2p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WP-2S": {
+     "hex": "#fb9961",
+     "from": "customconnectorkits.com/products/wp-2s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "FUEL-PUMP",
+     "at": [
+      3.355,
+      0.0,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-2P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "FUEL-PUMP",
+     "at": [
+      -3.355,
+      0.0,
+      -47.27
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTP04-2P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "FUEL-PUMP",
+     "at": [
+      3.355,
+      0.0,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-2S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "FUEL-PUMP",
+     "at": [
+      -3.355,
+      0.0,
+      20.79
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTP06-2S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dtp",
+   "pieces": [
+    "DTP06-2S",
+    "DTP04-2P"
+   ],
+   "missing": [
+    "QFS-H882 hanger and P367 pump",
+    "QFS-BKCN-GM bulkhead"
+   ]
+  },
+  "WIDEBAND": {
+   "endpoints": [
+    "WIDEBAND"
+   ],
+   "what": "WIDEBAND connector pair, mated: DTM04-4P receptacle and DTM06-4S plug",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "DTM06-4S + DTM04-4P",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 61.76,
+    "w": 19.2,
+    "h": 19.6
+   },
+   "frame": "origin at the centre of the mating plane; +Z toward the plug; +Y the latch side; the receptacle's wires leave toward -Z, the plug's toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "receptacle_wires": "-Z",
+     "plug_wires": "+Z",
+     "latch": "+Y"
+    }
+   },
+   "colors": {
+    "DTM04-4P housing": {
+     "hex": "#9e9c98",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "DTM06-4S housing": {
+     "hex": "#87817d",
+     "from": "customconnectorkits.com/products/dtm06-4s product photos (fetched 2026-09-29): grey housing; TE: 'Gray' (k-means of the photos, dominant cluster)"
+    },
+    "grommets and seals": {
+     "hex": "#c93a20",
+     "from": "customconnectorkits.com/products/dtm04-4p product photos (fetched 2026-09-29): orange-red grommet (k-means of the photos, dominant cluster)"
+    },
+    "WM-4P": {
+     "hex": "#fa8444",
+     "from": "customconnectorkits.com/products/wm-4p product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "WM-4S": {
+     "hex": "#f8a175",
+     "from": "customconnectorkits.com/products/wm-4s product photos (fetched 2026-09-29): orange wedgelock (k-means of the photos, dominant cluster)"
+    },
+    "pins": {
+     "hex": "#b9bbb8",
+     "from": "maker's stated finish: nickel-plated contacts (TE contact pages); colour not sampled"
+    }
+   },
+   "attach": [
+    {
+     "n": "rec_cav1",
+     "ep": "WIDEBAND",
+     "at": [
+      2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav2",
+     "ep": "WIDEBAND",
+     "at": [
+      2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav3",
+     "ep": "WIDEBAND",
+     "at": [
+      -2.095,
+      -1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "rec_cav4",
+     "ep": "WIDEBAND",
+     "at": [
+      -2.095,
+      1.905,
+      -43.7
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "DTM04-4P pin"
+    },
+    {
+     "n": "plug_cav1",
+     "ep": "WIDEBAND",
+     "at": [
+      2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav2",
+     "ep": "WIDEBAND",
+     "at": [
+      2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav3",
+     "ep": "WIDEBAND",
+     "at": [
+      -2.095,
+      -1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    },
+    {
+     "n": "plug_cav4",
+     "ep": "WIDEBAND",
+     "at": [
+      -2.095,
+      1.905,
+      18.06
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "DTM06-4S socket"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "deutsch dtm",
+   "pieces": [
+    "DTM06-4S",
+    "DTM04-4P"
+   ],
+   "missing": [
+    "MoTeC LTCD 61301 box",
+    "2 x Bosch LSU 4.9 sensors and their plugs"
+   ]
   }
  }
 }
