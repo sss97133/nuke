@@ -15,9 +15,10 @@ FAN:
   device: SPAL 30107090 16 in drop-in brushless puller fan, 2053 CFM, 17 x 17 in housing (matches the Champion 17 in core), 300 W — 'roughly 25 amp max'
   kit:
     '30130628': 1
+    7116-3250: 2
+    7158-3035: 2
   pins:
-    '21': power + (12 ga terminal, ProWire kit 30130628)
-    FAN_GND: ground - (12 ga terminal, ProWire kit 30130628)
+    '21': power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)
+    FAN_GND: ground - (8 AWG on Yazaki 7116-3250 + 7158-3035, as the power terminal)
     FAN_PWM: PWM control (white lead; 20-18 ga control terminal, ProWire kit 30130628)
-  note: 'power on OUT1+OUT6 (paralleled), speed on the M130 A34 low-side PWM (100 Hz), blue override and yellow unused · BUILD: route the fan feed apart from its ground and
-    outside the loom from the breakout to the fan (free-air rating, ProWire singles table)'
+  note: 'ONE power and ONE ground terminal (SPAL brushless wiring diagram; kit: two large 12 ga terminals = power + ground): OUT1 + OUT6 join at FAN-JUNCTION, 8 AWG tail and ground in the loom on the 10-8 AWG Yazaki terminals (the kit''s 12 ga large terminals stay unused); speed on the M130 A34 low-side PWM (100 Hz), blue override and yellow unused'

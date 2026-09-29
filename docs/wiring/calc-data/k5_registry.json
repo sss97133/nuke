@@ -15,7 +15,7 @@
   "counts": {
    "active": 174,
    "candidate": 243,
-   "implied": 240,
+   "implied": 246,
    "devices": 141
   }
  },
@@ -5072,7 +5072,7 @@
     ],
     "crossing": "cab exit: through the body to the outside (path not recorded)"
    },
-   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md))",
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -5330,7 +5330,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -6022,21 +6022,21 @@
    "status": "active",
    "section": "CHASSIS / UNDERBODY (12 wires, 110.4 ft)",
    "subsystem": "COOLING",
-   "frm": "FAN-JUNCTION (stud: the 12 AWG tail to the fan)",
+   "frm": "FAN-JUNCTION (stud: the 8 AWG tail to the fan)",
    "to": {
     "device": "Radiator_Fan_1",
-    "pin": "power + (12 ga terminal, ProWire kit 30130628)",
+    "pin": "power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)",
     "terminal": "Weatherpack_2pin"
    },
-   "awg": 12,
-   "spec": "M22759/32",
+   "awg": 8,
+   "spec": "M22759/16",
    "color": "red",
    "color_basis": "DAVE",
    "printed_label": "",
    "length_ft": 2.2,
    "length_basis": "twin: K5H_Battery (the PDM15's working position 'by the battery'; the twin has no PDM15 object) to K5H_RadFan_1, 0.55 m = 1.8 ft axis-aligned (twin_centers.json), x 1.2 engine pad (state row 33); not taped on the truck",
    "engine_running": true,
-   "notes": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail",
+   "notes": "8 AWG in the loom (ProWire bundled 40 A >= 32 / 0.85): the outside-the-loom and hot-soak conditions of round 3 are closed (see FANJ)",
    "april": {
     "id": "PTC-W029",
     "score": 1.0,
@@ -6050,19 +6050,20 @@
    "conflicts": [
     "gauge: v4.2 12 AWG vs April 14 AWG",
     "April superseded — insulation TXL/GXL — superseded by the Tefzel-only lock (state §1, 2026-05-11)",
+    "decision: awg 12 -> 8 — one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled (p.6: 'can be connected in parallel to increase current capacity'); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
+    "decision: spec M22759/32 -> M22759/16 — one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled (p.6: 'can be connected in parallel to increase current capacity'); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
     "decision: length_ft 4.6 -> 2.2 — twin: K5H_Battery (the PDM15's working position 'by the battery'; the twin has no PDM15 object) to K5H_RadFan_1, 0.55 m = 1.8 ft axis-aligned (twin_centers.json), x 1.2 engine pad (state row 33); not taped on the truck",
-    "decision: frm PDM30:OUT1 -> FAN-JUNCTION (stud: the 12 AWG tail to the fan) — one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled (p.6: 'can be connected in parallel to increase current capacity'); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
-    "pin text from the termination rows (one home for pins, review A3): to.pin 'PIN_A_12V' -> 'power + (12 ga terminal, ProWire kit 30130628)' at FAN"
+    "decision: frm PDM30:OUT1 -> FAN-JUNCTION (stud: the 8 AWG tail to the fan) — one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled (p.6: 'can be connected in parallel to increase current capacity'); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
+    "pin text from the termination rows (one home for pins, review A3): to.pin 'PIN_A_12V' -> 'power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)' at FAN"
    ],
    "sources": [
     "output/K5_cut_list_v4_2.txt:107",
     "build-plan/MASTER_CUT_LIST.csv:87"
    ],
    "protection": "PDM15 OUT1 + OUT6, 16 A each = 32 A: the lowest equal pair >= 1.25 x 25 A = 31.25 A (1 A steps, PDM manual p.36), so the limit cannot come down further. 12 AWG end to end (4 x 18 AWG pigtails -> M81824/1-3 -> 12 AWG -> the 12 ga SPAL terminal): ProWire 'Aerospace & Defense Singles Ampacity Rating' (web_snapshots/www.prowireusa.com__Aerospace%20&%20Defense%20Singles%20Ampacity%20Rating.md, linked from ProWire's Tefzel chart 'for wire/s in free air and not bundled'): single conductor in free air, 12 AWG = 38 A at a 60 C difference (150 C Tefzel, 90 C ambient), 10 AWG = 50 A; Table 2: 2 conductors x 0.85. The short run (twin 2.2 ft) leaves the loom at the breakout, so it is rated in free air, not on the bundled chart (ch.16 §2.2). Alone: 38 A >= 37.6 A (32 A / 0.85, ch.17 rule) and >= 32 A (MoTeC p.25: the wire carries the setting). Paired with FAN_GND: 38 x 0.85 = 32.3 A — passes MoTeC's rule, misses the 85 % rule. OPEN: (1) both results need ambient <= 90 C at the fan run; the table has no column for the 100 C engine-bay figure used elsewhere; (2) route #21 apart from FAN_GND past the breakout to keep the single-conductor rating, or accept MoTeC's rule for the pair. SPAL gives no fuse value ('varies dependent on the SPAL brushless motor size')",
-   "free_air": true,
    "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) — OUT1 and OUT6 on one channel (PDM manual p.22)",
    "length_kind": "twin",
-   "gauge": "12 AWG",
+   "gauge": "8 AWG",
    "route": {
     "sides": [
      "engine bay"
@@ -7538,7 +7539,7 @@
    "frm": "PDM30:OUT25 (B8)",
    "to": {
     "device": "UNDERHOOD-LAMP",
-    "pin": "feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)",
+    "pin": "feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)",
     "terminal": "lamp lead"
    },
    "awg": 20,
@@ -7554,7 +7555,7 @@
    "conflicts": [
     "decision: awg 22 -> 20 — crosses the firewall in the body bulkhead: DT size 16 contacts take 16-20 AWG (KSV DT04-12PA-L012 kit, nickel pins 20-16 AWG); 20 AWG is also the sturdier run to the front (the 2026-05-14 gauge audit had 22 AWG for 0.3-0.8 A lamps)",
     "decision: to None -> {'device': 'UNDERHOOD-LAMP', 'pin': '+', 'terminal': 'lamp lead'} — crosses the firewall in the body bulkhead: DT size 16 contacts take 16-20 AWG (KSV DT04-12PA-L012 kit, nickel pins 20-16 AWG); 20 AWG is also the sturdier run to the front (the 2026-05-14 gauge audit had 22 AWG for 0.3-0.8 A lamps)",
-    "pin text from the termination rows (one home for pins, review A3): to.pin '+' -> 'feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)' at UNDERHOOD-LAMP",
+    "pin text from the termination rows (one home for pins, review A3): to.pin '+' -> 'feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)' at UNDERHOOD-LAMP",
     "pin text from the termination rows (one home for pins, review A3): frm 'PDM30:OUT25' -> 'PDM30:OUT25 (B8)'"
    ],
    "sources": [
@@ -17177,14 +17178,15 @@
    "to": "M130:B14 (UDIG7)",
    "awg": 22,
    "spec": "M22759/16",
+   "color": "white",
+   "color_basis": "a SIGNAL line, not a ground: black is ground in this book (state 0f(a)); white is Dave's one-colour signal stock (state 0i: white 22 AWG + colour-ring codes; SIGNAL_RULE)",
    "sources": [
     "MoTeC PDM manual p.7: 'the isolator switch should have a secondary switch that is connected to a shutdown input on the ECU'; Blue Sea 7700 yellow = LED output, the LED's ground while the switch is closed (instructions p.2); M1 hardware spec p.9: universal digital input, switchable 3k3 pull-up via diode to +5 V, programmable trigger levels +/-10 V, peak 200 V — reads the yellow low when closed, high when open; the M1 tune shuts the engine down when it reads open"
    ],
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "battery isolator shutdown contact (state 0b)",
    "conflicts": [
-    "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
-    "decision: color None -> black — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+    "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm"
    ],
    "length_kind": null,
    "gauge": "22 AWG",
@@ -17194,7 +17196,6 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "color": "black",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17202,7 +17203,7 @@
    "id": "DAK_CONST",
    "label": "Dakota VHX CONST. POWER (always-hot, fused)",
    "status": "implied",
-   "frm": "PDM30-STUD (5 A inline fuse)",
+   "frm": "FUSE-DAK_CONST (load pigtail, step splice 327639)",
    "to": "DAKOTA-VHX (CONST. POWER)",
    "awg": 18,
    "spec": "M22759/32",
@@ -17235,7 +17236,7 @@
    "id": "PCS_BATT",
    "label": "PCS TCM-2650 constant 12V (5A)",
    "status": "implied",
-   "frm": "PDM30-STUD (5 A inline fuse)",
+   "frm": "FUSE-PCS_BATT (load pigtail, step splice 327639)",
    "to": "PCS-HARNESS-4610 (12 V battery lead)",
    "awg": 18,
    "spec": "M22759/32",
@@ -17257,7 +17258,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "protection": "5 A inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection": "5 A PROVISIONAL inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
    "protection_parts": {
     "holder": "BLUESEA-5065",
     "fuse": "BLUESEA-5239"
@@ -17324,6 +17325,7 @@
     "crossing": "firewall: FIREWALL-BODY-P 2"
    },
    "color": "red",
+   "pdm_limit": "PDM15 OUT13: OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17416,6 +17418,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17483,7 +17486,7 @@
    "id": "TRANS_BATT",
    "label": "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)",
    "status": "implied",
-   "frm": "PDM30-STUD (7.5 A inline fuse)",
+   "frm": "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
    "to": "PCS-HARNESS-4610 (case battery lead, cavities 1 + 4)",
    "awg": 18,
    "spec": "M22759/32",
@@ -17593,6 +17596,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17605,12 +17609,11 @@
    "awg": 12,
    "spec": "M22759/32",
    "color": "red",
-   "free_air": true,
    "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)",
    "length_ft": null,
    "length_basis": "short leg from the splice to the stud; formboard",
    "sources": [
-    "fan junction (round 3 close): PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg; both legs and the 12 AWG fan tail land on FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) on ProWire 9918 rings (12-10 AWG, 3/8 in). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Each output's pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each leg carries 16 A: 12 AWG singles 38 A (ProWire singles table, 60 C difference), 0.85 x 38 = 32.3 >= 16. The tail carries 32 A: it needs 32 / 0.85 = 37.6 A, the singles table gives 38 A — only in free air at <= 90 C ambient (the hot-soak OPEN and the outside-the-loom routing apply to the tail)"
+    "fan junction (round 3 close; round 6: all in the loom): the SPAL 30107090 has ONE power terminal and ONE ground terminal (SPAL brushless wiring diagram: one red lead through one fuse, one black to chassis ground, white PWM, blue override, yellow unused; ProWire 30130628 kit: (2) large terminals to suit 12 ga wire = power + ground, (2) small 20-18 ga control terminals), so the two outputs join at FAN-JUNCTION. PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg to FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each 12 AWG leg carries 16 A: ProWire Tefzel chart bundled 20 A, 0.85 x 20 = 17 >= 16 (in the loom). The tail (#21) and its ground (FAN_GND) carry up to 32 A: 8 AWG, ProWire bundled 40 A, 0.85 x 40 = 34 >= 32 (in the loom), on the Yazaki 7116-3250 375 L female 10-8 AWG terminal + 7158-3035 10-8 AWG seal that ProWire lists for the same SPAL housing (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md: 'Larger terminals and seals are available separately'). The bundled rating is a 35 C rise; M22759 is rated to 150 C (ProWire M22759/32 page), so the tail holds to 115 C ambient"
    ],
    "subsystem": "COOLING",
    "subsystem_basis": "radiator fan ground and PWM (2026-09-28 parts picks)",
@@ -17638,12 +17641,11 @@
    "awg": 12,
    "spec": "M22759/32",
    "color": "red",
-   "free_air": true,
    "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)",
    "length_ft": null,
    "length_basis": "short leg from the splice to the stud; formboard",
    "sources": [
-    "fan junction (round 3 close): PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg; both legs and the 12 AWG fan tail land on FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) on ProWire 9918 rings (12-10 AWG, 3/8 in). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Each output's pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each leg carries 16 A: 12 AWG singles 38 A (ProWire singles table, 60 C difference), 0.85 x 38 = 32.3 >= 16. The tail carries 32 A: it needs 32 / 0.85 = 37.6 A, the singles table gives 38 A — only in free air at <= 90 C ambient (the hot-soak OPEN and the outside-the-loom routing apply to the tail)"
+    "fan junction (round 3 close; round 6: all in the loom): the SPAL 30107090 has ONE power terminal and ONE ground terminal (SPAL brushless wiring diagram: one red lead through one fuse, one black to chassis ground, white PWM, blue override, yellow unused; ProWire 30130628 kit: (2) large terminals to suit 12 ga wire = power + ground, (2) small 20-18 ga control terminals), so the two outputs join at FAN-JUNCTION. PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg to FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each 12 AWG leg carries 16 A: ProWire Tefzel chart bundled 20 A, 0.85 x 20 = 17 >= 16 (in the loom). The tail (#21) and its ground (FAN_GND) carry up to 32 A: 8 AWG, ProWire bundled 40 A, 0.85 x 40 = 34 >= 32 (in the loom), on the Yazaki 7116-3250 375 L female 10-8 AWG terminal + 7158-3035 10-8 AWG seal that ProWire lists for the same SPAL housing (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md: 'Larger terminals and seals are available separately'). The bundled rating is a 35 C rise; M22759 is rated to 150 C (ProWire M22759/32 page), so the tail holds to 115 C ambient"
    ],
    "subsystem": "COOLING",
    "subsystem_basis": "radiator fan ground and PWM (2026-09-28 parts picks)",
@@ -17729,19 +17731,19 @@
    "status": "implied",
    "frm": "FAN (ground)",
    "to": "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-   "awg": 12,
-   "spec": "M22759/32",
+   "awg": 8,
+   "spec": "M22759/16",
    "color": "black",
    "length_ft": 2.2,
    "length_basis": "follows #21 (twin: battery -> K5H_RadFan_1, x 1.2 pad)",
    "sources": [
-    "SPAL 12 VDC brushless fan wiring diagram (reference_documents/component_drawings/SPAL_Brushless_Fan_Wiring_Diagram.pdf): 'FAN TO CHASSIS GROUND'; power red through a fuse; ProWire 30130628 kit: two 12 ga power terminals, two 20-18 ga control (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md); the fan had no ground wire in the registry; grounds run in the loom (state row 56)"
+    "fan junction (round 3 close; round 6: all in the loom): the SPAL 30107090 has ONE power terminal and ONE ground terminal (SPAL brushless wiring diagram: one red lead through one fuse, one black to chassis ground, white PWM, blue override, yellow unused; ProWire 30130628 kit: (2) large terminals to suit 12 ga wire = power + ground, (2) small 20-18 ga control terminals), so the two outputs join at FAN-JUNCTION. PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg to FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each 12 AWG leg carries 16 A: ProWire Tefzel chart bundled 20 A, 0.85 x 20 = 17 >= 16 (in the loom). The tail (#21) and its ground (FAN_GND) carry up to 32 A: 8 AWG, ProWire bundled 40 A, 0.85 x 40 = 34 >= 32 (in the loom), on the Yazaki 7116-3250 375 L female 10-8 AWG terminal + 7158-3035 10-8 AWG seal that ProWire lists for the same SPAL housing (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md: 'Larger terminals and seals are available separately'). The bundled rating is a 35 C rise; M22759 is rated to 150 C (ProWire M22759/32 page), so the tail holds to 115 C ambient; SPAL 12 VDC brushless fan wiring diagram (reference_documents/component_drawings/SPAL_Brushless_Fan_Wiring_Diagram.pdf): 'FAN TO CHASSIS GROUND'; power red through a fuse; ProWire 30130628 kit: two 12 ga power terminals, two 20-18 ga control (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md); the fan had no ground wire in the registry; grounds run in the loom (state row 56)"
    ],
-   "notes": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail",
+   "notes": "8 AWG in the loom beside #21, carrying the same up-to-32 A (FANJ)",
    "subsystem": "COOLING",
    "subsystem_basis": "radiator fan ground and PWM (2026-09-28 parts picks)",
    "length_kind": "estimate",
-   "gauge": "12 AWG",
+   "gauge": "8 AWG",
    "route": {
     "sides": [
      "engine bay"
@@ -19300,7 +19302,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -20301,6 +20303,202 @@
    "color": "black",
    "option": "BFL",
    "option_status": "candidate"
+  },
+  {
+   "id": "DAK_CONST_FH",
+   "label": "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "PDM30-STUD (5 A inline fuse)",
+   "to": "FUSE-DAK_CONST (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "cab"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "5 A inline fuse at the PDM30 stud (Dakota VHX manual 650314:P p.6: 'The constant +12V supply source should be a fused 5 - 20 amp circuit, the system draws less than 1 amp' and 'Use 18 AWG wire' — the lowest value in the maker's range (the earlier 3 A had no source and sat under it)). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "PCS_BATT_FH",
+   "label": "PCS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "PDM30-STUD (5 A PROVISIONAL inline fuse)",
+   "to": "FUSE-PCS_BATT (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "subsystem": "TRANS_6L90",
+   "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "cab"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "5 A PROVISIONAL inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "TRANS_BATT_FH",
+   "label": "TRANS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "PDM30-STUD (7.5 A inline fuse)",
+   "to": "FUSE-TRANS_BATT (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "subsystem": "TRANS_6L90",
+   "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "cab"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 11 A at 80 C (MoTeC PDM manual p.48, cab)). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5240",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5240"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "IBOOST_PERM_FH",
+   "label": "IBOOST_PERM fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "PS-STUDS (distribution stud, 5 A fuse)",
+   "to": "FUSE-IBOOST_PERM (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "subsystem": "BRAKES_IBOOSTER",
+   "subsystem_basis": "iBooster ground, wake (2026-09-27)",
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout (web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md): 'M 17 - Always Hot Power (5A Fuse)'; Tulay Gen-1 harness (web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md): 1.50 mm² red, 5 A fuse). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "ISO_PWR_FH",
+   "label": "ISO_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "ODYSSEY (+, 10 A fuse)",
+   "to": "FUSE-ISO_PWR (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "subsystem": "CHARGING_STARTING",
+   "subsystem_basis": "isolator + dual batteries (2026-09-27)",
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5241",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5241"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "ISO_SW_PWR_FH",
+   "label": "ISO_SW_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "status": "implied",
+   "frm": "ODYSSEY (+, 5 A fuse)",
+   "to": "FUSE-ISO_SW_PWR (line pigtail)",
+   "awg": 12,
+   "spec": "Blue Sea 5065 pigtail (supplied)",
+   "sources": [
+    "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"
+   ],
+   "subsystem": "CHARGING_STARTING",
+   "subsystem_basis": "isolator + dual batteries (2026-09-27)",
+   "length_kind": null,
+   "gauge": "12 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "color": "red",
+   "protection": "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
+   "option": "BASE",
+   "option_status": "base"
   },
   {
    "id": "HL_L_GND",
@@ -22171,7 +22369,7 @@
    "id": "ISO_PWR",
    "label": "Isolator control power (red, 24 hr) from the Odyssey positive, fused 10 A at the battery",
    "status": "implied",
-   "frm": "ODYSSEY (+, 10 A fuse)",
+   "frm": "FUSE-ISO_PWR (load pigtail, step splice 327638)",
    "to": "ISOLATOR (red, +12 V 24 hr)",
    "awg": 16,
    "spec": "M22759/32",
@@ -22319,7 +22517,7 @@
    "id": "ISO_SW_PWR",
    "label": "Dash switch feed (pin 2 common + pin 8 LED power) from the Odyssey positive, 24 hr",
    "status": "implied",
-   "frm": "ODYSSEY (+, 5 A fuse)",
+   "frm": "FUSE-ISO_SW_PWR (load pigtail, step splice 327638)",
    "to": "ISO-SWITCH (2145 pins 2 + 8)",
    "awg": 16,
    "spec": "M22759/32",
@@ -22510,6 +22708,8 @@
    "to": "DAKOTA-VHX (CHECK ENG (-))",
    "awg": 22,
    "spec": "M22759/16",
+   "color": "white",
+   "color_basis": "a SIGNAL line, not a ground: black is ground in this book (state 0f(a)); white is Dave's one-colour signal stock (state 0i: white 22 AWG + colour-ring codes; SIGNAL_RULE)",
    "sources": [
     "Dakota VHX manual 650314:P p.6: CHECK ENG (-) is ground-activated; M130 A32 = OUT_HB4 half bridge (stored pin table), free since #118 retired — set it as the warning/check-engine output in the M1 tune"
    ],
@@ -22523,10 +22723,6 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "conflicts": [
-    "decision: color None -> black — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
-   ],
-   "color": "black",
    "option": "BASE",
    "option_status": "base"
   },
@@ -22813,7 +23009,7 @@
    "id": "IBOOST_PERM",
    "label": "iBooster Gen 1 second always-hot (pin 17, 5 A)",
    "status": "implied",
-   "frm": "PS-STUDS (distribution stud, 5 A fuse)",
+   "frm": "FUSE-IBOOST_PERM (load pigtail, step splice 327638)",
    "to": "IBOOSTER (17, always-hot 5 A)",
    "awg": 16,
    "spec": "M22759/32",
@@ -23891,8 +24087,8 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 517,
-   "wire_ends": 547,
+   "mapped": 529,
+   "wire_ends": 559,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
@@ -23913,7 +24109,6 @@
    "ETH_RX-",
    "CAN_HI",
    "CAN_LO",
-   "ISO_KILL",
    "DAK_CONST",
    "PCS_BATT",
    "PCS_IGN_PT",
@@ -23975,6 +24170,12 @@
    "IBST_CAN_L",
    "BFL_SIG",
    "BFL_0V",
+   "DAK_CONST_FH",
+   "PCS_BATT_FH",
+   "TRANS_BATT_FH",
+   "IBOOST_PERM_FH",
+   "ISO_PWR_FH",
+   "ISO_SW_PWR_FH",
    "HL_L_GND",
    "HL_R_GND",
    "PT_LF_GND",
@@ -24051,7 +24252,6 @@
    "DCDC_IN",
    "DCDC_OUT",
    "DCDC_GND",
-   "DAK_CEL",
    "DAK_GEAR",
    "GSS_PWR",
    "GSS_GND",
@@ -24090,8 +24290,10 @@
     "UTC_0V"
    ],
    "M22759/16 22 AWG white": [
+    "ISO_KILL",
     "PCS_BRK",
-    "TRANS_BRK"
+    "TRANS_BRK",
+    "DAK_CEL"
    ],
    "M22759/32 12 AWG red": [
     "FAN_LEG1",
@@ -24614,9 +24816,9 @@
    "kit": {},
    "wires": [
     "PDM_BPOS",
-    "DAK_CONST",
-    "PCS_BATT",
-    "TRANS_BATT"
+    "DAK_CONST_FH",
+    "PCS_BATT_FH",
+    "TRANS_BATT_FH"
    ],
    "cavities": null,
    "empty": null,
@@ -24902,7 +25104,7 @@
    "side": "engine bay"
   },
   "SPL-PDM30-OUT5": {
-   "device": "PDM30 OUT5 pigtail splice — pins A9 + A17 (2 x 20 AWG) joined to the third brake light feed #93 (raised to 20 AWG)",
+   "device": "PDM30 OUT5 pigtail splice — ONE in-line M81824/1-2: pins A9 + A17 (2 x 20 AWG) in one end; the third brake light feed #93 (20 AWG) and the brake-signal taps PCS_BRK and TRANS_BRK (22 AWG each) out the other",
    "where": "cabin",
    "family": "miniseal",
    "kit": {
@@ -24915,7 +25117,13 @@
     "PCS_BRK",
     "TRANS_BRK"
    ],
-   "cavities": null,
+   "cavities": {
+    "93_PT1": "pigtail end",
+    "93_PT2": "pigtail end",
+    "93": "lead end",
+    "PCS_BRK": "lead end",
+    "TRANS_BRK": "lead end"
+   },
    "empty": null,
    "doubled": null,
    "range": [
@@ -24936,7 +25144,7 @@
     "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG + Raychem MiniSeal page (M81824/1 in-line series)",
     "book review 2026-09-28 (every single wire on a paired 20 A output)"
    ],
-   "splice_point": null,
+   "splice_point": true,
    "range_by_wire": null,
    "side": "cab"
   },
@@ -28015,7 +28223,9 @@
    "where": "engine",
    "family": "kit_terminal",
    "kit": {
-    "30130628": 1
+    "30130628": 1,
+    "7116-3250": 2,
+    "7158-3035": 2
    },
    "wires": [
     "21",
@@ -28023,8 +28233,8 @@
     "FAN_PWM"
    ],
    "cavities": {
-    "21": "power + (12 ga terminal, ProWire kit 30130628)",
-    "FAN_GND": "ground - (12 ga terminal, ProWire kit 30130628)",
+    "21": "power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)",
+    "FAN_GND": "ground - (8 AWG on Yazaki 7116-3250 + 7158-3035, as the power terminal)",
     "FAN_PWM": "PWM control (white lead; 20-18 ga control terminal, ProWire kit 30130628)"
    },
    "empty": null,
@@ -28032,7 +28242,7 @@
    "range": null,
    "out_of_range": [],
    "pigtailed": [],
-   "note": "power on OUT1+OUT6 (paralleled), speed on the M130 A34 low-side PWM (100 Hz), blue override and yellow unused · BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table)",
+   "note": "ONE power and ONE ground terminal (SPAL brushless wiring diagram; kit: two large 12 ga terminals = power + ground): OUT1 + OUT6 join at FAN-JUNCTION, 8 AWG tail and ground in the loom on the 10-8 AWG Yazaki terminals (the kit's 12 ga large terminals stay unused); speed on the M130 A34 low-side PWM (100 Hz), blue override and yellow unused",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -28074,7 +28284,7 @@
     "PDM15_BPOS",
     "52",
     "3",
-    "IBOOST_PERM"
+    "IBOOST_PERM_FH"
    ],
    "cavities": null,
    "empty": null,
@@ -28954,7 +29164,7 @@
     "UH_GND"
    ],
    "cavities": {
-    "73": "feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)",
+    "73": "feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)",
     "UH_GND": ""
    },
    "empty": null,
@@ -29191,6 +29401,7 @@
     10
    ],
    "out_of_range": [
+    "FAN_GND (8 AWG vs 22–10)",
     "DCDC_GND (6 AWG vs 22–10)",
     "AMP_GND (2 AWG vs 22–10)",
     "IBOOST_GND (6 AWG vs 22–10)"
@@ -30848,7 +31059,7 @@
    "side": "cab"
   },
   "PCS-HARNESS-4610": {
-   "device": "PCS TCM2650-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads",
+   "device": "PCS TCM-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads",
    "where": "cabin",
    "family": "kit_terminal",
    "kit": {},
@@ -30890,7 +31101,7 @@
     "OPEN until the TCM-4610 drawing: does the kit feed case 12 / 9 from the PCS ignition lead (then PDM15 OUT13 carries their wake current)"
    ],
    "sources": [
-    "web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller'; TCM2650-4610)",
+    "web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller')",
     "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.2 ('12V Battery, Ignition and Grounds'), p.11, p.18-20"
    ],
    "splice_point": null,
@@ -31228,7 +31439,7 @@
    "side": "engine bay"
   },
   "FAN-JUNCTION": {
-   "device": "fan feed junction: Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) near the PDM15 / fan breakout — two 12 AWG legs in (PDM15 OUT1, OUT6), one 12 AWG tail out to the fan",
+   "device": "fan feed junction: Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) near the PDM15 / fan breakout — two 12 AWG legs in (PDM15 OUT1, OUT6), one 8 AWG tail out to the fan (the fan has one power terminal: SPAL wiring diagram)",
    "where": "engine",
    "family": "lug",
    "kit": {
@@ -31245,7 +31456,7 @@
    "range": null,
    "out_of_range": [],
    "pigtailed": [],
-   "note": "every lug a ProWire 9918 hi-temp ring (12-10 AWG, 3/8 in); the tail runs outside the loom to the fan (free-air rating)",
+   "note": "legs on ProWire 9918 hi-temp rings (12-10 AWG, 3/8 in), the 8 AWG tail on an 838TP (8 AWG, 3/8 in); all in the loom (ProWire bundled: 12 AWG 20 A, 8 AWG 40 A)",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -31259,34 +31470,279 @@
    "range_by_wire": null,
    "side": "engine bay"
   },
-  "SPL-PDM15-OUT13": {
-   "device": "PCS ignition step-up splice by the PDM15: the 20 AWG OUT13 pin lead (PCS_IGN_PT) and the 14 AWG run through bulkhead P (PCS_IGN) in a stub splice",
-   "where": "engine",
-   "family": "miniseal",
+  "FUSE-DAK_CONST": {
+   "device": "in-line fuse for DAK_CONST: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639",
+   "where": "cabin",
+   "family": "none",
    "kit": {},
+   "wires": [
+    "DAK_CONST_FH",
+    "DAK_CONST"
+   ],
+   "cavities": {
+    "DAK_CONST_FH": "line pigtail (in the holder)",
+    "DAK_CONST": "load pigtail -> step splice 327639"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "DAK_CONST_FH": [
+     12,
+     12
+    ],
+    "DAK_CONST": [
+     22,
+     18
+    ]
+   },
+   "side": "cab"
+  },
+  "FUSE-PCS_BATT": {
+   "device": "in-line fuse for PCS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A PROVISIONAL (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639",
+   "where": "cabin",
+   "family": "none",
+   "kit": {},
+   "wires": [
+    "PCS_BATT_FH",
+    "PCS_BATT"
+   ],
+   "cavities": {
+    "PCS_BATT_FH": "line pigtail (in the holder)",
+    "PCS_BATT": "load pigtail -> step splice 327639"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "PCS_BATT_FH": [
+     12,
+     12
+    ],
+    "PCS_BATT": [
+     22,
+     18
+    ]
+   },
+   "side": "cab"
+  },
+  "FUSE-TRANS_BATT": {
+   "device": "in-line fuse for TRANS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 7.5 A (5240); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639",
+   "where": "cabin",
+   "family": "none",
+   "kit": {},
+   "wires": [
+    "TRANS_BATT_FH",
+    "TRANS_BATT"
+   ],
+   "cavities": {
+    "TRANS_BATT_FH": "line pigtail (in the holder)",
+    "TRANS_BATT": "load pigtail -> step splice 327639"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "TRANS_BATT_FH": [
+     12,
+     12
+    ],
+    "TRANS_BATT": [
+     22,
+     18
+    ]
+   },
+   "side": "cab"
+  },
+  "FUSE-IBOOST_PERM": {
+   "device": "in-line fuse for IBOOST_PERM: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638",
+   "where": "engine",
+   "family": "none",
+   "kit": {},
+   "wires": [
+    "IBOOST_PERM_FH",
+    "IBOOST_PERM"
+   ],
+   "cavities": {
+    "IBOOST_PERM_FH": "line pigtail (in the holder)",
+    "IBOOST_PERM": "load pigtail -> step splice 327638"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "IBOOST_PERM_FH": [
+     12,
+     12
+    ],
+    "IBOOST_PERM": [
+     16,
+     14
+    ]
+   },
+   "side": "engine bay"
+  },
+  "FUSE-ISO_PWR": {
+   "device": "in-line fuse for ISO_PWR: Blue Sea 5065 waterproof ATO/ATC holder, fuse 10 A (5241); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638",
+   "where": "engine",
+   "family": "none",
+   "kit": {},
+   "wires": [
+    "ISO_PWR_FH",
+    "ISO_PWR"
+   ],
+   "cavities": {
+    "ISO_PWR_FH": "line pigtail (in the holder)",
+    "ISO_PWR": "load pigtail -> step splice 327638"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "ISO_PWR_FH": [
+     12,
+     12
+    ],
+    "ISO_PWR": [
+     16,
+     14
+    ]
+   },
+   "side": "engine bay"
+  },
+  "FUSE-ISO_SW_PWR": {
+   "device": "in-line fuse for ISO_SW_PWR: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638",
+   "where": "engine",
+   "family": "none",
+   "kit": {},
+   "wires": [
+    "ISO_SW_PWR_FH",
+    "ISO_SW_PWR"
+   ],
+   "cavities": {
+    "ISO_SW_PWR_FH": "line pigtail (in the holder)",
+    "ISO_SW_PWR": "load pigtail -> step splice 327638"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')",
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"
+   ],
+   "splice_point": null,
+   "range_by_wire": {
+    "ISO_SW_PWR_FH": [
+     12,
+     12
+    ],
+    "ISO_SW_PWR": [
+     16,
+     14
+    ]
+   },
+   "side": "engine bay"
+  },
+  "SPL-PDM15-OUT13": {
+   "device": "PCS ignition step splice by the PDM15: TE PIDG step-down butt splice 327583 (22-18 AWG one end, 16-14 AWG the other) joins the 20 AWG OUT13 pin lead (PCS_IGN_PT) to the 14 AWG run through bulkhead P (PCS_IGN)",
+   "where": "engine",
+   "family": "none",
+   "kit": {
+    "CPA-100-3/8-RED": 1
+   },
    "wires": [
     "PCS_IGN_PT",
     "PCS_IGN"
    ],
-   "cavities": null,
+   "cavities": {
+    "PCS_IGN_PT": "20 AWG end",
+    "PCS_IGN": "14 AWG end"
+   },
    "empty": null,
    "doubled": null,
-   "range": [
-    26,
-    12
-   ],
+   "range": null,
    "out_of_range": [],
    "pigtailed": [],
-   "note": "stub splice: 20 AWG (1,020 CM) + 14 AWG (4,110 CM) = 5,130 CM, the 16-12 AWG cavity band (ProWire 3137CT)",
+   "note": "no MiniSeal covers 20 and 14 AWG in one barrel; the PIDG step-down takes each gauge in its own end; TE lists it not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied; TE gives no OD for 327583, its recovered inside diameter is 3.89 mm (web_snapshots/www.te.com__product-327583.md), well under 9.5 mm; a 2.2 in piece: the 32.13 mm splice + 12 mm onto each wire). One 4 ft stick of CPA-100-3/8-RED covers all seven step splices (6 x 2.6 in + 2.2 in = 18 in)",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [],
    "sources": [
     "MoTeC PDM user manual p.9 (8 A outputs 24#-20#)",
-    "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG"
+    "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327583: 16-14 AWG, 22-18 AWG; Sealable No)"
    ],
    "splice_point": null,
-   "range_by_wire": null,
+   "range_by_wire": {
+    "PCS_IGN_PT": [
+     22,
+     18
+    ],
+    "PCS_IGN": [
+     16,
+     14
+    ]
+   },
    "side": "engine bay"
   },
   "SPL-PDM15-OUT7": {
@@ -32992,7 +33448,7 @@
    "doubled": null
   },
   {
-   "wire": "DAK_CONST",
+   "wire": "DAK_CONST_FH",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
    "cavity": "stud, lug 9916",
@@ -33002,7 +33458,7 @@
    "doubled": null
   },
   {
-   "wire": "PCS_BATT",
+   "wire": "PCS_BATT_FH",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
    "cavity": "stud, lug 9916",
@@ -33012,7 +33468,7 @@
    "doubled": null
   },
   {
-   "wire": "TRANS_BATT",
+   "wire": "TRANS_BATT_FH",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
    "cavity": "stud, lug 9916",
@@ -33415,7 +33871,7 @@
    "wire": "93_PT1",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "splice 1",
+   "cavity": "pigtail end",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -33425,7 +33881,7 @@
    "wire": "93_PT2",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "splice 2",
+   "cavity": "pigtail end",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -33435,7 +33891,7 @@
    "wire": "93",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "splice 3",
+   "cavity": "lead end",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -33445,7 +33901,7 @@
    "wire": "PCS_BRK",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "splice 4",
+   "cavity": "lead end",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -33455,7 +33911,7 @@
    "wire": "TRANS_BRK",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "splice 5",
+   "cavity": "lead end",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -36825,7 +37281,7 @@
    "wire": "21",
    "endpoint": "FAN",
    "where": "engine",
-   "cavity": "power + (12 ga terminal, ProWire kit 30130628)",
+   "cavity": "power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)",
    "factory_circuit": null,
    "part": "kit terminal + seal",
    "family": "kit_terminal",
@@ -36835,7 +37291,7 @@
    "wire": "FAN_GND",
    "endpoint": "FAN",
    "where": "engine",
-   "cavity": "ground - (12 ga terminal, ProWire kit 30130628)",
+   "cavity": "ground - (8 AWG on Yazaki 7116-3250 + 7158-3035, as the power terminal)",
    "factory_circuit": null,
    "part": "kit terminal + seal",
    "family": "kit_terminal",
@@ -37002,7 +37458,7 @@
    "doubled": null
   },
   {
-   "wire": "IBOOST_PERM",
+   "wire": "IBOOST_PERM_FH",
    "endpoint": "PS-STUDS",
    "where": "engine",
    "cavity": "stud, lug 9918",
@@ -38185,7 +38641,7 @@
    "wire": "73",
    "endpoint": "UNDERHOOD-LAMP",
    "where": "engine",
-   "cavity": "feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)",
+   "cavity": "feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38567,7 +39023,7 @@
    "where": "engine",
    "cavity": "ring 20",
    "factory_circuit": null,
-   "part": "9918",
+   "part": "838TP",
    "family": "ring_small",
    "doubled": null
   },
@@ -40655,30 +41111,150 @@
    "wire": "21",
    "endpoint": "FAN-JUNCTION",
    "where": "engine",
-   "cavity": "stud, lug 9918",
+   "cavity": "stud, lug 838TP",
    "factory_circuit": null,
-   "part": "9918",
+   "part": "838TP",
    "family": "lug",
+   "doubled": null
+  },
+  {
+   "wire": "DAK_CONST_FH",
+   "endpoint": "FUSE-DAK_CONST",
+   "where": "cabin",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "DAK_CONST",
+   "endpoint": "FUSE-DAK_CONST",
+   "where": "cabin",
+   "cavity": "load pigtail -> step splice 327639",
+   "factory_circuit": null,
+   "part": "327639",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "PCS_BATT_FH",
+   "endpoint": "FUSE-PCS_BATT",
+   "where": "cabin",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "PCS_BATT",
+   "endpoint": "FUSE-PCS_BATT",
+   "where": "cabin",
+   "cavity": "load pigtail -> step splice 327639",
+   "factory_circuit": null,
+   "part": "327639",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "TRANS_BATT_FH",
+   "endpoint": "FUSE-TRANS_BATT",
+   "where": "cabin",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "TRANS_BATT",
+   "endpoint": "FUSE-TRANS_BATT",
+   "where": "cabin",
+   "cavity": "load pigtail -> step splice 327639",
+   "factory_circuit": null,
+   "part": "327639",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "IBOOST_PERM_FH",
+   "endpoint": "FUSE-IBOOST_PERM",
+   "where": "engine",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "IBOOST_PERM",
+   "endpoint": "FUSE-IBOOST_PERM",
+   "where": "engine",
+   "cavity": "load pigtail -> step splice 327638",
+   "factory_circuit": null,
+   "part": "327638",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "ISO_PWR_FH",
+   "endpoint": "FUSE-ISO_PWR",
+   "where": "engine",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "ISO_PWR",
+   "endpoint": "FUSE-ISO_PWR",
+   "where": "engine",
+   "cavity": "load pigtail -> step splice 327638",
+   "factory_circuit": null,
+   "part": "327638",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "ISO_SW_PWR_FH",
+   "endpoint": "FUSE-ISO_SW_PWR",
+   "where": "engine",
+   "cavity": "line pigtail (in the holder)",
+   "factory_circuit": null,
+   "part": "BLUESEA-5065",
+   "family": "none",
+   "doubled": null
+  },
+  {
+   "wire": "ISO_SW_PWR",
+   "endpoint": "FUSE-ISO_SW_PWR",
+   "where": "engine",
+   "cavity": "load pigtail -> step splice 327638",
+   "factory_circuit": null,
+   "part": "327638",
+   "family": "none",
    "doubled": null
   },
   {
    "wire": "PCS_IGN_PT",
    "endpoint": "SPL-PDM15-OUT13",
    "where": "engine",
-   "cavity": "splice 1",
+   "cavity": "20 AWG end",
    "factory_circuit": null,
-   "part": "D-609-03",
-   "family": "miniseal",
+   "part": "327583",
+   "family": "none",
    "doubled": null
   },
   {
    "wire": "PCS_IGN",
    "endpoint": "SPL-PDM15-OUT13",
    "where": "engine",
-   "cavity": "splice 2",
+   "cavity": "14 AWG end",
    "factory_circuit": null,
-   "part": "D-609-05",
-   "family": "miniseal",
+   "part": "327583",
+   "family": "none",
    "doubled": null
   },
   {
@@ -41005,7 +41581,9 @@
    "wires": [
     "93_PT1",
     "93_PT2",
-    "93"
+    "93",
+    "PCS_BRK",
+    "TRANS_BRK"
    ],
    "splice": "M81824/1-2",
    "type": "in-line",
@@ -41015,12 +41593,14 @@
      "93_PT2"
     ],
     [
-     "93"
+     "93",
+     "PCS_BRK",
+     "TRANS_BRK"
     ]
    ],
    "equiv_awg": [
     16,
-    20
+    16
    ]
   },
   {
@@ -41342,6 +41922,9 @@
    "238LTP": 22,
    "2516LTP": 7,
    "30130628": 1,
+   "327583": 1,
+   "327638": 3,
+   "327639": 3,
    "4-1437284-3": 44,
    "610TP": 2,
    "638TP": 2,
@@ -41349,22 +41932,26 @@
    "68055": 1,
    "68102": 16,
    "68201": 2,
-   "838TP": 2,
+   "7116-3250": 2,
+   "7158-3035": 2,
+   "838TP": 4,
    "8CYLK-90": 1,
    "9916": 3,
-   "9918": 5,
+   "9918": 3,
    "ADHESIVES-KIT": 1,
    "AEM-30-2131-100": 1,
    "AMP-KIT-RING": 1,
    "BLUESEA-1003": 4,
    "BLUESEA-2103": 3,
+   "BLUESEA-5065": 6,
    "CAN-TERM-100R": 2,
    "CAN-TERM-120R": 2,
    "COIL-CONN-LS2/7": 8,
    "CPA-100-3/4-BK": 1,
-   "D-609-03": 54,
+   "CPA-100-3/8-RED": 1,
+   "D-609-03": 53,
    "D-609-04": 20,
-   "D-609-05": 32,
+   "D-609-05": 31,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -41416,7 +42003,6 @@
    "WP-4P": 3,
    "WP-4S": 3,
    "WPAPP30": 1,
-   "BLUESEA-5065": 6,
    "BLUESEA-5239": 4,
    "BLUESEA-5240": 1,
    "BLUESEA-5241": 1
@@ -41425,6 +42011,8 @@
    "M22759/16 2 AWG black": 8.0,
    "M22759/16 2 AWG red": 37.5,
    "M22759/16 6 AWG red": 5.3,
+   "M22759/16 8 AWG black": 2.5,
+   "M22759/16 8 AWG red": 2.5,
    "M22759/16 10 AWG black": 21.2,
    "M22759/16 10 AWG red": 21.2,
    "M22759/16 22 AWG brown": 30.7,
@@ -41447,8 +42035,7 @@
    "M22759/16 22 AWG white": 68.2,
    "M22759/16 22 AWG white/orange": 19.8,
    "M22759/16 22 AWG white/blue": 14.6,
-   "M22759/32 12 AWG black": 2.5,
-   "M22759/32 12 AWG red": 11.8,
+   "M22759/32 12 AWG red": 9.3,
    "M22759/32 14 AWG black": 21.2,
    "M22759/32 14 AWG red": 42.8,
    "M22759/32 16 AWG black": 14.0,
@@ -41640,7 +42227,7 @@
    "codes": [],
    "need_ft": 68.2,
    "cart_ft": 0,
-   "status": "short by 68.2 ft; also PCS_BRK, TRANS_BRK (length not measured yet)"
+   "status": "short by 68.2 ft; also ISO_KILL, PCS_BRK, TRANS_BRK, DAK_CEL (length not measured yet)"
   },
   {
    "kind": "wire",
@@ -41684,9 +42271,9 @@
    "codes": [
     "M22759/16-8-0"
    ],
-   "need_ft": 0,
+   "need_ft": 2.5,
    "cart_ft": 5.0,
-   "status": "claimed by G3 — length not measured yet"
+   "status": "covered; also G3 (length not measured yet)"
   },
   {
    "kind": "wire",
@@ -41694,9 +42281,9 @@
    "codes": [
     "M22759/16-8-2"
    ],
-   "need_ft": 0,
+   "need_ft": 2.5,
    "cart_ft": 30.0,
-   "status": "not claimed by this scope"
+   "status": "covered"
   },
   {
    "kind": "wire",
@@ -42214,19 +42801,11 @@
   },
   {
    "kind": "wire",
-   "item": "M22759/32 12 AWG black",
-   "codes": [],
-   "need_ft": 2.5,
-   "cart_ft": 0,
-   "status": "short by 2.5 ft"
-  },
-  {
-   "kind": "wire",
    "item": "M22759/32 12 AWG red",
    "codes": [
     "M22759/32-12-2"
    ],
-   "need_ft": 11.8,
+   "need_ft": 9.3,
    "cart_ft": 20.0,
    "status": "covered; also FAN_LEG1, FAN_LEG2 (length not measured yet)"
   },
@@ -42481,6 +43060,36 @@
    "status": "missing — in no cart"
   },
   {
+   "kind": "splice",
+   "item": "327583",
+   "name": "TE PIDG step-down butt splice, 22-18 AWG / 16-14 AWG, blue, not sealable",
+   "need": 1,
+   "cart": 0,
+   "inside": [],
+   "vendor": "te",
+   "status": "missing — in no cart"
+  },
+  {
+   "kind": "splice",
+   "item": "327638",
+   "name": "TE PIDG step-down butt splice, 16-14 AWG / 12-10 AWG, yellow, not sealable",
+   "need": 3,
+   "cart": 0,
+   "inside": [],
+   "vendor": "te",
+   "status": "missing — in no cart"
+  },
+  {
+   "kind": "splice",
+   "item": "327639",
+   "name": "TE PIDG step-down butt splice, 22-18 AWG / 12-10 AWG, yellow, not sealable",
+   "need": 3,
+   "cart": 0,
+   "inside": [],
+   "vendor": "te",
+   "status": "missing — in no cart"
+  },
+  {
    "kind": "plug",
    "item": "4-1437284-3",
    "name": "Superseal 1.0 cavity sealing plug",
@@ -42581,6 +43190,26 @@
    "status": "REMOVE — wrong plug for this part (see TB)"
   },
   {
+   "kind": "terminal",
+   "item": "7116-3250",
+   "name": "Yazaki terminal 375 L female 10-8 AWG (SPAL brushless 4-way housing, large cavity)",
+   "need": 2,
+   "cart": 0,
+   "inside": [],
+   "vendor": "prowire",
+   "status": "missing — in no cart"
+  },
+  {
+   "kind": "seal",
+   "item": "7158-3035",
+   "name": "Yazaki large white wire seal 10-8 AWG (SPAL brushless housing)",
+   "need": 2,
+   "cart": 0,
+   "inside": [],
+   "vendor": "prowire",
+   "status": "missing — in no cart"
+  },
+  {
    "kind": "lug",
    "item": "810TP",
    "name": "8 AWG lug, #10 stud (MIDI M5)",
@@ -42594,11 +43223,11 @@
    "kind": "lug",
    "item": "838TP",
    "name": "8 AWG lug, 3/8 in stud",
-   "need": 2,
+   "need": 4,
    "cart": 4,
    "inside": [],
    "vendor": "prowire",
-   "status": "covered (+2 spare)"
+   "status": "covered"
   },
   {
    "kind": "kit",
@@ -42624,7 +43253,7 @@
    "kind": "lug",
    "item": "9918",
    "name": "HI-TEMP RING TERM 12-10 AWG, 3/8 in (M9) stud",
-   "need": 5,
+   "need": 3,
    "cart": 0,
    "inside": [],
    "vendor": "prowire",
@@ -42675,6 +43304,16 @@
    "item": "BLUESEA-2103",
    "name": "Blue Sea 2103 PowerPost Plus, 3/8-16 stud, 150 A, insulated base",
    "need": 3,
+   "cart": 0,
+   "inside": [],
+   "vendor": "bluesea",
+   "status": "missing — in no cart"
+  },
+  {
+   "kind": "fuse_holder",
+   "item": "BLUESEA-5065",
+   "name": "Blue Sea 5065 waterproof in-line ATO/ATC fuse holder, 12 AWG pigtails, 30 A max fuse",
+   "need": 6,
    "cart": 0,
    "inside": [],
    "vendor": "bluesea",
@@ -42754,7 +43393,7 @@
    "kind": "shrink",
    "item": "CPA-100-3/8-RED",
    "name": "3:1 adhesive-lined shrink 3/8 in, red, 4 ft",
-   "need": 0,
+   "need": 1,
    "cart": 1.0,
    "inside": [],
    "vendor": "prowire",
@@ -42764,11 +43403,11 @@
    "kind": "splice",
    "item": "D-609-03",
    "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-   "need": 54,
+   "need": 53,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 34"
+   "status": "short by 33"
   },
   {
    "kind": "splice",
@@ -42784,11 +43423,11 @@
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 32,
+   "need": 31,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 12"
+   "status": "short by 11"
   },
   {
    "kind": "housing",
@@ -43753,12 +44392,6 @@
     "qty": 25,
     "need_ft": 21.2,
     "why": "need 21.2 ft"
-   },
-   {
-    "code": "M22759/32-12-0",
-    "qty": 5,
-    "need_ft": 2.5,
-    "why": "need 2.5 ft"
    }
   ],
   "set_qty": [
@@ -43789,11 +44422,25 @@
   ],
   "trim": [
    {
+    "code": "M22759/16-8-2",
+    "qty_from": 30.0,
+    "qty": 5,
+    "need_ft": 2.5,
+    "saves": 101.6
+   },
+   {
     "code": "M22759/32-16-2",
     "qty_from": 110.0,
     "qty": 70,
     "need_ft": 66.8,
     "saves": 29.24
+   },
+   {
+    "code": "M22759/32-12-2",
+    "qty_from": 20.0,
+    "qty": 10,
+    "need_ft": 9.3,
+    "saves": 39.94
    }
   ],
   "parts": [
@@ -43894,6 +44541,30 @@
     "status": "missing — in no cart"
    },
    {
+    "code": "327583",
+    "name": "TE PIDG step-down butt splice, 22-18 AWG / 16-14 AWG, blue, not sealable",
+    "need": 1,
+    "cart": 0,
+    "vendor": "te",
+    "status": "missing — in no cart"
+   },
+   {
+    "code": "327638",
+    "name": "TE PIDG step-down butt splice, 16-14 AWG / 12-10 AWG, yellow, not sealable",
+    "need": 3,
+    "cart": 0,
+    "vendor": "te",
+    "status": "missing — in no cart"
+   },
+   {
+    "code": "327639",
+    "name": "TE PIDG step-down butt splice, 22-18 AWG / 12-10 AWG, yellow, not sealable",
+    "need": 3,
+    "cart": 0,
+    "vendor": "te",
+    "status": "missing — in no cart"
+   },
+   {
     "code": "4-1437284-3",
     "name": "Superseal 1.0 cavity sealing plug",
     "need": 44,
@@ -43942,6 +44613,22 @@
     "status": "REMOVE — wrong plug for this part (see TB)"
    },
    {
+    "code": "7116-3250",
+    "name": "Yazaki terminal 375 L female 10-8 AWG (SPAL brushless 4-way housing, large cavity)",
+    "need": 2,
+    "cart": 0,
+    "vendor": "prowire",
+    "status": "missing — in no cart"
+   },
+   {
+    "code": "7158-3035",
+    "name": "Yazaki large white wire seal 10-8 AWG (SPAL brushless housing)",
+    "need": 2,
+    "cart": 0,
+    "vendor": "prowire",
+    "status": "missing — in no cart"
+   },
+   {
     "code": "9916",
     "name": "HI-TEMP RING TERM 12-10 AWG, 1/4 stud",
     "need": 3,
@@ -43952,7 +44639,7 @@
    {
     "code": "9918",
     "name": "HI-TEMP RING TERM 12-10 AWG, 3/8 in (M9) stud",
-    "need": 5,
+    "need": 3,
     "cart": 0,
     "vendor": "prowire",
     "status": "missing — in no cart"
@@ -43982,6 +44669,14 @@
     "status": "missing — in no cart"
    },
    {
+    "code": "BLUESEA-5065",
+    "name": "Blue Sea 5065 waterproof in-line ATO/ATC fuse holder, 12 AWG pigtails, 30 A max fuse",
+    "need": 6,
+    "cart": 0,
+    "vendor": "bluesea",
+    "status": "missing — in no cart"
+   },
+   {
     "code": "CAN-TERM-100R",
     "name": "CAN terminator 100 ohm, 0.25 W, axial — one at each end of the trunk (M130 end, LTCD end)",
     "need": 2,
@@ -44000,18 +44695,18 @@
    {
     "code": "D-609-03",
     "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-    "need": 54,
+    "need": 53,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 34"
+    "status": "short by 33"
    },
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 32,
+    "need": 31,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 12"
+    "status": "short by 11"
    },
    {
     "code": "DL438",
@@ -49669,7 +50364,7 @@
    {
     "pin": "A32",
     "function": "half bridge 4 (OUT_HB4)",
-    "color": "—",
+    "color": "white",
     "goes_to": "M130 check-engine output to the Dakota CHECK ENG (-) input",
     "wires": [
      "DAK_CEL"
@@ -49805,7 +50500,7 @@
    {
     "pin": "B14",
     "function": "Udig 7 (UDIG7)",
-    "color": "—",
+    "color": "white",
     "goes_to": "Isolator state (yellow, grounded while closed) to the M130 shutdown input",
     "wires": [
      "ISO_KILL"
@@ -49968,7 +50663,7 @@
    "limit_a": 16,
    "need_a": 16,
    "max_a": 10,
-   "status": "set: 16 A per output (fan junction (round 3 close): PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg; both legs and the 12 AWG fan tail land on FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) on ProWire 9918 rings (12-10 AWG, 3/8 in). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Each output's pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each leg carries 16 A: 12 AWG singles 38 A (ProWire singles table, 60 C difference), 0.85 x 38 = 32.3 >= 16. The tail carries 32 A: it needs 32 / 0.85 = 37.6 A, the singles table gives 38 A — only in free air at <= 90 C ambient (the hot-soak OPEN and the outside-the-loom routing apply to the tail))"
+   "status": "set: 16 A per output (fan junction (round 3 close; round 6: all in the loom): the SPAL 30107090 has ONE power terminal and ONE ground terminal (SPAL brushless wiring diagram: one red lead through one fuse, one black to chassis ground, white PWM, blue override, yellow unused; ProWire 30130628 kit: (2) large terminals to suit 12 ga wire = power + ground, (2) small 20-18 ga control terminals), so the two outputs join at FAN-JUNCTION. PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg to FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each 12 AWG leg carries 16 A: ProWire Tefzel chart bundled 20 A, 0.85 x 20 = 17 >= 16 (in the loom). The tail (#21) and its ground (FAN_GND) carry up to 32 A: 8 AWG, ProWire bundled 40 A, 0.85 x 40 = 34 >= 32 (in the loom), on the Yazaki 7116-3250 375 L female 10-8 AWG terminal + 7158-3035 10-8 AWG seal that ProWire lists for the same SPAL housing (web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md: 'Larger terminals and seals are available separately'). The bundled rating is a 35 C rise; M22759 is rated to 150 C (ProWire M22759/32 page), so the tail holds to 115 C ambient)"
   },
   {
    "output": "PDM15 OUT2",
@@ -50058,6 +50753,7 @@
   {
    "output": "PDM15 OUT13",
    "loads": [
+    "PCS_IGN",
     "PCS_IGN_PT"
    ],
    "load_a": null,
@@ -50119,14 +50815,16 @@
   {
    "output": "PDM30 OUT5",
    "loads": [
-    "93"
+    "93",
+    "PCS_BRK",
+    "TRANS_BRK"
    ],
    "load_a": 0.5,
-   "source": "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md)",
-   "wire_cap_a": 8,
+   "source": "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none)",
+   "wire_cap_a": 6,
    "limit_a": 1,
    "need_a": 1,
-   "max_a": 6,
+   "max_a": 5,
    "status": "set"
   },
   {
@@ -50334,7 +51032,7 @@
    "limit_a": null,
    "need_a": 12,
    "max_a": 10,
-   "status": "CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it"
+   "status": "CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it"
   },
   {
    "output": "PDM30 OUT22",
@@ -52872,6 +53570,60 @@
     "length": "unknown",
     "crosses": false
    },
+   "DAK_CONST_FH": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "PCS_BATT_FH": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "TRANS_BATT_FH": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "IBOOST_PERM_FH": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "ISO_PWR_FH": {
+    "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": false,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "ISO_SW_PWR_FH": {
+    "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": false,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
    "HL_L_GND": {
     "L1 plugs": false,
     "L2 wire": true,
@@ -53959,17 +54711,17 @@
     }
    },
    "BASE": {
-    "wires": 324,
-    "L1 plugs": 245,
-    "L2 wire": 321,
-    "L3 crossing": 324,
-    "L4 ends": 310,
+    "wires": 330,
+    "L1 plugs": 249,
+    "L2 wire": 327,
+    "L3 crossing": 330,
+    "L4 ends": 314,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 159,
      "twin": 7,
-     "unknown": 158
+     "unknown": 164
     }
    },
    "BFL": {
@@ -54076,16 +54828,16 @@
     }
    },
    "dash_cabin": {
-    "wires": 53,
-    "L1 plugs": 35,
-    "L2 wire": 53,
-    "L3 crossing": 53,
-    "L4 ends": 51,
+    "wires": 54,
+    "L1 plugs": 36,
+    "L2 wire": 54,
+    "L3 crossing": 54,
+    "L4 ends": 52,
     "L5 material": 1,
     "crossings": 13,
     "length": {
      "estimated": 16,
-     "unknown": 37
+     "unknown": 38
     }
    },
    "engine": {
@@ -54129,74 +54881,74 @@
     }
    },
    "power_spine": {
-    "wires": 37,
+    "wires": 39,
     "L1 plugs": 23,
-    "L2 wire": 37,
-    "L3 crossing": 37,
+    "L2 wire": 39,
+    "L3 crossing": 39,
     "L4 ends": 29,
     "L5 material": 0,
     "crossings": 8,
     "length": {
      "twin": 5,
      "estimated": 2,
-     "unknown": 30
+     "unknown": 32
     }
    },
    "powertrain_chassis": {
-    "wires": 24,
-    "L1 plugs": 19,
-    "L2 wire": 24,
-    "L3 crossing": 24,
-    "L4 ends": 23,
+    "wires": 26,
+    "L1 plugs": 21,
+    "L2 wire": 26,
+    "L3 crossing": 26,
+    "L4 ends": 25,
     "L5 material": 0,
     "crossings": 1,
     "length": {
      "estimated": 6,
-     "unknown": 18
+     "unknown": 20
     }
    },
    "unsectioned": {
-    "wires": 2,
-    "L1 plugs": 2,
-    "L2 wire": 2,
-    "L3 crossing": 2,
-    "L4 ends": 2,
+    "wires": 3,
+    "L1 plugs": 3,
+    "L2 wire": 3,
+    "L3 crossing": 3,
+    "L4 ends": 3,
     "L5 material": 0,
     "crossings": 0,
     "length": {
-     "unknown": 2
+     "unknown": 3
     }
    }
   },
   "configuration": {
    "buildable (base + decided)": {
-    "wires": 355,
-    "L1 plugs": 264,
-    "L2 wire": 352,
-    "L3 crossing": 355,
-    "L4 ends": 341,
+    "wires": 361,
+    "L1 plugs": 268,
+    "L2 wire": 358,
+    "L3 crossing": 361,
+    "L4 ends": 345,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 173,
      "twin": 7,
-     "unknown": 175
+     "unknown": 181
     }
    }
   },
   "composite": {
    "composite (every option)": {
-    "wires": 387,
-    "L1 plugs": 268,
-    "L2 wire": 379,
-    "L3 crossing": 387,
-    "L4 ends": 371,
+    "wires": 393,
+    "L1 plugs": 272,
+    "L2 wire": 385,
+    "L3 crossing": 393,
+    "L4 ends": 375,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 176,
      "twin": 7,
-     "unknown": 204
+     "unknown": 210
     }
    }
   }
@@ -54446,6 +55198,12 @@
     "VSS_PWR",
     "VSS_GND",
     "VSS_DAK",
+    "DAK_CONST_FH",
+    "PCS_BATT_FH",
+    "TRANS_BATT_FH",
+    "IBOOST_PERM_FH",
+    "ISO_PWR_FH",
+    "ISO_SW_PWR_FH",
     "HL_L_GND",
     "HL_R_GND",
     "PT_LF_GND",
@@ -55061,7 +55819,7 @@
       "need_ft": 68.2,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 68.2 ft; also PCS_BRK, TRANS_BRK (length not measured yet)"
+      "status": "short by 68.2 ft; also ISO_KILL, PCS_BRK, TRANS_BRK, DAK_CEL (length not measured yet)"
      },
      {
       "item": "M22759/16 22 AWG white/orange",
@@ -55093,17 +55851,17 @@
      },
      {
       "item": "M22759/16 8 AWG black",
-      "need_ft": 0,
+      "need_ft": 2.5,
       "cart_ft": 5.0,
       "on_hand_ft": null,
-      "status": "claimed by G3 — length not measured yet"
+      "status": "covered; also G3 (length not measured yet)"
      },
      {
       "item": "M22759/16 8 AWG red",
-      "need_ft": 0,
+      "need_ft": 2.5,
       "cart_ft": 30.0,
       "on_hand_ft": null,
-      "status": "not claimed by this scope"
+      "status": "covered"
      },
      {
       "item": "M22759/16 6 AWG red",
@@ -55463,15 +56221,8 @@
       "status": "prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i)"
      },
      {
-      "item": "M22759/32 12 AWG black",
-      "need_ft": 2.5,
-      "cart_ft": 0,
-      "on_hand_ft": null,
-      "status": "short by 2.5 ft"
-     },
-     {
       "item": "M22759/32 12 AWG red",
-      "need_ft": 11.8,
+      "need_ft": 9.3,
       "cart_ft": 20.0,
       "on_hand_ft": null,
       "status": "covered; also FAN_LEG1, FAN_LEG2 (length not measured yet)"
@@ -55520,7 +56271,7 @@
      "PDM30 OUT21"
     ],
     "setting_conflicts": [
-     "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it"
+     "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it"
     ],
     "notes": null
    },

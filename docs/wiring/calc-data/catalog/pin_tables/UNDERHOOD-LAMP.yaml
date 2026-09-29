@@ -1,7 +1,7 @@
 UNDERHOOD-LAMP:
   family: open
   pins:
-    '73': 'feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)'
+    '73': 'feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)'
     UH_GND: ''
   note: 'maker''s document: factory underhood lamp & switch assembly, 93 bulb: one feed lead, grounds through its mount'
   open:

@@ -406,7 +406,12 @@ def attach(reg):
                                             "ev1": {"part": "68102"}}[fid]
             by_wire = ep.get("per_end_wire") or {}          # per-wire contact where one plug mixes wire sizes
             cfg = lambda w: by_wire.get(w) or pe_cfg
+            seen_ = set()
             for w in wl:
+                if ep.get("count_once"):                 # round 6: one step splice / holder joins several wire ends
+                    if str(cfg(w)["part"]) in seen_:
+                        continue
+                    seen_.add(str(cfg(w)["part"]))
                 need[str(cfg(w)["part"])] += 1
                 if cfg(w).get("seal"):
                     need[str(cfg(w)["seal"])] += 1

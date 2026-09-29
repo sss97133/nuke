@@ -2524,25 +2524,25 @@
    "kind": "v5",
    "label": "Radiator Fan 1",
    "from": [
-    "FAN-JUNCTION (stud: the 12 AWG tail to the fan)",
+    "FAN-JUNCTION (stud: the 8 AWG tail to the fan)",
     null
    ],
    "to": [
     "Radiator_Fan_1",
-    "power + (12 ga terminal, ProWire kit 30130628)"
+    "power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)"
    ],
    "sides": [
     "engine bay",
     "engine bay"
    ],
-   "from_str": "FAN-JUNCTION (stud: the 12 AWG tail to the fan)",
+   "from_str": "FAN-JUNCTION (stud: the 8 AWG tail to the fan)",
    "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
    "subsystem": "COOLING",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "FAN-JUNCTION (stud: the 12 AWG tail to the fan):None -> Radiator_Fan_1:power + (12 ga terminal, ProWire kit 30130628)"
+     "FAN-JUNCTION (stud: the 8 AWG tail to the fan):None -> Radiator_Fan_1:power + (8 AWG on Yazaki 7116-3250 375 L female 10-8 AWG + 7158-3035 seal, listed with the ProWire 30130628 kit)"
     ]
    }
   },
@@ -3171,7 +3171,7 @@
    ],
    "to": [
     "UNDERHOOD-LAMP",
-    "feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)"
+    "feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)"
    ],
    "sides": [
     "cab",
@@ -3184,7 +3184,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT25 -> UNDERHOOD-LAMP:feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)"
+     "PDM30:OUT25 -> UNDERHOOD-LAMP:feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)"
     ],
     "R9 pin": [
      "PASS",
@@ -5229,7 +5229,7 @@
    "kind": "implied",
    "label": "Dakota VHX CONST. POWER (always-hot, fused)",
    "from": [
-    "PDM30-STUD (5 A inline fuse)",
+    "FUSE-DAK_CONST (load pigtail, step splice 327639)",
     ""
    ],
    "to": [
@@ -5240,18 +5240,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "PDM30-STUD (5 A inline fuse)",
+   "from_str": "FUSE-DAK_CONST (load pigtail, step splice 327639)",
    "control": null,
    "subsystem": "DASH_CLUSTER_DAKOTA",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30-STUD (5 A inline fuse): -> DAKOTA-VHX (CONST. POWER):CONST. POWER"
-    ],
-    "R15 protected": [
-     "PASS",
-     "5 A inline fuse at the PDM30 stud (Dakota VHX manual 650314:P p.6: 'The constant"
+     "FUSE-DAK_CONST (load pigtail, step splice 327639): -> DAKOTA-VHX (CONST. POWER):CONST. POWER"
     ]
    }
   },
@@ -5260,7 +5256,7 @@
    "kind": "implied",
    "label": "PCS TCM-2650 constant 12V (5A)",
    "from": [
-    "PDM30-STUD (5 A inline fuse)",
+    "FUSE-PCS_BATT (load pigtail, step splice 327639)",
     ""
    ],
    "to": [
@@ -5271,18 +5267,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "PDM30-STUD (5 A inline fuse)",
+   "from_str": "FUSE-PCS_BATT (load pigtail, step splice 327639)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30-STUD (5 A inline fuse): -> PCS-HARNESS-4610 (12 V battery lead):12 V battery lead (lead label OPEN until the TCM-4610 drawing)"
-    ],
-    "R15 protected": [
-     "PASS",
-     "5 A inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80"
+     "FUSE-PCS_BATT (load pigtail, step splice 327639): -> PCS-HARNESS-4610 (12 V battery lead):12 V battery lead (lead label OPEN until the TCM-4610 drawing)"
     ]
    }
   },
@@ -5296,7 +5288,7 @@
    ],
    "to": [
     "SPL-PDM15-OUT13",
-    "splice 1"
+    "20 AWG end"
    ],
    "sides": [
     "engine bay",
@@ -5309,7 +5301,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM15:OUT13 -> SPL-PDM15-OUT13:splice 1"
+     "PDM15:OUT13 -> SPL-PDM15-OUT13:20 AWG end"
     ],
     "R11 command": [
      "PASS",
@@ -5504,7 +5496,7 @@
    "kind": "implied",
    "label": "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)",
    "from": [
-    "PDM30-STUD (7.5 A inline fuse)",
+    "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
     ""
    ],
    "to": [
@@ -5515,18 +5507,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "PDM30-STUD (7.5 A inline fuse)",
+   "from_str": "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30-STUD (7.5 A inline fuse): -> PCS-HARNESS-4610 (case battery lead, cavities 1 + 4):case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)"
-    ],
-    "R15 protected": [
-     "PASS",
-     "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant bat"
+     "FUSE-TRANS_BATT (load pigtail, step splice 327639): -> PCS-HARNESS-4610 (case battery lead, cavities 1 + 4):case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)"
     ]
    }
   },
@@ -8245,6 +8233,192 @@
    }
   },
   {
+   "wire": "DAK_CONST_FH",
+   "kind": "implied",
+   "label": "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "PDM30-STUD (5 A inline fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-DAK_CONST (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30-STUD (5 A inline fuse)",
+   "control": null,
+   "subsystem": null,
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30-STUD (5 A inline fuse): -> FUSE-DAK_CONST (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the PDM30 stud (Dakota VHX manual 650314:P p.6: 'The constant"
+    ]
+   }
+  },
+  {
+   "wire": "PCS_BATT_FH",
+   "kind": "implied",
+   "label": "PCS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "PDM30-STUD (5 A PROVISIONAL inline fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-PCS_BATT (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30-STUD (5 A PROVISIONAL inline fuse)",
+   "control": null,
+   "subsystem": "TRANS_6L90",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30-STUD (5 A PROVISIONAL inline fuse): -> FUSE-PCS_BATT (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A PROVISIONAL inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/202"
+    ]
+   }
+  },
+  {
+   "wire": "TRANS_BATT_FH",
+   "kind": "implied",
+   "label": "TRANS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "PDM30-STUD (7.5 A inline fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-TRANS_BATT (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30-STUD (7.5 A inline fuse)",
+   "control": null,
+   "subsystem": "TRANS_6L90",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30-STUD (7.5 A inline fuse): -> FUSE-TRANS_BATT (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant bat"
+    ]
+   }
+  },
+  {
+   "wire": "IBOOST_PERM_FH",
+   "kind": "implied",
+   "label": "IBOOST_PERM fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "PS-STUDS (distribution stud, 5 A fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-IBOOST_PERM (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PS-STUDS (distribution stud, 5 A fuse)",
+   "control": null,
+   "subsystem": "BRAKES_IBOOSTER",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PS-STUDS (distribution stud, 5 A fuse): -> FUSE-IBOOST_PERM (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout (web_snapsho"
+    ]
+   }
+  },
+  {
+   "wire": "ISO_PWR_FH",
+   "kind": "implied",
+   "label": "ISO_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "ODYSSEY (+, 10 A fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-ISO_PWR (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "ODYSSEY (+, 10 A fuse)",
+   "control": null,
+   "subsystem": "CHARGING_STARTING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "ODYSSEY (+, 10 A fuse): -> FUSE-ISO_PWR (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2:"
+    ]
+   }
+  },
+  {
+   "wire": "ISO_SW_PWR_FH",
+   "kind": "implied",
+   "label": "ISO_SW_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
+   "from": [
+    "ODYSSEY (+, 5 A fuse)",
+    ""
+   ],
+   "to": [
+    "FUSE-ISO_SW_PWR (line pigtail)",
+    "line pigtail (in the holder)"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "ODYSSEY (+, 5 A fuse)",
+   "control": null,
+   "subsystem": "CHARGING_STARTING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "ODYSSEY (+, 5 A fuse): -> FUSE-ISO_SW_PWR (line pigtail):line pigtail (in the holder)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through"
+    ]
+   }
+  },
+  {
    "wire": "HL_L_GND",
    "kind": "implied",
    "label": "Left headlight ground",
@@ -10060,7 +10234,7 @@
    "kind": "implied",
    "label": "Isolator control power (red, 24 hr) from the Odyssey positive, fused 10 A at the battery",
    "from": [
-    "ODYSSEY (+, 10 A fuse)",
+    "FUSE-ISO_PWR (load pigtail, step splice 327638)",
     ""
    ],
    "to": [
@@ -10071,18 +10245,14 @@
     "engine bay",
     "engine bay"
    ],
-   "from_str": "ODYSSEY (+, 10 A fuse)",
+   "from_str": "FUSE-ISO_PWR (load pigtail, step splice 327638)",
    "control": null,
    "subsystem": "CHARGING_STARTING",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "ODYSSEY (+, 10 A fuse): -> ISOLATOR (red, +12 V 24 hr):red (+12 V 24 hr)"
-    ],
-    "R15 protected": [
-     "PASS",
-     "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2:"
+     "FUSE-ISO_PWR (load pigtail, step splice 327638): -> ISOLATOR (red, +12 V 24 hr):red (+12 V 24 hr)"
     ]
    }
   },
@@ -10211,7 +10381,7 @@
    "kind": "implied",
    "label": "Dash switch feed (pin 2 common + pin 8 LED power) from the Odyssey positive, 24 hr",
    "from": [
-    "ODYSSEY (+, 5 A fuse)",
+    "FUSE-ISO_SW_PWR (load pigtail, step splice 327638)",
     ""
    ],
    "to": [
@@ -10222,22 +10392,18 @@
     "engine bay",
     "cab"
    ],
-   "from_str": "ODYSSEY (+, 5 A fuse)",
+   "from_str": "FUSE-ISO_SW_PWR (load pigtail, step splice 327638)",
    "control": null,
    "subsystem": "CHARGING_STARTING",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "ODYSSEY (+, 5 A fuse): -> ISO-SWITCH (2145 pins 2 + 8):2 + 8 (common + LED power, jumpered)"
+     "FUSE-ISO_SW_PWR (load pigtail, step splice 327638): -> ISO-SWITCH (2145 pins 2 + 8):2 + 8 (common + LED power, jumpered)"
     ],
     "R12 firewall": [
      "PASS",
      "body bulkhead B cavity 12"
-    ],
-    "R15 protected": [
-     "PASS",
-     "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through"
     ]
    }
   },
@@ -10698,7 +10864,7 @@
    "kind": "implied",
    "label": "iBooster Gen 1 second always-hot (pin 17, 5 A)",
    "from": [
-    "PS-STUDS (distribution stud, 5 A fuse)",
+    "FUSE-IBOOST_PERM (load pigtail, step splice 327638)",
     ""
    ],
    "to": [
@@ -10709,18 +10875,14 @@
     "engine bay",
     "engine bay"
    ],
-   "from_str": "PS-STUDS (distribution stud, 5 A fuse)",
+   "from_str": "FUSE-IBOOST_PERM (load pigtail, step splice 327638)",
    "control": null,
    "subsystem": "BRAKES_IBOOSTER",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PS-STUDS (distribution stud, 5 A fuse): -> IBOOSTER (17, always-hot 5 A):1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
-    ],
-    "R15 protected": [
-     "PASS",
-     "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout (web_snapsho"
+     "FUSE-IBOOST_PERM (load pigtail, step splice 327638): -> IBOOSTER (17, always-hot 5 A):1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
     ]
    }
   },
@@ -10819,7 +10981,7 @@
    ],
    "to": [
     "SPL-PDM30-OUT5 (pigtail side)",
-    "splice 1"
+    "pigtail end"
    ],
    "sides": [
     "cab",
@@ -10832,7 +10994,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A9 -> SPL-PDM30-OUT5 (pigtail side):splice 1"
+     "PDM30:A9 -> SPL-PDM30-OUT5 (pigtail side):pigtail end"
     ]
    }
   },
@@ -10846,7 +11008,7 @@
    ],
    "to": [
     "SPL-PDM30-OUT5 (pigtail side)",
-    "splice 2"
+    "pigtail end"
    ],
    "sides": [
     "cab",
@@ -10859,7 +11021,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A17 -> SPL-PDM30-OUT5 (pigtail side):splice 2"
+     "PDM30:A17 -> SPL-PDM30-OUT5 (pigtail side):pigtail end"
     ]
    }
   },

@@ -60,8 +60,8 @@ PDM30-STUD:
   device: PDM30 battery stud (M6; "eyelet and M6 nut")
   family: lug
   kit: {}
-  lugs: {PDM_BPOS: DL214, DAK_CONST: ["9916"], PCS_BATT: ["9916"], TRANS_BATT: ["9916"]}   # fused taps: the Blue Sea 5065 holder's 12 AWG pigtail on the M6 stud: ProWire 9916 12-10 AWG 1/4   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
-  wires: [PDM_BPOS, DAK_CONST, PCS_BATT, TRANS_BATT]
+  lugs: {PDM_BPOS: DL214, DAK_CONST_FH: ["9916"], PCS_BATT_FH: ["9916"], TRANS_BATT_FH: ["9916"]}   # fused taps: the Blue Sea 5065 holder's 12 AWG pigtail on the M6 stud: ProWire 9916 12-10 AWG 1/4   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
+  wires: [PDM_BPOS, DAK_CONST_FH, PCS_BATT_FH, TRANS_BATT_FH]
   sources: ["motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')", "build book DC primary table (DL214 = PDM30 M6)"]
 
 PDM15-A:
@@ -125,10 +125,12 @@ SPL-PDM15-OUT5:
   sources: ["MoTeC PDM user manual p.43 (20 A Output 5 on A9 with A17)", "MoTeC PDM user manual p.48 (20# to 16# on 20 A outputs)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG + Raychem MiniSeal page (M81824/1 in-line series)", "book review 2026-09-28 (every single wire on a paired 20 A output)"]
 SPL-PDM30-OUT5:
   where: cabin
-  device: "PDM30 OUT5 pigtail splice — pins A9 + A17 (2 x 20 AWG) joined to the third brake light feed #93 (raised to 20 AWG)"
+  device: "PDM30 OUT5 pigtail splice — ONE in-line M81824/1-2: pins A9 + A17 (2 x 20 AWG) in one end; the third brake light feed #93 (20 AWG) and the brake-signal taps PCS_BRK and TRANS_BRK (22 AWG each) out the other"
   family: miniseal
   kit: {M81824/1-2: 1}
-  wires: ["93_PT1", "93_PT2", "93", "PCS_BRK", "TRANS_BRK"]   # PCS_BRK / TRANS_BRK: brake-lamp signal taps (lead round 5)
+  wires: ["93_PT1", "93_PT2", "93", "PCS_BRK", "TRANS_BRK"]   # PCS_BRK / TRANS_BRK: brake-lamp signal taps on the lead side
+  pins: {"93_PT1": "pigtail end", "93_PT2": "pigtail end", "93": "lead end", PCS_BRK: "lead end", TRANS_BRK: "lead end"}
+  splice_point: true
   note: "in-line MiniSeal M81824/1-2: both pigtails in one end, the load wire out the other; pigtails cut to the same length"
   open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
   sources: ["MoTeC PDM user manual p.44 (20 A Output 5 on A9 with A17)", "MoTeC PDM user manual p.48 (20# to 16# on 20 A outputs)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG + Raychem MiniSeal page (M81824/1 in-line series)", "book review 2026-09-28 (every single wire on a paired 20 A output)"]
@@ -934,9 +936,9 @@ PS-STUDS:
     PDM15_BPOS: [2516LTP]  # the cable is 2 AWG (cable_decisions.json): 2516LTP, 2 AWG 5/16 in, on the MEGA M8 stud     # MEGA 100 A holder, M8 stud (the PDM15 end is PDM15-STUD)
     "52": [610TP]  # 6 AWG (cable_decisions.json) on the MIDI M5 stud: ProWire 610TP                 # MIDI 40 A holder, M5 stud
     "3": [AMP-KIT-RING]           # AMP Research kit harness red lead, its own fuse (IM75146 step 8)
-    IBOOST_PERM: ["9918"]         # the Blue Sea 5065 holder's 12 AWG pigtail on the 3/8 in distribution stud (the #6 lug there is 238LTP, 3/8): ProWire 9918 12-10 AWG 3/8
+    IBOOST_PERM_FH: ["9918"]         # the Blue Sea 5065 holder's 12 AWG pigtail on the 3/8 in distribution stud (the #6 lug there is 238LTP, 3/8): ProWire 9918 12-10 AWG 3/8
     GND_RET_CAB: [238LTP, 238LTP]
-  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM]
+  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM_FH]
   open:
     - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
@@ -1190,7 +1192,7 @@ GND-BANK-ENG:
   family: ring_small
   kit: {}
   wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND", "DCDC_GND", "AMP_GND", "IBOOST_GND", "TRANS_GND"]
-  lugs: {FAN_GND: ["9918"], DCDC_GND: ["638TP"], AMP_GND: ["238LTP"], IBOOST_GND: ["638TP"]}   # heavy returns: their lug on this star (round 4: one termination per end)     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
+  lugs: {FAN_GND: ["838TP"], DCDC_GND: ["638TP"], AMP_GND: ["238LTP"], IBOOST_GND: ["638TP"]}   # heavy returns: their lug on this star (round 4: one termination per end)     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
   note: "small returns take a ring each; the heavy ones (battery negatives, G1, G2, the cab return, amplifier, iBooster, DC-DC) take lugs and sit on the PS-STUDS list"
   sources: ["owner 2026-09-27: 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'",
             "state 0i: Dave's DC primary ground-stud bank", "chapters/17 §17.4.7: PDM Batt- to battery negative"]
@@ -1438,7 +1440,7 @@ ODYSSEY:
   device: "Odyssey AGM — the running battery (owner 2026-09-27); model set by the tray, not bought yet"
   family: open
   kit: {}
-  wires: ["63", ODY_NEG, ISO_PWR, ISO_SW_PWR]
+  wires: ["63", ODY_NEG, ISO_PWR_FH, ISO_SW_PWR_FH]
   note: "the + post carries #63 to the isolator plus two small fused taps that must stay live when the truck is isolated: the isolator's own control power (red, 10 A) and the dash switch feed (5 A)"
   open: ["Odyssey model / group size: set by the tray at the mock-up", "fused-tap holders at the + post: picked with the battery terminals"]
   sources: ["owner 2026-09-27: 'we picked the batteries ... an odessey for the running and also a yellow optima for other stuff like accessories'"]
@@ -1532,7 +1534,7 @@ PCS-TCM:
   sources: ["reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.1, p.12, p.13, p.18, p.19-20"]
 PCS-HARNESS-4610:
   where: cabin
-  device: "PCS TCM2650-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads"
+  device: "PCS TCM-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads"
   family: kit_terminal
   kit: {}
   wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND", "TRANS_BATT", "TRANS_BRK"]
@@ -1548,7 +1550,7 @@ PCS-HARNESS-4610:
   open: ["kit harness path from the cab to the case connector (floor pass-through, its grommet): the kit's own run, set at the mock-up",
          "TCM-4610 harness drawing: lead labels, which case cavities come out as leads (1+4, 2+5, 3, 6, 7, 16), and whether PCS_BATT also feeds case 1+4 (research §5) — ask ZGP/PSI or read the harness label when it arrives",
          "OPEN until the TCM-4610 drawing: does the kit feed case 12 / 9 from the PCS ignition lead (then PDM15 OUT13 carries their wake current)"]
-  sources: ["web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller'; TCM2650-4610)",
+  sources: ["web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller')",
             "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.2 ('12V Battery, Ignition and Grounds'), p.11, p.18-20"]
 PCS-HARNESS-4610-CASE:
   where: chassis
@@ -1674,22 +1676,106 @@ SPL-PDM15-OUT6:
   sources: ["MoTeC PDM user manual p.43 (20 A Output 6 on B3 with B9)", "ProWire 3137CT cavities 16-12 AWG"]
 FAN-JUNCTION:
   where: engine
-  device: "fan feed junction: Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) near the PDM15 / fan breakout — two 12 AWG legs in (PDM15 OUT1, OUT6), one 12 AWG tail out to the fan"
+  device: "fan feed junction: Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) near the PDM15 / fan breakout — two 12 AWG legs in (PDM15 OUT1, OUT6), one 8 AWG tail out to the fan (the fan has one power terminal: SPAL wiring diagram)"
   family: lug
   kit: {BLUESEA-2103: 1}
-  lugs: {FAN_LEG1: ["9918"], FAN_LEG2: ["9918"], "21": ["9918"]}
+  lugs: {FAN_LEG1: ["9918"], FAN_LEG2: ["9918"], "21": ["838TP"]}
   wires: [FAN_LEG1, FAN_LEG2, "21"]
-  note: "every lug a ProWire 9918 hi-temp ring (12-10 AWG, 3/8 in); the tail runs outside the loom to the fan (free-air rating)"
+  note: "legs on ProWire 9918 hi-temp rings (12-10 AWG, 3/8 in), the 8 AWG tail on an 838TP (8 AWG, 3/8 in); all in the loom (ProWire bundled: 12 AWG 20 A, 8 AWG 40 A)"
   open: ["stud spot near the PDM15 / fan breakout: formboard"]
   sources: ["web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md", "web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md"]
+# ---------------- small fused stud feeds (round 6): Blue Sea 5065 holder + TE PIDG step-down to the circuit wire
+FUSE-DAK_CONST:
+  where: cabin
+  device: "in-line fuse for DAK_CONST: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {DAK_CONST: {part: "327639"}}
+  range_by_wire: {DAK_CONST_FH: [12, 12], DAK_CONST: [22, 18]}
+  wires: [DAK_CONST_FH, DAK_CONST]
+  pins: {DAK_CONST_FH: "line pigtail (in the holder)", DAK_CONST: "load pigtail -> step splice 327639"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+FUSE-PCS_BATT:
+  where: cabin
+  device: "in-line fuse for PCS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A PROVISIONAL (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {PCS_BATT: {part: "327639"}}
+  range_by_wire: {PCS_BATT_FH: [12, 12], PCS_BATT: [22, 18]}
+  wires: [PCS_BATT_FH, PCS_BATT]
+  pins: {PCS_BATT_FH: "line pigtail (in the holder)", PCS_BATT: "load pigtail -> step splice 327639"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+FUSE-TRANS_BATT:
+  where: cabin
+  device: "in-line fuse for TRANS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 7.5 A (5240); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {TRANS_BATT: {part: "327639"}}
+  range_by_wire: {TRANS_BATT_FH: [12, 12], TRANS_BATT: [22, 18]}
+  wires: [TRANS_BATT_FH, TRANS_BATT]
+  pins: {TRANS_BATT_FH: "line pigtail (in the holder)", TRANS_BATT: "load pigtail -> step splice 327639"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+FUSE-IBOOST_PERM:
+  where: engine
+  device: "in-line fuse for IBOOST_PERM: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {IBOOST_PERM: {part: "327638"}}
+  range_by_wire: {IBOOST_PERM_FH: [12, 12], IBOOST_PERM: [16, 14]}
+  wires: [IBOOST_PERM_FH, IBOOST_PERM]
+  pins: {IBOOST_PERM_FH: "line pigtail (in the holder)", IBOOST_PERM: "load pigtail -> step splice 327638"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+FUSE-ISO_PWR:
+  where: engine
+  device: "in-line fuse for ISO_PWR: Blue Sea 5065 waterproof ATO/ATC holder, fuse 10 A (5241); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {ISO_PWR: {part: "327638"}}
+  range_by_wire: {ISO_PWR_FH: [12, 12], ISO_PWR: [16, 14]}
+  wires: [ISO_PWR_FH, ISO_PWR]
+  pins: {ISO_PWR_FH: "line pigtail (in the holder)", ISO_PWR: "load pigtail -> step splice 327638"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+FUSE-ISO_SW_PWR:
+  where: engine
+  device: "in-line fuse for ISO_SW_PWR: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638"
+  family: none
+  kit: {}
+  count_once: true
+  per_end: {part: BLUESEA-5065}
+  per_end_wire: {ISO_SW_PWR: {part: "327638"}}
+  range_by_wire: {ISO_SW_PWR_FH: [12, 12], ISO_SW_PWR: [16, 14]}
+  wires: [ISO_SW_PWR_FH, ISO_SW_PWR]
+  pins: {ISO_SW_PWR_FH: "line pigtail (in the holder)", ISO_SW_PWR: "load pigtail -> step splice 327638"}
+  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
+  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+
 SPL-PDM15-OUT13:
   where: engine
-  device: "PCS ignition step-up splice by the PDM15: the 20 AWG OUT13 pin lead (PCS_IGN_PT) and the 14 AWG run through bulkhead P (PCS_IGN) in a stub splice"
-  family: miniseal
-  kit: {}
+  device: "PCS ignition step splice by the PDM15: TE PIDG step-down butt splice 327583 (22-18 AWG one end, 16-14 AWG the other) joins the 20 AWG OUT13 pin lead (PCS_IGN_PT) to the 14 AWG run through bulkhead P (PCS_IGN)"
+  family: none
   wires: ["PCS_IGN_PT", "PCS_IGN"]
-  note: "stub splice: 20 AWG (1,020 CM) + 14 AWG (4,110 CM) = 5,130 CM, the 16-12 AWG cavity band (ProWire 3137CT)"
-  sources: ["MoTeC PDM user manual p.9 (8 A outputs 24#-20#)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG"]
+  pins: {PCS_IGN_PT: "20 AWG end", PCS_IGN: "14 AWG end"}
+  per_end: {part: "327583"}
+  count_once: true
+  kit: {CPA-100-3/8-RED: 1}   # one 4 ft stick for all seven PIDG step splices (see note)
+  range_by_wire: {PCS_IGN_PT: [22, 18], PCS_IGN: [16, 14]}
+  note: "no MiniSeal covers 20 and 14 AWG in one barrel; the PIDG step-down takes each gauge in its own end; TE lists it not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied; TE gives no OD for 327583, its recovered inside diameter is 3.89 mm (web_snapshots/www.te.com__product-327583.md), well under 9.5 mm; a 2.2 in piece: the 32.13 mm splice + 12 mm onto each wire). One 4 ft stick of CPA-100-3/8-RED covers all seven step splices (6 x 2.6 in + 2.2 in = 18 in)"
+  sources: ["MoTeC PDM user manual p.9 (8 A outputs 24#-20#)", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327583: 16-14 AWG, 22-18 AWG; Sealable No)"]
 SPL-PDM15-OUT7:
   where: engine
   device: "PDM15 OUT7 pigtail splice — pins B5 + B11 (2 × 16 AWG) joined to the LTCD feed #64 (16 AWG)"

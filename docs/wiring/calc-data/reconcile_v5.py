@@ -270,9 +270,9 @@ IMPLIED = [
      "ECU'; Blue Sea 7700 yellow = LED output, the LED's ground while the switch is closed (instructions p.2); M1 hardware spec "
      "p.9: universal digital input, switchable 3k3 pull-up via diode to +5 V, programmable trigger levels +/-10 V, peak 200 V — "
      "reads the yellow low when closed, high when open; the M1 tune shuts the engine down when it reads open"),
-    ("DAK_CONST", "Dakota VHX CONST. POWER (always-hot, fused)", "PDM30-STUD (5 A inline fuse)", "DAKOTA-VHX (CONST. POWER)", 18, "M22759/32",
+    ("DAK_CONST", "Dakota VHX CONST. POWER (always-hot, fused)", "FUSE-DAK_CONST (load pigtail, step splice 327639)", "DAKOTA-VHX (CONST. POWER)", 18, "M22759/32",
      "DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6"),
-    ("PCS_BATT", "PCS TCM-2650 constant 12V (5A)", "PDM30-STUD (5 A inline fuse)", "PCS harness B+", 18, "M22759/32",
+    ("PCS_BATT", "PCS TCM-2650 constant 12V (5A)", "FUSE-PCS_BATT (load pigtail, step splice 327639)", "PCS harness B+", 18, "M22759/32",
      "receipts/2026-07-12_6l80e-can-master-ruling.md F3"),
     ("PCS_IGN_PT", "PDM15 OUT13 pin lead to the PCS ignition step-up splice", "PDM15:OUT13", "SPL-PDM15-OUT13", 20, "M22759/32",
      "MoTeC PDM user manual p.9: 8 A outputs take 24#-20# in the Superseal pin; the run to the cab crosses body bulkhead P, whose size 12 DTP contacts take 14-12 AWG (customconnectorkits DTP04-4P-L012 / 0460-204-12141), so the 20 AWG pin lead steps up to 14 AWG at a stub splice"),
@@ -291,7 +291,7 @@ IMPLIED = [
     ("PCS_REV", "PCS lever-position switched output (reverse) -> PDM reverse-lamp input", "PCS PWM vs Lever Position", "PDM30:DIG15 (B17) reverse", 22, "M22759/32",
      "ZGP guide p.19-20"),
     # ---- 6L90 case connector (TRANS-CASE) through the PCS TCM-4610 kit harness (lead 2026-09-28)
-    ("TRANS_BATT", "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)", "PDM30-STUD (7.5 A inline fuse)",
+    ("TRANS_BATT", "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)", "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
      "PCS-HARNESS-4610 (case battery lead, cavities 1 + 4)", 18, "M22759/32",
      "Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: power 'supplies power to the transmission solenoids ... a constant battery source capable of supplying 5 amps'; "
      "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 1 and 4 RED/WHT 18 GA 12V BATTERY. Fuse >= 1.25 x 5 A = 6.25 A -> 7.5 A; 18 AWG carries 9 A at 100 C "
@@ -329,13 +329,23 @@ FANPWM = ("SPAL brushless PWM requirements (Kartek, image https://www.kartek.com
           "the low' on the white wire. PDM outputs are high side only (PDM manual p.22), so the M130 drives it: A34 OUT_HB6 is unused "
           "(M130 pinout) and a half bridge's 'high and low side drivers can be PWM', low side to 20 kHz (M1 hardware techspec, Half "
           "Bridge Output). 20 AWG: the kit's control terminals take 20-18 ga (ProWire 30130628), the 61-pin #20 contacts 20-24 AWG")
-FANJ = ("fan junction (round 3 close): PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, 12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg; both legs and the 12 AWG fan tail land on FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) on ProWire 9918 rings (12-10 AWG, 3/8 in). Limits 16 A per output, 32 A total >= 1.25 x 25 A. Each output's pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. Each leg carries 16 A: 12 AWG singles 38 A (ProWire singles table, 60 C difference), 0.85 x 38 = 32.3 >= 16. The tail carries 32 A: it needs 32 / 0.85 = 37.6 A, the singles table gives 38 A — only in free air at <= 90 C ambient (the hot-soak OPEN and the outside-the-loom routing apply to the tail)")
+FANJ = ("fan junction (round 3 close; round 6: all in the loom): the SPAL 30107090 has ONE power terminal and ONE ground terminal "
+        "(SPAL brushless wiring diagram: one red lead through one fuse, one black to chassis ground, white PWM, blue override, yellow unused; "
+        "ProWire 30130628 kit: (2) large terminals to suit 12 ga wire = power + ground, (2) small 20-18 ga control terminals), so the two "
+        "outputs join at FAN-JUNCTION. PDM15 OUT1 and OUT6 each feed 2 x 16 AWG pigtails into their own M81824/1-3 (2 x 2,580 = 5,160 CM, "
+        "12 AWG equivalent, in the 16-12 cavity) -> a 12 AWG leg to FAN-JUNCTION, a Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A). "
+        "Limits 16 A per output, 32 A total >= 1.25 x 25 A. Pigtails: 2 x 12 A at 100 C (PDM manual p.48) = 24 A, 0.85 x 24 = 20.4 >= 16. "
+        "Each 12 AWG leg carries 16 A: ProWire Tefzel chart bundled 20 A, 0.85 x 20 = 17 >= 16 (in the loom). The tail (#21) and its "
+        "ground (FAN_GND) carry up to 32 A: 8 AWG, ProWire bundled 40 A, 0.85 x 40 = 34 >= 32 (in the loom), on the Yazaki 7116-3250 "
+        "375 L female 10-8 AWG terminal + 7158-3035 10-8 AWG seal that ProWire lists for the same SPAL housing (" + "web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md" + ": 'Larger "
+        "terminals and seals are available separately'). The bundled rating is a 35 C rise; M22759 is rated to 150 C (ProWire M22759/32 "
+        "page), so the tail holds to 115 C ambient")
 IMPLIED += [("FAN_LEG1", "Fan feed leg 1: PDM15 OUT1 (pigtail splice) -> FAN-JUNCTION stud", "PDM15:OUT1", "FAN-JUNCTION (stud)", 12,
              "M22759/32", FANJ),
             ("FAN_LEG2", "Fan feed leg 2: PDM15 OUT6 (pigtail splice) -> FAN-JUNCTION stud", "PDM15:OUT6", "FAN-JUNCTION (stud)", 12,
              "M22759/32", FANJ)]
-BRANCH_EXTRA["FAN_LEG1"] = {"color": "red", "free_air": True, "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)", "length_ft": None, "length_basis": "short leg from the splice to the stud; formboard"}
-BRANCH_EXTRA["FAN_LEG2"] = {"color": "red", "free_air": True, "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)", "length_ft": None, "length_basis": "short leg from the splice to the stud; formboard"}
+BRANCH_EXTRA["FAN_LEG1"] = {"color": "red", "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)", "length_ft": None, "length_basis": "short leg from the splice to the stud; formboard"}
+BRANCH_EXTRA["FAN_LEG2"] = {"color": "red", "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) — OUT1 and OUT6 on one channel (p.22)", "length_ft": None, "length_basis": "short leg from the splice to the stud; formboard"}
 IMPLIED += [("FUEL_SND_LEAD", "Fuel sender signal lead: the #98 / #117 splice to DT pin 1 above the tank lid", "SPL-FUEL-SND (lead side)",
              "FUEL-LEVEL (1)", 20, "M22759/32",
              "the two instruments' sender wires join in ONE in-line splice (M81824/1-2, blue: 2 x 20 AWG = 2,040 CM, 16 AWG equivalent, one side; "
@@ -346,8 +356,8 @@ IMPLIED += [("FAN_PWM", "Radiator fan speed: M130 A34 low-side PWM -> SPAL white
              "M22759/32", FANPWM)]
 BRANCH_EXTRA["FAN_PWM"] = {"length_ft": 4.6, "length_basis": "cut list v4.2 zone estimate (the M130-to-engine-bay runs)",
                            "control": "M1 tune: A34 as a low-side PWM fan output at 100 Hz; set speed 25-100 % over 10-90 % duty (SPAL chart)"}
-IMPLIED += [("FAN_GND", "Radiator fan ground (SPAL 30107090 black) in the loom to the ground star", "FAN (ground)", GSTAR_EARLY, 12,
-             "M22759/32", SPALD + "; the fan had no ground wire in the registry; grounds run in the loom (state row 56)")]
+IMPLIED += [("FAN_GND", "Radiator fan ground (SPAL 30107090 black) in the loom to the ground star", "FAN (ground)", GSTAR_EARLY, 8,
+             "M22759/16", FANJ + "; " + SPALD + "; the fan had no ground wire in the registry; grounds run in the loom (state row 56)")]
 BRANCH_EXTRA["FAN_GND"] = {"color": "black", "length_ft": 2.2, "length_basis": "follows #21 (twin: battery -> K5H_RadFan_1, x 1.2 pad)"}
 IMPLIED += [("PUMP_GND", "Fuel pump ground: hanger ground terminal, in the loom beside #66, to the engine-bay ground star", "FUEL-PUMP (hanger ground)",
              GSTAR_EARLY, 14, "M22759/32", "QFS P367 5.1 A (highflowfuel.com); matches the #66 feed gauge; returns in the loom with "
@@ -613,6 +623,23 @@ IMPLIED += [
 ]
 
 
+# ---- fused stud feeds, round 6: stud <- ring <- Blue Sea 5065 line pigtail (12 AWG) | fuse | load pigtail (12 AWG) -> TE PIDG step-down -> circuit wire
+IMPLIED += [
+    ("DAK_CONST_FH", "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "PDM30-STUD (5 A inline fuse)", "FUSE-DAK_CONST (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+    ("PCS_BATT_FH", "PCS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "PDM30-STUD (5 A PROVISIONAL inline fuse)", "FUSE-PCS_BATT (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+    ("TRANS_BATT_FH", "TRANS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "PDM30-STUD (7.5 A inline fuse)", "FUSE-TRANS_BATT (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 18 AWG circuit wire at a TE PIDG step-down butt splice 327639 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+    ("IBOOST_PERM_FH", "IBOOST_PERM fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "PS-STUDS (distribution stud, 5 A fuse)", "FUSE-IBOOST_PERM (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+    ("ISO_PWR_FH", "ISO_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "ODYSSEY (+, 10 A fuse)", "FUSE-ISO_PWR (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+    ("ISO_SW_PWR_FH", "ISO_SW_PWR fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud", "ODYSSEY (+, 5 A fuse)", "FUSE-ISO_SW_PWR (line pigtail)", 12,
+     "Blue Sea 5065 pigtail (supplied)", "Blue Sea 5065 'Supplied with 12 AWG pigtails' (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md); the stud ring sits on this pigtail; the holder's load pigtail (12 AWG) steps down to the 16 AWG circuit wire at a TE PIDG step-down butt splice 327638 (web_snapshots/www.te.com__product-CAT-P592-ST433.md)"),
+]
+
+
 IMPLIED += [
     # ---- lamp and device grounds (the April cut list carried none)
     _gnd("HL_L_GND", "Left headlight ground", "HEADLIGHT-L", GFL, 16),
@@ -740,7 +767,7 @@ IMPLIED += [
     #      used on road/street vehicles', and MoTeC puts the isolator on battery positive (PDM user manual p.7)
     ("ISO_OUT", "Isolator stud B to the distribution stud", "PS-STUDS (isolator stud B)", "PS-STUDS (distribution stud)", 2, "M22759/16",
      MOTEC_ISO + "; " + BLUESEA + "; chapters/17 §17.3: battery -> isolator -> distribution stud"),
-    ("ISO_PWR", "Isolator control power (red, 24 hr) from the Odyssey positive, fused 10 A at the battery", "ODYSSEY (+, 10 A fuse)",
+    ("ISO_PWR", "Isolator control power (red, 24 hr) from the Odyssey positive, fused 10 A at the battery", "FUSE-ISO_PWR (load pigtail, step splice 327638)",
      "ISOLATOR (red, +12 V 24 hr)", 16, "M22759/32", BLUESEA + " — 'Connect the red wire through a 10A (min) circuit protection "
      "device to DC+ ... a direct connection to the battery' (p.2)"),
     ("ISO_GND", "Isolator control ground (black) to the ground star", "ISOLATOR (black, ground)", GSTAR, 16, "M22759/32",
@@ -754,7 +781,7 @@ IMPLIED += [
     ("ISO_LED", "Isolator state output (yellow) to the dash switch LED ground, pin 7", "ISOLATOR (yellow, LED output)",
      "ISO-SWITCH (2145 pin 7, LED ground)", 16, "M22759/32", BLUESEA + " — 'Connect the LED Ground terminal of the Control "
      "Switch, pin 7, to the yellow wire' (p.2); the M130 shutdown input tees off it in the cab (ISO_KILL)"),
-    ("ISO_SW_PWR", "Dash switch feed (pin 2 common + pin 8 LED power) from the Odyssey positive, 24 hr", "ODYSSEY (+, 5 A fuse)",
+    ("ISO_SW_PWR", "Dash switch feed (pin 2 common + pin 8 LED power) from the Odyssey positive, 24 hr", "FUSE-ISO_SW_PWR (load pigtail, step splice 327638)",
      "ISO-SWITCH (2145 pins 2 + 8)", 16, "M22759/32", BLUESEA + " — pin 2 'through a 2A (min) circuit protection device to DC+. "
      "Use a 24-hour power source (connected directly to the battery)'; pin 8 'can share the same wire/fuse' (p.2); 5 A keeps the "
      "fuse above Blue Sea's 2 A minimum and under the 16 AWG wire's rating (chapters/16) — " + AGENT),
@@ -800,7 +827,7 @@ IMPLIED += [
     # ---- iBooster wake and E-Stopp ignition safety from spare PDM30 outputs
     ("IBOOST_WAKE", "iBooster ignition 12 V (pin 20) from the body PDM", "PDM30:OUT9", "IBOOSTER (20, ignition 12 V)", 20,
      "M22759/32", IBOOST + "; PDM30 OUT9 (8 A, set to 5 A) freed when the step motors moved behind their own controller"),
-    ("IBOOST_PERM", "iBooster Gen 1 second always-hot (pin 17, 5 A)", "PS-STUDS (distribution stud, 5 A fuse)", "IBOOSTER (17, always-hot 5 A)", 16,
+    ("IBOOST_PERM", "iBooster Gen 1 second always-hot (pin 17, 5 A)", "FUSE-IBOOST_PERM (load pigtail, step splice 327638)", "IBOOSTER (17, always-hot 5 A)", 16,
      "M22759/32", "web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md: 'M 17 - Always Hot Power (5A Fuse)'; web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md: '1.50 mm² – Red (FLRYW) – Always Hot Power (recommended to use a 5A "
      "Fuse)'; 16 AWG matches the 1.50 mm² lead and carries 9 A at 100 C over the 5 A fuse (MoTeC PDM manual p.48)"),
     ("ESTOPP_IGN", "E-Stopp safety-to-ignition (wire F, blue)", "PDM30:OUT10", "E-STOPP (F, blue)", 20, "M22759/32",
@@ -808,6 +835,8 @@ IMPLIED += [
 ]
 IMPLIED_EXTRA_0927.update({
     "BLOWER_HI": {"control": "blower switch HI contact on PDM30 DIG7"},
+    "DAK_CEL": {"color": "white", "color_basis": "a SIGNAL line, not a ground: black is ground in this book (state 0f(a)); white is Dave's one-colour signal stock (state 0i: white 22 AWG + colour-ring codes; SIGNAL_RULE)"},
+    "ISO_KILL": {"color": "white", "color_basis": "a SIGNAL line, not a ground: black is ground in this book (state 0f(a)); white is Dave's one-colour signal stock (state 0i: white 22 AWG + colour-ring codes; SIGNAL_RULE)"},
     "DAK_BRAKE": {"color": "green", "color_basis": "the E-Stopp lead it continues is wire E, green (ESK001 wiring diagram); a switched-ground SIGNAL, so not black (black = ground in this book, state 0f(a))"},
     "RADIO_CONST": {"control": "always on (the PDM30 stays awake key-off: hazards and locks need it)"},
     "IBOOST_WAKE": {"control": "PDM30 DIG1 ignition RUN"},
@@ -917,11 +946,11 @@ LTCD_WHY = ("LTCD manual p.31: 110 mA typical plus the heater current, heater 0.
 CAN_CMD = "CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)"
 D0927 = {
     # engine PDM loads (PDM15 in the engine bay: no firewall crossing for these feeds)
-    "21": {"frm": "FAN-JUNCTION (stud: the 12 AWG tail to the fan)", "free_air": True, "control": "CAN: M130 fan request (" + CAN_CMD + ") — OUT1 and OUT6 on one channel (PDM manual p.22)",
+    "21": {"frm": "FAN-JUNCTION (stud: the 8 AWG tail to the fan)", "awg": 8, "spec": "M22759/16", "control": "CAN: M130 fan request (" + CAN_CMD + ") — OUT1 and OUT6 on one channel (PDM manual p.22)",
            "why": ("one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__"
                    "spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled "
                    "(p.6: 'can be connected in parallel to increase current capacity'); " + AGENT),
-           "note": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail",
+           "note": "8 AWG in the loom (ProWire bundled 40 A >= 32 / 0.85): the outside-the-loom and hot-soak conditions of round 3 are closed (see FANJ)",
            "length_ft": 2.2, "length_basis": ("twin: K5H_Battery (the PDM15's working position 'by the battery'; the twin has no PDM15 "
                                                "object) to K5H_RadFan_1, 0.55 m = 1.8 ft axis-aligned (twin_centers.json), x 1.2 engine pad "
                                                "(state row 33); not taped on the truck"),
@@ -1395,7 +1424,7 @@ IMPLIED_DECISIONS = {
     "VSS_GND": {"awg": 20, "spec": "M22759/32", "why": "crosses the body bulkhead FIREWALL-BODY-C, a Deutsch DT04-6P-L012 ('Wire Range: 14-20 AWG', size 16, 13 A — web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md): 22 AWG is under its floor, so 20 AWG M22759/32 (round 3)"},
     "VSS_DAK": {"awg": 20, "spec": "M22759/32", "why": "crosses the body bulkhead FIREWALL-BODY-C, a Deutsch DT04-6P-L012 ('Wire Range: 14-20 AWG', size 16, 13 A — web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md): 22 AWG is under its floor, so 20 AWG M22759/32 (round 3)"},
     "IBOOST_PERM": {"note": "source OPEN (isolator decision, research/2026-09-28_ibooster-gen2-wiring.md §4): A = Odyssey + post, battery side of the Blue Sea 7700, fused at the post; B = the distribution stud downstream of the isolator (as designed, the default until the owner/Dave call)"},
-    "FAN_GND": {"note": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail"},
+    "FAN_GND": {"note": "8 AWG in the loom beside #21, carrying the same up-to-32 A (FANJ)"},
     # ---- 8: the PCS TCM-2650 as an endpoint (its harness plug waits on the ZGP drawing; the pins say so)
     "PCS_BATT": {"to": "PCS-HARNESS-4610 (12 V battery lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 constant 12 V; endpoint PCS-TCM (book review 2026-09-28)"},
     "PCS_IGN": {"to": "PCS-HARNESS-4610 (ignition lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM"},
@@ -1688,7 +1717,7 @@ def colours(rows):
                 pass                                  # a switch input to a PDM: a signal, not a power or ground wire
             elif re.search(r"GND|ground|negative|\(-\)|\bRET\b|\b0 ?V\b", txt, re.I) or re.search(r"^PDM(30|15):(A28|B22)\b", frm):
                 new, why = "black", COLOUR_RULE
-            elif re.search(r"^PDM(30|15):OUT|^SPL-PDM|^PS-STUDS|^PDM30-STUD|[Dd]istribution stud|ODYSSEY \(\+|ACC-BATT \(\+|DCDC \(OUT", frm) \
+            elif re.search(r"^PDM(30|15):OUT|^SPL-PDM|^PS-STUDS|^PDM30-STUD|^FUSE-|[Dd]istribution stud|ODYSSEY \(\+|ACC-BATT \(\+|DCDC \(OUT", frm) \
                     or re.search(r"feed|\+12|power|battery|BPOS", txt, re.I):
                 new, why = "red", COLOUR_RULE
         if not new and not w.get("color") and isinstance(w.get("awg"), int):
@@ -1726,7 +1755,7 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM30", 2): (None, "needs the 4 Seasons 35587 blower current on HIGH (no published rating: measure)"),
     ("PDM30", 3): (11.0, "Nu-Relics 17383-2 ACI motor 11 A high load, 20 A stall (web_snapshots/www.nu-relics.com__17383-2.md); the master can also run the passenger motor (22 A) — OPEN"),
     ("PDM30", 4): (11.0, "Nu-Relics 17383-2 ACI motor 11 A high load, 20 A stall (web_snapshots/www.nu-relics.com__17383-2.md)"),
-    ("PDM30", 5): (0.5, "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md)"),
+    ("PDM30", 5): (0.5, "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none)"),
     ("PDM30", 6): (None, "needs the 4 Seasons 35587 blower current on LOW/MED through the resistor (measure)"),
     ("PDM30", 7): (None, "needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)"),
     ("PDM30", 8): (15.0, "Blue Sea 1011 dash socket, 15 A max (web_snapshots/www.bluesea.com__Dash_Socket_12V_DC_with_Watertight_Cap.md)"),
@@ -1770,6 +1799,9 @@ def pdm_settings(reg):
     for w in W.values():
         for m in re.finditer(r"\b(PDM30|PDM15):(OUT\d+)", str(w.get("frm") or "") + " " + json.dumps(w.get("to") or "")):
             by_out[(m.group(1), int(m.group(2)[3:]))].append(w["id"])
+        m = re.match(r"SPL-(PDM30|PDM15)-OUT(\d+)", str(w.get("frm") or ""))    # round 6: a tap or step-up run off a pigtail splice
+        if m and not w.get("pigtail_of"):
+            by_out[(m.group(1), int(m.group(2)))].append(w["id"])
     rows = []
     for (box, n), (amps, src) in sorted(PDM_LOADS.items()):
         loads = sorted(set(by_out.get((box, n), [])))
@@ -1791,8 +1823,16 @@ def pdm_settings(reg):
         else:
             need = max(1, math.ceil(1.25 * amps / outs))
             top = min(hw, math.floor(0.85 * cap)) if cap else hw
-            status = ("set" if need <= top else f"CONFLICT: needs {need} A per output, the thinnest conductor allows "
-                      f"{top} A (0.85 x {round(cap, 1)} A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it")
+            wire_top = math.floor(0.85 * cap) if cap else None
+            if need <= top:
+                status = "set"
+            elif wire_top is not None and need > wire_top:
+                status = (f"CONFLICT: needs {need} A per output, the thinnest conductor allows {wire_top} A (0.85 x {round(cap, 1)} A, "
+                          f"PDM manual p.48 {'100' if col else '80'} C column / ProWire tables) — a heavier wire or pigtail closes it")
+            else:
+                status = (f"CONFLICT: needs {need} A per output; the wire allows {wire_top} A (0.85 x {round(cap, 1)} A, PDM manual p.48 "
+                          f"{'100' if col else '80'} C column) but this is an {'8' if hw == 10 else '20'} A output whose setting stops at "
+                          f"{hw} A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it")
             if (box, n) in CONTACT_CAP and need > CONTACT_CAP[(box, n)][0]:
                 cc = int(CONTACT_CAP[(box, n)][0])      # the contact rating caps the limit (whole amps under it)
                 status, need = "set", cc
@@ -1814,13 +1854,18 @@ def pdm_settings(reg):
 
 
 
+SPLICE_TAPS = {   # signal taps landing in a PDM pigtail splice's lead side (round 6): sized per end, ProWire 3137CT bands
+    # (red 26-20 / blue 20-16 / yellow 16-12): pigtail end 2 x 20 AWG = 2,040 CM; lead end #93 20 AWG + PCS_BRK / TRANS_BRK 22 AWG
+    # = 1,020 + 2 x 640 = 2,300 CM — both ends inside the blue 20-16 band (1,020-2,580 CM), so M81824/1-2 holds
+    "SPL-PDM30-OUT5": ["PCS_BRK", "TRANS_BRK"],
+}
 INLINE_FUSES = {   # every inline fuse gets a protection record (standards review, round 4; round 5: holder + fuse part)
     # wire: (value, source, fuse part). One holder family for every small inline fuse in the truck: Blue Sea 5065 waterproof
     # in-line ATO/ATC holder, 12 AWG pigtails, 30 A max fuse (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md);
     # the smaller circuit wire joins its pigtail at a D-609 stub splice sized by combined CM. Fuses: Blue Sea ATO/ATC 5237 3 A, 5239 5 A,
     # 5240 7.5 A, 5241 10 A (web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md).
     "DAK_CONST": ("5 A inline fuse at the PDM30 stud", "Dakota VHX manual 650314:P p.6: 'The constant +12V supply source should be a fused 5 - 20 amp circuit, the system draws less than 1 amp' and 'Use 18 AWG wire' — the lowest value in the maker's range (the earlier 3 A had no source and sat under it)", "BLUESEA-5239"),
-    "PCS_BATT": ("5 A inline fuse at the PDM30 battery stud", "PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing", "BLUESEA-5239"),
+    "PCS_BATT": ("5 A PROVISIONAL inline fuse at the PDM30 battery stud", "PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing", "BLUESEA-5239"),
     "TRANS_BATT": ("7.5 A inline fuse at the PDM30 battery stud", "Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 11 A at 80 C (MoTeC PDM manual p.48, cab)", "BLUESEA-5240"),
     "ISO_PWR": ("10 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'", "BLUESEA-5241"),
     "ISO_SW_PWR": ("5 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating", "BLUESEA-5239"),
@@ -1832,7 +1877,9 @@ INLINE_HOLDER = "BLUESEA-5065"
 
 def inline_fuses(rows, reg=None):
     for w in rows:
-        f = INLINE_FUSES.get(str(w["id"]))
+        wid = str(w["id"])
+        pig = wid.endswith("_FH") and wid[:-3] in INLINE_FUSES          # the holder's line pigtail carries the same record
+        f = INLINE_FUSES.get(wid[:-3] if pig else wid)
         if not f or w.get("retired"):
             continue
         if f[2] is None:
@@ -1840,9 +1887,9 @@ def inline_fuses(rows, reg=None):
             continue
         w["protection"] = f"{f[0]} ({f[1]}). Holder: Blue Sea 5065 waterproof in-line ATO/ATC ({INLINE_HOLDER}); fuse: {f[2]}"
         w["protection_parts"] = {"holder": INLINE_HOLDER, "fuse": f[2]}
-        if reg is not None:
+        if reg is not None and not pig:
             bom = reg.setdefault("bom", {}).setdefault("parts", {})
-            for code in (INLINE_HOLDER, f[2]):
+            for code in (f[2],):                  # the holder is counted at its FUSE-<wire> endpoint (kits, per_end)
                 bom[code] = bom.get(code, 0) + 1
 
 # endpoint fields the kit build does not carry, copied from the catalog into the registry (review A10: CAN topology as data)
@@ -2019,10 +2066,13 @@ def main():
         if w["id"].endswith("_PT1"):
             load = w["pigtail_of"]
             legs = [x["id"] for x in pigtails if x["pigtail_of"] == load]
-            reg["splices"].append({"at": spl, "wires": legs + [load], "splice": w["splice"],
-                                   "type": "in-line", "sides": [legs, [load]],
+            taps = SPLICE_TAPS.get(spl, [])     # round 6: taps share the pigtail splice's lead side (one splice, one S-##)
+            reg["splices"].append({"at": spl, "wires": legs + [load] + taps, "splice": w["splice"],
+                                   "type": "in-line", "sides": [legs, [load] + taps],
                                    "equiv_awg": [kits_v5.awg_equiv(len(legs) * kits_v5.CMA[w["awg"]]),
-                                                 next(x["awg"] for x in list(wires) + list(implied) if x["id"] == load)]})
+                                                 (next(x["awg"] for x in list(wires) + list(implied) if x["id"] == load) if not taps else
+                                                  kits_v5.awg_equiv(sum(kits_v5.CMA[x["awg"]] for x in list(wires) + list(implied)
+                                                                        if x["id"] in [load] + taps)))]})
     OUT_REG.write_text(json.dumps(reg, indent=1, ensure_ascii=False) + "\n")
     write_report(wires, candidates, implied, apr, pairs)
     print(f"registry: {len(wires)} active ({sum(1 for w in wires if w.get('retired'))} retired), "
