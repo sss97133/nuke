@@ -12,15 +12,17 @@ boxes:
   - id: M130
     what: Engine computer (MoTeC M130)
     nodes: [M130-A]
-    where: Cab, passenger side, on the cab face of the firewall behind the glovebox, next to where the 61-pin comes through
+    where: Cab side, close to the 61-pin, which now goes at the driver-side fuse-box hole. The exact spot waits on Dave.
     zone: cab
-    status: proposed
+    status: open
     decision: k5-m130-location
     why:
+      - text: "Owner call: the ECU and PDMs go \"somewhere awesome and safe\". The 61-pin moves to the original fuse-box hole (driver side), so the ECU moves with it; the passenger-side spot below is superseded."
+        source: owner, 2026-09-29, in the pieces window (relayed by the pieces lane)
       - text: MoTeC's own limits make it a cab part. It is not a sealed engine-bay box ("protected location, occasional splash only"), it tops out at 85 °C, and it should not be bolted rigid to a vibrating panel.
         source: receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC constraints)
-      - text: The 61-pin is on the passenger firewall, so the 58 engine wires come through the firewall right beside it. The tails stay short.
-        source: K5_WIRING_STATE.md §1 rows 43 and 50; COMPUTER_PLACEMENT_MEMO.md
+      - text: Keep it close to the 61-pin so the 58 engine-wire tails stay short (HP Academy's tutors revisit wire sizes past about 300 mm from bulkhead to ECU).
+        source: K5_WIRING_STATE.md §1 rows 43 and 50; HP Academy forum (Zac Perston), via the pieces lane
       - text: The pedal's 6 wires and the dash switches never leave the cab. An engine-bay ECU would add 6 more firewall crossings.
         source: K5_WIRING_STATE.md §1 row 46
       - text: Leave 60–80 mm clear below both plug faces for the Superseal plugs and their boots.
@@ -37,9 +39,9 @@ boxes:
   - id: PDM30
     what: Body power box (MoTeC PDM30), which feeds the lights, blower, wipers, windows and locks
     nodes: [PDM30-A]
-    where: Cab, passenger side under the dash, in open air on its own plate below the M130, with an air gap between them
+    where: Cab, in open air on its own plate near the M130, with an air gap between them. The spot follows the M130 (now open).
     zone: cab
-    status: proposed
+    status: open
     why:
       - text: MoTeC says a PDM "may get very hot"; mount it where air moves and never against a hot surface.
         source: MoTeC PDM manual p.3 (Mounting)
@@ -75,6 +77,7 @@ boxes:
         why_not: It costs more than a PDM15. Neither box is bought yet, so nothing is wasted either way.
     open:
       - Pick the PDM15 in the cab or a PDM16 in the bay. Nothing is bought yet (state row 0k); Dave's opinion counts here.
+      - With Dave's one-connector rule (2026-09-29) the bay PDM would also carry the front-end loads, about 22–27 outputs, which points at a sealed PDM32. See the body pass-through entry.
 
   - id: LTCD
     what: Lambda box (MoTeC LTCD), which reads both O2 sensors and sends them to the M130 over CAN
@@ -142,40 +145,37 @@ boxes:
       - This follows the battery decision.
 
   - id: FIREWALL-61
-    what: The 61-pin firewall connector (MIL D38999), which carries engine wires only
+    what: The 61-pin firewall connector (MIL D38999), the only thing through the firewall
     parts: [D38999/24WJ61SN, D38999/26WJ61PN, M85049/69-25N]
-    where: Passenger firewall, at the factory A/C-and-ECU grommet hole (H3)
+    where: Driver side, in the original fuse-box hole, on a CNC'd adapter plate
     zone: firewall
     status: decided
     why:
-      - text: One 61-pin, engine signals only; body wires never go through it.
-        source: K5_WIRING_STATE.md §1 rows 43, 50, 53
-      - text: The factory H3 hole on the passenger side carried the A/C and ECU wires.
-        source: objectTraits.ts factory_holes H3; COMPUTER_PLACEMENT_MEMO.md (fixed nodes)
+      - text: "Owner call: \"the 61 pin connector should be placed at the original fuse box hole with a cnc'd adapater plate\"."
+        source: owner, 2026-09-29, in the pieces window (relayed by the pieces lane; not yet repeated in this lead's chat)
+      - text: "Dave's rule: \"the only reason to run a 61 pin is so you dont have any other wires going through the firewall. putting a bulkhead next to it is a problem.\""
+        source: Dave via the owner, 2026-09-29 (relayed by the pieces lane)
+      - text: The factory fuse-block punch-out on the driver side is a 4 in hole, already in the firewall.
+        source: objectTraits.ts factory_holes FB
     open:
-      - The twin's firewall-connector object is misplaced (in front of the bumper). Its real spot gets measured on the truck.
-
+      - Plate drawing. The M130 moves with the connector, cab side, close to it (HP Academy's tutors revisit wire sizes past about 300 mm from bulkhead to ECU).
+      - "Questions for Dave (draft below, owner sends): the battery cables, sensor splices on the engine side, the isolator's switch wires, the rear connector."
   - id: BODY-PASS
-    what: Body pass-through (what the book calls "body bulkhead A, B, C and P"), where the non-engine wires cross the firewall
-    parts: [DT04-12PA-L012, DT04-12PB-L012, DT04-6P-L012, DTP04-4P-L012, BLUESEA-1003]
-    where: The proposal is one aluminium plate on the passenger firewall beside the 61-pin, holding all four Deutsch plugs, with the rubber cable clamps for the big battery cables next to it
+    what: Body pass-through (the book's "body bulkhead A, B, C and P") — DROPPED
+    parts: [DT04-12PA-L012, DT04-12PB-L012, DT04-6P-L012, DTP04-4P-L012]
+    where: Not used. Nothing but the 61-pin goes through the firewall (Dave's rule).
     zone: firewall
-    status: proposed
+    status: flag
     why:
-      - text: "Four Deutsch plugs carry the 30 body wires through the firewall. A (12-way): headlights low and high, parking and turn lamps, side markers, washer pump, underhood light. B (12-way): wiper, blower, horn, iBooster wake, isolator dash switch. C (6-way): speed sender. P (4-way, heavy pins): blower high, PCS ignition."
-        source: k5_registry.json endpoints FIREWALL-BODY-A/B/C/P
-      - text: They exist because the 61-pin is engine-only and its pins take 20–24 AWG wire, while the lamp and motor feeds are 20–12 AWG.
-        source: K5_WIRING_STATE.md §1 rows 43 and 50; state row 0w (body firewall crossing decided)
-      - text: GM did this job with the fuse-block bulkhead plug on the driver side. One plate here does it with sealed plugs, so the whole front of the truck unplugs from the cab in one place.
-        source: 1977 LTSM p.834 fuse block layout (docs/wiring/extracted/p0834_8-fuse-block-layout.png); objectTraits.ts FB
-      - text: The 2 AWG battery cables don't go through a plug. Each gets its own rubber Blue Sea CableClam.
-        source: k5_registry.json FIREWALL-GROMMET (Blue Sea 1003)
+      - text: "Dave, via the owner: \"putting a bulkhead next to it is a problem.\" The four Deutsch plugs were an agent's placeholder (receipt 2026-09-27, decided for you, replaceable), picked because the kits were in stock, not on a builder's advice."
+        source: Dave via the owner, 2026-09-29 (relayed by the pieces lane); receipts/2026-09-27_whole-truck-body-circuits.md
+      - text: Their 30 wires are mostly front-end loads (headlights, park/turn, markers, horn, wipers, washer, blower, underhood light, iBooster wake). A PDM in the engine bay can drive them from the cab switches over CAN, so none has to cross. MoTeC says a PDM input's state is sent over CAN and a PDM's outputs can be commanded by CAN messages.
+        source: MoTeC PDM manual p.19; k5_registry.json FIREWALL-BODY-A/B/C/P
     instead:
-      - where: The factory fuse-block opening on the driver firewall (4 in)
-        why_not: It reuses a factory hole, but the PDM30 and the 61-pin are on the passenger side, so most body wires would cross the cab.
+      - where: Front loads on a sealed bay PDM, switched over CAN (candidate)
+        why_not: The bay PDM then needs about 22–27 outputs, which is a PDM32 (sealed, 32 outputs, 120 A). A PDM16 has only 16. It is not decided until Dave answers.
     open:
-      - Plate drawing and exact spot, after the A/C box and gold-panel answers.
-
+      - "What still has to cross: the 2 AWG feed to the cab PDM and the ground returns (sealed cable clamps), and the isolator's 4 dash-switch wires. Questions for Dave."
   - id: DAKOTA
     what: Gauge box (Dakota Digital VHX control box)
     where: Cab, driver side under the dash, within 3 ft of the cluster, both terminal rows reachable
@@ -193,3 +193,16 @@ boxes:
     why:
       - text: The M130 tunes over Ethernet to a panel RJ45; the PDMs configure through a MoTeC UTC on a 5-pin XLR.
         source: K5_WIRING_STATE.md row 0k (M1 Tune manual p.10; PDM manual p.48)
+
+  - id: REAR-CONN
+    what: Rear body connector (round), for the fuel pump and level, tail and rear lamps, the speed sender and the camera
+    where: Candidate — rear floor, driver side, so the body comes off the frame with one unplug
+    zone: rear
+    status: open
+    why:
+      - text: "Owner: other bulkheads only \"the sick ones that are round\"; a small one \"in the back for fuel and tail lights and rear stuff\" is fine if it proves best."
+        source: owner, 2026-09-29, in the pieces window (relayed by the pieces lane)
+      - text: About 29 wires go to things outside the body at the rear; with their grounds spliced outside, about 20 would cross it.
+        source: k5_registry.json (rear endpoints), pieces lane count 2026-09-29
+    open:
+      - A question for Dave. The connector and its spot aren't picked.
