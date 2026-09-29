@@ -706,99 +706,11 @@ async function syncToDatabase(
   return stats;
 }
 
-// ============================================
-// Bid Snapshot Recording (for backtesting)
-// ============================================
-
-/**
- * Records current bid snapshots for BaT auctions into bat_bids.
- * This provides the bid history needed for backtesting at all time windows.
- * Runs every 15 minutes when sync-live-auctions cron fires.
- */
-async function recordBidSnapshots(
-  supabase: ReturnType<typeof createClient>,
-  auctions: LiveAuction[]
-): Promise<number> {
-  // Only record bids for BaT auctions that have a current_bid
-  const biddable = auctions.filter(a => a.current_bid && a.current_bid > 0);
-  console.log(`[bid-debug] biddable: ${biddable.length}/${auctions.length} auctions have current_bid > 0`);
-  if (biddable.length === 0) return 0;
-
-  // Build URL-to-auction map
-  const auctionByUrl = new Map<string, LiveAuction>();
-  for (const a of biddable) auctionByUrl.set(a.url, a);
-  if (biddable.length > 0) {
-    console.log(`[bid-debug] sample auction URL: ${biddable[0].url} bid: ${biddable[0].current_bid}`);
-  }
-
-  // Query ALL active BaT vehicle_events (including id for direct use as bat_listing_id)
-  const { data: extListings, error: veErr } = await supabase
-    .from("vehicle_events")
-    .select("id, vehicle_id, source_url")
-    .eq("source_platform", "bat")
-    .eq("event_status", "active")
-    .limit(10000);
-
-  console.log(`[bid-debug] vehicle_events query: ${extListings?.length ?? 0} rows, error: ${veErr?.message ?? 'none'}`);
-  if (!extListings || extListings.length === 0) return 0;
-
-  if (extListings.length > 0) {
-    console.log(`[bid-debug] sample vehicle_event URL: ${extListings[0].source_url}`);
-  }
-
-  // Filter to only those with matching sync URLs
-  const matched = extListings.filter(el => el.source_url && auctionByUrl.has(el.source_url));
-  console.log(`[bid-debug] URL matched: ${matched.length} vehicle_events match scraped auction URLs`);
-  if (matched.length === 0) {
-    // Debug: check for near-misses (trailing slash differences)
-    const sampleVE = extListings.slice(0, 3).map(e => e.source_url);
-    const sampleAuction = [...auctionByUrl.keys()].slice(0, 3);
-    console.log(`[bid-debug] NO MATCH. Sample VE URLs: ${JSON.stringify(sampleVE)}`);
-    console.log(`[bid-debug] NO MATCH. Sample auction URLs: ${JSON.stringify(sampleAuction)}`);
-    return 0;
-  }
-
-  // Build batch of bid rows directly from matched results (id already selected)
-  const now = new Date().toISOString();
-  const bidRows: Array<{
-    bat_listing_id: string;
-    vehicle_id: string;
-    bat_username: string;
-    bid_amount: number;
-    bid_timestamp: string;
-    source: string;
-    metadata: Record<string, unknown>;
-  }> = [];
-
-  for (const el of matched) {
-    const auction = auctionByUrl.get(el.source_url || "");
-    if (!auction || !auction.current_bid) continue;
-
-    bidRows.push({
-      bat_listing_id: el.id, // vehicle_events.id directly (FK dropped)
-      vehicle_id: el.vehicle_id,
-      bat_username: "bid_snapshot",
-      bid_amount: auction.current_bid,
-      bid_timestamp: now,
-      source: "bid_history",
-      metadata: { source: "sync_live_auctions" },
-    });
-  }
-
-  if (bidRows.length === 0) return 0;
-
-  // Bulk insert — duplicates impossible since timestamp is unique per run
-  const { error } = await supabase.from("bat_bids").insert(bidRows);
-
-  if (error) {
-    console.error("[sync-live-auctions] Error recording bid snapshots:", JSON.stringify(error));
-    console.error(`[sync-live-auctions] Attempted to insert ${bidRows.length} rows. Sample:`, JSON.stringify(bidRows[0]));
-    return 0;
-  }
-
-  console.log(`[sync-live-auctions] Recorded ${bidRows.length} bid snapshots for BaT auctions`);
-  return bidRows.length;
-}
+// Bid snapshots (retired 2026-09-29). recordBidSnapshots matched the live list against vehicle_events rows with
+// event_status 'active', which live lots no longer get (upsert_live_auction_listings' call is gone, see above), so it
+// wrote 0 rows on every run since 2026-07-22 (86 of 86 runs on 2026-09-29) while reading up to 10,000 stale rows per
+// run. A lot's bid history comes from its comment thread: extract-bat-core writes every bid with its timestamp
+// (bat-data coverage audit, docs/ledger/2026-09-30_bat-data-coverage-audit.md).
 
 /**
  * Updates vehicle_events with fresh bid data from the BaT sync.
@@ -1053,15 +965,9 @@ Deno.serve(async (req) => {
 
         const normalizedPlatform = platformAliases[platform] || platform;
 
-        // Record bid snapshots + update vehicle_events FIRST (fast, critical for predictions)
-        let bidSnapshotCount = 0;
+        // Refresh the live lots' event rows first (fast, read by predictions). Bid snapshots are retired (see above).
+        const bidSnapshotCount = 0;
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
-          try {
-            bidSnapshotCount = await recordBidSnapshots(supabase, syncResult.auctions);
-            console.log(`[sync-live-auctions] Recorded ${bidSnapshotCount} BaT bid snapshots`);
-          } catch (e) {
-            console.error("[sync-live-auctions] Bid snapshot error (non-fatal):", e);
-          }
           try {
             const veUpdated = await updateVehicleEvents(supabase, syncResult.auctions);
             console.log(`[sync-live-auctions] Updated ${veUpdated} vehicle_events rows`);
