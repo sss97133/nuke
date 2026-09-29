@@ -73,18 +73,34 @@ def end_text(v):
 
 
 def fuse_of(w):
-    """(kind, amps or None, text) from the wire's own from/to words: 'MEGA 125 A', 'MIDI 40 A', '10 A fuse', 'via MEGA'."""
+    """(kind, amps or None, side) from the wire's own words — its from/to ('MEGA 125 A', 'MIDI 40 A', '10 A fuse',
+    '5 A inline fuse', 'via MEGA') and its protection record (round 6: every wire with a record is fused)."""
     for side in ("frm", "to"):
         t = end_text(w.get(side))
         m = re.search(r"\b(MEGA|MIDI)\b(?:\s*(\d+)\s*A)?", t)
         if m:
             return m.group(1), (int(m.group(2)) if m.group(2) else None), side
-        m = re.search(r"(\d+)\s*A fuse", t)
+        m = re.search(r"(\d+(?:\.\d+)?)\s*A\b(?:\s+(?:PROVISIONAL|inline|in-line))*\s+fuse", t)
         if m:
-            return "", int(m.group(1)), side
+            return "", float(m.group(1)) if "." in m.group(1) else int(m.group(1)), side
         if re.search(r"kit harness fuse", t):
             return "kit fuse", None, side
+    pr = str(w.get("protection") or "")
+    if w.get("protection_parts") or re.search(r"\bfuse\b", pr, re.I):
+        m = re.search(r"(\d+(?:\.\d+)?)\s*A\b(?:\s+(?:PROVISIONAL|inline|in-line))*\s+fuse", pr)
+        side = "frm"
+        at = re.search(r"\bat the ([^(,;]+)", pr)
+        if at and at.group(1).strip() and at.group(1).strip().split()[0] in end_text(w.get("to")):
+            side = "to"
+        if m:
+            return "", float(m.group(1)) if "." in m.group(1) else int(m.group(1)), side
+        if re.search(r"kit harness fuse|\bin the kit\b", pr, re.I):
+            return "kit fuse", None, side
     return None
+
+
+def has_protection(w):
+    return bool(w.get("protection_parts")) or fuse_of(w) is not None
 
 
 def plabel(w):
@@ -331,7 +347,26 @@ def sheet_a_wires(reg, wires, eps_y):
     # ground returns that belong to sheet B (block, frame, strap, cab return) are drawn there, not here
     for wid in ("G1", "G2", "G3", "GND_RET_CAB", "AMP_GND", "IBOOST_GND"):
         ids.pop(wid, None)
-    return [w for w in ids if w in wires]
+    # a holder's line pigtail (<W>_FH) is drawn as part of its load wire's fused run (stud -> ring -> holder -> step
+    # splice -> wire): the fuse label names the holder, the pigtail's ring and the step splice
+    for w in list(ids):
+        if w.endswith("_FH") and w[:-3] in wires:
+            ids[w[:-3]] = 1                           # the stud lists the holder line; its load wire is the drawn circuit
+    return [w for w in ids if w in wires and not w.endswith("_FH")]
+
+
+def holder_words(wid):
+    """'holder BLUESEA-5065 · 12 AWG line pigtail WID_FH, ring 9918 · step splice 327638' from the FUSE-<W> endpoint's
+    rows (registry round 6 data), or '' when the wire has no holder node."""
+    ts = _term_rows()
+    fh = f"{wid}_FH"
+    if fh not in ts and not any(t["endpoint"] == f"FUSE-{wid}" for t in ts.get(wid, [])):
+        return ""
+    ring = next((term_lug(t, {}) or t.get("part") for t in ts.get(fh, []) if not t["endpoint"].startswith("FUSE-")), None)
+    hold = next((t.get("part") for t in ts.get(fh, []) if t["endpoint"].startswith("FUSE-")), None)
+    step = next((t.get("part") for t in ts.get(wid, []) if t["endpoint"].startswith("FUSE-")), None)
+    return " · ".join(x for x in (f"holder {hold}" if hold else "", f"line pigtail {fh}" + (f", ring {ring}" if ring else ""),
+                                   f"step splice {step}" if step else "") if x)
 
 
 P = 22                                                   # row pitch on sheet A
@@ -381,7 +416,13 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
     conn = OrderedDict()
     for wid in wids:
         w = wires[wid]
-        a, b = resolve(end_text(w.get("frm"))), resolve(end_text(w.get("to")))
+        fa, fb = end_text(w.get("frm")), end_text(w.get("to"))
+        # a fused feed that starts at its in-line holder (FUSE-<W>) is drawn from where the holder's line pigtail starts
+        if fa.startswith("FUSE-") and f"{wid}_FH" in wires:
+            fa = end_text(wires[f"{wid}_FH"].get("frm"))
+        if fb.startswith("FUSE-") and f"{wid}_FH" in wires:
+            fb = end_text(wires[f"{wid}_FH"].get("frm"))
+        a, b = resolve(fa), resolve(fb)
         if a is None or b is None:
             raise SystemExit(f"DC primary: cannot place wire {wid}: {w.get('frm')} -> {w.get('to')}")
         nodes = [a, b]
@@ -470,6 +511,8 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
             reason = f"{titles.get(node, node).split(' — ')[0]} terminal part not named"
         return f"OPEN {notes.tag(reason)}", True
 
+    notes_holder = []
+
     def fuse_mark(wid):
         f = fuse_of(wires[wid])
         if not f:
@@ -477,7 +520,10 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
         kind, amps, side = f
         if amps is None:
             return f"{kind} · OPEN {notes.tag(fuse_open_note(wid, kind, parts))}", True, side
-        return f"{kind + ' ' if kind else ''}{amps} A", False, side
+        hw = holder_words(wid)
+        if hw:
+            notes_holder.append(f"{wid}: {amps:g} A in-line fuse · {hw}")
+        return f"{kind + ' ' if kind else ''}{amps:g} A", False, side
 
     # ---- runs
     count = {"cables": 0, "fuses": 0, "grounds": 0}
@@ -610,12 +656,25 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
     s.cur_owner = None
     # ---- notes at the foot
     inl = OrderedDict()
-    for wid in conn:
+    for wid in wires:                                 # every wire with a protection record, drawn here or on its own sheet
+        if wid.endswith("_FH"):
+            continue
         pp_ = (wires[wid].get("protection_parts") or {})
         if pp_.get("holder") and pp_.get("fuse"):
             inl.setdefault((pp_["holder"], pp_["fuse"]), []).append(wid.upper())
     if inl:
-        s.txt(SM, 680, "IN-LINE FUSES: " + " · ".join(f"{', '.join(v)}: holder {h}, fuse {f_}" for (h, f_), v in inl.items()), 5.6)
+        colw_ = (SW_ - 2 * SM) / 5                    # the last column of the notes foot
+        yy_ = 698
+        s.txt(SM + 4 * colw_, yy_, "IN-LINE FUSES: every wire with a protection record", 4.9, bold=True)
+        for (h, f_), v in inl.items():
+            for wid_ in v:
+                hw_ = holder_words(wid_.lower() if wid_.lower() in wires else wid_)
+                ring_ = re.search(r"ring (\S+)", hw_)
+                step_ = re.search(r"step splice (\S+)", hw_)
+                entry = f"{wid_}: {h} + {f_}" + (f", ring {ring_.group(1)}" if ring_ else "") + (f", step {step_.group(1)}" if step_ else "")
+                for ln_ in manual_v5.wrap_text(entry, colw_ - 10, 4.6):
+                    yy_ += 5.4
+                    s.txt(SM + 4 * colw_, yy_, ln_, 4.6)
     s.txt(SM, 689, "NOTES — OPEN ITEMS ON THIS SHEET (each letter is stamped where it applies)", 6.2, bold=True)
     notes_foot(s, notes.listed(), 698, 5)
     s.txt(SM, SH_ - SM + 10, f"{count['cables']} circuits · {count['fuses']} fuses · {count['grounds']} returns to the banks (drawn in full on sheet {next_sheet}) · "
@@ -1083,7 +1142,11 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
     no_pn = []
     rows = []
     fused = []
+    must = [wid for wid, w in wires.items() if w.get("protection_parts") or fuse_of(w)]
     for wid, w in wires.items():
+        if wid.endswith("_FH") and wid[:-3] in wires:
+            fused.append(wid)                             # the holder's line pigtail: on its circuit's row (holder, ring, step)
+            continue
         f = fuse_of(w)
         if not f:
             continue
@@ -1096,6 +1159,8 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
         f_lug, t_lug = ps_lugs(eps_y, wid, w)
         fp = [p_ for p_, _c in [term_part(ends, wid, t["endpoint"]) for t in ends.get(wid, [])]]
         val = f"{kind + ' ' if kind else ''}{amps} A" if amps else f"OPEN {notes.tag(fuse_open_note(wid, kind, parts))}"
+        if amps and "PROVISIONAL" in str(w.get("protection") or ""):
+            val += " PROVISIONAL"   # the value has no maker source yet (PCS_BATT: no PCS supply figure on file)
         # the wire's own protection record first (registry-fixes round 5: protection_parts {holder, fuse}); a kit fuse is
         # the kit's; only a circuit whose record truly lacks a part is named as missing
         pp = w.get("protection_parts") or {}
@@ -1132,6 +1197,7 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
                "6": "cranking-motor exemption: a fuse that survives cranking cannot protect it; the isolator kills it"}[wid]
         unf.append((num(wid), w.get("label"), awg_word(w), f_lug or "OPEN", t_lug or "OPEN", why))
     p.y = p.grid(PM, p.y, [40, 110, 22, 44, 44, 256], ["Circuit", "Cable", "AWG", "Lug, from", "Lug, to", "Why no fuse"], unf, size=5.6, lead=8.2) + 12
+    p.faults = [f"{wid}: has a protection record and no row on the Protection page" for wid in must if wid not in fused]
     return p, len(rows), len(unf)
 
 

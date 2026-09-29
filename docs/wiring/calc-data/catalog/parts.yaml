@@ -245,7 +245,7 @@ DL438: {vendor: prowire, kind: lug, name: "4 AWG lug, 3/8 in stud", sources: [re
 410LTP: {vendor: prowire, kind: lug, pool: power_spine, name: "4 AWG lug, #10 stud (MIDI M5, amp)", sources: [receipt 2026-09-25 PM]}
 CPA-100-3/4-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 3/4 in, red, 4 ft", sources: [prowire 238LTP heat-shrink options]}
 CPA-100-1/2-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 1/2 in, red, 4 ft"}
-CPA-100-3/8-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 3/8 in, red, 4 ft"}
+CPA-100-3/8-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 3/8 in, red, 4 ft", note: "also seals the seven TE PIDG step-down splices (round 6)", sources: [prowire 238LTP heat-shrink options]}
 CPA-100-3/4-BK:
   vendor: prowire
   kind: shrink
@@ -437,4 +437,13 @@ BLUESEA-5237: {vendor: bluesea, kind: fuse, name: "Blue Sea 5237 ATO/ATC fuse 3 
 BLUESEA-5239: {vendor: bluesea, kind: fuse, name: "Blue Sea 5239 ATO/ATC fuse 5 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
 BLUESEA-5240: {vendor: bluesea, kind: fuse, name: "Blue Sea 5240 ATO/ATC fuse 7.5 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
 BLUESEA-5241: {vendor: bluesea, kind: fuse, name: "Blue Sea 5241 ATO/ATC fuse 10 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
+
+# ---------------------------------------------------------------- SPAL fan 8 AWG power/ground (round 6)
+7116-3250: {vendor: prowire, kind: terminal, name: "Yazaki terminal 375 L female 10-8 AWG (SPAL brushless 4-way housing, large cavity)", range_awg: [10, 8], sources: ["reference_documents/web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md (related item 'YAZAKI TERMINAL 375 L FEMALE 10-8 AWG'; 'Larger terminals and seals are available separately')"]}
+7158-3035: {vendor: prowire, kind: seal, name: "Yazaki large white wire seal 10-8 AWG (SPAL brushless housing)", sources: ["reference_documents/web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md (related item 'YAZAKI LG WHITE WIRE SEAL 10-8 AWG')"]}
+
+# ---------------------------------------------------------------- TE PIDG step-down butt splices (round 6)
+"327583": {vendor: te, kind: splice, name: "TE PIDG step-down butt splice, 22-18 AWG / 16-14 AWG, blue, not sealable", sources: ["reference_documents/web_snapshots/www.te.com__product-CAT-P592-ST433.md"]}
+"327638": {vendor: te, kind: splice, name: "TE PIDG step-down butt splice, 16-14 AWG / 12-10 AWG, yellow, not sealable", sources: ["reference_documents/web_snapshots/www.te.com__product-CAT-P592-ST433.md"]}
+"327639": {vendor: te, kind: splice, name: "TE PIDG step-down butt splice, 22-18 AWG / 12-10 AWG, yellow, not sealable", sources: ["reference_documents/web_snapshots/www.te.com__product-CAT-P592-ST433.md"]}
 

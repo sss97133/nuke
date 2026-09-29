@@ -403,3 +403,31 @@ not judge cab-to-chassis wires at all.
 7. **BLOWER-RES cavities** are now BAT, M1, M2 and BLO. The factory circuits 51, 63, 72 and 101 move to factory_circuit, and the device text says they are circuit numbers.
 8. **IBOOSTER pin rows** each name the fastandquiet Gen-1 pinout and Tulay Gen-1 snapshot filenames.
 9. **IBOOST_PERM's stud ring** is 9918, not RING-SMALL.
+
+## Round 11: lead round 6 (builder's fifth read) (2026-09-28)
+1. **The fan has ONE power terminal, so FAN-JUNCTION stays.**
+   - Sources: the SPAL brushless wiring diagram (reference_documents/component_drawings/SPAL_Brushless_Fan_Wiring_Diagram.pdf) shows one red lead through one ATC fuse, one black lead to chassis ground, white PWM, blue override and yellow unused. The ProWire 30130628 kit (snapshot) has "(2) Large terminals to suit 12 ga wire", which are power plus ground, and "(2) Small terminals for PWM control".
+   - **Everything is now in the loom.** The 12 AWG legs carry 16 A each: ProWire bundled 20 A × 0.85 = 17 A. The tail #21 and FAN_GND are now 8 AWG M22759/16 and carry up to 32 A: ProWire bundled 40 A × 0.85 = 34 A.
+   - Both land on the Yazaki 7116-3250 375 L 10-8 AWG terminal and 7158-3035 seal. The 30130628 page lists these for the same housing ("Larger terminals and seals are available separately").
+   - Lugs are 838TP at FAN-JUNCTION and at the ground star.
+   - The free-air and outside-the-loom conditions are closed. The hot-soak OPEN is closed too: the bundled 35 °C rise on 150 °C-rated M22759 holds to 115 °C ambient.
+2. **The OUT5 pigtail splice is ONE splice**, S-24. The pigtail end holds 93_PT1 and 93_PT2; the lead end holds #93, PCS_BRK and TRANS_BRK.
+   - **It stays M81824/1-2 (blue), not yellow.** An in-line splice is sized per end. The pigtail end is 2 × 1,020 = 2,040 CM; the lead end is 1,020 + 2 × 640 = 2,300 CM. Both fall in the blue 20-16 band, 1,020-2,580 CM (ProWire 3137CT: red 26-20 / blue 20-16 / yellow 16-12). A yellow barrel would be under-filled at 2,300 CM.
+   - SPL-PDM15-OUT13 was also two splices. It is now one D-609-05 stub splice: 20 + 14 AWG = 5,130 CM, in the 16-12 band.
+3. **OUT5's loads now include PCS_BRK and TRANS_BRK.** pdm_settings reads loads through SPL-<box>-OUTn splices. Their input currents are OPEN: ZGP p.18 and Holley p.3 give none. The limit is now 1 A: at least 1.25 × 0.5 A, and at most 5 A for 22 AWG.
+4. **DAK_CEL and ISO_KILL are now white** (color_basis cites states 0f(a) and 0i). Every white signal, switch or motor lead already carries SIGNAL_RULE, which cites state 0i.
+5. **PCS_BATT and TRANS_BATT have protection records:** wire["protection"] (text) and wire["protection_parts"] = {"holder": "BLUESEA-5065", "fuse": "BLUESEA-5239" / "BLUESEA-5240"}. They are in reg["implied"].
+
+## Round 11 additions (standards reviewer's fifth read) (2026-09-28)
+- **B. Small fused stud feeds are now modelled end to end:** stud, ring, the Blue Sea 5065 12 AWG line pigtail, the fuse, the 12 AWG load pigtail, a TE PIDG step-down butt splice, then the circuit wire.
+  - This covers DAK_CONST, PCS_BATT, TRANS_BATT, IBOOST_PERM, ISO_PWR and ISO_SW_PWR.
+  - **New wires <W>_FH:** each is the holder's line pigtail, 12 AWG, supplied with the holder. It carries the stud ring (9916 at the PDM30 M6 stud, 9918 at the 3/8 in distribution stud) and the protection record.
+  - **New endpoints FUSE-<W>:** each holds the holder, with range_by_wire 12 AWG for the pigtail and 22-18 or 16-14 AWG for the circuit wire.
+  - **Step splices** (TE PIDG step-down page, snapshot): 327639 for 12-10 to 22-18 AWG on the 18 AWG feeds; 327638 for 12-10 to 16-14 AWG on the 16 AWG feeds.
+  - TE lists these splices as not sealable. The adhesive-lined heat-shrink part is OPEN.
+  - R1 now reads each end directly. The round-5 "pigtail gauge" shortcut in check_plug_ends.py is removed.
+  - The BOM counts 6 holders at the FUSE endpoints; the fuses are counted once.
+  - kits_v5 now honours count_once, so one part serves several ends.
+- **C. SPL-PDM15-OUT13** is now one TE PIDG 327583 step-down splice, 22-18 AWG to 16-14 AWG, joining the 20 AWG pin lead to the 14 AWG run. No MiniSeal barrel covers both gauges.
+- **D. OUT21 now says which limit binds.** 16 AWG on the 80 °C column is 15 A, so the wire allows 12 A, which covers the 12 A need. The binding limit is the 8 A output, whose setting stops at 10 A (PDM manual p.24). A 20 A output closes it; the PL/PW trade stands. pdm_settings now separates the wire limit from the output rating in its CONFLICT text.
+- **Text fixes:** the kit is named "TCM-4610". PCS_BATT's printed value is "5 A PROVISIONAL inline fuse", on both the feed and its line pigtail.

@@ -113,6 +113,37 @@ def splice_faults(sheet, rows):
     return bad
 
 
+LAST_PART_GAUGES = {}
+SPLICE_SEEN = {}                                   # S-## -> {"members": set(), "parts": set(), "sheets": set()} over the book
+
+
+def part_gauge_faults(parts):
+    """A part printed 'here on N AWG' where N is outside the part's own range_awg (review round 6)."""
+    bad = []
+    for code, gs in LAST_PART_GAUGES.items():
+        rng = (parts.get(code) or {}).get("range_awg")
+        if not rng:
+            continue
+        lo, hi = min(rng), max(rng)
+        for g in gs:
+            nums = [int(x) for x in re.findall(r"\d+", g)]
+            n = nums[-1] if nums else None
+            if n is not None and not (lo <= n <= hi):
+                bad.append(f"{code} printed on {g} AWG, outside its range {hi}-{lo} AWG")
+    return bad
+
+
+def splice_book_faults():
+    """One splice, one part and one member list everywhere in the book (review round 6: S-53 two parts, S-24 twice)."""
+    bad = []
+    for sid, d in SPLICE_SEEN.items():
+        if len(d["parts"]) > 1:
+            bad.append(f"splice {sid} printed with different parts: {', '.join(sorted(d['parts']))} ({', '.join(sorted(d['sheets']))})")
+        if len(d["members"]) > 1:
+            bad.append(f"splice {sid} printed with different member lists ({', '.join(sorted(d['sheets']))})")
+    return bad
+
+
 def cavity_rect(s, x, y, w, h, fill, lit, wid):
     """A bulkhead cavity: the wire's colour; a wire with no colour set gets the colour-unset style (grey dotted edge,
     manual_v5.UNSET_CAV_WORDS) — never a solid white box (review round 4: VSS_DAK in bulkhead C cavity 2)."""
@@ -235,7 +266,7 @@ TITLES = {"CKP": "crank sensor", "CMP": "cam sensor", "MAP": "MAP sensor", "CLT-
           "LOCK-SW-R": "passenger lock switch", "window_motor_DS": "driver window motor",
           "window_motor_PS": "passenger window motor", "lock_actuator_DS": "driver lock actuator",
           "lock_actuator_PS": "passenger lock actuator", "SPK-FL": "driver door speaker", "SPK-FR": "passenger door speaker",
-          "TG-SW-DASH": "tailgate window dash switch", "TG-SW-KEY": "tailgate key switch", "TG-CUTOUT": "tailgate-closed cutout switch", "TG-SW-KEY-REV": "tailgate key switch (reversing)", "TG-SW-MASTER": "tailgate dash switch (reversing master)", "BRAKE-FLUID-LVL": "brake-fluid level sensor", "IBST-DIAG": "iBooster diagnostic port (DTM 4-way)", "PCS-HARNESS-4610": "PCS TCM2650-4610 kit harness", "PCS-HARNESS-4610-CASE": "PCS kit harness, case branch", "TRANS-CASE": "6L90 case connector (Kostal 16-way)", "TG-MOTOR-ACI": "tailgate window motor (Nu-Relics ACI)",
+          "TG-SW-DASH": "tailgate window dash switch", "TG-SW-KEY": "tailgate key switch", "TG-CUTOUT": "tailgate-closed cutout switch", "TG-SW-KEY-REV": "tailgate key switch (reversing)", "TG-SW-MASTER": "tailgate dash switch (reversing master)", "BRAKE-FLUID-LVL": "brake-fluid level sensor", "IBST-DIAG": "iBooster diagnostic port (DTM 4-way)", "PCS-HARNESS-4610": "PCS TCM-4610 kit harness", "PCS-HARNESS-4610-CASE": "PCS kit harness, case branch", "TRANS-CASE": "6L90 case connector (Kostal 16-way)", "TG-MOTOR-ACI": "tailgate window motor (Nu-Relics ACI)",
           "rear_window_motor": "tailgate window motor", "Backup_Camera": "rear camera", "MIRROR-MON": "mirror display",
           "DOME-LAMP": "dome lamp", "FOOTWELL-LAMPS": "footwell lamps", "UNDERDASH-LAMPS": "under-dash lamps",
           "CARGO-LAMP": "cargo lamp", "DOOR-JAMB-L": "driver door jamb switch", "DOOR-JAMB-R": "passenger door jamb switch",
@@ -607,6 +638,8 @@ def sheet_parts(reg, eps_on_sheet, parts, junction_wires=None):
                 w = wires_.get(str(t["wire"]))
                 if code in rows and w and isinstance(w.get("awg"), int):
                     gauges[code].add(manual_v5.gauge_word(w))
+    global LAST_PART_GAUGES
+    LAST_PART_GAUGES = {c_: set(g_) for c_, g_ in gauges.items()}
     out = []
     for code, name, kind, q, used in rows.values():
         qs = str(int(round(q))) if abs(q - round(q)) < 1e-6 and q >= 1 else f"{math.ceil(q)} (1 kit serves {frac.get(code, 1)} plugs)"
@@ -733,8 +766,8 @@ class Ctx:
                         g["members"] = [str(q).upper() if q != "20 AWG lead" else f"20 AWG lead to {join_id}" for q in g["wires"]]
         # a splice endpoint the splice list does not carry (SPL-PDM15-OUT13, round 5 data) draws as a junction where its
         # runs reach, with its S-## (never left on no sheet)
-        extra_j = tuple(e for e in self.eps if e.startswith("SPL-") and e not in self.inline and e not in P.JUNCTIONS
-                        and (self.eps[e].get("wires")))
+        extra_j = tuple(e for e in self.eps if (e.startswith("SPL-") or e.startswith("FUSE-")) and e not in self.inline
+                        and e not in P.JUNCTIONS and (self.eps[e].get("wires")))
         if extra_j:
             P.JUNCTIONS = tuple(P.JUNCTIONS) + extra_j
         # the shield rule, as the wire rows state it
@@ -1519,6 +1552,38 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     s.mx = False                               # the CAN topology strip and the tables are drawn in true positions
     if sp["key"] == "data":
         draw_can_topology(s, ctx, open_notes)
+    # ---- fuses: any run whose wire has a protection record draws the fuse and its value on its longest level leg
+    # (review round 6: PCS_BATT / TRANS_BATT drawn with no fuse)
+    import power_v5
+    legs = defaultdict(list)
+    for o, pts_ in s.runs:
+        if o is None:
+            continue
+        for (ax, ay), (bx, by) in zip(pts_, pts_[1:]):
+            if abs(ay - by) < 0.05 and abs(ax - bx) > 30:
+                legs[o].append((abs(ax - bx), ax, bx, ay))
+    for wid in ws:
+        w = ctx.wires[wid]
+        f = power_v5.fuse_of(w)
+        if not f and not w.get("protection_parts"):
+            continue
+        if f"{wid}_FH" in ctx.wires:
+            continue                  # the fuse sits in the holder: drawn on the holder's line pigtail (<W>_FH), not here
+        if wid.endswith("_FH") and wid[:-3] in ctx.wires:
+            f = power_v5.fuse_of(ctx.wires[wid[:-3]]) or f     # the holder line carries its circuit's fuse value
+        if not legs.get(wid):
+            s.__dict__.setdefault("faults", []).append(f"{wid}: has a protection record and no leg to draw its fuse on")
+            continue
+        _l, ax, bx, y_ = max(legs[wid])
+        cx_ = (ax + bx) / 2                                   # true (unmirrored) position: s.runs holds drawn coordinates
+        s.el.append(f'<rect x="{cx_ - 6:.1f}" y="{y_ - 2.2:.1f}" width="12" height="4.4" fill="#fff" stroke="#000" stroke-width="0.7"/>'
+                    f'<line x1="{cx_ - 6:.1f}" y1="{y_:.1f}" x2="{cx_ + 6:.1f}" y2="{y_:.1f}" stroke="#000" stroke-width="0.5"/>')
+        kind, amps, _side = f if f else ("", None, "")
+        val = (f"{kind} {amps:g} A".strip() if amps else (kind or "fuse")) if f else "fuse"
+        mx_, s.mx = s.mx, False
+        s.txt(cx_, y_ + 7.4, val, 4.4, bold=True, anchor="middle", owner=wid)
+        s.mx = mx_
+        s.__dict__.setdefault("fuses_drawn", set()).add(wid)
     # ---- tables: parts, splices, ends not recorded, shield rule
     lowest = max([b.y + b.span() for b in left + right] + [TOP] + [face["bottom"] if face else TOP] +
                  [b.y + b.h + 20 for k, b in model["x"] if k == "strip"])
@@ -1532,6 +1597,35 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             open_notes.append((plug_title(code_, ep_), "housing, wedge and contacts not in the parts list", "connector not picked"))
     jw = {b.code: {w_ for r in b.rows for w_ in r["wires"]} for b in left + right if b.kind == "jun"}
     plist = sheet_parts(ctx.reg, eps_on, ctx.parts, jw)
+    s.__dict__.setdefault("faults", []).extend(part_gauge_faults(ctx.parts))
+    # a splice junction (S-53) is one splice: its row carries its members and the parts its ends carry
+    for b in left + right:
+        if b.kind == "jun" and b.code in ctx.spl_alias and not b.code.startswith("RAIL-"):
+            sid = ctx.spl_alias[b.code]
+            mem = [q for r in b.rows for q in r["wires"]]
+            prts = sorted({str(t.get("part")) for t in ctx.reg["terminations"] if t["endpoint"] == b.code and t.get("part")})
+            splice_rows.setdefault(sid, (sid, plug_title(b.code, ctx.eps.get(b.code, {})), "; ".join(q.upper() for q in
+                                         sorted(t["wire"] for t in ctx.reg["terminations"] if t["endpoint"] == b.code)),
+                                         " / ".join(prts) or "OPEN", "formboard: OPEN"))
+    # (3)(4) record every splice row for the book-wide check
+    for r_ in splice_rows.values():
+        d_ = SPLICE_SEEN.setdefault(r_[0], {"members": set(), "parts": set(), "sheets": set()})
+        d_["members"].add(re.sub(r"\s+", " ", str(r_[2])))
+        for part_ in str(r_[3]).split(" / "):
+            if part_ and not part_.startswith("OPEN"):
+                d_["parts"].add(part_)
+        d_["sheets"].add(number)
+    # (1) a plug our harness does not cut but whose cavities the data records (the 6L90 case connector): every
+    # cavity printed with its status, so the kit's leads can be checked against it
+    kit_rows = []
+    for e_ in sp["devs"]:
+        ep_ = ctx.eps.get(e_) or {}
+        cm_ = ep_.get("cavity_count") if isinstance(ep_.get("cavity_count"), dict) else None
+        if cm_ and not ep_.get("wires"):
+            for cav_, txt_ in sorted(cm_.items(), key=lambda kv: (int(re.sub(r"\D", "", kv[0]) or 0), kv[0])):
+                kit_rows.append((cav_, "OPEN" if "OPEN" in str(txt_) else "via the kit", str(txt_)))
+            s.__dict__["kit_title"] = f"{plug_title(e_, ep_).upper()}: KIT-INTERNAL CAVITIES, NOT CUT BY THIS HARNESS"
+    s.__dict__["kit_rows"] = kit_rows
     shield_line = None
     if any(r.get("shield") for b in left for r in b.rows):
         shield_line = ("SHIELDS: " + ctx.shield_rule) if ctx.shield_rule else "SHIELDS: drain grounding end OPEN"
@@ -1541,13 +1635,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     foot = []
     # a kit harness bought complete: its own circuits are the kit's, not cut by this harness (review round 4, PCS 4610)
     drawn_devs = [b.code for b in left + right if b.kind == "dev"]
-    for e in drawn_devs:
-        dev_ = str((ctx.eps.get(e) or {}).get("device") or "")
-        if re.search(r"\bkit harness\b", dev_.split(" — ")[0], re.I):
-            mates = [plug_title(m_, ctx.eps[m_]) for m_ in sp["devs"] if m_ != e and not (ctx.eps[m_].get("wires"))]
-            foot.append(f"KIT HARNESS: {plug_title(e, ctx.eps[e])} is supplied complete; its own circuits"
-                        + (f" (to the {', the '.join(mates)})" if mates else "") + " are the kit's, not cut by this harness. "
-                        "This book's wires land on its leads, as drawn.")
+    kits_ = [e for e in drawn_devs if re.search(r"\bkit harness\b", str((ctx.eps.get(e) or {}).get("device") or "").split(" — ")[0], re.I)]
+    if kits_:
+        mates = [plug_title(m_, ctx.eps[m_]) for m_ in sp["devs"] if m_ not in kits_ and not (ctx.eps[m_].get("wires"))]
+        foot.append(f"KIT HARNESS: {' and '.join(plug_title(e, ctx.eps[e]) for e in kits_)} "
+                    f"{'is' if len(kits_) == 1 else 'are'} supplied complete; the kit's own circuits"
+                    + (f" (to the {', the '.join(mates)})" if mates else "") + " are not cut by this harness. "
+                    "This book's wires land on its leads, as drawn.")
     if getattr(s, "cands", None):
         foot += [candidate_key(ctx, o) for o in sorted({ctx.wires[w_].get("option") for w_ in s.cands})]
     for k_, ln_ in enumerate(foot):
@@ -1799,6 +1893,9 @@ def place_tables(s, ctx, number, title, head, lowest, plist, splices, open_notes
     if splices:
         blocks.append(("SPLICES ON THIS SHEET", [34, 70, 300, 110, 70], ["Id", "At pin", "Wires joined", "Splice part", "Position"],
                        [(a, b, c, d, e) for a, b, c, d, e in splices]))
+    if getattr(s, "kit_rows", None):
+        blocks.append((getattr(s, "kit_title", "KIT-INTERNAL CAVITIES"), [38, 50, 452],
+                       ["Cavity", "Status", "As the data records it"], s.kit_rows))
     if open_notes:
         blocks.append(("OPEN ON THIS SHEET", [70, 150, 320], ["Circuit", "What is open", "As the wire list gives it"],
                        [(a, b, c) for a, b, c in open_notes]))
@@ -1980,6 +2077,7 @@ def build(first_number=6):
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("K5_diagram_*"):          # sheet numbers move when the plan changes: no stale sheets left behind
         old.unlink()
+    SPLICE_SEEN.clear()
     sheets, owned = plan(ctx)
     pages = []                                     # (sheet plan row, devs on the page, extra wires, page index, n pages)
     for sp in sheets:
@@ -1989,6 +2087,7 @@ def build(first_number=6):
     # numbering: pass 1 counts the facing pages, pass 2 draws with the final numbers (tags need the owner's number)
     n_facing = [0] * len(pages)
     for attempt in range(3):
+        SPLICE_SEEN.clear()                        # the book-wide splice record is of the final numbering only
         nums, n = [], first_number
         for k in range(len(pages)):
             nums.append(n)
@@ -2061,6 +2160,7 @@ def build(first_number=6):
                          str(stem.with_suffix(".pdf"))))
             sections.append(sp["section"])
     bad_all += colour_faults()
+    bad_all += splice_book_faults()
     seen_ids = {}
     for (e, sid), _w in ctx.rail_recs.items():
         if sid in seen_ids and seen_ids[sid] != e:
