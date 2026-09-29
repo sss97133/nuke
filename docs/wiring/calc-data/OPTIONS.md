@@ -44,7 +44,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 | TOP-LIGHT-SIDE | Side scene lamps on the top above the quarter windows (Truck-Lite 81335C x2), on their own 8 A output | **candidate** |  | 0 | Truck-Lite 81335C page (fetched 2026-09-29): "81 Series, LED, 6 Diode, 3x9 Rectangular Perimeter Light, Surfac |
 | CANKEY | MoTeC 8-button CAN keypad on the dash, for the top lamps and the other switchless add-ons | **candidate** |  | 0 | MoTeC PDM manual PN 63029 (Oct 2021): up to four MoTeC CAN keypads per PDM, three LEDs per button driven by PD |
 | TOP-CAM | Rear high-mount camera on the top's rear header (EchoMaster PHD5N1, flush housing, CVBS, mirrored), the mirror's driving view | **candidate** |  | 0 | owner 2026-09-29 ("do we put any cameras or anything in it"). EchoMaster PHD5N1 catalog page (web_snapshots/ca |
-| TOP-FINISH | Finish the top's inside — butyl on the flats, a closed-cell thermal layer and removable headliner panels, the top harness in the rib channels behind them | **candidate** |  | 0 | owner 2026-09-29 ("how do we finish the roof doing insulate it or delete it raw"). State §1 row 42 ("K5 insula |
+| TOP-FINISH | Finish the top's inside — butyl on the flats, a closed-cell thermal layer and removable headliner panels, the top harness in the rib channels behind them | **candidate** |  | 0 | owner 2026-09-29 ("how do we finish the roof doing insulate it or delete it raw"). State §1 row 41 ("K5 insula |
 
 ## Readiness by layer
 
