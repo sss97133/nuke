@@ -1,6 +1,6 @@
 {
  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
- "generated_at": "2026-09-29T15:54Z",
+ "generated_at": "2026-09-29T16:52Z",
  "source": "docs/wiring/calc-data/catalog/mounts.yaml",
  "boxes": [
   {
@@ -1288,18 +1288,24 @@
   },
   "WASHER-PUMP": {
    "id": "WASHER-PUMP",
-   "what": "Washer pump (Hella 8TW 004 223-031) in its tank",
-   "where": "Not placed: the Hella tank's spot is not picked",
+   "what": "Washer pump (factory, on the wiper motor)",
+   "where": "On the factory wiper motor at the cowl, engine side; a soft tube runs from the pump to the nozzles",
    "zone": "engine",
-   "status": "open",
+   "status": "decided",
+   "follows": "WIPER-MOTOR",
    "why": [
     {
-     "text": "The factory pump rode on the wiper motor; this build uses a Hella pump in a Hella tank.",
-     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16; docs/wiring/calc-data/catalog/endpoints.yaml WASHER-PUMP"
+     "text": "Owner 2026-09-29: \"the factory wiper does have the washer motor built into it which means we just need to make sure we use the correct connectors in the harness ... the correct soft tube\".",
+     "source": "owner, 2026-09-29"
+    },
+    {
+     "text": "Figure 8-16 shows the assembly of the washer pump on the wiper motor.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16 (Washer Mechanism Mounting on Wiper)"
     }
    ],
    "open": [
-    "Pick the tank spot (inner fender or core support)."
+    "The factory washer connector and soft-tube part numbers are not recorded yet.",
+    "The registry still lists the Hella 8TW 004 223-031 pump and tank."
    ]
   },
   "BLOWER-MOTOR": {

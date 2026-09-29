@@ -783,15 +783,20 @@ ends:
       - text: The factory wiper motor hole is under the cowl.
         source: nuke_frontend/src/components/wiring/objectTraits.ts factory_holes WP
   - id: WASHER-PUMP
-    what: Washer pump (Hella 8TW 004 223-031) in its tank
-    where: 'Not placed: the Hella tank''s spot is not picked'
+    what: Washer pump (factory, on the wiper motor)
+    where: On the factory wiper motor at the cowl, engine side; a soft tube runs from the pump to the nozzles
     zone: engine
-    status: open
+    status: decided
+    follows: WIPER-MOTOR
     why:
-      - text: The factory pump rode on the wiper motor; this build uses a Hella pump in a Hella tank.
-        source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16; docs/wiring/calc-data/catalog/endpoints.yaml WASHER-PUMP
+      - text: 'Owner 2026-09-29: "the factory wiper does have the washer motor built into it which means we just need to make sure we use the correct connectors
+          in the harness ... the correct soft tube".'
+        source: owner, 2026-09-29
+      - text: Figure 8-16 shows the assembly of the washer pump on the wiper motor.
+        source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16 (Washer Mechanism Mounting on Wiper)
     open:
-      - Pick the tank spot (inner fender or core support).
+      - The factory washer connector and soft-tube part numbers are not recorded yet.
+      - The registry still lists the Hella 8TW 004 223-031 pump and tank.
   - id: BLOWER-MOTOR
     what: Blower motor (4 Seasons 35587)
     where: In the Four-Season blower-evaporator case, engine side of the passenger firewall
