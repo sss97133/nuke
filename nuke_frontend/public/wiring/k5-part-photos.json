@@ -1238,6 +1238,18 @@
    "what": "LS Gen IV flat-response knock sensor, bank 2 (GM 12623730)",
    "confidence": "exact_pn"
   },
+  "MAP": {
+   "img": "https://static.summitracing.com/global/images/prod/xlarge/hly-538-24_xl.jpg",
+   "from": "summitracing.com",
+   "what": "MAP sensor: Holley 538-24, 1 bar, GM/Delphi-style body with a hose nipple, bolted off the engine",
+   "confidence": "exact_pn"
+  },
+  "IAT": {
+   "img": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg",
+   "from": "parts.chevrolet.com",
+   "what": "intake air temperature sensor: GM 12160244 (ACDelco 213-243), push-in thermistor in a grommet, GT150 2-way plug",
+   "confidence": "exact_pn"
+  },
   "CLT-ECU": {
    "img": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4514_Primary.jpg",
    "from": "parts.chevrolet.com",

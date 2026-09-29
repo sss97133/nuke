@@ -2114,20 +2114,22 @@ KNOCK-2:
   note: "ACDelco 213-1576 (chapter 08); photo is GM's image for 12623730"
 MAP:
   entry: device
-  what: "MAP sensor: GM Gen IV LS 1-bar on the LS crank/MAP Metri-Pack plug"
-  maker: GM
-  maker_pn: unknown
-  mates_with: [LS-CRANK-CONN-KIT]
-  confidence: unknown
-  note: "FLAG: the registry names the MAP only by its plug; chapter 08 names GM 55573248 (superseding 12592525), which takes a Bosch-style plug (ProWire 68104), and 12592525 is itself a 3-bar LSA/LS9 sensor — pick the sensor before the plug"
+  what: "MAP sensor: Holley 538-24, 1 bar, GM/Delphi-style body with a hose nipple, bolted off the engine"
+  maker: Holley
+  maker_pn: "538-24"
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/hly-538-24_xl.jpg", page: "https://www.summitracing.com/parts/hly-538-24", fetched: "2026-09-29"}
+  mates_with: ["1B-MAP-CONN-KIT"]
+  confidence: exact_pn
+  note: "PICKED 2026-09-29 from the engine as bought. The LS3 is naturally aspirated (Chevrolet Performance 19435106 long block), so 1 bar. The intake is Holley: the receipt lists 300-129, the state doc says 300-131, the photos show a single-plane with injector bosses. Holley's instructions for both families (199R10689 for 300-129/130, 199R10690 for 300-131/132/136/137) say 'Holley 1bar MAP sensor P/N 538-24 is recommended'. It bolts up by its two ears and takes a vacuum hose: the 300-129 has a 1/8 NPT MAP port, and the 300-131/136 sheet lists only a 3/8 NPT vacuum port. Its plug is the GM/Delphi 1-bar MAP connector, not the LS crank/MAP Metri-Pack kit the registry lists: ProWire 1B-MAP-CONN-KIT, 'keyed and colored for use with 1 bar GM/Delphi map sensors' (Delphi 12020403 body, 3 x 12089307 Weather Pack pins for 20-22 ga, 3 x 15324985 seals; photo https://www.prowireusa.com/content/57669/1B-MAP-CONN-KIT.webp). MoTeC's Delco MAP sheet (X18, WD 53000-53003) draws this body: A 0 V, B signal, C +5 V; 'One Bar Map sensors have a green connector'. Photo is Summit's image for hly-538-24, a grey unit; Holley's page lists the 538-24 as black and shows a black one under a hashed file name"
 IAT:
   entry: device
-  what: "intake air temperature sensor: GM thermistor on a GT150 2-way plug (GT150-AIR-TEMP-KIT)"
-  maker: GM
-  maker_pn: unknown
+  what: "intake air temperature sensor: GM 12160244 (ACDelco 213-243), push-in thermistor in a grommet, GT150 2-way plug"
+  maker: ACDelco (GM)
+  maker_pn: "213-243"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg", page: "https://parts.chevrolet.com/product/gm-genuine-parts-intake-air-temperature-sensor-12160244", fetched: "2026-09-29"}
   mates_with: [GT150-AIR-TEMP-KIT]
-  confidence: unknown
-  note: "FLAG: chapter 08 names GM 25036751 = ACDelco 213-190, a brass 3/8 NPT sensor with a Metri-Pack 150 2-way plug (GM image https://ecommerce-assets.ext.gm.com/assets/products/images/213-190_Primary.jpg), which the registry's GT150 kit (Delphi 15449027) does not fit; ACDelco 213-243 (GM 12160244) is a plastic IAT with a GT150-style plug (https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg) — pick the sensor, then the plug"
+  confidence: exact_pn
+  note: "PICKED 2026-09-29. GM 12160244 is sold as ACDelco 213-243 (Amazon: 'GM Genuine Parts 213-243 (12160244)'). It is the LS1 F-body air-box IAT. Its plug is the GT150 2-way 15449027: PT Motorsport sells 15449027 as the 'LS1 IAT Sensor Connector', and a thirdgen.org LS-swap list gives 15449027, 13520104 and 15335987 as the no-, half- and full-shroud IAT plugs for 12160244. 15449027 is the housing in the registry's ProWire GT150-AIR-TEMP-KIT, so that kit and the GT150 crimper already listed stay. It pushes into a GM 24504388 grommet in the air inlet ahead of the 12699160 throttle body (EFI Connection: 'used with the LS1 Camaro/Firebird air boxes. An excellent solution for engine swaps when a custom air intake is used'). Chapter 08's GM 25036751 (ACDelco 213-190) is a brass 3/8 NPT sensor with a Metri-Pack plug (https://ecommerce-assets.ext.gm.com/assets/products/images/213-190_Primary.jpg); it would need a threaded bung and another plug. Photo is GM's catalogue image for 213-243"
 CLT-ECU:
   entry: device
   what: "LS engine coolant temperature sensor for the M130 (GT150 2-way, M12 x 1.5)"
