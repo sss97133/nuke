@@ -55573,6 +55573,1012 @@
    ],
    "demand": null,
    "history": null
+  },
+  "MCAM": {
+   "name": "Side-mirror cameras, stick-on under the current mirrors (EchoMaster PCAM-BS1 x2), shown on turn signal",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"if we wanted to like add like a side camera it hooks into the side mirror even like sensors ... we can try to develop it even though we're not quite ready to do it\"). Specs: EchoMaster PCAM-BS1 user manual (web_snapshots/ catalog.echomaster.com__index.php__controller=attachment&id_attachment=2113.md) and catalog page (catalog.echomaster.com__pcam-bs1.md)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RC mirror feed, RUN): camera power"
+    ],
+    "limits": [
+     "OUT23 group (RUN): RC mirror 0.67 A (8 W at 12 V) + 0.14 A cameras; set OUT23 at 1.25 x the group total, in 1 A steps (MoTeC PDM manual PDF p.4)"
+    ],
+    "door_cavities": 1,
+    "notes": "video goes to the MIRD switcher (inputs 3 and 4) or straight to the mirror's CH2; the coax crosses the hinge unbroken in the door conduit, not in a DT cavity. OPEN: the manual says 9-12 V DC and a running truck sits near 14 V (confirm with EchoMaster)",
+    "adds": [
+     {
+      "id": "MCAM_L_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "MCAM-L +12 V (red)",
+      "current_a": 0.07,
+      "length_ft_est": 9,
+      "basis": "6.9 ft door zone (cut list v4.2 estimate on #34/#38/#42) + 2 ft up the door (FR-88 door opening 940 mm)"
+     },
+     {
+      "id": "MCAM_L_VID",
+      "gauge": null,
+      "spec": "kit video cable, shielded (plug type not stated)",
+      "from": "MCAM-L video",
+      "to": "MIRD VS41 input 3 (or mirror CH2)",
+      "current_a": 0,
+      "length_ft_est": 11,
+      "basis": "door run 9 ft + 2 ft under the dash; shielded per canon ch.16 s7.1 (video)"
+     },
+     {
+      "id": "MCAM_R_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "MCAM-R +12 V (red)",
+      "current_a": 0.07,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "MCAM_R_VID",
+      "gauge": null,
+      "spec": "kit video cable, shielded (plug type not stated)",
+      "from": "MCAM-R video",
+      "to": "MIRD VS41 input 4 (or mirror CH2)",
+      "current_a": 0,
+      "length_ft_est": 11,
+      "basis": "as MCAM_L_VID"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG (2 x 9 ft); coax, cameras and the shared door ground not counted (masses not published)"
+   },
+   "history": null,
+   "requires": "DGND"
+  },
+  "MCAM-BIL": {
+   "name": "Side-mirror cameras built into billet mirrors (camera module pocketed in the mirror, e.g. EchoMaster PHD5N1)",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"if we're gonna go all out with a billet that means we can install like Tesla style cameras\"). The Tesla repeater camera itself is not usable here: it sends serialized FPD-Link video over coax to the Autopilot computer (Tesla Motors Club thread, web_snapshots/teslamotorsclub.com__tesla-fender-camera-output.301521.md, forum evidence) and is calibrated from the car's own screen (Tesla service manual, service.tesla.com__GUID-E473ED74-9C48-4106-936F-C6A8806AAF5B.md)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RC mirror feed, RUN): camera power"
+    ],
+    "door_cavities": 1,
+    "notes": "set CVBS for the VS41 and the RVS mirror (both CVBS); the pocket, lens window and seal are the producer's (BMIR). OPEN: current draw and body size (not on the maker's page)",
+    "adds": [
+     {
+      "id": "MCAMB_L_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "BMIR-L connector (camera +12 V)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "MCAMB_L_VID",
+      "gauge": null,
+      "spec": "kit coax (RCA)",
+      "from": "BMIR-L camera",
+      "to": "MIRD VS41 input 3",
+      "current_a": 0,
+      "length_ft_est": 11,
+      "basis": "as MCAM_L_VID"
+     },
+     {
+      "id": "MCAMB_R_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "BMIR-R connector (camera +12 V)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "MCAMB_R_VID",
+      "gauge": null,
+      "spec": "kit coax (RCA)",
+      "from": "BMIR-R camera",
+      "to": "MIRD VS41 input 4",
+      "current_a": 0,
+      "length_ft_est": 11,
+      "basis": "as MCAM_L_VID"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG; coax and cameras not published"
+   },
+   "history": null,
+   "alternative_to": "MCAM",
+   "requires": [
+    "BMIR",
+    "DGND"
+   ]
+  },
+  "BSM": {
+   "name": "Blind-spot radar, license-plate bar for metal bumpers (Rydeen BSS2LPB), LED warnings on the A-pillars",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"even like sensors\"). Rydeen BSS2LPB page (web_snapshots/rydeenmobile.com__bss2lpb.md): \"Applicable for metal bumper vehicles (pickup trucks)\", bar at the top or bottom of the plate, GPS speed gate, 9-18 V, working current < 100 mA, radars IP67 / cables NOT waterproof. Wiring from the family's BSS1 manual (rydeenmobile.com__BSS1-Instruction-Manual-1.md; the BSS2LPB manual is not fetched): ACC/IGN, ground, left/right turn, optional reverse",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): main unit power",
+     "PDM30 OUT27 / OUT28 (turn L/R): turn inputs",
+     "PDM30 OUT15 (reverse): cross-traffic input"
+    ],
+    "limits": [
+     "OUT23 group: + 0.10 A"
+    ],
+    "door_cavities": 0,
+    "notes": "the radar bar sits at the plate with the RC camera, so its kit cable follows the camera's path into the body (a rear entry, the 0ah 'small rear bulkhead' question). Its own GPS gives speed; nothing goes on the MoTeC CAN. OPEN: plate on the bumper or the tailgate (mounts.yaml LICENSE-LAMP); a tailgate plate puts the cable across the tailgate hinge",
+    "adds": [
+     {
+      "id": "BSM_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "BSM main unit ACC/IGN",
+      "current_a": 0.1,
+      "length_ft_est": 3,
+      "basis": "main unit under the dash beside the PDM30 (spot open)"
+     },
+     {
+      "id": "BSM_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "BSM main unit ground",
+      "to": "GND-BANK-CAB",
+      "current_a": 0.1,
+      "length_ft_est": 3,
+      "basis": "as BSM_PWR"
+     },
+     {
+      "id": "BSM_TURN_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27) at the PDM30",
+      "to": "BSM left turn input",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "as BSM_PWR"
+     },
+     {
+      "id": "BSM_TURN_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28) at the PDM30",
+      "to": "BSM right turn input",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "as BSM_PWR"
+     },
+     {
+      "id": "BSM_REV",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #97 (PDM30:OUT15, reverse group)",
+      "to": "BSM reverse input",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "as BSM_PWR"
+     },
+     {
+      "id": "BSM_BAR",
+      "gauge": null,
+      "spec": "kit radar-bar cable (not waterproof: sleeve it, joints inside the cab)",
+      "from": "radar bar at the plate",
+      "to": "BSM main unit",
+      "current_a": 0,
+      "length_ft_est": 18,
+      "basis": "18.4 ft, the cut list v4.2 zone estimate on #97 (PDM30 to the plate camera)"
+     }
+    ],
+    "mass_g_est": "29 g of 20 AWG (5 x 3 ft); kit cable, bar and main unit not published"
+   },
+   "history": null
+  },
+  "BSM-SD2": {
+   "name": "Blind-spot radar, commercial side sensors (Sensata PreView Side Defender II x2) with their own in-cab display",
+   "status": "candidate",
+   "decided": null,
+   "source": "Sensata PreView Side Defender II manual (web_snapshots/www.sensata.com__preview-side-defender-II-user-manual.md) and product page (www.sensata.com__preview-side-defender-ii.md, \"a reliable legacy solution\"): 24 GHz FMCW, 9-33 V, < 0.5 A, IP69K, J1939 250/500 kbit/s, aux output sinks 1 A (a mirror LED), Deutsch DT06-08SA plug; \"do not connect ... directly to the vehicle CAN bus\", use its PreView display as a one-way gateway; mount 23-39 in high and 137-197 in back from the front edge; \"intended for commercial use\". Partly validated for this truck: the mount zone is drawn for trucks and buses, and no price is published",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): sensor power",
+     "PDM30 OUT27 / OUT28 (turn L/R): pin 8 turn input"
+    ],
+    "limits": [
+     "OUT23 group: + up to 1.0 A (2 x < 0.5 A)"
+    ],
+    "door_cavities": 0,
+    "notes": "its J1939 bus is private between the sensors and the PreView display, never the M1 trunk. OPEN: price (distributor quote); whether a 106.5 in wheelbase Blazer has a body side 137-197 in back from the front edge at 23-39 in high clear of metal",
+    "adds": [
+     {
+      "id": "SD2_L_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23",
+      "to": "SD2-L pin 1 battery +",
+      "current_a": 0.5,
+      "length_ft_est": 16,
+      "basis": "rear quarter to the cab, estimate below the 18.4 ft plate run"
+     },
+     {
+      "id": "SD2_L_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "SD2-L pin 2",
+      "to": "GND-SPLICE-REAR",
+      "current_a": 0.5,
+      "length_ft_est": 4,
+      "basis": "to the rear ground bus (estimate)"
+     },
+     {
+      "id": "SD2_L_CAN",
+      "gauge": 22,
+      "spec": "M22759/16 twisted pair",
+      "from": "SD2-L pins 3/4",
+      "to": "PreView display (J1939 250/500k)",
+      "current_a": 0,
+      "length_ft_est": 16,
+      "basis": "as SD2_L_PWR"
+     },
+     {
+      "id": "SD2_L_TURN",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27)",
+      "to": "SD2-L pin 8 turn input",
+      "current_a": 0,
+      "length_ft_est": 16,
+      "basis": "as SD2_L_PWR"
+     },
+     {
+      "id": "SD2_R_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23",
+      "to": "SD2-R pin 1 battery +",
+      "current_a": 0.5,
+      "length_ft_est": 16,
+      "basis": "as SD2_L_PWR"
+     },
+     {
+      "id": "SD2_R_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "SD2-R pin 2",
+      "to": "GND-SPLICE-REAR",
+      "current_a": 0.5,
+      "length_ft_est": 4,
+      "basis": "as SD2_L_GND"
+     },
+     {
+      "id": "SD2_R_CAN",
+      "gauge": 22,
+      "spec": "M22759/16 twisted pair",
+      "from": "SD2-R pins 3/4",
+      "to": "PreView display",
+      "current_a": 0,
+      "length_ft_est": 16,
+      "basis": "as SD2_L_PWR"
+     },
+     {
+      "id": "SD2_R_TURN",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28)",
+      "to": "SD2-R pin 8 turn input",
+      "current_a": 0,
+      "length_ft_est": 16,
+      "basis": "as SD2_L_PWR"
+     }
+    ],
+    "mass_g_est": "900 g of sensors (2 x 0.45 kg, manual) + about 180 g of wire (the 20 AWG at 1.95 g/ft; the /16-22 pair not in the table)"
+   },
+   "history": null,
+   "alternative_to": "BSM"
+  },
+  "MTS": {
+   "name": "Mirror turn and hazard repeaters, a sealed 3/4 in LED in each mirror head (Grote MicroNova Dot 49343 amber)",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"the illumination lights for like blinkers caution stuff\"). Grote 49343 page (web_snapshots/www.grote.com__49343.md): amber, 0.05 A, 3/4 in mounting hole, extends less than 3/8 in, .180 bullet or Deutsch versions, PC and P2 versions; the MicroNova family is FMVSS 108 PC-rated clearance/marker (www.grote.com__47973.md), used here as a supplementary repeater",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT27 (#80 left front turn)",
+     "PDM30 OUT28 (#82 right front turn)"
+    ],
+    "limits": [
+     "OUT27 / OUT28 stay at 3 A: 2.1 A (1157 front turn, registry) + 0.05 A = 2.15 A, x 1.25 = 2.7 A"
+    ],
+    "door_cavities": 1,
+    "notes": "the PDM already flashes OUT27/OUT28 and runs hazard as both (DIG4 + DIG5); the stock chrome head takes a drilled 3/4 in hole, a billet head takes a machined pocket",
+    "adds": [
+     {
+      "id": "MTS_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27) at the PDM30",
+      "to": "MTS-L lamp (.180 bullet)",
+      "current_a": 0.05,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "MTS_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28) at the PDM30",
+      "to": "MTS-R lamp",
+      "current_a": 0.05,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG; lamp mass not published"
+   },
+   "history": null,
+   "requires": "DGND"
+  },
+  "MTS-SOG": {
+   "name": "Mirror turn arrows behind the glass (signal-on-glass, custom billet mirror glass)",
+   "status": "candidate",
+   "decided": null,
+   "source": "the aftermarket makes it for GM tow mirrors: Boost Auto Parts T1SOG \"adds an integrated red turn signal on glass to your upper mirror glass\" of 2019+-style GM tow mirrors, $113.25 (web_snapshots/boostautoparts.com__t1sog.md, 2026-09-29). For a billet head the glass and LED board are custom: partly validated (no supplier for this glass yet)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT27 / OUT28 (front turn)"
+    ],
+    "limits": [
+     "OUT27 / OUT28: 2.1 A + the arrow current (unknown)"
+    ],
+    "door_cavities": 1,
+    "notes": "OPEN: LED board current, glass supplier and the FMVSS 111 reflective area left after the arrow (126 cm2 floor, 49 CFR 571.111 S6.1(b))",
+    "adds": [
+     {
+      "id": "SOG_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27)",
+      "to": "BMIR-L connector (arrow +)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "SOG_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28)",
+      "to": "BMIR-R connector (arrow +)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG"
+   },
+   "history": null,
+   "alternative_to": "MTS",
+   "requires": [
+    "BMIR",
+    "DGND"
+   ]
+  },
+  "PUD": {
+   "name": "Door puddle lamps in the door bottoms (Lumitec Echo x2), on the courtesy group with an off-delay",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"on the doors I really like ... the light puddle what's our options there\"). Lumitec Echo flush courtesy light (web_snapshots/www.apexlighting.com__echo-flush-mount-led-courtesy-light.md): 45 lm, 145 mA at 12 V, IP67, threaded nut, made in USA, 12 V only; a second listing gives about 45 mA (check the part in hand)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT25 (dome/courtesy group, driven by the jamb inputs DIG12/DIG13)"
+    ],
+    "limits": [
+     "OUT25 6 A -> 7 A: 4.73 A (registry) + 0.29 A = 5.02 A, x 1.25 = 6.3 A; above the 20 AWG lead 8 A at 80 C, 85 % = 6.8 A (MoTeC PDM manual printed p.48; canon ch.17 fuse rule), so the OUT25 pin lead goes to 18 AWG (11 A) or the base lamps go LED"
+    ],
+    "door_cavities": 1,
+    "notes": "PDM logic adds an off-delay after the door shuts (Pulse/timer operators, MoTeC PDM manual PDF p.4); unlock-triggered only if a keyless receiver is ever added (not designed)",
+    "adds": [
+     {
+      "id": "PUD_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #67 (PDM30:OUT25) at the PDM30",
+      "to": "PUD-L lamp",
+      "current_a": 0.145,
+      "length_ft_est": 8,
+      "basis": "6.9 ft door zone + 1 ft down to the door bottom"
+     },
+     {
+      "id": "PUD_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #67 (PDM30:OUT25) at the PDM30",
+      "to": "PUD-R lamp",
+      "current_a": 0.145,
+      "length_ft_est": 8,
+      "basis": "as PUD_L"
+     }
+    ],
+    "mass_g_est": "31 g of 20 AWG; lamp mass not published"
+   },
+   "history": null,
+   "requires": "DGND"
+  },
+  "PUD-MIR": {
+   "name": "Puddle lamps in the underside of billet mirrors (GM 84408372-type module or an 18 mm LED)",
+   "status": "candidate",
+   "decided": null,
+   "source": "GM 84408372 LED puddle light kit for exterior mirrors, bowtie logo, $150.94 (MSRP $175.00) (web_snapshots/www.chevypartspros.com__84408372.md, 2026-09-29), a pair (driver and passenger) for 2019+ GM heated power mirrors with factory puddle lighting; universal 18 mm LED puddle light, 12 V, 10 W nominal, from $11.99 (undergroundlighting.com__led-puddle-lights.md). Partly validated: the GM module's size and current are not published, and the pocket is the producer's",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT25 (courtesy group)"
+    ],
+    "limits": [
+     "OUT25 6 A -> 8 A with two 10 W modules: 4.73 + 1.67 = 6.40 A, x 1.25 = 8.0 A; the OUT25 pin lead goes to 18 AWG (20 AWG lead 8 A at 80 C, 85 % = 6.8 A (MoTeC PDM manual printed p.48; canon ch.17 fuse rule))"
+    ],
+    "door_cavities": 1,
+    "notes": "a 10 W module is about 0.83 A at 12 V (10 W / 12 V), so two add about 1.7 A to OUT25",
+    "adds": [
+     {
+      "id": "PUDM_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #67 (PDM30:OUT25)",
+      "to": "BMIR-L connector (puddle +)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     },
+     {
+      "id": "PUDM_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #67 (PDM30:OUT25)",
+      "to": "BMIR-R connector (puddle +)",
+      "current_a": null,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG"
+   },
+   "history": null,
+   "alternative_to": "PUD",
+   "requires": [
+    "BMIR",
+    "DGND"
+   ]
+  },
+  "BML": {
+   "name": "Front-bumper park/turn lamps set into the bumper face (Truck-Lite 60094Y x2), with the bumper locked in position",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"there's a lot of space in these gigantic vintage bumpers scary to adjust them because they often very often fall out of adjustment but maybe we can you know remedy that\"). Truck-Lite 60094Y (web_snapshots/www.trucklightparts.com__truck-lite-60094y.md): 44-diode amber oval, SAE/DOT front park and turn, 0.55 A turn / 0.08 A park, 12 V, 3 wires 16 gauge, sealed, grommet into a 2.5 x 6.75 in cut-out, Fit 'N Forget S.S. with a PL-3 adapter. Bumper: 1977 LTSM p.111 bracket-and-brace mounting, p.114 torques; LMC Blazer/Suburban brace kits 30-3769 front (73-80) and 30-3767 rear (www.lmctruck.com__csb-1973-91-bumper-brace-kits-and-bumper-bolt-kits.md)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT27 / OUT28 (front turn, +0.55 A each)",
+     "PDM30 OUT13 (park/tail group, +0.16 A)"
+    ],
+    "limits": [
+     "OUT27 / OUT28 3 A -> 4 A: 2.1 + 0.55 (+ 0.05 with MTS) = 2.70 A, x 1.25 = 3.4 A; within the 20 AWG lead 8 A at 80 C, 85 % = 6.8 A (MoTeC PDM manual printed p.48; canon ch.17 fuse rule)",
+     "OUT13 3 A -> 4 A: 2.36 + 0.16 = 2.52 A, x 1.25 = 3.2 A"
+    ],
+    "door_cavities": 0,
+    "notes": "the splices sit in the front lamp loom, so they follow wherever the front loads are fed from (state 0ah: the 61-pin or a bay PDM, open). A DT 3-way at each bumper bracket lets the bumper come off. DRL is not designed: no DRL-rated lamp is picked and it would need its own output. Locking the bumper: torque the brackets and braces to the manual, then the builder decides how to pin them",
+    "adds": [
+     {
+      "id": "BML_L_TURN",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "splice on #80 at the front lamp loom",
+      "to": "BML-L turn lead",
+      "current_a": 0.55,
+      "length_ft_est": 3,
+      "basis": "bumper face to the grille park/turn splice; measure at mock-up"
+     },
+     {
+      "id": "BML_L_PARK",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "splice on #83 at the front lamp loom",
+      "to": "BML-L park lead",
+      "current_a": 0.08,
+      "length_ft_est": 3,
+      "basis": "as BML_L_TURN"
+     },
+     {
+      "id": "BML_L_GND",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "BML-L ground lead",
+      "to": "front lamp ground path (as PT_LF_GND)",
+      "current_a": 0.55,
+      "length_ft_est": 3,
+      "basis": "as BML_L_TURN"
+     },
+     {
+      "id": "BML_R_TURN",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "splice on #82 at the front lamp loom",
+      "to": "BML-R turn lead",
+      "current_a": 0.55,
+      "length_ft_est": 3,
+      "basis": "as BML_L_TURN"
+     },
+     {
+      "id": "BML_R_PARK",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "splice on #84 at the front lamp loom",
+      "to": "BML-R park lead",
+      "current_a": 0.08,
+      "length_ft_est": 3,
+      "basis": "as BML_L_TURN"
+     },
+     {
+      "id": "BML_R_GND",
+      "gauge": 18,
+      "spec": "M22759/32",
+      "from": "BML-R ground lead",
+      "to": "front lamp ground path (as PT_RF_GND)",
+      "current_a": 0.55,
+      "length_ft_est": 3,
+      "basis": "as BML_L_TURN"
+     }
+    ],
+    "mass_g_est": "53 g of 18 AWG (6 x 3 ft at 9.67 kg/km); lamp mass not published"
+   },
+   "history": null
+  },
+  "FWC": {
+   "name": "Forward windshield camera with collision and lane warnings (Mobileye 8 Connect) behind the mirror",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"in newer vehicles that use sensors it typically have to put a camera in like the windshield so that's also an integration we have to build on the rearview mirror\"). Mobileye 8 Connect Technical Installation Guide (4G) v3.0, Nov 2023 (web_snapshots/fleetsafe.com.au__Mobileye-8-Connect%E2%84%A2-Technical-Installation-Guide-4G-v3.0.md): 10-36 V, full system 1 A at 12 V (12 W max), main unit 120 x 78 x 44 mm 200 g on a 3 m cable, inputs BAT+ and ignition each on a 2 A fuse, ground, analog VSS, AUX (both turn signals through diodes), IHC high-beam output; camera 1.2-2.65 m above the road, in the wiper sweep, within 8 % of the vehicle width of centre, roll within 2 deg; \"installation must be carried out by an authorized\" installer; \"Internet access is mandatory to configure and calibrate\"",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT11 (RADIO_CONST, constant): BAT+",
+     "PDM30 OUT23 (RUN): ignition",
+     "PDM30 OUT27 / OUT28: AUX through two diodes"
+    ],
+    "limits": [
+     "OUT23 group: + up to 1.0 A (the whole Mobileye system at 12 V)",
+     "OUT11 (RADIO_CONST): + the Mobileye standby current (not published)"
+    ],
+    "door_cavities": 0,
+    "notes": "speed from the Dakota VHX SPD OUT (2,000 or 4,000 PPM; it does not work if the Dakota takes speed from a BIM bus module, VHX manual p.8), not the MoTeC CAN: Mobileye's CAN reader works from its vehicle database. The IHC output stays unused (high beams keep the factory floor dimmer). The main unit's 3 m cable shares the HDL route down the A-pillar. OPEN: price and installer (quote), how the 1 A splits between BAT+ and IGN",
+    "adds": [
+     {
+      "id": "FWC_BAT",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on RADIO_CONST (PDM30:OUT11)",
+      "to": "Mobileye BAT+ (red, kit 2 A fuse)",
+      "current_a": null,
+      "length_ft_est": 3,
+      "basis": "signals connector under the dash (estimate)"
+     },
+     {
+      "id": "FWC_IGN",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "Mobileye ignition (blue, kit 2 A fuse)",
+      "current_a": 1.0,
+      "length_ft_est": 3,
+      "basis": "as FWC_BAT; 1 A is the whole system at 12 V"
+     },
+     {
+      "id": "FWC_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "Mobileye ground (black)",
+      "to": "GND-BANK-CAB",
+      "current_a": 1.0,
+      "length_ft_est": 3,
+      "basis": "as FWC_BAT"
+     },
+     {
+      "id": "FWC_VSS",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "DAKOTA-VHX SPD OUT",
+      "to": "Mobileye VSS (orange)",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "as FWC_BAT"
+     },
+     {
+      "id": "FWC_AUX",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "#80 and #82 through two diodes (not picked)",
+      "to": "Mobileye AUX (pink)",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "as FWC_BAT"
+     }
+    ],
+    "mass_g_est": "200 g main unit + an EyeWatch 3 (46 g) or EyeWatch 8 (109 g, 146 g with cable) display (guide spec sheets) + 29 g of 20 AWG"
+   },
+   "history": null
+  },
+  "MIRD": {
+   "name": "Multi-camera mirror, a 4-camera switcher into the RC mirror's second input (PAC VS41)",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"the rearview mirror is also kind of maybe an optimal screen situation ... but we also eventually want like other screens as like other angles of the vehicle\"). The decided RC mirror has \"Video Input 2 Channel\", 9-32 V, 8 W (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md). PAC VS41 page and manual (catalog.archive.pac-audio.com__vs41.md; catalog.archive.pac-audio.com__index.php__controller=attachment&id_attachment=894.md): four inputs, input 1 shown when no trigger is on, priority by input number, + triggers 2-12 V, pulsed or constant (turn signals), a 150 mA reverse-trigger output while any input is triggered; $155.94 (sonicelectronix, 2026-09-29)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): VS41 power",
+     "PDM30 OUT27 / OUT28: triggers 3 and 4"
+    ],
+    "limits": [
+     "OUT23 group: + the VS41 (not published)"
+    ],
+    "door_cavities": 0,
+    "notes": "inputs: 1 = the top camera (top-design lane) as the default view, 2 = the FC front camera on a dash toggle, 3/4 = the mirror cameras on the turn signals. Mirror CH1 stays the RC plate camera on reverse. OPEN: + trigger range 2-12 V against a ~14 V running truck (ask PAC); the VS41's own current (not published); which RVS harness wire selects CH2",
+    "adds": [
+     {
+      "id": "MIRD_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "VS41 accessory +12 V (yellow)",
+      "current_a": null,
+      "length_ft_est": 2,
+      "basis": "switcher beside the PDM30 (spot open)"
+     },
+     {
+      "id": "MIRD_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "VS41 ground (black)",
+      "to": "GND-BANK-CAB",
+      "current_a": null,
+      "length_ft_est": 2,
+      "basis": "as MIRD_PWR"
+     },
+     {
+      "id": "MIRD_T3",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27)",
+      "to": "VS41 input 3 trigger + (green)",
+      "current_a": 0,
+      "length_ft_est": 2,
+      "basis": "as MIRD_PWR"
+     },
+     {
+      "id": "MIRD_T4",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28)",
+      "to": "VS41 input 4 trigger + (purple)",
+      "current_a": 0,
+      "length_ft_est": 2,
+      "basis": "as MIRD_PWR"
+     },
+     {
+      "id": "MIRD_T2",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "dash toggle fed from the OUT23 group",
+      "to": "VS41 input 2 trigger + (gray)",
+      "current_a": 0,
+      "length_ft_est": 3,
+      "basis": "dash toggle to the switcher (estimate)"
+     },
+     {
+      "id": "MIRD_OUT",
+      "gauge": null,
+      "spec": "kit coax (RCA)",
+      "from": "VS41 video out",
+      "to": "RC mirror CH2 input",
+      "current_a": 0,
+      "length_ft_est": 2,
+      "basis": "to the RVS power harness inputs (their spot is not on the page)"
+     }
+    ],
+    "mass_g_est": "25 g of 20 AWG (13 ft); switcher mass not published"
+   },
+   "history": null
+  },
+  "MIRD-FV": {
+   "name": "Full-display streaming mirror with a built-in front recording camera (Brandmotion FullVUE FVMR-1100), in place of the RC mirror",
+   "status": "candidate",
+   "decided": null,
+   "source": "Brandmotion FullVUE page (web_snapshots/www.brandmotion.com__fullvue-mirror-vision-system.md, 2026-09-29): 9.66 in 320 x 1280, 12/24 V, 5 W, HD-TVI rear camera powered at 5 V by the mirror (IP67, 1080p, 30 ft harness), a second camera supported, built-in front camera with DVR, \"Video trigger input triggers: No\", out of stock. It replaces the decided RC mirror and its CVBS camera, so it needs an owner call on RC",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): the RC MIRROR_PWR itself"
+    ],
+    "limits": [
+     "OUT23: the FullVUE is 5 W (0.42 A at 12 V) in place of the RVS mirror 8 W (0.67 A)"
+    ],
+    "door_cavities": 0,
+    "notes": "MIRROR_TRIG and #97 fall away (no trigger input; the camera is fed by the mirror); CAM_VIDEO becomes the kit's 30 ft TVI harness; the VS41 cannot feed it (CVBS)",
+    "adds": [
+     {
+      "id": "FV_CAM",
+      "gauge": null,
+      "spec": "kit 30 ft camera harness (HD-TVI, 5 V from the mirror)",
+      "from": "rear camera at the plate",
+      "to": "FullVUE mirror",
+      "current_a": 0,
+      "length_ft_est": 30,
+      "basis": "the kit harness length (Brandmotion page)"
+     }
+    ],
+    "mass_g_est": "not published"
+   },
+   "history": null,
+   "alternative_to": "MIRD"
+  },
+  "MIRD-360": {
+   "name": "360-degree bird's-eye camera system on its own dash monitor (Rear View Safety inView 360 HD)",
+   "status": "candidate",
+   "decided": null,
+   "source": "RVS inView 360 HD page (web_snapshots/www.rearviewsafety.com__inview-360-hd-around-vehicle-monitoring-systems-rvs-01-360.md, 2026-09-29): four 1080p fisheye cameras (up to six), ECU 5.8 x 6.8 x 1.5 in, 8-32 V, max 25 W, triggers left/right/reverse/panic 6-32 V at 0.12-0.63 mA, auto-calibration, $2,161.76 with the 7 in monitor or $2,268.65 with 10.1 in, calibration mat $234.22",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): ECU power",
+     "PDM30 OUT27 / OUT28 / OUT15: triggers"
+    ],
+    "limits": [
+     "OUT23 group: + up to 2.1 A (25 W max)"
+    ],
+    "door_cavities": 0,
+    "notes": "the side cameras sit under the mirrors, so their kit cables cross the hinges in the door conduit; the front camera at the grille; the ECU triggers take 12-14 V directly (6-32 V)",
+    "adds": [
+     {
+      "id": "V360_PWR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "PDM30:OUT23 (splice with MIRROR_PWR)",
+      "to": "360 ECU power",
+      "current_a": 2.1,
+      "length_ft_est": 3,
+      "basis": "25 W max / 12 V; ECU under a seat or dash (estimate)"
+     },
+     {
+      "id": "V360_GND",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "360 ECU ground",
+      "to": "GND-BANK-CAB",
+      "current_a": 2.1,
+      "length_ft_est": 3,
+      "basis": "as V360_PWR"
+     },
+     {
+      "id": "V360_TL",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #80 (PDM30:OUT27)",
+      "to": "360 ECU left trigger",
+      "current_a": 0.001,
+      "length_ft_est": 3,
+      "basis": "as V360_PWR"
+     },
+     {
+      "id": "V360_TR",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #82 (PDM30:OUT28)",
+      "to": "360 ECU right trigger",
+      "current_a": 0.001,
+      "length_ft_est": 3,
+      "basis": "as V360_PWR"
+     },
+     {
+      "id": "V360_TREV",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "splice on #97 (PDM30:OUT15)",
+      "to": "360 ECU reverse trigger",
+      "current_a": 0.001,
+      "length_ft_est": 3,
+      "basis": "as V360_PWR"
+     }
+    ],
+    "mass_g_est": "29 g of 20 AWG; ECU, cameras and monitor not published"
+   },
+   "history": null,
+   "alternative_to": "MIRD"
+  },
+  "HDL": {
+   "name": "Mirror loom through the header, with spare conductors pulled now (one coax, two 20 AWG)",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"we haven't done any wiring planning headliner planning for the rearview mirror\"). The inside mirror hangs on a glass-mounted bracket, 45 in-lb (1977 LTSM p.132 and p.187, C-K); the Blazer's steel cab carries the header panel the removable top bolts to (p.155). The RC wires already run this way: \"plate -> body -> cab -> headliner -> mirror\" (CAM_VIDEO)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "door_cavities": 0,
+    "notes": "route: mirror bracket up to the header, along the header under its trim to the driver A-pillar, down the pillar to the dash beside the PDM30. The builder confirms the path on the truck (wiring-receipt rule). The Mobileye cable (FWC) and top-design's top camera lead share the pillar run. OPEN: headliner or bare header in this cab (read on the truck)",
+    "adds": [
+     {
+      "id": "HDL_COAX",
+      "gauge": null,
+      "spec": "kit coax (RCA), spare",
+      "from": "dash beside the PDM30",
+      "to": "mirror bracket",
+      "current_a": 0,
+      "length_ft_est": 8,
+      "basis": "0.84 m header (half of FR-88's 1686 mm windshield) + 0.60 m pillar (FR-88 windshield corner 600 mm) + 0.5 m to the PDM30 zone, +15 % body pad (state s1)"
+     },
+     {
+      "id": "HDL_SP1",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "dash beside the PDM30",
+      "to": "mirror bracket",
+      "current_a": 0,
+      "length_ft_est": 8,
+      "basis": "as HDL_COAX"
+     },
+     {
+      "id": "HDL_SP2",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "dash beside the PDM30",
+      "to": "mirror bracket",
+      "current_a": 0,
+      "length_ft_est": 8,
+      "basis": "as HDL_COAX"
+     }
+    ],
+    "mass_g_est": "31 g of 20 AWG (2 x 8 ft); coax not published"
+   },
+   "history": null
+  },
+  "BMIR": {
+   "name": "Billet reproduction side mirrors in the original 1973-87 style, with pockets for the camera, turn and puddle modules (to be produced)",
+   "status": "candidate",
+   "decided": null,
+   "source": "owner 2026-09-29 (\"ideally in a perfect world like actually billet style side mirrors reproductions from the original style which is my hundred percent of my goal if we found a builder for that\"; \"in two or three days we basically have like a viable option to send to a producer ... and then we have like a budget figured out that's when we toggle on the cost of that side mirror\"). Production anchors (2026-09-29): Intek Otto squarebody billet pair via Pro Touring Store $2,499 raw / $2,799 polished (protouringstore.com__billet-mirrors-for-1973-1987-squarebody-chevy-trucks.js.md); Ringbrothers universal truck pair $1,200 (www.ringbrothers.com__universal-truck-rectangular-mirror.md); Eddie Motorsports Kinetic square $275.95 each (eddiemotorsports.com__kinetic-square-mirror.md); LMC GM-style repro $39.95 each (www.lmctruck.com__cc-1973-87-gm-style-reproduction-door-mirror.md)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "door_cavities": 0,
+    "notes": "a sealed DT 6-way inside each door at the mirror base carries the module feeds and the DGND return; the mirror is still the factory 3-screw door mount with its inner brace. OPEN: the budget (quotes; drafts in the research file, not sent), the mirror on the truck today, and a design floor of 126 cm2 of unit-magnification glass per side (49 CFR 571.111 S6.1(b))",
+    "mass_g_est": "the mirrors themselves not known until designed"
+   },
+   "history": null,
+   "requires": "DGND"
+  },
+  "DGND": {
+   "name": "Door accessory ground, one per door, the shared return for the door and mirror add-ons",
+   "status": "candidate",
+   "decided": null,
+   "source": "grounds run in the loom to a ground bank, never to the body (state s1 row 56, owner 2026-09-27); one return per door serves every door add-on (camera, repeater, puddle) so each add-on needs only its feed cavity in the hinge pass-through",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "door_cavities": 1,
+    "notes": "built only with at least one of MCAM, MCAM-BIL, MTS, MTS-SOG, PUD, PUD-MIR or BMIR; splits inside the door to each device",
+    "adds": [
+     {
+      "id": "DOOR_ACC_GND_L",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "driver door accessory splice (inside the door)",
+      "to": "GND-BANK-CAB",
+      "current_a": 0.27,
+      "length_ft_est": 9,
+      "basis": "as MCAM_L_PWR; current = camera 0.07 + repeater 0.05 + puddle 0.145 (their sources)"
+     },
+     {
+      "id": "DOOR_ACC_GND_R",
+      "gauge": 20,
+      "spec": "M22759/32",
+      "from": "passenger door accessory splice (inside the door)",
+      "to": "GND-BANK-CAB",
+      "current_a": 0.27,
+      "length_ft_est": 9,
+      "basis": "as DOOR_ACC_GND_L"
+     }
+    ],
+    "mass_g_est": "35 g of 20 AWG (2 x 9 ft)"
+   },
+   "history": null
+  },
+  "DPASS12": {
+   "name": "Door hinge pass-throughs as Deutsch DT 12-way (DT04-12PA / DT06-12SA) in place of the DT 8-way, both doors",
+   "status": "candidate",
+   "decided": null,
+   "source": "capacity ledger (options_v5, 2026-09-29): the door add-ons need 4 cavities per door and the DT 8-way has 2 spare with the PL lock wires (6 without); pieces lane 2026-09-29: \"show both fixes as toggles: a DT 12-way at the hinge, or drop PL\". The DT 12-way is the family body bulkhead A used (DT04-12PA-L012, state 0w)",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "door_pass_capacity": 12,
+    "notes": "same size-16 contacts (0460-202-16141 / 0462-201-16141, 20-16 AWG) and crimper as the 8-way; wedges W12P / W12S. OPEN: the 12-way's vendor page is not saved, and its body is larger than the 8-way's, so check it through the door conduit"
+   },
+   "history": null
   }
  },
  "capacity": {
@@ -55684,6 +56690,26 @@
     "used": 52,
     "spare": 8,
     "source": "M130 datasheet; registry pinout (kits_v5)"
+   },
+   "door pass-through DOOR-L-PASS": {
+    "capacity": 8,
+    "used": 2,
+    "spare": 6,
+    "candidate_wires": 4,
+    "candidate_options": [
+     "PL"
+    ],
+    "source": "catalog/endpoints.yaml wires (DT04-08PA 8-way)"
+   },
+   "door pass-through DOOR-R-PASS": {
+    "capacity": 8,
+    "used": 2,
+    "spare": 6,
+    "candidate_wires": 4,
+    "candidate_options": [
+     "PL"
+    ],
+    "source": "catalog/endpoints.yaml wires (DT04-08PA 8-way)"
    },
    "ground bank GND-BANK-ENG": {
     "capacity": null,
@@ -56268,7 +57294,12 @@
      "PDM30 OUT4"
     ],
     "setting_conflicts": [],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "PL": {
     "status": "candidate",
@@ -56283,7 +57314,12 @@
     "setting_conflicts": [
      "PDM30 OUT21: CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it. The wire is not the limit: it allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column)"
     ],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "TG": {
     "status": "candidate",
@@ -56294,7 +57330,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "FC": {
     "status": "candidate",
@@ -56305,7 +57346,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": "camera and display not picked; if the mirror display takes a second input, video only"
+    "notes": "camera and display not picked; if the mirror display takes a second input, video only",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "AS": {
     "status": "candidate",
@@ -56316,7 +57362,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": "receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads"
+    "notes": "receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "TS2": {
     "status": "candidate",
@@ -56327,7 +57378,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": "2 lamp feeds + 2 grounds in the loom; the location sets the zone"
+    "notes": "2 lamp feeds + 2 grounds in the loom; the location sets the zone",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "LO4": {
     "status": "candidate",
@@ -56338,7 +57394,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": "cab-side lever; the hubs stay a by-hand check"
+    "notes": "cab-side lever; the hubs stay a by-hand check",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "DISP": {
     "status": "candidate",
@@ -56349,7 +57410,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": "the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's"
+    "notes": "the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "PCS-CAN": {
     "status": "candidate",
@@ -56360,7 +57426,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "IBST-CAN": {
     "status": "candidate",
@@ -56371,7 +57442,12 @@
     "pdm15_outputs": 0,
     "takes": [],
     "setting_conflicts": [],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    },
    "BFL": {
     "status": "candidate",
@@ -56384,13 +57460,336 @@
      "PDM15 DIG1"
     ],
     "setting_conflicts": [],
-    "notes": null
+    "notes": null,
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
+   },
+   "MCAM": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "video goes to the MIRD switcher (inputs 3 and 4) or straight to the mirror's CH2; the coax crosses the hinge unbroken in the door conduit, not in a DT cavity. OPEN: the manual says 9-12 V DC and a running truck sits near 14 V (confirm with EchoMaster)",
+    "planned_wires": 4,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT23 (RC mirror feed, RUN): camera power"
+    ],
+    "alternative_to": null,
+    "requires": "DGND"
+   },
+   "MCAM-BIL": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "set CVBS for the VS41 and the RVS mirror (both CVBS); the pocket, lens window and seal are the producer's (BMIR). OPEN: current draw and body size (not on the maker's page)",
+    "planned_wires": 4,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT23 (RC mirror feed, RUN): camera power"
+    ],
+    "alternative_to": "MCAM",
+    "requires": [
+     "BMIR",
+     "DGND"
+    ]
+   },
+   "BSM": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "the radar bar sits at the plate with the RC camera, so its kit cable follows the camera's path into the body (a rear entry, the 0ah 'small rear bulkhead' question). Its own GPS gives speed; nothing goes on the MoTeC CAN. OPEN: plate on the bumper or the tailgate (mounts.yaml LICENSE-LAMP); a tailgate plate puts the cable across the tailgate hinge",
+    "planned_wires": 6,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): main unit power",
+     "PDM30 OUT27 / OUT28 (turn L/R): turn inputs",
+     "PDM30 OUT15 (reverse): cross-traffic input"
+    ],
+    "alternative_to": null,
+    "requires": null
+   },
+   "BSM-SD2": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "its J1939 bus is private between the sensors and the PreView display, never the M1 trunk. OPEN: price (distributor quote); whether a 106.5 in wheelbase Blazer has a body side 137-197 in back from the front edge at 23-39 in high clear of metal",
+    "planned_wires": 8,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): sensor power",
+     "PDM30 OUT27 / OUT28 (turn L/R): pin 8 turn input"
+    ],
+    "alternative_to": "BSM",
+    "requires": null
+   },
+   "MTS": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "the PDM already flashes OUT27/OUT28 and runs hazard as both (DIG4 + DIG5); the stock chrome head takes a drilled 3/4 in hole, a billet head takes a machined pocket",
+    "planned_wires": 2,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT27 (#80 left front turn)",
+     "PDM30 OUT28 (#82 right front turn)"
+    ],
+    "alternative_to": null,
+    "requires": "DGND"
+   },
+   "MTS-SOG": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "OPEN: LED board current, glass supplier and the FMVSS 111 reflective area left after the arrow (126 cm2 floor, 49 CFR 571.111 S6.1(b))",
+    "planned_wires": 2,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT27 / OUT28 (front turn)"
+    ],
+    "alternative_to": "MTS",
+    "requires": [
+     "BMIR",
+     "DGND"
+    ]
+   },
+   "PUD": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "PDM logic adds an off-delay after the door shuts (Pulse/timer operators, MoTeC PDM manual PDF p.4); unlock-triggered only if a keyless receiver is ever added (not designed)",
+    "planned_wires": 2,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT25 (dome/courtesy group, driven by the jamb inputs DIG12/DIG13)"
+    ],
+    "alternative_to": null,
+    "requires": "DGND"
+   },
+   "PUD-MIR": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "a 10 W module is about 0.83 A at 12 V (10 W / 12 V), so two add about 1.7 A to OUT25",
+    "planned_wires": 2,
+    "door_cavities": 1,
+    "taps": [
+     "PDM30 OUT25 (courtesy group)"
+    ],
+    "alternative_to": "PUD",
+    "requires": [
+     "BMIR",
+     "DGND"
+    ]
+   },
+   "BML": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "the splices sit in the front lamp loom, so they follow wherever the front loads are fed from (state 0ah: the 61-pin or a bay PDM, open). A DT 3-way at each bumper bracket lets the bumper come off. DRL is not designed: no DRL-rated lamp is picked and it would need its own output. Locking the bumper: torque the brackets and braces to the manual, then the builder decides how to pin them",
+    "planned_wires": 6,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT27 / OUT28 (front turn, +0.55 A each)",
+     "PDM30 OUT13 (park/tail group, +0.16 A)"
+    ],
+    "alternative_to": null,
+    "requires": null
+   },
+   "FWC": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "speed from the Dakota VHX SPD OUT (2,000 or 4,000 PPM; it does not work if the Dakota takes speed from a BIM bus module, VHX manual p.8), not the MoTeC CAN: Mobileye's CAN reader works from its vehicle database. The IHC output stays unused (high beams keep the factory floor dimmer). The main unit's 3 m cable shares the HDL route down the A-pillar. OPEN: price and installer (quote), how the 1 A splits between BAT+ and IGN",
+    "planned_wires": 5,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT11 (RADIO_CONST, constant): BAT+",
+     "PDM30 OUT23 (RUN): ignition",
+     "PDM30 OUT27 / OUT28: AUX through two diodes"
+    ],
+    "alternative_to": null,
+    "requires": null
+   },
+   "MIRD": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "inputs: 1 = the top camera (top-design lane) as the default view, 2 = the FC front camera on a dash toggle, 3/4 = the mirror cameras on the turn signals. Mirror CH1 stays the RC plate camera on reverse. OPEN: + trigger range 2-12 V against a ~14 V running truck (ask PAC); the VS41's own current (not published); which RVS harness wire selects CH2",
+    "planned_wires": 6,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): VS41 power",
+     "PDM30 OUT27 / OUT28: triggers 3 and 4"
+    ],
+    "alternative_to": null,
+    "requires": null
+   },
+   "MIRD-FV": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "MIRROR_TRIG and #97 fall away (no trigger input; the camera is fed by the mirror); CAM_VIDEO becomes the kit's 30 ft TVI harness; the VS41 cannot feed it (CVBS)",
+    "planned_wires": 1,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): the RC MIRROR_PWR itself"
+    ],
+    "alternative_to": "MIRD",
+    "requires": null
+   },
+   "MIRD-360": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "the side cameras sit under the mirrors, so their kit cables cross the hinges in the door conduit; the front camera at the grille; the ECU triggers take 12-14 V directly (6-32 V)",
+    "planned_wires": 5,
+    "door_cavities": 0,
+    "taps": [
+     "PDM30 OUT23 (RUN): ECU power",
+     "PDM30 OUT27 / OUT28 / OUT15: triggers"
+    ],
+    "alternative_to": "MIRD",
+    "requires": null
+   },
+   "HDL": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "route: mirror bracket up to the header, along the header under its trim to the driver A-pillar, down the pillar to the dash beside the PDM30. The builder confirms the path on the truck (wiring-receipt rule). The Mobileye cable (FWC) and top-design's top camera lead share the pillar run. OPEN: headliner or bare header in this cab (read on the truck)",
+    "planned_wires": 3,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
+   },
+   "BMIR": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "a sealed DT 6-way inside each door at the mirror base carries the module feeds and the DGND return; the mirror is still the factory 3-screw door mount with its inner brace. OPEN: the budget (quotes; drafts in the research file, not sent), the mirror on the truck today, and a design floor of 126 cm2 of unit-magnification glass per side (49 CFR 571.111 S6.1(b))",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": "DGND"
+   },
+   "DGND": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "built only with at least one of MCAM, MCAM-BIL, MTS, MTS-SOG, PUD, PUD-MIR or BMIR; splits inside the door to each device",
+    "planned_wires": 2,
+    "door_cavities": 1,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
+   },
+   "DPASS12": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "same size-16 contacts (0460-202-16141 / 0462-201-16141, 20-16 AWG) and crimper as the 8-way; wedges W12P / W12S. OPEN: the 12-way's vendor page is not saved, and its body is larger than the 8-way's, so check it through the door conduit",
+    "planned_wires": 0,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
    }
   },
   "verdict": {
    "body crossings": "Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C",
    "PDM30 outputs": "PDM30 outputs: candidates would take 5; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads",
-   "PDM30 inputs": "PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN"
+   "PDM30 inputs": "PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN",
+   "door pass-throughs": "Door pass-throughs (DT 8-way, each door): base + decided use 2 of 8; designed candidate wires take 4 (PL); undesigned candidates would take 4 per door — fits only without PL; a DT 12-way (DT04-12PA / DT06-12SA) gives 4 more cavities; with DPASS12 each door has 12: 2 + 4 + 4 = 10 — fits",
+   "alternates": "Alternate versions not counted above (one version of an add-on is built): MCAM-BIL, BSM-SD2, MTS-SOG, PUD-MIR, MIRD-FV, MIRD-360"
   }
  }
 }

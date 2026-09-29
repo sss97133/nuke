@@ -36,6 +36,9 @@ LAYERS = ["L1 plugs", "L2 wire", "L3 crossing", "L4 ends", "L5 material"]
 PDM_CAP = {"PDM30": {"inputs": 16, "out20": 8, "out8": 22}, "PDM15": {"inputs": 16, "out20": 8, "out8": 7}}
 M130_PINS = 60                                        # 34-way A + 26-way B (M130 datasheet)
 BODY_CAP = {"FIREWALL-BODY-A": 12, "FIREWALL-BODY-B": 12, "FIREWALL-BODY-P": 4, "FIREWALL-BODY-C": 6}
+# door hinge pass-throughs for the low-current door wires: Deutsch DT 8-way DT04-08PA/DT06-08SA (catalog/endpoints.yaml
+# DOOR-L-PASS / DOOR-R-PASS). The window-power DTP 4-way (DOOR-x-PASS-P) is full with the PW candidate and is not offered.
+DOOR_CAP = {"DOOR-L-PASS": 8, "DOOR-R-PASS": 8}
 
 
 def load():
@@ -180,6 +183,15 @@ def capacity(reg, wires, opts, eps_yaml):
     m130 = reg.get("m130_pinout") or {}
     m_used = m130.get("used", 0) if isinstance(m130, dict) else len(m130)
     res["M130 pins"] = OrderedDict(capacity=M130_PINS, used=m_used, spare=M130_PINS - m_used, source="M130 datasheet; registry pinout (kits_v5)")
+    # door hinge pass-throughs: base + decided wires use a cavity each; candidate wires already designed (PL) are shown on top
+    opt_of = {str(w["id"]): w["option"] for w in wires}
+    for e, n in DOOR_CAP.items():
+        wl = [str(x) for x in (eps_yaml.get(e, {}).get("wires") or [])]
+        cand = [x for x in wl if (opts.get(opt_of.get(x)) or {}).get("status") in ("candidate", "rejected")]
+        used_ = len(wl) - len(cand)
+        res[f"door pass-through {e}"] = OrderedDict(capacity=n, used=used_, spare=n - used_, candidate_wires=len(cand),
+                                                    candidate_options=sorted({opt_of[x] for x in cand}),
+                                                    source="catalog/endpoints.yaml wires (DT04-08PA 8-way)")
     for bank in ("GND-BANK-ENG", "GND-BANK-CAB", "GND-SPLICE-REAR"):
         n = len(eps_yaml.get(bank, {}).get("wires") or [])
         res[f"ground bank {bank}"] = OrderedDict(capacity=None, used=n, spare=None, source="catalog/endpoints.yaml wires; stud count not yet set")
@@ -204,18 +216,48 @@ def capacity(reg, wires, opts, eps_yaml):
         # an output-setting conflict on a candidate's wires (reconcile_v5 pdm_settings) is the candidate's to resolve
         d["setting_conflicts"] = sorted({w["pdm_limit"] for w in ws if "CONFLICT" in str(w.get("pdm_limit") or "")})
         d["notes"] = dd.get("notes")
+        # undesigned add-ons: planned wires, door cavities, outputs they share instead of taking; alternates are shown but not
+        # summed (one version of an add-on is built, never two)
+        d["planned_wires"] = len(dd.get("adds") or [])
+        d["door_cavities"] = dd.get("door_cavities", 0)
+        d["taps"] = dd.get("taps") or []
+        d["alternative_to"] = o.get("alternative_to")
+        d["requires"] = o.get("requires")
         demand[code] = d
     verdict = OrderedDict()
-    tot_cross = sum(d["crossings"] for d in demand.values())
+    alts = [c for c, d in demand.items() if d["alternative_to"]]
+    lead = [d for d in demand.values() if not d["alternative_to"]]
+    tot_cross = sum(d["crossings"] for d in lead)
     body_spare = sum(r["spare"] for k, r in res.items() if k.startswith("body bulkhead"))
     verdict["body crossings"] = f"Body firewall crossings: candidates would take {tot_cross}; body bulkheads have {body_spare} spare — " + (
         "fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C" if tot_cross <= body_spare else "does NOT fit: bulkhead C is required")
-    out_need = sum(d["pdm30_outputs"] for d in demand.values())
+    out_need = sum(d["pdm30_outputs"] for d in lead)
     out_spare = res["PDM30 20 A outputs"]["spare"] + res["PDM30 8 A outputs"]["spare"]
     verdict["PDM30 outputs"] = f"PDM30 outputs: candidates would take {out_need}; {out_spare} spare — " + ("fits" if out_need <= out_spare else f"does NOT fit; the engine PDM15 has {res['PDM15 20 A outputs']['spare'] + res['PDM15 8 A outputs']['spare']} spare outputs for engine-bay loads")
-    in_need = sum(d["pdm30_inputs"] for d in demand.values())
+    in_need = sum(d["pdm30_inputs"] for d in lead)
     verdict["PDM30 inputs"] = f"PDM30 inputs: candidates would take {in_need}; {res['PDM30 inputs']['spare']} spare — " + (
         "fits" if in_need <= res["PDM30 inputs"]["spare"] else f"does NOT fit; PDM15 has {res['PDM15 inputs']['spare']} spare inputs, read over CAN")
+    doors = [r for k, r in res.items() if k.startswith("door pass-through")]
+    if doors:
+        spare_min = min(r["spare"] for r in doors)
+        wired = max(r["candidate_wires"] for r in doors)
+        wired_by = sorted({c for r in doors for c in r["candidate_options"]})
+        door_need = sum(d["door_cavities"] for d in lead)
+        fit = ("fits" if wired + door_need <= spare_min else
+               (f"fits only without {'/'.join(wired_by)}" if door_need <= spare_min else "does NOT fit") +
+               "; a DT 12-way (DT04-12PA / DT06-12SA) gives 4 more cavities")
+        verdict["door pass-throughs"] = (f"Door pass-throughs (DT 8-way, each door): base + decided use {doors[0]['used']} of {doors[0]['capacity']}; "
+                                         f"designed candidate wires take {wired} ({'/'.join(wired_by) or 'none'}); undesigned candidates would take "
+                                         f"{door_need} per door — {fit}")
+        # a candidate that swaps the pass-through for a bigger one (demand.door_pass_capacity) is the other toggle: say what it gives
+        for code, o in opts.items():
+            cap_ = (o.get("demand") or {}).get("door_pass_capacity") if o["status"] == "candidate" else None
+            if cap_:
+                tot_ = doors[0]["used"] + wired + door_need
+                verdict["door pass-throughs"] += (f"; with {code} each door has {cap_}: {doors[0]['used']} + {wired} + {door_need} = {tot_} — "
+                                                  + ("fits" if tot_ <= cap_ else "does NOT fit"))
+    if alts:
+        verdict["alternates"] = f"Alternate versions not counted above (one version of an add-on is built): {', '.join(alts)}"
     return OrderedDict(resources=res, candidate_demand=demand, verdict=verdict)
 
 
@@ -232,7 +274,8 @@ def attach(reg, opts, eps_yaml, checks):
     )
     reg["options"] = OrderedDict((code, OrderedDict(name=o["name"], status=o["status"], decided=(str(o["decided"]) if o.get("decided") else None), source=o.get("source"),
                                                     subsystems=o.get("subsystems") or [], wires=[str(w["id"]) for w in wires if w["option"] == code],
-                                                    demand=o.get("demand"), history=o.get("history")))
+                                                    demand=o.get("demand"), history=o.get("history"),
+                                                    **{k: o[k] for k in ("alternative_to", "requires") if o.get(k)}))
                                  for code, o in opts.items())
     reg["capacity"] = capacity(reg, wires, opts, eps_yaml)
     return reg
@@ -268,9 +311,10 @@ def write_md(reg):
     P.append("\n### Wire stock\n\n| item | need ft | in carts ft | on hand ft | status |\n|---|---|---|---|---|")
     for l in reg["capacity"]["resources"]["wire stock (ft)"]["lines"]:
         P.append(f"| {l['item']} | {l['need_ft']} | {l['cart_ft']} | not recorded | {l['status']} |")
-    P.append("\n### What the candidates would take\n\n| option | designed wires | crossings | PDM30 outputs | PDM30 inputs | notes |\n|---|---|---|---|---|---|")
+    P.append("\n### What the candidates would take\n\n| option | designed wires | planned wires | crossings | PDM30 outputs | PDM30 inputs | door cavities | alternative to | notes |\n|---|---|---|---|---|---|---|---|---|")
     for code, d in reg["capacity"]["candidate_demand"].items():
-        P.append(f"| {code} | {d['designed_wires']} | {d['crossings']} | {d['pdm30_outputs']} | {d['pdm30_inputs']} | {d['notes'] or ''} |")
+        P.append(f"| {code} | {d['designed_wires']} | {d.get('planned_wires', 0)} | {d['crossings']} | {d['pdm30_outputs']} | {d['pdm30_inputs']} | "
+                 f"{d.get('door_cavities', 0)} | {d.get('alternative_to') or ''} | {d['notes'] or ''} |")
     P.append("\n### Verdict\n")
     for k, v in reg["capacity"]["verdict"].items():
         P.append(f"- **{k}:** {v}")

@@ -2,7 +2,7 @@
 """Keep a copy of every web source the K5 master list cites, so audit_citations.py can check it.
 
 Pages are fetched through Firecrawl (never straight from this machine's IP -- ProWire's firewall banned it once,
-2026-09-25) one at a time: 15 s between ProWire pages, 8 s elsewhere. Stops at the first 403/429 from a host.
+2026-09-25) one at a time: 20 s between ProWire pages, 10 s elsewhere. Stops at the first 403/429 from a host.
 Each page is saved as markdown with a header (url, fetched time, status) to reference_documents/web_snapshots/,
 which is gitignored: third-party text never goes into the public repo.
 
@@ -232,6 +232,59 @@ URLS = [
     "https://www.fastandquiet.com/downloadable/bosch-ibooster-gen-1-pinout.PDF",
     "https://tulayswirewerks.com/product/bosch-ibooster-gen-1-universal-wire-harness/",
     "https://raw.githubusercontent.com/commaai/opendbc/master/opendbc/dbc/tesla_can.dbc",
+    # door, mirror, camera and lighting add-ons (research/2026-09-30_door-mirror-camera-lighting-options.md, fetched 2026-09-29)
+    "https://www.rearviewsafety.com/license-plate-backup-camera-system-rvs-7180355-ir.html",
+    "https://www.rearviewsafety.com/oem-rear-view-replacement-mirror-monitor.html",
+    "https://www.rearviewsafety.com/inview-360-hd-around-vehicle-monitoring-systems-rvs-01-360.html",
+    "https://catalog.echomaster.com/catalog/universal-solutions/pcam-bs1",
+    "https://catalog.echomaster.com/index.php?controller=attachment&id_attachment=2113",
+    "https://catalog.echomaster.com/catalog/ahd-cameras/phd5n1",
+    "https://catalog.echomaster.com/catalog/lane-change-assistance/fc-gmld103-mc",
+    "https://service.tesla.com/docs/Model3/ServiceManual/2024/en-us/GUID-E473ED74-9C48-4106-936F-C6A8806AAF5B.html",
+    "https://teslamotorsclub.com/tmc/threads/tesla-fender-camera-output.301521/",
+    "https://www.notebookcheck.net/Tesla-HW4-vs-HW3-side-indicator-design-and-specs-comparison-shows-it-can-t-be-retrofit.726575.0.html",
+    "https://rydeenmobile.com/product/bss2lpb/",
+    "https://rydeenmobile.com/product/bss3-microwave-radar-blindspot-detection-system/",
+    "https://rydeenmobile.com/wp-content/uploads/BSS1-Instruction-Manual-1.pdf",
+    "https://www.sensata.com/products/blind-spot-monitoring-systems/preview-side-defender-ii",
+    "https://www.sensata.com/sites/default/files/a/preview-side-defender-II-user-manual.pdf",
+    "https://www.grote.com/signal-lighting/clearance-marker-lights/micronova-dot-led-clearance-marker-lights/49343/",
+    "https://www.grote.com/signal-lighting/clearance-marker-lights/micronova-led-clearance-marker-lights/47973/",
+    "https://boostautoparts.com/products/t1sog",
+    "https://www.apexlighting.com/boat-lights/courtesy-lights/echo-flush-mount-led-courtesy-light/",
+    "https://undergroundlighting.com/collections/led-puddle-lights",
+    "https://www.chevypartspros.com/sku/84408372.html",
+    "https://www.trucklightparts.com/truck-lite-60094y.html",
+    "https://centrevilletrailer.com/product/truck-lite-10-series-25-amber-round-low-profile-grommet-mount-led-clearancemarker-light/",
+    "https://www.lmctruck.com/bumpers/custom-bumper/cc-1973-87-custom-chrome-front-bumper-lighted",
+    "https://www.lmctruck.com/1973-91-chevy-gmc/csb-1973-91-bumper-brace-kits-and-bumper-bolt-kits",
+    "https://fleetsafe.com.au/wp-content/uploads/2024/03/Mobileye-8-Connect%E2%84%A2-Technical-Installation-Guide-4G-v3.0.pdf",
+    "https://catalog.archive.pac-audio.com/catalog/camera-switchers/vs41",
+    "https://catalog.archive.pac-audio.com/index.php?controller=attachment&id_attachment=894",
+    "https://www.sonicelectronix.com/item-123401-PAC-VS41.html",
+    "https://www.brandmotion.com/product/fullvue-mirror-vision-system/",
+    "https://www.ringbrothers.com/gentex-gntx-r-auto-dimming-rearview-mirror-black",
+    "https://protouringstore.com/products/billet-mirrors-for-1973-1987-squarebody-chevy-trucks",
+    "https://protouringstore.com/products/billet-mirrors-for-1973-1987-squarebody-chevy-trucks.js",
+    "https://www.intekotto.com/exterior-mirrors",
+    "https://www.bbtfabrications.com/cnc-machining-and-custom-hot-rod-parts",
+    "https://azproperformance.com/products/interk-otto-classic-rectangle-mirrors-csrms",
+    "https://www.ringbrothers.com/mirrors",
+    "https://www.ringbrothers.com/universal-truck-rectangular-mirror",
+    "https://www.summitracing.com/parts/rgb-92000-2200-b",
+    "https://eddiemotorsports.com/products/kinetic-square-mirror",
+    "https://www.billetrides.com/product/universal-truck-gm-73-87",
+    "https://www.lmctruck.com/mirrors/door/cc-1973-87-gm-style-reproduction-door-mirror",
+    "https://www.autometaldirect.com/door-mirror---chrome---small-style---lh-or-rh---73-91-chevy-gmc-ck-squarebody-truck",
+    "https://www.gmsquarebody.com/threads/door-mirror-mount.19400/",
+    "https://www.ecfr.gov/current/title-49/subtitle-B/chapter-V/part-571/subpart-B/section-571.111",
+    "https://fabcon.com/articles/precision-cnc-machining/cnc-machining-hourly-rate-us/",
+    "https://3space.com/how-much-does-3d-scanning-cost/",
+    "https://www.rostra.com/backzone-truck-parking-sensor-system.php",
+    "https://www.lmctruck.com/electrical/wiper-components/cc-1973-84-windshield-wiper-and-washer",
+    "https://www.classicparts.com/1973-84-Windshield-Washer-Hose-Kit/productinfo/67-865/",
+    "https://www.ebay.com/itm/192684099994",
+    "https://ck5.com/forums/threads/tech-detailed-wiper-wiring-diagram.174785/",
 ]
 
 
@@ -239,7 +292,9 @@ def stem(url):
     u = urlparse(url)
     last = [p for p in u.path.split("/") if p][-1] if u.path.strip("/") else "index"
     last = re.sub(r"\.(html?|pdf)$", "", last)
-    return f"{u.netloc}__{last}"
+    # a query URL keeps its query after a double underscore, so two attachments on one path don't share a file
+    # (the existing openinverter.org__viewtopic.php__p=82361.md naming)
+    return f"{u.netloc}__{last}" + (f"__{u.query}" if u.query else "")
 
 
 def scrape(url, key):
@@ -269,7 +324,7 @@ def main():
         if host in blocked:
             print(f"skip  {url} (host blocked this run)")
             continue
-        gap = 15 if "prowireusa" in host else 8
+        gap = 20 if "prowireusa" in host else 10      # owner rule: one request per host every 10 s, ProWire every 20 s
         wait = last_host_at.get(host, 0) + gap - time.time()
         if wait > 0:
             time.sleep(wait)

@@ -21,6 +21,23 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 | PCS-CAN | PCS CAN out to the M130 / Dakota (gear, fluid temperature on the dash) | **candidate** |  | 0 | lead 2026-09-28; research/2026-09-28_6l90-transmission-electrical.md §4: the PCS speaks J1939, GMLAN and PCS C |
 | IBST-CAN | iBooster CAN read-only logging bus, step 2 | **candidate** |  | 2 | lead 2026-09-28; research/2026-09-28_ibooster-gen2-wiring.md A4-A5: a twisted pair from the booster's vehicle  |
 | BFL | Brake-fluid level warning (reservoir sensor to PDM15 DIG1) | **candidate** |  | 2 | lead 2026-09-28; research/2026-09-28_ibooster-gen2-wiring.md §6: the reservoir level sensor is not wired in th |
+| MCAM | Side-mirror cameras, stick-on under the current mirrors (EchoMaster PCAM-BS1 x2), shown on turn signal | **candidate** |  | 0 | owner 2026-09-29 ("if we wanted to like add like a side camera it hooks into the side mirror even like sensors |
+| MCAM-BIL | Side-mirror cameras built into billet mirrors (camera module pocketed in the mirror, e.g. EchoMaster PHD5N1) | **candidate** |  | 0 | owner 2026-09-29 ("if we're gonna go all out with a billet that means we can install like Tesla style cameras" |
+| BSM | Blind-spot radar, license-plate bar for metal bumpers (Rydeen BSS2LPB), LED warnings on the A-pillars | **candidate** |  | 0 | owner 2026-09-29 ("even like sensors"). Rydeen BSS2LPB page (web_snapshots/rydeenmobile.com__bss2lpb.md): "App |
+| BSM-SD2 | Blind-spot radar, commercial side sensors (Sensata PreView Side Defender II x2) with their own in-cab display | **candidate** |  | 0 | Sensata PreView Side Defender II manual (web_snapshots/www.sensata.com__preview-side-defender-II-user-manual.m |
+| MTS | Mirror turn and hazard repeaters, a sealed 3/4 in LED in each mirror head (Grote MicroNova Dot 49343 amber) | **candidate** |  | 0 | owner 2026-09-29 ("the illumination lights for like blinkers caution stuff"). Grote 49343 page (web_snapshots/ |
+| MTS-SOG | Mirror turn arrows behind the glass (signal-on-glass, custom billet mirror glass) | **candidate** |  | 0 | the aftermarket makes it for GM tow mirrors: Boost Auto Parts T1SOG "adds an integrated red turn signal on gla |
+| PUD | Door puddle lamps in the door bottoms (Lumitec Echo x2), on the courtesy group with an off-delay | **candidate** |  | 0 | owner 2026-09-29 ("on the doors I really like ... the light puddle what's our options there"). Lumitec Echo fl |
+| PUD-MIR | Puddle lamps in the underside of billet mirrors (GM 84408372-type module or an 18 mm LED) | **candidate** |  | 0 | GM 84408372 LED puddle light kit for exterior mirrors, bowtie logo, $150.94 (MSRP $175.00) (web_snapshots/www. |
+| BML | Front-bumper park/turn lamps set into the bumper face (Truck-Lite 60094Y x2), with the bumper locked in position | **candidate** |  | 0 | owner 2026-09-29 ("there's a lot of space in these gigantic vintage bumpers scary to adjust them because they  |
+| FWC | Forward windshield camera with collision and lane warnings (Mobileye 8 Connect) behind the mirror | **candidate** |  | 0 | owner 2026-09-29 ("in newer vehicles that use sensors it typically have to put a camera in like the windshield |
+| MIRD | Multi-camera mirror, a 4-camera switcher into the RC mirror's second input (PAC VS41) | **candidate** |  | 0 | owner 2026-09-29 ("the rearview mirror is also kind of maybe an optimal screen situation ... but we also event |
+| MIRD-FV | Full-display streaming mirror with a built-in front recording camera (Brandmotion FullVUE FVMR-1100), in place of the RC mirror | **candidate** |  | 0 | Brandmotion FullVUE page (web_snapshots/www.brandmotion.com__fullvue-mirror-vision-system.md, 2026-09-29): 9.6 |
+| MIRD-360 | 360-degree bird's-eye camera system on its own dash monitor (Rear View Safety inView 360 HD) | **candidate** |  | 0 | RVS inView 360 HD page (web_snapshots/www.rearviewsafety.com__inview-360-hd-around-vehicle-monitoring-systems- |
+| HDL | Mirror loom through the header, with spare conductors pulled now (one coax, two 20 AWG) | **candidate** |  | 0 | owner 2026-09-29 ("we haven't done any wiring planning headliner planning for the rearview mirror"). The insid |
+| BMIR | Billet reproduction side mirrors in the original 1973-87 style, with pockets for the camera, turn and puddle modules (to be produced) | **candidate** |  | 0 | owner 2026-09-29 ("ideally in a perfect world like actually billet style side mirrors reproductions from the o |
+| DGND | Door accessory ground, one per door, the shared return for the door and mirror add-ons | **candidate** |  | 0 | grounds run in the loom to a ground bank, never to the body (state s1 row 56, owner 2026-09-27); one return pe |
+| DPASS12 | Door hinge pass-throughs as Deutsch DT 12-way (DT04-12PA / DT06-12SA) in place of the DT 8-way, both doors | **candidate** |  | 0 | capacity ledger (options_v5, 2026-09-29): the door add-ons need 4 cavities per door and the DT 8-way has 2 spa |
 
 ## Readiness by layer
 
@@ -78,6 +95,8 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | PDM15 8 A outputs | 7 | 3 | 4 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 inputs | 16 | 2 | 14 (DIG1, DIG2, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | M130 pins | 60 | 52 | 8 | M130 datasheet; registry pinout (kits_v5) |
+| door pass-through DOOR-L-PASS | 8 | 2 | 6 | catalog/endpoints.yaml wires (DT04-08PA 8-way) |
+| door pass-through DOOR-R-PASS | 8 | 2 | 6 | catalog/endpoints.yaml wires (DT04-08PA 8-way) |
 | ground bank GND-BANK-ENG |  | 24 |  | catalog/endpoints.yaml wires; stud count not yet set |
 | ground bank GND-BANK-CAB |  | 21 |  | catalog/endpoints.yaml wires; stud count not yet set |
 | ground bank GND-SPLICE-REAR |  | 13 |  | catalog/endpoints.yaml wires; stud count not yet set |
@@ -167,22 +186,41 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 ### What the candidates would take
 
-| option | designed wires | crossings | PDM30 outputs | PDM30 inputs | notes |
-|---|---|---|---|---|---|
-| PW | 14 | 0 | 2 | 0 |  |
-| PL | 6 | 0 | 1 | 0 |  |
-| TG | 8 | 0 | 0 | 0 |  |
-| FC | 0 | 2 | 1 | 0 | camera and display not picked; if the mirror display takes a second input, video only |
-| AS | 0 | 0 | 0 | 2 | receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads |
-| TS2 | 0 | 0 | 0 | 0 | 2 lamp feeds + 2 grounds in the loom; the location sets the zone |
-| LO4 | 0 | 0 | 0 | 1 | cab-side lever; the hubs stay a by-hand check |
-| DISP | 0 | 0 | 1 | 0 | the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's |
-| PCS-CAN | 0 | 0 | 0 | 0 |  |
-| IBST-CAN | 2 | 0 | 0 | 0 |  |
-| BFL | 2 | 0 | 0 | 0 |  |
+| option | designed wires | planned wires | crossings | PDM30 outputs | PDM30 inputs | door cavities | alternative to | notes |
+|---|---|---|---|---|---|---|---|---|
+| PW | 14 | 0 | 0 | 2 | 0 | 0 |  |  |
+| PL | 6 | 0 | 0 | 1 | 0 | 0 |  |  |
+| TG | 8 | 0 | 0 | 0 | 0 | 0 |  |  |
+| FC | 0 | 0 | 2 | 1 | 0 | 0 |  | camera and display not picked; if the mirror display takes a second input, video only |
+| AS | 0 | 0 | 0 | 0 | 2 | 0 |  | receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads |
+| TS2 | 0 | 0 | 0 | 0 | 0 | 0 |  | 2 lamp feeds + 2 grounds in the loom; the location sets the zone |
+| LO4 | 0 | 0 | 0 | 0 | 1 | 0 |  | cab-side lever; the hubs stay a by-hand check |
+| DISP | 0 | 0 | 0 | 1 | 0 | 0 |  | the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's |
+| PCS-CAN | 0 | 0 | 0 | 0 | 0 | 0 |  |  |
+| IBST-CAN | 2 | 0 | 0 | 0 | 0 | 0 |  |  |
+| BFL | 2 | 0 | 0 | 0 | 0 | 0 |  |  |
+| MCAM | 0 | 4 | 0 | 0 | 0 | 1 |  | video goes to the MIRD switcher (inputs 3 and 4) or straight to the mirror's CH2; the coax crosses the hinge unbroken in the door conduit, not in a DT cavity. OPEN: the manual says 9-12 V DC and a running truck sits near 14 V (confirm with EchoMaster) |
+| MCAM-BIL | 0 | 4 | 0 | 0 | 0 | 1 | MCAM | set CVBS for the VS41 and the RVS mirror (both CVBS); the pocket, lens window and seal are the producer's (BMIR). OPEN: current draw and body size (not on the maker's page) |
+| BSM | 0 | 6 | 0 | 0 | 0 | 0 |  | the radar bar sits at the plate with the RC camera, so its kit cable follows the camera's path into the body (a rear entry, the 0ah 'small rear bulkhead' question). Its own GPS gives speed; nothing goes on the MoTeC CAN. OPEN: plate on the bumper or the tailgate (mounts.yaml LICENSE-LAMP); a tailgate plate puts the cable across the tailgate hinge |
+| BSM-SD2 | 0 | 8 | 0 | 0 | 0 | 0 | BSM | its J1939 bus is private between the sensors and the PreView display, never the M1 trunk. OPEN: price (distributor quote); whether a 106.5 in wheelbase Blazer has a body side 137-197 in back from the front edge at 23-39 in high clear of metal |
+| MTS | 0 | 2 | 0 | 0 | 0 | 1 |  | the PDM already flashes OUT27/OUT28 and runs hazard as both (DIG4 + DIG5); the stock chrome head takes a drilled 3/4 in hole, a billet head takes a machined pocket |
+| MTS-SOG | 0 | 2 | 0 | 0 | 0 | 1 | MTS | OPEN: LED board current, glass supplier and the FMVSS 111 reflective area left after the arrow (126 cm2 floor, 49 CFR 571.111 S6.1(b)) |
+| PUD | 0 | 2 | 0 | 0 | 0 | 1 |  | PDM logic adds an off-delay after the door shuts (Pulse/timer operators, MoTeC PDM manual PDF p.4); unlock-triggered only if a keyless receiver is ever added (not designed) |
+| PUD-MIR | 0 | 2 | 0 | 0 | 0 | 1 | PUD | a 10 W module is about 0.83 A at 12 V (10 W / 12 V), so two add about 1.7 A to OUT25 |
+| BML | 0 | 6 | 0 | 0 | 0 | 0 |  | the splices sit in the front lamp loom, so they follow wherever the front loads are fed from (state 0ah: the 61-pin or a bay PDM, open). A DT 3-way at each bumper bracket lets the bumper come off. DRL is not designed: no DRL-rated lamp is picked and it would need its own output. Locking the bumper: torque the brackets and braces to the manual, then the builder decides how to pin them |
+| FWC | 0 | 5 | 0 | 0 | 0 | 0 |  | speed from the Dakota VHX SPD OUT (2,000 or 4,000 PPM; it does not work if the Dakota takes speed from a BIM bus module, VHX manual p.8), not the MoTeC CAN: Mobileye's CAN reader works from its vehicle database. The IHC output stays unused (high beams keep the factory floor dimmer). The main unit's 3 m cable shares the HDL route down the A-pillar. OPEN: price and installer (quote), how the 1 A splits between BAT+ and IGN |
+| MIRD | 0 | 6 | 0 | 0 | 0 | 0 |  | inputs: 1 = the top camera (top-design lane) as the default view, 2 = the FC front camera on a dash toggle, 3/4 = the mirror cameras on the turn signals. Mirror CH1 stays the RC plate camera on reverse. OPEN: + trigger range 2-12 V against a ~14 V running truck (ask PAC); the VS41's own current (not published); which RVS harness wire selects CH2 |
+| MIRD-FV | 0 | 1 | 0 | 0 | 0 | 0 | MIRD | MIRROR_TRIG and #97 fall away (no trigger input; the camera is fed by the mirror); CAM_VIDEO becomes the kit's 30 ft TVI harness; the VS41 cannot feed it (CVBS) |
+| MIRD-360 | 0 | 5 | 0 | 0 | 0 | 0 | MIRD | the side cameras sit under the mirrors, so their kit cables cross the hinges in the door conduit; the front camera at the grille; the ECU triggers take 12-14 V directly (6-32 V) |
+| HDL | 0 | 3 | 0 | 0 | 0 | 0 |  | route: mirror bracket up to the header, along the header under its trim to the driver A-pillar, down the pillar to the dash beside the PDM30. The builder confirms the path on the truck (wiring-receipt rule). The Mobileye cable (FWC) and top-design's top camera lead share the pillar run. OPEN: headliner or bare header in this cab (read on the truck) |
+| BMIR | 0 | 0 | 0 | 0 | 0 | 0 |  | a sealed DT 6-way inside each door at the mirror base carries the module feeds and the DGND return; the mirror is still the factory 3-screw door mount with its inner brace. OPEN: the budget (quotes; drafts in the research file, not sent), the mirror on the truck today, and a design floor of 126 cm2 of unit-magnification glass per side (49 CFR 571.111 S6.1(b)) |
+| DGND | 0 | 2 | 0 | 0 | 0 | 1 |  | built only with at least one of MCAM, MCAM-BIL, MTS, MTS-SOG, PUD, PUD-MIR or BMIR; splits inside the door to each device |
+| DPASS12 | 0 | 0 | 0 | 0 | 0 | 0 |  | same size-16 contacts (0460-202-16141 / 0462-201-16141, 20-16 AWG) and crimper as the 8-way; wedges W12P / W12S. OPEN: the 12-way's vendor page is not saved, and its body is larger than the 8-way's, so check it through the door conduit |
 
 ### Verdict
 
 - **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
 - **PDM30 outputs:** PDM30 outputs: candidates would take 5; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads
 - **PDM30 inputs:** PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN
+- **door pass-throughs:** Door pass-throughs (DT 8-way, each door): base + decided use 2 of 8; designed candidate wires take 4 (PL); undesigned candidates would take 4 per door — fits only without PL; a DT 12-way (DT04-12PA / DT06-12SA) gives 4 more cavities; with DPASS12 each door has 12: 2 + 4 + 4 = 10 — fits
+- **alternates:** Alternate versions not counted above (one version of an add-on is built): MCAM-BIL, BSM-SD2, MTS-SOG, PUD-MIR, MIRD-FV, MIRD-360
