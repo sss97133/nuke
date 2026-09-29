@@ -340,6 +340,14 @@ export default function WiringPlan() {
           {vehicleInfo ? `${vehicleInfo.year} ${vehicleInfo.make} ${vehicleInfo.model}` : 'VEHICLE'} — WIRING HARNESS
         </span>
         <span style={{ marginLeft: 'auto' }} />
+        {/* The chips below come from the older compute-wiring-overlay engine (it recommends an M150 and counts
+            the April device list). The MAP tab reads the typed rows and carries its own counts, so on the map
+            these would contradict it (owner saw "ECU M150" on 2026-09-29; the locked ECU is the M130). */}
+        {activeTab === 'map' ? (
+          <span style={{ color: C.label, fontFamily: 'Arial', fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+            COUNTS ARE ON THE MAP BELOW (TYPED ROWS)
+          </span>
+        ) : (<>
         <StatusChip label="DEVICES" value={overlay.result.deviceCount} />
         <StatusChip label="WIRES" value={overlay.result.wireCount} />
         <StatusChip label="LENGTH" value={`${overlay.result.totalWireLengthFt} FT`} />
@@ -367,6 +375,7 @@ export default function WiringPlan() {
             <span style={{ color: C.fail, fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700 }}>{drc.summary.fail}</span>
           </span>
         </span>
+        </>)}
       </div>
 
       {/* ── Tab Bar ── */}

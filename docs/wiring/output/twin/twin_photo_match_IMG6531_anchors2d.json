@@ -1,0 +1,338 @@
+{
+ "res": [
+  660,
+  495
+ ],
+ "anchors": {
+  "ac_clutch": {
+   "u": 0.6912,
+   "v": 0.0236,
+   "depth": 0.947,
+   "dave": "A/C clutch",
+   "conf": "low",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "alternator": {
+   "u": 0.7438,
+   "v": 0.2789,
+   "depth": 0.797,
+   "dave": "alternator plug",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_Alternator_197-302",
+   "in_frame": true
+  },
+  "cam": {
+   "u": 0.5402,
+   "v": 0.1984,
+   "depth": 0.903,
+   "dave": "cam",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_MidMount_WaterPumpManifold",
+   "in_frame": true
+  },
+  "coil_1": {
+   "u": 0.4497,
+   "v": 0.6378,
+   "depth": 1.096,
+   "dave": "coil 1",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_TB_MotorHousing",
+   "in_frame": true
+  },
+  "coil_2": {
+   "u": 0.4907,
+   "v": 0.6385,
+   "depth": 1.092,
+   "dave": "coil 2",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_ThrottleBody_12699160",
+   "in_frame": true
+  },
+  "coil_3": {
+   "u": 0.5321,
+   "v": 0.6391,
+   "depth": 1.088,
+   "dave": "coil 3",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_ThrottleBody_12699160",
+   "in_frame": true
+  },
+  "coil_4": {
+   "u": 0.5737,
+   "v": 0.6398,
+   "depth": 1.083,
+   "dave": "coil 4",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_Intake_Plenum",
+   "in_frame": true
+  },
+  "coil_5": {
+   "u": 0.4543,
+   "v": 0.6891,
+   "depth": 1.153,
+   "dave": "coil 5",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_ThrottleBody_12699160",
+   "in_frame": true
+  },
+  "coil_6": {
+   "u": 0.4933,
+   "v": 0.6899,
+   "depth": 1.148,
+   "dave": "coil 6",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_TB_Bore",
+   "in_frame": true
+  },
+  "coil_7": {
+   "u": 0.5326,
+   "v": 0.6907,
+   "depth": 1.144,
+   "dave": "coil 7",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_TB_Bore",
+   "in_frame": true
+  },
+  "coil_8": {
+   "u": 0.5722,
+   "v": 0.6915,
+   "depth": 1.14,
+   "dave": "coil 8",
+   "conf": "medium-low",
+   "hidden": true,
+   "hidden_by": "E3_Coil_4_Tower",
+   "in_frame": true
+  },
+  "coolant_temp": {
+   "u": 0.7041,
+   "v": 0.3234,
+   "depth": 1.022,
+   "dave": "coolant temp",
+   "conf": "low",
+   "hidden": true,
+   "hidden_by": "E3_Alternator_197-302",
+   "in_frame": true
+  },
+  "crank": {
+   "u": 0.4343,
+   "v": 0.5312,
+   "depth": 1.348,
+   "dave": "crank",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_Intake_Plenum",
+   "in_frame": true
+  },
+  "iat": {
+   "u": 0.498,
+   "v": 0.7419,
+   "depth": 0.776,
+   "dave": "IAT",
+   "conf": "unknown",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "inj_1": {
+   "u": 0.6351,
+   "v": 0.4181,
+   "depth": 0.826,
+   "dave": "inj 1",
+   "conf": "medium",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "inj_2": {
+   "u": 0.3749,
+   "v": 0.4408,
+   "depth": 0.861,
+   "dave": "inj 2",
+   "conf": "medium",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "inj_3": {
+   "u": 0.6279,
+   "v": 0.5152,
+   "depth": 0.895,
+   "dave": "inj 3",
+   "conf": "medium",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "inj_4": {
+   "u": 0.3873,
+   "v": 0.5325,
+   "depth": 0.93,
+   "dave": "inj 4",
+   "conf": "medium",
+   "hidden": false,
+   "hidden_by": null,
+   "in_frame": true
+  },
+  "inj_5": {
+   "u": 0.6218,
+   "v": 0.5984,
+   "depth": 0.964,
+   "dave": "inj 5",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_FuelRail_L",
+   "in_frame": true
+  },
+  "inj_6": {
+   "u": 0.3979,
+   "v": 0.6116,
+   "depth": 0.999,
+   "dave": "inj 6",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_FuelRail_R",
+   "in_frame": true
+  },
+  "inj_7": {
+   "u": 0.6164,
+   "v": 0.6705,
+   "depth": 1.033,
+   "dave": "inj 7",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_FuelRail_L",
+   "in_frame": true
+  },
+  "inj_8": {
+   "u": 0.4072,
+   "v": 0.6805,
+   "depth": 1.068,
+   "dave": "inj 8",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_FuelRail_R",
+   "in_frame": true
+  },
+  "knock_L": {
+   "u": 0.6068,
+   "v": 0.4124,
+   "depth": 1.19,
+   "dave": "knock L",
+   "conf": "low",
+   "hidden": true,
+   "hidden_by": "E3_Intake_Runner_1",
+   "in_frame": true
+  },
+  "knock_R": {
+   "u": 0.4243,
+   "v": 0.4133,
+   "depth": 1.21,
+   "dave": "knock R",
+   "conf": "low",
+   "hidden": true,
+   "hidden_by": "E3_Intake_Runner_2",
+   "in_frame": true
+  },
+  "ltcd_candidate_A": {
+   "u": 0.5165,
+   "v": 0.6105,
+   "depth": 1.289,
+   "dave": "LTCD (A)",
+   "conf": "candidate",
+   "hidden": true,
+   "hidden_by": "E3_ThrottleBody_12699160",
+   "in_frame": true
+  },
+  "ltcd_candidate_B": {
+   "u": 0.3405,
+   "v": 0.5311,
+   "depth": 1.54,
+   "dave": "LTCD (B)",
+   "conf": "candidate",
+   "hidden": true,
+   "hidden_by": "E3_ValveCover_R",
+   "in_frame": true
+  },
+  "map": {
+   "u": 0.5101,
+   "v": 0.6562,
+   "depth": 1.05,
+   "dave": "MAP",
+   "conf": "unknown",
+   "hidden": true,
+   "hidden_by": "E3_TB_Bore",
+   "in_frame": true
+  },
+  "o2_L": {
+   "u": 0.6896,
+   "v": 0.5588,
+   "depth": 1.547,
+   "dave": "O2 L",
+   "conf": "candidate",
+   "hidden": true,
+   "hidden_by": "E3_ValveCover_L",
+   "in_frame": true
+  },
+  "o2_R": {
+   "u": 0.3584,
+   "v": 0.5559,
+   "depth": 1.595,
+   "dave": "O2 R",
+   "conf": "candidate",
+   "hidden": true,
+   "hidden_by": "E3_ValveCover_R",
+   "in_frame": true
+  },
+  "oil_psi": {
+   "u": 0.5283,
+   "v": 0.6617,
+   "depth": 1.161,
+   "dave": "oil PSI",
+   "conf": "low",
+   "hidden": true,
+   "hidden_by": "E3_ThrottleBody_12699160",
+   "in_frame": true
+  },
+  "starter": {
+   "u": 0.4137,
+   "v": 0.527,
+   "depth": 1.444,
+   "dave": "starter",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_Head_R",
+   "in_frame": true
+  },
+  "tps": {
+   "u": 0.4195,
+   "v": 0.6295,
+   "depth": 0.91,
+   "dave": "TPS",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "E3_TB_MotorHousing",
+   "in_frame": true
+  },
+  "trans_6L90": {
+   "u": 0.4733,
+   "v": 0.8353,
+   "depth": 1.84,
+   "dave": "6L90 case",
+   "conf": "medium",
+   "hidden": true,
+   "hidden_by": "Under_Main_Blazer",
+   "in_frame": true
+  }
+ }
+}

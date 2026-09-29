@@ -65,6 +65,8 @@ export function HarnessView3D({
   onDeviceClick, onDeselect,
 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
+  // X-ray the body so the engine bay shows (owner 2026-09-29: the twin must show the real engine)
+  const [xray, setXray] = useState(true);
 
   // ── Compute trunk segments for rendering ──
   const trunkSegments = useMemo((): TrunkRenderSegment[] => {
@@ -115,7 +117,7 @@ export function HarnessView3D({
 
         {/* K5 shell — loads GLB inside Suspense so the rest of the scene mounts */}
         <Suspense fallback={null}>
-          <VehicleShell />
+          <VehicleShell xray={xray} />
         </Suspense>
 
         {/* Zone volumes */}
@@ -191,6 +193,12 @@ export function HarnessView3D({
         color: '#666680',
       }}>
         ORBIT=DRAG  ZOOM=SCROLL  PAN=RIGHT-DRAG  CLICK=SELECT
+        <button onClick={() => setXray(v => !v)} style={{
+          marginLeft: 10, background: xray ? '#ffd24a' : 'transparent', color: xray ? '#0a0a18' : '#9999b0',
+          border: '1px solid #666680', fontFamily: "'Courier New', monospace", fontSize: 9, fontWeight: 700,
+          padding: '1px 6px', cursor: 'pointer',
+        }}>X-RAY BODY {xray ? 'ON' : 'OFF'}</button>
+        <span style={{ marginLeft: 10 }}>ENGINE BAY: TWIN V3 (LS3 BUILT FROM PUBLISHED DIMENSIONS; PLUGS LABELLED)</span>
       </div>
     </div>
   );
@@ -233,8 +241,30 @@ const MATERIAL_OVERRIDES: MatRule[] = [
 
 useGLTF.preload(K5_MODEL_URL);
 
-function VehicleShell() {
+// Twin v3 engine bay (docs/wiring/twin/): LS3 long block, Holley single-plane EFI intake, DBW body on the 4-bolt
+// adapter, rails and injectors, DEL-Stributor coil mount, Holley mid-mount drive, 6L90. Same frame as the body GLB
+// (exported from the same Blender world), so it takes the body's scale and offset. ANCHOR_* nodes carry each plug's
+// Dave name and its source in their extras (three.js userData).
+const K5_ENGINE_URL = '/models/k5-enginebay.glb';
+useGLTF.preload(K5_ENGINE_URL);
+
+function VehicleShell({ xray }: { xray: boolean }) {
   const { scene } = useGLTF(K5_MODEL_URL);
+  const { scene: engineScene } = useGLTF(K5_ENGINE_URL);
+  const engine = useMemo(() => engineScene.clone(true), [engineScene]);
+  const anchors = useMemo(() => {
+    engine.updateMatrixWorld(true);
+    const out: { name: string; p: THREE.Vector3 }[] = [];
+    engine.traverse((o) => {
+      const dave = (o.userData as { dave_name?: string })?.dave_name;
+      if (o.name.startsWith('ANCHOR_') && dave) {
+        const p = new THREE.Vector3();
+        o.getWorldPosition(p);
+        out.push({ name: dave, p });
+      }
+    });
+    return out;
+  }, [engine]);
 
   // Clone so material overrides don't leak across instances
   const cloned = useMemo(() => scene.clone(true), [scene]);
@@ -284,11 +314,36 @@ function VehicleShell() {
     return { scale: s, offset: center.multiplyScalar(s).negate() };
   }, [cloned]);
 
+  // X-ray: the painted body goes see-through so the engine bay reads.
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[];
+      mats.forEach((m) => {
+        if (!m || !/car_paint/i.test(m.name || '')) return;
+        m.transparent = xray;
+        m.opacity = xray ? 0.18 : 1;
+        m.depthWrite = !xray;
+        m.needsUpdate = true;
+      });
+    });
+  }, [cloned, xray]);
+
   // Model from Blender export has +Z forward. Our scene has +X forward.
   // Rotate -90° around Y to align.
   return (
     <group rotation={[0, -Math.PI / 2, 0]}>
       <primitive object={cloned} scale={scale} position={offset} />
+      <group scale={scale} position={offset}>
+        <primitive object={engine} />
+        {anchors.map((a) => (
+          <Text key={a.name} position={[a.p.x, a.p.y + 0.05, a.p.z]} fontSize={0.035} color="#ffd24a"
+            anchorX="center" anchorY="bottom" outlineWidth={0.004} outlineColor="#000000">
+            {a.name}
+          </Text>
+        ))}
+      </group>
     </group>
   );
 }

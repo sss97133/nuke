@@ -20,6 +20,7 @@ import {
 import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
+import { EnginePhoto, MountsPanel, PartPhotos } from './MountsPanel';
 import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
 } from './useWiringMap';
@@ -208,6 +209,12 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
                   })}
                 </svg>
 
+                {/* the real engine with each plug named where it sits (K5 only) */}
+                {!sec && <EnginePhoto vehicleId={vehicleId} cw={cw} />}
+
+                {/* where each box goes (the K5's mounts list; nothing for other vehicles) */}
+                {!sec && <MountsPanel vehicleId={vehicleId} cw={cw} />}
+
                 {/* open calls: targets too */}
                 {openCalls.length > 0 && (
                   <div style={{ marginTop: 10 }}>
@@ -346,6 +353,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       <Field cw={cw} label="WHO">{n.assignee ?? 'UNASSIGNED'}</Field>
       <Field cw={cw} label="POSITION">{n.x != null ? n.posSource ?? 'placed' : 'NOT PLACED YET'}</Field>
       {n.partNumber && <Field cw={cw} label="PLUG / KIT">{n.partNumber}</Field>}
+      {n.partNumber && <PartPhotos cw={cw} codes={n.partNumber} />}
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}
       <Field cw={cw} label="SOURCE">{n.source ?? '—'}{n.trust ? ` (${n.trust})` : ''}</Field>
 
