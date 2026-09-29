@@ -41,6 +41,78 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'status';
 
+    // Action: pull posted transactions (Purchase + Deposit) into qb_transactions (2026-09-28).
+    // The old loader read a one-time export file, so the books stopped at 2026-04-02. Raw lines only:
+    // no vendor-category attribution (receipts:reconcile asks who paid and what for). Ids match the
+    // export's scheme ("purchase-<Id>-<n>"), so re-pulling an overlapping range updates, never duplicates.
+    // Bank-feed items still "For review" in QuickBooks are not visible to the API until accepted.
+    if (action === 'pull_transactions') {
+      const since = url.searchParams.get('since') || '2026-04-01';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) throw new Error('since must be YYYY-MM-DD');
+      const { data: company, error: cErr } = await supabase
+        .from('parent_company').select('*').not('quickbooks_realm_id', 'is', null).limit(1).single();
+      if (cErr || !company) throw new Error('QuickBooks not connected');
+      let accessToken = company.quickbooks_access_token;
+      if (new Date(company.quickbooks_token_expires_at) < new Date()) accessToken = await refreshToken(supabase, company);
+      const realmId = company.quickbooks_realm_id;
+
+      const rows: any[] = [];
+      const counts: Record<string, number> = {};
+      for (const entity of ['Purchase', 'Deposit']) {
+        let start = 1;
+        counts[entity] = 0;
+        for (let page = 0; page < 200; page++) {
+          const q = `select * from ${entity} where TxnDate >= '${since}' startposition ${start} maxresults 500`;
+          const res = await fetch(`${QB_API_BASE}/v3/company/${realmId}/query?query=${encodeURIComponent(q)}&minorversion=70`, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' },
+          });
+          if (!res.ok) throw new Error(`${entity} query HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          const body = await res.json();
+          const txns: any[] = body?.QueryResponse?.[entity] || [];
+          counts[entity] += txns.length;
+          for (const t of txns) {
+            const lines = (t.Line || []).filter((l: any) => typeof l.Amount === 'number' && l.DetailType !== 'SubTotalLineDetail');
+            lines.forEach((l: any, i: number) => {
+              if (entity === 'Purchase') {
+                const sign = t.Credit === true ? -1 : 1;
+                rows.push({
+                  qb_id: `purchase-${t.Id}-${i + 1}`, qb_type: 'Purchase', date: t.TxnDate,
+                  vendor_name: t.EntityRef?.name ?? null, total_amount: sign * Number(t.TotalAmt ?? 0),
+                  line_description: l.Description ?? null, line_amount: sign * Number(l.Amount),
+                  line_account_name: l.AccountBasedExpenseLineDetail?.AccountRef?.name ?? l.ItemBasedExpenseLineDetail?.ItemRef?.name ?? null,
+                  memo: t.PrivateNote ?? null, doc_number: t.DocNumber ?? null, payment_type: t.PaymentType ?? null,
+                  payment_account: t.AccountRef?.name ?? null, updated_at: new Date().toISOString(),
+                });
+              } else {
+                const d = l.DepositLineDetail || {};
+                rows.push({
+                  qb_id: `deposit-${t.Id}-${i + 1}`, qb_type: 'Deposit', date: t.TxnDate,
+                  vendor_name: d.Entity?.name ?? null, total_amount: Number(t.TotalAmt ?? 0),
+                  line_description: l.Description ?? null, line_amount: Number(l.Amount),
+                  line_account_name: d.AccountRef?.name ?? null, memo: t.PrivateNote ?? null,
+                  doc_number: t.DocNumber ?? null, payment_type: d.PaymentMethodRef?.name ?? null,
+                  payment_account: t.DepositToAccountRef?.name ?? null, updated_at: new Date().toISOString(),
+                });
+              }
+            });
+          }
+          if (txns.length < 500) break;
+          start += 500;
+        }
+      }
+      let upserted = 0;
+      for (let i = 0; i < rows.length; i += 200) {
+        const { error } = await supabase.from('qb_transactions').upsert(rows.slice(i, i + 200), { onConflict: 'qb_id' });
+        if (error) throw new Error(`upsert failed at ${i}: ${error.message}`);
+        upserted += Math.min(200, rows.length - i);
+      }
+      const dates = rows.map((r) => r.date).sort();
+      return new Response(JSON.stringify({ success: true, since, transactions: counts, lines: rows.length, upserted,
+        first_date: dates[0] ?? null, last_date: dates[dates.length - 1] ?? null }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Action: Get OAuth URL to start connection
     if (action === 'auth_url') {
       const state = crypto.randomUUID();
