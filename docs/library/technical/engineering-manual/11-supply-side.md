@@ -440,3 +440,28 @@ How to know the supply side is working:
 ---
 
 *This is the technical implementation spec. The philosophical case is in `docs/library/intellectual/contemplations/the-supply-side.md`. The operational playbook is in `docs/playbooks/SUPPLIER_INTELLIGENCE_PIPELINE.md`.*
+
+---
+
+## Owner note 2026-09-29: cost per part, money paths, the technician in the loop
+
+Skylar (via the K5 wiring work): every part should carry its **cost**, orders should have a **money path**
+(referral or commission on parts ordered through Nuke), and the **technician** doing the work should be
+in the loop, with agents' and humans' status side by side. The structures already exist; this section says
+how they join. Build from them; mint nothing without the SCHEMA_LAW checklist.
+
+| Need | Existing structure | What is missing |
+|---|---|---|
+| Cost per part | `parts_catalog` (average/min/max price, `price_updated_at`, `data_source`, `image_url`), `part_suppliers`, `suppliers` | A sanctioned writer for prices; none exists (only `update_supplier_rating`). Prices are testimony with short half-lives, so each carries its supplier, `price_scraped_at` and source URL. Inputs already in the repo: `docs/wiring/calc-data/catalog/parts.yaml` (cart snapshots), `catalog/suppliers/affordablestreetrods.yaml` (436 items, 2026-09-29), `catalog/part_media.yaml` (maker PNs) |
+| Cost on the surface | K5 map plug cards read `public/wiring/k5-part-photos.json`; the layout page | Price per part code with its date, cheapest current supplier, and the build total by proof rung (lined up / acquired / installed) |
+| Money path | `suppliers`, `supplier_accounts`, `purchase_orders`, `purchase_order_items`; VISION.md "marketplace commission" | Each supplier's referral program as a sourced fact (program, rate, cookie window, link format, terms URL, as-of). A cart link carries the tag; the owner checks out (agents fill carts, never check out). A commission earned is a receivable on the order. Referral links are disclosed to the buyer |
+| Technician in the loop | `work_orders`, `work_order_assignments`, `work_order_labor`, `work_order_parts`, `technicians`, `technician_work_evidence`, labor-rate tables; `harness_endpoints.assignee` / `work_status` | Each wiring node (install this plug, run this loom) becomes a work-order line, assigned to a person (Skylar, Dave, Desert Performance) or an agent (research, drawing, audit), with status and evidence. The map shows people and agents in one column |
+
+**Rules that still hold:** the supply side is a decoder ring, not a store (no checkout or order tracking
+built here); gap computation is a SQL join; scrape from demand (this build's categories only).
+
+**First slices (in order):**
+1. A price writer (compare-and-supersede, source required), then load the ProWire cart snapshot and the Affordable Street Rods index.
+2. A cost line on each plug card and a build total by proof rung.
+3. Referral-program facts for the suppliers this build actually uses (Summit, Amazon, eBay, Holley, ProWire, DigiKey), each with its terms URL and date.
+4. The K5 work orders per harness section, with assignees and status on the map.
