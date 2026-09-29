@@ -91,3 +91,42 @@ export function MountsPanel({ vehicleId, cw }: { vehicleId?: string; cw: Colorwa
     </div>
   );
 }
+
+// ── THE PIECES: the maker's own photo of each part number on a plug card (owner 2026-09-29: "need to start really
+// seeing the pieces"). Photos are linked from the maker/vendor site, not copied; /wiring/k5-part-photos.json maps
+// part code → image URL. A code with no photo on file says so.
+let photoIndex: Promise<Record<string, { img: string; from: string }>> | null = null;
+const loadPhotos = () => {
+  photoIndex ??= fetch('/wiring/k5-part-photos.json').then(r => (r.ok ? r.json() : { photos: {} })).then(d => d.photos ?? {}).catch(() => ({}));
+  return photoIndex;
+};
+
+export function PartPhotos({ codes, cw }: { codes: string; cw: Colorway }) {
+  const [idx, setIdx] = useState<Record<string, { img: string; from: string }> | null>(null);
+  useEffect(() => { let c = false; loadPhotos().then(p => { if (!c) setIdx(p); }); return () => { c = true; }; }, []);
+  if (!idx) return null;
+  const list = codes.split(',').map(s => s.trim()).filter(Boolean);
+  if (!list.some(c => idx[c])) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '4px 0 8px' }}>
+      {list.map(c => {
+        const p = idx[c];
+        return (
+          <div key={c} style={{ width: 92, border: frame(cw), background: '#fff' }}>
+            {p ? (
+              <a href={p.img} target="_blank" rel="noreferrer" title={`${c} — photo from ${p.from}`}>
+                <img src={p.img} alt={c} width={88} height={66} loading="lazy" referrerPolicy="no-referrer"
+                  style={{ display: 'block', width: 88, height: 66, objectFit: 'contain', margin: 2 }} />
+              </a>
+            ) : (
+              <div style={{ width: 88, height: 66, margin: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, color: cw.inkFaint, textAlign: 'center' }}>NO PHOTO ON FILE</div>
+            )}
+            <div style={{ fontFamily: cw.fontMono, fontSize: 10, padding: '1px 3px', color: cw.ink, background: cw.surface,
+              borderTop: rule(cw), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

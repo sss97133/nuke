@@ -1,0 +1,301 @@
+{
+ "note": "Maker and vendor product photos of the exact part numbers, linked from their own sites (not copied). Source list: reference_documents/product_images/sources.json (local, gitignored). Photos whose URL carries a 32-hex cache hash are left out (the secret scanner reads those as tokens).",
+ "photos": {
+  "0498040.M": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/524/0498080.M.JPG",
+   "from": "mm.digikey.com"
+  },
+  "11079-VUS": {
+   "img": "https://static.summitracing.com/global/images/prod/xlarge/vta-11079-vus_xl.jpg",
+   "from": "static.summitracing.com"
+  },
+  "12110847": {
+   "img": "https://www.prowireusa.com/content/59818/12110847.webp",
+   "from": "prowireusa.com"
+  },
+  "12155975": {
+   "img": "https://www.prowireusa.com/content/61489/121559575.webp",
+   "from": "prowireusa.com"
+  },
+  "12191818": {
+   "img": "https://www.prowireusa.com/content/60241/12191818.webp",
+   "from": "prowireusa.com"
+  },
+  "15035084": {
+   "img": "https://ecommerce-assets.ext.gm.com/assets/products/images/15-5720_Primary.jpg",
+   "from": "ecommerce-assets.ext.gm.com"
+  },
+  "15324976": {
+   "img": "https://www.prowireusa.com/content/57702/15324976.webp",
+   "from": "prowireusa.com"
+  },
+  "15359996": {
+   "img": "https://www.prowireusa.com/content/59758/15359996.webp",
+   "from": "prowireusa.com"
+  },
+  "1990084": {
+   "img": "https://cdn.powered-by-nitrosell.com/product_images/2/437/elc-1034.jpg",
+   "from": "cdn.powered-by-nitrosell.com"
+  },
+  "238LTP": {
+   "img": "https://www.prowireusa.com/content/117820/238LTP.webp",
+   "from": "prowireusa.com"
+  },
+  "30107090": {
+   "img": "https://www.kartek.com/mm5/graphics/00000003/spal-30107101-plus-series-17-inch-curved-blade-brushless-puller-fan-drop-in-mount-sits-inside-shroud_270x202.jpg",
+   "from": "kartek.com"
+  },
+  "30130628": {
+   "img": "https://www.prowireusa.com/content/58775/spal-30130628.webp",
+   "from": "prowireusa.com"
+  },
+  "3137CT": {
+   "img": "https://www.prowireusa.com/content/61669/3137-CL.webp",
+   "from": "prowireusa.com"
+  },
+  "4514-003": {
+   "img": "https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp?v=1769554854&width=900",
+   "from": "oraclelights.com"
+  },
+  "68102": {
+   "img": "https://www.prowireusa.com/content/60582/68102.webp",
+   "from": "prowireusa.com"
+  },
+  "68201": {
+   "img": "https://www.prowireusa.com/content/57642/68201.webp",
+   "from": "prowireusa.com"
+  },
+  "80251C": {
+   "img": "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg",
+   "from": "truck-lite.com"
+  },
+  "8CYLK-90": {
+   "img": "https://www.prowireusa.com/content/57704/8CYLK-90.webp",
+   "from": "prowireusa.com"
+  },
+  "AFM8": {
+   "img": "https://www.prowireusa.com/content/61185/M225202-01.webp",
+   "from": "prowireusa.com"
+  },
+  "AUTZT2000": {
+   "img": "https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg?v=1739641298",
+   "from": "shop.autoloc.com"
+  },
+  "BS-1003": {
+   "img": "https://www.westmarine.com/dw/image/v2/BGFG_PRD/on/demandware.static/-/Sites-wm-master-catalog/default/dw60075368/images/orig/540740.jpg?sw=576&sh=576",
+   "from": "westmarine.com"
+  },
+  "BS-1011": {
+   "img": "https://image.fisheriessupply.com/image/upload/w_288/f_auto/t_fs_shared/static-images/blue-sea-systems-12-volt-dash-socket-1011",
+   "from": "image.fisheriessupply.com"
+  },
+  "BS-1045": {
+   "img": "https://powerwerx.blob.core.windows.net/powerwerxpictures/blue-sea-1045-fast-charge-dual-usb-charger-socket-mount__4539_580.jpg",
+   "from": "powerwerx.blob.core.windows.net"
+  },
+  "BS-2103": {
+   "img": "https://www.thornebros.com/cdn/shop/files/2103.jpg?v=1699562069&width=2000",
+   "from": "thornebros.com"
+  },
+  "COIL-CONN-LS2-7": {
+   "img": "https://www.prowireusa.com/content/57659/COIL-CONNLS217.webp",
+   "from": "prowireusa.com"
+  },
+  "D-609-03": {
+   "img": "https://www.prowireusa.com/content/59742/D-609-03.webp",
+   "from": "prowireusa.com"
+  },
+  "D-609-04": {
+   "img": "https://www.prowireusa.com/content/59741/D-609-04.webp",
+   "from": "prowireusa.com"
+  },
+  "D-609-05": {
+   "img": "https://www.prowireusa.com/content/59740/D-609-05.webp",
+   "from": "prowireusa.com"
+  },
+  "D38999-24WJ61SN": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg (DigiKey product photo)",
+   "from": "mm.digikey.com"
+  },
+  "D38999-26WJ61PN": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg (DigiKey product photo)",
+   "from": "mm.digikey.com"
+  },
+  "D38999-SERIES": {
+   "img": "https://dmctools.com/media/m39029/connectors/10/images/MIL-DTL-38999-SERIES-1-01.jpg",
+   "from": "dmctools.com"
+  },
+  "DT04-2P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-2P_Front.jpg?v=1738267776&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT04-3P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-3P_1_1200__29945.1647371744.1200.1200.jpg?v=1686738319&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT06-2S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-2S_Front.jpg?v=1738267636&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT06-3S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-3S_Front.jpg?v=1738267875&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DTP04-4P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP04-4P_Front.jpg?v=1738272991&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "GT150-WTR-TEMP-KIT": {
+   "img": "https://www.prowireusa.com/content/57648/GT150-WTR-TEMP-KIT.webp",
+   "from": "prowireusa.com"
+  },
+  "JLF-73-87-tail-socket": {
+   "img": "https://jlfabrication.com/cdn/shop/products/s-l1600_4b7e7589-894b-4823-8b9f-d7867851c43c.png?v=1675805521",
+   "from": "jlfabrication.com"
+  },
+  "K1S": {
+   "img": "https://www.prowireusa.com/content/61188/K1S.webp",
+   "from": "prowireusa.com"
+  },
+  "K43": {
+   "img": "https://dmctools.com/media/catalog/product/k/4/k43_images_k43.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=1200&width=1800&canvas=1800:1200",
+   "from": "dmctools.com"
+  },
+  "LMC-36-4481": {
+   "img": "https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png",
+   "from": "lmcnopstorage.blob.core.windows.net"
+  },
+  "LS-CAM-CONN-KIT": {
+   "img": "https://www.prowireusa.com/content/57673/LS-CAM-CONN-KIT.webp",
+   "from": "prowireusa.com"
+  },
+  "LS-CRANK-CONN-KIT": {
+   "img": "https://www.prowireusa.com/content/57671/LS-CRANK-CONN-KIT.webp",
+   "from": "prowireusa.com"
+  },
+  "M39029-56-351": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/961/300/1208_M39029%5E56-351_sml.jpg",
+   "from": "mm.digikey.com"
+  },
+  "M39029-58-363": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/957/750/1208_M39029%5E58-363_sml%28200x200%29.jpg",
+   "from": "mm.digikey.com"
+  },
+  "M81969-14-10": {
+   "img": "https://dmctools.com/media/catalog/product/m/8/m81969_14-10_images_m81969-14-10.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=270&width=270&canvas=270:270",
+   "from": "dmctools.com"
+  },
+  "M85049-69-25N": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/936/020/M8504969-25N_sml.jpg",
+   "from": "mm.digikey.com"
+  },
+  "MCK5REARWINDOWSWITCH": {
+   "img": "https://www.motorcityk5.com/images/F22904.jpg",
+   "from": "motorcityk5.com"
+  },
+  "NR-17383-1": {
+   "img": "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg?v-cache=1758200630",
+   "from": "cdn4.volusion.store"
+  },
+  "NU-RELICS-17383-1": {
+   "img": "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2T.jpg?v-cache=1758200630",
+   "from": "cdn4.volusion.store"
+  },
+  "QFS-BKCN-01": {
+   "img": "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/8003/664524/qfs-fuel-cell-electrical-bulkhead-fitting-10ga-wire-fuel-pump-assembly-cfd-504-qfs-bkcn-01__72734.1778638717.jpg?c=1",
+   "from": "cdn11.bigcommerce.com"
+  },
+  "QFS-BKCN-GM": {
+   "img": "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43679/592535/qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm__58527.1748480105.jpg?c=1",
+   "from": "cdn11.bigcommerce.com"
+  },
+  "QU30048": {
+   "img": "https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1786090930&width=232",
+   "from": "torqueking.com"
+  },
+  "SSC-N": {
+   "img": "https://www.prowireusa.com/content/58337/SSC-N.webp",
+   "from": "prowireusa.com"
+  },
+  "STRIPMASTER-45-1987": {
+   "img": "https://www.prowireusa.com/content/61708/IMG_9164.webp",
+   "from": "prowireusa.com"
+  },
+  "UP-111157_1157-socket": {
+   "img": "https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200",
+   "from": "upcarparts.com"
+  },
+  "USA1-HL-SW": {
+   "img": "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/500x659/products/4929/4601/1973-91-Square_body-Chevy--GMC-Truck-Headlight-Switch-16603__46913.1762446061.jpg?c=1",
+   "from": "cdn11.bigcommerce.com"
+  },
+  "WCTHB50": {
+   "img": "https://www.ictbillet.com/cdn/shop/files/WCTHB50_1.jpg?v=1751968122&width=1000",
+   "from": "ictbillet.com"
+  },
+  "WPAPP30": {
+   "img": "https://www.ictbillet.com/cdn/shop/files/WPAPP30.jpg?v=1751969926&width=1000",
+   "from": "ictbillet.com"
+  },
+  "BLUESEA-1003": {
+   "img": "https://www.westmarine.com/dw/image/v2/BGFG_PRD/on/demandware.static/-/Sites-wm-master-catalog/default/dw60075368/images/orig/540740.jpg?sw=576&sh=576",
+   "from": "westmarine.com",
+   "alias_of": "BS-1003"
+  },
+  "BLUESEA-1011": {
+   "img": "https://image.fisheriessupply.com/image/upload/w_288/f_auto/t_fs_shared/static-images/blue-sea-systems-12-volt-dash-socket-1011",
+   "from": "image.fisheriessupply.com",
+   "alias_of": "BS-1011"
+  },
+  "BLUESEA-1045": {
+   "img": "https://powerwerx.blob.core.windows.net/powerwerxpictures/blue-sea-1045-fast-charge-dual-usb-charger-socket-mount__4539_580.jpg",
+   "from": "powerwerx.blob.core.windows.net",
+   "alias_of": "BS-1045"
+  },
+  "BLUESEA-2103": {
+   "img": "https://www.thornebros.com/cdn/shop/files/2103.jpg?v=1699562069&width=2000",
+   "from": "thornebros.com",
+   "alias_of": "BS-2103"
+  },
+  "COIL-CONN-LS2/7": {
+   "img": "https://www.prowireusa.com/content/57659/COIL-CONNLS217.webp",
+   "from": "prowireusa.com",
+   "alias_of": "COIL-CONN-LS2-7"
+  },
+  "D38999/24WJ61SN": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg (DigiKey product photo)",
+   "from": "mm.digikey.com",
+   "alias_of": "D38999-24WJ61SN"
+  },
+  "D38999/26WJ61PN": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg (DigiKey product photo)",
+   "from": "mm.digikey.com",
+   "alias_of": "D38999-26WJ61PN"
+  },
+  "D38999/SERIES": {
+   "img": "https://dmctools.com/media/m39029/connectors/10/images/MIL-DTL-38999-SERIES-1-01.jpg",
+   "from": "dmctools.com",
+   "alias_of": "D38999-SERIES"
+  },
+  "M39029/56-351": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/961/300/1208_M39029%5E56-351_sml.jpg",
+   "from": "mm.digikey.com",
+   "alias_of": "M39029-56-351"
+  },
+  "M39029/58-363": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/957/750/1208_M39029%5E58-363_sml%28200x200%29.jpg",
+   "from": "mm.digikey.com",
+   "alias_of": "M39029-58-363"
+  },
+  "M81969/14-10": {
+   "img": "https://dmctools.com/media/catalog/product/m/8/m81969_14-10_images_m81969-14-10.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=270&width=270&canvas=270:270",
+   "from": "dmctools.com",
+   "alias_of": "M81969-14-10"
+  },
+  "M85049/69-25N": {
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/936/020/M8504969-25N_sml.jpg",
+   "from": "mm.digikey.com",
+   "alias_of": "M85049-69-25N"
+  }
+ }
+}

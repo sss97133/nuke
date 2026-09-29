@@ -20,7 +20,7 @@ import {
 import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
-import { MountsPanel } from './MountsPanel';
+import { MountsPanel, PartPhotos } from './MountsPanel';
 import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
 } from './useWiringMap';
@@ -350,6 +350,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       <Field cw={cw} label="WHO">{n.assignee ?? 'UNASSIGNED'}</Field>
       <Field cw={cw} label="POSITION">{n.x != null ? n.posSource ?? 'placed' : 'NOT PLACED YET'}</Field>
       {n.partNumber && <Field cw={cw} label="PLUG / KIT">{n.partNumber}</Field>}
+      {n.partNumber && <PartPhotos cw={cw} codes={n.partNumber} />}
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}
       <Field cw={cw} label="SOURCE">{n.source ?? '—'}{n.trust ? ` (${n.trust})` : ''}</Field>
 
