@@ -109,6 +109,10 @@ totals (options-rd, #416).
   - Follow-up note: MoTeC's table puts 24–20 AWG on 8 A outputs. The COMMS output is therefore a 20 A output with paired
     16 AWG pigtails (COM and COM-TOP); an 8 A output would be a written exception.
 - **options-rd:** no output claimed that options-rd uses (OUT23/25/27/28/15/11/13).
+- **Explicit output conflict (top-design, relaying pieces' rule, 2026-09-29):** COM and COM-TOP carry
+  `conflicts_with: [PW]` and a CONFLICT line in `demand.limits`. The COMMS output must be a 20 A output; OUT3/OUT4 are
+  the only spare 20 A outputs, and PW's designed wires take both (options_v5 ledger on main). RTR's limits say it rides
+  COM's output. This is the same format as TOP-LIGHT's `conflicts_with: [PL]`.
 - **pieces audit (2026-09-29):** NAV-L10 `conflicts_with: [WSS-F2]`, because wheel-speed's WSS-F2 takes M130 B10 and B11 (the last two
   spare UDIGs) and NAV-L10 names B11. The recommended NAV (CAN) is clear of it.
 - **The lead's "check before you claim":** OUT21 is left to PL / TOP-LIGHT; OUT3 is named for COMMS only if PW is not fitted.

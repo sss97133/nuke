@@ -951,6 +951,7 @@ ATT-CLINO:
 COM:
   name: Starlink Mini on the steel half-cab roof, powered by Starlink's Mini Car Adapter from its own sealed socket on a COMMS output
   status: candidate
+  conflicts_with: [PW]     # the COMMS output must be a 20 A output; OUT3/OUT4 are the only spare ones and PW names both; see demand.limits CONFLICT
   source: >-
     owner 2026-09-29 ("communication Wi-Fi connection small starling connector Starlink"). Starlink Mini specification sheet
     (web_snapshots/starlink.com__specification_sheet_mini.md; PDF text read 2026-09-29): 298.5 x 259 x 38.5 mm, 1.10 kg, 110 deg,
@@ -967,11 +968,11 @@ COM:
   wire_patterns: ["^COMMS_", "^SL_"]
   demand:
     crossings: 0
-    pdm30_outputs: 1      # a 20 A output (MoTeC's wire table puts 20-16 AWG on 20 A outputs). None is free: PW takes OUT3/OUT4, PL and TOP-LIGHT name OUT21. OUT3 if PW is not fitted; else a cab output from the PDM15-to-cab (mounts.yaml PDM15, state row 0ag(b)) or second-body-PDM decision; until then COM-DASH
+    pdm30_outputs: 1      # a 20 A output (MoTeC's wire table puts 20-16 AWG on 20 A outputs): OUT3 if PW is not fitted (see CONFLICT); until then COM-DASH
     pdm30_inputs: 0       # on with RUN; the camp latch is a CANKEY button if top-design's CANKEY is built, else a PDM off-delay
     top_cavities: 0
     taps: ["PDM30 DIG1 (ignition RUN) in the output's logic", "CANKEY button for the camp latch, if CANKEY is built"]
-    limits: ["COMMS output 7 A for Starlink alone (1.25 x 5.0 A, the Mini's 60 W rating at 12 V) or 9 A with RTR (1.25 x 6.6 A = 8.25 A), on a 20 A output: its two pins take 2 x 16 AWG pigtails (PDM manual printed p.48: 20-16 AWG for 20 A outputs) into SPL-COMMS; the 18 AWG branches allow 0.85 x 11 A = 9.35 A (printed p.48, 80 C)", "on an 8 A output MoTeC's 24-20 AWG leads allow at most 0.85 x 8 A = 6.8 A, under even the 7 A Starlink-alone setting: an 8 A output would be a deliberate exception, an 18 AWG lead on the SSC-N contact (16-24 AWG) as the registry already does for #71 on OUT29, with a Superseal seal check (top-design, 2026-09-29)", "drop on the Starlink path 0.23 V (1.6 %) at 5.0 A: paired 16 AWG pigtails, 4 ft feed and 3 ft ground of 18 AWG (6.23 ohm/1000 ft, canon ch.16 §1.8)"]
+    limits: ["CONFLICT: the COMMS output must be a 20 A output, and OUT3/OUT4 are the only spare 20 A outputs (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4, both named by PW's designed wires; 8 A 21/22 used, spare OUT21 named by PL and TOP-LIGHT). COM on OUT3 means PW is not fitted. Building COM and PW together needs another body-side 20 A output: a second body PDM (the owner's multiple-PDM direction, state §1 'Owner scope calls', 2026-09-24) or the PDM15 moved to the cab (mounts.yaml PDM15, state row 0ag(b)). Owner call", "COMMS output 7 A for Starlink alone (1.25 x 5.0 A, the Mini's 60 W rating at 12 V) or 9 A with RTR (1.25 x 6.6 A = 8.25 A), on a 20 A output: its two pins take 2 x 16 AWG pigtails (PDM manual printed p.48: 20-16 AWG for 20 A outputs) into SPL-COMMS; the 18 AWG branches allow 0.85 x 11 A = 9.35 A (printed p.48, 80 C)", "on an 8 A output MoTeC's 24-20 AWG leads allow at most 0.85 x 8 A = 6.8 A, under even the 7 A Starlink-alone setting: an 8 A output would be a deliberate exception, an 18 AWG lead on the SSC-N contact (16-24 AWG) as the registry already does for #71 on OUT29, with a Superseal seal check (top-design, 2026-09-29)", "drop on the Starlink path 0.23 V (1.6 %) at 5.0 A: paired 16 AWG pigtails, 4 ft feed and 3 ft ground of 18 AWG (6.23 ohm/1000 ft, canon ch.16 §1.8)"]
     notes: >-
       Off below a battery-voltage threshold (PDM logic) and kept alive key-off in one of the PDM's four stay-alive outputs, only
       if the owner wants camp use (threshold and delay: owner/Dave). The Car Adapter's minimum input and loss are not
@@ -1037,6 +1038,7 @@ COM-TOP:
   status: candidate
   alternative_to: COM
   requires: [TOP-DISC]
+  conflicts_with: [PW]     # same COMMS output as COM (a 20 A output: OUT3 is named by PW); stated here as well as inherited through alternative_to
   source: >-
     top-design's TOP-DISC (#420): 26 x #20, "4 of the spares for a top-mounted Starlink DC pair", #20 = 7.5 A with 20 AWG (MILNEC
     test rating), paralleled #20 pairs per pole, lengths split the 18.4 ft zone as 13 ft body + 5.5 ft top. top-design's check
@@ -1051,7 +1053,7 @@ COM-TOP:
     pdm30_outputs: 1      # the same COMMS output as COM; it is PDM-protected, not fused
     pdm30_inputs: 0
     top_cavities: 4       # 2 x #20 paralleled per pole; top-design has reserved exactly these 4 (TOP-DISC 18 of 26 with it)
-    limits: ["PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.35 V (2.5 %), with RTR's 1.6 A also on the paired pigtails (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)", "the COMMS output is a 20 A output, as in COM (an 8 A output is the same deliberate exception)"]
+    limits: ["CONFLICT: as COM: it takes the same 20 A COMMS output, OUT3/OUT4 are the only spare 20 A outputs and PW names both (options_v5 ledger on main); with PW it needs a second body PDM or the PDM15 in the cab. Owner call", "PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.35 V (2.5 %), with RTR's 1.6 A also on the paired pigtails (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)", "the COMMS output is a 20 A output, as in COM (an 8 A output is the same deliberate exception)"]
     notes: >-
       Unplug TOP-DISC before the top comes off (top-design). Over the disconnect the router cannot take Starlink by Ethernet; it
       joins the Mini's Wi-Fi instead. Each side of the joint steps 12 or 14 AWG -> 16 AWG stub (M81824/1-3) -> 2 x 20 AWG
@@ -1095,7 +1097,7 @@ RTR:
     pdm30_outputs: 0      # shares COM's COMMS output (same switch position); without COM it needs its own 8 A output at 2 A (1.25 x 1.6 A)
     pdm30_inputs: 0
     taps: ["COM's COMMS output (SPL-COMMS)"]
-    limits: ["+1.6 A on the COMMS output (19 W at 12 V): the group goes 7 A -> 9 A; the branch is 18 AWG because the group's 9 A limit protects it (20 AWG allows 6.8 A)"]
+    limits: ["+1.6 A on the COMMS output (19 W at 12 V): the group goes 7 A -> 9 A; the branch is 18 AWG because the group's 9 A limit protects it (20 AWG allows 6.8 A)", "rides COM's output, so COM's CONFLICT with PW applies to it; on its own it would need an 8 A output at 2 A (1.25 x 1.6 A), and the only spare 8 A output, OUT21, is named by PL and TOP-LIGHT"]
     notes: >-
       One truck network that stays up with the dish off (the wireless display, a logger and phones join it), cellular where the
       dish can't see sky, Starlink over Ethernet into its WAN (Mini Starlink Cable, not in the Mini kit). Its ignition-sense

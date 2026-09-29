@@ -274,7 +274,8 @@ Whether M1 Tune works through a router's network is **unknown**; MoTeC documents
 - **Which output.** None is free on the PDM30. The base ledger has OUT3 and OUT4 (20 A) and OUT21 (8 A) spare, and they're
   taken as follows: PW takes OUT3/OUT4; PL and top-design's TOP-LIGHT both name OUT21 (PL needs 12 A and a 20 A output
   anyway: capacity ledger `setting_conflicts`). options-rd shares OUT23/25/27/28/15/11/13. So COMMS takes OUT3 if PW is
-  not fitted (OUT3 is a 20 A output). If PW is fitted, COMMS waits for more cab outputs: the PDM15 moved to the cab (`mounts.yaml`, state row
+  not fitted (OUT3 is a 20 A output), and COM and COM-TOP carry `conflicts_with: [PW]` with a CONFLICT line saying so.
+  If PW is fitted, COMMS waits for more cab outputs: the PDM15 moved to the cab (`mounts.yaml`, state row
   0ag(b)) or a second body PDM. Until then, option B (the dash outlet).
 - **Switching.** On with ignition RUN (PDM30 DIG1), held on after key-off by a latch, and off below a battery-voltage
   threshold (L4 p.4 [1] low-battery logic). The latch is a CANKEY button (top-design's CAN keypad candidate) or, without a
