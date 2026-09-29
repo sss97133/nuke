@@ -86,9 +86,11 @@ export function HarnessView3D({
   }, [devices, result.wires]);
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0a18' }}>
+    <div style={{ width: '100%', height: '100%', background: '#0a0a18', position: 'relative' }}>
       <Canvas
-        camera={{ position: [32, 18, 32], fov: 45, near: 0.1, far: 500 }}
+        // Open on the engine bay from the front passenger corner. The body GLB is centred at the origin with its
+        // front at -X after the -90 deg turn, so the engine bay centre sits near (-5.4, 0, 0).
+        camera={{ position: [-19, 9, -13], fov: 45, near: 0.1, far: 500 }}
         style={{ background: '#0a0a18' }}
         onClick={(e) => {
           // Click on empty space = deselect
@@ -106,6 +108,7 @@ export function HarnessView3D({
 
         {/* Controls */}
         <OrbitControls
+          target={[-5.4, 0.2, 0]}
           enableDamping
           dampingFactor={0.1}
           minDistance={3}
