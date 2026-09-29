@@ -18,14 +18,19 @@
 #   attach       where each wire lands: {n, ep (endpoint id), at [mm], dir (the way the wire leaves)}
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
-ends_covered: 49
-ends_complete: 46
+ends_covered: 59
+ends_complete: 50
 ends_total: 178
-ends_unmodelled_with_reason: 31
+ends_unmodelled_with_reason: 28
 ends:
   ACC-BATT:
     models:
     - ACC-BATT
+    complete: true
+  AMP-BLOCK:
+    models:
+    - 238LTP
+    - DL438
     complete: true
   AMP-PASS:
     models:
@@ -107,7 +112,8 @@ ends:
     models: []
     complete: false
     missing:
-    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+    - 'ring not picked: the registry''s 18 terminations say ''read the head''s ground boss thread at the bench (no stud size
+      in the LS3 documents on file)'''
   DCDC:
     models:
     - DCDC
@@ -147,6 +153,8 @@ ends:
   FAN-JUNCTION:
     models:
     - '2103'
+    - 838TP
+    - '9918'
     complete: true
   FIREWALL-BODY-A:
     models:
@@ -183,6 +191,20 @@ ends:
     - DTP4P-L012-GKT
     - FIREWALL-BODY-P
     complete: true
+  FIREWALL-CABIN:
+    models:
+    - FIREWALL-CABIN
+    complete: false
+    missing:
+    - 202K163-25-0 shrink boot (dimensions not on file)
+    - M39029 size-20 contacts (slash-sheet dimensions not on file)
+  FIREWALL-ENGINE:
+    models:
+    - FIREWALL-ENGINE
+    complete: false
+    missing:
+    - 202K163-25-0 shrink boot (dimensions not on file)
+    - M39029 size-20 contacts (slash-sheet dimensions not on file)
   FIREWALL-GROMMET:
     models:
     - '1003'
@@ -209,6 +231,12 @@ ends:
     missing:
     - QFS-BKCN-GM bulkhead
     - QFS-H882 hanger and P367 pump
+  FUELP:
+    models:
+    - FUELP
+    complete: false
+    missing:
+    - the kit's mating Packard 3-pin plug (not drawn)
   FUSE-DAK_CONST:
     models: []
     complete: false
@@ -246,20 +274,30 @@ ends:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
       bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
   GND-BANK-CAB:
-    models: []
+    models:
+    - '9906'
+    - '9912'
+    - '9918'
     complete: false
     missing:
-    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+    - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
   GND-BANK-ENG:
-    models: []
+    models:
+    - 238LTP
+    - 638TP
+    - 838TP
+    - '9906'
+    - '9912'
+    - '9918'
     complete: false
     missing:
-    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+    - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
+    - 'one ring for the AMP Research kit lead (the registry: gauge unknown, IM75146 names none)'
   GND-SPLICE-REAR:
     models: []
     complete: false
     missing:
-    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+    - 'ring not picked: the registry''s 13 terminations say ''the rear stud bus is not picked, so its stud size is unknown'''
   IAT:
     models:
     - '12191818'
@@ -362,6 +400,7 @@ ends:
     complete: true
   PDM15-STUD:
     models:
+    - DL214
     - PDM15-A
     complete: true
   PDM30-A:
@@ -374,13 +413,29 @@ ends:
     complete: true
   PDM30-STUD:
     models:
+    - '9916'
+    - DL214
     - PDM30-A
     complete: true
+  PORT-ETH:
+    models:
+    - NE8FDP
+    complete: true
+  PORT-UTC:
+    models:
+    - NC5FD-L-1
+    complete: true
   PS-STUDS:
-    models: []
+    models:
+    - 238LTP
+    - 2516LTP
+    - 610TP
+    - 838TP
+    - '9918'
+    - DL438
     complete: false
     missing:
-    - the DC primary lugs land on six different studs; the lug set per stud is not picked (endpoints.yaml PS-STUDS)
+    - AMP-KIT-RING (the AMP Research kit's own ring)
   RAIL-COIL_PWR:
     models: []
     complete: false
@@ -522,7 +577,11 @@ ends:
     models: []
     complete: false
     missing:
-    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+    - 'ring not picked: the registry says ''read the S-terminal stud off the starter (bench)'''
+  TRANS-CASE:
+    models:
+    - TRANS-CASE
+    complete: true
   WIDEBAND:
     models:
     - 0460-202-20141
@@ -20770,6 +20829,730 @@ parts:
   - COIL-CONN-LS2-7
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: NC5FD-L-1
+  endpoints:
+  - PORT-UTC
+  what: Neutrik NC5FD-L-1 5-pole female XLR receptacle, D-size flange (the MoTeC UTC port)
+  maker: Neutrik
+  maker_pn: NC5FD-L-1
+  shape_basis: maker drawing
+  dims_mm:
+    l: 32.3
+    w: 26.0
+    h: 31.0
+  dims_note: 26.0 x 31.0 x 32.3
+  frame: the flange's rear face at z = 0 (panel side), +Z toward the rear (wires); front toward -Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    housing:
+      hex: '#23262a'
+      from: 'Neutrik NC5FD-L-1: black metal housing (Neutrik datasheet ''Housing: Zinc diecast, black chrome'')'
+    contacts:
+      hex: '#d6b56a'
+      from: gold-plated contacts (Neutrik datasheet)
+  attach:
+  - n: c1
+    ep: PORT-UTC
+    at:
+    - 4.1
+    - 1.2
+    - 20.3
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c2
+    ep: PORT-UTC
+    at:
+    - 3.2
+    - -2.5
+    - 20.3
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c3
+    ep: PORT-UTC
+    at:
+    - 0.0
+    - -4.3
+    - 20.3
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c4
+    ep: PORT-UTC
+    at:
+    - -3.3
+    - -2.5
+    - 20.3
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c5
+    ep: PORT-UTC
+    at:
+    - -4.2
+    - 1.2
+    - 20.3
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  mount: []
+  params:
+  - name: flange_w
+    value: 26.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '26.00 [1.024"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '26 [1.02]'
+    basis: maker
+  - name: flange_h
+    value: 31.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '31.00 [1.220"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '31 [1.22]'
+    basis: maker
+  - name: hole_x
+    value: 19.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '19.00 [0.748"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '19 +-0.1'
+    basis: maker
+  - name: hole_y
+    value: 24.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '24.00 [0.945"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '24 +-0.1'
+    basis: maker
+  - name: hole_d
+    value: 3.2
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) 'dia 3.20 [0.126"]' (panel
+      cutout); reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) '>= dia 3.2'
+    basis: maker
+  - name: cutout_d
+    value: 23.8
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) panel cut out '>= dia 23.80
+      [0.937"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) '>= dia 24'
+    basis: maker
+  - name: flange_t
+    value: 2.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) side view '2.00 [0.078"]'
+    basis: maker
+  - name: depth
+    value: 27.2
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) side view '27.20 [1.071"]'
+      overall
+    basis: maker
+  - name: rear
+    value: 18.3
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) side view '18.30 [0.720"]'
+      behind the flange
+    basis: maker
+  - name: rear_w
+    value: 21.0
+    source: scaled off reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) at its printed
+      26.00
+    basis: scaled
+  checks:
+  - check: flange width (drawing)
+    model: 26.0
+    drawing: 26.0
+    tol: 0.05
+    ok: true
+  - check: flange height (drawing)
+    model: 31.0
+    drawing: 31.0
+    tol: 0.05
+    ok: true
+  - check: overall depth (drawing)
+    model: 27.2
+    drawing: 27.2
+    tol: 0.3
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - scaled off reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) front view at its printed
+    19.00 (contact numbers as printed)
+  kind: piece
+  family: panel ports, bulkheads, case connectors
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
+- id: NE8FDP
+  endpoints:
+  - PORT-ETH
+  what: Neutrik NE8FDP etherCON RJ45 feedthrough, D-size flange (the M130 laptop port)
+  maker: Neutrik
+  maker_pn: NE8FDP
+  shape_basis: maker drawing
+  dims_mm:
+    l: 34.5
+    w: 26.0
+    h: 31.0
+  dims_note: 26.0 x 31.0 x 34.5
+  frame: the flange's rear face at z = 0 (panel side), +Z toward the rear (wires); front toward -Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    housing:
+      hex: '#23262a'
+      from: 'Neutrik NE8FDP: black metal housing (Neutrik datasheet)'
+    contacts:
+      hex: '#d6b56a'
+      from: gold-plated contacts (Neutrik datasheet)
+  attach:
+  - n: c1
+    ep: PORT-ETH
+    at:
+    - -3.57
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c2
+    ep: PORT-ETH
+    at:
+    - -2.55
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c3
+    ep: PORT-ETH
+    at:
+    - -1.53
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c4
+    ep: PORT-ETH
+    at:
+    - -0.51
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c5
+    ep: PORT-ETH
+    at:
+    - 0.51
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c6
+    ep: PORT-ETH
+    at:
+    - 1.53
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c7
+    ep: PORT-ETH
+    at:
+    - 2.55
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  - n: c8
+    ep: PORT-ETH
+    at:
+    - 3.57
+    - 2.0
+    - 20.05
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: solder / rear contact
+  mount: []
+  params:
+  - name: flange_w
+    value: 26.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '26.00 [1.024"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '26 [1.02]'
+    basis: maker
+  - name: flange_h
+    value: 31.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '31.00 [1.220"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '31 [1.22]'
+    basis: maker
+  - name: hole_x
+    value: 19.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '19.00 [0.748"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '19 +-0.1'
+    basis: maker
+  - name: hole_y
+    value: 24.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) '24.00 [0.945"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf
+      (Neutrik drawing) '24 +-0.1'
+    basis: maker
+  - name: hole_d
+    value: 3.2
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) 'dia 3.20 [0.126"]' (panel
+      cutout); reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) '>= dia 3.2'
+    basis: maker
+  - name: cutout_d
+    value: 23.8
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) panel cut out '>= dia 23.80
+      [0.937"]'; reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) '>= dia 24'
+    basis: maker
+  - name: flange_t
+    value: 2.0
+    source: reference_documents/component_drawings/Neutrik_NC5FD-L-1_drawing.pdf (Neutrik drawing) side view '2.00 [0.078"]'
+    basis: maker
+  - name: depth
+    value: 34.55
+    source: reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) side view '34.55 [1.36]' overall
+    basis: maker
+  - name: rear
+    value: 18.05
+    source: reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) side view '18.05 [.71]'
+    basis: maker
+  - name: rear_w
+    value: 25.5
+    source: reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) rear view '25.5 [1.00]'
+    basis: maker
+  - name: rear_h
+    value: 27.64
+    source: reference_documents/component_drawings/Neutrik_NE8FDP_drawing.pdf (Neutrik drawing) rear view '27.64 [1.09]'
+    basis: maker
+  checks:
+  - check: flange width (drawing)
+    model: 26.0
+    drawing: 26.0
+    tol: 0.05
+    ok: true
+  - check: flange height (drawing)
+    model: 31.0
+    drawing: 31.0
+    tol: 0.05
+    ok: true
+  - check: overall depth (drawing)
+    model: 34.55
+    drawing: 34.55
+    tol: 0.3
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'RJ45 contacts at 1.02 mm (the TIA-568 jack pitch), drawn across the jack: cited as design'
+  kind: piece
+  family: panel ports, bulkheads, case connectors
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
+- id: FIREWALL-CABIN
+  endpoints:
+  - FIREWALL-CABIN
+  what: 'D38999/24WJ61SN (jam-nut receptacle, sockets), shell 25, 61 x #20, olive drab, with its M85049/69-25N adapter'
+  maker: MIL-DTL-38999 Series III (MILNEC TX07 / TX06 dims)
+  maker_pn: D38999/24WJ61SN
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 54.5
+    w: 59.0
+    h: 55.6
+  dims_note: 59.0 x 55.6 x 54.5
+  frame: the receptacle's flange face at z = 0 (+Z toward the cabin wires)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    shell:
+      hex: '#5b5c3d'
+      from: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 finish code 'W  Aluminum, olive
+        drab cadmium' (D38999/24WJ61SN, /26WJ61PN)
+    insert:
+      hex: '#2a2a2a'
+      from: 'insert: dark (catalog photos)'
+  attach:
+  - n: bundle
+    ep: FIREWALL-CABIN
+    at:
+    - 0.0
+    - 0.0
+    - 30.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 61-way bundle through the adapter
+  mount: []
+  params:
+  - name: W
+    value: 55.6
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 (TX07 / D38999/24 jam nut receptacle)
+      shell 25 'W 2.188 (55.6)' the flange
+    basis: maker
+  - name: D
+    value: 59.0
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 shell 25 '2.323 (59.0)' the jam
+      nut
+    basis: maker
+  - name: K
+    value: 44.7
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 shell 25 'K 1.759 (44.7)'
+    basis: maker
+  - name: J
+    value: 51.2
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 shell 25 'J max 2.017 (51.2)'
+    basis: maker
+  - name: M
+    value: 43.4
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 shell 25 'M 1.709 (43.4)'
+    basis: maker
+  - name: P
+    value: 3.2
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 'P max rear panel .125 (3.2)'
+    basis: maker
+  - name: H
+    value: 44.7
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 'H 1.760 (44.7)' panel D-hole
+    basis: maker
+  - name: A
+    value: 43.4
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 'A 1.710 (43.4)' the D-hole flat
+    basis: maker
+  - name: L
+    value: 32.5
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 '1.280 (32.5) Max'
+    basis: maker
+  - name: oring
+    value: 3.6
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 '.142 (3.6) Max O-Ring'
+    basis: maker
+  - name: adapter_C
+    value: 36.6
+    source: 'catalog/families.yaml d38999_20: M85049/69-25N, ''Amphenol PCD datasheet: C dia max 1.44 in'''
+    basis: maker
+  - name: adapter_L
+    value: 22.0
+    source: 'M85049/69-25N length: not on file'
+    basis: assumed
+    note: '+-8: drawn so the shell has its adapter; confirm'
+  checks:
+  - check: flange square W (MILNEC)
+    model: 55.6
+    drawing: 55.6
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - The M85049/69-25N length is assumed (22 +-8); its diameter is the families.yaml figure.
+  - 'The 61 cavity positions (25-61 arrangement, MILNEC insert arrangements p.4) are not mapped: pins.json lists each registry
+    cavity at the bundle exit.'
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: panel ports, bulkheads, case connectors
+  pieces:
+  - D38999/24WJ61SN
+  - M85049/69-25N
+  missing:
+  - 202K163-25-0 shrink boot (dimensions not on file)
+  - M39029 size-20 contacts (slash-sheet dimensions not on file)
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
+- id: FIREWALL-ENGINE
+  endpoints:
+  - FIREWALL-ENGINE
+  what: 'D38999/26WJ61PN (plug, pins), shell 25, 61 x #20, olive drab, with its M85049/69-25N adapter'
+  maker: MIL-DTL-38999 Series III (MILNEC TX07 / TX06 dims)
+  maker_pn: D38999/26WJ61PN
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 53.3
+    w: 48.0
+    h: 48.0
+  dims_note: 48.0 x 48.0 x 53.3
+  frame: the plug's coupling face at z = 0 (+Z toward the engine loom)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    shell:
+      hex: '#5b5c3d'
+      from: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 finish code 'W  Aluminum, olive
+        drab cadmium' (D38999/24WJ61SN, /26WJ61PN)
+    insert:
+      hex: '#2a2a2a'
+      from: 'insert: dark (catalog photos)'
+  attach:
+  - n: bundle
+    ep: FIREWALL-ENGINE
+    at:
+    - 0.0
+    - 0.0
+    - 30.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 61-way bundle through the adapter
+  mount: []
+  params:
+  - name: A
+    value: 48.0
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.43 (TX06 / D38999/26 plug) shell
+      25 'A 1.890 (48.0)' coupling ring
+    basis: maker
+  - name: L
+    value: 31.3
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.43 shell 25 '1.234 (31.3)'
+    basis: maker
+  - name: V
+    value: 37.0
+    source: reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.43 shell 25 'V thread M37X1-6g'
+      (the accessory thread)
+    basis: maker
+  - name: adapter_C
+    value: 36.6
+    source: 'catalog/families.yaml d38999_20: M85049/69-25N, ''Amphenol PCD datasheet: C dia max 1.44 in'''
+    basis: maker
+  - name: adapter_L
+    value: 22.0
+    source: 'M85049/69-25N length: not on file'
+    basis: assumed
+    note: '+-8: drawn so the shell has its adapter; confirm'
+  checks:
+  - check: coupling ring A (MILNEC)
+    model: 48.0
+    drawing: 48.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - The M85049/69-25N length is assumed (22 +-8); its diameter is the families.yaml figure.
+  - 'The 61 cavity positions (25-61 arrangement, MILNEC insert arrangements p.4) are not mapped: pins.json lists each registry
+    cavity at the bundle exit.'
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: panel ports, bulkheads, case connectors
+  pieces:
+  - D38999/26WJ61PN
+  - M85049/69-25N
+  missing:
+  - 202K163-25-0 shrink boot (dimensions not on file)
+  - M39029 size-20 contacts (slash-sheet dimensions not on file)
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
+- id: TRANS-CASE
+  endpoints:
+  - TRANS-CASE
+  what: '6L90 external case connector: Kostal LKS 1.5 16-cavity pin housing (case side) mated with the socket housing GM 19303772
+    (Kostal 09430010) on the PCS harness'
+  maker: Kostal
+  maker_pn: 09330004 + 09430010 (GM 19303772)
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 86.7
+    w: 50.3
+    h: 39.2
+  dims_note: 50.3 x 39.2 x 86.7
+  frame: the mating plane at z = 0; the case side toward -Z, the harness socket toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    housings:
+      hex: '#1f2022'
+      from: 'reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, ''DIMENSIONS'' / ''TECHNICAL
+        DATA''): product photos, black'
+  attach:
+  - n: harness
+    ep: TRANS-CASE
+    at:
+    - 0.0
+    - 0.0
+    - 39.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 16-way harness exit
+  mount: []
+  params:
+  - name: sock_L
+    value: 39.0
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') socket housing 09430010 (16 cavities) 'Dimensions L x H x W' 39 x 42.7 x 50.3
+    basis: maker
+  - name: sock_H
+    value: 42.7
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') 09430010
+    basis: maker
+  - name: sock_W
+    value: 50.3
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') 09430010
+    basis: maker
+  - name: pin_L
+    value: 47.7
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') pin housing 09330004 (16 cavities) 47.7 x 41 x 37.4
+    basis: maker
+  - name: pin_H
+    value: 41.0
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') 09330004
+    basis: maker
+  - name: pin_W
+    value: 37.4
+    source: reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL
+      DATA') 09330004
+    basis: maker
+  checks:
+  - check: socket housing length (Kostal)
+    model: 39.0
+    drawing: 39.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Only the envelopes are Kostal's; the round body, bayonet and lever are drawn from the POP photos without a scale (shape
+    only).
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: panel ports, bulkheads, case connectors
+  pieces:
+  - 09330004
+  - 09430010
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
+- id: FUELP
+  endpoints:
+  - FUELP
+  what: AEM 30-2131-100 fuel pressure sensor, 0-100 psig, 1/8-27 NPT, Packard 3-pin (its mating plug comes in the kit)
+  maker: AEM Electronics
+  maker_pn: 30-2131-100
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 54.6
+    w: 27.5
+    h: 23.8
+  dims_note: 27.5 x 23.8 x 54.6
+  frame: the NPT thread's end at z = 0 (into the fuel fitting), the connector up (+Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    brass:
+      hex: '#c9a45a'
+      from: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+        10-2131 Rev C): ''Body Material: Brass'''
+    body:
+      hex: '#b9bcbd'
+      from: 'AEM photo: steel body'
+    connector:
+      hex: '#1c1c1c'
+      from: 'AEM photo: black connector'
+  attach:
+  - n: plug
+    ep: FUELP
+    at:
+    - 0.0
+    - 0.0
+    - 54.6
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Packard 3-pin
+  mount: []
+  params:
+  - name: L
+    value: 54.6
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) drawing '2.15' in overall
+    basis: maker
+  - name: hex_l
+    value: 19.3
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) drawing '0.76' in
+    basis: maker
+    note: the hex and body
+  - name: thread_l
+    value: 10.2
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) drawing '0.40' in thread
+    basis: maker
+    note: 1/8-27 NPT
+  - name: hex
+    value: 23.8
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) drawing '15/16' in hex across flats
+    basis: maker
+  - name: thread_d
+    value: 10.3
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) '1/8" Male NPT' (1/8-27 NPT major diameter 0.405 in)
+    basis: maker
+  - name: conn_d
+    value: 20.0
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) drawing, scaled at its printed 2.15
+    basis: scaled
+    note: '+-2: the Packard 3-pin connector end'
+  checks:
+  - check: overall length (AEM)
+    model: 54.6
+    drawing: 54.6
+    tol: 0.1
+    ok: true
+  - check: hex across flats (AEM)
+    model: 23.8
+    drawing: 23.8
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: panel ports, bulkheads, case connectors
+  pieces:
+  - 30-2131-100
+  missing:
+  - the kit's mating Packard 3-pin plug (not drawn)
+  script: docs/wiring/calc-data/cad/fab/fam_misc.py
 - id: '1003'
   endpoints:
   - FIREWALL-GROMMET
@@ -21073,3 +21856,1128 @@ parts:
   kind: piece
   family: power hardware
   script: docs/wiring/calc-data/cad/fab/fam_power.py
+- id: 238LTP
+  endpoints:
+  - PS-STUDS
+  - GND-BANK-ENG
+  - AMP-BLOCK
+  what: 'ProWire 238LTP: heavy-duty tinned-copper lug, 2 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: 238LTP
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 42.9
+    w: 16.5
+    h: 10.8
+  dims_note: 42.9 long, tang 16.51 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 34.67
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: C
+    value: 8.534
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Barrel I.D. (C): .336 in'
+    basis: vendor
+  - name: W
+    value: 16.51
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Tang Width (W): .65 in'
+    basis: vendor
+  - name: F
+    value: 17.526
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Tang Length (F): .69 in'
+    basis: vendor
+  - name: Dl
+    value: 13.335
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Barrel Length (D): .525 in'
+    basis: vendor
+  - name: E
+    value: 42.926
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Overall Length (E): 1.69 in'
+    basis: vendor
+  - name: T
+    value: 2.54
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Tang Thickness (T): .1 in'
+    basis: vendor
+  - name: hole
+    value: 9.925
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29) Stud Size: 3/8" (M9), + 0.4 clearance'
+    basis: design
+  - name: I
+    value: 11.989
+    source: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29)Barrel Flare (I): .472 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 42.9
+    drawing: 42.9
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 16.51
+    drawing: 16.51
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS, GND-BANK-ENG, AMP-BLOCK'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: 2516LTP
+  endpoints:
+  - PS-STUDS
+  what: 'ProWire 2516LTP: heavy-duty tinned-copper lug, 2 AWG, 5/16" (M8) stud'
+  maker: ProWire USA
+  maker_pn: 2516LTP
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 42.9
+    w: 16.5
+    h: 10.8
+  dims_note: 42.9 long, tang 16.51 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 34.67
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 8.34
+    note: 5/16" (M8)
+  params:
+  - name: C
+    value: 8.534
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Barrel I.D. (C): .336 in'
+    basis: vendor
+  - name: W
+    value: 16.51
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Tang Width (W): .65 in'
+    basis: vendor
+  - name: F
+    value: 17.526
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Tang Length (F): .69 in'
+    basis: vendor
+  - name: Dl
+    value: 13.335
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Barrel Length (D): .525 in'
+    basis: vendor
+  - name: E
+    value: 42.926
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Overall Length (E): 1.69 in'
+    basis: vendor
+  - name: T
+    value: 2.54
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Tang Thickness (T): .1 in'
+    basis: vendor
+  - name: hole
+    value: 8.34
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29) Stud Size: 5/16" (M8), + 0.4 clearance'
+    basis: design
+  - name: I
+    value: 11.989
+    source: 'prowireusa.com/2516LTP (ProWire product page, read 2026-09-29)Barrel Flare (I): .472 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 42.9
+    drawing: 42.9
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 16.51
+    drawing: 16.51
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: 838TP
+  endpoints:
+  - PS-STUDS
+  - GND-BANK-ENG
+  - FAN-JUNCTION
+  what: 'ProWire 838TP: heavy-duty tinned-copper lug, 8 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: 838TP
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 28.7
+    w: 14.5
+    h: 6.3
+  dims_note: 28.7 long, tang 14.478 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 21.46
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: C
+    value: 4.724
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Barrel I.D. (C): .186 in'
+    basis: vendor
+  - name: W
+    value: 14.478
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Tang Width (W): .57 in'
+    basis: vendor
+  - name: F
+    value: 16.256
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Tang Length (F): .64 in'
+    basis: vendor
+  - name: Dl
+    value: 6.858
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Barrel Length (D): .27 in'
+    basis: vendor
+  - name: E
+    value: 28.702
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Overall Length (E): 1.13 in'
+    basis: vendor
+  - name: T
+    value: 1.27
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Tang Thickness (T): .05 in'
+    basis: vendor
+  - name: hole
+    value: 9.925
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29) Stud Size: 3/8" (M9), + 0.4 clearance'
+    basis: design
+  - name: I
+    value: 7.239
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Barrel Flare (I): .285 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 28.7
+    drawing: 28.7
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 14.48
+    drawing: 14.478
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS, GND-BANK-ENG, FAN-JUNCTION'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: 638TP
+  endpoints:
+  - GND-BANK-ENG
+  what: 'ProWire 638TP: heavy-duty tinned-copper lug, 6 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: 638TP
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 33.5
+    w: 13.5
+    h: 7.5
+  dims_note: 33.5 long, tang 13.462 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: GND-BANK-ENG
+    at:
+    - 26.8
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: C
+    value: 5.893
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Barrel I.D. (C): .232 in'
+    basis: vendor
+  - name: W
+    value: 13.462
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Tang Width (W): .53 in'
+    basis: vendor
+  - name: F
+    value: 16.256
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Tang Length (F): .64 in'
+    basis: vendor
+  - name: Dl
+    value: 10.795
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Barrel Length (D): .425 in'
+    basis: vendor
+  - name: E
+    value: 33.528
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Overall Length (E): 1.32 in'
+    basis: vendor
+  - name: T
+    value: 1.549
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Tang Thickness (T): .061 in'
+    basis: vendor
+  - name: hole
+    value: 9.925
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29) Stud Size: 3/8" (M9), + 0.4 clearance'
+    basis: design
+  - name: I
+    value: 8.687
+    source: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29)Barrel Flare (I): .342 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 33.5
+    drawing: 33.5
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 13.46
+    drawing: 13.462
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: GND-BANK-ENG'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: 610TP
+  endpoints:
+  - PS-STUDS
+  what: 'ProWire 610TP: heavy-duty tinned-copper lug, 6 AWG, #10 (M5) stud'
+  maker: ProWire USA
+  maker_pn: 610TP
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 33.5
+    w: 12.0
+    h: 7.5
+  dims_note: 33.5 long, tang 12.04 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 27.51
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.23
+    note: '#10 (M5)'
+  params:
+  - name: C
+    value: 5.893
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Barrel I.D. (C): .232 in'
+    basis: vendor
+  - name: W
+    value: 12.04
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Tang Width (W): .474 in'
+    basis: vendor
+  - name: F
+    value: 17.78
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Tang Length (F): .7 in'
+    basis: vendor
+  - name: Dl
+    value: 10.795
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Barrel Length (D): .425 in'
+    basis: vendor
+  - name: E
+    value: 33.528
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Overall Length (E): 1.32 in'
+    basis: vendor
+  - name: T
+    value: 1.549
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Tang Thickness (T): .061 in'
+    basis: vendor
+  - name: hole
+    value: 5.23
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29) Stud Size: #10 (M5), + 0.4 clearance'
+    basis: design
+  - name: I
+    value: 8.687
+    source: 'prowireusa.com/610TP (ProWire product page, read 2026-09-29)Barrel Flare (I): .342 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 33.5
+    drawing: 33.5
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 12.04
+    drawing: 12.04
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: DL438
+  endpoints:
+  - PS-STUDS
+  - AMP-BLOCK
+  what: 'ProWire DL438: heavy-duty tinned-copper lug, 4 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: DL438
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 42.7
+    w: 17.8
+    h: 10.8
+  dims_note: 42.7 long, tang 17.78 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 33.78
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: C
+    value: 6.985
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Barrel I.D. (C): .275 in'
+    basis: vendor
+  - name: W
+    value: 17.78
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Tang Width (W): .7 in'
+    basis: vendor
+  - name: F
+    value: 21.082
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Tang Length (F): .83 in'
+    basis: vendor
+  - name: Dl
+    value: 12.7
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Barrel Length (D): .5 in'
+    basis: vendor
+  - name: E
+    value: 42.672
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Overall Length (E): 1.68 in'
+    basis: vendor
+  - name: T
+    value: 2.54
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Tang Thickness (T): .1 in'
+    basis: vendor
+  - name: hole
+    value: 9.925
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29) Stud Size: 3/8" (M9), + 0.4 clearance'
+    basis: design
+  - name: OD
+    value: 10.795
+    source: 'prowireusa.com/DL438 (ProWire product page, read 2026-09-29)Barrel O.D.: .425 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 42.7
+    drawing: 42.7
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 17.78
+    drawing: 17.78
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS, AMP-BLOCK'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: DL214
+  endpoints:
+  - PDM30-STUD
+  - PDM15-STUD
+  what: 'ProWire DL214: heavy-duty tinned-copper lug, 2 AWG, 1/4" (M6) stud'
+  maker: ProWire USA
+  maker_pn: DL214
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 54.1
+    w: 17.5
+    h: 12.2
+  dims_note: 54.1 long, tang 17.526 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: wire
+    ep: PDM30-STUD
+    at:
+    - 45.34
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 6.75
+    note: 1/4" (M6)
+  params:
+  - name: C
+    value: 9.779
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Barrel I.D. (C): .385 in'
+    basis: vendor
+  - name: W
+    value: 17.526
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Tang Width (W): .69 in'
+    basis: vendor
+  - name: F
+    value: 21.844
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Tang Length (F): .86 in'
+    basis: vendor
+  - name: Dl
+    value: 15.24
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Barrel Length (D): .6 in'
+    basis: vendor
+  - name: E
+    value: 54.102
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Overall Length (E): 2.13 in'
+    basis: vendor
+  - name: T
+    value: 3.073
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Tang Thickness (T): .121 in'
+    basis: vendor
+  - name: hole
+    value: 6.75
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29) Stud Size: 1/4" (M6), + 0.4 clearance'
+    basis: design
+  - name: OD
+    value: 12.192
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Barrel O.D.: .480 in'
+    basis: vendor
+  checks:
+  - check: overall length E (ProWire)
+    model: 54.1
+    drawing: 54.1
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 17.53
+    drawing: 17.526
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'lands on: PDM30-STUD, PDM15-STUD'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: '9906'
+  endpoints:
+  - GND-BANK-ENG
+  - GND-BANK-CAB
+  what: 'ProWire 9906: hi-temp non-insulated ring terminal, 22-18 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: '9906'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 25.8
+    w: 17.4
+    h: 3.3
+  dims_note: 25.8 long, tang 17.37 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: wire
+    ep: GND-BANK-ENG
+    at:
+    - 17.12
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: hole
+    value: 9.925
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) STUD SIZE 3/8" (M9), + 0.4 clearance
+    basis: design
+  - name: W
+    value: 17.37
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: the ring OD is 1.75 x the hole'
+  - name: F
+    value: 17.37
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: E
+    value: 25.81
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: overall 2.6 x the hole'
+  - name: C
+    value: 1.7
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-20 %: the barrel bore for 22-18 AWG'
+  - name: Dl
+    value: 8.93
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: T
+    value: 0.8
+    source: prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: overall length E (ProWire)
+    model: 25.8
+    drawing: 25.8
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 17.37
+    drawing: 17.37
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'ProWire prints no dimensions for its hi-temp rings: sized off its photo against the stud they take (+-15 %).'
+  cross_checks: []
+  notes:
+  - 'lands on: GND-BANK-ENG, GND-BANK-CAB'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: '9912'
+  endpoints:
+  - GND-BANK-ENG
+  - GND-BANK-CAB
+  what: 'ProWire 9912: hi-temp non-insulated ring terminal, 16-14 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: '9912'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 25.8
+    w: 17.4
+    h: 4.0
+  dims_note: 25.8 long, tang 17.37 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: wire
+    ep: GND-BANK-ENG
+    at:
+    - 17.12
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: hole
+    value: 9.925
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) STUD SIZE 3/8" (M9), + 0.4 clearance
+    basis: design
+  - name: W
+    value: 17.37
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: the ring OD is 1.75 x the hole'
+  - name: F
+    value: 17.37
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: E
+    value: 25.81
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: overall 2.6 x the hole'
+  - name: C
+    value: 2.4
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-20 %: the barrel bore for 16-14 AWG'
+  - name: Dl
+    value: 8.93
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: T
+    value: 0.9
+    source: prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: overall length E (ProWire)
+    model: 25.8
+    drawing: 25.8
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 17.37
+    drawing: 17.37
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'ProWire prints no dimensions for its hi-temp rings: sized off its photo against the stud they take (+-15 %).'
+  cross_checks: []
+  notes:
+  - 'lands on: GND-BANK-ENG, GND-BANK-CAB'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: '9918'
+  endpoints:
+  - PS-STUDS
+  - GND-BANK-ENG
+  - GND-BANK-CAB
+  - FAN-JUNCTION
+  what: 'ProWire 9918: hi-temp non-insulated ring terminal, 12-10 AWG, 3/8" (M9) stud'
+  maker: ProWire USA
+  maker_pn: '9918'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 25.8
+    w: 17.4
+    h: 5.2
+  dims_note: 25.8 long, tang 17.37 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: wire
+    ep: PS-STUDS
+    at:
+    - 17.12
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.925
+    note: 3/8" (M9)
+  params:
+  - name: hole
+    value: 9.925
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) STUD SIZE 3/8" (M9), + 0.4 clearance
+    basis: design
+  - name: W
+    value: 17.37
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: the ring OD is 1.75 x the hole'
+  - name: F
+    value: 17.37
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: E
+    value: 25.81
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-15 %: overall 2.6 x the hole'
+  - name: C
+    value: 3.6
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: '+-20 %: the barrel bore for 12-10 AWG'
+  - name: Dl
+    value: 8.93
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-15 %
+  - name: T
+    value: 1.0
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: overall length E (ProWire)
+    model: 25.8
+    drawing: 25.8
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 17.37
+    drawing: 17.37
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'ProWire prints no dimensions for its hi-temp rings: sized off its photo against the stud they take (+-15 %).'
+  cross_checks: []
+  notes:
+  - 'lands on: PS-STUDS, GND-BANK-ENG, GND-BANK-CAB, FAN-JUNCTION'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: '9916'
+  endpoints:
+  - PDM30-STUD
+  what: 'ProWire 9916: hi-temp non-insulated ring terminal, 12-10 AWG, 1/4" (M6) stud'
+  maker: ProWire USA
+  maker_pn: '9916'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 17.6
+    w: 11.8
+    h: 5.2
+  dims_note: 17.6 long, tang 11.81 wide
+  frame: tang on z = 0, stud hole at the origin, barrel toward +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      wire: +X
+  colors:
+    metal:
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: wire
+    ep: PDM30-STUD
+    at:
+    - 11.64
+    - 0.0
+    - 1.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: crimp barrel
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 6.75
+    note: 1/4" (M6)
+  params:
+  - name: hole
+    value: 6.75
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) STUD SIZE 1/4" (M6), + 0.4 clearance
+    basis: design
+  - name: W
+    value: 11.81
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: '+-15 %: the ring OD is 1.75 x the hole'
+  - name: F
+    value: 11.81
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: +-15 %
+  - name: E
+    value: 17.55
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: '+-15 %: overall 2.6 x the hole'
+  - name: C
+    value: 3.6
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: '+-20 %: the barrel bore for 12-10 AWG'
+  - name: Dl
+    value: 6.08
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: +-15 %
+  - name: T
+    value: 1.0
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: overall length E (ProWire)
+    model: 17.6
+    drawing: 17.6
+    tol: 0.6
+    ok: true
+  - check: tang width W (ProWire)
+    model: 11.81
+    drawing: 11.81
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'ProWire prints no dimensions for its hi-temp rings: sized off its photo against the stud they take (+-15 %).'
+  cross_checks: []
+  notes:
+  - 'lands on: PDM30-STUD'
+  kind: piece
+  family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py

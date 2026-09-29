@@ -69,9 +69,10 @@ UNMODELLED = {
     **{e: ("Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this "
            "product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale")
        for e in ("FUSE-IBOOST_PERM", "FUSE-ISO_PWR", "FUSE-ISO_SW_PWR", "FUSE-DAK_CONST", "FUSE-PCS_BATT", "FUSE-TRANS_BATT")},
-    **{e: "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
-       for e in ("GND-BANK-ENG", "GND-BANK-CAB", "GND-SPLICE-REAR", "COIL-GROUND-RINGS", "STARTER-S")},
-    "PS-STUDS": "the DC primary lugs land on six different studs; the lug set per stud is not picked (endpoints.yaml PS-STUDS)",
+    "GND-SPLICE-REAR": "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'",
+    "COIL-GROUND-RINGS": ("ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud "
+                          "size in the LS3 documents on file)'"),
+    "STARTER-S": "ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'",
 }
 
 
