@@ -2394,12 +2394,13 @@ HORN:
   note: horn part number not recorded (the registry names only the connector)
 WASHER-PUMP:
   entry: device
-  what: "Hella 12 V mono washer pump, 2 bar, 1 l/min, 35 mm housing (in the Hella 8TW 003 248-001 tank)"
-  maker: Hella
-  maker_pn: "8TW 004 223-031"
-  drawing: {url: "https://www.hella.com/forvia-us/assets/documents/BI_Washer-pumps-and-water-tanks_2026.pdf", page: "https://www.hella.com/forvia-us/assets/documents/BI_Washer-pumps-and-water-tanks_2026.pdf"}
+  what: "factory washer pump on the wiper motor (1973-77 GM truck); its solenoid takes the 2-way 12004622; LMC 36-4078 is the replacement pump"
+  maker: GM (factory); replacement pump LMC Truck
+  maker_pn: "36-4078 (LMC replacement; the GM pump number is not recorded)"
+  drawing: {url: "https://www.lmctruck.com/electrical/wiper-components/cc-1973-84-windshield-wiper-and-washer", page: "https://www.lmctruck.com/electrical/wiper-components/cc-1973-84-windshield-wiper-and-washer"}
+  mates_with: [WIPER-MOTOR]
   confidence: unknown
-  note: "no photo fetched yet (retailer pages refuse scripts); drawing link is Hella's washer pumps and tanks product information"
+  note: "owner 2026-09-29: the factory pump on the wiper motor (1977 LTSM p.803 Fig. 8-16) replaces the Hella 8TW 004 223-031 pump and tank the registry still names; the LMC page is an exploded diagram of the 1973-84 wiper and washer with part numbers (hoses 36-4070 and 36-4071); no photo of 36-4078 fetched yet"
 UNDERHOOD-LAMP:
   entry: device
   what: "underhood lamp and switch assembly: factory, one feed lead, 93 bulb"
