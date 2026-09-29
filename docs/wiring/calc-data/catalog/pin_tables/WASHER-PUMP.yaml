@@ -1,15 +1,17 @@
 WASHER-PUMP:
   family: open
-  device: "Hella 8TW 004 223-031 12 V mono washer pump (2 bar, 1 l/min, housing 35 mm) in the Hella 8TW 003 248-001 1.5 l tank with bracket (pump holder 35 mm, bore 11 mm); mate Hella 8JD 008 151-021"
-  mate: "Hella 8JD 008 151-021 (flat connector 6.3 x 0.8 mm)"
-  pins: {"50": "pin 1 (+)", "WASH_GND": "pin 2 (-)"}
-  note: 'the 1977 pump is driven by the wiper motor and triggered by a ratchet solenoid (1977 manual Fig. 8-16 p.803; p.814). The 1985-87 C/K pump is electric in the bottom of the jar, 2 wires: white = power from the wiper fuse, pink = ground through the washer switch (1987 manual 8A-34). Here the PDM switches the feed (OUT26 on #50, commanded by the washer contact on DIG9 through #46) and the ground runs in the loom.'
-  retired_alternative: 'USA1 Industries 20530 jar kit + 20151 pump (the 1985-87 GM-style jar pump): retired 2026-09-28. The listing publishes no plug and no current (snapshot); the Hella pump publishes its plug and pin assignment.'
+  device: "factory 1977 C/K windshield washer pump on the wiper motor gear box: driven by the wiper gear, released by a ratchet solenoid (1977 LTSM p.803 Fig. 8-16, p.814); owner correction 2026-09-29 replaces the Hella pump and tank"
+  mate: "GM 2-way washer-solenoid connector 12004622 (1978 C-K booklet ST-352-78 fold-out A-1, the closest year on file; confirm on the 1977 motor)"
+  pins: {"50": "93B cavity: solenoid feed side (1978 booklet 18 YEL/BLK-93B, the wiper motor feed)", "WASH_GND": "94 cavity: solenoid switch side (1978 booklet 18 DK BLU-94, 'Windshield Washer Sw. to Washer')"}
+  note: 'Owner 2026-09-29: "the factory wiper does have the washer motor built into it which means we just need to make sure we use the correct connectors in the harness ... the correct soft tube". The 1977 manual: "Figure 8-16 shows the assembly of the washer pump to the wiper motor" (p.803); the solenoid has a feed wire and a wire to the switch, and a grounded switch wire makes it pump continuously (p.814). The 1978 booklet A-1 draws WASH SOL inside the wiper motor block on connector 12004622 (circuits 94 and 93B). In the factory circuit the dash switch grounds 94 and 93B shares the motor feed. The registry today feeds the solenoid from PDM30 OUT26 (#50) and returns it to the ground bank (WASH_GND) with the switch read on DIG9 (#46); that works for the solenoid, and the factory way frees OUT26 and DIG9. The choice is the wiring lane''s (topology re-point pending). Soft tube: LMC 36-4070 jar to pump 9 ft and 36-4071 pump to nozzle 12 ft, or Classic Parts kit 67-865 (repro numbers; no GM hose number found).'
+  retired_alternative: 'Hella 8TW 004 223-031 pump in the Hella 8TW 003 248-001 1.5 l tank, mate 8JD 008 151-021: retired 2026-09-29 on the owner''s correction (the factory pump rides on the wiper motor). Earlier: USA1 Industries 20530 jar kit + 20151 pump (1985-87 style), retired 2026-09-28.'
   open:
-  - 'pump current: Hella publishes voltage, pressure, flow and plug, not current. Bench it before setting OUT26 (current None).'
-  - 'fit of the 1.5 l tank on the 1977 inner fender and whether 8TW 003 248-001 ships with the pump fitted: read the part at mock-up'
+  - 'confirm connector 12004622 on the 1977 motor in hand (the 1977 booklet ST-352-77 is not on file)'
+  - 'solenoid coil current: not in the manual text; bench it before setting a PDM limit'
+  - 'whether the 1977 dash switch''s wash position also runs the wipers (the pump only pumps while the wiper gear turns): read the switch'
   sources:
-  - 'reference_documents/web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md (Hella product information: program overview 8TW 004 223-031 12 V 2 bar 1 l/min mono, flat connector 6.3 x 0.8 mm, mating connector 8JD 008 151-021; pin assignment pin 1 +, pin 2 -; water tank 003248001 12 V 1.5 l with bracket and 1 pump, pump holder 35 mm)'
-  - '1987 Light Duty Truck Service Manual (reference_documents/k5_factory_docs/1987_Light_Duty_Truck_Service_Manual.pdf) p.8A-34 (PDF p.1103): washer motor in the bottom of the reservoir; two wires, white = power from the fuse box (shared with the wiper), pink = ground through the washer switch'
-  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803 Fig. 8-16 and p.814'
-  - reference_documents/web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803 Fig. 8-16 ''Washer Mechanism Mounting on Wiper''; p.814 washer diagnosis; p.815 ''Disconnect electrical harness at wiper motor and hoses at washer pump'''
+  - 'ST-352-78 1978 C-K wiring booklet fold-out A-1 (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png, read from the image 2026-09-29): WASH SOL, connector 12004622, 18 DK BLU-94 and 18 YEL/BLK-93B; circuit table p.9: 94 ''Windshield Washer Sw. to Washer'''
+  - 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-84-windshield-wiper-and-washer.md (36-4078 Washer Pump 73-77; 36-4070 Hose-Jar To Pump-9 ft; 36-4071 Hose-Pump To Nozzle-12 ft; 30-1365 hose retainer; 30-1423 nozzle 73-80)'
+  - 'reference_documents/web_snapshots/www.classicparts.com__67-865.md ((1973-84) Windshield Washer Hose Kit 67-865)'
+  - 'docs/wiring/research/2026-09-30_door-mirror-camera-lighting-options.md §10'
