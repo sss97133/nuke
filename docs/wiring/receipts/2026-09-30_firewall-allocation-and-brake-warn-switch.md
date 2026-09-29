@@ -17,9 +17,14 @@
    - It's read on PDM15 DIG2 (A19) through wire BWS_SIG, 20 AWG M22759/32, and sent over CAN as its own dash message.
    - The valve body is the return (1977 LTSM PDF p.406).
    - Status: proposed. Its part number and exact spot are open.
-2. **The allocation proposal.** The 61-pin carries 50 engine-management wires, 2 CAN and the isolator's 3 remote-switch
-   wires. The headlights, blower and wipers become cab switch inputs driving engine-bay PDM outputs over CAN. The engine-bay
-   box becomes a PDM32. The registry is not rewired for this until Dave and the owner confirm.
+2. **The allocation proposal.** There are two ways to fill the firewall connector.
+   - (a) The 61-pin as it is: 50 engine-management wires, 2 CAN and the isolator's 3 remote-switch wires, 61 of 61.
+   - (b) The same shell with insert 25-35: 128 size-22D contacts, room for every 22 AWG wire with about 70 cavities spare.
+     The ETB motor pair, the seal margin at the 22D maximum and the 22D tooling are its trade-offs (research §2a, MILNEC
+     catalog).
+
+   Either way, the headlights, blower and wipers become cab switch inputs driving engine-bay PDM outputs over CAN, and the
+   engine-bay box becomes a PDM32. The registry is not rewired for this until Dave and the owner confirm.
 3. **The registry rebuild** (reconcile_v5.py, then options_v5.py) also brings k5_registry.json and OPTIONS.md up to date
    with the catalog and options already merged on main. Before this pass, main's registry was behind endpoints.yaml for
    WIPER-SW, WIPER-MOTOR and WASHER-PUMP.

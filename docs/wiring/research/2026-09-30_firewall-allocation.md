@@ -11,10 +11,13 @@ end is added in this pass.
 
 - **The 61-pin** is D38999/26WJ61PN with insert 25-61 (61 size-20 contacts).
   - `check_plug_ends.py --wires` reports 58 used and 3 spare (d, t, u).
-  - Shell 25 is the series' largest. No shell-25 insert has more than 25-61's 61 size-20 contacts: 25-4 is 48 × #20 plus
+  - Shell 25 is the series' largest. No shell-25 insert has more *size-20* contacts than 25-61's 61: 25-4 is 48 × #20 plus
     8 × #16, and 25-43 is 23 × #20 plus 20 × #16 (MILNEC D38999 Series III catalog p.B-19, Insert Arrangement Selection,
     reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf).
-  - A size-20 contact takes 20–24 AWG, so 16 AWG circuits can't use it in any shell.
+  - **But a denser insert fits the same shell: 25-35 has 128 × #22D contacts** (same catalog, the Insert Arrangement
+    Selection table, service rating M). See §2a: it's the main alternative to filling the 61 exactly.
+  - A size-20 contact takes 20–24 AWG, and a size-22D takes 22–28 AWG, so 16 AWG circuits can't use either (catalog,
+    Contact Specifications).
 - **The 58 wires in it** (registry endpoint FIREWALL-ENGINE):
 
   | Group | Wires | Ids |
@@ -32,6 +35,8 @@ end is added in this pass.
   - isolator remote switch: ISO_CLOSE, ISO_OPEN, ISO_LED, ISO_SW_PWR.
 
 ## 2. What the 61-pin is for, in priority order
+
+This section fills the 61-pin as it is. §2a gives the alternative with more room.
 
 1. **Engine management: 50 wires, stays.** The M130 lives in the cab. These are its injector and coil drives and its
    sensor inputs, and none of them can travel as a CAN message.
@@ -51,6 +56,37 @@ end is added in this pass.
 The result is 58 + 3 = 61 of 61, with the isolator's state lead (ISO_LED) reaching the dash over CAN. If the M130's shutdown
 input has to be hardwired (ISO_KILL taps that lead today, per PDM manual p.4's "secondary switch that is connected to a
 shutdown input on the ECU"), it's a fourth wire, and FAN_PWM moves to the bay PDM to make room.
+
+## 2a. The alternative: the same shell with a 25-35 insert (128 × #22D)
+
+It uses the same plate, the same hole and the same shell-25 coupling. Only the insert and the contacts change: receptacle
+D38999/24WJ35SN and plug D38999/26WJ35PN in place of /24WJ61SN and /26WJ61PN.
+
+- **Why it's worth it.** 55 of the 58 wires in the 61-pin are 22 AWG (registry FIREWALL-ENGINE). The only 20 AWG ones are
+  the ETB motor pair (4a, 4b) and FAN_PWM. A #22D contact takes 22–28 AWG and carries 5 A at 22 AWG. A #20 takes 20–24 AWG
+  and carries 7.5 A at 20 AWG ("test ratings only"). Both are from the catalog's Contact Specifications and Current Rating
+  tables. With 25-35, every 22 AWG wire moves across and about 70 of the 128 cavities stay spare, where "fill the 61" leaves 0.
+- **What fits and what doesn't:**
+  - The 55 × 22 AWG, and FAN_PWM as a 22 AWG control lead (Dave's call).
+  - The isolator's switch lines, as 22 AWG. Their fuse is 5 A, the 22D's rated current; Dave's call.
+  - **The ETB motor pair doesn't fit as it's wired.** It's 20 AWG, and a 22D contact is rated 5 A at 22 AWG. The motor's
+    current isn't in the registry. It needs one of these, Dave's call:
+    - two 22D contacts in parallel per leg;
+    - 22 AWG, if the M130's ETB current is under the rating;
+    - a small separate path.
+  - The headlights, wipers and blower are power wires (16 AWG). The engine-bay PDM route in §3 still applies to them either way.
+- **The seal margin.** The #22D seals a jacket of 0.76–1.37 mm (0.030–0.054 in); the #20 seals 1.02–2.11 mm.
+  - M22759/16-22 is 1.27–1.37 mm (K5_WIRING_STATE.md row 0p), right at the 22D maximum.
+  - This build moved 22 AWG from /32 to /16 on 2026-09-26 (canon ch.16 §1.5). With 22D contacts that choice gets looked at
+    again against the 22D range, with the wire's published OD. That's the canon owner's and Dave's call.
+- **Contacts and tools.** The 22D pin is TXPP22 and the socket TXSS22, crimped with MILNEC's TP209 (pin) and TP207 (socket)
+  positioners. That's new tooling next to the #20 set's TP104 turret (catalog, contacts and tooling table). The rest of the
+  kit (backshell, boot, plate) stays.
+- **Recommendation.** Put both in front of Dave:
+  - **25-35 buys room** for later candidates (wheel speed, fuel temperature, the isolator lines, and more) at the cost of
+    22D tooling and the ETB-pair question.
+  - **"Fill the 61"** keeps the parts already bought and leaves no room.
+  - Nothing is bought or rewired either way.
 
 ## 3. The rest: switched in the engine bay, commanded over CAN
 
