@@ -169,9 +169,9 @@ items:
     compare_to: "gm77.body.top.lower-holes-width (63 in between the lower bolt holes); twin Exterior_Roof (1881 mm long, 1855 mm wide, model only)."
     result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
 
-  - id: T-16
+  - id: T-20
     priority: 2
-    what: Seat runs and seat travel (asked by the seat-climate lane, for cooled seats)
+    what: Seat runs and seat travel (asked by the seat-climate lane, for cooled seats; numbered after the wheel-speed items T-16 to T-19 in PR #427)
     from_to: "(a) Along the route, from the PDM30's spot to under each seat. (b) The driver seat adjuster's full fore-aft travel. (c) The passenger seat's tip-forward arc, measured at the plug spot near the front pivot bracket. (d) Clearance from under each cushion to the floor, at both ends of travel. (e) The backrest's inside depth between the foam and the vinyl back."
     how: "Cloth tape along the route for (a); tape for (b) to (d); a thin rule pushed in at the back seam for (e)."
     settles: "Seat feed lengths and the passenger feed's gauge (volt drop), the service loops at the seat disconnects (SEAT-L/R-PASS-P), and whether a thermoelectric unit fits in the backrest (docs/wiring/research/2026-09-30_cooled-seats.md, PR #422)."
