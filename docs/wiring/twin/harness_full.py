@@ -11,7 +11,7 @@ the engine loom tree and the DC primary cables are reused as they were reviewed,
 Every route is a PROPOSAL for the owner and the builder to confirm (.claude/rules/wiring-receipt.md). Every number
 carries its source or says it is not sourced.
 """
-import argparse, json, math, os, subprocess, sys
+import argparse, json, math, os, re, subprocess, sys
 from collections import defaultdict, Counter
 from pathlib import Path
 
@@ -60,6 +60,32 @@ def glb_path(eid):
     return None
 
 
+# ------------------------------------------------------------------ the DEL-Stributor coil ring (delstributor lane, PR #434)
+def load_delstributor():
+    loc = CAD / "delstributor_geometry.yaml"
+    try:
+        if loc.exists():
+            return yaml.safe_load(open(loc)), str(loc.relative_to(REPO))
+        txt = subprocess.run(["git", "-C", str(REPO), "show", "origin/wiring/delstributor:docs/wiring/calc-data/cad/delstributor_geometry.yaml"],
+                             capture_output=True, text=True, check=True).stdout
+        return yaml.safe_load(txt), "docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434)"
+    except Exception:
+        return None, None
+
+
+DS, DS_SRC = load_delstributor()
+RING = None
+if DS:
+    zc = DS["coils_common"]["z_world"]
+    RING = {"src": DS_SRC, "post": (DS["post"]["axis_world"]["x"], DS["post"]["axis_world"]["y"]),
+            "coils": {c["id"]: {"xy": (c["axis_world"]["x"], c["axis_world"]["y"]), "az": c["azimuth_deg"], "bank": c["bank"]} for c in DS["coils"]},
+            "z": zc, "Y": (0.045, -1.395, 0.985),
+            "rings": {"driver": (0.150, -1.468, 1.000), "passenger": (-0.150, -1.448, 1.000)},
+            "why": ("delstributor lane (PR #434): the coils stand in a ring round the Delmo post behind the block, towers up, plugs down "
+                    "and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y), "
+                    "h_F +-35 mm. Supersedes the twin's 4 x 2 grid (E3_DelStributer_Plate)")}
+
+
 # ------------------------------------------------------------------ placements of the parts lane's models
 # Local frame: origin at the mounting-face centre, +Z out of the mounting face. rot = world images of local X, Y, Z.
 ROT_FW_CAB = ((-1, 0, 0), (0, 0, 1), (0, 1, 0))       # MoTeC case flat on the firewall's cab face, plugs down
@@ -73,10 +99,12 @@ GLB_PLACE = {
                        "case rises behind the dash (the twin's panel is a closure, not structure: tape T-04). Assumes the 90-degree boots "
                        "(HELD in part_models.yaml) so the wires turn at the plugs; a straight boot needs 60-80 mm under them. The parking-brake "
                        "pedal sits outboard on the real truck: its keep-out is not modelled"),
-    "PDM30-A": dict(origin=(0.085, -1.372, 1.010), rot=ROT_FW_CAB,
-                    why="PROPOSED: its own plate on the tunnel bulge of the firewall (the cab face runs y -1.378..-1.405 across the case, so "
-                        "the plate bridges it), open air round the case (MoTeC), ~0.5 m from the M130. Same 90-degree-boot assumption; the "
-                        "case top rises 43 mm behind the twin's dash panel (T-04)"),
+    "PDM30-A": dict(origin=(0.245, -1.460, 1.040), rot=ROT_FW_CAB,
+                    why="PROPOSED: the firewall's cab face inboard of the 61-pin plate, plugs down, 6 mm off the face, so the M130 and the "
+                        "PDM30 flank the 61-pin (main lane's proposal) with ~0.3 m of air between them (MoTeC: open air). Kept outboard of "
+                        "the firewall's centre dish, where the DEL-Stributor coil ring sits (delstributor lane FIT-FIREWALL; the twin has "
+                        "no dish). The accelerator pedal bolts to the firewall below it: its stroke keep-out is not modelled. Assumes the "
+                        "90-degree boots; the case top rises behind the twin's dash panel (T-04)"),
     "ODYSSEY": dict(origin=(-0.600, -2.300, 1.010), rot=ROT_BATT_P,
                     why="PROPOSED: GM's right battery tray spot (1977 LTSM p.122), long side fore-aft, side terminals and posts inboard, + forward; "
                         "tray height not published (base drawn at z 1.01)"),
@@ -97,7 +125,7 @@ OVERRIDE = {
     "WIPER-MOTOR": ([0.000, -1.470, 1.220], "factory wiper hole on the cowl, engine side (mounts.yaml); z lowered from 1.30 to below the twin cowl skin (z 1.25)"),
     "WASHER-PUMP": ([0.030, -1.482, 1.200], "pieces lane 2026-09-29 / 1977 LTSM p.803 Fig. 8-16: the factory pump rides on the wiper motor"),
     "FAN": ([0.000, -2.300, 0.955], "the fan motor hub on the engine side of the radiator core (mounts.yaml FAN)"),
-    "GND-BANK-CAB": ([-0.075, -1.362, 0.985], "PROPOSED: beside the PDM30 on the tunnel bulge of the firewall, passenger side of it (mounts.yaml: beside the PDM30); keeps the 2 AWG return short to H3 and clear of the pedals"),
+    "GND-BANK-CAB": ([0.370, -1.440, 1.060], "PROPOSED: beside the PDM30 on the firewall's cab face, between it and the 61-pin plate, above the plate (mounts.yaml: beside the PDM30)"),
     "AMP-BLOCK": ([0.740, 1.400, 1.140], "PROPOSED: on the driver side panel behind the amp's rear end (mounts.yaml: beside the amp); positions_v3 put it inside the amp's case"),
     "AMP-PASS": ([0.550, 1.300, 0.850], "rear floor near the amplifier (mounts.yaml); on the twin's cargo floor, z 0.845"),
     "GND-SPLICE-REAR": ([0.600, 1.500, 0.880], "inside the rear body (mounts.yaml); positions_v3 had it under the floor"),
@@ -106,9 +134,15 @@ OVERRIDE = {
     "FUEL-LEVEL": ([0.050, 1.300, 0.830], "on the hanger (mounts.yaml), tank per the pieces lane"),
     "SPL-FUEL-SND": ([0.150, 1.300, 0.840], "above the tank lid (mounts.yaml)"),
     "AC-HP-SW": ([-0.620, -2.080, 1.050], "candidate spot (not decided): on the liquid line (not plumbed), on the passenger inner-fender shelf behind the Odyssey; positions_v3 put it inside the Odyssey"),
+    "HEADLIGHT-L": ([0.789, -2.520, 1.050], "pieces lane ruling 2026-09-30: the body model's headlamp bucket (mesh Headlights), x +-0.789 +-15 mm"),
+    "HEADLIGHT-R": ([-0.789, -2.520, 1.050], "pieces lane ruling 2026-09-30: the body model's headlamp bucket (mesh Headlights), x +-0.789 +-15 mm"),
     "PORT-ETH": ([-0.500, -1.060, 1.080], "glovebox (mounts.yaml), inside the dash (twin Dash_Main)"),
     "PORT-UTC": ([-0.560, -1.060, 1.080], "glovebox (mounts.yaml), inside the dash (twin Dash_Main)"),
 }
+if RING:
+    for cid, c in RING["coils"].items():
+        OVERRIDE[cid] = ([round(c["xy"][0], 4), round(c["xy"][1], 4), RING["z"]["plug_tip"]],
+                         f"plug tip on the DEL-Stributor ring (azimuth {c['az']} deg, {c['bank']} half): " + RING["why"])
 REAR_CONN = {"id": "REAR-CONN", "xyz": list(G.N["RC"]), "why": "mounts.yaml box REAR-CONN (open): 'rear floor, driver side, so the body comes off the frame with one unplug'; the task's rear loom ends here before the frame rail"}
 FUSE_BATT = [-0.455, -2.200, 1.150]   # the three battery-corner inline fuses (mounts.yaml: at the battery end of their feeds)
 
@@ -176,6 +210,13 @@ def aabb_of(rec):
         P = np.array(corners) + np.array(rec["origin"])
         return P.min(axis=0).tolist(), P.max(axis=0).tolist()
     c = np.array(rec.get("centre"), float)
+    if k == "obox":
+        sx, sy, sz = (v * MM / 2 for v in rec["size_mm"])
+        a = math.radians(rec["yaw_deg"])
+        ex = abs(math.cos(a)) * sx + abs(math.sin(a)) * sy; ey = abs(math.sin(a)) * sx + abs(math.cos(a)) * sy
+        lo = c - np.array([ex, ey, sz]); hi = c + np.array([ex, ey, sz])
+        lo[2] = min(lo[2], rec["plug"]["z0"]); hi[2] = max(hi[2], rec["tower"]["z1"])
+        return lo.tolist(), hi.tolist()
     if k in ("box", "battery", "isolator", "context_box", "plate", "ring"):
         s = np.array(rec["size_mm"], float) * MM / 2
         return (c - s).tolist(), (c + s).tolist()
@@ -242,7 +283,7 @@ def build_full_parts():
         elif eid in SIZES:
             sh, dims, src, colh, colb = SIZES[eid]
             rec.update(kind=sh, size_mm=list(dims), centre=[round(float(c), 4) for c in xyz], model="stand-in (true size)", sources=[src], colour=colh, colour_basis=colb)
-        elif eid in TWIN_OBJ:
+        elif eid in TWIN_OBJ and not (RING and eid in RING["coils"]):
             objs, colh, colb = TWIN_OBJ[eid]
             rec.update(kind="twin", objects=objs, centre=[round(float(c), 4) for c in xyz], model="twin v3 object (twin lane, built from published dimensions)",
                        colour=colh, colour_basis=colb, sources=["docs/wiring/twin/build_engine_v3.py"])
@@ -254,6 +295,36 @@ def build_full_parts():
                        colour=col or "#9aa0a6", colour_basis=cb if col else "not read (neutral grey)",
                        sources=[DEFAULT_SRC.format(dims[0], dims[1], dims[2], pv.get("cat"))])
         H.PARTS.append(rec)
+    if RING:
+        P2 = {p["id"]: p for p in H.PARTS}
+        cs = DS["coil_shape"]
+        for cid, c in RING["coils"].items():
+            rec = P2.get(cid)
+            if rec is None:
+                continue
+            a = math.radians(c["az"]); rad = (math.sin(a), -math.cos(a))
+            r_in, r_out = cs["body_radial_mm"]["inner"], cs["body_radial_mm"]["outer"]
+            off = (r_out - r_in) / 2 * MM
+            zc_ = RING["z"]
+            rec.update(kind="obox", yaw_deg=round(-c["az"], 2),
+                       centre=[round(c["xy"][0] + rad[0] * off, 4), round(c["xy"][1] + rad[1] * off, 4), round((zc_["body_top"] + zc_["body_bottom"]) / 2, 4)],
+                       size_mm=[cs["body_tangential_mm"]["value"], r_in + r_out, round((zc_["body_top"] - zc_["body_bottom"]) / MM, 1)],
+                       tower={"at": [c["xy"][0], c["xy"][1]], "z0": zc_["body_top"], "z1": zc_["tower_tip"], "d_mm": cs["tower_od_mm"]["value"]},
+                       plug={"at": [c["xy"][0], c["xy"][1]], "z0": zc_["plug_tip"], "z1": zc_["body_bottom"], "size_mm": [26, 22]},
+                       model="stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)", colour="#353535",
+                       colour_basis="GM catalogue photo of D510C", position_basis=OVERRIDE[cid][1],
+                       sources=[f"{RING['src']}: coil_shape (IMG_3918, IMG_1101), circle, coils[{cid}]"])
+        F = DS["post_base"].get("world") or {}
+        pz0 = 0.962 - 0.016; pz1 = 0.962 + 0.1274
+        H.PARTS.append({"id": "DEL-STRIBUTOR-POST", "endpoint": None, "kind": "box", "size_mm": [52.6, 52.6, round((pz1 - pz0) / MM, 1)],
+                        "centre": [RING["post"][0], RING["post"][1], round((pz0 + pz1) / 2, 4)], "model": "stand-in (delstributor lane: width sourced, depth working)",
+                        "status": "decided part (Delmo DELSTRIB01); spot probable", "colour": "#b9bcbf", "colour_basis": "billet aluminium (Delmo photos)",
+                        "what": "Delmo Del-Stributer post (the coil ring's mount), on the 12 o'clock bell bolt",
+                        "sources": [f"{RING['src']}: post (width 52.6 +-2 from NewCR1; depth unknown, working 52.6; top F+127.4, bottom F-16)"]})
+        H.PARTS.append({"id": "COIL-GROUND-RINGS-P", "endpoint": "COIL-GROUND-RINGS", "kind": "box", "size_mm": [60, 60, 40], "centre": list(RING["rings"]["passenger"]),
+                        "model": "dashed (size not sourced)", "status": "proposed", "colour": "#9aa0a6", "colour_basis": "not read (neutral grey)",
+                        "what": "COIL-GROUND-RINGS on the passenger head (the passenger half's a and b grounds)",
+                        "sources": [f"{RING['src']}: harness.ground_rings (passenger zone x -0.20..-0.09, y -1.448, z 0.95..1.04)"]})
     H.PARTS.append({"id": "REAR-CONN", "endpoint": None, "kind": "box", "size_mm": [45, 45, 30], "centre": REAR_CONN["xyz"],
                     "model": "dashed (size not sourced)", "status": "open", "colour": "#5b5d3f", "colour_basis": "marker (olive like the 61-pin)",
                     "what": "Proposed round rear-floor connector (the rear loom's one unplug)", "sources": [REAR_CONN["why"]]})
@@ -339,9 +410,9 @@ def part_audit(mesh_dir, obst):
             if near:
                 dmin = min(near.values())
                 checks.append({"rule": "clear of the spare tire and its carrier", "source": "owner call 2026-09-29 (subs behind the rear wheel wells on a built structure; flag the spare-tire carrier in the right rear corner); twin Interior_Spare_Tire_Carrier, Wheel_Spare_Tire",
-                               "result": "flag" if dmin < 0.10 else "pass",
-                               "why": "driver alone: " + ", ".join(f"{k} {v / MM:.0f} mm" for k, v in near.items()) +
-                                      ("; the enclosure (not designed; JBL's volume not read) and its structure land inside the carrier's reach: a clash to resolve with the spare's mount" if dmin < 0.10 else "")})
+                               "result": "flag" if dmin < 0.15 else "pass",
+                               "why": "driver alone (254 mm, 83 mm deep) clears " + ", ".join(f"{k} by {v / MM:.0f} mm" for k, v in near.items()) +
+                                      ("; its enclosure is not designed (JBL's box volume not read) and any box or built structure deeper than that inboard of the side panel reaches the carrier: the clash the owner flagged, to resolve with the spare's mount" if dmin < 0.15 else "")})
         over = [oid for oid, a, b in boxes if oid != p["id"] and not ({oid, p["id"]} <= fw61) and np.all(np.minimum(hi, b) > np.maximum(lo, a))]
         if over:
             checks.append({"rule": "clear of neighbouring parts", "source": "part envelopes in this scene", "result": "flag", "why": "envelope overlaps " + ", ".join(over)})
@@ -392,19 +463,20 @@ def dc_full():
     stud = P["PDM30-A"]["ports"]["PDM30-STUD"]["at"]
     lug_y = round(stud[1] + 0.006, 4)
     r = R["DC-PDM_BPOS"]
-    r["pts"] = r["pts"][:3] + [[-0.495, -1.700, 1.055], [-0.470, -1.580, 0.960], [-0.357, -1.540, 0.905], [-0.357, -1.300, 0.905],
-                               [0.000, -1.300, 0.935], [stud[0], lug_y, 0.940], [stud[0], lug_y, stud[2]]]
-    r["fw_idx"] = [5, 6, 7, 8, 9]
+    r["pts"] = r["pts"][:3] + [[-0.495, -1.700, 1.055], [-0.470, -1.580, 0.960], [-0.357, -1.540, 0.905], [-0.357, -1.190, 0.905],
+                               [0.150, -1.190, 0.935], [stud[0], -1.330, 0.950], [stud[0], lug_y, 0.960], [stud[0], lug_y, stud[2]]]
+    r["fw_idx"] = [5, 6, 7, 8, 9, 10]
     r["to"] = "PDM30-STUD (M6, through H3: the exception)"
     r["path_why"] = ("back along the passenger inner-fender edge, down behind the head to H3 (the exception route); in the cab it sweeps "
-                     "out behind the firewall at 10 x OD, over the tunnel and up to the PDM30's M6 stud (parts lane: 74.3 mm up, 17.9 proud)")
+                     "back under the dash at 10 x OD, crosses behind the firewall's centre dish (the coil ring's; not in the twin) and "
+                     "comes forward to the PDM30's M6 stud (parts lane: 74.3 mm up, 17.9 proud)")
     gb = P["GND-BANK-CAB"]["centre"]
     r = R["DC-GND_RET_CAB"]
-    r["pts"] = [[gb[0], gb[1] + 0.030, gb[2]], [gb[0] - 0.065, gb[1] + 0.032, gb[2] - 0.025], [-0.343, -1.290, 0.895], [-0.343, -1.560, 0.895],
-                [-0.450, -1.620, 0.925], [-0.480, -1.740, 1.025], [-0.470, -1.950, 1.045], [-0.470, -1.985, 0.960], [-0.480, -2.010, 0.925]]
+    r["pts"] = [[gb[0], gb[1] + 0.022, gb[2]], [gb[0], gb[1] + 0.022, 0.960], [gb[0], -1.320, 0.950], [0.250, -1.175, 0.925], [-0.343, -1.175, 0.895],
+                [-0.343, -1.560, 0.895], [-0.450, -1.620, 0.925], [-0.480, -1.740, 1.025], [-0.470, -1.950, 1.045], [-0.470, -1.985, 0.960], [-0.480, -2.010, 0.925]]
     r["frm"] = "GND-BANK-CAB (through H3: the exception)"
-    r["fw_idx"] = [0, 1, 2, 3]
-    r["path_why"] = "from the cab ground bank beside the PDM30, swept out behind the firewall to H3, then paired with PDM_BPOS on the passenger inner-fender edge into the ground star's rear face"
+    r["fw_idx"] = [0, 1, 2, 5]
+    r["path_why"] = "from the cab ground bank beside the PDM30, back under the dash behind the centre dish, forward to H3, then paired with PDM_BPOS on the passenger inner-fender edge into the ground star's rear face"
     # cables the sample left out
     dcp = P["DCDC"]["ports"]
     tin, tout, tgnd = dcp["DCDC.in_pos"]["at"], dcp["DCDC.out_pos"]["at"], dcp["DCDC.gnd"]["at"]
@@ -464,10 +536,14 @@ def port_of(ep):
 EPIDS = sorted(ENDS.keys(), key=len, reverse=True)
 
 
+EP_UP = {e.upper(): e for e in ENDS}
+
+
 def ep_in(text):
-    t = (text or "").upper()
-    for e in EPIDS:
-        if e.upper() in t:
+    """The first whole token in text that is an endpoint id (so KICKP is not CKP, and DROP-X is not X)."""
+    for tok in re.findall(r"[A-Za-z0-9_-]+", text or ""):
+        e = EP_UP.get(tok.upper())
+        if e:
             return e
     return None
 
@@ -570,7 +646,10 @@ def route_all(reg, placed, dc_routes, engine_routes, E0):
             special[k] = (v["at"], "cab")
     special["PDM15-A"] = (list(G.N["PDM15"]), "bay")
     special["FUSE-BATT"] = (FUSE_BATT, "bay")
-    special["RAIL-COIL_PWR"] = ([0.000, -1.510, 1.118], None)
+    special["RAIL-COIL_PWR"] = ((list(RING["Y"]) if RING else [0.000, -1.510, 1.118]), None)
+    if RING:
+        special["COIL-GROUND-RINGS"] = (list(RING["rings"]["driver"]), None)
+        special["COIL-GROUND-RINGS-P"] = (list(RING["rings"]["passenger"]), None)
     special["RAIL-INJ_PWR"] = (list(G.N["H0"]), None)
     special["FIREWALL-ENGINE"] = (list(E0), None)
     special["FIREWALL-CABIN"] = (list(G.N["C61"]), None)
@@ -583,7 +662,7 @@ def route_all(reg, placed, dc_routes, engine_routes, E0):
             continue
         attach_device(g, dev, pos, zone or "bay", ports)
     for dev, xyz in placed.items():
-        if dev in ports or dev in ("FIREWALL-GROMMET", "FIREWALL-ENGINE", "FIREWALL-CABIN", "M130-A", "PDM30-A", "PDM15-A"):
+        if dev in ports or dev in ("FIREWALL-GROMMET", "FIREWALL-ENGINE", "FIREWALL-CABIN", "M130-A", "PDM30-A", "PDM15-A", "COIL-GROUND-RINGS"):
             continue
         zone = G.zone_of_end(dev, xyz, ENDS[dev].get("zone"))
         if ENDS[dev].get("zone") == "engine" and zone == "bay":
@@ -628,6 +707,16 @@ def route_all(reg, placed, dc_routes, engine_routes, E0):
         ch = []
         for e in chain:
             p = port_of(e)
+            if p == "COIL-GROUND-RINGS" and RING:
+                coils = [c for c in chain if c in RING["coils"]]
+                if coils:
+                    p = "COIL-GROUND-RINGS" if RING["coils"][coils[0]]["bank"] == "driver" else "COIL-GROUND-RINGS-P"
+                else:
+                    others = [np.array(ports[port_of(c)]) for c in chain if c != e and port_of(c) in ports]
+                    if others:
+                        dD = min(np.linalg.norm(o - np.array(RING["rings"]["driver"])) for o in others)
+                        dP = min(np.linalg.norm(o - np.array(RING["rings"]["passenger"])) for o in others)
+                        p = "COIL-GROUND-RINGS" if dD <= dP else "COIL-GROUND-RINGS-P"
             if p not in ch:
                 ch.append(p)
         if len(ch) < 2:
@@ -667,8 +756,11 @@ def node_name(g, k):
     return f"break-out ({p[0]:.3f}, {p[1]:.3f}, {p[2]:.3f})"
 
 
-def graph_routes(g, edge_members, open_edges, engine_routes):
+def graph_routes(g, edge_members, open_edges, engine_routes, ports=None):
     src = {r["id"]: r for r in engine_routes}
+    dev_at = {}
+    for d, p in (ports or {}).items():
+        dev_at.setdefault(g.key(p), d)
     out = []
     for eid, e in g.edges.items():
         mem = sorted(set(edge_members.get(eid, [])))
@@ -678,13 +770,13 @@ def graph_routes(g, edge_members, open_edges, engine_routes):
         kind = {"device": "drop", "crossing": "crossing"}.get(e["kind"], "branch")
         dev = e.get("device")
         rec = {"id": eid, "edge_of": base, "loom": e["loom"], "kind": kind, "members": mem,
-               "frm": ("break-out on " + base) if kind == "drop" else node_name(g, e["a"]),
-               "to": dev if dev else node_name(g, e["b"]), "pts": e["pts"], "fixed_to": e["fixed_to"]}
+               "frm": "break-out" if kind == "drop" else (dev_at.get(e["a"]) or node_name(g, e["a"])),
+               "to": dev if dev else (dev_at.get(e["b"]) or node_name(g, e["b"])), "pts": e["pts"], "fixed_to": e["fixed_to"]}
         s0 = src.get(e.get("src_route") or base)
         if s0:
             if s0["kind"] == "trunk":
                 rec["kind"] = "trunk"
-            for k in ("conflict", "position_open", "ends_at_fan", "why"):
+            for k in ("conflict", "position_open", "ends_at_fan", "why", "fw_dish"):
                 if s0.get(k):
                     rec[k] = s0[k]
         if kind == "crossing":
@@ -755,6 +847,34 @@ def clean(o):
     return o
 
 
+def ring_routes():
+    """Replace the sample's 4 x 2 coil comb with the delstributor lane's split star: one Y on the driver side of the
+    post below the plug ring, a 4-coil star per half, each leg rising into its plug from below, and each half's grounds
+    to its own head. A PROPOSAL (Dave has the final call)."""
+    drop_ids = {"ENG-COILS", "ENG-COMB-P", "ENG-COMB-D"} | {f"ENG-COIL-{i}" for i in range(1, 9)}
+    H.ROUTES[:] = [r for r in H.ROUTES if r["id"] not in drop_ids]
+    Y = list(RING["Y"]); zc = RING["z"]
+    SD, SP = [0.068, -1.374, 0.980], [-0.088, -1.374, 0.980]
+    why = "delstributor lane split star (PR #434, harness.topology): " + RING["why"]
+    L = "engine"
+    H.route(id="ENG-COILS", loom=L, kind="branch", members=[], frm="engine trunk behind the driver head", to="coil-ring Y (driver side of the post)",
+            pts=[[0.400, -1.535, 1.020], [0.220, -1.500, 0.995], [0.100, -1.440, 0.985], Y], fixed_to="back of the driver head", why=why, fw_dish=True)
+    H.route(id="ENG-STAR-D", loom=L, kind="branch", members=[], frm="coil-ring Y", to="driver half star (COIL-1/3/5/7)",
+            pts=[Y, [0.060, -1.385, 0.982], SD], fixed_to="DEL-Stributor bracket", why=why, fw_dish=True)
+    H.route(id="ENG-STAR-P", loom=L, kind="branch", members=[], frm="coil-ring Y", to="passenger half star (COIL-2/4/6/8)",
+            pts=[Y, [0.010, -1.420, 0.975], [-0.050, -1.418, 0.975], SP], fixed_to="DEL-Stributor bracket (in front of the post)", why=why, fw_dish=True)
+    H.route(id="ENG-GND-D", loom=L, kind="branch", members=[], frm="driver half star", to="COIL-GROUND-RINGS (back of the driver head)",
+            pts=[SD, [0.110, -1.430, 0.988], list(RING["rings"]["driver"])], fixed_to="back of the driver head", why=why, fw_dish=True)
+    H.route(id="ENG-GND-P", loom=L, kind="branch", members=[], frm="passenger half star", to="COIL-GROUND-RINGS-P (back of the passenger head)",
+            pts=[SP, [-0.125, -1.420, 0.988], list(RING["rings"]["passenger"])], fixed_to="back of the passenger head", why=why, fw_dish=True)
+    for cid, c in RING["coils"].items():
+        x, y = c["xy"]
+        star = SD if c["bank"] == "driver" else SP
+        H.route(id=f"ENG-{cid}", loom=L, kind="drop", members=[], frm=("driver" if c["bank"] == "driver" else "passenger") + " half star", to=cid,
+                pts=[star, [round((star[0] + x) / 2, 4), round((star[1] + y) / 2, 4), 0.982], [x, y, 0.990], [x, y, zc["plug_tip"]]],
+                fixed_to="coil plug (mates from below)", why=why, fw_dish=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mesh-dir", default=None)
@@ -768,12 +888,14 @@ def main():
             r["pts"] = [[0.030, -1.985, 1.120], [0.006, -2.075, 1.100], [0.000, -2.078, 1.010], [0.000, -2.052, 0.983]]
             r["to"] = "FUELP (AEM 30-2131-100 in the regulator's gauge port)"; r["position_open"] = False
             r["fixed_to"] = "regulator gauge port (fuel-system lane)"
+    if RING:
+        ring_routes()
     engine_routes = [r for r in H.ROUTES if r["loom"] == "engine"]
     E0 = list(engine_routes[0]["pts"][0])
     obst = H.Obstacles(a.mesh_dir)
     dc_routes = dc_full()
     g, members, open_edges, info = route_all(reg, placed, dc_routes, engine_routes, E0)
-    groutes = graph_routes(g, members, open_edges, engine_routes)
+    groutes = graph_routes(g, members, open_edges, engine_routes, info["ports"])
     H.ROUTES[:] = dc_routes + groutes
     out = H.evaluate(obst, W)
     for r in out:
@@ -790,7 +912,9 @@ def main():
     for p in H.PARTS:
         p["wires_landing"] = sorted(landed.get(p.get("endpoint") or p["id"], set()))
     notes = {"unrouted": info["unrouted"], "rehomed": info["rehomed"], "open_no_crossing": info["open"], "through_h3": info["h3"]}
-    json.dump(clean({"frame": "twin metres: +x driver, -y front, +z up", "scope": "all", "parts": H.PARTS, "routes": out, "notes": notes, "sources": S}),
+    hide = (["E3_DelStributer_Plate"] + [f"E3_Coil_{i}" for i in range(1, 9)] + [f"E3_Coil_{i}_Tower" for i in range(1, 9)]) if RING else []
+    json.dump(clean({"frame": "twin metres: +x driver, -y front, +z up", "scope": "all", "parts": H.PARTS, "routes": out, "notes": notes, "sources": S,
+                     "hide_twin": hide, "coil_ring_source": DS_SRC}),
               open(CAD / "scene_v4.json", "w"), indent=1)
     lay = H.export_layout(out, reg)
     lay["scope"] = "whole truck: engine, front (bay box), DC primary, cab/dash, doors, rear, underbody/trans"

@@ -676,9 +676,14 @@ def evaluate(obst, W):
                            "why": "aft of the firewall (body or frame); no firewall crossing"})
         else:
             behind = [p for p in pts if abs(p[0]) < 0.76 and 0.90 <= p[2] <= 1.25 and y_fw(p[0]) - rad + 0.002 < p[1] < y_fw(p[0]) + 0.10]
-            checks.append({"rule": "firewall crossings only at the 61-pin or the H3 exception", "source": S["fw"], "result": "fail" if behind else "pass",
-                           "why": (f"{len(behind)} path points inside the twin's firewall panel (worst {max(p[1] - y_fw(p[0]) + rad for p in behind) * 1000:+.0f} mm)" if behind
-                                   else "stays on the engine side; its wires cross only in the 61-pin")})
+            if behind and r.get("fw_dish"):
+                checks.append({"rule": "firewall crossings only at the 61-pin or the H3 exception", "source": S["fw"] + "; delstributor lane FIT-FIREWALL (PR #434)",
+                               "result": "flag",
+                               "why": f"{len(behind)} points behind the twin's firewall face at the centre, where the real firewall has a deep dish (IMG_6531) and the DEL-Stributor ring sits (Delmo: 'designed for applications with a deep firewall'): a twin inaccuracy to tape (block rear face to the dish), not a crossing"})
+            else:
+                checks.append({"rule": "firewall crossings only at the 61-pin or the H3 exception", "source": S["fw"], "result": "fail" if behind else "pass",
+                               "why": (f"{len(behind)} path points inside the twin's firewall panel (worst {max(p[1] - y_fw(p[0]) + rad for p in behind) * 1000:+.0f} mm)" if behind
+                                       else "stays on the engine side; its wires cross only in the 61-pin")})
         if r.get("conflict"):
             checks.append({"rule": "clear of neighbouring parts", "source": "twin K5H_iBooster (v2 box, size not read); objectTraits FB (position not measured)",
                            "result": "flag", "why": f"the path runs through the twin {r['conflict']} box. Both positions are unmeasured, so this is a flagged conflict, not a detour (tapes T-02, T-03)"})
@@ -766,11 +771,14 @@ def export_layout(routes, reg):
     epids = sorted(reg["endpoints"].keys(), key=len, reverse=True)
     nodes, seg_out, clips = {}, [], []
 
+    up = {e.upper(): e for e in epids}
+
     def ep_in(text):
-        t = (text or "").upper()
-        for e in epids:
-            if e.upper() in t:
-                return e
+        """The first whole token that is an endpoint id (so KICKP is not CKP)."""
+        import re
+        for tok in re.findall(r"[A-Za-z0-9_-]+", text or ""):
+            if tok.upper() in up:
+                return up[tok.upper()]
         return None
 
     def node(pos, label, kind, wires):

@@ -28,7 +28,82 @@ parts:
     (Milnec TX37 shell 25), M6 holes 13 mm from the edge, gasket 1.5 mm'
   - 'objectTraits.ts Exterior_Body_Blazer factory_holes FB [+0.50, -1.00, 0.90], 4.0 in: x and z kept; y moved onto the v3 firewall face (the trait''s y -1.00 is
     the dash face in v3)'
-  wires_landing: []
+  wires_landing:
+  - '10'
+  - '101'
+  - 101g
+  - 101r
+  - 101s
+  - '102'
+  - 102g
+  - 102r
+  - '103'
+  - 103g
+  - 103s
+  - '104'
+  - 104g
+  - 104s
+  - '108'
+  - 108g
+  - 108r
+  - '109'
+  - 109g
+  - '11'
+  - '110'
+  - 110g
+  - '112'
+  - 112g
+  - 112r
+  - '113'
+  - 113g
+  - '114'
+  - '115'
+  - '12'
+  - '13'
+  - '14'
+  - '15'
+  - '16'
+  - '17'
+  - '18'
+  - '19'
+  - '20'
+  - '24'
+  - 4a
+  - 4b
+  - 4c
+  - 4e
+  - 4f
+  - '5'
+  - '7'
+  - '8'
+  - 85a
+  - 85b
+  - 86a
+  - 86b
+  - '9'
+  - '99'
+  - 99g
+  - 99r
+  - 99s
+  - BLOWER_BAT
+  - BLOWER_M2
+  - BLOWER_MED
+  - CAN_FW_H
+  - CAN_FW_L
+  - DAK_CTS_RET
+  - DAK_OILP_5V
+  - DAK_OILP_GND
+  - ECU_GND1
+  - ECU_GND2
+  - FAN_PWM
+  - IBST_CAN_H
+  - IBST_CAN_L
+  - ISO_CLOSE
+  - ISO_LED
+  - ISO_OPEN
+  - ISO_SW_PWR
+  - WIPER_T1
+  - WIPER_T3
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -51,7 +126,82 @@ parts:
   sources:
   - 'registry endpoint FIREWALL-ENGINE: D38999/26WJ61PN plug, engine loom side (pins)'
   - K5_WIRING_STATE.md s1 row 43 (D38999/24WJ61SN + /26WJ61PN, insert 25-61)
-  wires_landing: []
+  wires_landing:
+  - '10'
+  - '101'
+  - 101g
+  - 101r
+  - 101s
+  - '102'
+  - 102g
+  - 102r
+  - '103'
+  - 103g
+  - 103s
+  - '104'
+  - 104g
+  - 104s
+  - '108'
+  - 108g
+  - 108r
+  - '109'
+  - 109g
+  - '11'
+  - '110'
+  - 110g
+  - '112'
+  - 112g
+  - 112r
+  - '113'
+  - 113g
+  - '114'
+  - '115'
+  - '12'
+  - '13'
+  - '14'
+  - '15'
+  - '16'
+  - '17'
+  - '18'
+  - '19'
+  - '20'
+  - '24'
+  - 4a
+  - 4b
+  - 4c
+  - 4e
+  - 4f
+  - '5'
+  - '7'
+  - '8'
+  - 85a
+  - 85b
+  - 86a
+  - 86b
+  - '9'
+  - '99'
+  - 99g
+  - 99r
+  - 99s
+  - BLOWER_BAT
+  - BLOWER_M2
+  - BLOWER_MED
+  - CAN_FW_H
+  - CAN_FW_L
+  - DAK_CTS_RET
+  - DAK_OILP_5V
+  - DAK_OILP_GND
+  - ECU_GND1
+  - ECU_GND2
+  - FAN_PWM
+  - IBST_CAN_H
+  - IBST_CAN_L
+  - ISO_CLOSE
+  - ISO_LED
+  - ISO_OPEN
+  - ISO_SW_PWR
+  - WIPER_T1
+  - WIPER_T3
   checks: []
 - id: FIREWALL-CABIN
   endpoint: FIREWALL-CABIN
@@ -64,7 +214,78 @@ parts:
   zone: firewall
   sources:
   - registry endpoint FIREWALL-CABIN
-  wires_landing: []
+  wires_landing:
+  - '10'
+  - '101'
+  - 101g
+  - 101r
+  - 101s
+  - '102'
+  - 102g
+  - 102r
+  - '103'
+  - 103g
+  - 103s
+  - '104'
+  - 104g
+  - 104s
+  - '108'
+  - 108g
+  - 108r
+  - '109'
+  - 109g
+  - '11'
+  - '110'
+  - 110g
+  - '112'
+  - 112g
+  - 112r
+  - '113'
+  - 113g
+  - '114'
+  - '115'
+  - '12'
+  - '13'
+  - '14'
+  - '15'
+  - '16'
+  - '17'
+  - '18'
+  - '19'
+  - '20'
+  - '24'
+  - 4a
+  - 4b
+  - 4c
+  - 4e
+  - 4f
+  - '5'
+  - '7'
+  - '8'
+  - 85a
+  - 85b
+  - 86a
+  - 86b
+  - '9'
+  - '99'
+  - 99g
+  - 99r
+  - 99s
+  - BLOWER_BAT
+  - BLOWER_M2
+  - BLOWER_MED
+  - CAN_FW_H
+  - CAN_FW_L
+  - DAK_CTS_RET
+  - DAK_OILP_5V
+  - DAK_OILP_GND
+  - FAN_PWM
+  - ISO_CLOSE
+  - ISO_LED
+  - ISO_OPEN
+  - ISO_SW_PWR
+  - WIPER_T1
+  - WIPER_T3
   checks: []
 - id: ODYSSEY
   endpoint: ODYSSEY
@@ -318,7 +539,39 @@ parts:
   - 'mounts.yaml PDM15 (flag: unsealed case in the bay); state row 0ah (sealed bay PDM32 candidate for the front loads)'
   - 'main lane 2026-09-29: sealed bay PDM on the passenger inner fender, PROPOSED'
   wires_landing:
+  - '105'
+  - '111'
+  - '21'
+  - '23'
+  - '48'
+  - '49'
+  - '50'
+  - '64'
+  - '66'
+  - '73'
+  - '80'
+  - '82'
+  - '83'
+  - '84'
+  - '87'
+  - '88'
+  - AC_HP_0V
+  - AC_LP_0V
+  - ALT_L
+  - BFL_0V
+  - BFL_SIG
+  - BLOWER_HI
+  - CAN_FW_H
+  - CAN_FW_L
+  - CAN_LTCD_H
+  - CAN_LTCD_L
+  - COIL_PWR
+  - IBOOST_WAKE
+  - INJ_PWR
   - PDM15_BPOS
+  - PDM15_GND1
+  - PDM15_GND2
+  - START_TRIG
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -483,7 +736,7 @@ parts:
   - rule: clear of neighbouring parts
     source: part envelopes in this scene
     result: flag
-    why: envelope overlaps FW61-PLATE, BRAKE-FLUID-LVL
+    why: envelope overlaps FW61-PLATE, BRAKE-FLUID-LVL, GND-BANK-CAB
   - rule: '>= 1 in from the exhaust (heat)'
     source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
       spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
@@ -558,21 +811,9 @@ parts:
   sources:
   - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
   wires_landing:
-  - 27a
-  - 27b
-  - '35'
-  - '43'
   - '99'
   - 99g
   - 99r
-  - LOCK_BUS_A
-  - LOCK_BUS_B
-  - LOCK_FEED_R
-  - LOCK_GND_R
-  - STEP_DOOR_R
-  - WIN_GND_R
-  - WIN_R_DN
-  - WIN_R_UP
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -653,7 +894,9 @@ parts:
   zone: engine
   sources:
   - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
-  wires_landing: []
+  wires_landing:
+  - '103'
+  - 103g
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -941,7 +1184,10 @@ parts:
   zone: engine
   sources:
   - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
-  wires_landing: []
+  wires_landing:
+  - '108'
+  - 108g
+  - 108r
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -1179,186 +1425,352 @@ parts:
   endpoint: COIL-1
   what: Ignition coil 1 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - -0.097
-  - -1.556
-  - 1.023
+  - 0.0121
+  - -1.469
+  - 1.0762
+  aabb:
+  - - -0.0098
+    - -1.4912
+    - 1.0157
+  - - 0.034
+    - -1.4468
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 13.7 deg, driver half): delstributor lane (PR #434): the coils stand in a ring round the Delmo post
+    behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y), h_F
+    +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-1]'
   wires_landing:
   - '24'
   - COIL1_GND
   - COIL1_PWR
   - COIL1_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 292 mm from the twin's headers/collectors/tails
 - id: COIL-2
   endpoint: COIL-2
   what: Ignition coil 2 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - -0.032
-  - -1.556
-  - 1.023
+  - -0.0344
+  - -1.469
+  - 1.0762
+  aabb:
+  - - -0.0563
+    - -1.4912
+    - 1.0157
+  - - -0.0125
+    - -1.4468
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 346.3 deg, passenger half): delstributor lane (PR #434): the coils stand in a ring round the Delmo
+    post behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y),
+    h_F +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-2]'
   wires_landing:
   - '9'
   - COIL2_GND
   - COIL2_PWR
   - COIL2_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 274 mm from the twin's headers/collectors/tails
 - id: COIL-3
   endpoint: COIL-3
   what: Ignition coil 3 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - 0.032
-  - -1.556
-  - 1.023
+  - 0.0842
+  - -1.397
+  - 1.0762
+  aabb:
+  - - 0.062
+    - -1.4189
+    - 1.0157
+  - - 0.1064
+    - -1.3751
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 76.3 deg, driver half): delstributor lane (PR #434): the coils stand in a ring round the Delmo post
+    behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y), h_F
+    +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-3]'
   wires_landing:
   - '5'
   - COIL3_GND
   - COIL3_PWR
   - COIL3_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (3 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 262 mm from the twin's headers/collectors/tails
 - id: COIL-4
   endpoint: COIL-4
   what: Ignition coil 4 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - 0.097
-  - -1.556
-  - 1.023
+  - -0.1064
+  - -1.397
+  - 1.0762
+  aabb:
+  - - -0.1286
+    - -1.4189
+    - 1.0157
+  - - -0.0842
+    - -1.3751
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 283.7 deg, passenger half): delstributor lane (PR #434): the coils stand in a ring round the Delmo
+    post behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y),
+    h_F +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-4]'
   wires_landing:
   - '10'
   - COIL4_GND
   - COIL4_PWR
   - COIL4_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (12 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 238 mm from the twin's headers/collectors/tails
 - id: COIL-5
   endpoint: COIL-5
   what: Ignition coil 5 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - -0.097
-  - -1.464
-  - 1.023
+  - 0.0842
+  - -1.3504
+  - 1.0762
+  aabb:
+  - - 0.062
+    - -1.3723
+    - 1.0157
+  - - 0.1064
+    - -1.3285
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 103.7 deg, driver half): delstributor lane (PR #434): the coils stand in a ring round the Delmo post
+    behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y), h_F
+    +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-5]'
   wires_landing:
   - '7'
   - COIL5_GND
   - COIL5_PWR
   - COIL5_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Interior_Main (19 pts), Dash_Main (15 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 285 mm from the twin's headers/collectors/tails
 - id: COIL-6
   endpoint: COIL-6
   what: Ignition coil 6 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - -0.032
-  - -1.464
-  - 1.023
+  - -0.1064
+  - -1.3504
+  - 1.0762
+  aabb:
+  - - -0.1286
+    - -1.3723
+    - 1.0157
+  - - -0.0842
+    - -1.3285
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 256.3 deg, passenger half): delstributor lane (PR #434): the coils stand in a ring round the Delmo
+    post behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y),
+    h_F +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-6]'
   wires_landing:
   - '11'
   - COIL6_GND
   - COIL6_PWR
   - COIL6_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Interior_Main (21 pts), Dash_Main (21 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 259 mm from the twin's headers/collectors/tails
 - id: COIL-7
   endpoint: COIL-7
   what: Ignition coil 7 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - 0.032
-  - -1.464
-  - 1.023
+  - 0.0121
+  - -1.2784
+  - 1.0762
+  aabb:
+  - - -0.0098
+    - -1.3006
+    - 1.0157
+  - - 0.034
+    - -1.2562
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 166.3 deg, driver half): delstributor lane (PR #434): the coils stand in a ring round the Delmo post
+    behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y), h_F
+    +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-7]'
   wires_landing:
   - '8'
   - COIL7_GND
   - COIL7_PWR
   - COIL7_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Dash_Main (15 pts) - re-check at the mock-up (or the twin is off there: tapes)'
 - id: COIL-8
   endpoint: COIL-8
   what: Ignition coil 8 (ACDelco D510C)
   status: decided
-  model: twin v3 object (twin lane, built from published dimensions)
-  kind: twin
+  model: 'stand-in (true size: delstributor lane, GM 12611424 as Delmo photographs it)'
+  kind: obox
+  size_mm:
+  - 36
+  - 37
+  - 64.8
   centre:
-  - 0.097
-  - -1.464
-  - 1.023
+  - -0.0344
+  - -1.2784
+  - 1.0762
+  aabb:
+  - - -0.0563
+    - -1.3006
+    - 1.0157
+  - - -0.0125
+    - -1.2562
+    - 1.1405
   colour: '#353535'
   colour_basis: GM catalogue photo of D510C
-  position_basis: twin v3 engine anchor
+  position_basis: 'plug tip on the DEL-Stributor ring (azimuth 193.7 deg, passenger half): delstributor lane (PR #434): the coils stand in a ring round the Delmo
+    post behind the block, towers up, plugs down and mated from below; +-6 mm relative to the post; t_bell and the post depth are unknown (add t_bell to every y),
+    h_F +-35 mm. Supersedes the twin''s 4 x 2 grid (E3_DelStributer_Plate)'
   mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
   zone: engine
   sources:
-  - docs/wiring/twin/build_engine_v3.py
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): coil_shape (IMG_3918, IMG_1101), circle, coils[COIL-8]'
   wires_landing:
   - '12'
   - COIL8_GND
   - COIL8_PWR
   - COIL8_SGND
-  checks: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Dash_Main (15 pts) - re-check at the mock-up (or the twin is off there: tapes)'
 - id: COIL-GROUND-RINGS
   endpoint: COIL-GROUND-RINGS
   what: Ring terminals for the coil grounds
@@ -1390,20 +1802,12 @@ parts:
   wires_landing:
   - COIL1_GND
   - COIL1_SGND
-  - COIL2_GND
-  - COIL2_SGND
   - COIL3_GND
   - COIL3_SGND
-  - COIL4_GND
-  - COIL4_SGND
   - COIL5_GND
   - COIL5_SGND
-  - COIL6_GND
-  - COIL6_SGND
   - COIL7_GND
   - COIL7_SGND
-  - COIL8_GND
-  - COIL8_SGND
   - ECU_GND1
   - ECU_GND2
   checks:
@@ -1764,19 +2168,19 @@ parts:
   - 178
   - 80
   centre:
-  - 0.73
+  - 0.789
   - -2.52
   - 1.05
   aabb:
-  - - 0.641
+  - - 0.7
     - -2.56
     - 0.961
-  - - 0.819
+  - - 0.878
     - -2.48
     - 1.139
   colour: '#403d3c'
   colour_basis: Truck-Lite photo
-  position_basis: 1978 Blazer body model
+  position_basis: 'pieces lane ruling 2026-09-30: the body model''s headlamp bucket (mesh Headlights), x +-0.789 +-15 mm'
   mounts_where: Front, left headlamp bucket; the plug is at the back of the lamp, engine side
   zone: engine
   sources:
@@ -1801,19 +2205,19 @@ parts:
   - 178
   - 80
   centre:
-  - -0.73
+  - -0.789
   - -2.52
   - 1.05
   aabb:
-  - - -0.819
+  - - -0.878
     - -2.56
     - 0.961
-  - - -0.641
+  - - -0.7
     - -2.48
     - 1.139
   colour: '#403d3c'
   colour_basis: Truck-Lite photo
-  position_basis: 1978 Blazer body model
+  position_basis: 'pieces lane ruling 2026-09-30: the body model''s headlamp bucket (mesh Headlights), x +-0.789 +-15 mm'
   mounts_where: Front, right headlamp bucket; the plug is at the back of the lamp, engine side
   zone: engine
   sources:
@@ -2426,13 +2830,13 @@ parts:
     w: 133.1
     h: 38.7
   centre:
-  - 0.085
-  - -1.3527
-  - 0.9925
+  - 0.245
+  - -1.4406
+  - 1.0225
   origin:
-  - 0.085
-  - -1.372
-  - 1.01
+  - 0.245
+  - -1.46
+  - 1.04
   rot:
   - - -1
     - 0
@@ -2444,15 +2848,17 @@ parts:
     - 1
     - 0
   aabb:
-  - - 0.0313
-    - -1.372
-    - 0.9084
-  - - 0.1388
-    - -1.3333
-    - 1.0766
+  - - 0.1913
+    - -1.46
+    - 0.9385
+  - - 0.2988
+    - -1.4213
+    - 1.1065
   colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
-  position_basis: 'PROPOSED: its own plate on the tunnel bulge of the firewall (the cab face runs y -1.378..-1.405 across the case, so the plate bridges it), open
-    air round the case (MoTeC), ~0.5 m from the M130. Same 90-degree-boot assumption; the case top rises 43 mm behind the twin''s dash panel (T-04)'
+  position_basis: 'PROPOSED: the firewall''s cab face inboard of the 61-pin plate, plugs down, 6 mm off the face, so the M130 and the PDM30 flank the 61-pin (main
+    lane''s proposal) with ~0.3 m of air between them (MoTeC: open air). Kept outboard of the firewall''s centre dish, where the DEL-Stributor coil ring sits (delstributor
+    lane FIT-FIREWALL; the twin has no dish). The accelerator pedal bolts to the firewall below it: its stroke keep-out is not modelled. Assumes the 90-degree boots;
+    the case top rises behind the twin''s dash panel (T-04)'
   mounts_where: Cab, in open air on its own plate near the M130
   zone: cab
   sources:
@@ -2461,27 +2867,27 @@ parts:
   ports:
     PDM30-A:
       at:
-      - 0.1013
-      - -1.3509
-      - 0.9113
+      - 0.2612
+      - -1.4388
+      - 0.9414
       dir:
       - 0.0
       - 0.0
       - -1.0
     PDM30-B:
       at:
-      - 0.0658
-      - -1.3509
-      - 0.9113
+      - 0.2258
+      - -1.4388
+      - 0.9414
       dir:
       - 0.0
       - 0.0
       - -1.0
     PDM30-STUD:
       at:
-      - 0.085
-      - -1.3386
-      - 1.0206
+      - 0.245
+      - -1.4266
+      - 1.0506
       dir:
       - 0.0
       - 0.0
@@ -2546,13 +2952,12 @@ parts:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
     result: flag
-    why: 'its envelope holds twin surface: Interior_Main (108 pts), Dash_Main (30 pts), Under_Main_Blazer (4 pts) - re-check at the mock-up (or the twin is off there:
-      tapes)'
+    why: 'its envelope holds twin surface: Interior_Main (52 pts), Dash_Main (41 pts) - re-check at the mock-up (or the twin is off there: tapes)'
   - rule: '>= 1 in from the exhaust (heat)'
     source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
       spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
-    result: pass
-    why: 211 mm from the twin's headers/collectors/tails
+    result: flag
+    why: '91 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
 - id: GND-BANK-CAB
   endpoint: GND-BANK-CAB
   what: Cab ground bank (insulated stud bus)
@@ -2564,20 +2969,19 @@ parts:
   - 40
   - 60
   centre:
-  - -0.075
-  - -1.362
-  - 0.985
+  - 0.37
+  - -1.44
+  - 1.06
   aabb:
-  - - -0.105
-    - -1.382
-    - 0.955
-  - - -0.045
-    - -1.342
-    - 1.015
+  - - 0.34
+    - -1.46
+    - 1.03
+  - - 0.4
+    - -1.42
+    - 1.09
   colour: '#9aa0a6'
   colour_basis: not read (neutral grey)
-  position_basis: 'PROPOSED: beside the PDM30 on the tunnel bulge of the firewall, passenger side of it (mounts.yaml: beside the PDM30); keeps the 2 AWG return short
-    to H3 and clear of the pedals'
+  position_basis: 'PROPOSED: beside the PDM30 on the firewall''s cab face, between it and the 61-pin plate, above the plate (mounts.yaml: beside the PDM30)'
   mounts_where: Beside the PDM30
   zone: cab
   sources:
@@ -2609,12 +3013,16 @@ parts:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
     result: flag
-    why: 'its envelope holds twin surface: Under_Main_Blazer (13 pts), Interior_Main (4 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+    why: 'its envelope holds twin surface: Interior_Main (3 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps IBOOSTER
   - rule: '>= 1 in from the exhaust (heat)'
     source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
       spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
     result: pass
-    why: 232 mm from the twin's headers/collectors/tails
+    why: 169 mm from the twin's headers/collectors/tails
 - id: PORT-ETH
   endpoint: PORT-ETH
   what: M130 laptop port (panel RJ45)
@@ -3812,7 +4220,17 @@ parts:
   zone: doors
   sources:
   - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
-  wires_landing: []
+  wires_landing:
+  - 26a
+  - 26b
+  - '34'
+  - '38'
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  - LOCK_GND_L
+  - WIN_GND_L
+  - WIN_R_DN
+  - WIN_R_UP
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -4069,7 +4487,17 @@ parts:
   zone: doors
   sources:
   - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
-  wires_landing: []
+  wires_landing:
+  - 27a
+  - 27b
+  - '35'
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  - LOCK_FEED_R
+  - LOCK_GND_R
+  - WIN_GND_R
+  - WIN_R_DN
+  - WIN_R_UP
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -4654,7 +5082,9 @@ parts:
   sources:
   - 'Truck-Lite 80251C ''2 x 13 in rectangular'', 1.08 in deep (reference_documents/web_snapshots/www.truck-lite.com__80251c-1.md); the top-design lane reads 462
     x 146 x 27.4 overall: unreconciled'
-  wires_landing: []
+  wires_landing:
+  - '74'
+  - CARGO_GND
   checks:
   - rule: clear of the body (twin)
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
@@ -5219,7 +5649,7 @@ parts:
     source: owner call 2026-09-29 (subs behind the rear wheel wells on a built structure; flag the spare-tire carrier in the right rear corner); twin Interior_Spare_Tire_Carrier,
       Wheel_Spare_Tire
     result: pass
-    why: 'driver alone: Interior_Spare_Tire_Carrier 1295 mm, Wheel_Spare_Tire 1046 mm'
+    why: driver alone (254 mm, 83 mm deep) clears Interior_Spare_Tire_Carrier by 1295 mm, Wheel_Spare_Tire by 1046 mm
   - rule: clear of neighbouring parts
     source: part envelopes in this scene
     result: flag
@@ -5262,8 +5692,10 @@ parts:
   - rule: clear of the spare tire and its carrier
     source: owner call 2026-09-29 (subs behind the rear wheel wells on a built structure; flag the spare-tire carrier in the right rear corner); twin Interior_Spare_Tire_Carrier,
       Wheel_Spare_Tire
-    result: pass
-    why: 'driver alone: Interior_Spare_Tire_Carrier 105 mm, Wheel_Spare_Tire 135 mm'
+    result: flag
+    why: 'driver alone (254 mm, 83 mm deep) clears Interior_Spare_Tire_Carrier by 105 mm, Wheel_Spare_Tire by 135 mm; its enclosure is not designed (JBL''s box volume
+      not read) and any box or built structure deeper than that inboard of the side panel reaches the carrier: the clash the owner flagged, to resolve with the spare''s
+      mount'
 - id: GND-SPLICE-REAR
   endpoint: GND-SPLICE-REAR
   what: Rear ground bus
@@ -5568,6 +6000,89 @@ parts:
     source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
     result: flag
     why: 'its envelope holds twin surface: Interior_Main (1 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+- id: DEL-STRIBUTOR-POST
+  what: Delmo Del-Stributer post (the coil ring's mount), on the 12 o'clock bell bolt
+  status: decided part (Delmo DELSTRIB01); spot probable
+  model: 'stand-in (delstributor lane: width sourced, depth working)'
+  kind: box
+  size_mm:
+  - 52.6
+  - 52.6
+  - 143.4
+  centre:
+  - -0.0111
+  - -1.3737
+  - 1.0177
+  aabb:
+  - - -0.0374
+    - -1.4
+    - 0.946
+  - - 0.0152
+    - -1.3474
+    - 1.0894
+  colour: '#b9bcbf'
+  colour_basis: billet aluminium (Delmo photos)
+  sources:
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): post (width 52.6 +-2 from NewCR1; depth unknown, working 52.6; top
+    F+127.4, bottom F-16)'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (24 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 267 mm from the twin's headers/collectors/tails
+- id: COIL-GROUND-RINGS-P
+  endpoint: COIL-GROUND-RINGS
+  what: COIL-GROUND-RINGS on the passenger head (the passenger half's a and b grounds)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - -0.15
+  - -1.448
+  - 1.0
+  aabb:
+  - - -0.18
+    - -1.478
+    - 0.98
+  - - -0.12
+    - -1.418
+    - 1.02
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  sources:
+  - 'docs/wiring/calc-data/cad/delstributor_geometry.yaml (branch wiring/delstributor, PR #434): harness.ground_rings (passenger zone x -0.20..-0.09, y -1.448, z
+    0.95..1.04)'
+  wires_landing:
+  - COIL1_GND
+  - COIL1_SGND
+  - COIL3_GND
+  - COIL3_SGND
+  - COIL5_GND
+  - COIL5_SGND
+  - COIL7_GND
+  - COIL7_SGND
+  - ECU_GND1
+  - ECU_GND2
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (12 pts), Interior_Main (5 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 164 mm from the twin's headers/collectors/tails
 - id: REAR-CONN
   what: Proposed round rear-floor connector (the rear loom's one unplug)
   status: open

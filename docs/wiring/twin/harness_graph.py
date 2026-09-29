@@ -12,7 +12,9 @@ Where the numbers come from (twin probes 2026-09-29, harness-cad; TurboSquid bod
   (a loom rides the upper web, the DC cables the lower web; brackets and hangers smoothed out)
 - firewall cab face y_fw(x) (harness_cad.FW_FACE), the toe board (Under_Main_Blazer: z 0.90 at the firewall face,
   sloping to z 0.66 at y -1.22 for |x| 0.2..0.8), the tunnel (top z 0.88 at the firewall, 0.80 at y -0.9), the dash's
-  modelled lower panel (Dash_Main, z 1.03: a closure, not real structure; tape T-04 settles the under-dash space)
+  modelled lower panel (Dash_Main, z 1.03: a closure, not real structure; tape T-04 settles the under-dash space);
+  the dash crossbar runs at y -1.20, behind the firewall's centre dish (the DEL-Stributor ring sits in it; the twin has
+  no dish: delstributor lane FIT-FIREWALL)
 - cab floor z 0.645, rear cargo floor z 0.845, kick panels |x| 0.80, door inner panel x 0.90, headliner z 1.86
 """
 import heapq, math
@@ -66,8 +68,8 @@ N = {
     # cab (firewall cab face above the toe board; under-dash crossbar; kick panels; sill)
     "C61": (0.500, -1.418, 0.900),        # the 61-pin's cab side, where the harness leaves the receptacle's rear
     "B61": (0.500, -1.392, 0.935),        # cab-side break-out over the 61-pin
-    "FWD": (0.760, -1.360, 0.915), "PDMN": (0.140, -1.345, 0.925),
-    "DASH0": (0.000, -1.300, 0.990), "COL": (0.465, -1.300, 0.990), "DASHD": (0.700, -1.300, 0.990), "DASHP": (-0.700, -1.300, 0.990),
+    "FWD": (0.760, -1.360, 0.915), "PDMN": (0.200, -1.365, 0.950),
+    "DASH0": (0.000, -1.200, 0.990), "COL": (0.465, -1.200, 0.990), "DASHD": (0.700, -1.200, 0.990), "DASHP": (-0.700, -1.200, 0.990),
     "KICKD": (0.760, -1.300, 0.860), "KICKP": (-0.760, -1.300, 0.860),
     "HDRD": (0.600, -0.880, 1.840), "HDR0": (0.000, -0.860, 1.860),
     "SILLR": (0.760, 0.020, 0.665), "RC": (0.550, 0.050, 0.645),
@@ -123,13 +125,13 @@ CHANNELS = [
     ("C-FW-D", "cab", "firewall cab face above the toe board, outboard (under the M130)", [N["B61"], (0.600, -1.400, 0.935), (0.700, -1.400, 0.935), N["FWD"]]),
     ("C-KF-D", "cab", "driver kick panel, front", [N["FWD"], (0.772, -1.325, 0.885), N["KICKD"]]),
     ("C-FW-P", "cab", "firewall cab face above the toe board and the tunnel, inboard (to the PDM30)",
-     [N["B61"], (0.400, -1.392, 0.940), (0.250, -1.392, 0.940), (0.180, -1.372, 0.935), N["PDMN"]]),
-    ("C-PDM-DASH", "cab", "up the tunnel's front to the dash centre", [N["PDMN"], (0.070, -1.318, 0.965), N["DASH0"]]),
+     [N["B61"], (0.400, -1.392, 0.940), (0.300, -1.392, 0.945), N["PDMN"]]),
+    ("C-PDM-DASH", "cab", "back under the dash, clear of the firewall's centre dish, to the dash centre", [N["PDMN"], (0.170, -1.250, 0.975), N["DASH0"]]),
     ("C-DASH-D2", "cab", "under-dash crossbar", [N["DASH0"], N["COL"]]),
     ("C-DASH-D1", "cab", "under-dash crossbar", [N["COL"], N["DASHD"]]),
     ("C-DASH-P", "cab", "under-dash crossbar", [N["DASH0"], N["DASHP"]]),
-    ("C-KICK-D", "cab", "driver kick panel", [N["DASHD"], N["KICKD"]]),
-    ("C-KICK-P", "cab", "passenger kick panel", [N["DASHP"], N["KICKP"]]),
+    ("C-KICK-D", "cab", "driver kick panel", [N["DASHD"], (0.740, -1.260, 0.930), N["KICKD"]]),
+    ("C-KICK-P", "cab", "passenger kick panel", [N["DASHP"], (-0.740, -1.260, 0.930), N["KICKP"]]),
     ("C-APIL-D", "cab", "driver A-pillar and header", [N["DASHD"], (0.790, -1.180, 1.250), (0.730, -1.000, 1.600), N["HDRD"]]),
     ("C-HEADER", "cab", "windshield header", [N["HDRD"], N["HDR0"]]),
     ("C-HEADER-P", "cab", "windshield header", [N["HDR0"], (-0.550, -0.870, 1.850)]),
@@ -137,8 +139,8 @@ CHANNELS = [
     ("C-SILL-D", "cab", "inside the driver sill, under the sill plate", [N["KICKD"], (0.760, -1.120, 0.665), (0.760, -0.400, 0.665), N["SILLR"]]),
     ("C-REARCONN", "cab", "rear floor, driver side (the round rear connector)", [N["SILLR"], (0.620, 0.050, 0.660), N["RC"]]),
     ("C-STEP", "rear", "rear floor step into the rear body", [N["SILLR"], (0.780, 0.180, 0.870), N["RD0"]]),
-    ("C-TUN-D", "cab", "driver side of the tunnel, to the floor grommet by the transfer case", [N["DASH0"], (0.150, -1.100, 0.790), N["BODYC"]]),
-    ("C-TUN-P", "cab", "passenger side of the tunnel", [N["DASHP"], (-0.300, -1.200, 0.900), N["TUNP"]]),
+    ("C-TUN-D", "cab", "driver side of the tunnel, to the floor grommet by the transfer case", [N["DASH0"], (0.150, -1.050, 0.790), N["BODYC"]]),
+    ("C-TUN-P", "cab", "passenger side of the tunnel", [N["DASHP"], (-0.300, -1.150, 0.900), N["TUNP"]]),
     # doors (from the kick panel through the hinge side into the door)
     ("D-L-HINGE", "door", "driver door hinge side (pass-through)", [N["KICKD"], (0.820, -1.150, 0.950), N["DLP"]]),
     ("D-L", "door", "driver door inner panel", [N["DLP"], (0.900, -1.000, 0.950), (0.900, -0.600, 0.950), (0.900, -0.250, 1.000)]),

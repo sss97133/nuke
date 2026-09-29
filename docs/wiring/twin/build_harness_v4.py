@@ -243,6 +243,10 @@ def import_part(p):
 
 
 # ------------------------------------------------------------------ parts
+for n in SCENE.get("hide_twin", []):      # twin objects a lane's better geometry supersedes (the coil grid -> the DEL-Stributor ring)
+    ob = bpy.data.objects.get(n)
+    if ob is not None:
+        ob.hide_render = True; ob.hide_viewport = True
 for p in SCENE["parts"]:
     k = p["kind"]
     dashed = str(p.get("model", "")).startswith("dashed")
@@ -294,6 +298,20 @@ for p in SCENE["parts"]:
         else:
             o = box(p["id"], p["centre"], [v * MM for v in p["size_mm"]], principled("v4_part_" + p["id"], hexrgb(p["colour"]), rough=0.45))
         objs.append(o); tag(o, p)
+    elif k == "obox":
+        mat = principled("v4_part_" + p["id"], hexrgb(p["colour"]), rough=0.45)
+        o = box(p["id"], p["centre"], [v * MM for v in p["size_mm"]], mat)
+        o.rotation_euler = (0.0, 0.0, math.radians(p.get("yaw_deg", 0.0)))
+        objs.append(o); tag(o, p)
+        if p.get("tower"):
+            t = p["tower"]
+            objs.append(cyl(p["id"] + "_tower", (t["at"][0], t["at"][1], t["z0"]), (t["at"][0], t["at"][1], t["z1"]), t["d_mm"] * MM, mat, verts=20))
+        if p.get("plug"):
+            q = p["plug"]
+            pl = box(p["id"] + "_plug", (q["at"][0], q["at"][1], (q["z0"] + q["z1"]) / 2), (q["size_mm"][0] * MM, q["size_mm"][1] * MM, q["z1"] - q["z0"]),
+                     principled("v4_plug_black", hexrgb("#1f1f1f"), rough=0.6))
+            pl.rotation_euler = (0.0, 0.0, math.radians(p.get("yaw_deg", 0.0)))
+            objs.append(pl)
     elif k in ("disc_x", "disc_y"):
         d, t = (v * MM for v in p["size_mm"])
         c = Vector(p["centre"]); ax = Vector((1, 0, 0)) if k == "disc_x" else Vector((0, 1, 0))
@@ -449,7 +467,7 @@ except Exception as e:
     print("GPU setup failed, CPU render:", e)
 sc.cycles.samples = int(OPT["samples"])
 sc.cycles.use_denoising = True
-sc.cycles.transparent_max_bounces = 64
+sc.cycles.transparent_max_bounces = 40
 sc.cycles.max_bounces = 8
 sc.view_settings.view_transform = "Standard"
 sc.view_settings.look = "None"
