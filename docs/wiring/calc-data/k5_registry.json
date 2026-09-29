@@ -56846,7 +56846,7 @@
      "PDM30 OUT5 (#93 CHMSL, brake) and OUT25 (#74 CARGO, courtesy) stay as they are; their wires gain a TOP-DISC break"
     ],
     "limits": [
-     "CONFLICT: PDM30 OUT21 is the only spare 8 A output (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4 named by PW; 8 A 21/22 used, spare OUT21 named by PL). PL cannot stay on it anyway (its 12 A needs a 20 A output; an 8 A output's setting caps at 10 A, PDM manual p.24), but moving PL puts it on OUT3/OUT4 against PW. Building TOP-LIGHT and PL together needs another body-side output (a second body PDM, the owner's multiple-PDM direction in state §1 row 55; proposal). Owner call",
+     "CONFLICT: PDM30 OUT21 is the only spare 8 A output (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4 named by PW; 8 A 21/22 used, spare OUT21 named by PL). PL cannot stay on it anyway (its 12 A needs a 20 A output; an 8 A output's setting caps at 10 A, PDM manual p.24), but moving PL puts it on OUT3/OUT4 against PW. Building TOP-LIGHT and PL together needs another body-side output (a second body PDM, the owner's multiple-PDM direction in state §1 row 54, 'Owner scope calls' 2026-09-24; proposal). Owner call",
      "OUT21 set 4 A: 1.25 x 2.9 A = 3.6 A; the 20 AWG pin lead allows 6.8 A and one #20 contact 6.4 A",
      "OUT25 stays at 4.73 A (registry); no new top courtesy load goes on it (options-rd PUD limits)"
     ],
@@ -56995,7 +56995,7 @@
     "top_cavities": 1,
     "limits": [
      "its own output, set 3 A (1.25 x 2.4 A); sharing OUT21 with the work lamps would need 7 A, over the 20 AWG pin lead's 6.8 A",
-     "PROPOSAL, not in the registry: the output has to come from a cab-side PDM that does not exist today. The PDM15 is the engine-bay box (registry PDM15-A/B); moving it to the cab is only an option in mounts.yaml PDM15, and the sealed bay PDM32 idea (state row 0ah) keeps it in the bay. A second body PDM (state §1 row 55, owner's multiple-PDM direction) is the other path. Owner call"
+     "PROPOSAL, not in the registry: the output has to come from a cab-side PDM that does not exist today. The PDM15 is the engine-bay box (registry PDM15-A/B); moving it to the cab is only an option in mounts.yaml PDM15, and the sealed bay PDM32 idea (state row 0ah) keeps it in the bay. A second body PDM (state §1 row 54, 'Owner scope calls' 2026-09-24, owner's multiple-PDM direction) is the other path. Owner call"
     ],
     "notes": "camp light down both sides; the top's side walls carry the sliding quarter windows (photos lane), so the lamps sit on the strip above them. Not buildable until a cab-side output exists (see limits). OPEN: the IP rating (not on the Truck-Lite page)",
     "adds": [
@@ -57243,7 +57243,7 @@
    "name": "Finish the top's inside — butyl on the flats, a closed-cell thermal layer and removable headliner panels, the top harness in the rib channels behind them",
    "status": "candidate",
    "decided": null,
-   "source": "owner 2026-09-29 (\"how do we finish the roof doing insulate it or delete it raw\"). State §1 row 42 (\"K5 insulation = COMPLETE (roof, firewall, floor)\") rests on \"I've already insulated the vehicle\" (receipt 2026-05-23). The photos lane (2026-09-29) found bare moulded fiberglass under the top (2021-06-12), bare painted steel under the half-cab roof (2024-10 to 2024-12) and Kilmat butyl only on the cargo-tub walls (2026-01-31 and 02-01), so the lock does not cover the top. Materials and prices: Dynamat Xtreme bulk pack 36 sq ft $239.95 (dynamat.com, 2026-09-29; maker claims 9-18 dB for a full install); Lizard Skin Ceramic Insulation 1 gal $89.95, 22-25 sq ft at .040-.060 in, \"can reduce heat transfer by up to 30 degrees F\" (raybuck.com, 2026-09-29); Click Bond cable-tie mount kit, 4 mounts, $97.75 (aircraftspruce.com 04-06000, 2026-09-29)",
+   "source": "owner 2026-09-29 (\"how do we finish the roof doing insulate it or delete it raw\"). State §1 row 41 (\"K5 insulation = COMPLETE (roof, firewall, floor)\") rests on \"I've already insulated the vehicle\" (receipt 2026-05-23). The photos lane (2026-09-29) found bare moulded fiberglass under the top (2021-06-12), bare painted steel under the half-cab roof (2024-10 to 2024-12) and Kilmat butyl only on the cargo-tub walls (2026-01-31 and 02-01), so the lock does not cover the top. Materials and prices: Dynamat Xtreme bulk pack 36 sq ft $239.95 (dynamat.com, 2026-09-29; maker claims 9-18 dB for a full install); Lizard Skin Ceramic Insulation 1 gal $89.95, 22-25 sq ft at .040-.060 in, \"can reduce heat transfer by up to 30 degrees F\" (raybuck.com, 2026-09-29); Click Bond cable-tie mount kit, 4 mounts, $97.75 (aircraftspruce.com 04-06000, 2026-09-29)",
    "subsystems": [],
    "wires": [],
    "demand": {
