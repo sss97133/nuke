@@ -318,4 +318,21 @@ Do not create alternative display systems. Do not create dashboards that recompu
 
 ---
 
+## Owner notes, 2026-09-29
+
+Skylar's direction for the profile, relayed word for word from the pieces lane's window. It's captured here and not
+built yet. The wiring workspace moves into the profile once this design is set.
+
+| His note | What it asks of the profile |
+|---|---|
+| The north star is the vintage service manual: "information was so concise and finite ... if you had the service man you had everything" | A finite, sectioned whole where each section is complete, with click-through for depth. Today the profile is inconsistent and confusing. The K5 build book already works this way: GM factory-manual pages generated from the registry (`docs/wiring/calc-data/manual_v5.py`). |
+| "Done" for a subject means every bit of its data | For each subject: what's installed and who installs it, its status, its financial relation or target, the history of how it got there, and the DB rows and columns that hold it. A section is complete when all five show, or say "unknown". |
+| Show the data flowing in | Make the incoming activity visible: observations, photos and records as they arrive. "People would find it interesting." |
+| Photos aren't always current or the ones you need | Pick photos per subject and date, and say when the photo a section needs is missing. |
+| The same records seen by role (his Uber analogy, client vs driver) | Client, owner and builder each see the same records their own way. Data often comes in from one side and is viewed from the other. The masking spectrum decides what each role sees. |
+| Financial, labour and means-of-production data | Show costs, labour and tools on the profile, with values that accumulate over time. |
+| Options as toggles with instant recalculation | A customer builds their harness in a live 3D view, and the counts and fits recalculate as each option toggles. The engine exists in Python today (`catalog/options.yaml` and `options_v5.py` capacity verdicts). Live means porting it to the frontend or an edge function. |
+
+---
+
 *This document is the canonical reference for all vehicle profile work. Read it before touching profile code. If your change contradicts this document, stop and reconsider.*
