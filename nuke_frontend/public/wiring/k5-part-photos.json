@@ -1,6 +1,10 @@
 {
- "note": "Maker and vendor product photos of the exact part numbers, linked from their own sites (not copied). Source list: reference_documents/product_images/sources.json (local, gitignored). Photos whose URL carries a 32-hex cache hash are left out (the secret scanner reads those as tokens).",
+ "note": "Maker and vendor product photos of the exact part numbers, linked from their own sites (not copied). Source list: reference_documents/product_images/sources.json (local, gitignored). Photos whose URL carries a 32-hex cache hash are left out (the secret scanner reads those as tokens). 'devices' maps a map node code to a photo of the box itself ('what' says which). A sibling part is never filed under the code: it would go in a separate 'family' object with a 'note'.",
  "photos": {
+  "0413-204-2005": {
+   "img": "https://www.buydeutsch.com/cdn/shop/products/0413-204-2005_855cdf91-7b13-451e-a9a5-2687bc1bde70.jpg?v=1597685247",
+   "from": "buydeutsch.com"
+  },
   "0498040.M": {
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/524/0498080.M.JPG",
    "from": "mm.digikey.com"
@@ -8,6 +12,10 @@
   "11079-VUS": {
    "img": "https://static.summitracing.com/global/images/prod/xlarge/vta-11079-vus_xl.jpg",
    "from": "static.summitracing.com"
+  },
+  "114017": {
+   "img": "https://www.buydeutsch.com/cdn/shop/products/114017_caa2fdef-6f15-4407-ab3c-735478e401c9.jpg?v=1597685759",
+   "from": "buydeutsch.com"
   },
   "12110847": {
    "img": "https://www.prowireusa.com/content/59818/12110847.webp",
@@ -37,6 +45,14 @@
    "img": "https://cdn.powered-by-nitrosell.com/product_images/2/437/elc-1034.jpg",
    "from": "cdn.powered-by-nitrosell.com"
   },
+  "202K163-25-0": {
+   "img": "https://www.prowireusa.com/content/58610/202K163-25-0.webp",
+   "from": "prowireusa.com"
+  },
+  "210LTP": {
+   "img": "https://www.prowireusa.com/content/117800/210LTP.webp",
+   "from": "prowireusa.com"
+  },
   "238LTP": {
    "img": "https://www.prowireusa.com/content/117820/238LTP.webp",
    "from": "prowireusa.com"
@@ -57,12 +73,28 @@
    "img": "https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp?v=1769554854&width=900",
    "from": "oraclelights.com"
   },
+  "68054": {
+   "img": "https://assets.motec.com.au/strapi/68054_6b5edbd77e.webp",
+   "from": "motec.com.au"
+  },
+  "68055": {
+   "img": "https://assets.motec.com.au/strapi/68055_72a69e1961.webp",
+   "from": "motec.com.au"
+  },
   "68102": {
    "img": "https://www.prowireusa.com/content/60582/68102.webp",
    "from": "prowireusa.com"
   },
   "68201": {
    "img": "https://www.prowireusa.com/content/57642/68201.webp",
+   "from": "prowireusa.com"
+  },
+  "7116-3250": {
+   "img": "https://www.prowireusa.com/content/61841/7116-3250.webp",
+   "from": "prowireusa.com"
+  },
+  "7158-3035": {
+   "img": "https://www.prowireusa.com/content/61843/7158-3035.webp",
    "from": "prowireusa.com"
   },
   "80251C": {
@@ -72,6 +104,14 @@
   "8CYLK-90": {
    "img": "https://www.prowireusa.com/content/57704/8CYLK-90.webp",
    "from": "prowireusa.com"
+  },
+  "ADHESIVES-KIT": {
+   "img": "https://www.prowireusa.com/content/57327/ADHESIVES_KIT.webp",
+   "from": "prowireusa.com"
+  },
+  "AEM-30-2131-100": {
+   "img": "https://static.summitracing.com/global/images/prod/xlarge/avm-30-2131-100_xl.jpg",
+   "from": "static.summitracing.com"
   },
   "AFM8": {
    "img": "https://www.prowireusa.com/content/61185/M225202-01.webp",
@@ -101,6 +141,14 @@
    "img": "https://www.prowireusa.com/content/57659/COIL-CONNLS217.webp",
    "from": "prowireusa.com"
   },
+  "CPA-100-3-4-BK": {
+   "img": "https://www.prowireusa.com/content/62105/CPA-100-3-4-BK.webp",
+   "from": "prowireusa.com"
+  },
+  "CPA-100-3-8-RED": {
+   "img": "https://www.prowireusa.com/content/102695/CPA-100-3-8-RD.webp",
+   "from": "prowireusa.com"
+  },
   "D-609-03": {
    "img": "https://www.prowireusa.com/content/59742/D-609-03.webp",
    "from": "prowireusa.com"
@@ -114,16 +162,28 @@
    "from": "prowireusa.com"
   },
   "D38999-24WJ61SN": {
-   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg (DigiKey product photo)",
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg",
    "from": "mm.digikey.com"
   },
   "D38999-26WJ61PN": {
-   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg (DigiKey product photo)",
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg",
    "from": "mm.digikey.com"
   },
   "D38999-SERIES": {
    "img": "https://dmctools.com/media/m39029/connectors/10/images/MIL-DTL-38999-SERIES-1-01.jpg",
    "from": "dmctools.com"
+  },
+  "DT04-08PA": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-08PA_Front.jpg?v=1738268451&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT04-12PA-L012": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-12PA-L012_Front.jpg?v=1739397832&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT04-12PB-L012": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-12PB-L012_back__73942.1639701151.1200.1200.jpg?v=1686740560&width=760",
+   "from": "customconnectorkits.com"
   },
   "DT04-2P": {
    "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-2P_Front.jpg?v=1738267776&width=760",
@@ -131,6 +191,22 @@
   },
   "DT04-3P": {
    "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-3P_1_1200__29945.1647371744.1200.1200.jpg?v=1686738319&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT04-6P-L012": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-6P-L012_back__97291.1669401186.1200.1200.jpg?v=1686744338&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT06-08SA": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-08SA_Back.jpg?v=1738268519&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT06-12SA": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-12SA_Front.jpg?v=1738268725&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT06-12SB": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-125B_Front.jpg?v=1743116187&width=760",
    "from": "customconnectorkits.com"
   },
   "DT06-2S": {
@@ -141,13 +217,49 @@
    "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-3S_Front.jpg?v=1738267875&width=760",
    "from": "customconnectorkits.com"
   },
+  "DT06-6S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT06-6S_Front.jpg?v=1738268335&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DT12-L012-GKT": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DT12-L012-GKT__26192.1674678810.1200.1200.jpg?v=1686744420&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DTP04-2P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP04-2P_Front.jpg?v=1738273032&width=760",
+   "from": "customconnectorkits.com"
+  },
   "DTP04-4P": {
    "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP04-4P_Front.jpg?v=1738272991&width=760",
    "from": "customconnectorkits.com"
   },
+  "DTP04-4P-L012": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP04-4P-L012_Front.jpg?v=1739397879&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DTP06-2S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP06-2S_Front.jpg?v=1738273115&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DTP06-4S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP06-4S_Front.jpg?v=1738273213&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "DTP4P-L012-GKT": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/DTP4P-L012-GKT-__45965.1674678783.1200.1200.jpg?v=1686744417&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "GT150-AIR-TEMP-KIT": {
+   "img": "https://www.prowireusa.com/content/57561/GT150-AIR-TEMP-KIT.webp",
+   "from": "prowireusa.com"
+  },
   "GT150-WTR-TEMP-KIT": {
    "img": "https://www.prowireusa.com/content/57648/GT150-WTR-TEMP-KIT.webp",
    "from": "prowireusa.com"
+  },
+  "ICT-GEN4-OILP": {
+   "img": "https://www.ictbillet.com/cdn/shop/files/WC0IL40_1.jpg?v=1751970210&width=1000",
+   "from": "ictbillet.com"
   },
   "JLF-73-87-tail-socket": {
    "img": "https://jlfabrication.com/cdn/shop/products/s-l1600_4b7e7589-894b-4823-8b9f-d7867851c43c.png?v=1675805521",
@@ -173,6 +285,10 @@
    "img": "https://www.prowireusa.com/content/57671/LS-CRANK-CONN-KIT.webp",
    "from": "prowireusa.com"
   },
+  "M-RJ45-CABLE": {
+   "img": "https://www.prowireusa.com/content/59737/M-RJ45-CABLE.webp",
+   "from": "prowireusa.com"
+  },
   "M39029-56-351": {
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/961/300/1208_M39029%5E56-351_sml.jpg",
    "from": "mm.digikey.com"
@@ -180,6 +296,18 @@
   "M39029-58-363": {
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/957/750/1208_M39029%5E58-363_sml%28200x200%29.jpg",
    "from": "mm.digikey.com"
+  },
+  "M800-KIT-N": {
+   "img": "https://www.prowireusa.com/content/58361/M800-KIT-N_.webp",
+   "from": "prowireusa.com"
+  },
+  "M81824-1-2": {
+   "img": "https://www.prowireusa.com/content/57537/M81824_1-2.webp",
+   "from": "prowireusa.com"
+  },
+  "M81824-1-3": {
+   "img": "https://www.prowireusa.com/content/60321/M81824_1-3.webp",
+   "from": "prowireusa.com"
   },
   "M81969-14-10": {
    "img": "https://dmctools.com/media/catalog/product/m/8/m81969_14-10_images_m81969-14-10.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=270&width=270&canvas=270:270",
@@ -192,6 +320,10 @@
   "MCK5REARWINDOWSWITCH": {
    "img": "https://www.motorcityk5.com/images/F22904.jpg",
    "from": "motorcityk5.com"
+  },
+  "NC5FD-L-1": {
+   "img": "https://www.neutrik.com/uploads/media/400x/02/522-nc5fd-l-1.jpg?v=1-0",
+   "from": "neutrik.com"
   },
   "NR-17383-1": {
    "img": "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg?v-cache=1758200630",
@@ -213,6 +345,14 @@
    "img": "https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1786090930&width=232",
    "from": "torqueking.com"
   },
+  "SSB-26BS-PA66": {
+   "img": "https://www.prowireusa.com/content/58575/SSB-26BS-PA66.webp",
+   "from": "prowireusa.com"
+  },
+  "SSB-34BS-PA66": {
+   "img": "https://www.prowireusa.com/content/58572/SSB-34BS-PA66.webp",
+   "from": "prowireusa.com"
+  },
   "SSC-N": {
    "img": "https://www.prowireusa.com/content/58337/SSC-N.webp",
    "from": "prowireusa.com"
@@ -229,9 +369,41 @@
    "img": "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/500x659/products/4929/4601/1973-91-Square_body-Chevy--GMC-Truck-Headlight-Switch-16603__46913.1762446061.jpg?c=1",
    "from": "cdn11.bigcommerce.com"
   },
+  "W12P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W12P.jpg?v=1738268554&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "W12S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W12S.jpg?v=1738268691&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "W6P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W6P.jpg?v=1738268276&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "W6S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W6S.jpg?v=1738268245&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "W8P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W8P.jpg?v=1738268358&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "W8S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/W8S.jpg?v=1738268393&width=760",
+   "from": "customconnectorkits.com"
+  },
   "WCTHB50": {
    "img": "https://www.ictbillet.com/cdn/shop/files/WCTHB50_1.jpg?v=1751968122&width=1000",
    "from": "ictbillet.com"
+  },
+  "WP-4P": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/WP-4P.jpg?v=1738273165&width=760",
+   "from": "customconnectorkits.com"
+  },
+  "WP-4S": {
+   "img": "https://www.customconnectorkits.com/cdn/shop/products/WP-4S.jpg?v=1738273261&width=760",
+   "from": "customconnectorkits.com"
   },
   "WPAPP30": {
    "img": "https://www.ictbillet.com/cdn/shop/files/WPAPP30.jpg?v=1751969926&width=1000",
@@ -262,13 +434,23 @@
    "from": "prowireusa.com",
    "alias_of": "COIL-CONN-LS2-7"
   },
+  "CPA-100-3/4-BK": {
+   "img": "https://www.prowireusa.com/content/62105/CPA-100-3-4-BK.webp",
+   "from": "prowireusa.com",
+   "alias_of": "CPA-100-3-4-BK"
+  },
+  "CPA-100-3/8-RED": {
+   "img": "https://www.prowireusa.com/content/102695/CPA-100-3-8-RD.webp",
+   "from": "prowireusa.com",
+   "alias_of": "CPA-100-3-8-RED"
+  },
   "D38999/24WJ61SN": {
-   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg (DigiKey product photo)",
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg",
    "from": "mm.digikey.com",
    "alias_of": "D38999-24WJ61SN"
   },
   "D38999/26WJ61PN": {
-   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg (DigiKey product photo)",
+   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg",
    "from": "mm.digikey.com",
    "alias_of": "D38999-26WJ61PN"
   },
@@ -287,6 +469,16 @@
    "from": "mm.digikey.com",
    "alias_of": "M39029-58-363"
   },
+  "M81824/1-2": {
+   "img": "https://www.prowireusa.com/content/57537/M81824_1-2.webp",
+   "from": "prowireusa.com",
+   "alias_of": "M81824-1-2"
+  },
+  "M81824/1-3": {
+   "img": "https://www.prowireusa.com/content/60321/M81824_1-3.webp",
+   "from": "prowireusa.com",
+   "alias_of": "M81824-1-3"
+  },
   "M81969/14-10": {
    "img": "https://dmctools.com/media/catalog/product/m/8/m81969_14-10_images_m81969-14-10.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=270&width=270&canvas=270:270",
    "from": "dmctools.com",
@@ -296,6 +488,63 @@
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/936/020/M8504969-25N_sml.jpg",
    "from": "mm.digikey.com",
    "alias_of": "M85049-69-25N"
+  }
+ },
+ "devices": {
+  "M130-A": {
+   "img": "https://assets.motec.com.au/strapi/m130_052880dbeb.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC M130 ECU"
+  },
+  "M130-B": {
+   "img": "https://assets.motec.com.au/strapi/m130_052880dbeb.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC M130 ECU"
+  },
+  "PDM30-A": {
+   "img": "https://assets.motec.com.au/strapi/pdm30_c01f1c1cac.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC PDM30 power distribution module"
+  },
+  "PDM30-B": {
+   "img": "https://assets.motec.com.au/strapi/pdm30_c01f1c1cac.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC PDM30 power distribution module"
+  },
+  "PDM15-A": {
+   "img": "https://assets.motec.com.au/strapi/pdm15_ca7836f587.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC PDM15 power distribution module"
+  },
+  "PDM15-B": {
+   "img": "https://assets.motec.com.au/strapi/pdm15_ca7836f587.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC PDM15 power distribution module"
+  },
+  "WIDEBAND": {
+   "img": "https://assets.motec.com.au/strapi/LTCD_7c7a5eed0a.webp",
+   "from": "motec.com.au",
+   "what": "MoTeC LTCD (Lambda to CAN, dual)"
+  },
+  "ISOLATOR": {
+   "img": "https://www.12voltpower.com/wp-content/uploads/2025/09/7700.jpg",
+   "from": "12voltpower.com",
+   "what": "Blue Sea 7700 ML-RBS remote battery switch, 12 V 500 A, manual control"
+  },
+  "ISO-SWITCH": {
+   "img": "https://image.fisheriessupply.com/image/upload/w_288/f_auto/t_fs_shared/static-images/207810-blue-sea-b-s-2145-it1-tif",
+   "from": "image.fisheriessupply.com",
+   "what": "Blue Sea 2145 Contura SPDT (ON)-OFF-(ON) remote switch"
+  },
+  "ACC-BATT": {
+   "img": "https://static.summitracing.com/global/images/prod/xlarge/ult-9014-045_xl.jpg",
+   "from": "static.summitracing.com",
+   "what": "Optima YellowTop D34/78 (the candidate; the tray is not set, so the model is not final)"
+  },
+  "IBOOSTER": {
+   "img": "https://www.evcreate.com/wp-content/uploads/2020/07/Tesla_1037123-00-B-1.jpg",
+   "from": "evcreate.com",
+   "what": "Bosch iBooster Gen 1, Tesla Model S/X 1037123-00-B"
   }
  }
 }
