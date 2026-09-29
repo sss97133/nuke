@@ -2144,6 +2144,450 @@ parts:
     page: https://www.oraclelights.com/products/linear-universal-led-3rd-brake-light-chmsl-module-red
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/CHMSL.py
+- id: CLEARANCE-C
+  endpoints:
+  - CLEARANCE-C
+  what: 'Roof clearance lamp, centre: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness
+    36-3770'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb
+  shape_basis: not sourced
+  dims_mm:
+    l: 100.0
+    w: 42.0
+    h: 60.0
+  dims_note: 'no printed size (LMC): a 100 x 60 x 42 envelope, assumed (±20)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#1b1b1c'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): 36-4482 lens pad (black)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f0a01d'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): ''36-4481 Lens-Roof Marker Amber'''
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: +
+    ep: CLEARANCE-C
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp + lead (splice)
+  - n: '-'
+    ep: CLEARANCE-C
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp - lead (splice)
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 100.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 60.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+  - name: depth
+    value: 42.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 194 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 100.0
+    drawing: 100.0
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 60.0
+    drawing: 60.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: LMC prints no size for the roof marker
+  registry:
+    CLEARANCE-C:
+      device: 'LMC 1973-87 roof marker: 36-4481 amber lens + 36-4482 pad + 36-0368 amber LED 194-type bulb, in the LMC harness
+        36-3770'
+      family: miniseal
+      where: cabin
+      wires:
+      - id: '90'
+        label: Cab Clearance Light Center
+        color: red
+        awg: 22
+      - id: CL_C_GND
+        label: Center cab clearance lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '90': center cab roof clearance lamp + lead (splice)
+        CL_C_GND: center cab roof clearance lamp − lead (splice)
+  photo:
+    url: https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png
+    page: https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/CLEARANCE-C.py
+- id: CLEARANCE-L
+  endpoints:
+  - CLEARANCE-L
+  what: 'Roof clearance lamp, left: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness
+    36-3770'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb
+  shape_basis: not sourced
+  dims_mm:
+    l: 100.0
+    w: 42.0
+    h: 60.0
+  dims_note: 'no printed size (LMC): a 100 x 60 x 42 envelope, assumed (±20)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#1b1b1c'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): 36-4482 lens pad (black)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f0a01d'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): ''36-4481 Lens-Roof Marker Amber'''
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: +
+    ep: CLEARANCE-L
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp + lead (splice)
+  - n: '-'
+    ep: CLEARANCE-L
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp - lead (splice)
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 100.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 60.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+  - name: depth
+    value: 42.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 194 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 100.0
+    drawing: 100.0
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 60.0
+    drawing: 60.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: LMC prints no size for the roof marker
+  registry:
+    CLEARANCE-L:
+      device: 'LMC 1973-87 roof marker: 36-4481 amber lens + 36-4482 pad + 36-0368 amber LED 194-type bulb, in the LMC harness
+        36-3770'
+      family: miniseal
+      where: cabin
+      wires:
+      - id: '79'
+        label: Cab Clearance Light Left
+        color: red
+        awg: 22
+      - id: CL_L_GND
+        label: Left cab clearance lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '79': left cab roof clearance lamp + lead (splice)
+        CL_L_GND: left cab roof clearance lamp − lead (splice)
+  photo:
+    url: https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png
+    page: https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/CLEARANCE-L.py
+- id: CLEARANCE-R
+  endpoints:
+  - CLEARANCE-R
+  what: 'Roof clearance lamp, right: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness
+    36-3770'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb
+  shape_basis: not sourced
+  dims_mm:
+    l: 100.0
+    w: 42.0
+    h: 60.0
+  dims_note: 'no printed size (LMC): a 100 x 60 x 42 envelope, assumed (±20)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#1b1b1c'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): 36-4482 lens pad (black)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f0a01d'
+      from: 'reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482
+        pad, 36-0412 socket): ''36-4481 Lens-Roof Marker Amber'''
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: +
+    ep: CLEARANCE-R
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp + lead (splice)
+  - n: '-'
+    ep: CLEARANCE-R
+    at:
+    - 0.0
+    - 0.0
+    - -67.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: roof lamp - lead (splice)
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 100.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 60.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+  - name: depth
+    value: 42.0
+    source: 'no dimension on reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481
+      lens, 36-4482 pad, 36-0412 socket): envelope assumed from LMC''s diagram proportions'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 194 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 100.0
+    drawing: 100.0
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 60.0
+    drawing: 60.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: LMC prints no size for the roof marker
+  registry:
+    CLEARANCE-R:
+      device: 'LMC 1973-87 roof marker: 36-4481 amber lens + 36-4482 pad + 36-0368 amber LED 194-type bulb, in the LMC harness
+        36-3770'
+      family: miniseal
+      where: cabin
+      wires:
+      - id: '91'
+        label: Cab Clearance Light Right
+        color: red
+        awg: 22
+      - id: CL_R_GND
+        label: Right cab clearance lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '91': right cab roof clearance lamp + lead (splice)
+        CL_R_GND: right cab roof clearance lamp − lead (splice)
+  photo:
+    url: https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png
+    page: https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/CLEARANCE-R.py
 - id: DCDC
   endpoints:
   - DCDC
@@ -2545,6 +2989,150 @@ parts:
   - 'Mounting: ''Mount vertically on a non-flammable surface, with the power terminals facing downwards'' (reference_documents/web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md);
     mounts.yaml flags the DCDC placement.'
   script: docs/wiring/calc-data/cad/fab/DCDC.py
+- id: DOME-LAMP
+  endpoints:
+  - DOME-LAMP
+  what: 'Dome lamp (cab roof): battery-feed terminal and the switched-ground terminal (now a plain ground)'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp (which one the truck carries is read at the bench)
+  shape_basis: twin object
+  dims_mm:
+    l: 97.2
+    w: 20.3
+    h: 56.8
+  dims_note: '97.2 x 56.8 x 20.3: the body model''s dome lamp (±30)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#d9d9d6'
+      from: 'housing: drawn white'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f2f2ef'
+      from: 'lens: white (assumed; the body model''s Dome_Light_Glass has no colour)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: DOME-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -45.3
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: battery-feed terminal
+  - n: GND
+    ep: DOME-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -45.3
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: switched-ground terminal
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 97.2
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Interior_Dome_Light_Blazer,
+      97.2 x 56.8 x 20.3'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 56.8
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Interior_Dome_Light_Blazer,
+      97.2 x 56.8 x 20.3'
+    basis: assumed
+  - name: depth
+    value: 20.3
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Interior_Dome_Light_Blazer,
+      97.2 x 56.8 x 20.3'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 211 bulb''s SV8.5 festoon base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 97.2
+    drawing: 97.2
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 56.8
+    drawing: 56.8
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Which dome lamp the truck carries (Blazer C8B pair or the single cab lamp): bench (registry).'
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    DOME-LAMP:
+      device: dome lamp (cab roof)
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '67'
+        label: Dome Light
+        color: red
+        awg: 20
+      - id: DOME_GND
+        label: Dome lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '67': battery-feed terminal
+        DOME_GND: switched-ground terminal
+  script: docs/wiring/calc-data/cad/fab/DOME-LAMP.py
 - id: E-STOPP
   endpoints:
   - E-STOPP
@@ -4757,6 +5345,143 @@ parts:
     page: https://www.bluesea.com/products/7700
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/ISOLATOR.py
+- id: LICENSE-LAMP
+  endpoints:
+  - LICENSE-LAMP
+  what: 'License plate lamp (67 bulb): one feed lead, grounds through its housing'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; connector 2977721 (67 bulb)
+  shape_basis: not sourced
+  dims_mm:
+    l: 80.0
+    w: 45.0
+    h: 40.0
+  dims_note: 'no source: an 80 x 40 x 45 envelope, assumed (±25)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#eeeeec'
+      from: 'lens: clear (assumed)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: LICENSE-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -70.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: feed lead
+  - n: GND
+    ep: LICENSE-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -70.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: 'ground (through the housing: LIC_GND needs a lead or ring)'
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 80.0
+    source: 'no GM drawing or body-model mesh of the license lamp on file: envelope assumed'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 40.0
+    source: 'no GM drawing or body-model mesh of the license lamp on file: envelope assumed'
+    basis: assumed
+  - name: depth
+    value: 45.0
+    source: 'no GM drawing or body-model mesh of the license lamp on file: envelope assumed'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 67 bulb''s BA15s base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 80.0
+    drawing: 80.0
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 40.0
+    drawing: 40.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 25.0
+    why: no drawing, mesh or photo of the lamp on file
+  registry:
+    LICENSE-LAMP:
+      device: license plate lamp
+      family: open
+      where: rear
+      wires:
+      - id: '92'
+        label: License Plate Light
+        color: red
+        awg: 22
+      - id: LIC_GND
+        label: License lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '92': feed lead
+        LIC_GND: ''
+  script: docs/wiring/calc-data/cad/fab/LICENSE-LAMP.py
 - id: M130-A
   endpoints:
   - M130-A
@@ -5331,6 +6056,586 @@ parts:
   - MoTeC's label is a raised badge (product photo). It is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 depth
     holds; its lettering is redrawn from the photo as cosmetic text, not MoTeC's artwork.
   script: docs/wiring/calc-data/cad/fab/M130-A.py
+- id: MARKER-LF
+  endpoints:
+  - MARKER-LF
+  what: Left front side marker (168 bulb in socket 6294015)
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 6294015 (168)
+  shape_basis: twin object
+  dims_mm:
+    l: 46.5
+    w: 42.9
+    h: 191.9
+  dims_note: '46.5 wide x 191.9 tall x 42.9 deep: the body model''s front marker (±30)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f19a1c'
+      from: owner's photo of the front fender, vehicle_images 640fc598 (amber side marker, chrome bezel)
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: MARKER-LF
+    at:
+    - 0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: park-circuit lead
+  - n: 2ND
+    ep: MARKER-LF
+    at:
+    - 0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: second lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 46.5
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 191.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+  - name: depth
+    value: 42.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 168 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 46.5
+    drawing: 46.5
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 191.9
+    drawing: 191.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    MARKER-LF:
+      device: 'left front side marker (factory socket: park feed + a second lead that used to ground through the turn filament)'
+      family: open
+      where: engine
+      wires:
+      - id: '87'
+        label: Side Marker Front Left
+        color: red
+        awg: 20
+      - id: MK_LF_GND
+        label: Left front side marker ground
+        color: black
+        awg: 20
+      cavities:
+        '87': park-circuit lead
+        MK_LF_GND: second lead
+  photo:
+    url: vehicle_images 640fc598
+    page: Nuke vehicle e08bf694 images
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/MARKER-LF.py
+- id: MARKER-LR
+  endpoints:
+  - MARKER-LR
+  what: Left rear side marker (168 bulb in socket 6294015)
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 6294015 (168)
+  shape_basis: twin object
+  dims_mm:
+    l: 46.5
+    w: 42.9
+    h: 191.9
+  dims_note: '46.5 wide x 191.9 tall x 42.9 deep: the body model''s front marker (±30), used for the rear'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#c4262e'
+      from: 'lens: red (assumed: US rear side markers are red)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: MARKER-LR
+    at:
+    - 0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: feed lead
+  - n: 2ND
+    ep: MARKER-LR
+    at:
+    - 0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 46.5
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 191.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+  - name: depth
+    value: 42.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 168 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 46.5
+    drawing: 46.5
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 191.9
+    drawing: 191.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    MARKER-LR:
+      device: left rear side marker
+      family: open
+      where: rear
+      wires:
+      - id: '77'
+        label: Side Marker Rear Left
+        color: red
+        awg: 22
+      - id: MK_LR_GND
+        label: Left rear side marker ground
+        color: black
+        awg: 20
+      cavities:
+        '77': feed lead
+        MK_LR_GND: ground lead
+  script: docs/wiring/calc-data/cad/fab/MARKER-LR.py
+- id: MARKER-RF
+  endpoints:
+  - MARKER-RF
+  what: Right front side marker (168 bulb in socket 6294015)
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 6294015 (168)
+  shape_basis: twin object
+  dims_mm:
+    l: 46.5
+    w: 42.9
+    h: 191.9
+  dims_note: '46.5 wide x 191.9 tall x 42.9 deep: the body model''s front marker (±30)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z) (mirrored)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f19a1c'
+      from: owner's photo of the front fender, vehicle_images 640fc598 (amber side marker, chrome bezel)
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: MARKER-RF
+    at:
+    - -0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: park-circuit lead
+  - n: 2ND
+    ep: MARKER-RF
+    at:
+    - -0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: second lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 46.5
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 191.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+  - name: depth
+    value: 42.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 168 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 46.5
+    drawing: 46.5
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 191.9
+    drawing: 191.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    MARKER-RF:
+      device: right front side marker
+      family: open
+      where: engine
+      wires:
+      - id: '88'
+        label: Side Marker Front Right
+        color: red
+        awg: 20
+      - id: MK_RF_GND
+        label: Right front side marker ground
+        color: black
+        awg: 20
+      cavities:
+        '88': park-circuit lead
+        MK_RF_GND: second lead
+  photo:
+    url: vehicle_images 640fc598
+    page: Nuke vehicle e08bf694 images
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/MARKER-RF.py
+- id: MARKER-RR
+  endpoints:
+  - MARKER-RR
+  what: Right rear side marker (168 bulb in socket 6294015)
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 6294015 (168)
+  shape_basis: twin object
+  dims_mm:
+    l: 46.5
+    w: 42.9
+    h: 191.9
+  dims_note: '46.5 wide x 191.9 tall x 42.9 deep: the body model''s front marker (±30), used for the rear'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z) (mirrored)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#c4262e'
+      from: 'lens: red (assumed: US rear side markers are red)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: MARKER-RR
+    at:
+    - -0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: feed lead
+  - n: 2ND
+    ep: MARKER-RR
+    at:
+    - -0.0
+    - 0.0
+    - -67.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 46.5
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 191.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+  - name: depth
+    value: 42.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Marker_Lights (front), one
+      side 46.5 x 42.9 x 191.9; the rear marker is drawn the same size (no rear mesh read)'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 22.0
+    source: 'the 168 bulb''s W2.1x9.5d wedge base (10 mm): socket drawn 22 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 46.5
+    drawing: 46.5
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 191.9
+    drawing: 191.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    MARKER-RR:
+      device: right rear side marker
+      family: open
+      where: rear
+      wires:
+      - id: '78'
+        label: Side Marker Rear Right
+        color: red
+        awg: 22
+      - id: MK_RR_GND
+        label: Right rear side marker ground
+        color: black
+        awg: 20
+      cavities:
+        '78': feed lead
+        MK_RR_GND: ground lead
+  script: docs/wiring/calc-data/cad/fab/MARKER-RR.py
 - id: MIRROR-MON
   endpoints:
   - MIRROR-MON
@@ -6178,6 +7483,328 @@ parts:
     page: https://www.bluesea.com/products/1011
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/OUTLET-12V.py
+- id: PARK-TURN-LF
+  endpoints:
+  - PARK-TURN-LF
+  what: 'Left front park/turn lamp (1157: park = low filament, turn = high filament)'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 8911486 (1157)
+  shape_basis: twin object
+  dims_mm:
+    l: 214.9
+    w: 56.8
+    h: 86.3
+  dims_note: '214.9 wide x 86.3 tall x 56.8 deep: the body model''s own lamp (±30); 1157 socket behind'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f3b12a'
+      from: 'lens: amber (assumed: the body model''s lens material has no colour)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: PARK
+    ep: PARK-TURN-LF
+    at:
+    - 0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: park filament lead
+  - n: TURN
+    ep: PARK-TURN-LF
+    at:
+    - 0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: turn filament lead
+  - n: GND
+    ep: PARK-TURN-LF
+    at:
+    - 0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 214.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 86.3
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+  - name: depth
+    value: 56.8
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 1157 bulb''s BAY15d base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 214.9
+    drawing: 214.9
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 86.3
+    drawing: 86.3
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - The lens colour on the 1977 grille lamp is not read (drawn amber).
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    PARK-TURN-LF:
+      device: 'left front park/turn lamp (1157: park = low filament, turn = high filament)'
+      family: open
+      where: engine
+      wires:
+      - id: '83'
+        label: Parking Light Left Front
+        color: red
+        awg: 20
+      - id: '80'
+        label: Turn Signal Left Front
+        color: red
+        awg: 20
+      - id: PT_LF_GND
+        label: Left front park/turn lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '83': park filament lead
+        '80': turn filament lead
+        PT_LF_GND: ground lead
+  script: docs/wiring/calc-data/cad/fab/PARK-TURN-LF.py
+- id: PARK-TURN-RF
+  endpoints:
+  - PARK-TURN-RF
+  what: 'Right front park/turn lamp (1157: park = low filament, turn = high filament)'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; socket GM 8911486 (1157)
+  shape_basis: twin object
+  dims_mm:
+    l: 214.9
+    w: 56.8
+    h: 86.3
+  dims_note: '214.9 wide x 86.3 tall x 56.8 deep: the body model''s own lamp (±30); 1157 socket behind'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z) (mirrored)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#f3b12a'
+      from: 'lens: amber (assumed: the body model''s lens material has no colour)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: PARK
+    ep: PARK-TURN-RF
+    at:
+    - -0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: park filament lead
+  - n: TURN
+    ep: PARK-TURN-RF
+    at:
+    - -0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: turn filament lead
+  - n: GND
+    ep: PARK-TURN-RF
+    at:
+    - -0.0
+    - 0.0
+    - -81.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 214.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 86.3
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+  - name: depth
+    value: 56.8
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Parking_Lights, one side 214.9
+      x 56.8 x 86.3'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 1157 bulb''s BAY15d base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 214.9
+    drawing: 214.9
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 86.3
+    drawing: 86.3
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - The lens colour on the 1977 grille lamp is not read (drawn amber).
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    PARK-TURN-RF:
+      device: right front park/turn lamp (1157)
+      family: open
+      where: engine
+      wires:
+      - id: '84'
+        label: Parking Light Right Front
+        color: red
+        awg: 20
+      - id: '82'
+        label: Turn Signal Right Front
+        color: red
+        awg: 20
+      - id: PT_RF_GND
+        label: Right front park/turn lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '84': park filament lead
+        '82': turn filament lead
+        PT_RF_GND: ground lead
+  script: docs/wiring/calc-data/cad/fab/PARK-TURN-RF.py
 - id: PDM15-A
   endpoints:
   - PDM15-A
@@ -9998,6 +11625,426 @@ parts:
     page: https://www.nu-relics.com/17383-1
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/TG-MOTOR-ACI.py
+- id: Tail_Light_Left
+  endpoints:
+  - Tail_Light_Left
+  - Backup_Light_Left
+  what: 'Left rear combination lamp: tail/stop/turn (1157) above the back-up lamp (1156), one housing'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; sockets GM 8911029 (1157) and 8911027 (1156)
+  shape_basis: twin object
+  dims_mm:
+    l: 148.1
+    w: 146.9
+    h: 193.6
+  dims_note: '148.1 wide x 193.6 tall x 146.9 deep: the body model''s own lamp (±30); red lens over the clear back-up lens'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#c0262c'
+      from: owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome
+        trim)
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+    lens2:
+      hex: '#e9ebea'
+      from: owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome
+        trim)
+  attach:
+  - n: TAIL
+    ep: Tail_Light_Left
+    at:
+    - 0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: tail filament lead
+  - n: STOP
+    ep: Tail_Light_Left
+    at:
+    - 0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: stop/turn filament lead
+  - n: GND
+    ep: Tail_Light_Left
+    at:
+    - 0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  - n: BU
+    ep: Backup_Light_Left
+    at:
+    - 0.0
+    - -63.89
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: back-up feed lead
+  - n: BU_GND
+    ep: Backup_Light_Left
+    at:
+    - 0.0
+    - -63.89
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: back-up ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 148.1
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 193.6
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+  - name: depth
+    value: 146.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 1157 bulb''s BAY15d base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 148.1
+    drawing: 148.1
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 193.6
+    drawing: 193.6
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    Tail_Light_Left:
+      device: left tail lamp, 1157 socket (RUN = park/tail group; BRK = stop/turn output)
+      family: open
+      where: rear
+      wires:
+      - id: '81'
+        label: Tail Light Left
+        color: red
+        awg: 22
+      - id: REAR_ST_L
+        label: Left rear stop/turn (1157 brake filament)
+        color: red
+        awg: 18
+      - id: TL_L_GND
+        label: Left tail lamp ground
+        color: black
+        awg: 18
+      cavities:
+        '81': tail filament lead
+        REAR_ST_L: stop/turn filament lead
+        TL_L_GND: ground lead to the rear ground bus GND-SPLICE-REAR (state row 56 — grounds run in the loom, no body studs)
+    Backup_Light_Left:
+      device: left backup lamp
+      family: open
+      where: rear
+      wires:
+      - id: '89'
+        label: Backup Light Left
+        color: red
+        awg: 22
+      - id: BU_L_GND
+        label: Left backup lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '89': feed lead
+        BU_L_GND: ground lead
+  photo:
+    url: vehicle_images 34e05023
+    page: Nuke vehicle e08bf694 images
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/Tail_Light_Left.py
+- id: Tail_Light_Right
+  endpoints:
+  - Tail_Light_Right
+  - Backup_Light_Right
+  what: 'Right rear combination lamp: tail/stop/turn (1157) above the back-up lamp (1156), one housing'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory lamp; sockets GM 8911029 (1157) and 8911027 (1156)
+  shape_basis: twin object
+  dims_mm:
+    l: 148.1
+    w: 146.9
+    h: 193.6
+  dims_note: '148.1 wide x 193.6 tall x 146.9 deep: the body model''s own lamp (±30); red lens over the clear back-up lens'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z) (mirrored)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#c0262c'
+      from: owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome
+        trim)
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+    lens2:
+      hex: '#e9ebea'
+      from: owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome
+        trim)
+  attach:
+  - n: TAIL
+    ep: Tail_Light_Right
+    at:
+    - -0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: tail filament lead
+  - n: STOP
+    ep: Tail_Light_Right
+    at:
+    - -0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: stop/turn filament lead
+  - n: GND
+    ep: Tail_Light_Right
+    at:
+    - -0.0
+    - 34.85
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: ground lead
+  - n: BU
+    ep: Backup_Light_Right
+    at:
+    - -0.0
+    - -63.89
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: back-up feed lead
+  - n: BU_GND
+    ep: Backup_Light_Right
+    at:
+    - -0.0
+    - -63.89
+    - -171.9
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: back-up ground lead
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 148.1
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 193.6
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+  - name: depth
+    value: 146.9
+    source: 'the body model''s own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane''s Blazer body model;
+      the body model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json): mesh Tail_Lights_Main, one side
+      148.1 x 146.9 x 193.6'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 1157 bulb''s BAY15d base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 148.1
+    drawing: 148.1
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 193.6
+    drawing: 193.6
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: the lamp's envelope is the body model's mesh (±30); no GM drawing of the lamp is on file
+  registry:
+    Tail_Light_Right:
+      device: right tail lamp, 1157 socket
+      family: open
+      where: rear
+      wires:
+      - id: '75'
+        label: Tail Light Right
+        color: red
+        awg: 22
+      - id: REAR_ST_R
+        label: Right rear stop/turn (1157 brake filament)
+        color: red
+        awg: 18
+      - id: TL_R_GND
+        label: Right tail lamp ground
+        color: black
+        awg: 18
+      cavities:
+        '75': tail filament lead
+        REAR_ST_R: stop/turn filament lead
+        TL_R_GND: ground lead to the rear ground bus GND-SPLICE-REAR (state row 56 — grounds run in the loom, no body studs)
+    Backup_Light_Right:
+      device: right backup lamp
+      family: open
+      where: rear
+      wires:
+      - id: '76'
+        label: Backup Light Right
+        color: red
+        awg: 22
+      - id: BU_R_GND
+        label: Right backup lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '76': feed lead
+        BU_R_GND: ground lead
+  photo:
+    url: vehicle_images 34e05023
+    page: Nuke vehicle e08bf694 images
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/Tail_Light_Right.py
 - id: UNDERDASH-LAMPS
   endpoints:
   - UNDERDASH-LAMPS
@@ -10145,6 +12192,143 @@ parts:
     page: https://www.lumiteclighting.com/mini-rail2-led-utility-light-2
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/UNDERDASH-LAMPS.py
+- id: UNDERHOOD-LAMP
+  endpoints:
+  - UNDERHOOD-LAMP
+  what: 'Underhood lamp: one feed lead, grounds through its mount (the factory spot not found in the 1977 manual text)'
+  maker: GM (factory, 1973-87 C/K)
+  maker_pn: factory underhood lamp & switch assembly (93 bulb)
+  shape_basis: not sourced
+  dims_mm:
+    l: 90.0
+    w: 45.0
+    h: 45.0
+  dims_note: 'no source: a 90 x 45 x 45 envelope, assumed (±25)'
+  frame: origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light),
+    +Y up; the housing and socket behind (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      lens: +Z
+      socket: -Z
+  colors:
+    housing:
+      hex: '#2a2b2c'
+      from: 'housing: drawn black (not in the photos)'
+    bezel:
+      hex: '#cfd2d4'
+      from: 'bezel: chrome (owner''s photos)'
+    lens:
+      hex: '#eeeeec'
+      from: 'lens: clear (assumed)'
+    socket:
+      hex: '#d9d2bc'
+      from: 'socket: natural nylon (the part_media socket photos)'
+  attach:
+  - n: FEED
+    ep: UNDERHOOD-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -70.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: feed lead (PDM30 OUT25)
+  - n: GND
+    ep: UNDERHOOD-LAMP
+    at:
+    - 0.0
+    - 0.0
+    - -70.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: socket lead
+    note: 'ground (through the mount: UH_GND)'
+  mount:
+  - n: flange
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: housing screws / nuts into the body opening (not dimensioned)
+  params:
+  - name: width
+    value: 90.0
+    source: 'no GM drawing, mesh or photo of the underhood lamp on file: envelope assumed'
+    basis: assumed
+    note: lamp across its lens
+  - name: height
+    value: 45.0
+    source: 'no GM drawing, mesh or photo of the underhood lamp on file: envelope assumed'
+    basis: assumed
+  - name: depth
+    value: 45.0
+    source: 'no GM drawing, mesh or photo of the underhood lamp on file: envelope assumed'
+    basis: assumed
+    note: lens face to the back of the housing
+  - name: bezel
+    value: 4.0
+    source: the bezel width is not printed
+    basis: assumed
+  - name: socket_d
+    value: 27.0
+    source: 'the 93 bulb''s BA15s base (15 mm): socket drawn 27 across'
+    basis: assumed
+  - name: socket_l
+    value: 28.0
+    source: the socket body length is not printed
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: the socket's lead length is not printed
+    basis: assumed
+  checks:
+  - check: width
+    model: 90.0
+    drawing: 90.0
+    tol: 0.05
+    ok: true
+  - check: height
+    model: 45.0
+    drawing: 45.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'No GM drawing of the lamp is on file: its envelope is the body model''s mesh (±30).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 25.0
+    why: nothing on file for the lamp
+  registry:
+    UNDERHOOD-LAMP:
+      device: underhood lamp
+      family: open
+      where: engine
+      wires:
+      - id: '73'
+        label: Underhood Light
+        color: red
+        awg: 20
+      - id: UH_GND
+        label: Underhood lamp ground
+        color: black
+        awg: 20
+      cavities:
+        '73': feed lead (fed from PDM30 OUT25; the output current limit protects the wire, no inline fuse)
+        UH_GND: ''
+  script: docs/wiring/calc-data/cad/fab/UNDERHOOD-LAMP.py
 - id: USB-PORT
   endpoints:
   - USB-PORT
@@ -10383,7 +12567,7 @@ parts:
 - id: WIDEBAND
   endpoints:
   - WIDEBAND
-  what: Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 via Dave)
+  what: Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 through the builder)
   maker: 'MoTeC (sensors: Bosch)'
   maker_pn: 61301 LTCD + 2 x Bosch LSU 4.9
   shape_basis: maker drawing
@@ -10706,7 +12890,7 @@ parts:
       the looms and plugs are scaled off a drawing not to scale (±3)'
   registry:
     WIDEBAND:
-      device: MoTeC LTCD + 2 × LSU 4.9 (not owned — bought with the M130 via Dave)
+      device: MoTeC LTCD + 2 × LSU 4.9 (not owned — bought with the M130 via the builder)
       family: dtm
       where: engine
       wires:

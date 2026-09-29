@@ -31,13 +31,15 @@ LEAD_HEX = {"red": "#c4161c", "black": "#1b1b1b", "white": "#ececec", "yellow": 
 
 # ------------------------------------------------------------------------------------------ the registry record
 def scrub(t):
-    """The registry's device text without prices, order numbers, order dates or record ids (the repo is public)."""
+    """The registry's device text without prices, order numbers, order dates, record ids or people's names (the repo is
+    public)."""
     if not t:
         return t
     t = re.sub(r"\s*\([^()]*(\$|order|obs:)[^()]*\)", "", t)
     t = re.sub(r"[;,]?\s*lined up at [^;—]*?\$[\d,]+(?:\.\d+)?(?: a pair| each)?", "", t)
     t = re.sub(r"\$[\d,]+(?:\.\d+)?", "", t)
     t = re.sub(r"\bbought \d{4}-\d{2}-\d{2}\s*", "", t)
+    t = re.sub(r"\b(via|through|from) Dave\b", r"\1 the builder", t)
     return re.sub(r"\s{2,}", " ", t).strip(" ;,")
 
 

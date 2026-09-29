@@ -445,3 +445,231 @@ def lumitec_mini_rail2(end):
               ("width", lambda b: Compound(children=b).bounding_box().size.Y, 28.2),
               ("depth", lambda b: Compound(children=b).bounding_box().size.Z, 15.3)]
     return _namespace(P, COLORS, PART, build, attach_points, terminals, mount_points, CHECKS)
+
+
+# ------------------------------------------------------------------------------------------ 1973-87 C/K factory lamps
+TWIN = ("the body model's own lamp mesh (layout-ui scratch sizes.py, measured from the twin lane's Blazer body model; the body "
+        "model holds about ±30 mm on the body, docs/wiring/twin/body_check_v3.json)")
+LMC_TAIL = "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-tail-light-fleetside.md (LMC parts list: lens, gasket, sockets 36-0416 / 36-0415)"
+LMC_ROOF = "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket)"
+OWN_REAR = "owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome trim)"
+OWN_MARK = "owner's photo of the front fender, vehicle_images 640fc598 (amber side marker, chrome bezel)"
+BULB = {"1157": ("BAY15d", 15.0), "1156": ("BA15s", 15.0), "67": ("BA15s", 15.0), "93": ("BA15s", 15.0), "168": ("W2.1x9.5d wedge", 10.0),
+        "194": ("W2.1x9.5d wedge", 10.0), "211": ("SV8.5 festoon", 10.0)}
+
+
+def factory_lamp(end, spec):
+    """spec: title, what, dims (w, h, d) with their sources, lens colours, bulb, leads [(pin, name, wires, colour)], endpoints,
+    frame note, mirror (bool), extra refs / notes / unknowns."""
+    w, h, d = spec["dims"]
+    base, bdia = BULB[spec["bulb"]]
+    P = {
+        "width": Dim(w, spec["src"], spec.get("basis", "assumed"), "lamp across its lens"),
+        "height": Dim(h, spec["src"], spec.get("basis", "assumed")),
+        "depth": Dim(d, spec["src"], spec.get("basis", "assumed"), "lens face to the back of the housing"),
+        "bezel": Dim(4.0, "the bezel width is not printed", "assumed"),
+        "socket_d": Dim(bdia + 12.0, f"the {spec['bulb']} bulb's {base} base ({bdia:g} mm): socket drawn {bdia + 12:g} across", "assumed"),
+        "socket_l": Dim(28.0, "the socket body length is not printed", "assumed"),
+        "lead_l": Dim(150.0, "the socket's lead length is not printed", "assumed"),
+    }
+    COLORS = {"housing": (spec.get("housing", "#2a2b2c"), spec.get("housing_src", "housing: drawn black (not in the photos)")),
+              "bezel": ("#cfd2d4", spec.get("bezel_src", "bezel: chrome (owner's photos)")),
+              "lens": (spec["lens"][0], spec["lens"][1]),
+              "socket": ("#d9d2bc", "socket: natural nylon (the part_media socket photos)")}
+    if spec.get("lens2"):
+        COLORS["lens2"] = spec["lens2"]
+    PART = {
+        "pid": end, "endpoints": spec.get("endpoints", [end]), "maker": "GM (factory, 1973-87 C/K)", "pn": spec["pn"],
+        "title": spec["title"], "what": spec["what"], "shape_basis": spec.get("shape_basis", "twin object"), "viewset": "wall",
+        "dims_mm": {"l": w, "w": d, "h": h},
+        "dims_note": spec["dims_note"],
+        "margin": {"mm": spec.get("margin", 30.0), "why": spec.get("margin_why", "the lamp's envelope is the body model's mesh (±30); "
+                                                                                  "no GM drawing of the lamp is on file")},
+        "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), "
+                 "+Y up; the housing and socket behind (-Z)" + (" (mirrored)" if spec.get("mirror") else ""),
+        "axes": {"mount_normal": "+Z", "maker_up": "+Y", "faces": {"lens": "+Z", "socket": "-Z"}},
+        "photo": spec.get("photo", {}), "photo_short": spec.get("photo_short", ""), "branding": [],
+        "dims_draw": [("front", "x", "width", -10), ("front", "y", "height", -10), ("right", "z", "depth", 10)],
+        "refs": [("[1]", "the body model's own lamp mesh", "the body model's lamp mesh (via layout-ui's sizes)")] + spec.get("refs", []) +
+                [("[9]", "not printed", "not in any source: assumed")],
+        "drawing_notes": spec.get("notes", []),
+        "unknowns": spec.get("unknowns", []) + ["No GM drawing of the lamp is on file: its envelope is the body model's mesh (±30)."],
+    }
+    v = K.v
+    SL = v(P["socket_l"])
+    SOCK = spec.get("socket_at", (0.0, 0.0))
+
+    def build():
+        bz = v(P["bezel"])
+        housing = Pos(0, 0, -d) * D.rbox(w - 2 * bz, h - 2 * bz, d, r=6.0)
+        bezel = D.rbox(w, h, 6.0, r=6.0) - Pos(0, 0, -1) * D.rbox(w - 2 * bz, h - 2 * bz, 8.0, r=4.0)
+        parts = [K.body(housing, f"{end} housing", COLORS["housing"][0])]
+        if spec.get("lens2"):
+            h1 = h * spec["lens_split"]
+            fw = spec.get("lens2_width", 1.0)
+            l1 = D.rbox(w - 2 * bz - 1, h - 2 * bz - 1, 5.5, r=4.0)
+            sgn = spec.get("lens2_side", 1.0)          # +1: the lens toward +X; -1: toward -X
+            l2 = Pos(sgn * (w - 2 * bz) * (1 - fw) / 2, -(h - 2 * bz) / 2 + (h - h1) / 2, 0.3) * D.rbox((w - 2 * bz) * fw - 6, h - h1 - 2 * bz, 5.5, r=4.0)
+            l1 = l1 - Pos(0, 0, -0.5) * l2
+            parts += [K.body(l1, f"{end} lens ({spec['lens_name']})", COLORS["lens"][0], finish="lens"),
+                      K.body(l2, f"{end} lens ({spec['lens2_name']})", COLORS["lens2"][0], finish="lens")]
+        else:
+            lens = D.rbox(w - 2 * bz - 1, h - 2 * bz - 1, 5.5, r=4.0)
+            parts.append(K.body(lens, f"{end} lens ({spec['lens_name']})", COLORS["lens"][0], finish="lens"))
+        parts.append(K.body(bezel, f"{end} chrome bezel", COLORS["bezel"][0], finish="chrome"))
+        for sx, sy in spec.get("sockets", [SOCK]):
+            sock = D.cyl(v(P["socket_d"]), SL, at=(sx, sy, -d - SL + 2.0))
+            parts.append(K.body(sock, f"{end} bulb socket ({spec['bulb']}, {base})", COLORS["socket"][0]))
+        cos = []
+        for i, (pin, nm, wires, col) in enumerate(spec["leads"]):
+            sx, sy = spec.get("lead_from", {}).get(pin, SOCK)
+            s, _ = D.lead((sx + (i - 1) * 2.6, sy, -d - SL + 3.0), (0, 0, -1), v(P["lead_l"]), d=2.0)
+            cos.append(K.body(s, f"{end} lead {col} ({nm})", D.LEAD_HEX.get(col, "#888888"), finish="rubber"))
+        if spec.get("mirror"):
+            from dev_motors import mirror_x
+            parts, cos = mirror_x(parts), mirror_x(cos)
+        keep = [K.body(Pos(SOCK[0] * (-1 if spec.get("mirror") else 1), SOCK[1], -d - SL - 30.0) * Box(40.0, 40.0, 30.0, align=D.BASE),
+                       "keep-out: socket twist-out and leads behind the housing (30 mm)", "#2e7d32", alpha=0.25)]
+        return parts, keep, cos
+
+    def _at(pin):
+        sx, sy = spec.get("lead_from", {}).get(pin, SOCK)
+        return ((-sx if spec.get("mirror") else sx), sy, -d - SL + 3.0)
+
+    def attach_points():
+        out = []
+        for pin, nm, wires, col in spec["leads"]:
+            a = _at(pin)
+            out.append({"n": pin, "ep": spec.get("ep_of", {}).get(pin, end), "at": [round(c, 2) for c in a], "dir": [0, 0, -1],
+                        "kind": "socket lead", "note": nm})
+        return out
+
+    def terminals():
+        return [{"pin": pin, "endpoint": spec.get("ep_of", {}).get(pin, end), "name": nm, "kind": "socket lead", "wires": wires,
+                 "at": _at(pin), "dir": (0, 0, -1), "free": (_at(pin)[0], _at(pin)[1], _at(pin)[2] - v(P["lead_l"]))}
+                for pin, nm, wires, col in spec["leads"]]
+
+    def mount_points():
+        return [{"n": "flange", "at": [0, 0, 0], "dir": [0, 0, -1], "note": "housing screws / nuts into the body opening (not dimensioned)"}]
+
+    CHECKS = [("width", lambda b: Compound(children=[x for x in b if "bezel" in x.label]).bounding_box().size.X, w),
+              ("height", lambda b: Compound(children=[x for x in b if "bezel" in x.label]).bounding_box().size.Y, h)]
+    return _namespace(P, COLORS, PART, build, attach_points, terminals, mount_points, CHECKS)
+
+
+def park_turn(end):
+    left = end.endswith("LF")
+    w = ("83", "80", "PT_LF_GND") if left else ("84", "82", "PT_RF_GND")
+    return factory_lamp(end, {
+        "title": f"Factory front park / turn lamp ({'left' if left else 'right'}, 1157)", "pn": "factory lamp; socket GM 8911486 (1157)",
+        "what": f"{'Left' if left else 'Right'} front park/turn lamp (1157: park = low filament, turn = high filament)",
+        "dims": (214.9, 86.3, 56.8), "src": f"{TWIN}: mesh Parking_Lights, one side 214.9 x 56.8 x 86.3",
+        "dims_note": "214.9 wide x 86.3 tall x 56.8 deep: the body model's own lamp (±30); 1157 socket behind", "bulb": "1157",
+        "lens": ("#f3b12a", "lens: amber (assumed: the body model's lens material has no colour)"), "lens_name": "amber",
+        "leads": [("PARK", "park filament lead", [w[0]], "brown"), ("TURN", "turn filament lead", [w[1]], "blue" if left else "blue"),
+                  ("GND", "ground lead", [w[2]], "black")],
+        "mirror": not left, "notes": [("Factory socket 8911486 in the harness, or a new pigtail socket + splice: owner/builder call "
+                                       "(registry).", "#10151a")],
+        "unknowns": ["The lens colour on the 1977 grille lamp is not read (drawn amber)."]})
+
+
+def side_marker(end):
+    front = end in ("MARKER-LF", "MARKER-RF")
+    left = end in ("MARKER-LF", "MARKER-LR")
+    wires = {"MARKER-LF": ("87", "MK_LF_GND"), "MARKER-RF": ("88", "MK_RF_GND"), "MARKER-LR": ("77", "MK_LR_GND"),
+             "MARKER-RR": ("78", "MK_RR_GND")}[end]
+    return factory_lamp(end, {
+        "title": f"Factory {'front' if front else 'rear'} side marker ({'left' if left else 'right'}, 168)", "pn": "factory lamp; socket GM 6294015 (168)",
+        "what": f"{'Left' if left else 'Right'} {'front' if front else 'rear'} side marker (168 bulb in socket 6294015)",
+        "dims": (46.5, 191.9, 42.9), "src": f"{TWIN}: mesh Marker_Lights (front), one side 46.5 x 42.9 x 191.9" + ("" if front else
+                                                                                                          "; the rear marker is drawn the same size (no rear mesh read)"),
+        "dims_note": "46.5 wide x 191.9 tall x 42.9 deep: the body model's front marker (±30)" + ("" if front else ", used for the rear"),
+        "bulb": "168",
+        "lens": (("#f19a1c", f"{OWN_MARK}") if front else ("#c4262e", "lens: red (assumed: US rear side markers are red)")),
+        "lens_name": "amber" if front else "red",
+        "leads": [("FEED", "park-circuit lead" if front else "feed lead", [wires[0]], "brown"),
+                  ("2ND", "second lead" if front else "ground lead", [wires[1]], "black")],
+        "mirror": not left, "photo": {"url": "vehicle_images 640fc598", "page": "Nuke vehicle e08bf694 images", "fetched": "2026-09-29"} if front else {},
+        "photo_short": "owner's photo 640fc598" if front else "",
+        "notes": [("The factory marker grounded through the turn filament; here the second lead is its own ground (registry).", "#10151a")]})
+
+
+def tail_lamp(end):
+    left = end.endswith("Left")
+    t = ("81", "REAR_ST_L", "TL_L_GND", "89", "BU_L_GND") if left else ("75", "REAR_ST_R", "TL_R_GND", "76", "BU_R_GND")
+    bu = "Backup_Light_Left" if left else "Backup_Light_Right"
+    h, w = 193.6, 148.1
+    return factory_lamp(end, {
+        "title": f"Factory tail / stop / turn and back-up lamp ({'left' if left else 'right'})", "pn": "factory lamp; sockets GM 8911029 (1157) and 8911027 (1156)",
+        "what": f"{'Left' if left else 'Right'} rear combination lamp: tail/stop/turn (1157) above the back-up lamp (1156), one housing",
+        "dims": (w, h, 146.9), "src": f"{TWIN}: mesh Tail_Lights_Main, one side 148.1 x 146.9 x 193.6",
+        "dims_note": "148.1 wide x 193.6 tall x 146.9 deep: the body model's own lamp (±30); red lens over the clear back-up lens",
+        "bulb": "1157", "endpoints": [end, bu],
+        "lens": ("#c0262c", OWN_REAR), "lens_name": "red, tail / stop / turn", "lens2": ("#e9ebea", OWN_REAR), "lens2_name": "clear, back-up",
+        "lens_split": 0.72, "lens2_width": 0.62, "lens2_side": -1.0,     # outboard, low (owner's photo 34e05023)
+        "sockets": [(0.0, h * 0.18), (0.0, -h * 0.33)], "socket_at": (0.0, h * 0.18),
+        "lead_from": {"BU": (0.0, -h * 0.33), "BU_GND": (0.0, -h * 0.33)},
+        "ep_of": {"BU": bu, "BU_GND": bu},
+        "leads": [("TAIL", "tail filament lead", [t[0]], "brown"), ("STOP", "stop/turn filament lead", [t[1]], "yellow"),
+                  ("GND", "ground lead", [t[2]], "black"), ("BU", "back-up feed lead", [t[3]], "light blue"),
+                  ("BU_GND", "back-up ground lead", [t[4]], "black")],
+        "mirror": not left, "photo": {"url": "vehicle_images 34e05023", "page": "Nuke vehicle e08bf694 images", "fetched": "2026-09-29"},
+        "photo_short": "owner's photo 34e05023",
+        "refs": [("[2]", "tail-light-fleetside", "LMC 1973-87 tail light parts (lens, gasket, sockets)"), ("[3]", "34e05023", "owner's photo")],
+        "notes": [("One housing, two ends: the tail lamp (1157) and the back-up lamp (1156) in the lower lens (layout-ui SAME_PIECE).", "#10151a")]})
+
+
+def license_lamp(end="LICENSE-LAMP"):
+    return factory_lamp(end, {
+        "title": "Factory license plate lamp (67)", "pn": "factory lamp; connector 2977721 (67 bulb)",
+        "what": "License plate lamp (67 bulb): one feed lead, grounds through its housing", "shape_basis": "not sourced",
+        "dims": (80.0, 40.0, 45.0), "src": "no GM drawing or body-model mesh of the license lamp on file: envelope assumed",
+        "dims_note": "no source: an 80 x 40 x 45 envelope, assumed (±25)", "margin": 25.0,
+        "margin_why": "no drawing, mesh or photo of the lamp on file", "bulb": "67",
+        "lens": ("#eeeeec", "lens: clear (assumed)"), "lens_name": "clear",
+        "leads": [("FEED", "feed lead", ["92"], "brown"), ("GND", "ground (through the housing: LIC_GND needs a lead or ring)", ["LIC_GND"], "black")],
+        "notes": [("The factory lamp grounds through its housing (1978 booklet p.14): LIC_GND is a new lead or ring.", "#10151a")]})
+
+
+def dome_lamp(end="DOME-LAMP"):
+    return factory_lamp(end, {
+        "title": "Factory dome lamp (cab roof)", "pn": "factory lamp (which one the truck carries is read at the bench)",
+        "what": "Dome lamp (cab roof): battery-feed terminal and the switched-ground terminal (now a plain ground)",
+        "dims": (97.2, 56.8, 20.3), "src": f"{TWIN}: mesh Interior_Dome_Light_Blazer, 97.2 x 56.8 x 20.3",
+        "dims_note": "97.2 x 56.8 x 20.3: the body model's dome lamp (±30)", "bulb": "211",
+        "lens": ("#f2f2ef", "lens: white (assumed; the body model's Dome_Light_Glass has no colour)"), "lens_name": "white",
+        "housing": "#d9d9d6", "housing_src": "housing: drawn white", "socket_at": (0.0, 0.0),
+        "leads": [("FEED", "battery-feed terminal", ["67"], "orange"), ("GND", "switched-ground terminal", ["DOME_GND"], "black")],
+        "unknowns": ["Which dome lamp the truck carries (Blazer C8B pair or the single cab lamp): bench (registry)."]})
+
+
+def clearance_lamp(end):
+    pos = {"CLEARANCE-L": ("left", "79", "CL_L_GND"), "CLEARANCE-C": ("centre", "90", "CL_C_GND"), "CLEARANCE-R": ("right", "91", "CL_R_GND")}[end]
+    return factory_lamp(end, {
+        "title": f"LMC 1973-87 roof marker lamp ({pos[0]}), 36-4481", "pn": "LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb",
+        "what": f"Roof clearance lamp, {pos[0]}: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness 36-3770",
+        "shape_basis": "not sourced", "dims": (100.0, 60.0, 42.0),
+        "src": f"no dimension on {LMC_ROOF}: envelope assumed from LMC's diagram proportions",
+        "dims_note": "no printed size (LMC): a 100 x 60 x 42 envelope, assumed (±20)", "margin": 20.0,
+        "margin_why": "LMC prints no size for the roof marker", "bulb": "194",
+        "lens": ("#f0a01d", f"{LMC_ROOF}: '36-4481 Lens-Roof Marker Amber'"), "lens_name": "amber", "housing": "#1b1b1c",
+        "housing_src": f"{LMC_ROOF}: 36-4482 lens pad (black)",
+        "leads": [("+", "roof lamp + lead (splice)", [pos[1]], "brown"), ("-", "roof lamp - lead (splice)", [pos[2]], "black")],
+        "photo": {"url": "https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png",
+                  "page": "https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp", "fetched": "2026-09-29"},
+        "photo_short": "LMC roof marker diagram",
+        "refs": [("[2]", "roof-marker-lamp", "LMC 1973-87 roof marker lamp parts list")],
+        "notes": [("LMC lists 5 roof lamps per truck; the registry keeps 3 (owner item).", "#10151a")]})
+
+
+def underhood_lamp(end="UNDERHOOD-LAMP"):
+    return factory_lamp(end, {
+        "title": "Factory underhood lamp and switch (93)", "pn": "factory underhood lamp & switch assembly (93 bulb)",
+        "what": "Underhood lamp: one feed lead, grounds through its mount (the factory spot not found in the 1977 manual text)",
+        "shape_basis": "not sourced", "dims": (90.0, 45.0, 45.0),
+        "src": "no GM drawing, mesh or photo of the underhood lamp on file: envelope assumed",
+        "dims_note": "no source: a 90 x 45 x 45 envelope, assumed (±25)", "margin": 25.0,
+        "margin_why": "nothing on file for the lamp", "bulb": "93",
+        "lens": ("#eeeeec", "lens: clear (assumed)"), "lens_name": "clear",
+        "leads": [("FEED", "feed lead (PDM30 OUT25)", ["73"], "brown"), ("GND", "ground (through the mount: UH_GND)", ["UH_GND"], "black")],
+        "notes": [("The factory lamp grounds through its mount (1978 booklet p.16): UH_GND is a new lead or ring.", "#10151a")]})

@@ -77,7 +77,7 @@ COLORS = {
 PART = {
     "pid": "WIDEBAND", "endpoints": ["WIDEBAND"], "maker": "MoTeC (sensors: Bosch)", "pn": "61301 LTCD + 2 x Bosch LSU 4.9",
     "title": "MoTeC LTCD dual lambda controller with two Bosch LSU 4.9 sensors",
-    "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 via Dave)",
+    "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 through the builder)",
     "shape_basis": "maker drawing", "viewset": "wall",
     "dims_mm": {"l": 38.0, "w": 23.5, "h": 26.0},
     "dims_note": "LTCD case 38 x 26 x 23.5 (MoTeC drawing; the manual says 14 thick); looms reach 200 from the case top; each "

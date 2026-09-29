@@ -1226,6 +1226,279 @@
     }
    ]
   },
+  "CLEARANCE-C": {
+   "endpoints": [
+    "CLEARANCE-C"
+   ],
+   "what": "Roof clearance lamp, centre: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness 36-3770",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 100.0,
+    "w": 42.0,
+    "h": 60.0
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1b1b1c",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): 36-4482 lens pad (black)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f0a01d",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): '36-4481 Lens-Roof Marker Amber'"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "+",
+     "ep": "CLEARANCE-C",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp + lead (splice)"
+    },
+    {
+     "n": "-",
+     "ep": "CLEARANCE-C",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp - lead (splice)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "CLEARANCE-L": {
+   "endpoints": [
+    "CLEARANCE-L"
+   ],
+   "what": "Roof clearance lamp, left: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness 36-3770",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 100.0,
+    "w": 42.0,
+    "h": 60.0
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1b1b1c",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): 36-4482 lens pad (black)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f0a01d",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): '36-4481 Lens-Roof Marker Amber'"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "+",
+     "ep": "CLEARANCE-L",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp + lead (splice)"
+    },
+    {
+     "n": "-",
+     "ep": "CLEARANCE-L",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp - lead (splice)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "CLEARANCE-R": {
+   "endpoints": [
+    "CLEARANCE-R"
+   ],
+   "what": "Roof clearance lamp, right: LMC 1973-87 roof marker (36-4481 amber lens, 36-4482 pad, 36-0368 LED 194), LMC harness 36-3770",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "LMC 36-4481 lens + 36-4482 pad + 36-0368 194 LED bulb",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 100.0,
+    "w": 42.0,
+    "h": 60.0
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1b1b1c",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): 36-4482 lens pad (black)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f0a01d",
+     "from": "reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md (LMC 36-4481 lens, 36-4482 pad, 36-0412 socket): '36-4481 Lens-Roof Marker Amber'"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "+",
+     "ep": "CLEARANCE-R",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp + lead (splice)"
+    },
+    {
+     "n": "-",
+     "ep": "CLEARANCE-R",
+     "at": [
+      0.0,
+      0.0,
+      -67.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "roof lamp - lead (splice)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
   "DCDC": {
    "endpoints": [
     "DCDC"
@@ -1409,6 +1682,97 @@
      ],
      "d": 8.0,
      "note": "open slot, 8 wide with an R4 end, 6 in from the plate edge"
+    }
+   ]
+  },
+  "DOME-LAMP": {
+   "endpoints": [
+    "DOME-LAMP"
+   ],
+   "what": "Dome lamp (cab roof): battery-feed terminal and the switched-ground terminal (now a plain ground)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp (which one the truck carries is read at the bench)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 97.2,
+    "w": 20.3,
+    "h": 56.8
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#d9d9d6",
+     "from": "housing: drawn white"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f2f2ef",
+     "from": "lens: white (assumed; the body model's Dome_Light_Glass has no colour)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "DOME-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -45.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "battery-feed terminal"
+    },
+    {
+     "n": "GND",
+     "ep": "DOME-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -45.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "switched-ground terminal"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
     }
    ]
   },
@@ -2461,6 +2825,97 @@
     }
    ]
   },
+  "LICENSE-LAMP": {
+   "endpoints": [
+    "LICENSE-LAMP"
+   ],
+   "what": "License plate lamp (67 bulb): one feed lead, grounds through its housing",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; connector 2977721 (67 bulb)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 80.0,
+    "w": 45.0,
+    "h": 40.0
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#eeeeec",
+     "from": "lens: clear (assumed)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "LICENSE-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -70.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "feed lead"
+    },
+    {
+     "n": "GND",
+     "ep": "LICENSE-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -70.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground (through the housing: LIC_GND needs a lead or ring)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
   "M130-A": {
    "endpoints": [
     "M130-A",
@@ -2616,6 +3071,370 @@
     "budget_mm": 80.0,
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
+  },
+  "MARKER-LF": {
+   "endpoints": [
+    "MARKER-LF"
+   ],
+   "what": "Left front side marker (168 bulb in socket 6294015)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 6294015 (168)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 46.5,
+    "w": 42.9,
+    "h": 191.9
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f19a1c",
+     "from": "owner's photo of the front fender, vehicle_images 640fc598 (amber side marker, chrome bezel)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "MARKER-LF",
+     "at": [
+      0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "park-circuit lead"
+    },
+    {
+     "n": "2ND",
+     "ep": "MARKER-LF",
+     "at": [
+      0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "second lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "MARKER-LR": {
+   "endpoints": [
+    "MARKER-LR"
+   ],
+   "what": "Left rear side marker (168 bulb in socket 6294015)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 6294015 (168)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 46.5,
+    "w": 42.9,
+    "h": 191.9
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#c4262e",
+     "from": "lens: red (assumed: US rear side markers are red)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "MARKER-LR",
+     "at": [
+      0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "feed lead"
+    },
+    {
+     "n": "2ND",
+     "ep": "MARKER-LR",
+     "at": [
+      0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "MARKER-RF": {
+   "endpoints": [
+    "MARKER-RF"
+   ],
+   "what": "Right front side marker (168 bulb in socket 6294015)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 6294015 (168)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 46.5,
+    "w": 42.9,
+    "h": 191.9
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z) (mirrored)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f19a1c",
+     "from": "owner's photo of the front fender, vehicle_images 640fc598 (amber side marker, chrome bezel)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "MARKER-RF",
+     "at": [
+      -0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "park-circuit lead"
+    },
+    {
+     "n": "2ND",
+     "ep": "MARKER-RF",
+     "at": [
+      -0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "second lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "MARKER-RR": {
+   "endpoints": [
+    "MARKER-RR"
+   ],
+   "what": "Right rear side marker (168 bulb in socket 6294015)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 6294015 (168)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 46.5,
+    "w": 42.9,
+    "h": 191.9
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z) (mirrored)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#c4262e",
+     "from": "lens: red (assumed: US rear side markers are red)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "MARKER-RR",
+     "at": [
+      -0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "feed lead"
+    },
+    {
+     "n": "2ND",
+     "ep": "MARKER-RR",
+     "at": [
+      -0.0,
+      0.0,
+      -67.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
   },
   "MIRROR-MON": {
    "endpoints": [
@@ -2969,6 +3788,220 @@
      ],
      "d": 4.0,
      "note": "flange screw hole"
+    }
+   ]
+  },
+  "PARK-TURN-LF": {
+   "endpoints": [
+    "PARK-TURN-LF"
+   ],
+   "what": "Left front park/turn lamp (1157: park = low filament, turn = high filament)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 8911486 (1157)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 214.9,
+    "w": 56.8,
+    "h": 86.3
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f3b12a",
+     "from": "lens: amber (assumed: the body model's lens material has no colour)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "PARK",
+     "ep": "PARK-TURN-LF",
+     "at": [
+      0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "park filament lead"
+    },
+    {
+     "n": "TURN",
+     "ep": "PARK-TURN-LF",
+     "at": [
+      0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "turn filament lead"
+    },
+    {
+     "n": "GND",
+     "ep": "PARK-TURN-LF",
+     "at": [
+      0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "PARK-TURN-RF": {
+   "endpoints": [
+    "PARK-TURN-RF"
+   ],
+   "what": "Right front park/turn lamp (1157: park = low filament, turn = high filament)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; socket GM 8911486 (1157)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 214.9,
+    "w": 56.8,
+    "h": 86.3
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z) (mirrored)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#f3b12a",
+     "from": "lens: amber (assumed: the body model's lens material has no colour)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "PARK",
+     "ep": "PARK-TURN-RF",
+     "at": [
+      -0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "park filament lead"
+    },
+    {
+     "n": "TURN",
+     "ep": "PARK-TURN-RF",
+     "at": [
+      -0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "turn filament lead"
+    },
+    {
+     "n": "GND",
+     "ep": "PARK-TURN-RF",
+     "at": [
+      -0.0,
+      0.0,
+      -81.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
     }
    ]
   },
@@ -4636,6 +5669,294 @@
     }
    ]
   },
+  "Tail_Light_Left": {
+   "endpoints": [
+    "Tail_Light_Left",
+    "Backup_Light_Left"
+   ],
+   "what": "Left rear combination lamp: tail/stop/turn (1157) above the back-up lamp (1156), one housing",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; sockets GM 8911029 (1157) and 8911027 (1156)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 148.1,
+    "w": 146.9,
+    "h": 193.6
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#c0262c",
+     "from": "owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome trim)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    },
+    "lens2": {
+     "hex": "#e9ebea",
+     "from": "owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome trim)"
+    }
+   },
+   "attach": [
+    {
+     "n": "TAIL",
+     "ep": "Tail_Light_Left",
+     "at": [
+      0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "tail filament lead"
+    },
+    {
+     "n": "STOP",
+     "ep": "Tail_Light_Left",
+     "at": [
+      0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "stop/turn filament lead"
+    },
+    {
+     "n": "GND",
+     "ep": "Tail_Light_Left",
+     "at": [
+      0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    },
+    {
+     "n": "BU",
+     "ep": "Backup_Light_Left",
+     "at": [
+      0.0,
+      -63.89,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "back-up feed lead"
+    },
+    {
+     "n": "BU_GND",
+     "ep": "Backup_Light_Left",
+     "at": [
+      0.0,
+      -63.89,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "back-up ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "Tail_Light_Right": {
+   "endpoints": [
+    "Tail_Light_Right",
+    "Backup_Light_Right"
+   ],
+   "what": "Right rear combination lamp: tail/stop/turn (1157) above the back-up lamp (1156), one housing",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory lamp; sockets GM 8911029 (1157) and 8911027 (1156)",
+   "shape_basis": "twin object",
+   "dims_mm": {
+    "l": 148.1,
+    "w": 146.9,
+    "h": 193.6
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z) (mirrored)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#c0262c",
+     "from": "owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome trim)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    },
+    "lens2": {
+     "hex": "#e9ebea",
+     "from": "owner's photo of the truck's rear corner, vehicle_images 34e05023 (red upper lens, clear back-up lens, chrome trim)"
+    }
+   },
+   "attach": [
+    {
+     "n": "TAIL",
+     "ep": "Tail_Light_Right",
+     "at": [
+      -0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "tail filament lead"
+    },
+    {
+     "n": "STOP",
+     "ep": "Tail_Light_Right",
+     "at": [
+      -0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "stop/turn filament lead"
+    },
+    {
+     "n": "GND",
+     "ep": "Tail_Light_Right",
+     "at": [
+      -0.0,
+      34.85,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground lead"
+    },
+    {
+     "n": "BU",
+     "ep": "Backup_Light_Right",
+     "at": [
+      -0.0,
+      -63.89,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "back-up feed lead"
+    },
+    {
+     "n": "BU_GND",
+     "ep": "Backup_Light_Right",
+     "at": [
+      -0.0,
+      -63.89,
+      -171.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "back-up ground lead"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
   "UNDERDASH-LAMPS": {
    "endpoints": [
     "UNDERDASH-LAMPS"
@@ -4720,6 +6041,97 @@
      ],
      "d": 4.0,
      "note": "screw through the end cap"
+    }
+   ]
+  },
+  "UNDERHOOD-LAMP": {
+   "endpoints": [
+    "UNDERHOOD-LAMP"
+   ],
+   "what": "Underhood lamp: one feed lead, grounds through its mount (the factory spot not found in the 1977 manual text)",
+   "maker": "GM (factory, 1973-87 C/K)",
+   "maker_pn": "factory underhood lamp & switch assembly (93 bulb)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 90.0,
+    "w": 45.0,
+    "h": 45.0
+   },
+   "frame": "origin at the centre of the lamp's mounting face on the body (the housing's flange); +Z out of the body (the light), +Y up; the housing and socket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "socket": "-Z"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2a2b2c",
+     "from": "housing: drawn black (not in the photos)"
+    },
+    "bezel": {
+     "hex": "#cfd2d4",
+     "from": "bezel: chrome (owner's photos)"
+    },
+    "lens": {
+     "hex": "#eeeeec",
+     "from": "lens: clear (assumed)"
+    },
+    "socket": {
+     "hex": "#d9d2bc",
+     "from": "socket: natural nylon (the part_media socket photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "FEED",
+     "ep": "UNDERHOOD-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -70.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "feed lead (PDM30 OUT25)"
+    },
+    {
+     "n": "GND",
+     "ep": "UNDERHOOD-LAMP",
+     "at": [
+      0.0,
+      0.0,
+      -70.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "socket lead",
+     "note": "ground (through the mount: UH_GND)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "housing screws / nuts into the body opening (not dimensioned)"
     }
    ]
   },
@@ -4819,7 +6231,7 @@
    "endpoints": [
     "WIDEBAND"
    ],
-   "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 via Dave)",
+   "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 through the builder)",
    "maker": "MoTeC (sensors: Bosch)",
    "maker_pn": "61301 LTCD + 2 x Bosch LSU 4.9",
    "shape_basis": "maker drawing",
