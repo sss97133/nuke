@@ -61,6 +61,9 @@ def _meta(mod, script):
     return meta
 
 
+UNMODELLED = {}     # end id -> why it has no model yet (from the family modules)
+
+
 def load_parts():
     """Part scripts named by an end id (<END>.py), plus family modules (fam_*.py) whose pieces() returns part-like
     objects: housings keyed by maker PN and one assembly per end. Returns (records, end ids, END_NEEDS)."""
@@ -79,6 +82,8 @@ def load_parts():
                 parts.append(_meta(piece, script))
             for e, n in getattr(mod, "END_NEEDS", {}).items():
                 needs.setdefault(e, []).extend(x for x in n if x not in needs.get(e, []))
+            for e, why in getattr(mod, "UNMODELLED", {}).items():
+                UNMODELLED[e] = why
         else:
             parts.append(_meta(mod, script))
     return parts, ends, needs
@@ -96,6 +101,8 @@ def end_table(parts, ends, needs):
         if own is not None:
             missing = sorted(set(missing) | set(own.get("missing", [])))
         if not recs:
+            if e in UNMODELLED:
+                out[e] = {"models": [], "complete": False, "missing": [UNMODELLED[e]]}
             continue
         out[e] = {"models": recs, "complete": not missing, **({"missing": missing} if missing else {})}
     return out
@@ -140,7 +147,9 @@ def main():
         seen[p["id"]] = p["script"]
     table = end_table(parts, ends, needs)
     done = sum(1 for v in table.values() if v["complete"])
-    doc = {"generated": str(date.today()), "ends_covered": len(table), "ends_complete": done, "ends_total": len(ends),
+    modelled = sum(1 for v in table.values() if v["models"])
+    doc = {"generated": str(date.today()), "ends_covered": modelled, "ends_complete": done, "ends_total": len(ends),
+           "ends_unmodelled_with_reason": sum(1 for v in table.values() if not v["models"]),
            "ends": table, "parts": parts}
     text = HEADER + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=120)
     m = re.search(r"[0-9a-fA-F]{32,}", text)
@@ -150,7 +159,8 @@ def main():
     for p in parts:
         counts[p["shape_basis"]] = counts.get(p["shape_basis"], 0) + 1
     print(f"{len(parts)} part(s): " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
-    print(f"ends: {len(table)} of {len(ends)} have a model, {done} complete")
+    print(f"ends: {modelled} of {len(ends)} have a model, {done} complete; "
+          f"{sum(1 for v in table.values() if not v['models'])} listed without one, with the reason")
     if errors:
         print("\n".join("LINT " + e for e in errors))
         sys.exit(1)

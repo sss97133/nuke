@@ -18,13 +18,18 @@
 #   attach       where each wire lands: {n, ep (endpoint id), at [mm], dir (the way the wire leaves)}
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
-ends_covered: 45
-ends_complete: 42
+ends_covered: 49
+ends_complete: 46
 ends_total: 178
+ends_unmodelled_with_reason: 31
 ends:
   ACC-BATT:
     models:
     - ACC-BATT
+    complete: true
+  AMP-PASS:
+    models:
+    - '1003'
     complete: true
   CKP:
     models:
@@ -98,6 +103,11 @@ ends:
     - COIL-8
     - COIL-CONN-LS2-7
     complete: true
+  COIL-GROUND-RINGS:
+    models: []
+    complete: false
+    missing:
+    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
   DCDC:
     models:
     - DCDC
@@ -134,6 +144,10 @@ ends:
     - DTP04-4P
     - DTP06-4S
     complete: true
+  FAN-JUNCTION:
+    models:
+    - '2103'
+    complete: true
   FIREWALL-BODY-A:
     models:
     - 0460-202-16141
@@ -169,6 +183,10 @@ ends:
     - DTP4P-L012-GKT
     - FIREWALL-BODY-P
     complete: true
+  FIREWALL-GROMMET:
+    models:
+    - '1003'
+    complete: true
   FUEL-LEVEL:
     models:
     - 0460-202-16141
@@ -191,6 +209,57 @@ ends:
     missing:
     - QFS-BKCN-GM bulkhead
     - QFS-H882 hanger and P367 pump
+  FUSE-DAK_CONST:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  FUSE-IBOOST_PERM:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  FUSE-ISO_PWR:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  FUSE-ISO_SW_PWR:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  FUSE-PCS_BATT:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  FUSE-TRANS_BATT:
+    models: []
+    complete: false
+    missing:
+    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
+      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+  GND-BANK-CAB:
+    models: []
+    complete: false
+    missing:
+    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+  GND-BANK-ENG:
+    models: []
+    complete: false
+    missing:
+    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
+  GND-SPLICE-REAR:
+    models: []
+    complete: false
+    missing:
+    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
   IAT:
     models:
     - '12191818'
@@ -307,6 +376,153 @@ ends:
     models:
     - PDM30-A
     complete: true
+  PS-STUDS:
+    models: []
+    complete: false
+    missing:
+    - the DC primary lugs land on six different studs; the lug set per stud is not picked (endpoints.yaml PS-STUDS)
+  RAIL-COIL_PWR:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (D-609-05 x 7): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000
+      = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  RAIL-INJ_PWR:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (D-609-05 x 7): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000
+      = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-FUEL-SND:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-2): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-ISO-YEL:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (D-609-04): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05)
+      opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice
+      from the ProWire order'
+  SPL-PDM15-OUT1:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT13:
+    models:
+    - '327583'
+    complete: true
+  SPL-PDM15-OUT2:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT3:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT4:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT5:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT6:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM15-OUT7:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT1:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT2:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT3:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT4:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT5:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (D-609-05): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05)
+      opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice
+      from the ProWire order'
+  SPL-PDM30-OUT6:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT7:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  SPL-PDM30-OUT8:
+    models: []
+    complete: false
+    missing:
+    - 'Raychem MiniSeal (M81824/1-3): no dimension on file. TE''s data sheet (2347480-1, linked from DigiKey 680106-000 =
+      D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers
+      on a splice from the ProWire order'
+  STARTER-S:
+    models: []
+    complete: false
+    missing:
+    - 'ring terminal and stud bank not picked (families.yaml ring_small: ''UNKNOWN: ring PN per stud size + gauge'')'
   WIDEBAND:
     models:
     - 0460-202-20141
@@ -20550,3 +20766,306 @@ parts:
   - COIL-CONN-LS2-7
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: '1003'
+  endpoints:
+  - FIREWALL-GROMMET
+  - AMP-PASS
+  what: Blue Sea 1003 CableClam cable pass-through (one per cable)
+  maker: Blue Sea Systems
+  maker_pn: '1003'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 67.7
+    w: 67.7
+    h: 28.3
+  dims_note: 67.7 x 67.7 x 28.3
+  frame: stands on the panel at z = 0, the cable up through its centre (+Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    cableclam:
+      hex: '#1b1c1e'
+      from: 'Blue Sea CableClam: black (the drawing and the product photos show black acetal)'
+    clam seal:
+      hex: '#262626'
+      from: 'Blue Sea CableClam: black rubber seal insert'
+  attach:
+  - n: cable
+    ep: FIREWALL-GROMMET
+    at:
+    - 0.0
+    - 0.0
+    - 28.33
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: cable exit
+  - n: cable_amp
+    ep: AMP-PASS
+    at:
+    - 0.0
+    - 0.0
+    - 28.33
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: cable exit
+  mount: []
+  params:
+  - name: od
+    value: 67.7
+    source: 'd2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1 ''CableClam
+      1.385 Inch'', fetched 2026-09-29): ''dia 2.67in [67.70mm]'''
+    basis: maker
+  - name: boss_d
+    value: 38.16
+    source: 'd2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1 ''CableClam
+      1.385 Inch'', fetched 2026-09-29): ''dia 1.50in [38.16mm]'''
+    basis: maker
+  - name: h
+    value: 28.33
+    source: 'd2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1 ''CableClam
+      1.385 Inch'', fetched 2026-09-29): ''1.12in [28.33mm]'''
+    basis: maker
+  - name: hole_r
+    value: 25.86
+    source: 'd2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1 ''CableClam
+      1.385 Inch'', fetched 2026-09-29): ''1.02in [25.86mm]'' centre to the holes'
+    basis: maker
+  - name: hole_d
+    value: 4.4
+    source: 'd2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1 ''CableClam
+      1.385 Inch'', fetched 2026-09-29): ''Mounting hole for #8 Screw'' (a #8 clearance hole)'
+    basis: design
+  - name: base_h
+    value: 4.0
+    source: scaled off d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf (Blue Sea drawing 1003-1
+      'CableClam 1.385 Inch', fetched 2026-09-29) side view at the printed 28.33
+    basis: scaled
+  - name: cable_max
+    value: 14.22
+    source: 'reference_documents/web_snapshots/www.bluesea.com__CableClam_1.40in.md: ''Max Cable Diameter 0.56in (14.22 mm)'''
+    basis: maker
+    note: the 1.40 in CableClam's figure; the 1003's own range is not on file
+  checks:
+  - check: outside diameter (drawing)
+    model: 67.7
+    drawing: 67.7
+    tol: 0.05
+    ok: true
+  - check: height (drawing)
+    model: 28.33
+    drawing: 28.33
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - The 1003's own cable range is not on file (the 1.40 in CableClam's 14.22 max is shown).
+  cross_checks: []
+  notes:
+  - 'FIREWALL-GROMMET and AMP-PASS take one CableClam per cable (endpoints.yaml): one is drawn'
+  kind: piece
+  family: power hardware
+  script: docs/wiring/calc-data/cad/fab/fam_power.py
+- id: '2103'
+  endpoints:
+  - FAN-JUNCTION
+  what: Blue Sea 2103 PowerPost Plus, 3/8-16 stud, 150 A, eight screw terminals
+  maker: Blue Sea Systems
+  maker_pn: '2103'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 83.8
+    w: 44.5
+    h: 51.0
+  dims_note: 83.8 x 44.5 x 51.0
+  frame: stands on its base at z = 0, the stud up (+Z), the mounting holes along X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    base:
+      hex: '#1c1c1e'
+      from: 'reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page):
+        ''Base Material is Black Nylon 8231 GHS'''
+    stud:
+      hex: '#c7c9c6'
+      from: 'reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page):
+        3/8" stud (tin-plated copper assumed colour: not stated)'
+  attach:
+  - n: stud
+    ep: FAN-JUNCTION
+    at:
+    - 0.0
+    - 0.0
+    - 51.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 3/8-16 stud (lugs)
+  mount: []
+  params:
+  - name: L
+    value: 83.82
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): ''3.300 [83.82]'''
+    basis: maker
+  - name: W
+    value: 44.45
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): ''1.750 [44.45]'''
+    basis: maker
+  - name: hole_x
+    value: 63.5
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): ''2.500 [63.50]'',
+      mounting holes for 1/4" screws'
+    basis: maker
+  - name: base_h
+    value: 11.43
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): ''.450 [11.43]'''
+    basis: maker
+  - name: top_h
+    value: 26.04
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): ''1.025 [26.04]''
+      to the terminal ring'
+    basis: maker
+  - name: A
+    value: 51.0
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table, 2103 dimension
+      A ''2.0 [51]'' to the stud tip'
+    basis: maker
+  - name: stud_d
+    value: 9.525
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table ''3/8"-16 UNC
+      X 3/4"''; reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page)
+      ''Stud dimensions: 3/8" x 3/4"'''
+    basis: maker
+  - name: stud_l
+    value: 19.05
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table ''3/8"-16 UNC
+      X 3/4"'''
+    basis: maker
+  - name: ring_d
+    value: 38.0
+    source: scaled off reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) top view
+      at the printed 44.45
+    basis: scaled
+    note: the round terminal ring
+  - name: screw_n
+    value: 8
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) top view: eight screw
+      terminals round the stud'
+    basis: scaled
+  checks:
+  - check: length (drawing)
+    model: 83.82
+    drawing: 83.82
+    tol: 0.05
+    ok: true
+  - check: width (drawing)
+    model: 44.45
+    drawing: 44.45
+    tol: 0.05
+    ok: true
+  - check: stud tip height A (drawing)
+    model: 51.0
+    drawing: 51.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: power hardware
+  script: docs/wiring/calc-data/cad/fab/fam_power.py
+- id: '327583'
+  endpoints:
+  - SPL-PDM15-OUT13
+  what: TE PIDG 327583 step-down butt splice, 16-14 / 22-18 AWG, blue translucent nylon
+  maker: TE Connectivity (AMP)
+  maker_pn: '327583'
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 6.4
+    w: 6.4
+    h: 32.1
+  dims_note: 6.4 x 6.4 x 32.1
+  frame: the splice axis is Z, the 16-14 AWG end at z = 0
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    pidg:
+      hex: '#6f9fd8'
+      from: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): ''Primary Product Color
+        Blue - Transluscent'''
+    pidg barrel:
+      hex: '#c9c6bf'
+      from: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): ''Terminal Plating
+        Material Tin'''
+  attach:
+  - n: big_end
+    ep: SPL-PDM15-OUT13
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: 16-14 AWG end
+  - n: small_end
+    ep: SPL-PDM15-OUT13
+    at:
+    - 0.0
+    - 0.0
+    - 32.13
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 22-18 AWG end
+  mount: []
+  params:
+  - name: L
+    value: 32.13
+    source: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): ''Product Length 32.13
+      mm [1.265 in]'''
+    basis: maker
+  - name: id
+    value: 3.89
+    source: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): ''Recovered Inside
+      Diameter 3.89 mm [.153 in]'''
+    basis: maker
+  - name: od
+    value: 6.4
+    source: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): the insulation sleeve,
+      scaled from the 3.89 recovered ID (TE photo)'
+    basis: photo
+    note: +-15 %
+  - name: step
+    value: 4.8
+    source: 'reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583): the 22-18 AWG end''s
+      smaller sleeve (photo)'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: length (TE)
+    model: 32.13
+    drawing: 32.13
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: power hardware
+  script: docs/wiring/calc-data/cad/fab/fam_power.py
