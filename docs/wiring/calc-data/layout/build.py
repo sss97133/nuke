@@ -1092,6 +1092,17 @@ for o in OPEN:
     for r in o["rel"]:
         OPEN_BY.setdefault(r, []).append(o["id"])
 
+# ------------------------------------------------------------------ service data for the manual: PDM outputs, splices, crimp tools (no prices, no buying notes)
+PDM_OUT = [{"output": x.get("output"), "loads": x.get("loads") or [], "load_a": x.get("load_a"), "wire_a": x.get("wire_cap_a"), "limit_a": x.get("limit_a"),
+            "status": re.split(r"\s*[(;:]", str(x.get("status") or ""), maxsplit=1)[0].strip() or None, "src": x.get("source")}
+           for x in REG.get("pdm_settings") or []]
+SPLICES = [{"at": x.get("at"), "wires": x.get("wires") or [], "pn": x.get("splice"), "awg": x.get("equiv_awg"), "type": x.get("type")} for x in REG.get("splices") or []]
+TOOL_WORD = {"picked": "picked", "to_buy": "not on hand", "alt": "alternative"}
+TOOLS = [{"id": x.get("id"), "name": x.get("name"), "pn": x.get("pn"), "families": x.get("families") or [], "status": TOOL_WORD.get(x.get("status"), x.get("status"))}
+         for x in REG.get("tools") or []]
+for i in items:
+    i["families"] = sorted({t.get("family") for t in REG["terminations"] if t["endpoint"] == i["id"] and t.get("family")})
+
 # ------------------------------------------------------------------ data on this vehicle: what the database holds for it, and what came in lately
 VID = "e08bf694-970f-4cbe-8a74-8715158a0f2e"
 
@@ -1150,7 +1161,7 @@ data = {
     "views": VIEWS, "items": items, "wires": WIRES, "context": ctx, "routes": routes, "boxes": boxes, "glb": glb,
     "counts": {"ends": len(items), "drawn": drawn}, "body_margin": BODY_MARGIN, "roll": roll, "carts": carts,
     "sys": sys_list, "devs": DEVS, "pins": PINS, "bom": bom, "open": OPEN, "open_by": OPEN_BY, "tape": TAPE_ITEMS, "lib": LIB, "cov": cov,
-    "dec": sizes_m.DECISIONS, "dec_src": sizes_m.DECISIONS_SRC, "renders": RENDERS, "vdata": VEHICLE_DATA, "fw_plan": sizes_m.FIREWALL_PLAN, "bay": {"stats": sizes_m.BAY_STATS, "src": sizes_m.BAY_SRC},
+    "dec": sizes_m.DECISIONS, "dec_src": sizes_m.DECISIONS_SRC, "renders": RENDERS, "vdata": VEHICLE_DATA, "fw_plan": sizes_m.FIREWALL_PLAN, "pdm_out": PDM_OUT, "splices": SPLICES, "tools": TOOLS, "bay": {"stats": sizes_m.BAY_STATS, "src": sizes_m.BAY_SRC},
     "stale_days": sizes_m.STALE_DAYS, "builder_note": sizes_m.BUILDER_NOTE, "referral": sizes_m.REFERRAL,
     "sources": {"ends": "pieces lane: ends.py " + stamp["ends.py"] + ", pos.py " + stamp["pos.py"],
                 "sizes": "footprints.py (pieces), part_models.yaml (parts-artist), sizes.py (layout-ui)",

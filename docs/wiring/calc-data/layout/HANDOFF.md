@@ -32,6 +32,7 @@ The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one
   - the component legend;
   - connector identification: end view, then a CAV/CKT/WIRE/FUNCTION/TO table;
   - the circuit tabulation.
+- **v14 (built, waiting on the pieces lane's go):** the wiring diagram, power feeds (pdm_settings), splices, harness specifications per bundle, connector service (terminals, seals, tools by family) and a special-tools plate, plus contents with real page numbers.
 - **Still to add:** procedure pages. These are the service steps for each system, from the records: build, test and diagnosis. Where no record exists yet, the procedure is left out rather than written up.
 - **One click-through pattern, everywhere:** a click selects. The selection is filled; what links to it is outlined.
 - **Photos** show only when they are the exact part.

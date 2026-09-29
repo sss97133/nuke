@@ -18,6 +18,9 @@ SHOTS = [
     ("m05_manual_tab", (1600, 1000), "light", "y.COOLING", [("mscroll", 99999)]),
     ("m06_manual_dark", (1600, 1000), "dark", "c.M130-A", [("mscroll", 1150)]),
     ("m07_phone_manual", (400, 860), "light", "", [("mscroll", 0)]),
+    ("m08_manual_wiring", (1600, 1000), "light", "y.COOLING", [("mjump", "WIRING DIAGRAM")]),
+    ("m09_manual_service", (1600, 1000), "light", "y.COOLING", [("mjump", "CONNECTOR SERVICE")]),
+    ("m10_manual_feeds", (1600, 1000), "light", "y.LIGHTING_EXTERIOR", [("mjump", "POWER FEEDS")]),
     ("d01_data_panel", (1600, 1000), "light", "", [("click", "#vdbtn")]),
     ("w01_vehicle_top", (1600, 1000), "light", "", [("view", "vehicle")]),
     ("w02_vehicle_m130", (1600, 1000), "light", "c.M130-A", [("view", "vehicle"), ("frame",)]),
@@ -72,6 +75,8 @@ async def run():
                     await pg.evaluate("y => window.scrollTo(0, y)", a[1]); await pg.wait_for_timeout(400)
                 elif a[0] == "mscroll":
                     await pg.evaluate("y => { const m = document.querySelector('#man'); m.scrollTo(0, y); }", a[1]); await pg.wait_for_timeout(400)
+                elif a[0] == "mjump":
+                    await pg.evaluate("t => { const h = [...document.querySelectorAll('#man h3')].find(x => x.textContent.trim() === t); if (h) h.scrollIntoView({block: 'start'}); }", a[1]); await pg.wait_for_timeout(400)
                 elif a[0] == "click":
                     await pg.click(a[1]); await pg.wait_for_timeout(400)
                 elif a[0] == "tq":

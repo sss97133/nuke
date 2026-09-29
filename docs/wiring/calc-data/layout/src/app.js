@@ -1048,6 +1048,21 @@ function manualFace(ep, rows) {
   cells.forEach((p, k) => { const cx = 12 + (k % per) * cw, cy = 26 + Math.floor(k / per) * (ch + 16); o += `<g data-go="p:${esc(ep + '|' + p.c)}" style="cursor:pointer"><text x="${cx + cw / 2 - 2}" y="${cy - 3}" text-anchor="middle" style="font:700 9px Arial">${esc(short ? p.c : String(k + 1))}</text><rect x="${cx + 2}" y="${cy}" width="${cw - 8}" height="${ch - 6}" fill="#fff" stroke="#111" stroke-width="1.2"/></g>`; });
   return `<svg viewBox="0 0 ${W0} ${H0}" style="width:${Math.min(300, W0 * 1.35).toFixed(0)}px">${o}</svg>`;
 }
+function manualWiring(sysId) {
+  const L = schLayout(sysId); if (!L) return '';
+  let o = '';
+  L.hops.forEach(h => { const w = W[h.wid] || {}; o += `<path class="mwire${w.kind === 'implied' ? ' imp' : ''}" data-w="${esc(h.wid)}" data-go="w:${esc(h.wid)}" d="${h.d}"/>`; });
+  L.labels.forEach(lb => { const w0 = W[lb.wires[0]] || {}; const txt = lb.wires.length === 1 ? `${lb.wires[0]} ${w0.awg || ''} ${gmColor(w0.color)}` : `${lb.wires.slice(0, 2).join(' ')}${lb.wires.length > 2 ? ' +' + (lb.wires.length - 2) : ''}`;
+    o += `<text x="${lb.x}" y="${lb.y}" text-anchor="${lb.anchor}" style="font:9px Arial;fill:#111">${esc(txt.trim())}</text>`; });
+  Object.entries(L.place).forEach(([dev, pl]) => {
+    const conns = uniq(pl.rows.flatMap(r => [...r.eps]));
+    o += `<g class="mbox" data-dev="${esc(dev)}"><rect x="${pl.x}" y="${pl.y}" width="${pl.w}" height="${pl.h}" fill="#fff" stroke="#111" stroke-width="1.2"/><line x1="${pl.x}" y1="${pl.y + L.HDR - 4}" x2="${pl.x + pl.w}" y2="${pl.y + L.HDR - 4}" stroke="#111"/>`
+      + `<text x="${pl.x + 7}" y="${pl.y + 14}" data-go="${esc(DEVS[dev] && DEVS[dev].conns.length > 1 ? 'd:' + dev : 'c:' + conns[0])}" style="font:700 11px Arial;fill:#111;cursor:pointer">${esc(trunc(upper(devName(dev)), pl.w > 200 ? 34 : 24))}</text><text x="${pl.x + 7}" y="${pl.y + 26}" style="font:9.5px 'Courier New';fill:#111">${esc(trunc(conns.join(' '), pl.w > 200 ? 38 : 26))}</text>`;
+    pl.rows.forEach(r => { const ep = [...r.eps][0], pin = pinByKey[ep + '|' + r.c] || {}; o += `<g data-go="p:${esc(ep + '|' + r.c)}" style="cursor:pointer"><text x="${pl.x + 7}" y="${r.y + 3.5}" style="font:9.5px 'Courier New';fill:#111">${esc(trunc(r.c || '—', 9))}</text><text x="${pl.x + 70}" y="${r.y + 3.5}" style="font:9px Arial;fill:#111">${esc(trunc(upper(pin.n || (pl.ci === 1 ? r.wires.join(' ') : (W[r.wires[0]] || {}).label || '')), pl.w > 200 ? 26 : 15))}</text></g>`; });
+    o += '</g>';
+  });
+  return `<svg viewBox="0 0 ${L.width} ${L.height}" width="${L.width}" height="${L.height}" style="display:block">${o}</svg>`;
+}
 function renderManual() {
   if (!S.sch || !SYS[S.sch]) S.sch = focusSys(S.sel) || (D.sys[0] || {}).id;
   const sel = $('#mansel'); if (sel && sel.value !== S.sch) sel.value = S.sch;
@@ -1099,7 +1114,32 @@ function renderManual() {
   const connPages = [];
   for (let k = 0; k < blocks.length; k += 6) connPages.push(`${k === 0 ? '<h3>CONNECTOR IDENTIFICATION</h3>' : ''}<div class="mgrid">${blocks.slice(k, k + 6).join('')}</div>`);
   const tab = `<h3>CIRCUIT TABULATION</h3><div class="mtab"><div class="t">${esc(name)} — Circuit Tabulation</div><table class="mt"><thead><tr><th>Ckt</th><th>Color</th><th>Ga</th><th>Circuit</th><th>From</th><th>To</th><th>Length mm</th></tr></thead><tbody>${y.wires.slice().sort(natCmp).map(x => { const w = W[x], L = wireLen(w), ch = w.ch || []; return `<tr data-go="w:${esc(x)}" data-w="${esc(x)}"><td class="m">${esc(x)}</td><td>${esc(gmColor(w.color))}</td><td class="c">${esc(w.awg || '')}</td><td>${esc(upper(w.label || ''))}</td><td class="m">${esc(endTxt(ch[0]))}</td><td class="m">${esc(ch.length > 1 ? endTxt(ch[ch.length - 1]) : '')}</td><td class="m">${L.mm ? mm(L.mm) + (L.pm ? ' ±' + L.pm : '') : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
-  el.innerHTML = [p1, p2].concat(connPages, [tab]).map((x, ix) => page(x, ix + 1)).join('');
+  const wset = new Set(y.wires);
+  const extra = [];
+  const wd = manualWiring(S.sch);
+  if (wd) extra.push(['Wiring Diagram', `<h3>WIRING DIAGRAM</h3><div class="mdiag">${wd}</div><div class="mcap">Fig. ${n}-${M.conns.length + 2}—${esc(y.name)} wiring diagram. Sources and controllers left, pass-throughs and splices centre, loads right. Dashed wires are required by decisions made after cut list v4.2.</div>`]);
+  const feeds = (D.pdm_out || []).filter(o => o.loads.some(x => wset.has(x)));
+  if (feeds.length) extra.push(['Power Feeds', `<h3>POWER FEEDS</h3><table class="mt"><thead><tr><th>PDM Output</th><th>Circuit</th><th>Load A</th><th>Wire A</th><th>Limit A</th><th>Setting</th></tr></thead><tbody>${feeds.map(o => `<tr${o.loads[0] ? ` data-go="w:${esc(o.loads[0])}" data-w="${esc(o.loads[0])}"` : ''}><td class="m">${esc(o.output)}</td><td class="m">${esc(o.loads.join(' '))}</td><td class="c">${esc(o.load_a == null ? '—' : o.load_a)}</td><td class="c">${esc(o.wire_a == null ? '—' : o.wire_a)}</td><td class="c">${esc(o.limit_a == null ? '—' : o.limit_a)}</td><td>${esc(upper(o.status || ''))}</td></tr>`).join('')}</tbody></table><div class="mlater"><b>NOTE:</b> Load A is the device's draw, Wire A what the wire carries, Limit A the PDM output's current limit.</div>`]);
+  const splRows = (D.splices || []).filter(x => x.wires.some(w => wset.has(w)));
+  if (splRows.length) extra.push(['Splices', `<h3>SPLICES</h3><table class="mt"><thead><tr><th>Location</th><th>Splice</th><th>Equiv. AWG</th><th>Wires</th></tr></thead><tbody>${splRows.map(x => `<tr><td class="m">${esc(x.at)}</td><td class="m">${esc(x.pn || '')}</td><td class="c">${esc(x.awg || '')}</td><td class="m">${x.wires.map(w => `<span class="go" data-go="w:${esc(w)}" style="cursor:pointer">${esc(w)}</span>`).join(' ')}</td></tr>`).join('')}</tbody></table>`]);
+  if (routes && M.segs.length) {
+    const byB = {};
+    M.segs.forEach(sid => { const sg = segById[sid]; if (sg) (byB[sg.bundle || 'Other'] = byB[sg.bundle || 'Other'] || []).push(sg); });
+    const ep = nid => { const nd = nodeById[nid]; return nd && nd.ep ? nd.ep : nid; };
+    extra.push(['Harness Specifications', `<h3>HARNESS SPECIFICATIONS</h3>${Object.entries(byB).map(([b, segs]) => `<h4>${esc(upper(b))}</h4><table class="mt"><thead><tr><th>Segment</th><th>From</th><th>To</th><th>OD mm</th><th>Covering</th><th>Clips</th><th>Length mm</th></tr></thead><tbody>${segs.sort((a, b2) => natCmp(a.id, b2.id)).map(sg => `<tr data-go="s:${esc(sg.id)}"><td class="m">${esc(sg.id)}</td><td class="m">${esc(ep(sg.from_node))}</td><td class="m">${esc(ep(sg.to_node))}</td><td class="c">${esc(sg.od_mm)}${(sg.parallel || 1) > 1 ? ' ×' + sg.parallel : ''}</td><td>${esc((sg.covering || '').split(';')[0])}</td><td class="c">${(routes.clips || []).filter(c => c.segment === sg.id).length}</td><td class="m">${mm((sg.length_m || 0) * 1000)} ±${esc(sg.margin_mm)}</td></tr>`).join('')}</tbody></table>`).join('')}<div class="mlater"><b>NOTE:</b> Lengths are routed along the loom with their margin. Cut lengths are set on the formboard.</div>`]);
+  }
+  const svcRows = M.conns.map(ep => { const i = byId[ep]; if (!i) return ''; const f = (i.conn || {}).fields || {}; const tools = (D.tools || []).filter(t => t.families.some(fm => (i.families || []).includes(fm)));
+    const list = a => (a || []).map(x => esc(x.code) + (x.qty != null ? ' ×' + esc(x.qty) : '')).join('<br>');
+    return `<tr data-go="c:${esc(ep)}"><td class="m">${esc(ep)}</td><td>${esc((i.conn || {}).family_word || '')}</td><td class="m">${list(f.term) || '—'}</td><td class="m">${list((f.seal || []).concat(f.shell || [])) || '—'}</td><td>${tools.map(t => esc(t.name) + (t.pn ? ' (' + esc(t.pn) + ')' : '')).join('<br>') || '—'}</td></tr>`; }).join('');
+  if (svcRows) extra.push(['Connector Service', `<h3>CONNECTOR SERVICE</h3><table class="mt"><thead><tr><th>Connector</th><th>Family</th><th>Terminals</th><th>Seals, plugs, boots</th><th>Tools</th></tr></thead><tbody>${svcRows}</tbody></table>`]);
+  const famSet = new Set(M.conns.flatMap(ep => (byId[ep] || {}).families || []));
+  const tools = (D.tools || []).filter(t => t.families.some(fm => famSet.has(fm)));
+  if (tools.length) extra.push(['Special Tools', `<h3>SPECIAL TOOLS</h3><div class="mtab"><div class="t">Special Tools</div><table class="mt"><thead><tr><th>No.</th><th>Tool</th><th>Part No.</th><th>Used on</th></tr></thead><tbody>${tools.map((t, k) => `<tr><td class="c">${k + 1}</td><td>${esc(t.name)}</td><td class="m">${esc(t.pn || '—')}</td><td>${esc(t.families.map(fm => ((items.find(i => (i.families || []).includes(fm)) || {}).conn || {}).family_word || fm).filter((x, ix, a) => a.indexOf(x) === ix).join(', '))}</td></tr>`).join('')}</tbody></table></div>`]);
+  // number the pages in reading order, then write the contents with the real page numbers
+  const body = [['Component Locations', p2]].concat(connPages.map((x, k) => [k === 0 ? 'Connector Identification' : null, x]), [['Circuit Tabulation', tab]], extra);
+  const toc = [['General Description', 1]]; body.forEach(([t], k) => { if (t) toc.push([t, k + 2]); });
+  const p1full = p1.replace(/<div class="mtoc">[\s\S]*?<\/div><\/div>/, `<div class="mtoc">${toc.map(([t, pgn]) => `<div>${esc(t)}<span class="dots"></span>${n}-${pgn}</div>`).join('')}</div>`);
+  el.innerHTML = [p1full].concat(body.map(b => b[1])).map((x, ix) => page(x, ix + 1)).join('');
   markManual();
   el.scrollTop = 0;
   $('#vcap').textContent = `Section ${n}, ${y.name}: laid out like the 1977 Light Truck Service Manual. Every number and row selects its part, wire or pin.`;
@@ -1119,6 +1159,8 @@ function markManual() {
   });
   el.querySelectorAll('[data-part]').forEach(n => { const on = live && priConn(n.dataset.part); n.classList.toggle('on', on); n.classList.toggle('rel', !on && live && R.c.has(n.dataset.part)); });
   el.querySelectorAll('.mloom').forEach(n => n.classList.toggle('on', live && R.s.has(n.dataset.seg)));
+  el.querySelectorAll('.mwire').forEach(n => { const on = live && S.sel === 'w:' + n.dataset.w; n.classList.toggle('on', on); n.classList.toggle('rel', !on && live && R.w.has(n.dataset.w)); });
+  el.querySelectorAll('.mbox').forEach(n => { const on = devPri(n.dataset.dev); n.classList.toggle('on', on); n.classList.toggle('rel', !on && live && R.d.has(n.dataset.dev)); });
   const hit = el.querySelector('.mconn.on') || el.querySelector('tr.on');
   if (hit && MAN.scrollTo) { hit.scrollIntoView({block: 'center'}); MAN.scrollTo = false; }
 }
