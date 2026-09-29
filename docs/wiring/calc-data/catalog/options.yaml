@@ -691,6 +691,7 @@ TOP-LIGHT:
   name: Top and cargo lighting — CHMSL on the top's rear header, cargo lamp on the top's ceiling, two rear work/scene lamps (Baja Designs S1 flush) on PDM30 OUT21
   status: candidate
   requires: [TOP-DISC, CANKEY]
+  conflicts_with: [PL]     # both name PDM30 OUT21; see demand.limits CONFLICT
   source: >-
     owner 2026-09-29 ("we need to actually do like the lighting design and we didn't do that"). Base lamps kept as picked
     (research/2026-09-28_unpicked-parts-and-fuel-hanger.md): CHMSL ORACLE 4514-003 (7 in, 6 W, IP68; the same page also says 0.15 A, the
@@ -702,11 +703,12 @@ TOP-LIGHT:
             specs: "1.45 A, 2.1 in cube, IP69K; lumens for the work/scene lens not confirmed on a maker page"}
   demand:
     crossings: 0
-    pdm30_outputs: 1      # OUT21 (B1), the last spare 8 A output; the PL candidate also names OUT21 but needs a 20 A output for its 12 A
+    pdm30_outputs: 1      # OUT21 (B1): the only spare 8 A output, and the PL candidate already names it (see CONFLICT)
     pdm30_inputs: 0       # switched from a CANKEY button, not a DIG input
     top_cavities: 3       # CHMSL, CARGO, WORK (the return pair belongs to TOP-DISC)
     taps: ["PDM30 OUT5 (#93 CHMSL, brake) and OUT25 (#74 CARGO, courtesy) stay as they are; their wires gain a TOP-DISC break"]
-    limits: ["OUT21 set 4 A: 1.25 x 2.9 A = 3.6 A; the 20 AWG pin lead allows 6.8 A and one #20 contact 6.4 A", "OUT25 stays at 4.73 A (registry); no new top courtesy load goes on it (options-rd PUD limits)"]
+    limits: ["CONFLICT: PDM30 OUT21 is the only spare 8 A output (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4 named by PW; 8 A 21/22 used, spare OUT21 named by PL). PL cannot stay on it anyway (its 12 A needs a 20 A output; an 8 A output's setting caps at 10 A, PDM manual p.24), but moving PL puts it on OUT3/OUT4 against PW. Building TOP-LIGHT and PL together needs another body-side output (a second body PDM, the owner's multiple-PDM direction in state §1 row 55; proposal). Owner call",
+             "OUT21 set 4 A: 1.25 x 2.9 A = 3.6 A; the 20 AWG pin lead allows 6.8 A and one #20 contact 6.4 A", "OUT25 stays at 4.73 A (registry); no new top courtesy load goes on it (options-rd PUD limits)"]
     notes: >-
       CHMSL outside on the top's rear header above the tailgate glass; work lamps flush in the header corners; cargo lamp centred on the
       ceiling between the ribs. The dome lamp and CLEARANCE-L/C/R stay on the steel half-cab roof, so they never cross TOP-DISC. Lamps end in
@@ -736,13 +738,14 @@ TOP-LIGHT-SIDE:
   product: {maker: Truck-Lite, pn: 81335C, price_usd: null, price_date: 2026-09-29, each: true, specs: "1000 lm, 1.2 A, 63.5 x 226 x 43 mm, 1.35 lb"}
   demand:
     crossings: 0
-    pdm30_outputs: 1      # no PDM30 output is left once TOP-LIGHT takes OUT21: this needs the PDM15 moved to the cab (mounts.yaml PDM15) or it is not buildable
+    pdm30_outputs: 1      # one more body-side 8 A output; the PDM30 has none left after OUT21, so as the registry stands this is NOT buildable
     pdm30_inputs: 0
     top_cavities: 1
-    limits: ["its own output, set 3 A (1.25 x 2.4 A); sharing OUT21 with the work lamps would need 7 A, over the 20 AWG pin lead's 6.8 A"]
-    notes: "camp light down both sides; the top's side walls carry the sliding quarter windows (photos lane), so the lamps sit on the strip above them. OPEN: the IP rating (not on the Truck-Lite page)"
+    limits: ["its own output, set 3 A (1.25 x 2.4 A); sharing OUT21 with the work lamps would need 7 A, over the 20 AWG pin lead's 6.8 A",
+             "PROPOSAL, not in the registry: the output has to come from a cab-side PDM that does not exist today. The PDM15 is the engine-bay box (registry PDM15-A/B); moving it to the cab is only an option in mounts.yaml PDM15, and the sealed bay PDM32 idea (state row 0ah) keeps it in the bay. A second body PDM (state §1 row 55, owner's multiple-PDM direction) is the other path. Owner call"]
+    notes: "camp light down both sides; the top's side walls carry the sliding quarter windows (photos lane), so the lamps sit on the strip above them. Not buildable until a cab-side output exists (see limits). OPEN: the IP rating (not on the Truck-Lite page)"
     adds:
-      - {id: SIDE_P, gauge: 20, spec: M22759/32, from: "PDM15:OUT (a spare 8 A output, PDM15 in the cab)", to: "SPL-SIDE-1 (M81824/1-2)", current_a: 2.4, length_ft_est: 1.0, basis: "as WORK_P"}
+      - {id: SIDE_P, gauge: 20, spec: M22759/32, from: "PROPOSAL: an 8 A output on a cab-side PDM (none exists in the registry today)", to: "SPL-SIDE-1 (M81824/1-2)", current_a: 2.4, length_ft_est: 1.0, basis: "as WORK_P"}
       - {id: SIDE_B, gauge: 16, spec: M22759/32, from: "SPL-SIDE-1", to: "SPL-SIDE-2 (at the TOP-DISC receptacle)", current_a: 2.4, length_ft_est: 13.0, basis: "as WORK_B; 0.33 V (2.3 %)"}
       - {id: SIDE_BT, gauge: 20, spec: M22759/32, from: "SPL-SIDE-2 (M81824/1-2)", to: "TOP-DISC receptacle (SIDE cavity)", current_a: 2.4, length_ft_est: 0.5, basis: "as WORK_BT"}
       - {id: SIDE_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (SIDE cavity)", to: "SPL-SIDE-3 (pillar top)", current_a: 2.4, length_ft_est: 3.0, basis: "up the pillar"}

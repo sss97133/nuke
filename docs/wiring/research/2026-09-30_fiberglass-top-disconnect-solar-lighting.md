@@ -21,7 +21,7 @@
 | The disconnect | One round **MIL-DTL-38999 Series III, shell 17, insert 26** (26 × size-20 contacts), the same family as the 61-pin firewall connector. The receptacle has pins and sits on the body at the **lower rear pillar**, where GM put the top's own dome-lamp disconnect. The plug has sockets and hangs on a pigtail from the top. It couples with one turn, the body side gets a cover on a wire rope, and the plug parks in a stowage receptacle on the top. 14 of 26 contacts are used and 12 are spare. |
 | Solar size | **One rigid 235 W, 72-cell panel on a low rack** (Victron SPM042357203, 1350 × 880 mm) and a **Victron SmartSolar MPPT 75/15** beside the YellowTop. The MPPT charges alongside the Orion; nothing replaces the Orion. Expect about 1.05 kWh a day as a year average (78 Ah) and 37 Ah a day in December. |
 | The "fat wires" | **16 AWG.** A series string keeps the current at the panel's 6 A, so the whole solar run is 16 AWG. The only heavy wire is a 3 ft pair of 10 AWG from the MPPT to the battery. |
-| Lighting | The CHMSL goes outside on the top's rear header. The cargo lamp goes on the top's ceiling. Two Baja S1 work/scene lamps go in the rear header corners on PDM30 OUT21. Side scene lamps are optional and need a second output. The dome lamp and clearance lamps go on the steel half-cab roof, so they never cross the disconnect. The switches are a MoTeC CAN keypad, which uses no PDM inputs. |
+| Lighting | The CHMSL goes outside on the top's rear header. The cargo lamp goes on the top's ceiling. Two Baja S1 work/scene lamps go in the rear header corners on PDM30 OUT21, which **conflicts with the power-lock candidate PL** (§3.2). Side scene lamps are optional and need a cab-side output that doesn't exist yet. The dome lamp and clearance lamps go on the steel half-cab roof, so they never cross the disconnect. The switches are a MoTeC CAN keypad, which uses no PDM inputs. |
 | Camera | One **rear high-mount camera** on the top's header (EchoMaster PHD5N1, flush, CVBS, mirrored image). It feeds input 1 of options-rd's VS41 switcher, whose output goes to the mirror's CH2. A forward camera on the top could not see the hood. |
 | Finish | **Butyl on the flat panels, a closed-cell thermal layer, and removable headliner panels**, with the top harness in the moulded rib channels behind them. The "insulation COMPLETE" row does **not** cover the top: no photo shows insulation on the top or the cab roof. |
 
@@ -201,6 +201,10 @@ Sources:
   (https://www.victronenergy.com/upload/documents/VE.Smart_Networking/20723-VE_Smart_Networking-pdf-en.pdf).
 - M3: renogy.com product data.
 
+**A 235 W panel on a 220 W controller.** The datasheet's note 1a says "If more PV power is connected, the controller will limit
+input power". On the rack at 74 °C, the panel's Pmpp coefficient (−0.45 %/°C) puts it at about 183 W (235 × (1 − 0.0045 × 49)), so
+the 75/15 clips only on cool, bright days. The 100/20 (290 W) removes the clipping and costs a 25 A fuse instead of 20 A.
+
 **Where the MPPT sits** (Victron §4.1): "within 3 meters from the battery, but never directly above the battery", vertical, with
 the terminals down. It must also be dry: IP22 at the connection area, "never operate it in a wet environment" (§1.1), and "not
 allowed to be mounted in a user accessible area", which calls for an enclosure or the MPPT WireBox (§1.1, §3.13, §4). It follows
@@ -269,7 +273,7 @@ the open YellowTop decision (mounts.yaml BATTERIES, asked 2026-09-29):
 | CHMSL | Outside, top's rear header, centred above the tailgate glass | ORACLE 4514-003 (7 in linear module, red) | not published | 0.5 A (6 W; the same page also says 0.15 A) | 7 in long | IP68 | PDM30 OUT5 (existing #93) | brake (DIG14) | yes |
 | Cargo | Top's ceiling, centred over the cargo floor, between the ribs | Truck-Lite 80251C (10 × 1 W LED) | not published | 2 A | 18.19 × 5.75 × 1.08 in overall with bracket; "will mount in 1'' deep pocket" | sealed | PDM30 OUT25 (existing #74) | door jambs DIG12/13 + a keypad button | yes |
 | Work / scene, rear ×2 | Flush in the rear header corners, aimed back and down | Baja Designs S1 flush, work/scene lens | the reseller lists 2,375 lm for the spot lens; the work/scene lens figure isn't confirmed | 1.45 A each (20 W) | 2.1 in cube; 0.4 lb | IP69K; MIL-STD-810G; IK10 | **PDM30 OUT21 (B1), set at 4 A** | keypad (reverse too, if the owner wants) | yes |
-| Side scene ×2 (optional) | Above the quarter windows on the top's sides | Truck-Lite 81335C (3 × 9 in perimeter light) | 1000 lm | 1.2 A each | 63.5 × 226 × 43 mm; 1.35 lb | not on the page | **its own 8 A output**: none left on the PDM30, so it needs the PDM15 moved to the cab | keypad | yes |
+| Side scene ×2 (optional) | Above the quarter windows on the top's sides | Truck-Lite 81335C (3 × 9 in perimeter light) | 1000 lm | 1.2 A each | 63.5 × 226 × 43 mm; 1.35 lb | not on the page | **its own 8 A output on a cab-side PDM that doesn't exist yet** (proposal, §3.2); not buildable as the registry stands | keypad | yes |
 | Dome | Steel half-cab roof, centre (existing wire, image 029da4ae) | factory dome, 211-2 festoon or an LED | 12 CP, about 151 lm (1977 LTSM p.838; 12 × 4π) | 0.97 A (registry) | factory | — | PDM30 OUT25 | door jambs | no |
 | Clearance L/C/R | Steel half-cab roof front edge, the C/K roof-marker spots | LMC 36-4483 set (36-4481 amber lens, 36-0368 LED bulb, harness 36-3770); LMC lists 5 per truck, the registry has 3 | — | ≤ 0.27 A each (the registry's 194 figure) | factory | — | PDM30 OUT19 (existing) | park | no |
 
@@ -297,11 +301,24 @@ Sources:
 
 - **Why the 16 AWG body run:** 8 A output pins take 24–20 AWG (PDM manual p.48) and #20 contacts take 20–24 AWG (MILNEC p.B-9).
   So the run steps up to 16 AWG between M81824/1-2 splices, the same pigtail method as the 20 A outputs (state row 0ac).
-- **PDM capacity:**
-  - OUT21 is the PDM30's last spare 8 A output. The PL candidate also names OUT21, but PL needs a 20 A output for its 12 A anyway
-    (options_v5 setting conflict).
-  - With TOP-LIGHT and TOP-LIGHT-SIDE added, the candidates would take 7 PDM30 outputs against 3 spare (options_v5 dry run,
-    2026-09-29). That verdict is the same as before: the candidates do not fit the PDM30.
+- **PDM capacity: a conflict.** No PDM30 output is free of a claim. The options_v5 ledger on main counts base and decided loads
+  only:
+  - the 20 A outputs are 6 of 8 used, and the spare OUT3 and OUT4 are named by PW;
+  - the 8 A outputs are 21 of 22 used, and the spare OUT21 is named by PL.
+
+  TOP-LIGHT takes OUT21 and says so: it lists `conflicts_with: [PL]` plus a CONFLICT line in its `limits`.
+  - PL can't stay on OUT21 anyway. It needs 12 A, and an 8 A output's setting caps at 10 A (PDM manual p.24; the options_v5
+    setting conflict).
+  - Moving PL to a 20 A output puts it against PW.
+  - Building all three together needs one more body-side output. That means a second body PDM, which fits the owner's "run multiple
+    pdm" direction (state §1 row 55). It's a proposal.
+- **TOP-LIGHT-SIDE is not buildable as the registry stands.**
+  - Its second output would have to come from a cab-side PDM that doesn't exist.
+  - The PDM15 is the engine-bay box in the registry (PDM15-A/B). Moving it to the cab is only an option in mounts.yaml, and the
+    sealed-PDM32 idea (state row 0ah) keeps it in the bay.
+  - Feeding the top from the engine bay would cross the firewall, where only the 61-pin goes.
+- **Verdict:** with TOP-LIGHT and TOP-LIGHT-SIDE added, the candidates would take 7 PDM30 outputs against 3 spare (options_v5,
+  2026-09-29). They didn't fit before either (5 against 3).
 
 ### 3.3 Switching: a CAN keypad (CANKEY)
 
@@ -404,8 +421,10 @@ It is a frontend data file, so it goes to the lead as a separate change.
 3. **Solar look:** a rigid 235 W panel on a low rack (recommended: 74 °C modelled) or flush flexible panels (sleeker, but about
    105 °C modelled on a hot day, over their 85 °C rating)?
 4. **Finish:** headliner panels (recommended), sprayed coating, or raw?
-5. **PDM outputs:** can the top lamps have PDM30 OUT21? If so, the lock option needs a 20 A output. Is the PDM15 moving to the cab?
-   That decides whether the side lamps are buildable.
+5. **PDM outputs:** OUT21 is the PDM30's only spare 8 A output, and both the power locks (PL) and the top work lamps name it.
+   - Which one gets it?
+   - Do you want a second body PDM ("run multiple pdm", state row 55) for the extras?
+   - Without one, the side scene lamps can't be built.
 6. **Switches:** a MoTeC keypad ($574) or one dash switch on DIG16?
 7. **Clearance lamps:** 3 (as in the registry) or the factory 5, on the steel cab roof's front edge?
 8. **Top camera:** yes or no? It goes on the VS41 if MIRD goes in; otherwise it competes with the front camera for the mirror.
