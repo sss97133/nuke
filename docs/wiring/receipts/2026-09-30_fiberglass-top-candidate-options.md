@@ -67,7 +67,7 @@ blocks merge mechanically. `top_cavities` is informational; neither version of `
 
 ## Substrate inconsistencies surfaced (not fixed inline)
 
-1. **State §1 row 42 says "K5 insulation = COMPLETE (roof, firewall, floor)".**
+1. **State §1 row 41 says "K5 insulation = COMPLETE (roof, firewall, floor)".**
    - The owner's words were "I've already insulated the vehicle" (receipt 2026-05-23).
    - The photos lane (2026-09-29) found bare fiberglass under the top (2021-06-12) and bare steel under the cab roof (2024-10 to
      2024-12). The Kilmat it found was only on the cargo-tub walls (2026-01-31 and 02-01).
@@ -91,7 +91,7 @@ blocks merge mechanically. `top_cavities` is informational; neither version of `
 - **The top's weight:** weigh it; it bounds the rack and panel.
 - **YellowTop location:** owner (asked 2026-09-29). It moves the MPPT and the PV length (4 ft or 13 ft on the body side).
 - **PDM30 OUT21:** TOP-LIGHT and PL both name it, and it is the only spare 8 A output. Owner call.
-- **One more cab-side output:** a second body PDM (owner's multiple-PDM direction, state §1 row 55) or the PDM15 moved to the cab
+- **One more cab-side output:** a second body PDM (owner's multiple-PDM direction, state §1 row 54, 'Owner scope calls' 2026-09-24) or the PDM15 moved to the cab
   (mounts.yaml; the registry has it in the engine bay). Without one, TOP-LIGHT-SIDE can't be built, and neither can TOP-LIGHT with
   PL. Owner or Dave.
 - **Currents to measure:** EchoMaster PHD5N1 (not published), and the MoTeC keypad's current and plug (MoTeC documentation).

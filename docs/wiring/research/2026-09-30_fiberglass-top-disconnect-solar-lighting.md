@@ -311,7 +311,7 @@ Sources:
     setting conflict).
   - Moving PL to a 20 A output puts it against PW.
   - Building all three together needs one more body-side output. That means a second body PDM, which fits the owner's "run multiple
-    pdm" direction (state §1 row 55). It's a proposal.
+    pdm" direction (state §1 row 54, 'Owner scope calls' 2026-09-24). It's a proposal.
 - **TOP-LIGHT-SIDE is not buildable as the registry stands.**
   - Its second output would have to come from a cab-side PDM that doesn't exist.
   - The PDM15 is the engine-bay box in the registry (PDM15-A/B). Moving it to the cab is only an option in mounts.yaml, and the
@@ -367,7 +367,7 @@ Sources:
 
 ### 5.1 Is the top already insulated?
 
-**No.** State §1 row 42 says "K5 insulation = COMPLETE (roof, firewall, floor)", but the owner's words behind it were "I've
+**No.** State §1 row 41 says "K5 insulation = COMPLETE (roof, firewall, floor)", but the owner's words behind it were "I've
 already insulated the vehicle" (receipt `2026-05-23_ac-architecture-locked.md`); the word "roof" was the agent's.
 
 The photos lane (2026-09-29) found:
@@ -423,7 +423,7 @@ It is a frontend data file, so it goes to the lead as a separate change.
 4. **Finish:** headliner panels (recommended), sprayed coating, or raw?
 5. **PDM outputs:** OUT21 is the PDM30's only spare 8 A output, and both the power locks (PL) and the top work lamps name it.
    - Which one gets it?
-   - Do you want a second body PDM ("run multiple pdm", state row 55) for the extras?
+   - Do you want a second body PDM ("run multiple pdm", state §1 row 54) for the extras?
    - Without one, the side scene lamps can't be built.
 6. **Switches:** a MoTeC keypad ($574) or one dash switch on DIG16?
 7. **Clearance lamps:** 3 (as in the registry) or the factory 5, on the steel cab roof's front edge?
