@@ -541,8 +541,9 @@ def readiness_blocks(reg):
               f"digital twin, {L.get('estimated', 0)} estimated, {L.get('unknown', 0)} unknown. The Specifications page carries the count per option and per section, "
               f"and the fill of every connector and PDM channel."),
         ("p", ("Decided options: " + ", ".join(dec) + ". " if dec else "") +
-              ("Candidates, not yet decided: " + ", ".join(cand) + ". Their wires are carried in the composite design "
-               "and are not in the buildable count." if cand else "")),
+              (f"{len(cand)} candidate options are not yet decided; the Specifications page lists each one with its wire "
+               "count (the list outgrew this page, 2026-09-29). Their wires are carried in the composite design and are "
+               "not in the buildable count." if cand else "")),
     ]
 
 
@@ -1316,10 +1317,20 @@ def page_specs(reg, number, odd):
     p = Page(number, "Harness Standards", odd=odd)
     p.heading("Specifications")
     rd, cap, opts = reg["readiness"], reg["capacity"], reg["options"]
-    p.txt(M, p.y + 6, "OPTIONS — EVERY WIRE OF THE DESIGN, BY OPTION", 8.5, bold=True)
+    q = p      # the page the text has reached: a table too long for its page continues on the next (2026-09-29: the
+               # options table ran onto 1-20 and the readiness table was then drawn over it on 1-19)
+
+    def titled_table(title, off, widths, header, rows):
+        nonlocal q
+        if q.y + off + 4 + 9.2 * 3 > q.BOTTOM:        # a title keeps its header and first rows on its page
+            q = q.cont()
+        q.txt(M, q.y + off, title, 8.5, bold=True)
+        y = q.table(M, q.y + off + 4, widths, header, rows, size=6.6, lead=9.2)
+        q = q.tail
+        q.y = y
+
     rows = [(code, o["name"], o["status"].upper(), len(o["wires"])) for code, o in opts.items()]
-    p.y = p.table(M, p.y + 10, [40, 340, 70, 66], ["Code", "Option", "Status", "Wires"], rows, size=6.6, lead=9.2)
-    p.txt(M, p.y + 14, "READINESS BY SECTION — EVERY WIRE OF THE DESIGN: BASE + DECIDED + CANDIDATE OPTIONS", 8.5, bold=True)
+    titled_table("OPTIONS — EVERY WIRE OF THE DESIGN, BY OPTION", 6, [40, 340, 70, 66], ["Code", "Option", "Status", "Wires"], rows)
     hdr = ["Section", "Wires", "Both ends", "Crossing", "Terminals", "Material", "Measured", "No length"]
     rows = []
     keys = ("wires", "L2 wire", "L3 crossing", "L4 ends", "L5 material")
@@ -1343,8 +1354,8 @@ def page_specs(reg, number, odd):
         p.faults.append(f"buildable row says {c['wires']}, the wire list has {n_build} base + decided wires")
     if sum(len(o["wires"]) for o in opts.values()) != len(allw):
         p.faults.append("the options table's wires do not add up to the design")
-    p.y = p.table(M, p.y + 18, [120, 46, 56, 56, 60, 60, 60, 58], hdr, rows, size=6.6, lead=9.2)
-    p.txt(M, p.y + 14, "CONNECTOR AND CHANNEL FILL — THE BUILDABLE HARNESS (CANDIDATE DEMAND IN THE NOTES BELOW)", 8.5, bold=True)
+    titled_table("READINESS BY SECTION — EVERY WIRE OF THE DESIGN: BASE + DECIDED + CANDIDATE OPTIONS", 14,
+                 [120, 46, 56, 56, 60, 60, 60, 58], hdr, rows)
     rows = []
     for k, r in cap["resources"].items():
         if "lines" in r:
@@ -1352,10 +1363,11 @@ def page_specs(reg, number, odd):
         sp = r["spare"]
         sp = ", ".join(sp) if isinstance(sp, list) else ("—" if sp is None else sp)
         rows.append((k, "—" if r["capacity"] is None else r["capacity"], r["used"], sp))
-    p.y = p.table(M, p.y + 18, [200, 80, 80, 156], ["Resource", "Capacity", "Used", "Spare"], rows, size=6.6, lead=9.2)
+    titled_table("CONNECTOR AND CHANNEL FILL — THE BUILDABLE HARNESS (CANDIDATE DEMAND IN THE NOTES BELOW)", 14,
+                 [200, 80, 80, 156], ["Resource", "Capacity", "Used", "Spare"], rows)
     notes = [("note", v) for v in cap["verdict"].values()]
-    p.y += 8
-    p.columns([("h", "What the candidate options would take")] + notes, top=p.y)
+    q.y += 8
+    q.columns([("h", "What the candidate options would take")] + notes, top=q.y)
     return p
 
 

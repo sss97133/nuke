@@ -68,7 +68,7 @@ STEPS:
 # number must pass. Lengths are ESTIMATES or null with the reason.
 
 STEP-DCMD:
-  name: Power steps on the bay PDM (the PDM15, per the registry) through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)
+  name: Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)
   status: candidate
   source: >-
     owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor-driver-dcmd.md;
