@@ -10,6 +10,7 @@
 #   shape_basis  maker drawing | datasheet dims | scaled from photo | twin object | not sourced
 #   params       dimension: value (mm or degrees), source (doc + page, or URL + date), basis:
 #                  maker = printed by the maker; scaled = measured off the maker's drawing at its printed scale;
+#                  photo = sized off a product photo against a sourced dimension;
 #                  design = our clearance or choice; assumed = in no source (say so, don't hide it)
 #   frame        the part's own axes. Origin at the mounting-face centre; +Z out of the mounting face.
 #   axes         the same, for code: mount_normal (always +Z), maker_up (the axis that is up in the maker's view),
@@ -64,31 +65,36 @@ parts:
       hex: '#f0a030'
       from: design aid, not a product colour
     plug:
-      hex: '#5d6670'
-      from: design aid (envelope of TE's plug), not a product colour
+      hex: '#2a2c2e'
+      from: TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')
+    backshell:
+      hex: '#1f2123'
+      from: 'ProWire product photos: black thermoplastic (PBT per ProWire''s title)'
   attach:
   - n: plug
     ep: M130-A
     at:
     - -16.3
-    - -69.35
+    - -98.65
     - 21.2
     dir:
     - 0
     - -1
     - 0
-    note: 34-way plug face; the plug and its boot hang straight down (keep-out 60-80 mm)
+    note: '34-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
   - n: plug
     ep: M130-B
     at:
     - 19.15
-    - -69.35
+    - -98.65
     - 21.2
     dir:
     - 0
     - -1
     - 0
-    note: 26-way plug face
+    note: '26-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
   mount:
   - n: hole_0
     at:
@@ -123,6 +129,12 @@ parts:
     - -1
     d: 5.2
     note: M5 or 3/16 in; washer or head 13 max
+  mated:
+    what: TE Superseal 1.0 plugs 2-1437285-3 (34) and -2 (26) with ProWire SSB-34BS-PA66 / SSB-26BS-PA66 backshells
+    sources:
+    - reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+    - ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29), sized
+      against the plug's rear body; ProWire prints no dimensions
   keepout:
     what: plug + boot + wire bend below both plug faces
     min_mm: 60.0
@@ -329,26 +341,12 @@ parts:
     source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
       p.1 and p.2
     basis: maker
-  - name: plug34_w
-    value: 38.2
-    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
-      p.1 (34-way plug housing 2-1437285-3)
-    basis: maker
-  - name: plug26_w
-    value: 32.2
-    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
-      p.2 (26-way plug housing 2-1437285-2)
-    basis: maker
-  - name: plug_h
-    value: 38.0
-    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
-      p.1 and p.2 (overall, over the lock arms)
-    basis: maker
-  - name: plug_l
-    value: 32.15
-    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
-      p.1 and p.2 (mating face to rear)
-    basis: maker
+  - name: cav_depth
+    value: 13.8
+    source: 'inferred: TE''s plug nose (reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, scaled 13.7) seats fully inside the header; MoTeC does not draw the header internals'
+    basis: scaled
+    note: header cavity depth above the header face
   - name: keepout_min
     value: 60.0
     source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
@@ -359,6 +357,99 @@ parts:
     source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
       60-80 mm below the connector face for the plug and boot'
     basis: design
+  - name: plug34_w
+    value: 38.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way, 2-1437285-3)
+    basis: maker
+  - name: plug26_w
+    value: 32.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2 (26-way, 2-1437285-2)
+    basis: maker
+  - name: nose34_w
+    value: 29.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1, SECT B
+    basis: maker
+  - name: nose26_w
+    value: 23.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2, SECT B
+    basis: maker
+  - name: nose_h
+    value: 18.3
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, side view
+    basis: maker
+  - name: plug_h
+    value: 38.0
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (overall, over the lock arm and the flange)
+    basis: maker
+  - name: plug_l
+    value: 32.15
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (mating face to rear)
+    basis: maker
+  - name: nose_l
+    value: 13.7
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'mating face to the flange: this length sits inside the header'
+  - name: flange_l
+    value: 7.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+  - name: flange_up
+    value: 13.6
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: flange edge on the lock side, from the pin-field centre
+  - name: rear_h
+    value: 24.1
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: rear body height
+  - name: rear_w_off
+    value: 3.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'rear body is narrower than the overall width by this (34-way: 34.9)'
+  - name: lock_w
+    value: 12.0
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: lock arm width along the rows
+  - name: bs_wall
+    value: 1.8
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+  - name: bs_l
+    value: 14.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: backshell length along the wires, clip body
+  - name: bs_collar_l
+    value: 7.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar length
+  - name: bs_collar_h
+    value: 12.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar (flat oval) height; its length follows the rear body
   checks:
   - check: case width (x)
     model: 107.5
@@ -438,7 +529,9 @@ parts:
     ok: true
   unknowns:
   - The Key 1 rib geometry inside the headers is not in any drawing on file; the latch side is modelled.
-  - The mated plug is drawn seated at the header face; its insertion depth over the header is not dimensioned.
+  - The plug is drawn fully seated (its 13.7 mm nose inside the header); TE does not dimension the mated stack.
+  - 'The ProWire backshells are sized off ProWire''s photos (no printed dimensions): basis photo, fit not guaranteed.'
+  - The boot (straight / 70 / 90 degrees) is HELD, so the model stops at the backshell's exit collar.
   - Scaled values (orange on the drawing) are read off MoTeC's drawing at its printed scale, not printed numbers.
   - Pin colour is not visible in the photo.
   cross_checks:

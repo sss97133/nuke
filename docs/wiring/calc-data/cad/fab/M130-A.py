@@ -21,6 +21,7 @@ from build123d import (Align, Axis, Box, Compound, Cylinder, Plane, Polygon, Pos
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import k5cad as K  # noqa: E402
+import superseal as SS  # noqa: E402
 from k5cad import Dim  # noqa: E402
 
 DS = "reference_documents/component_drawings/motec_m130_datasheet.pdf"
@@ -73,18 +74,17 @@ P = {
     "label_h": Dim(17.9, SC, "scaled"),
     "label_y": Dim(14.8, SC, "scaled", "label centre above the bottom edge"),
     "label_depth": Dim(0.4, "not shown on any MoTeC drawing", "assumed"),
-    # ---- the Superseal 1.0 pin field and plugs (TE's drawing of the mating plug)
+    # ---- the Superseal 1.0 pin field (TE's drawing of the mating plug)
     "pin_pitch": Dim(3.0, f"{TE} p.1 and p.2 (face view: 3 mm pitch, rows offset 1.5)"),
     "row_gap_outer": Dim(3.5, f"{TE} p.1 and p.2 (rows 3.5 / 4 / 3.5)"),
     "row_gap_inner": Dim(4.0, f"{TE} p.1 and p.2"),
-    "plug34_w": Dim(38.2, f"{TE} p.1 (34-way plug housing 2-1437285-3)"),
-    "plug26_w": Dim(32.2, f"{TE} p.2 (26-way plug housing 2-1437285-2)"),
-    "plug_h": Dim(38.0, f"{TE} p.1 and p.2 (overall, over the lock arms)"),
-    "plug_l": Dim(32.15, f"{TE} p.1 and p.2 (mating face to rear)"),
+    "cav_depth": Dim(13.8, f"inferred: TE's plug nose ({TE} sheets 1-2, scaled 13.7) seats fully inside the header; "
+                     "MoTeC does not draw the header internals", "scaled", "header cavity depth above the header face"),
     # ---- clearance we design around
     "keepout_min": Dim(60.0, KO, "design"),
     "keepout": Dim(80.0, KO, "design"),
 }
+P.update(SS.P)
 COLORS = {
     "case": ("#28292a", PHOTO + " (upper case, 95%)"),
     "housing": ("#2b2b28", PHOTO + " (connector housing, 65%)"),
@@ -92,7 +92,8 @@ COLORS = {
     "header": ("#2e3032", PHOTO + " (plug headers, 86%)"),
     "pins": ("#b9b4a8", "not visible in the photo; drawn as tin-plated brass (colour not sourced)"),
     "keepout": ("#f0a030", "design aid, not a product colour"),
-    "plug": ("#5d6670", "design aid (envelope of TE's plug), not a product colour"),
+    "plug": SS.C_PLUG,
+    "backshell": SS.C_BS,
 }
 W, H, D = K.v(P["case_w"]), K.v(P["case_h"]), K.v(P["depth"])
 T = K.v(P["plate_t"])
@@ -151,6 +152,8 @@ def case_solid():
         shell -= Pos(x, y, -1) * Cylinder(K.v(P["hole_d"]) / 2, T + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
     lab = extrude(RectangleRounded(K.v(P["label_w"]), K.v(P["label_h"]), 2.9), amount=2)
     shell -= Pos(0, Y0 + K.v(P["label_y"]), D - K.v(P["label_depth"])) * lab
+    shell -= header_pocket(A_X0, A_X1)
+    shell -= header_pocket(B_X0, B_X1)
     return shell
 
 
@@ -160,18 +163,26 @@ def label_solid():
 
 
 def header_solid(x0, x1):
+    """Shroud 5.6 proud of the bottom edge; its cavity runs up into the housing deep enough for TE's plug nose."""
     w = x1 - x0
     cx = (x0 + x1) / 2
-    proud = K.v(P["hdr_proud"])
     wall = K.v(P["hdr_wall"])
-    outer = Pos(cx, Y0 - proud / 2, HDR_Z) * Box(w, proud, HDR_D)
+    top = HDR_FACE + K.v(P["cav_depth"]) + 1.0          # 1 mm floor above the cavity
+    outer = Pos(cx, (HDR_FACE + top) / 2, HDR_Z) * Box(w, top - HDR_FACE, HDR_D)
     outer = fillet(outer.edges().filter_by(Axis.Y), radius=K.v(P["hdr_r"]))
-    cav = Pos(cx, Y0 - proud / 2 - 0.5, HDR_Z) * Box(w - 2 * wall, proud - 1.0 + 0.02, HDR_D - 2 * wall)
+    cav_h = K.v(P["cav_depth"])
+    cav = Pos(cx, HDR_FACE + cav_h / 2 - 0.01, HDR_Z) * Box(w - 2 * wall, cav_h + 0.02, HDR_D - 2 * wall)
     cav = fillet(cav.edges().filter_by(Axis.Y), radius=max(0.3, K.v(P["hdr_r"]) - wall))
     shroud = outer - cav
     lw, lp = K.v(P["latch_w"]), K.v(P["latch_proud"])
     latch = Pos(cx, Y0 - 3.2, HDR_Z + HDR_D / 2 + lp / 2) * Box(lw, 2.2, lp)
     return shroud + latch
+
+
+def header_pocket(x0, x1):
+    """The room the header takes inside the housing (subtracted from the case)."""
+    top = HDR_FACE + K.v(P["cav_depth"]) + 1.0
+    return Pos((x0 + x1) / 2, (Y0 - 0.5 + top) / 2, HDR_Z) * Box(x1 - x0, top - Y0 + 0.5, HDR_D)
 
 
 def pins_solid(cx, outer_n):
@@ -183,22 +194,24 @@ def pins_solid(cx, outer_n):
     for dz, n in ((zo, outer_n), (zi, outer_n - 1), (-zi, outer_n - 1), (-zo, outer_n)):
         for i in range(n):
             x = cx + (i - (n - 1) / 2) * pitch
-            pins.append(Pos(x, Y0 - 1.0 - 1.75, HDR_Z + dz) * Box(1.0, 3.5, 0.6))
+            floor = HDR_FACE + K.v(P["cav_depth"])
+            pins.append(Pos(x, floor - 4.25, HDR_Z + dz) * Box(1.0, 8.5, 0.6))
     return Compound(children=pins).fuse() if len(pins) > 1 else pins[0]
 
 
-def keepout_solids():
-    face = HDR_FACE
-    zc = HDR_Z
-    ph, pl = K.v(P["plug_h"]), K.v(P["plug_l"])
-    a_w, b_w = K.v(P["plug34_w"]), K.v(P["plug26_w"])
-    plug_a = Pos(A_CX, face - pl / 2, zc) * Box(a_w, pl, ph)
-    plug_b = Pos(B_CX, face - pl / 2, zc) * Box(b_w, pl, ph)
-    x0, x1 = A_CX - a_w / 2, B_CX + b_w / 2
+def mated_solids():
+    """TE plugs + ProWire backshells seated on both headers (superseal.py), and the keep-out below them."""
+    a, a_exit, a_dir = SS.plug_solids(34, A_CX, HDR_FACE, HDR_Z, "M130-A")
+    b, b_exit, b_dir = SS.plug_solids(26, B_CX, HDR_FACE, HDR_Z, "M130-B")
+    x0 = A_CX - K.v(P["plug34_w"]) / 2
+    x1 = B_CX + K.v(P["plug26_w"]) / 2
+    ph = K.v(P["plug_h"])
     kmin, kmax = K.v(P["keepout_min"]), K.v(P["keepout"])
-    k60 = Pos((x0 + x1) / 2, face - kmin / 2, zc) * Box(x1 - x0, kmin, ph)
-    k80 = Pos((x0 + x1) / 2, face - kmin - (kmax - kmin) / 2, zc) * Box(x1 - x0, kmax - kmin, ph)
-    return plug_a, plug_b, k60, k80, (x0, x1)
+    k60 = Pos((x0 + x1) / 2, HDR_FACE - kmin / 2, HDR_Z) * Box(x1 - x0, kmin, ph)
+    k80 = Pos((x0 + x1) / 2, HDR_FACE - kmin - (kmax - kmin) / 2, HDR_Z) * Box(x1 - x0, kmax - kmin, ph)
+    ko = [K.body(k60, "keep-out 0-60 mm below the plug faces (minimum)", COLORS["keepout"][0], 0.22),
+          K.body(k80, "keep-out 60-80 mm below the plug faces (budget)", COLORS["keepout"][0], 0.12)]
+    return a + b, ko, (x0, x1), {"M130-A": (a_exit, a_dir), "M130-B": (b_exit, b_dir)}
 
 
 def build():
@@ -208,33 +221,38 @@ def build():
     hdr_b = K.body(header_solid(B_X0, B_X1), "M130-B header: 26-way TE Superseal 1.0 Key 1 (mates MoTeC #65045)", COLORS["header"][0])
     pins_a = K.body(pins_solid(A_CX, 9), "M130-A pins (34)", COLORS["pins"][0])
     pins_b = K.body(pins_solid(B_CX, 7), "M130-B pins (26)", COLORS["pins"][0])
-    plug_a, plug_b, k60, k80, span = keepout_solids()
-    ko = [K.body(plug_a, "M130-A mated plug envelope (TE 2-1437285-3, 38.2 x 38 x 32.15)", COLORS["plug"][0], 0.45),
-          K.body(plug_b, "M130-B mated plug envelope (TE 2-1437285-2, 32.2 x 38 x 32.15)", COLORS["plug"][0], 0.45),
-          K.body(k60, "keep-out 0-60 mm below the plug faces (minimum)", COLORS["keepout"][0], 0.22),
-          K.body(k80, "keep-out 60-80 mm below the plug faces (budget)", COLORS["keepout"][0], 0.12)]
-    return [case, label, hdr_a, hdr_b, pins_a, pins_b], ko, span
+    mated, ko, span, exits = mated_solids()
+    EXITS.update(exits)
+    return [case, label, hdr_a, hdr_b, pins_a, pins_b], mated + ko, span
+
+
+EXITS = {}
 
 
 def attach_points():
-    return [
-        {"n": "plug", "ep": "M130-A", "at": [round(A_CX, 2), round(HDR_FACE, 2), HDR_Z], "dir": [0, -1, 0],
-         "note": "34-way plug face; the plug and its boot hang straight down (keep-out 60-80 mm)"},
-        {"n": "plug", "ep": "M130-B", "at": [round(B_CX, 2), round(HDR_FACE, 2), HDR_Z], "dir": [0, -1, 0],
-         "note": "26-way plug face"},
-    ]
+    if not EXITS:
+        mated_solids_ = mated_solids()
+        EXITS.update(mated_solids_[3])
+    out = []
+    for ep, ways in (("M130-A", 34), ("M130-B", 26)):
+        (x, y, z), d = EXITS[ep]
+        out.append({"n": "plug", "ep": ep, "at": [x, y, z], "dir": d,
+                    "note": f"{ways}-way: wires leave the ProWire backshell's boot collar straight down; the boot "
+                            "(straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"})
+    return out
 
 
 def drawing(path, meta, span):
     S = K.Sheet(480, 272, "MoTeC M130")
     solid = [(b, "solid") for b in meta["_bodies"]]
-    ko_shapes = [(b, "keepout") for b in meta["_ko"]]
+    mated = [(b, "mated") for b in meta["_ko"] if not b.label.startswith("keep-out")]
+    ko_shapes = [(b, "keepout") for b in meta["_ko"] if b.label.startswith("keep-out")]
     FX, FY = 100, 96                       # front view origin (the back-face centre) on the sheet
     RX = FX + 130                          # right view: its u = -z, so the back face sits at RX
     BY = FY + 150                          # bottom view: its w = z, the back face at BY
     front = S.view("front", solid, (FX, FY), hidden=False)
-    right = S.view("right", solid + ko_shapes, (RX, FY), hidden=True)
-    bottom = S.view("bottom", solid + ko_shapes[:2], (FX, BY), hidden=False)
+    right = S.view("right", solid + mated + ko_shapes, (RX, FY), hidden=True)
+    bottom = S.view("bottom", solid + mated, (FX, BY), hidden=False)
     S.text((FX, FY - H / 2 - 22), "FRONT VIEW", size=3.6, weight="bold")
     S.text((RX - 20, FY - H / 2 - 22), "RIGHT VIEW", size=3.6, weight="bold")
     S.text((FX, BY + 12), "BOTTOM VIEW  (looking up at the plug faces; the front of the unit is at the top)", size=3.0, weight="bold")
@@ -268,8 +286,9 @@ def drawing(path, meta, span):
     S.dim(right, (0, HDR_FACE, zb), (0, HDR_FACE - kmax, zb), 13, P["keepout"], axis="v")
     S.text(right.xy((0, HDR_FACE - 45, HDR_Z)), "KEEP-OUT", size=3.0, color=K.BASIS_COLOR["design"], weight="bold")
     S.text(right.xy((0, HDR_FACE - 50, HDR_Z)), "plug + boot + bend", size=2.4, color=K.BASIS_COLOR["design"])
-    S.text(right.xy((0, HDR_FACE - 18, HDR_Z)), "TE plug", size=2.4, color="#5d6670")
-    S.text(right.xy((0, HDR_FACE - 22, HDR_Z)), "38 × 32.15", size=2.2, color="#5d6670")
+    S.text(right.xy((0, HDR_FACE - 4.5, HDR_Z + 21)), "TE plug", size=2.2, color="#5d6670", anchor="end")
+    S.text(right.xy((0, HDR_FACE - 21, HDR_Z + 21)), "backshell", size=2.2, color="#5d6670", anchor="end")
+    S.text(right.xy((0, HDR_FACE - 25, HDR_Z + 21)), "(photo-sized)", size=2.0, color=K.BASIS_COLOR["photo"], anchor="end")
     # ---- bottom view
     S.dim(bottom, (-W / 2, 0, 0), (-W / 2, 0, D), -9, P["depth"], axis="v")
     S.dim(bottom, (A_X0, 0, 0), (A_X0, 0, HDR_Z), -(A_X0 + W / 2) - 17, P["hdr_z"], axis="v")
@@ -281,7 +300,7 @@ def drawing(path, meta, span):
     S.text(bottom.xy((B_CX, 0, 3.5)), "B · 26-way", size=2.5)
     S.text(bottom.xy((0, 0, D + 12)), "latch ramps on the front side of each header (away from the mounting face); plugs exit straight down",
            size=2.5, color="#10151a")
-    S.text(bottom.xy((0, 0, D + 8)), "green dashed = TE plug outline over each header", size=2.3, color=K.BASIS_COLOR["design"])
+    S.text(bottom.xy((0, 0, D + 8)), "grey = the mated TE plug and ProWire backshell outlines", size=2.3, color="#5d6670")
     # ---- title block and the dimension table
     tx, ty = 272, 18
     S.text((tx, ty), "MoTeC M130 engine computer · MoTeC part 13130", size=5.2, anchor="start", weight="bold")
@@ -291,15 +310,17 @@ def drawing(path, meta, span):
            anchor="start")
     S.text((tx, ty + 15), "Origin: centre of the back (mounting) face. +Y up, +Z out of the back face; plugs face -Y.", size=2.8,
            anchor="start")
-    S.text((tx, ty + 21), "blue = printed by MoTeC · orange ≈ scaled off MoTeC's drawing · green = our clearance · red = assumed",
+    S.text((tx, ty + 21), "blue = printed by the maker · orange ≈ scaled off the maker's drawing · purple ≈ sized off a photo · green = our clearance · red = assumed",
            size=2.6, anchor="start", weight="bold")
     refs = [("[1]", "motec_m130_datasheet.pdf p.3", "MoTeC datasheet part 13130 (published 6 June 2014) p.3 Dimensions and Mounting"),
             ("[2]", "motec_m130_datasheet.pdf p.2", "same datasheet p.2 Physical: 107.5 x 127.5 x 38.7 mm, 300 g"),
             ("[3]", "techspec.pdf p.42", "MoTeC M1 ECU Hardware (7 Nov 2013) p.42: the same drawing"),
-            ("[4]", "scaled off", "measured off [1] at its printed scale (107.5 wide)"),
-            ("[5]", "te_C-2-1437285-3", "TE customer drawing 2-1437285-3 (Superseal 1.0 plug housings 34/26), sheets 1-2"),
+            ("[4]", f"scaled off {DS}", "measured off [1] at its printed scale (107.5 wide)"),
+            ("[5]", "te_C-2-1437285-3", "TE customer drawing 2-1437285-3 (Superseal 1.0 plug housings 34/26), sheets 1-2 (orange = scaled off it)"),
             ("[6]", "receipts/2026-06-09", "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment limits)"),
-            ("[7]", "not shown", "no drawing gives it: assumed")]
+            ("[7]", "not shown on any", "no drawing gives it: assumed"),
+            ("[8]", "ProWire SSB", "ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (ProWire prints no dimensions)"),
+            ("[9]", "inferred:", "inferred from [5]: the plug nose seats fully inside the header")]
     y = S.table(P, tx, ty + 28, refs)
     S.text((tx, y + 2), "Colours (MoTeC product photo, k-means per region): case " + COLORS["case"][0] + ", housing " + COLORS["housing"][0]
            + ", label " + COLORS["label"][0] + ", headers " + COLORS["header"][0] + "; pins " + COLORS["pins"][0] + " not sourced.",
@@ -308,10 +329,13 @@ def drawing(path, meta, span):
            size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
     S.text((tx, y + 9), "the raised label badge (photo) is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 holds; its artwork is not reproduced.",
            size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
-    S.text((tx, y + 12.5), "The mated plug is drawn seated at the header face (insertion depth not dimensioned).",
+    S.text((tx, y + 12.5), "The plugs are drawn fully seated (TE's 13.7 mm nose inside the header); TE does not dimension the mated stack.",
            size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
-    S.text((tx, y + 17), "Cross-check: TE's 34- and 26-way housings differ by two 3 mm pin columns (38.2 vs 32.2); the scaled headers differ by 5.7.",
+    S.text((tx, y + 16), "The ProWire backshells are sized off ProWire's photos; the boot (straight / 70 / 90) is HELD, so the model ends at the collar.",
+           size=2.3, anchor="start", color=K.BASIS_COLOR["photo"])
+    S.text((tx, y + 20.5), "Cross-check: TE's 34- and 26-way housings differ by two 3 mm pin columns (38.2 vs 32.2); the scaled headers differ by 5.7.",
            size=2.3, anchor="start", color=K.BASIS_COLOR["scaled"])
+    S.h = max(S.h, y + 30)
     S.write(path, {k: v for k, v in meta.items() if not k.startswith("_")})
 
 
@@ -369,12 +393,16 @@ def part_meta(bodies):
             "attach": attach_points(),
             "mount": [{"n": f"hole_{i}", "at": [x, y, 0], "dir": [0, 0, -1], "d": K.v(P["hole_d"]),
                        "note": "M5 or 3/16 in; washer or head 13 max"} for i, (x, y) in enumerate(HOLES)],
+            "mated": {"what": "TE Superseal 1.0 plugs 2-1437285-3 (34) and -2 (26) with ProWire SSB-34BS-PA66 / SSB-26BS-PA66 backshells",
+                      "sources": [TE, SS.PW]},
             "keepout": {"what": "plug + boot + wire bend below both plug faces", "min_mm": K.v(P["keepout_min"]),
                         "budget_mm": K.v(P["keepout"]), "source": KO},
             "params": K.params_table(P),
             "checks": checks(bodies),
             "unknowns": ["The Key 1 rib geometry inside the headers is not in any drawing on file; the latch side is modelled.",
-                         "The mated plug is drawn seated at the header face; its insertion depth over the header is not dimensioned.",
+                         "The plug is drawn fully seated (its 13.7 mm nose inside the header); TE does not dimension the mated stack.",
+                         "The ProWire backshells are sized off ProWire's photos (no printed dimensions): basis photo, fit not guaranteed.",
+                         "The boot (straight / 70 / 90 degrees) is HELD, so the model stops at the backshell's exit collar.",
                          "Scaled values (orange on the drawing) are read off MoTeC's drawing at its printed scale, not printed numbers.",
                          "Pin colour is not visible in the photo."],
             "cross_checks": [
@@ -396,8 +424,13 @@ def main(out):
             "Units mm. Origin: centre of the back (mounting) face. +Y up in MoTeC's front view, +Z out of the back, plugs face -Y."]
     desc += [f"{k} = {d.value:g} [{d.basis}] {d.source}" for k, d in P.items()]
     K.write_step(Compound(children=bodies, label="M130"), out / "M130-A.step", desc)
-    K.write_step(Compound(children=ko, label="M130 keep-out"), out / "M130-A_keepout.step",
-                 ["K5 harness: clearance around the MoTeC M130 plugs (design aid, not a product)", KO, f"plugs: {TE}"])
+    mated = [b for b in ko if not b.label.startswith("keep-out")]
+    vols = [b for b in ko if b.label.startswith("keep-out")]
+    K.write_step(Compound(children=mated, label="M130 mated plugs"), out / "M130-A_mated.step",
+                 ["K5 harness: the two TE Superseal 1.0 plugs and ProWire SSB backshells seated on the MoTeC M130",
+                  f"plugs: {TE}", "backshells: " + SS.PW] + [f"{k} = {d.value:g} [{d.basis}] {d.source}" for k, d in SS.P.items()])
+    K.write_step(Compound(children=vols, label="M130 keep-out"), out / "M130-A_keepout.step",
+                 ["K5 harness: clearance below the MoTeC M130 plugs (design aid, not a product)", KO])
     K.write_glb(bodies + ko, out / "M130-A.glb")
     meta = part_meta(bodies)
     bad = [c for c in meta["checks"] if not c["ok"]]

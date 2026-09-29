@@ -19,7 +19,7 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 glb, out = Path(argv[0]).expanduser(), Path(argv[1]).expanduser()
 upright = "--upright" in argv
 px = int(argv[argv.index("--px") + 1]) if "--px" in argv else 1600
-LIGHT = float(argv[argv.index("--light") + 1]) if "--light" in argv else 0.06   # calibrated: the M130 case renders at the photo's #2d2e2f
+LIGHT = float(argv[argv.index("--light") + 1]) if "--light" in argv else 0.042   # calibrated with the edge lights: the M130 case face renders near the photo's #2d2e2f
 FAST = "--fast" in argv
 out.mkdir(parents=True, exist_ok=True)
 pid = glb.stem
@@ -41,6 +41,11 @@ bpy.context.view_layer.update()
 def is_clear(o):
     n = o.name.lower()
     return n.startswith("keep-out") or "envelope" in n
+
+
+def is_mated(o):
+    n = o.name.lower()
+    return " plug:" in n or "backshell:" in n or n.startswith("mated ")
 
 
 def bounds(objs):
@@ -142,6 +147,9 @@ s = size
 area("key", (ctr.x - 2.2 * s, ctr.y - 2.6 * s, ctr.z + 2.8 * s), LIGHT * 60 * s * s * 40, 2.2 * s)
 area("fill", (ctr.x + 3.0 * s, ctr.y - 1.5 * s, ctr.z + 1.2 * s), LIGHT * 18 * s * s * 40, 2.5 * s)
 area("rim", (ctr.x + 1.5 * s, ctr.y + 3.0 * s, ctr.z + 2.5 * s), LIGHT * 45 * s * s * 40, 1.5 * s)
+# edge lights: two strips behind and above, left and right, so black parts show their edges, chamfers and slopes
+area("edge_l", (ctr.x - 2.4 * s, ctr.y + 2.2 * s, ctr.z + 1.8 * s), LIGHT * 140 * s * s * 40, 0.6 * s)
+area("edge_r", (ctr.x + 2.6 * s, ctr.y + 1.6 * s, ctr.z + 2.4 * s), LIGHT * 120 * s * s * 40, 0.6 * s)
 
 cam_d = bpy.data.cameras.new("cam")
 cam = bpy.data.objects.new("cam", cam_d)
@@ -197,9 +205,9 @@ ctree.links.new(rl.outputs["Image"], ao.inputs[2])
 ctree.links.new(ao.outputs["Image"], comp.inputs["Image"])
 
 
-def shoot(name, az_deg, el_deg, w, h, show_clear, transparent=False, fit=1.18):
+def shoot(name, az_deg, el_deg, w, h, show_clear, transparent=False, fit=1.18, show_mated=True):
     for o in parts:
-        o.hide_render = is_clear(o) and not show_clear
+        o.hide_render = (is_clear(o) and not show_clear) or (is_mated(o) and not show_mated)
     for o in wire_objs:
         o.hide_render = not show_clear
     floor.hide_render = transparent
@@ -236,4 +244,5 @@ if FAST:
 else:
     shoot("hero", 38, 22, px, int(px * 0.75), show_clear=False)
     shoot("clearance", 35, -12 if not upright else 18, px, int(px * 0.9), show_clear=True, fit=1.08)
-    shoot("photo_match", 0, 12, 1000, 1000, show_clear=False, transparent=True, fit=1.3)
+    shoot("photo_match", 0, 12, 1000, 1000, show_clear=False, transparent=True, fit=1.3, show_mated=False)
+    shoot("bare", 38, 22, px, int(px * 0.75), show_clear=False, show_mated=False)

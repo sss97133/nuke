@@ -8,8 +8,10 @@ This module writes what each part ships with:
   <id>_drawing.svg   third-angle views with dimensions, drawn from the model's own edges (1 SVG unit = 1 mm)
   <id>.params.json   the dimension table: value, source, basis
 Dimension basis: maker = the maker's drawing prints the number; scaled = measured off the maker's drawing with
-one of its printed dimensions as the scale; design = our clearance or choice; assumed = not in any source.
-The drawing prints maker numbers in blue, scaled ones in orange with a "≈", design ones in green.
+one of its printed dimensions as the scale; photo = sized off a product photo against a sourced dimension;
+design = our clearance or choice; assumed = not in any source.
+The drawing prints maker numbers in blue, scaled ones in orange with a "≈", photo ones in purple with a "≈",
+design ones in green, assumed ones in red.
 Nothing here traces a maker's image: shapes come from the numbers.
 """
 import json
@@ -19,7 +21,7 @@ from pathlib import Path
 
 from build123d import Color, Compound, GeomType, Location, export_step
 
-BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "design": "#2e7d32", "assumed": "#b3261e"}
+BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "photo": "#7b3fa0", "design": "#2e7d32", "assumed": "#b3261e"}
 
 
 @dataclass
@@ -139,7 +141,7 @@ class View:
     def svg(self):
         out = []
         for edges, style in self.edges:
-            cls = {"solid": "vis", "hidden": "hid", "keepout": "ko"}[style]
+            cls = {"solid": "vis", "hidden": "hid", "keepout": "ko", "mated": "mat"}[style]
             d = []
             for e in edges:
                 if e.geom_type == GeomType.LINE:
@@ -210,7 +212,7 @@ class Sheet:
         if text is None:
             val = v(dimv) if dimv is not None else meas
             text = f"{val:.2f}".rstrip("0").rstrip(".")
-        if basis == "scaled":
+        if basis in ("scaled", "photo"):
             text = "≈" + text
         text = prefix + text
         mid = ((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)
@@ -290,6 +292,7 @@ class Sheet:
                  ".vis{fill:none;stroke:#10151a;stroke-width:0.35;stroke-linejoin:round;stroke-linecap:round}"
                  ".hid{fill:none;stroke:#7d8791;stroke-width:0.16;stroke-dasharray:1.4 0.9}"
                  ".ko{fill:none;stroke:#2e7d32;stroke-width:0.22;stroke-dasharray:2.4 1.2}"
+                 ".mat{fill:none;stroke:#5d6670;stroke-width:0.2}"
                  ".thin{stroke:#1a2027;stroke-width:0.18}.ext{stroke:#6b747d;stroke-width:0.13}"
                  ".ctr{stroke:#6b747d;stroke-width:0.13;stroke-dasharray:3 0.8 0.6 0.8}")
         body_ = "\n".join(vw.svg() for vw in self.views.values())

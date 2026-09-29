@@ -52,8 +52,12 @@
      "from": "design aid, not a product colour"
     },
     "plug": {
-     "hex": "#5d6670",
-     "from": "design aid (envelope of TE's plug), not a product colour"
+     "hex": "#2a2c2e",
+     "from": "TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')"
+    },
+    "backshell": {
+     "hex": "#1f2123",
+     "from": "ProWire product photos: black thermoplastic (PBT per ProWire's title)"
     }
    },
    "attach": [
@@ -62,7 +66,7 @@
      "ep": "M130-A",
      "at": [
       -16.3,
-      -69.35,
+      -98.65,
       21.2
      ],
      "dir": [
@@ -70,14 +74,14 @@
       -1,
       0
      ],
-     "note": "34-way plug face; the plug and its boot hang straight down (keep-out 60-80 mm)"
+     "note": "34-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
     },
     {
      "n": "plug",
      "ep": "M130-B",
      "at": [
       19.15,
-      -69.35,
+      -98.65,
       21.2
      ],
      "dir": [
@@ -85,7 +89,7 @@
       -1,
       0
      ],
-     "note": "26-way plug face"
+     "note": "26-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
     }
    ],
    "mount": [
