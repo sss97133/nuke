@@ -140,11 +140,14 @@ Deno.serve(async (req) => {
           // If extractor returned a quality score, use it to flag low-quality extractions
           const queueStatus = (qualityScore !== null && qualityScore < 0.3) ? 'pending_review' : 'complete';
 
-          // extract-bat-core does not chain comment extraction itself
-          // (see the comment at the isBat routing branch above) — trigger
-          // it here, fire-and-forget, mirroring continuous-queue-processor's
-          // established pattern for the same gap.
-          if (isBat && vehicleId) {
+          // extract-bat-core v4.1 (2026-09-27) writes every comment and bid itself, skipping comments the vehicle
+          // already holds by BaT's own comment id. Firing extract-auction-comments after it wrote the lot's comments
+          // wrote them a second time: its hash carries the thread position, which shifts as a thread grows, so
+          // 36.5% of the comment rows on the latest 150 settled lots were duplicates (bat-data coverage audit,
+          // 2026-09-29, docs/ledger/2026-09-30_bat-data-coverage-audit.md). Fall back to it only when the core
+          // wrote none, e.g. a page whose comments JSON didn't parse.
+          const coreComments = Number(extractData?.comments_written ?? 0);
+          if (isBat && vehicleId && !(coreComments > 0)) {
             fetch(supabaseUrl + '/functions/v1/extract-auction-comments', {
               method: 'POST',
               headers: {
