@@ -1,0 +1,170 @@
+# K5 TAPE LIST -- what no document or scan option settles, measured on the truck with a tape
+#
+# Every item: what to measure, from where to where, the harness decision it settles, and the tolerance that
+# decision needs. Fill `result` in; an agent turns each result into a measured row (source = physical
+# measurement, date, who, method) and harness-cad uses it for the margin table.
+#
+# How to take them
+#   - Truck on level ground, doors shut unless the item says otherwise. mm if the tape has it, else inches
+#     to 1/16 and say so.
+#   - Point to point with the tape pulled straight unless the item says "along the route" (then lay a
+#     cloth tape along the path the loom will take).
+#   - One photo per item with the tape in the frame. Write its IMG number in `photo`.
+#   - Calipers where the item says so (the CNC plate needs better than a tape).
+#
+# Priority: 1 = a decision is waiting on it now; 2 = sets lengths or places a box; 3 = calibrates the twin
+# (tells harness-cad how far off the Blender body is).
+# Tolerance: how close the number must be for that decision. Cut lengths carry the locked 15 % body / 20 %
+# engine pad (K5_WIRING_STATE.md s.1), so a length only needs about +/-25 mm.
+
+items:
+
+  - id: T-01
+    priority: 1
+    what: The original fuse-box opening in the dash panel -- its shape and size, and the screw holes around it
+    from_to: "Edge to edge of the opening, across and up-and-down; corner radius; centre-to-centre of every screw or stud hole around it; panel thickness at the edge."
+    how: Calipers or a steel rule; one photo square-on with the rule in frame, from the cab side.
+    settles: The CNC adapter plate for the 61-pin (D38999/24WJ61SN receptacle, K5_WIRING_STATE.md row 0ah) -- the cutout, the bolt pattern, and whether the receptacle's square flange fits inside the opening or the plate has to cover it.
+    tolerance_mm: 0.5
+    compare_to: "Nothing published. objectTraits.ts calls it a 4 in hole with no source; the GM manuals we hold do not dimension it."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-02
+    priority: 1
+    what: Where the fuse-box opening sits on the dash panel
+    from_to: "Centre of the opening to: (a) the driver hinge pillar (kick panel), level, at the same height; (b) the steering column centreline where it passes the dash panel; (c) the floor straight below; (d) the base of the windshield (bottom of the glass) straight above."
+    how: Tape; square or level for (a) and (c).
+    settles: The 61-pin's place in the twin, the M130 spot beside it (HP Academy's ~300 mm bulkhead-to-ECU rule of thumb in catalog/mounts.yaml), and whether the plug and its M85049/69-25N backshell clear the column.
+    tolerance_mm: 5
+    compare_to: "fr88.body.apillar.A-B (1746 mm between the hinge-pillar jamb switches, across the cab); twin firewall about y = -1.46."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-03
+    priority: 1
+    what: Free space straight out from the fuse-box opening, on both faces
+    from_to: "Cab side: from the panel face, straight back, to the first thing in the way (cluster back, pedal bracket, column, duct) -- and which way is open (up, down, toward the door, toward the centre). Engine side: from the panel face, straight forward, to the first thing in the way (iBooster, master cylinder, valve cover or coil, heater hoses) -- and which way is open."
+    how: Tape or a stick; note what each face first hits.
+    settles: Straight or 90-degree boot on each face of the 61-pin, and which way each side of the harness leaves it (the owner's "where we're supposed to put the 90 in the boots").
+    tolerance_mm: 5
+    compare_to: "Nothing published."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-04
+    priority: 1
+    what: Free space under the dash, driver side, near the fuse-box opening
+    from_to: "The empty box left of the steering column: width (column to kick panel), height (bottom of the dash to the floor or to where knees are), depth (dash panel to the back of the dash)."
+    how: Tape; seat all the way back.
+    settles: Whether the M130 (and its 60-80 mm plug clearance) fits on a plate there, close to the 61-pin (catalog/mounts.yaml M130, status open); same for the Dakota VHX box.
+    tolerance_mm: 10
+    compare_to: "Nothing published."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-05
+    priority: 2
+    what: Engine-side trunk lengths from the fuse-box opening
+    from_to: "Along the route the trunk will take, from the opening's engine face to: (a) the rear corner of the driver valve cover, (b) the rear corner of the passenger valve cover, (c) the top of the bellhousing flange."
+    how: Cloth tape laid along the route.
+    settles: The 61-pin engine tails and the trunk to the coil and injector branches (engine lengths are estimates today); also where the engine sits against the firewall, which K5_WIRING_STATE.md s.4 lists as unknown.
+    tolerance_mm: 25
+    compare_to: "Twin engine position (twin lane, K5_harness_workspace_v3.blend)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-06
+    priority: 2
+    what: Body on the frame -- firewall and cab mounts against the frame-side motor mount
+    from_to: "(a) Dash panel (engine face, at floor level) to the frame-side motor-mount bolt, fore-aft, each side. (b) Front cab-mount bolt to the rear cab-mount bolt, each side. (c) Front cab-mount bolt to the frame-side motor-mount bolt, fore-aft."
+    how: Tape under the truck; plumb bob or square to transfer to the floor if easier.
+    settles: Where the body sits on the frame in the twin, which sets every firewall-to-engine and cab-to-rear length.
+    tolerance_mm: 10
+    compare_to: "klm84.frame.bodymount.A-B.driver (1040 mm, KLM 1984); fr88.frame.len.E-G (motor-mount bolt 791 mm ahead of gauge hole G)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-07
+    priority: 2
+    what: The rear double wall -- inside widths and wall depth
+    from_to: "(a) Left inner quarter panel to the right, straight across, at belt height (just above the wheelhouses). (b) Wheelhouse to wheelhouse at the floor. (c) Wall depth, inner skin to outer skin, at the tail-lamp pocket (through the lamp opening). (d) Height of the wheelhouse top above the floor."
+    how: Tape; for (c) a rod or tape through the lamp hole.
+    settles: Whether the rear loom runs inside the double wall or under the floor, what size plug fits at the tail lamp, and the rear round connector's spot (catalog/mounts.yaml REAR-CONN, open).
+    tolerance_mm: 5
+    compare_to: "ortho77.body.rear-cargo-width (64.8, unlabelled); fr88.body.tailgate.top-A-B (1657)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-08
+    priority: 2
+    what: Tailgate opening, all four corners
+    from_to: "Mitchell's points: A and B = upper inner corners of the opening, C and D = lower inner corners at the floor. Measure A-B, D-C, A-D, B-C, and both diagonals A-C and B-D."
+    how: Tape, tailgate down.
+    settles: Mitchell's sheet contradicts itself here by 8 mm (1657 x 505 wants a 1732 diagonal; it prints 1724). One tape settles it. It also sets the tailgate-window and lamp loop across the hinge.
+    tolerance_mm: 3
+    compare_to: "fr88.body.tailgate.top-A-B, bottom-D-C, side-A-D, side-B-C, diag-A-C."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-09
+    priority: 2
+    what: Rear run lengths
+    from_to: "Along the route, from the rear connector's candidate spot (rear floor, driver side) to: each tail-lamp socket, the licence lamp, the fuel sender plug at the tank, the tailgate hinge pass-through; and from the cab (driver kick panel) to that spot."
+    how: Cloth tape along the route.
+    settles: The rear cut lengths (estimates today) and the rear connector's place.
+    tolerance_mm: 25
+    compare_to: "Nothing published."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-10
+    priority: 2
+    what: Door jumper path, each door
+    from_to: "(a) Hole in the hinge pillar to the hole in the door's front face, door shut and door wide open. (b) Height of each hole above the rocker. (c) Gap between the door's front face and the pillar when shut. (d) How far the door opens (angle, or the striker-side edge's travel)."
+    how: Tape; door shut, then wide open.
+    settles: The power-window and lock pass-through (DTP 4-way and DT 8-way per door, K5_WIRING_STATE.md row 0ae) -- boot length, and whether the plug fits inside the pillar.
+    tolerance_mm: 5
+    compare_to: "fr88.body.door.F-C (940 mm striker to jamb switch)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-11
+    priority: 2
+    what: Passenger engine-bay corner -- battery against the Four-Season box
+    from_to: "The free box in the passenger rear corner of the engine bay: dash panel to the nearest face of the A/C box footprint, inner fender to the engine side, height to the hood. Then, along the route, from that spot to the starter and to the fuse-box opening."
+    how: Tape; mark the A/C box footprint if the box is out.
+    settles: Which corner the batteries get (catalog/mounts.yaml BATTERIES, open) and the 2 AWG DC primary lengths (cable_sizing_v5.py uses twin lengths today).
+    tolerance_mm: 10
+    compare_to: "Nothing published."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-12
+    priority: 3
+    what: Cab inside widths (twin calibration)
+    from_to: "(a) Left hinge-pillar door-jamb switch face to the right one, across the cab ('surface above switch'). (b) Left striker bolt centre to the right one. (c) Upper rear corner of the left door opening to the right one."
+    how: Tape, doors open.
+    settles: How far off the Blender cab interior is, against Mitchell's numbers; it also sets the cross-dash loom length.
+    tolerance_mm: 3
+    compare_to: "fr88.body.apillar.A-B (1746), fr88.body.bpillar.E-F (1858), fr88.body.bpillar.C-D (1416)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-13
+    priority: 3
+    what: Windshield opening (twin calibration, outside)
+    from_to: "Centre of each corner arc of the reveal moulding: top corner to top corner, bottom to bottom, and one diagonal."
+    how: Tape outside.
+    settles: Puts a number on 'the outside is good' for the margin table.
+    tolerance_mm: 3
+    compare_to: "fr88.body.windshield.top-A-B (1417), bottom-D-C (1686), diag-A-C (1657)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-14
+    priority: 3
+    what: Engine compartment -- radiator support to cowl
+    from_to: "Outer end of the radiator-support top, each side, to the outer end of the cowl the same side; across at the radiator support; across at the cowl; one diagonal."
+    how: Tape, hood open.
+    settles: Whether the truck carries the 1973-80 front end (the published 1523/1524 mm front widths are 1981+ sheets), and the front-lamp run lengths.
+    tolerance_mm: 5
+    compare_to: "fr88.body.engcomp.* (1523/1715/1102/1957), klm84.body.underhood.* (1524/1721/1108/1962)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-15
+    priority: 3
+    what: Removable top and half-cab roof (asked by the top-design lane)
+    from_to: "(a) Top length, the joint with the steel half-cab to the rear edge above the tailgate, along the centre. (b) Top width at the drip rail, front and rear. (c) The flat roof panel inside the edge radii, length x width. (d) Crown: a straight edge laid across, gap at the centre. (e) Rear opening, tailgate top to the underside of the top's header. (f) Steel half-cab roof, windshield header to the joint, and its width."
+    how: Tape and a straight edge.
+    settles: Solar-panel fit and the roof loom (dome lamps, third brake lamp, camera). No document we hold dimensions the top.
+    tolerance_mm: 10
+    compare_to: "gm77.body.top.lower-holes-width (63 in between the lower bolt holes); twin Exterior_Roof (1881 mm long, 1855 mm wide, model only)."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
