@@ -1,7 +1,7 @@
 ISO-10303-21;
 HEADER;
-FILE_DESCRIPTION(('generator fw61_adapter_plate.py blob 82f61ef48603', 'FB_OPENING=NOT SOURCED: shape from AAW 510351 sheet 1 illustration', 'size NOT SOURCED, right side 101.6 ASSUMED', 'FB_H_RIGHT=101.600', 'FB_H_LEFT=74.168', 'FB_W=93.472', 'FB_R=8.128', 'FB_A1=(52.49, 64.22)', 'FB_A2=(-54.88, -51.46)', 'FB_FASTENERS=two screws in two stock holes (AAW 510351 rev 1.0 sheet 1), positions not printed', 'THICK=3.175', 'PANEL_MAX=3.175', 'SPOTFACE_T=2.794', 'SPOTFACE_D=62.000', 'GASKET_T=1.500', 'GASKET_INSET=3.000', 'SIDE=135.000', 'CORNER_R=10.000', 'HOLE_D=6.600', 'HOLE_OFF=54.500', 'CUT_D=44.704', 'CUT_FLAT=43.434'),'2;1');
-FILE_NAME('Open CASCADE Shape Model','2026-09-29T21:20:01',('Author'),(
+FILE_DESCRIPTION(('generator fw61_adapter_plate.py blob 51be27732d8d', 'FB_OPENING=NOT SOURCED: shape from AAW 510351 sheet 1 illustration', 'size NOT SOURCED, right side 101.6 ASSUMED', 'FB_H_RIGHT=101.600', 'FB_H_LEFT=74.168', 'FB_W=93.472', 'FB_R=8.128', 'FB_A1=(52.49, 64.22)', 'FB_A2=(-54.88, -51.46)', 'FB_FASTENERS=two screws in two stock holes (AAW 510351 rev 1.0 sheet 1), positions not printed', 'JAM_NUT_TORQUE=120-130 in-lb (13.6-14.7 N-m), MILNEC p.B-15, shell 25 aluminium', 'THICK=3.175', 'PANEL_MAX=3.175', 'SPOTFACE_T=2.794', 'SPOTFACE_D=62.000', 'GASKET_T=1.500', 'GASKET_INSET=3.000', 'SIDE=135.000', 'CORNER_R=10.000', 'HOLE_D=6.600', 'HOLE_OFF=54.500', 'CUT_D=44.704', 'CUT_FLAT=43.434'),'2;1');
+FILE_NAME('Open CASCADE Shape Model','2026-09-29T21:49:49',('Author'),(
     'Open CASCADE'),'Open CASCADE STEP processor 8.0','build123d',
   'Unknown');
 FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
