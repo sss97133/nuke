@@ -68,13 +68,43 @@ page, and each is drawn as published: twin metres, glTF Y-up, the zones' frame.
 | Layer | File (lane) | Zone nodes hidden while it is shown |
 |---|---|---|
 | FRAME | `k5-frame.glb` (chassis-3d, #470) | `CTX-frame-rail-web-driver`, `CTX-frame-rail-web-passenger` |
-| SHEET METAL | `k5-front-sheetmetal.glb` (chassis-3d, #470) | `CTX-core-support-face`, `CTX-firewall-face`, `CTX-inner-fender-wall-driver`, `CTX-inner-fender-wall-passenger` |
-| ENGINE | `k5-engine-ls3.glb` (engine-3d, #468) | every `E3_*` node except `E3_Starter_DFSR-8715`, `E3_Starter_Solenoid` and `E3_FuelPressReg_asbuilt` (the new engine has no starter or regulator) |
+| SHEET METAL | `k5-front-sheetmetal.glb` (chassis-3d, #470) | `CTX-core-support-face`, `CTX-firewall-face`, `CTX-toe-board`, `CTX-inner-fender-wall-driver`, `CTX-inner-fender-wall-passenger` |
+| ENGINE | `k5-engine-ls3.glb` (engine-3d, #468) | the lead's list, 82 of the zones' 92 `E3_*` nodes (below) |
+
+The engine list covers these groups:
+- **Long block:** block, heads, valve covers, valley, front and rear covers, oil pan.
+- **Intake, fuel and the TB adapter.**
+- **Front drive:** Mid-Mount, water pump, damper, crank pulley, alternator, PS, tensioner, idler, belt.
+- **The A/C group.**
+- **Exhaust:** headers, flanges, collectors, tails, O2 bungs.
+
+Checked against the three zone GLBs, it hides no non-`E3` node. Still drawn:
+- the starter and its solenoid;
+- the as-built fuel pressure regulator;
+- the 6L90 bell, case and pan.
+
+The new model has none of those. The four TB nodes go with the TB part swap.
+
+On the new engine:
+- `alternator_197-302` and `alternator_pulley` select as `ALTERNATOR-SENSE`, as the old alternator did.
+- `injectors_L` and `injectors_R` are one mesh per bank. They are listed as "injectors, driver bank (INJ-1, 3, 5, 7)" and "injectors, passenger bank (INJ-2, 4, 6, 8)": odd cylinders on the driver side, per the engine receipt and the old per-injector ends. Per-injector picking waits for per-injector meshes.
+- AC-CLUTCH has no 3D while the engine layer is shown. Its 3D returns when the engine lane models the SD7 and its Mid-Mount bracket (next pass). The old planned compressor sits driver-low, off the new belt plane.
+
+**Coil ring:**
+- COIL-1..8 and COIL-1..8_plug (exact names) are never drawn. The twin parked them on a 1.37 m ring, some outside the body, while their towers sit on the real cap ring (a scale error). No wire runs to the parked bodies.
+- The towers still select `COIL-n`. `COIL-n_tower`, `DROP-COIL-n`, `COIL-GROUND-RINGS*` and `ENG-COILS*` stay.
+- The real fix is the 12611424 true parts on the plate.
 
 - The harness pass-through runs (`FIREWALL-ENGINE_seg*`, `FIREWALL-CABIN_seg0`) are never hidden.
 - The MAP tab doesn't load `k5-blazer.glb`, so its `Under_Frame_Blazer` needs no entry.
 - Those lanes' geometry is untouched; this change only hides the old nodes while their files are shown.
-- Tested with the three files from #468 and #470, copied locally and not committed.
+- Tested with the three files from #468 (`8503ee923`) and #470 (`4a1d76785`), copied locally and not committed. The
+  ENGINE BAY view shows:
+  - the new engine, with the TB on its adapter;
+  - no old exhaust and no second alternator;
+  - the starter and the as-built regulator still drawn;
+  - the sheet metal where the flat context faces were;
+  - nothing outside the body.
 
 ## True-size parts
 
@@ -92,8 +122,8 @@ file (X, Y, Z) = part (x, z, -y), as each `pins.json` says.
   (0, -1.720, 1.108), which is within 6 mm.
 - **On the engine layer:** when the engine layer is drawn, the TB stands on that GLB's `tb_flange` node instead. That is
   twin (0, -1.640, 1.1077), the adapter top 25 mm over `intake_4150_pad`, with the bore along the node's +Y. The tag says
-  so. That flange is 85 mm aft of the `tps` anchor the harness is routed to. For the next registry pass, the engine
-  lane's TB position and the harness end need to agree.
+  so. That flange is about 80 mm aft of where the old TB sat. The TB end's harness spot in `k5-positions.json` stays
+  where it is; for the next registry pass, the engine lane's TB position and the harness end need to agree.
 - **Hidden placeholders:** `HEADLIGHT-L`, `HEADLIGHT-R`, `FAN`, and `E3_ThrottleBody_12699160` / `E3_TB_Bore` /
   `E3_TB_MotorHousing` / `E3_TB_Blade`.
 - **Keep-out volumes** in the part files are not drawn.
@@ -119,7 +149,7 @@ file (X, Y, Z) = part (x, z, -y), as each `pins.json` says.
   (lights, `primitive`), the same gap `HarnessView3D.tsx` has.
 - `eslint` on the changed files: 0 errors, 0 warnings.
 - `npm run build`: exit 0; `check-client-secrets` is clean. Chunk sizes:
-  - `ZoneModels3D` 22.8 kB (8.9 kB gzip). It loads only when the 3D view opens.
+  - `ZoneModels3D` 23.6 kB (9.2 kB gzip). It loads only when the 3D view opens.
   - `WiringMap` 85.7 kB; `WiringPlan` 45.0 kB.
 - Local dev server against the production database, logged out, in headless Chromium (SwiftShader WebGL):
   - each view;
