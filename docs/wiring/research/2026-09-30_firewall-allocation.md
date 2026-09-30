@@ -41,21 +41,21 @@ This section fills the 61-pin as it is. §2a gives the alternative with more roo
 1. **Engine management: 50 wires, stays.** The M130 lives in the cab. These are its injector and coil drives and its
    sensor inputs, and none of them can travel as a CAN message.
 2. **CAN: 2 wires, stays.** Everything below crosses on it.
-3. **The isolator's remote switch: 3 wires, moves in, taking the 3 spares.** The isolator is what powers the PDMs: "The
-   isolator must isolate the battery from all devices in the vehicle including the PDM" (MoTeC PDM manual p.4). So the switch
-   that closes it can't depend on a PDM, and its circuit has to be copper.
-   - ISO_SW_PWR runs from its 5 A fuse at the battery (FUSE-ISO_SW_PWR) up to the dash switch. ISO_CLOSE and ISO_OPEN
-     come back down to the Blue Sea 7700.
-   - All three are 20 AWG. A size-20 contact carries 7.5 A with 20 AWG (MILNEC catalog p.B-9), above the 5 A fuse.
+3. **The isolator's remote switch: its control circuit can't use a 61-pin contact (corrected 2026-09-30, see §7).** The
+   isolator is what powers the PDMs: "The isolator must isolate the battery from all devices in the vehicle including the
+   PDM" (MoTeC PDM manual p.4). So the switch that closes it can't depend on a PDM, and its circuit has to be copper.
+   - Blue Sea's 7700 instructions say "Use minimum 16 AWG wire for the Control Circuit" (990180170 Rev.006 p.2), and the
+     registry carries ISO_SW_PWR, ISO_CLOSE, ISO_OPEN and ISO_LED at 16 AWG. A #20 contact takes 20–24 AWG and a #22D
+     22–28 AWG (MILNEC catalog, Contact Specifications), so none of the four fits either insert.
+   - This section first said "all three are 20 AWG" and moved them into the 3 spares. That was wrong. §7 keeps the 7700's
+     control circuit in the engine bay on two relays and brings 4 signal wires across instead.
 4. **The Dakota senders (5) and FAN_PWM (1) stay for now, but are the first to move out if room is needed.**
    - Dakota's BIM-EFI-1 has a native MoTeC mode and would read coolant temperature and oil pressure from the M130 over CAN
      (DAKOTA_VHX_ARCHITECTURE.md §3b). That frees 5, but the dual-sender setup is locked (K5_WIRING_STATE.md §1,
      2026-05-14), so moving it is the owner's call.
    - The fan's PWM command can come from the engine-bay PDM beside the fan. That frees 1.
 
-The result is 58 + 3 = 61 of 61, with the isolator's state lead (ISO_LED) reaching the dash over CAN. If the M130's shutdown
-input has to be hardwired (ISO_KILL taps that lead today, per PDM manual p.4's "secondary switch that is connected to a
-shutdown input on the ECU"), it's a fourth wire, and FAN_PWM moves to the bay PDM to make room.
+The result (corrected in §7): 58 + 4 isolator signal wires = 62, so FAN_PWM moves to the bay PDM and the 61-pin is 61 of 61.
 
 ## 2a. The alternative: the same shell with a 25-35 insert (128 × #22D)
 
@@ -68,7 +68,7 @@ D38999/24WJ35SN and plug D38999/26WJ35PN in place of /24WJ61SN and /26WJ61PN.
   tables. With 25-35, every 22 AWG wire moves across and about 70 of the 128 cavities stay spare, where "fill the 61" leaves 0.
 - **What fits and what doesn't:**
   - The 55 × 22 AWG, and FAN_PWM as a 22 AWG control lead (Dave's call).
-  - The isolator's switch lines, as 22 AWG. Their fuse is 5 A, the 22D's rated current; Dave's call.
+  - Not the isolator's control circuit: Blue Sea asks for 16 AWG minimum (see §2 item 3 and §7).
   - **The ETB motor pair doesn't fit as it's wired.** It's 20 AWG, and a 22D contact is rated 5 A at 22 AWG. The motor's
     current isn't in the registry. It needs one of these, Dave's call:
     - two 22D contacts in parallel per leg;
@@ -85,7 +85,7 @@ D38999/24WJ35SN and plug D38999/26WJ35PN in place of /24WJ61SN and /26WJ61PN.
 - **Recommendation.** Put both in front of Dave:
   - **25-35 buys room** for later candidates (wheel speed, fuel temperature, the isolator lines, and more) at the cost of
     22D tooling and the ETB-pair question.
-  - **"Fill the 61"** keeps the parts already bought and leaves no room.
+  - **"Fill the 61"** keeps the #20 contacts and tools already in the carts (not bought) and leaves no room.
   - Nothing is bought or rewired either way.
 
 ## 3. The rest: switched in the engine bay, commanded over CAN
@@ -139,3 +139,76 @@ For Dave:
   - which valve is on the truck and its part number (the 2024 build log lists a proportioning valve bought);
   - the switch plug and terminal;
   - its exact spot on the crossmember.
+
+## 7. The recount, and the insert pick (pieces lane, 2026-09-30)
+
+The call is the system's to make (owner, 2026-09-29: "dave is an avatar concept. we are building this system"). Counts are
+from the registry on main at c5840f1e0; ratings from the MILNEC D38999 Series III catalog (Contact Specifications, Current
+Rating, Insert Arrangement Selection), reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf.
+
+### 7.1 Demand
+
+| What wants a cavity | Cavities | Source |
+|---|---|---|
+| In the 61-pin now | 58: 55 × 22 AWG, 3 × 20 AWG (ETB motor 4a and 4b, FAN_PWM) | registry FIREWALL-ENGINE |
+| The isolator, as §7.2 wires it | +4 × 22 AWG | §7.2 |
+| Wheel speed: WSS-F2 or WSS-4E | +2 | registry options, demand.pin61_cavities |
+| Fuel temperature: FT or FT-FLEX | +2 | same |
+| iBooster CAN logging (IBST-CAN) | 0: its port IBST-DIAG is in the engine bay | registry IBST-DIAG |
+| M130 shutdown input (ISO_KILL) | 0: both ends are in the cab | registry ISO_KILL |
+
+### 7.2 The isolator crosses as signals, on two relays
+
+The 7700's control circuit stays in the engine bay at 16 AWG, as Blue Sea asks (990180170 Rev.006 p.2): the fused 24-hour
+feed, brown to close, orange to open, black to ground, all short runs beside the 7700. Two sealed relays next to it switch that
+feed onto brown or onto orange. The 2145 dash switch then drives only the two relay coils, so what crosses is signal wiring:
+
+| New wire (22 AWG, M22759/16) | From | To |
+|---|---|---|
+| ISO switch feed | small fuse at the battery | 2145 pins 2 and 8 |
+| ISO close command | 2145 pin 3 | close relay coil |
+| ISO open command | 2145 pin 1 | open relay coil |
+| ISO state | 7700 yellow (LED output) | 2145 pin 7, teed in the cab to M130 UDIG7 (ISO_KILL) |
+
+- No PDM is in the path, as MoTeC requires (PDM manual p.4). The relays are a narrow exception to "the PDM replaces relays":
+  that lock is about switching loads, and this is the switch that powers the PDMs.
+- **Open, for the parts pick:** the relay (sealed, 12 V coil, contacts above the 2 A minimum Blue Sea puts on the switch
+  feed, p.2); the fuse on the new 22 AWG feed; and whether Blue Sea's 16 AWG minimum covers the yellow LED lead, which carries
+  only LED current (ask Blue Sea, or keep it 16 AWG and move the tee to the engine side).
+- The other way is to mount the 2145 in the engine bay. Then only ISO state crosses (1 cavity), but the dash loses the switch.
+
+### 7.3 Fill, by case
+
+| Case | Insert 25-61 (61 × #20) | Insert 25-35 (128 × #22D) |
+|---|---|---|
+| Today, with §7.2 | 62: FAN_PWM moves to the bay PDM (§2 item 4), 61 of 61 | 62 of 128 (with the ETB pair as in §7.4) |
+| Plus one wheel-speed and one fuel-temperature option | 65: the Dakota senders move to CAN (§2 item 4, −5), 60 of 61 | 66 of 128 |
+
+### 7.4 Margins
+
+- **ETB motor pair.** The M1 half bridge is rated "RMS current 4 Amps" (M1 hardware techspec p.11). The canon's check is
+  that the protection is at most 85 % of the conductor's capacity (ch.17 §17.1 item 3); taking the M1's 4 A as that limit:
+  - #20 at 20 AWG: 0.85 × 7.5 A = 6.4 A. Passes, as the build wires it today.
+  - #22D at 22 AWG: 0.85 × 5 A = 4.25 A. Passes by 0.25 A, and only if the pair drops from 20 to 22 AWG. Two #22D per leg,
+    same gauge, length and termination (ch.17 §17.5 items 2–3), give the margin back for 2 more cavities and a splice at
+    each end.
+- **Seal.** M22759/16-22 is 1.27–1.37 mm (state row 0p). The #20 seals 1.02–2.11 mm, so it has room either side. The #22D
+  seals 0.76–1.37 mm, so the wire's maximum is the seal's maximum. M22759/32-22 (1.09 mm) would centre in the #22D but is
+  under the 1.20 mm GT150 seal at the sensor ends (state §1), so /16-22 stays.
+- **Tools and contacts.** The #20 contacts and the M81969/14-10 tool are in the carts (state row 0j, not bought). The #22D
+  needs its own contacts and positioners.
+
+### 7.5 The pick
+
+**25-61 stays: D38999/24WJ61SN (cab) and D38999/26WJ61PN (engine).**
+
+1. It holds today's 58 and the isolator's 4 signals once FAN_PWM moves to the bay PDM: 61 of 61.
+2. It holds one wheel-speed and one fuel-temperature option once the Dakota senders move to CAN: 60 of 61. That move
+   unlocks the owner's dual-sender lock (state §1, 2026-05-14), so it's his call, and it only comes up when one of those
+   options is decided.
+3. Every margin in §7.4 is comfortable on the #20, and two of them are at the edge on the #22D.
+4. 25-35 is the fallback if demand passes 61 after those moves. The shell, the plate, the fuse-box hole, the backshell and
+   the boot are the same, so switching costs only the insert and the contacts, and only before purchase.
+
+No other shell-25 insert does better. 25-4 has 48 × #20 and 8 × #16; its #16 cavities would take 16 AWG, but 48 is short of
+the 55 wires at 22 AWG. 25-43 (43) and 25-46 (46) are smaller still (catalog, Insert Arrangement Selection).
