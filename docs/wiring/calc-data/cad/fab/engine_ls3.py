@@ -139,10 +139,10 @@ P = {
     "hdr_primary_d": D(54.0, PH30 + " / " + PH32 + ": cast primaries against the port pitch (111.76)", "photo", 8.0),
     "hdr_log_d": D(66.0, PH30 + " / " + PH32 + ": the lower log the primaries merge into", "photo", 10.0),
     "hdr_log_x": D(300.0, PH30 + " / " + PH32 + "; stays inside the frame rails' inside faces at +-353 (" + FR88 + ")", "photo", 20.0),
-    "hdr_log_z": D(0.0, PH30 + " / " + PH32 + ": the log runs at about crank height", "photo", 35.0),
-    "hdr_outlet_z": D(-70.0, PH30 + ": collector flange at the rear bottom, facing down", "photo", 30.0),
+    "hdr_log_z": D(20.0, PH30 + " / " + PH32 + ": the log runs just above crank height, close under the ports (a compact cast shorty)", "photo", 35.0),
+    "hdr_outlet_z": D(-50.0, PH30 + ": collector flange at the head's rear bottom, facing down", "photo", 30.0),
     "downpipe_d": D(64.0, "2.5 in down-pipe; the pipes below the collector flange are not photographed", "assumed", 13.0),
-    "downpipe_end_y": D(420.0, "down-pipes drawn to 420 mm behind the bell face (beside the 6L90); route not photographed", "assumed", 150.0),
+    "downpipe_end_y": D(150.0, "down-pipe stubs drawn to 150 mm behind the bell face; the pipes below the collector flange are not photographed", "assumed", 150.0),
 }
 v = lambda k: float(P[k].value) if not isinstance(P[k].value, tuple) else P[k].value
 
@@ -203,20 +203,21 @@ def mat(name, hexc, metallic, rough):
 
 def M(key):
     return {
-        "block": ("cast aluminium (block, heads, front cover)", "#80817c", 0.35, 0.6),   # PH31/PH32 natural castings
-        "intake": ("cast aluminium, as-cast Holley intake", "#9a968a", 0.35, 0.65),        # PH31: sandy natural casting
-        "manifold": ("cast aluminium, Holley manifold natural", "#a6a49c", 0.4, 0.55),     # PH31: 85R9913 raw
-        "cover": ("gloss black paint (valve covers)", "#141517", 0.0, 0.22),             # PH30/PH32 DELVC01 black paint
-        "anod": ("black anodised aluminium (rails, pulleys)", "#1c1c1e", 0.5, 0.4),      # PH31/PH32
-        "billet": ("polished billet aluminium (TB adapter)", "#d9d9d6", 1.0, 0.15),      # PH31
-        "alt": ("natural aluminium (alternator case)", "#b9bcbe", 0.6, 0.4),            # dev_engine.py TRUCK_ENG colour
-        "header": ("coated cast header (glossy grey)", "#5f5d5a", 0.8, 0.28),            # PH30/PH32 crops
+        # base colours are medians of 36 x 36 px patches of his photos (full resolution)
+        "block": ("cast aluminium (block, heads, front cover)", "#938b7e", 0.35, 0.6),   # f9a38895 (2024-08-24) head side
+        "intake": ("cast aluminium, as-cast Holley intake", "#9a9386", 0.35, 0.65),        # IMG_6531 runners
+        "manifold": ("cast aluminium, Holley manifold natural", "#b3ada0", 0.4, 0.55),     # IMG_6531 manifold, lit + shaded faces
+        "cover": ("gloss black paint (valve covers)", "#2b2825", 0.0, 0.22),             # IMG_6531 cover faces
+        "anod": ("black anodised aluminium (rails, pulleys)", "#222223", 0.5, 0.4),      # IMG_6531 water-pump pulley
+        "billet": ("polished billet aluminium (TB adapter)", "#d9d9d6", 1.0, 0.15),      # IMG_6531 / IMG_6532 (polished)
+        "alt": ("natural aluminium (alternator case)", "#c9c2b5", 0.6, 0.4),            # IMG_6531 case (#dfd8ca lit, less the highlight)
+        "header": ("coated cast header (glossy grey)", "#877f73", 0.8, 0.28),            # IMG_6532 + IMG_6530 header patches
         "pipe": ("mild steel down-pipe", "#77736d", 1.0, 0.5),                           # assumed, not photographed
         "belt": ("rubber belt", "#151515", 0.0, 0.85),
-        "plastic": ("black plastic (P/S reservoir)", "#121212", 0.0, 0.5),               # PH32
-        "damper": ("black damper/pulley", "#1b1b1c", 0.4, 0.5),                          # PH31
-        "chrome": ("zinc/chrome fittings", "#b8b8b4", 1.0, 0.2),                         # PH31 barbs
-        "pan": ("cast aluminium oil pan (model not on record)", "#777874", 0.35, 0.6),
+        "plastic": ("black plastic (P/S reservoir)", "#121212", 0.0, 0.5),               # IMG_6532
+        "damper": ("black damper/pulley", "#222223", 0.4, 0.5),                          # IMG_6531
+        "chrome": ("zinc/chrome fittings", "#b8b8b4", 1.0, 0.2),                         # IMG_6531 barbs
+        "pan": ("cast aluminium oil pan (model not on record)", "#8a847a", 0.35, 0.6),
     }[key]
 
 
@@ -354,14 +355,36 @@ def bank_box(sig, s0, s1, r0, r1, y0, y1):
     return bm
 
 
-def tube(name, pts, d, key, closed=False, res=10):
-    """a round tube along a smooth path through the given engine-local points (a NURBS-free Bezier with auto handles)"""
+def tube(name, pts, d, key, closed=False, res=10, rect=None):
+    """a tube along a smooth path through the given engine-local points (a Bezier with auto handles): round of
+    diameter d, or with rect=(w, h) a rounded-rectangle section kept upright (w across, h vertical)"""
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"
-    cu.bevel_depth = d / 2
-    cu.bevel_resolution = 4
     cu.resolution_u = res
     cu.use_fill_caps = True
+    prof_ob = None
+    if rect:
+        w, h = rect
+        pc = bpy.data.curves.new(name + "_section", "CURVE")
+        ps = pc.splines.new("POLY")
+        r_ = min(w, h) * 0.3
+        corners = []
+        for cx, cy, a0 in ((w / 2 - r_, h / 2 - r_, 0), (-w / 2 + r_, h / 2 - r_, 90), (-w / 2 + r_, -h / 2 + r_, 180), (w / 2 - r_, -h / 2 + r_, 270)):
+            for k in range(4):
+                a_ = math.radians(a0 + 30 * k)
+                corners.append((cx + r_ * math.cos(a_), cy + r_ * math.sin(a_)))
+        ps.points.add(len(corners) - 1)
+        for pt, (x_, y_) in zip(ps.points, corners):
+            pt.co = (y_, x_, 0.0, 1.0)      # section X = the curve's normal (kept near +Z), so h goes on X
+        ps.use_cyclic_u = True
+        prof_ob = bpy.data.objects.new(name + "_section", pc)
+        bpy.context.scene.collection.objects.link(prof_ob)
+        cu.bevel_mode = "OBJECT"
+        cu.bevel_object = prof_ob
+        cu.twist_mode = "Z_UP"
+    else:
+        cu.bevel_depth = d / 2
+        cu.bevel_resolution = 4
     sp = cu.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
     for bp, p in zip(sp.bezier_points, pts):
@@ -375,6 +398,10 @@ def tube(name, pts, d, key, closed=False, res=10):
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
     bpy.data.objects.remove(ob)
     bpy.data.curves.remove(cu)
+    if prof_ob is not None:
+        pcu = prof_ob.data
+        bpy.data.objects.remove(prof_ob)
+        bpy.data.curves.remove(pcu)
     bm = bmesh.new()
     bm.from_mesh(me)
     bpy.data.meshes.remove(me)
@@ -487,10 +514,23 @@ def build():
         dx, dy = p0.x, y - PAD_Y
         k = min((PW / 2) / abs(dx), (PL / 2) / abs(dy) if dy else 9e9)
         ex, ey = dx * k, PAD_Y + dy * k
-        z_in = (PZ0 + PAD_Z - 12) / 2 + 8
-        p3 = Vector((ex * 0.8, PAD_Y + (ey - PAD_Y) * 0.8, z_in))
-        p2 = Vector((ex + (p1.x - ex) * 0.45, ey + (y - ey) * 0.45, z_in + 6))
-        parts.append(tube(f"runner_{cyl_n}", [p0, p1, p2, p3], RD, "intake"))
+        z_in = PAD_Z - 12 - (v("port_h") + 12) / 2          # runners arch up into the plenum's top, under the pad
+        if cyl_n in (1, 2):                                  # the front pair meets under the pad's front edge: the Λ
+            ex, ey = sig * 22, PAD_Y - PL / 2
+        p3 = Vector((ex * 0.8, PAD_Y + (ey - PAD_Y) * 0.85, z_in))
+        p2 = Vector((ex + (p1.x - ex) * 0.45, ey + (y - ey) * 0.45, z_in + 4))
+        parts.append(tube(f"runner_{cyl_n}", [p0, p1, p2, p3], RD, "intake", rect=(v("port_w") + 16, v("port_h") + 12)))
+        if cyl_n == 1:   # the cast "Holley" script along the top of the driver front runner (IMG_6531), cosmetic
+            mid = (p1 + p2) / 2
+            dirh = Vector(((p2 - p1).x, (p2 - p1).y, 0)).normalized()
+            if dirh.y > 0:
+                dirh = -dirh
+            side = Vector((0, 0, 1)).cross(dirh)
+            logo = text_mesh("Holley", 30.0, 2.0)
+            rotm = Matrix((dirh, side, Vector((0, 0, 1)))).transposed().to_4x4()
+            bmesh.ops.transform(logo, matrix=rotm, verts=logo.verts)
+            bmesh.ops.translate(logo, vec=mid + Vector((0, 0, (v("port_h") + 12) / 2 - 1)), verts=logo.verts)
+            parts.append(logo)
         # port flange boss on the head's intake face
         parts.append(bank_box(sig, v("port_s") - 42, v("port_s") + 42, -HW / 2 - 14, -HW / 2, y - 26, y + 26))
         runner_ends[cyl_n] = (p0, p1)
@@ -618,8 +658,8 @@ def build():
         parts.append(cyl((sig * LX, y_out + 4, OZ - 4), LD + 30, 8, axis="z"))          # collector flange
         join(f"header_{tag}", parts, "header", bevel=0)
         ye = v("downpipe_end_y")
-        dp = [Vector((sig * LX, y_out + 4, OZ - 8)), Vector((sig * (LX + 8), y_out + 50, OZ - 75)),
-              Vector((sig * (LX + 15), y_out + 180, OZ - 100)), Vector((sig * (LX + 15), ye, OZ - 105))]
+        dp = [Vector((sig * LX, y_out + 4, OZ - 8)), Vector((sig * (LX + 6), y_out + 40, OZ - 70)),
+              Vector((sig * (LX + 12), ye, OZ - 110))]
         join(f"downpipe_{tag}", [tube(f"downpipe_{tag}", dp, v("downpipe_d"), "pipe", res=16)], "pipe")
     return dict(length=length, arcs=arcs, inj=inj_pos, ports=ports, pad_z=PAD_Z, belt_y=BY)
 
@@ -714,8 +754,8 @@ def render(outdir, px=1400):
     scene.world = world
     world.use_nodes = True
     world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.62, 0.64, 0.67, 1)
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.35
-    for name, loc, energy in (("key", (1.2, -1.6, 2.2), 160), ("fill", (-1.8, -0.8, 1.2), 70), ("rim", (0.3, 1.8, 1.8), 110)):
+    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.2
+    for name, loc, energy in (("key", (1.2, -1.6, 2.2), 55), ("fill", (-1.8, -0.8, 1.2), 22), ("rim", (0.3, 1.8, 1.8), 40)):
         ld = bpy.data.lights.new(name, "AREA")
         ld.energy, ld.size = energy, 1.4
         lo_ = bpy.data.objects.new(name, ld)
@@ -745,7 +785,7 @@ def render(outdir, px=1400):
         scene.cycles.device = "GPU"
     except Exception:
         scene.cycles.device = "CPU"
-    scene.view_settings.view_transform = "AgX"
+    scene.view_settings.view_transform = "Standard"
     scene.render.resolution_x, scene.render.resolution_y = px, int(px * 0.75)
     for name, (d, ortho) in VIEWS.items():
         d = Vector(d).normalized()
