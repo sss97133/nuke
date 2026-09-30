@@ -133,18 +133,35 @@
    "note": "+/-0.04 m"
   },
   {
+   "name": "recess_half_width",
+   "value": 0.34,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): the engine's rear (heads x +/-0.329, banks +/-0.254) reaches y -1.40 to -1.45, behind the firewall station; geometry-scan's receipt flags it. A clearance recess sized to the twin's engine, not a GM shape",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "recess_z",
+   "value": [
+    0.6,
+    1.06
+   ],
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): block, rear cover and heads z 0.64-1.05, plus margin",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "recess_depth",
+   "value": 0.08,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): the block's rear cover at y -1.40, 60 mm behind -1.46, plus 20 mm",
+   "basis": "design",
+   "note": "m"
+  },
+  {
    "name": "tunnel_half_width",
    "value": 0.25,
    "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): 6L90 bell x +/-0.22 plus 30 mm",
    "basis": "design",
    "note": "m"
-  },
-  {
-   "name": "tunnel_depth",
-   "value": 0.1,
-   "source": "the dash's centre recess for the bellhousing; the block's rear face (E3_RearCover) is at y -1.40, 60 mm behind the firewall station (geometry-scan receipt 2026-09-30)",
-   "basis": "assumed",
-   "note": "+/-0.03 m"
   },
   {
    "name": "tunnel_top_z",

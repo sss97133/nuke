@@ -56,10 +56,13 @@ P = {
     "cowl_z": Dim(1.270, TWIN + ": hood rear edge 1.32, cowl 1.366 at y -1.5", "design", "+/-0.03 m"),
     "toe_bottom": Dim((-1.220, 0.660), "the old CTX-toe-board's lower edge (y, z)", "assumed", "+/-0.04 m"),
     "toe_top_z": Dim(0.900, "the old CTX-toe-board's upper edge", "assumed", "+/-0.04 m"),
+    "recess_half_width": Dim(0.340, TWIN + ": the engine's rear (heads x +/-0.329, banks +/-0.254) reaches y -1.40 to"
+                                     " -1.45, behind the firewall station; geometry-scan's receipt flags it. A clearance"
+                                     " recess sized to the twin's engine, not a GM shape", "design", "m"),
+    "recess_z": Dim((0.600, 1.060), TWIN + ": block, rear cover and heads z 0.64-1.05, plus margin", "design", "m"),
+    "recess_depth": Dim(0.080, TWIN + ": the block's rear cover at y -1.40, 60 mm behind -1.46, plus 20 mm", "design",
+                        "m"),
     "tunnel_half_width": Dim(0.250, TWIN + ": 6L90 bell x +/-0.22 plus 30 mm", "design", "m"),
-    "tunnel_depth": Dim(0.100, "the dash's centre recess for the bellhousing; the block's rear face (E3_RearCover) is"
-                               " at y -1.40, 60 mm behind the firewall station (geometry-scan receipt 2026-09-30)",
-                        "assumed", "+/-0.03 m"),
     "tunnel_top_z": Dim(0.980, TWIN + ": 6L90 bell top 0.94 plus 40 mm", "design", "m"),
     "skirt_wall_x_front": Dim(0.510, "FR88 Fig 2 engine compartment: skirt walls drawn from the radiator-support bar"
                                      " (read x 470-520 px against the 1523 pair)", "scaled", "+/-0.03 m"),
@@ -112,20 +115,25 @@ for sx in (1, -1):
     rs += box(sx * hw - (0.03 if sx > 0 else -0.03), sx * hw, yf, yr + 0.02, zb, zt)   # the flange the fender bolts to
 add(rs, "radiator_support", SUPPORT)
 
-# ---- firewall: dash panel with the bellhousing recess, and the toe board (the cowl skin is the body's)
+# ---- firewall: dash panel with a clearance recess and tunnel for the twin's engine and 6L90, and the toe board
+#      (the cowl skin is the body's)
 fy, fw, cz = v("firewall_y"), v("firewall_half_width"), v("cowl_z")
-tw, td, tz = v("tunnel_half_width"), v("tunnel_depth"), v("tunnel_top_z")
+rw, (rz0, rz1), rd = v("recess_half_width"), v("recess_z"), v("recess_depth")
+tw, tz = v("tunnel_half_width"), v("tunnel_top_z")
 (ty0, tz0), tzt = v("toe_bottom"), v("toe_top_z")
-dash = box(-fw, fw, fy, fy + T, tzt, cz)
-dash -= box(-tw, tw, fy - 0.01, fy + 0.01, tzt - 0.01, tz)            # opening for the recess
-dash += box(-tw, tw, fy + td, fy + td + T, tzt - 0.3, tz) + box(-tw - T, -tw, fy, fy + td + T, tzt - 0.3, tz) \
-    + box(tw, tw + T, fy, fy + td + T, tzt - 0.3, tz) + box(-tw - T, tw + T, fy, fy + td + T, tz - T, tz)
-add(dash, "firewall_dash_panel", DASH)
+yb = fy + rd                                                          # the recess's back face
+dash = box(-fw, fw, fy, fy + T, tzt, cz) - box(-rw, rw, fy - 0.01, fy + 0.01, tzt - 0.01, rz1)
+recess = (box(-rw, rw, yb, yb + T, rz0, rz1) + box(-rw - T, -rw, fy, yb + T, rz0, rz1)
+          + box(rw, rw + T, fy, yb + T, rz0, rz1) + box(-rw - T, rw + T, fy, yb + T, rz1 - T, rz1))
+recess -= box(-tw, tw, yb - 0.01, yb + 0.01, rz0 - 0.01, tz)          # the tunnel continues through its back
+tunnel = (box(-tw - T, -tw, yb, ty0, rz0, tz) + box(tw, tw + T, yb, ty0, rz0, tz) + box(-tw - T, tw + T, yb, ty0,
+                                                                                        tz - T, tz))
+add(dash + recess + tunnel, "firewall_dash_panel", DASH)
 # toe board: a plate sloping from the dash's lower edge down and back to the floor
 L = math.hypot(ty0 - fy, tzt - tz0)
 ang = math.degrees(math.atan2(tzt - tz0, ty0 - fy))
 toe = Pos(0, mm((fy + ty0) / 2), mm((tzt + tz0) / 2)) * Box(mm(2 * fw), mm(L), mm(T)).rotate(Axis.X, -ang)
-toe -= box(-tw, tw, fy - 0.05, ty0 + 0.05, tz0 - 0.1, tzt + 0.05)   # the tunnel runs through it
+toe -= box(-rw, rw, fy - 0.05, yb, tz0 - 0.1, tzt + 0.05) + box(-tw, tw, fy - 0.05, ty0 + 0.05, tz0 - 0.1, tzt + 0.05)
 add(toe, "firewall_toe_board", DASH)
 
 # ---- inner fenders (fender skirts): engine-side wall, top, wheelhouse arch
