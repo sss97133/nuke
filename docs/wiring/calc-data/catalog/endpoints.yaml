@@ -60,8 +60,8 @@ PDM30-STUD:
   device: PDM30 battery stud (M6; "eyelet and M6 nut")
   family: lug
   kit: {}
-  lugs: {PDM_BPOS: DL214, DAK_CONST_FH: ["9916"], PCS_BATT_FH: ["9916"], TRANS_BATT_FH: ["9916"]}   # fused taps: the Blue Sea 5065 holder's 12 AWG pigtail on the M6 stud: ProWire 9916 12-10 AWG 1/4   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
-  wires: [PDM_BPOS, DAK_CONST_FH, PCS_BATT_FH, TRANS_BATT_FH]
+  lugs: {PDM_BPOS: DL214, DAK_CONST_FH: ["9916"], PCS_BATT_FH: ["9916"]}   # fused taps: the Blue Sea 5065 holder's 12 AWG pigtail on the M6 stud: ProWire 9916 12-10 AWG 1/4   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
+  wires: [PDM_BPOS, DAK_CONST_FH, PCS_BATT_FH]
   sources: ["motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')", "build book DC primary table (DL214 = PDM30 M6)"]
 
 PDM15-A:
@@ -125,11 +125,11 @@ SPL-PDM15-OUT5:
   sources: ["MoTeC PDM user manual p.43 (20 A Output 5 on A9 with A17)", "MoTeC PDM user manual p.48 (20# to 16# on 20 A outputs)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG + Raychem MiniSeal page (M81824/1 in-line series)", "book review 2026-09-28 (every single wire on a paired 20 A output)"]
 SPL-PDM30-OUT5:
   where: cabin
-  device: "PDM30 OUT5 pigtail splice — ONE MiniSeal stub splice D-609-05, all five conductors in one barrel: pins A9 + A17 (2 x 20 AWG), the third brake light feed #93 (20 AWG) and the brake-signal taps PCS_BRK and TRANS_BRK (22 AWG each) = 4,340 CM, in the yellow 16-12 band (2,580-6,530 CM)"
+  device: "PDM30 OUT5 pigtail splice — ONE MiniSeal stub splice D-609-05, all four conductors in one barrel: pins A9 + A17 (2 x 20 AWG), the third brake light feed #93 (20 AWG) and the brake-signal tap PCS_BRK (22 AWG) = 3,700 CM, in the yellow 16-12 band (2,580-6,530 CM); TRANS_BRK retired 2026-09-30 (the kit leaves case 6 empty, drawing A-TCM4610 rev 009)"
   family: miniseal
   kit: {D-609-05: 1}
-  wires: ["93_PT1", "93_PT2", "93", "PCS_BRK", "TRANS_BRK"]
-  pins: {"93_PT1": "splice", "93_PT2": "splice", "93": "splice", PCS_BRK: "splice", TRANS_BRK: "splice"}
+  wires: ["93_PT1", "93_PT2", "93", "PCS_BRK"]
+  pins: {"93_PT1": "splice", "93_PT2": "splice", "93": "splice", PCS_BRK: "splice"}
   splice_point: true
   note: "in-line MiniSeal M81824/1-2: both pigtails in one end, the load wire out the other; pigtails cut to the same length"
   open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
@@ -1524,47 +1524,61 @@ GSS-SENSOR:
   wires: [GSS_SENS_R, GSS_SENS_G, GSS_SENS_B]
   sources: ["web_snapshots/www.dakotadigital.com__GSS-3000.md"]
 
-# ---------------- PCS TCM-2650 (book review 2026-09-28: its seven wires ended nowhere)
+# ---------------- PCS TCM-2650 (book review 2026-09-28: its seven wires ended nowhere; drawing A-TCM4610 rev 009 read 2026-09-30)
 PCS-TCM:
   where: cabin
-  mount: "under the dash beside the PDM30: the ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no environmental or sealing rating (lead rule 2026-09-28)"
-  device: "PCS TCM-2650 transmission controller — owned (Zero Gravity order, delivered 2024-09-12; no database record yet); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)"
+  mount: "under the dash beside the PDM30: the ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no environmental or sealing rating (lead rule 2026-09-28); the kit's case lead is 72 in (1.83 m) and the twin puts the PDM30 0.92 m axis-by-axis from the transmission centre (twin_centers.json), so the spot reaches"
+  device: "PCS TCM-2650 transmission controller — owned (Zero Gravity order, delivered 2024-09-12; no database record yet); the TCM-4610 kit harness plugs into its 56-cavity C-1 plug (PCS-HARNESS-4610)"
   family: open
   kit: {}
   wires: []
-  note: "none of our wires lands on the TCM: the vehicle-side wires end at the TCM-4610 harness leads (PCS-HARNESS-4610)"
-  open: ["TCM plug and pin numbers: awaiting the ZGP harness drawing (the setup guide rev2 has none; Jim emailed, state 0y)"]
-  sources: ["reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.1, p.12, p.13, p.18, p.19-20"]
+  cavities:
+    "2": "DIG IN 1, GRY\\BLK — the kit's BRAKE INPUT lead (PCS_BRK)"
+    "9": "GND 1, BLK — kit splice S2 (CHASSIS GND lead, case 2 + 5, OBD2 4 + 5)"
+    "11": "PWM1, VIO\\BLK — the kit's REVERSE lead (PCS_REV)"
+    "17": "SPEEDO OUT, ORN\\WHT — the kit's SPEEDO lead, not wired (Dakota speed candidate)"
+    "19": "SW +12V in, YEL 18 AWG — kit splice S3 (SWITCHED +12V lead, case 9 + 12)"
+    "20": "+12V BATT, RED 18 AWG — kit splice S1 (+12V BATTERY lead, case 1 + 4, OBD2 16)"
+    "23": "SIG GND, BLK\\WHT — the kit's TACHOMETER GND lead, not wired"
+    "24": "SPEED 3, ORN\\BLK — the kit's TACHOMETER lead (PCS_RPM)"
+    "41": "DIG OUT 4, VIO\\WHT — the kit's SPEED OUTPUT lead, not wired"
+    "43": "CAN 2 HIGH, YELLOW — case 10 (the private PCS-T43 GMLAN bus)"
+    "44": "CAN 2 LOW, GREEN — case 11"
+    "45": "ANA IN 1, YEL\\BLK — the kit's C6 TPS connector B (PCS_TPS)"
+    "53": "PWM 7, PNK\\BLK — the kit's PARK\\NEUTRAL lead (PCS_NS)"
+  note: "none of our wires lands on the TCM itself: the vehicle-side wires end at the TCM-4610 kit's leads and its C6 plug (PCS-HARNESS-4610). Cavity functions from the drawing's p.1 C-1 list, which is the cavity truth: its p.2 unterminated-wire table gives DIGITAL IN 2-5 as TCU-2 to TCU-5, one lower than p.1's cavities 3-6, with the same colours"
+  open: []
+  sources: ["reference_documents/component_drawings/PCS_A-TCM4610_rev009_6L50-80-90_to_TCM-2600_harness.pdf p.1 (TCU-2600 C-1 cavity list), p.2 (connector tables)",
+            "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.1, p.12, p.13, p.18, p.19-20"]
 PCS-HARNESS-4610:
   where: cabin
-  device: "PCS TCM-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads"
+  device: "PCS TCM-4610 kit harness, PCS A-TCM4610 rev 009 (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete: TCM plug C-1, a 72 in lead to the 6L90 case plug, 60 in flying leads, and the C2 OBD2, C3 option, C4 CAN, C5 laptop, C6 TPS and C7 paddle plugs"
   family: kit_terminal
   kit: {}
-  wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND", "TRANS_BATT", "TRANS_BRK"]
-  pins: {PCS_BATT: "12 V battery lead (lead label OPEN until the TCM-4610 drawing)", PCS_IGN: "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)",
-         PCS_TPS: "analog 1 lead (lead label OPEN until the TCM-4610 drawing)", PCS_RPM: "speed input 3 lead, orange/black (ZGP p.11)",
-         PCS_BRK: "brake light input lead (lead label OPEN until the TCM-4610 drawing)",
-         PCS_NS: "lever-position output lead, neutral (lead label OPEN until the TCM-4610 drawing)",
-         PCS_REV: "lever-position output lead, reverse (lead label OPEN until the TCM-4610 drawing)",
-         PCS_GND: "PCS ground lead (lead label OPEN until the TCM-4610 drawing)",
-         TRANS_BATT: "case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)",
-         TRANS_BRK: "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"}
-  kit_circuits: "inside the kit, drawn not cut by us: the PCS-T43 GMLAN pair (case 10/14/15 CAN+, 8/11/13 CAN-, 120 ohm at 15 and 8), case ignition 12 and accessory 9 (fed from the kit's ignition lead: OPEN until the drawing), and the case-side ends of the leads above"
+  wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND"]
+  pins: {PCS_BATT: "+12V BATTERY lead, 18 AWG RED, 60 in: splice S1 feeds TCM cavity 20, case 1 + 4 and OBD2 16",
+         PCS_IGN: "SWITCHED +12V lead, 16 AWG YEL, 60 in: splice S3 feeds TCM cavity 19 and case 9 + 12; PCS_IGN arrives 14 AWG through bulkhead P and steps down to the 16 AWG lead",
+         PCS_TPS: "C6 TPS connector cavity B (TPS SIG, YEL\\BLK, TCM cavity 45 = ANA IN 1), through the C-7M mating pigtail; C6 A (SIG GND) and C (+5V SENSOR) unused",
+         PCS_RPM: "TACHOMETER lead, ORN\\BLK, 60 in (TCM cavity 24 = SPEED 3)",
+         PCS_BRK: "BRAKE INPUT lead, GRY\\BLK, 60 in (TCM cavity 2 = DIG IN 1)",
+         PCS_NS: "PARK\\NEUTRAL lead, PNK\\BLK, 60 in (TCM cavity 53 = PWM 7)",
+         PCS_REV: "REVERSE lead, VIO\\BLK, 60 in (TCM cavity 11 = PWM1)",
+         PCS_GND: "CHASSIS GND lead, 16 AWG BLK, 60 in: splice S2 joins TCM cavity 9, case 2 + 5 and OBD2 4 + 5"}
+  kit_circuits: "inside the kit, drawn not cut by us: the PCS-T43 GMLAN pair (TCM 43/44 to case 10/11; case 14/13 on to OBD2 6/14, so a scan tool reads the T43's own GMLAN there), the case feeds on splices S1/S2/S3, the single-wire tap shift (case 7, BLUE) to C7 cavity 5, and CAN1 (TCM 15/16, WHT\\RED / WHT\\BLK) to C3, C4 and C7. Case 3, 6, 8, 15, 16 are empty (blocking plugs). Unwired flying leads: DIG IN 2-5, SPEEDO OUT, SPEED OUTPUT (DIG OUT 4), PWM 9, ANA IN 6, TACHOMETER GND"
   open: ["kit harness path from the cab to the case connector (floor pass-through, its grommet): the kit's own run, set at the mock-up",
-         "TCM-4610 harness drawing: lead labels, which case cavities come out as leads (1+4, 2+5, 3, 6, 7, 16), and whether PCS_BATT also feeds case 1+4 (research §5) — ask ZGP/PSI or read the harness label when it arrives",
-         "OPEN until the TCM-4610 drawing: does the kit feed case 12 / 9 from the PCS ignition lead (then PDM15 OUT13 carries their wake current)"]
-  sources: ["web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller')",
+         "flying lead length: p.2 dimensions them at 60 in, p.1 says 'unterminated pigtail to a length of 10 feet'; measure the kit on the bench",
+         "C6 cavity C: p.2 lists '+5V SENSOR ... TCU-21, S3', and S3 is the switched +12 V splice; meter C6 C before anything mates it (expect 5 V)"]
+  sources: ["reference_documents/component_drawings/PCS_A-TCM4610_rev009_6L50-80-90_to_TCM-2600_harness.pdf p.1-2 (lead colours, gauges, splices S1-S8, connector tables, lengths; notes: 20 AWG TXL unless stated, lengths +/- 1/2 in)",
+            "web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller')",
             "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.2 ('12V Battery, Ignition and Grounds'), p.11, p.18-20"]
 PCS-HARNESS-4610-CASE:
   where: chassis
-  device: "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5) — the kit's run from the cab to the case connector under the truck"
+  device: "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5)"
   family: kit_terminal
   kit: {}
-  wires: ["TRANS_GND"]
-  pins: {TRANS_GND: "case ground lead, cavities 2 + 5 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"}
-  open: ["the kit's route from the cab to the case, and where its case-side ground lead leaves it: set at the mock-up"]
-  sources: ["reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (ground to a good chassis/engine ground)",
-            "web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (cavities 2, 5 BLK/WHT 18 GA GROUND)"]
+  wires: []
+  retired: "the kit brings out no case-side lead: drawing A-TCM4610 rev 009 p.2 C1 table puts case 2 + 5 on splice S2, which returns through the cab-side CHASSIS GND lead (PCS_GND)"
+  sources: ["reference_documents/component_drawings/PCS_A-TCM4610_rev009_6L50-80-90_to_TCM-2600_harness.pdf p.2 (C1 transmission connector table)"]
 TRANS-CASE:
   where: chassis
   device: "6L90 external case connector: Kostal 16-cavity, GM 15131300 / 19303772 — the only external connector; solenoids, pressure switches, speed sensors, fluid temperature and the range switch are inside the case on the TEHCM"
@@ -1572,27 +1586,27 @@ TRANS-CASE:
   kit: {}
   wires: []
   cavities:
-    "1": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit"
-    "4": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit"
-    "2": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
-    "5": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
-    "12": "12 V switched ignition, PNK 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 12 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)"
-    "9": "12 V accessory, YEL 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 9 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)"
-    "10": "CAN+ (GMLAN high), TAN/BLK 20 GA — PCS-T43 private bus, inside the kit"
-    "14": "CAN+, TAN/BLK 20 GA — inside the kit"
-    "15": "CAN+, 120 ohm applied, TAN/BLK 20 GA — inside the kit"
-    "8": "CAN-, 120 ohm applied, TAN 20 GA — inside the kit"
-    "11": "CAN-, TAN 20 GA — inside the kit"
-    "13": "CAN-, TAN 20 GA — inside the kit"
-    "6": "stop lamp switch signal, WHT 22 GA — TRANS_BRK via the kit"
-    "7": "tap up/down signal, PPL 22 GA — not wired: OPEN (shifter buttons not picked)"
-    "3": "park/neutral signal (output, grounded in P/N), ORN/BLK 20 GA — available, not wired (neutral start comes from PCS_NS)"
-    "16": "replicated TOS (output-speed) signal, ORN/BLK 22 GA — available, not wired (Dakota SPD substitution OPEN: pulses per mile, input acceptance)"
+    "1": "12 V battery — kit splice S1 on the +12V BATTERY lead (PCS_BATT)"
+    "4": "12 V battery — kit splice S1 on the +12V BATTERY lead (PCS_BATT)"
+    "2": "ground — kit splice S2 on the CHASSIS GND lead (PCS_GND)"
+    "5": "ground — kit splice S2 on the CHASSIS GND lead (PCS_GND)"
+    "12": "12 V switched ignition, wakes the internal TCM — kit splice S3 on the SWITCHED +12V lead (PCS_IGN, PDM15 OUT13)"
+    "9": "12 V accessory, wakes the internal TCM — kit splice S3 on the SWITCHED +12V lead (PCS_IGN, PDM15 OUT13)"
+    "10": "CAN2 HIGH (GMLAN), YEL — kit wire to TCM cavity 43"
+    "14": "CAN2 HIGH, YEL — kit wire to OBD2 cavity 6"
+    "15": "empty in the kit (blocking plug)"
+    "8": "empty in the kit (blocking plug)"
+    "11": "CAN2 LOW (GMLAN), GRN — kit wire to TCM cavity 44"
+    "13": "CAN2 LOW, GREEN — kit wire to OBD2 cavity 14"
+    "6": "empty in the kit (blocking plug): the brake reaches the PCS on its BRAKE INPUT lead (PCS_BRK)"
+    "7": "single-wire tap shift, BLUE — kit wire to the C7 paddle plug cavity 5; C7 stays capped (no paddles picked)"
+    "3": "empty in the kit (blocking plug)"
+    "16": "empty in the kit (blocking plug): no replicated output speed; the PCS SPEEDO OUT lead is the Dakota speed candidate"
   note: "our harness does not cut or terminate this plug: the TCM-4610 kit harness carries it; the cavity map is recorded so the kit's leads can be checked against it"
-  open: ["OPEN until the TCM-4610 drawing: does the kit feed case 12 (switched ignition) and case 9 (accessory) from the PCS ignition lead — if it does, PCS_IGN's load (PDM15 OUT13) includes them",
-         "Dakota SPD / GEAR substitution from case 16 or the PCS outputs: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
+  open: ["Dakota SPD / GEAR substitution from the PCS SPEEDO OUT lead: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
          "tap up/down (case 7): shifter buttons not picked"]
-  sources: ["web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (GM connector part numbers 15131300, 19303772; cavity designations table)",
+  sources: ["reference_documents/component_drawings/PCS_A-TCM4610_rev009_6L50-80-90_to_TCM-2600_harness.pdf p.2 (C1 transmission connector table: what the kit fills)",
+            "web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (GM connector part numbers 15131300, 19303772; cavity designations table)",
             "reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (park/neutral output grounded in P/N; solenoid power 5 A)",
             "reference_documents/component_drawings/Moveras_31AS_6L80_Installation_Manual_Rev1.6.pdf p.4 (internal TCM)"]
 
@@ -1703,7 +1717,7 @@ FUSE-DAK_CONST:
   sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
 FUSE-PCS_BATT:
   where: cabin
-  device: "in-line fuse for PCS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A PROVISIONAL (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
+  device: "in-line fuse for PCS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 7.5 A (5240: the kit's one +12V BATTERY lead also feeds the 6L90 case, drawing A-TCM4610 rev 009); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
   family: none
   kit: {}
   count_once: true
@@ -1716,17 +1730,12 @@ FUSE-PCS_BATT:
   sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
 FUSE-TRANS_BATT:
   where: cabin
-  device: "in-line fuse for TRANS_BATT: Blue Sea 5065 waterproof ATO/ATC holder, fuse 7.5 A (5240); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 18 AWG circuit wire in a TE PIDG 327639"
+  device: "in-line fuse for TRANS_BATT (retired 2026-09-30)"
   family: none
   kit: {}
-  count_once: true
-  per_end: {part: BLUESEA-5065}
-  per_end_wire: {TRANS_BATT: {part: "327639"}}
-  range_by_wire: {TRANS_BATT_FH: [12, 12], TRANS_BATT: [22, 18]}
-  wires: [TRANS_BATT_FH, TRANS_BATT]
-  pins: {TRANS_BATT_FH: "line pigtail (in the holder)", TRANS_BATT: "load pigtail -> step splice 327639"}
-  note: "TE lists the PIDG step-down splices as not sealable: sealed with 3:1 adhesive-lined shrink CPA-100-3/8-RED (3/8 in = 9.5 mm supplied, over the splice's 5.64 mm OD (web_snapshots/www.te.com__product-327638.md / 327639.md 'Outside Diameter 5.64 mm'); a 2.6 in piece: the 42.06 mm splice + 12 mm onto each wire)"
-  sources: ["web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md ('Supplied with 12 AWG pigtails', '30A Maximum fuse amperage')", "web_snapshots/www.te.com__product-CAT-P592-ST433.md (327639 12-10 / 22-18 AWG; 327638 12-10 / 16-14 AWG; 'Sealable No')"]
+  wires: []
+  retired: "TRANS_BATT is retired: the TCM-4610 kit feeds case 1 + 4 from its one +12V BATTERY lead (PCS_BATT, splice S1), so its 7.5 A fuse moved to FUSE-PCS_BATT"
+  sources: ["reference_documents/component_drawings/PCS_A-TCM4610_rev009_6L50-80-90_to_TCM-2600_harness.pdf p.2 (C1 transmission connector table)"]
 FUSE-IBOOST_PERM:
   where: engine
   device: "in-line fuse for IBOOST_PERM: Blue Sea 5065 waterproof ATO/ATC holder, fuse 5 A (5239); line pigtail (12 AWG, supplied) to the stud, load pigtail (12 AWG) stepped down to the 16 AWG circuit wire in a TE PIDG 327638"

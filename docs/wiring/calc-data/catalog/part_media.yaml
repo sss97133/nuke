@@ -2816,15 +2816,6 @@ PCS-HARNESS-4610:
   photo: {url: "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg", page: "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/", fetched: "2026-09-28"}
   confidence: exact_pn
   note: "Zero Gravity's listing photo for the TCM4610 harness (the harness shown with a TCM-2650)"
-PCS-HARNESS-4610-CASE:
-  entry: device
-  what: "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5)"
-  maker: Powertrain Control Solutions (PCS)
-  maker_pn: TCM-4610
-  photo: {url: "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg", page: "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/", fetched: "2026-09-28"}
-  piece: PCS-HARNESS-4610
-  confidence: exact_pn
-  note: "Zero Gravity's listing photo for the TCM4610 harness (the harness shown with a TCM-2650)"
 TRANS-CASE:
   entry: device
   what: "6L90 external case connector (TEHCM pass-through), Kostal 16-cavity; GM 19303772 is the harness-side round connector kit that mates it"
@@ -2923,16 +2914,6 @@ FUSE-PCS_BATT:
   maker_pn: "5065"
   photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
   mates_with: [BLUESEA-5239]
-  piece: BLUESEA-5065
-  confidence: exact_pn
-  note: no drawing listed on the Blue Sea page
-FUSE-TRANS_BATT:
-  entry: device
-  what: "in-line fuse for TRANS_BATT: Blue Sea 5065 waterproof ATO/ATC holder with a 7.5 A fuse (5240)"
-  maker: Blue Sea Systems
-  maker_pn: "5065"
-  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
-  mates_with: [BLUESEA-5240]
   piece: BLUESEA-5065
   confidence: exact_pn
   note: no drawing listed on the Blue Sea page

@@ -5264,8 +5264,8 @@
     ""
    ],
    "to": [
-    "PCS-HARNESS-4610 (12 V battery lead)",
-    "12 V battery lead (lead label OPEN until the TCM-4610 drawing)"
+    "PCS-HARNESS-4610 (+12V BATTERY lead, 18 AWG RED)",
+    "+12V BATTERY lead, 18 AWG RED, 60 in: splice S1 feeds TCM cavity 20, case 1 + 4 and OBD2 16"
    ],
    "sides": [
     "cab",
@@ -5278,7 +5278,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "FUSE-PCS_BATT (load pigtail, step splice 327639): -> PCS-HARNESS-4610 (12 V battery lead):12 V battery lead (lead label OPEN until the TCM-4610 drawing)"
+     "FUSE-PCS_BATT (load pigtail, step splice 327639): -> PCS-HARNESS-4610 (+12V BATTERY lead, 18 AWG RED):+12V BATTERY lead, 18 AWG RED, 60 in: splice S1 feeds TCM cavity 20, case 1 + 4 and OBD2 16"
     ]
    }
   },
@@ -5322,8 +5322,8 @@
     ""
    ],
    "to": [
-    "PCS-HARNESS-4610 (ignition lead)",
-    "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)"
+    "PCS-HARNESS-4610 (SWITCHED +12V lead, 16 AWG YEL)",
+    "SWITCHED +12V lead, 16 AWG YEL, 60 in: splice S3 feeds TCM cavity 19 and case 9 + 12; PCS_IGN arrives 14 AWG through bulkhead P and steps down to the 16 AWG lead"
    ],
    "sides": [
     "engine bay",
@@ -5336,7 +5336,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM15-OUT13: -> PCS-HARNESS-4610 (ignition lead):ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)"
+     "SPL-PDM15-OUT13: -> PCS-HARNESS-4610 (SWITCHED +12V lead, 16 AWG YEL):SWITCHED +12V lead, 16 AWG YEL, 60 in: splice S3 feeds TCM cavity 19 and case 9 + 12; PCS_IGN arrives 14 AWG through bulkhead P and steps down to the 16 AWG lead"
     ],
     "R11 command": [
      "PASS",
@@ -5357,8 +5357,8 @@
     "B21"
    ],
    "to": [
-    "PCS-HARNESS-4610 (analog 1 lead)",
-    "analog 1 lead (lead label OPEN until the TCM-4610 drawing)"
+    "PCS-HARNESS-4610 (C6 TPS connector cavity B, ANA IN 1)",
+    "C6 TPS connector cavity B (TPS SIG, YEL\\BLK, TCM cavity 45 = ANA IN 1), through the C-7M mating pigtail; C6 A (SIG GND) and C (+5V SENSOR) unused"
    ],
    "sides": [
     "cab",
@@ -5371,7 +5371,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B21 -> PCS-HARNESS-4610 (analog 1 lead):analog 1 lead (lead label OPEN until the TCM-4610 drawing)"
+     "M130:B21 -> PCS-HARNESS-4610 (C6 TPS connector cavity B, ANA IN 1):C6 TPS connector cavity B (TPS SIG, YEL\\BLK, TCM cavity 45 = ANA IN 1), through the C-7M mating pigtail; C6 A (SIG GND) and C (+5V SENSOR) unused"
     ],
     "R9 pin": [
      "OPEN",
@@ -5388,8 +5388,8 @@
     "A33"
    ],
    "to": [
-    "PCS-HARNESS-4610 (speed input 3 lead, orange/black)",
-    "speed input 3 lead, orange/black (ZGP p.11)"
+    "PCS-HARNESS-4610 (TACHOMETER lead, ORN\\BLK)",
+    "TACHOMETER lead, ORN\\BLK, 60 in (TCM cavity 24 = SPEED 3)"
    ],
    "sides": [
     "cab",
@@ -5402,7 +5402,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:A33 -> PCS-HARNESS-4610 (speed input 3 lead, orange/black):speed input 3 lead, orange/black (ZGP p.11)"
+     "M130:A33 -> PCS-HARNESS-4610 (TACHOMETER lead, ORN\\BLK):TACHOMETER lead, ORN\\BLK, 60 in (TCM cavity 24 = SPEED 3)"
     ],
     "R9 pin": [
      "OPEN",
@@ -5419,8 +5419,8 @@
     ""
    ],
    "to": [
-    "PCS-HARNESS-4610 (brake light input lead)",
-    "brake light input lead (lead label OPEN until the TCM-4610 drawing)"
+    "PCS-HARNESS-4610 (BRAKE INPUT lead, GRY\\BLK)",
+    "BRAKE INPUT lead, GRY\\BLK, 60 in (TCM cavity 2 = DIG IN 1)"
    ],
    "sides": [
     "cab",
@@ -5433,7 +5433,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM30-OUT5 (brake lamp output tap): -> PCS-HARNESS-4610 (brake light input lead):brake light input lead (lead label OPEN until the TCM-4610 drawing)"
+     "SPL-PDM30-OUT5 (brake lamp output tap): -> PCS-HARNESS-4610 (BRAKE INPUT lead, GRY\\BLK):BRAKE INPUT lead, GRY\\BLK, 60 in (TCM cavity 2 = DIG IN 1)"
     ],
     "R11 command": [
      "PASS",
@@ -5446,7 +5446,7 @@
    "kind": "implied",
    "label": "PCS lever-position switched output (neutral) -> PDM crank-enable input",
    "from": [
-    "PCS-HARNESS-4610 (lever-position output lead: neutral)",
+    "PCS-HARNESS-4610 (PARK\\NEUTRAL lead, PNK\\BLK)",
     ""
    ],
    "to": [
@@ -5457,14 +5457,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "PCS-HARNESS-4610 (lever-position output lead: neutral)",
+   "from_str": "PCS-HARNESS-4610 (PARK\\NEUTRAL lead, PNK\\BLK)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PCS-HARNESS-4610 (lever-position output lead: neutral): -> PDM30:DIG11 (B20) crank enable, relayed to the engine PDM over CAN:DIG11 (B20) crank enable, relayed to the engine PDM over CAN"
+     "PCS-HARNESS-4610 (PARK\\NEUTRAL lead, PNK\\BLK): -> PDM30:DIG11 (B20) crank enable, relayed to the engine PDM over CAN:DIG11 (B20) crank enable, relayed to the engine PDM over CAN"
     ]
    }
   },
@@ -5473,7 +5473,7 @@
    "kind": "implied",
    "label": "PCS lever-position switched output (reverse) -> PDM reverse-lamp input",
    "from": [
-    "PCS-HARNESS-4610 (lever-position output lead: reverse)",
+    "PCS-HARNESS-4610 (REVERSE lead, VIO\\BLK)",
     ""
    ],
    "to": [
@@ -5484,77 +5484,23 @@
     "cab",
     "cab"
    ],
-   "from_str": "PCS-HARNESS-4610 (lever-position output lead: reverse)",
+   "from_str": "PCS-HARNESS-4610 (REVERSE lead, VIO\\BLK)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PCS-HARNESS-4610 (lever-position output lead: reverse): -> PDM30:DIG15 (B17) reverse:DIG15 (B17) reverse"
-    ]
-   }
-  },
-  {
-   "wire": "TRANS_BATT",
-   "kind": "implied",
-   "label": "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)",
-   "from": [
-    "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
-    ""
-   ],
-   "to": [
-    "PCS-HARNESS-4610 (case battery lead, cavities 1 + 4)",
-    "case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)"
-   ],
-   "sides": [
-    "cab",
-    "cab"
-   ],
-   "from_str": "FUSE-TRANS_BATT (load pigtail, step splice 327639)",
-   "control": null,
-   "subsystem": "TRANS_6L90",
-   "engine_run": false,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "FUSE-TRANS_BATT (load pigtail, step splice 327639): -> PCS-HARNESS-4610 (case battery lead, cavities 1 + 4):case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)"
-    ]
-   }
-  },
-  {
-   "wire": "TRANS_GND",
-   "kind": "implied",
-   "label": "6L90 case ground (case cavities 2 + 5)",
-   "from": [
-    "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)",
-    ""
-   ],
-   "to": [
-    "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ring 24"
-   ],
-   "sides": [
-    "other",
-    "engine bay"
-   ],
-   "from_str": "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)",
-   "control": null,
-   "subsystem": "TRANS_6L90",
-   "engine_run": false,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ring 24"
+     "PCS-HARNESS-4610 (REVERSE lead, VIO\\BLK): -> PDM30:DIG15 (B17) reverse:DIG15 (B17) reverse"
     ]
    }
   },
   {
    "wire": "PCS_GND",
    "kind": "implied",
-   "label": "PCS TCM-2650 ground",
+   "label": "PCS TCM-2650 + 6L90 case ground (kit CHASSIS GND lead)",
    "from": [
-    "PCS-HARNESS-4610 (PCS ground lead)",
+    "PCS-HARNESS-4610 (CHASSIS GND lead, 16 AWG BLK)",
     ""
    ],
    "to": [
@@ -5565,45 +5511,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "PCS-HARNESS-4610 (PCS ground lead)",
+   "from_str": "PCS-HARNESS-4610 (CHASSIS GND lead, 16 AWG BLK)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PCS-HARNESS-4610 (PCS ground lead): -> GND-BANK-CAB (cab ground bank beside the PDM30):ring 20"
-    ]
-   }
-  },
-  {
-   "wire": "TRANS_BRK",
-   "kind": "implied",
-   "label": "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap",
-   "from": [
-    "SPL-PDM30-OUT5 (brake lamp output tap)",
-    ""
-   ],
-   "to": [
-    "PCS-HARNESS-4610 (case stop-lamp lead, cavity 6)",
-    "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
-   ],
-   "sides": [
-    "cab",
-    "cab"
-   ],
-   "from_str": "SPL-PDM30-OUT5 (brake lamp output tap)",
-   "control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)",
-   "subsystem": "TRANS_6L90",
-   "engine_run": false,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "SPL-PDM30-OUT5 (brake lamp output tap): -> PCS-HARNESS-4610 (case stop-lamp lead, cavity 6):case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
-    ],
-    "R11 command": [
-     "PASS",
-     "switched by brake switch on PDM30 DIG14 (a tap of OUT5, #93)"
+     "PCS-HARNESS-4610 (CHASSIS GND lead, 16 AWG BLK): -> GND-BANK-CAB (cab ground bank beside the PDM30):ring 20"
     ]
    }
   },
@@ -8325,38 +8240,7 @@
     ],
     "R15 protected": [
      "PASS",
-     "5 A PROVISIONAL inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/202"
-    ]
-   }
-  },
-  {
-   "wire": "TRANS_BATT_FH",
-   "kind": "implied",
-   "label": "TRANS_BATT fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
-   "from": [
-    "PDM30-STUD (7.5 A inline fuse)",
-    ""
-   ],
-   "to": [
-    "FUSE-TRANS_BATT (line pigtail)",
-    "line pigtail (in the holder)"
-   ],
-   "sides": [
-    "cab",
-    "cab"
-   ],
-   "from_str": "PDM30-STUD (7.5 A inline fuse)",
-   "control": null,
-   "subsystem": "TRANS_6L90",
-   "engine_run": false,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PDM30-STUD (7.5 A inline fuse): -> FUSE-TRANS_BATT (line pigtail):line pigtail (in the holder)"
-    ],
-    "R15 protected": [
-     "PASS",
-     "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant bat"
+     "7.5 A inline fuse at the PDM30 battery stud (PCS harness drawing A-TCM4610 rev 0"
     ]
    }
   },

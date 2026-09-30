@@ -1330,17 +1330,6 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - The source end follows the power box that feeds it.
-  - id: FUSE-TRANS_BATT
-    what: In-line fuse, TRANS_BATT
-    where: At the source end of its feed
-    zone: cab
-    status: proposed
-    follows: PDM30
-    why:
-      - text: A fuse goes at the source end of the wire it protects.
-        source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
-    open:
-      - The source end follows the power box that feeds it.
   - id: PORT-ETH
     what: M130 laptop port (panel RJ45)
     where: Cab, under the dash or in the glovebox
@@ -2022,14 +2011,6 @@ ends:
     why:
       - text: The sensor mounts on the detent shaft.
         source: docs/wiring/calc-data/catalog/endpoints.yaml GSS-SENSOR (Dakota GSS-3000)
-  - id: PCS-HARNESS-4610-CASE
-    what: Transmission harness case ground
-    where: At the 6L90 case
-    zone: underbody
-    status: fixed_by_engine
-    why:
-      - text: The kit's case ground lead lands on the case.
-        source: docs/wiring/calc-data/catalog/endpoints.yaml PCS-HARNESS-4610-CASE (Holley 558-499 p.3)
   - id: TCASE-4WD-SW
     what: 4WD indicator switch (fabricated plunger switch)
     where: At the transfer-case shift lever, on a bracket
