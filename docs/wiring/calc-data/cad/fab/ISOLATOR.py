@@ -204,10 +204,12 @@ def attach_points():
 
 
 def terminals():
-    rows = [{"pin": "STUD_A", "endpoint": "ISOLATOR", "name": "stud A (3/8-16)", "kind": "stud", "wires": ["63"],
-             "at": (-SX, YSEAT, SZ), "dir": (0, -1, 0), "note": "registry: wire 63 lands on PS-STUDS 'isolator stud A'"},
-            {"pin": "STUD_B", "endpoint": "ISOLATOR", "name": "stud B (3/8-16)", "kind": "stud", "wires": ["ISO_OUT"],
-             "at": (SX, YSEAT, SZ), "dir": (0, -1, 0), "note": "registry: ISO_OUT 'Isolator stud B to the distribution stud'"}]
+    rows = [{"pin": "STUD_A", "endpoint": "ISOLATOR", "registry_endpoint": "PS-STUDS", "name": "stud A (3/8-16)",
+             "kind": "stud", "wires": ["63"], "at": (-SX, YSEAT, SZ), "dir": (0, -1, 0),
+             "note": "registry: wire 63 lands on PS-STUDS 'isolator stud A'"},
+            {"pin": "STUD_B", "endpoint": "ISOLATOR", "registry_endpoint": "PS-STUDS", "name": "stud B (3/8-16)",
+             "kind": "stud", "wires": ["ISO_OUT"], "at": (SX, YSEAT, SZ), "dir": (0, -1, 0),
+             "note": "registry: ISO_OUT 'Isolator stud B to the distribution stud'"}]
     for wid, col, dx in LEADS:
         rows.append({"pin": col.upper(), "endpoint": "ISOLATOR", "name": f"{col} control lead", "kind": "flying lead",
                      "match": rf"^{col}", "at": (0, YBOOT, BZ), "dir": (0, -1, 0),

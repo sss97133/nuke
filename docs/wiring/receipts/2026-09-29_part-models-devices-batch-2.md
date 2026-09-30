@@ -40,11 +40,40 @@ owner_words: "we cant buy everything til we make the endpoints in 3d like all th
 ## Findings
 - **iBooster generation: Gen 1.** The registry's order record and the controller label in the owner's photo on the truck
   both read 1037123-00-B; openinverter lists 1037123-00-A and -B as Gen 1 (Tesla Model S / X). K5_WIRING_STATE.md
-  line 31 says "Gen 2": that line disagrees with the part numbers (substrate inconsistency, not fixed here).
+  agrees (corrected to Gen 1 in PR #449).
 - On the truck the Tesla reservoir is replaced by **two billet reservoirs** on the master cylinder, and the booster sits
   on a flat firewall adapter plate; the reservoirs' part number is not recorded. They are drawn as the photo shows them.
 - The Holley mid-mount parts list names its own SD7 compressor (199-102); the registry's compressor is the Sanden 7176.
   Which one is on the truck is to be confirmed.
+
+## Sources tried for the not-sourced ends (none gave a size)
+- window_motor_DS / _PS (Nu-Relics 17383-2) and TG-MOTOR-ACI (17383-1):
+  - Nu-Relics' 17383-2 and 17383-1 pages: kit contents and the ACI motor's currents, no size.
+  - Nu-Relics' install sheets 17380 and 17780 (one page each): door photos marked "4 Mounting Holes", "Idler Track
+    Welded In" and "Lower Stop Welded In", no size.
+  - 1977 LTSM p.141-142, Fig. 2D-34 (power window regulator, motor and connector): "do not drill hole closer than
+    1/2 in to edge" and a No. 10-12 x 3/4 screw, no regulator size.
+  - 1987 LDTSM, regulator replacement: a 3.1 mm drill hole, no regulator size.
+  - For the tailgate, 1977 LTSM p.150-151, Figs. 2D-58 / 2D-59 (endgate latch, regulator and motor removal): a 1/8 in
+    hole through the sector gear and back plate to lock the lift arms, no regulator or motor size.
+  - The twin's door and tailgate (K5_harness_workspace_v4.blend): shells with no inner panel, so they bound the
+    regulator and do not size it. Below the belt the door shell is 1052 long x 764 tall, 150-160 thick from the outer
+    skin to its inner face at heights 700-1150 mm (101 at the belt), with 892 x 456 glass; the drawn 510 x 460 x 60
+    regulator fits inside it. The tailgate shell is 1708 wide with 1515 x 523 glass.
+  - Scaled photo: the Nu-Relics photos hold no object of known size and the part has no sourced dimension to scale from.
+- rear_window_motor (factory tailgate window motor): the registry names its 1978 GM connector 6288909 (2-way, UP-1 /
+  DN-2) and no motor part number; 1977 LTSM p.150-151 (Figs. 2D-58 / 2D-59) gives the removal steps and no size.
+- HORN: the registry names no horn part number, only the factory 1-way connector 12004267 (circuit 29) and the core
+  support location. LMC's catalogue (text in the database, catalog source ccComplete.pdf) sells 36-2150 / 36-2152
+  standard low / high horns for 1973-87 with no size.
+- WIPER-MOTOR + WASHER-PUMP: 1977 LTSM p.803 Figs. 8-16 / 8-17 and p.811-819 (arrangement, end-play specs, no size).
+- BLOWER-RES: RockAuto's 1977 K5 Blazer 350 listing names the GM number for A/C without the heavy-duty heater:
+  336403 (Four Seasons 20083, SMP RU67, Wells 3A1044, UMP BMR11, Holstein 2BMR0020). Their spec tables give 4 male
+  blade terminals and a bolt-on mount, no size. Dorman's and Four Seasons' own sites answer a direct fetch with a bot
+  check (ShieldSquare, Cloudflare).
+- AMP-STEP-CTRL: AMP Research install guide 75146: motor screws (4 mm hex, 36 in-lb) and two 11 in cable ties for the
+  controller, no controller size.
+- STARTER-S: not picked, kept as it is.
 
 ## Unknowns (in the parts, not guessed)
 - Nu-Relics regulators and ACI motors: every size assumed (margins 60 and 100 mm). Measure the kits on arrival.

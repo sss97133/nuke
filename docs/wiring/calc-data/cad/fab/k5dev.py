@@ -77,7 +77,8 @@ def part_meta(mod, bodies):
 # ------------------------------------------------------------------------------------------ pins
 def write_pins(mod, out):
     """<id>.pins.json. mod.terminals() -> [{pin, endpoint, name, at, dir, and either wires: [ids] or match: regex on the
-    registry termination's cavity text}]. A lead's pin_tip is where it leaves the part; wire_side is its free end."""
+    registry termination's cavity text}]. A lead's pin_tip is where it leaves the part; wire_side is its free end.
+    registry_endpoint names the registry end a wire lands on when it isn't the part's own (the isolator's studs are PS-STUDS)."""
     A = mod.PART
     terms = K.registry()["terminations"]
     rows = []
@@ -92,6 +93,7 @@ def write_pins(mod, out):
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "kind": tm.get("kind", ""), "pin_tip_glb_m": K.glb_point(tip), "wire_side_glb_m": K.glb_point(free),
                      "exit_dir_glb": K.glb_dir(tm["dir"]), "wires": K.wire_rows(ids),
+                     **({"registry_endpoint": tm["registry_endpoint"]} if tm.get("registry_endpoint") else {}),
                      **({"note": tm["note"]} if tm.get("note") else {})})
     (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
         {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug, blade or lead "
