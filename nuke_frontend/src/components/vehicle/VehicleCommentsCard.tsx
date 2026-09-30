@@ -707,8 +707,9 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                 )}
                               </div>
                             )}
-                            {/* Link to original comment if available */}
-                            {comment.comment_url && (
+                            {/* Link to original comment if available (a URL captured from a dev server, e.g. localhost, is dead
+                                for every visitor: 2026-09-30, a K5 comment linked to localhost:5174) */}
+                            {comment.comment_url && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(comment.comment_url) && (
                               <div style={{ marginTop: '4px' }}>
                                 <a
                                   href={comment.comment_url}
