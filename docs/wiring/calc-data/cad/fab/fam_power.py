@@ -71,7 +71,7 @@ UNMODELLED = {
            "Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet "
            "(DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse "
            "seated, calipers, or a photo of the part with a scale")
-       for e in ("FUSE-IBOOST_PERM", "FUSE-ISO_PWR", "FUSE-ISO_SW_PWR", "FUSE-DAK_CONST", "FUSE-PCS_BATT", "FUSE-TRANS_BATT")},
+       for e in ("FUSE-IBOOST_PERM", "FUSE-ISO_PWR", "FUSE-ISO_SW_PWR", "FUSE-DAK_CONST", "FUSE-PCS_BATT")},
     "GND-SPLICE-REAR": "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'",
     "COIL-GROUND-RINGS": ("ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud "
                           "size in the LS3 documents on file)'"),

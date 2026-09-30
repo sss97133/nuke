@@ -454,15 +454,6 @@ ends:
       photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
       19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
       the part with a scale'
-  FUSE-TRANS_BATT:
-    models: []
-    complete: false
-    missing:
-    - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
-      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
-      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
-      the part with a scale'
   GND-BANK-CAB:
     models:
     - '9906'
@@ -704,11 +695,6 @@ ends:
     complete: false
     missing:
     - the PCS TCM-4610 harness is bought complete; PCS prints no connector or loom dimensions
-  PCS-HARNESS-4610-CASE:
-    models: []
-    complete: false
-    missing:
-    - as PCS-HARNESS-4610
   PCS-TCM:
     models:
     - PCS-TCM

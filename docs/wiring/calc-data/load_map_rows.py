@@ -116,7 +116,8 @@ for n in range(3, 9):
 
 
 # master plugs replaced by another node (superseded_by points at the replacement)
-REPLACED_NODES = {"G-FRONT-L": "GND-BANK-ENG", "G-FRONT-R": "GND-BANK-ENG", "G-FIREWALL": "GND-BANK-ENG",
+REPLACED_NODES = {"FUSE-TRANS_BATT": "FUSE-PCS_BATT",   # TRANS_BATT retired: the kit feeds case 1 + 4 from PCS_BATT (A-TCM4610 rev 009)
+                  "G-FRONT-L": "GND-BANK-ENG", "G-FRONT-R": "GND-BANK-ENG", "G-FIREWALL": "GND-BANK-ENG",
                   "G-FRAME-REAR": "GND-BANK-ENG", "G-KICK-L": "GND-BANK-CAB", "G-KICK-R": "GND-BANK-CAB",
                   "G-ROOF": "GND-BANK-CAB", "DASH-STAR": "GND-BANK-CAB", "G-REAR": "GND-SPLICE-REAR",
                   # April parts a later decision replaced (state §1 / 0x): the P367 pump, one fan, the Blue Sea 7700, the
@@ -522,7 +523,41 @@ def main():
     changed_c = [r for r in live if r["derivation_version"] == "k5_registry_v5" and r["circuit_code"] in reg_v5
                  and _sig(r) != _sig(reg_v5[r["circuit_code"]])]
     retired_c = [r for r in live if r["derivation_version"] == "k5_registry_v5" and r["circuit_code"] not in reg_v5]
+    # April concept rows whose ends point at a node superseded after they were loaded (115 rows on 89 nodes, 2026-09-30).
+    # Each end moves along superseded_by to the live node it leads to, and the row is superseded + reinserted like a
+    # changed v5 row. An end whose chain stops at a retired node with no successor stays put. April rows carry no wire ends.
+    april_live = [r for r in live if r["derivation_version"] == "april_2026_candidate" and r["circuit_code"] not in april_fate]
+    # --resume-row=<id>: a row an interrupted run already superseded before its copy went in (2026-09-30: one row,
+    # when a TLS handshake timed out mid-run). Its copy goes in and it points at it; nothing else about it changes.
+    resume_ids = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--resume-row=")]
+    resumed = api.get("vehicle_custom_circuits", "select=id,circuit_code,derivation_version,from_endpoint_id,to_endpoint_id,"
+                      f"is_superseded,superseded_by&id=in.({','.join(resume_ids)})") if resume_ids else []
+    for g in resumed or []:
+        assert g["is_superseded"] and not g["superseded_by"] and g["derivation_version"] == "april_2026_candidate", g["id"]
+        assert not any(r["circuit_code"] == g["circuit_code"] for r in april_live), g["circuit_code"]
+    succ_of, live_ids = {}, set()
+    ask = {e for r in april_live + (resumed or []) for e in (r["from_endpoint_id"], r["to_endpoint_id"]) if e}
+    while ask:
+        ask = sorted(ask)
+        for i in range(0, len(ask), 80):
+            for g in api.get("harness_endpoints", f"select=id,is_superseded,superseded_by&id=in.({','.join(ask[i:i + 80])})") or []:
+                succ_of[g["id"]] = g["superseded_by"] if g["is_superseded"] else None
+                if not g["is_superseded"]:
+                    live_ids.add(g["id"])
+        ask = {s for s in succ_of.values() if s and s not in succ_of}
+    def _live_end(eid):
+        end, seen = eid, set()
+        while succ_of.get(end) and end not in seen:
+            seen.add(end)
+            end = succ_of[end]
+        return end if end in live_ids else eid
+    relink_a = [(r, _live_end(r["from_endpoint_id"]), _live_end(r["to_endpoint_id"])) for r in april_live]
+    relink_a = [(r, f, t) for r, f, t in relink_a if (f, t) != (r["from_endpoint_id"], r["to_endpoint_id"])]
+    relink_a += [(r, _live_end(r["from_endpoint_id"]), _live_end(r["to_endpoint_id"])) for r in resumed or []]
+    resumed_ids = {r["id"] for r in resumed or []}
     if PLAN:
+        print(f"PLAN April concept rows relinked along superseded_by: {len(relink_a)} -> superseded + reinserted "
+              f"({sum((f != r['from_endpoint_id']) + (t != r['to_endpoint_id']) for r, f, t in relink_a)} ends moved)")
         print(f"PLAN wires: {len(changed_c)} changed -> superseded + reinserted, {len(retired_c)} retired: "
               f"{', '.join(r['circuit_code'] for r in retired_c)}")
         for r in changed_c[:10]:
@@ -549,6 +584,25 @@ def main():
         api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}&is_superseded=eq.false",
                   {"is_superseded": True, "source": (f"superseded by k5_registry v5 @ {SHA}" if june_succ_code[r["id"]]
                                                      else f"retired: not in k5_registry v5 @ {SHA}")})
+    # relinked April rows: the full row is copied with its ends moved; the old row points at its successor
+    n_relink = 0
+    if relink_a:
+        ids, full = [r["id"] for r, _, _ in relink_a], {}
+        for i in range(0, len(ids), 80):
+            full.update({g["id"]: g for g in api.get("vehicle_custom_circuits", f"select=*&id=in.({','.join(ids[i:i + 80])})") or []})
+        skip = {"id", "created_at", "is_superseded", "superseded_by", "checks", "checks_version", "checked_at"}
+        for r, f, t in relink_a:     # one row at a time: an interrupted run leaves at most one row between states
+            if r["id"] not in resumed_ids:
+                api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}&is_superseded=eq.false", {"is_superseded": True})
+            ins = api.insert("vehicle_custom_circuits", [dict({k: v for k, v in full[r["id"]].items() if k not in skip},
+                             from_endpoint_id=f, to_endpoint_id=t,
+                             source=f"{SRC_APRIL}; ends relinked along superseded_by to the live nodes (k5_registry v5 @ {SHA})")])
+            api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", {"superseded_by": ins[0]["id"]})
+            have_c[(r["circuit_code"], "april_2026_candidate")] = ins[0]["id"]
+            n_relink += 1
+    if "--relink-only" in sys.argv:
+        print(f"April concept rows relinked to live nodes: {n_relink} of {len(relink_a)}")
+        return
     rows = []
     for c in v5_circuits + april_circuits:
         if (c["circuit_code"], c["derivation_version"]) in have_c or c["_from"] in blocked or c["_to"] in blocked:
@@ -587,7 +641,8 @@ def main():
         del have_c[(code_, "april_2026_candidate")]
         n_cov += fate == "covered"
         n_dead += fate == "dead"
-    print(f"April concept rows: {n_cov} carried by a v5 wire, {n_dead} ruled out by a locked decision — superseded")
+    print(f"April concept rows: {n_cov} carried by a v5 wire, {n_dead} ruled out by a locked decision — superseded; "
+          f"{n_relink} relinked to live nodes")
     print(f"wires: {len(rows)} inserted ({len(changed_c)} of them replace changed rows) · {len(retired_c)} retired · "
           f"June rows: {n_sup} superseded by their v5 row, {n_ret} retired (not in the master)")
     # wire ends

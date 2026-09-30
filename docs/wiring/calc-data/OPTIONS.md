@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 331 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 327 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | STEP-DCMD | Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test) | **candidate** |  | 0 | owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor |
@@ -74,15 +74,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 362 | 270 | 359 | 362 | 348 | 2 | 90 | m 0 · e 173 · u 182 |
-| composite (every option) | 394 | 274 | 386 | 394 | 378 | 2 | 90 | m 0 · e 176 · u 211 |
+| buildable (base + decided) | 358 | 266 | 355 | 358 | 344 | 2 | 90 | m 0 · e 173 · u 178 |
+| composite (every option) | 390 | 270 | 382 | 390 | 374 | 2 | 90 | m 0 · e 176 · u 207 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 331 | 251 | 328 | 331 | 317 | 2 | 90 | m 0 · e 159 · u 165 |
+| BASE | 327 | 247 | 324 | 327 | 313 | 2 | 90 | m 0 · e 159 · u 161 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -101,7 +101,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 9 · u 14 |
 | power_spine | 39 | 25 | 39 | 39 | 31 | 0 | 8 | m 0 · e 2 · u 32 |
-| powertrain_chassis | 26 | 21 | 26 | 26 | 25 | 0 | 1 | m 0 · e 6 · u 20 |
+| powertrain_chassis | 22 | 17 | 22 | 22 | 21 | 0 | 1 | m 0 · e 6 · u 16 |
 | unsectioned | 4 | 3 | 4 | 4 | 4 | 0 | 0 | m 0 · e 0 · u 4 |
 
 ## Capacity ledger
@@ -149,7 +149,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 22 AWG green/gray | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/white | 9.2 | 0 | not recorded | short by 9.2 ft |
 | M22759/16 22 AWG gray | 39.3 | 0 | not recorded | short by 39.3 ft |
-| M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft; also ISO_KILL, PCS_BRK, TRANS_BRK, DAK_CEL (length not measured yet) |
+| M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft; also ISO_KILL, PCS_BRK, DAK_CEL (length not measured yet) |
 | M22759/16 22 AWG white/orange | 19.8 | 0 | not recorded | short by 19.8 ft |
 | M22759/16 22 AWG white/blue | 14.6 | 0 | not recorded | short by 14.6 ft |
 | M22759/16 10 AWG black | 21.2 | 30.0 | not recorded | covered |

@@ -127,7 +127,6 @@ UNMODELLED = {
                   "and no photo of the sensor alone is on file",
     "BRAKE-FLUID-LVL": "sensor part number not recorded (part_media: 'read the unit')",
     "PCS-HARNESS-4610": "the PCS TCM-4610 harness is bought complete; PCS prints no connector or loom dimensions",
-    "PCS-HARNESS-4610-CASE": "as PCS-HARNESS-4610",
     "CAN-BUS": "the 100 / 120 ohm terminators are not picked (endpoints.yaml CAN-BUS kit 'CAN-TERM-100R')",
 }
 
