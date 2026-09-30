@@ -2,6 +2,7 @@
 
     /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python \
         docs/wiring/calc-data/cad/fab/render_part.py -- <part.glb> <out_dir> [--upright] [--px 1600]
+        [--photo-el 12] [--photo-az 0]
 
 Writes <out>/<id>_hero.png (3/4 view, keep-outs hidden), <id>_clearance.png (3/4 from below, keep-outs shown)
 and <id>_photo_match.png (straight on, a few degrees above, transparent background, for a side-by-side with the
@@ -22,6 +23,7 @@ px = int(argv[argv.index("--px") + 1]) if "--px" in argv else 1600
 LIGHT = float(argv[argv.index("--light") + 1]) if "--light" in argv else 0.042   # calibrated with the edge lights: the M130 case face renders near the photo's #2d2e2f
 FAST = "--fast" in argv
 PHOTO_EL = float(argv[argv.index("--photo-el") + 1]) if "--photo-el" in argv else 12.0
+PHOTO_AZ = float(argv[argv.index("--photo-az") + 1]) if "--photo-az" in argv else 0.0   # match a maker's 3/4 photo
 out.mkdir(parents=True, exist_ok=True)
 pid = glb.stem
 
@@ -245,5 +247,5 @@ if FAST:
 else:
     shoot("hero", 38, 22, px, int(px * 0.75), show_clear=False)
     shoot("clearance", 35, -12 if not upright else 18, px, int(px * 0.9), show_clear=True, fit=1.08)
-    shoot("photo_match", 0, PHOTO_EL, 1000, 1000, show_clear=False, transparent=True, fit=1.3, show_mated=False)
+    shoot("photo_match", PHOTO_AZ, PHOTO_EL, 1000, 1000, show_clear=False, transparent=True, fit=1.3, show_mated=False)
     shoot("bare", 38, 22, px, int(px * 0.75), show_clear=False, show_mated=False)
