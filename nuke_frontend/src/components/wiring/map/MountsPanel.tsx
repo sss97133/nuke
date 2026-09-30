@@ -112,8 +112,9 @@ const loadFile = () => {
 };
 const loadPhotos = () => loadFile().then(f => f.photos);
 
-// The box itself (the M130, a PDM, the isolator...) at the top of its plug card, keyed by node code.
-export function DevicePhoto({ code, cw }: { code: string; cw: Colorway }) {
+// The box itself (the M130, a PDM, the isolator...) at the top of its plug card, keyed by node code. captionOf lets the
+// MAP workspace draw the caption as a public name (no "candidate" and the like).
+export function DevicePhoto({ code, cw, captionOf }: { code: string; cw: Colorway; captionOf?: (t: string) => string }) {
   const [rec, setRec] = useState<PhotoRec | null>(null);
   const [dead, setDead] = useState(false);
   useEffect(() => { let c = false; loadFile().then(f => { if (!c) setRec(f.devices[code] ?? null); }); return () => { c = true; }; }, [code]);
@@ -124,7 +125,7 @@ export function DevicePhoto({ code, cw }: { code: string; cw: Colorway }) {
       <img src={rec.img} alt={rec.what ?? code} width={220} height={150} loading="lazy" referrerPolicy="no-referrer"
         onError={() => setDead(true)} style={{ display: 'block', width: 220, height: 150, objectFit: 'contain' }} />
       <div style={{ fontSize: 10, padding: '2px 4px', color: cw.ink, background: cw.surface, borderTop: rule(cw) }}>
-        {(rec.what ?? code).toUpperCase()} · PHOTO: {rec.from}
+        {(captionOf ? captionOf(rec.what ?? code) || code : rec.what ?? code).toUpperCase()} · PHOTO: {rec.from}
       </div>
     </a>
   );
@@ -197,7 +198,9 @@ const END_WORD: Record<string, string> = {
   fixed_by_engine: 'FIXED BY THE ENGINE / FACTORY', decided: 'DECIDED', proposed: 'PROPOSED', open: 'NOT DECIDED', flag: 'BREAKS A RULE',
 };
 
-export function WhereOnTruck({ code, cw }: { code: string; cw: Colorway }) {
+// showWhy / showStatus: the reasons, their sources, what is still open and the decision status are the owner's working
+// record (the MAP workspace shows them to the owner only); the spot itself is a result.
+export function WhereOnTruck({ code, cw, showWhy = true, showStatus = true }: { code: string; cw: Colorway; showWhy?: boolean; showStatus?: boolean }) {
   const [e, setE] = useState<EndRec | null>(null);
   const [more, setMore] = useState(false);
   useEffect(() => { let c = false; loadEnds().then(f => { if (!c) setE(f.ends[code] ?? null); }); return () => { c = true; }; }, [code]);
@@ -207,16 +210,16 @@ export function WhereOnTruck({ code, cw }: { code: string; cw: Colorway }) {
     <div style={{ margin: '6px 0 10px', padding: '6px 8px', border: frame(cw), background: cw.surface }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted }}>WHERE ON THE TRUCK</span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', background: t, color: textOn(t) }}>{END_WORD[e.status] ?? e.status.toUpperCase()}</span>
+        {showStatus && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', background: t, color: textOn(t) }}>{END_WORD[e.status] ?? e.status.toUpperCase()}</span>}
       </div>
       <div style={{ fontSize: 14, marginTop: 3 }}>{e.where}</div>
-      {(!!e.why?.length || !!e.open?.length) && (
+      {showWhy && (!!e.why?.length || !!e.open?.length) && (
         <button onClick={() => setMore(m => !m)} style={{ marginTop: 4, background: 'transparent', border: 'none', padding: 0,
           color: cw.accent, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
           {more ? 'HIDE WHY' : 'WHY / SOURCES'}
         </button>
       )}
-      {more && (
+      {showWhy && more && (
         <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
           {(e.why ?? []).map((w, i) => (
             <div key={i} style={{ marginTop: 2 }}>{w.text} <span style={{ color: cw.inkFaint, fontFamily: cw.fontMono, fontSize: 10 }}>[{w.source}]</span></div>
