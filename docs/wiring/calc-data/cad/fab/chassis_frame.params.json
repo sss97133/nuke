@@ -324,7 +324,7 @@
   {
    "name": "z_rail_bottom_center",
    "value": 0.5,
-   "source": "twin metres; front and rear springs reach the twin's axle centres (z 0.396) with 2-3 in of arch from the FR88 hanger heights; the TurboSquid frame in the twin sits at 0.496. Needs one tape: floor to the rail's bottom flange at the transmission crossmember, and tyre size",
+   "source": "twin metres; front and rear springs reach the twin's axle centres (z 0.396) with 2-3 in of arch from the FR88 hanger heights; the TurboSquid frame in the twin sits at 0.496. Stock height: the truck has a Rough Country lift (build log, vehicle_observations aa5bff91), height not recorded, which lowers the axles and wheels against frame and body. Needs one tape: floor to the rail's bottom flange at the transmission crossmember, and tyre size",
    "basis": "assumed",
    "note": "+/-0.040 m"
   },

@@ -126,8 +126,10 @@ P = {  # every number the model uses: value (mm unless noted), source, basis
                                " midpoint (I, M: 3384.5) sits 11 ahead of the rear axle at +2705", "assumed", "+/-25"),
     "z_rail_bottom_center": Dim(0.500, "twin metres; front and rear springs reach the twin's axle centres (z 0.396) with"
                                       " 2-3 in of arch from the FR88 hanger heights; the TurboSquid frame in the twin sits"
-                                      " at 0.496. Needs one tape: floor to the rail's bottom flange at the transmission"
-                                      " crossmember, and tyre size", "assumed", "+/-0.040 m"),
+                                      " at 0.496. Stock height: the truck has a Rough Country lift (build log,"
+                                      " vehicle_observations aa5bff91), height not recorded, which lowers the axles and"
+                                      " wheels against frame and body. Needs one tape: floor to the rail's bottom flange"
+                                      " at the transmission crossmember, and tyre size", "assumed", "+/-0.040 m"),
     # ---- crossmembers (FR88 bottom view, read against the station lines)
     "cm1_s": Dim(257, FR88 + " bottom view: front crossmember between B and C (x 252-272 px)", "scaled", "+/-20"),
     "cm1_w": Dim(78, FR88 + " bottom view: 20 px at 3.9 mm/px", "scaled", "+/-15"),
