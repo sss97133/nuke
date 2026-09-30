@@ -67,7 +67,10 @@ COL = {"cableclam": ("#1b1c1e", "Blue Sea CableClam: black (the drawing and the 
 # ends in this lane that cannot be drawn yet, and why (index_v5 lists them)
 UNMODELLED = {
     **{e: ("Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this "
-           "product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale")
+           "product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue "
+           "Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet "
+           "(DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse "
+           "seated, calipers, or a photo of the part with a scale")
        for e in ("FUSE-IBOOST_PERM", "FUSE-ISO_PWR", "FUSE-ISO_SW_PWR", "FUSE-DAK_CONST", "FUSE-PCS_BATT", "FUSE-TRANS_BATT")},
     "GND-SPLICE-REAR": "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'",
     "COIL-GROUND-RINGS": ("ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud "

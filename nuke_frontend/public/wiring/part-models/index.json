@@ -496,13 +496,11 @@
     "0462-201-16141",
     "DT04-2P",
     "DT06-2S",
-    "FUEL-LEVEL"
+    "FUEL-LEVEL",
+    "QFS-BKCN-GM",
+    "QFS-H882"
    ],
-   "complete": false,
-   "missing": [
-    "QFS-BKCN-GM bulkhead",
-    "QFS-H882 hanger and level sender"
-   ]
+   "complete": true
   },
   "FUEL-PUMP": {
    "models": [
@@ -510,13 +508,11 @@
     "0462-203-12141",
     "DTP04-2P",
     "DTP06-2S",
-    "FUEL-PUMP"
+    "FUEL-PUMP",
+    "QFS-BKCN-GM",
+    "QFS-H882"
    ],
-   "complete": false,
-   "missing": [
-    "QFS-BKCN-GM bulkhead",
-    "QFS-H882 hanger and P367 pump"
-   ]
+   "complete": true
   },
   "FUELP": {
    "models": [
@@ -531,42 +527,42 @@
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "FUSE-IBOOST_PERM": {
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "FUSE-ISO_PWR": {
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "FUSE-ISO_SW_PWR": {
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "FUSE-PCS_BATT": {
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "FUSE-TRANS_BATT": {
    "models": [],
    "complete": false,
    "missing": [
-    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale"
+    "Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this product', bluesea.com 2026-09-29), and every listing photo checked (eBay 'blue sea 5065', 2026-09-29) is Blue Sea's own stock photo, the holder open and empty. The ruler is ready: Littelfuse's 257 Series ATO data sheet (DigiKey's mirror) prints 19.1 (.75\") and 5.1 (.20\"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of the part with a scale"
    ]
   },
   "GND-BANK-CAB": {
@@ -17964,10 +17960,7 @@
     "DT06-2S",
     "DT04-2P"
    ],
-   "missing": [
-    "QFS-H882 hanger and level sender",
-    "QFS-BKCN-GM bulkhead"
-   ]
+   "missing": []
   },
   "FUEL-PUMP": {
    "endpoints": [
@@ -18087,10 +18080,7 @@
     "DTP06-2S",
     "DTP04-2P"
    ],
-   "missing": [
-    "QFS-H882 hanger and P367 pump",
-    "QFS-BKCN-GM bulkhead"
-   ]
+   "missing": []
   },
   "WIDEBAND": {
    "endpoints": [
@@ -18269,6 +18259,163 @@
    "pieces": [
     "DTM06-4S",
     "DTM04-4P"
+   ],
+   "missing": []
+  },
+  "QFS-BKCN-GM": {
+   "endpoints": [
+    "FUEL-LEVEL",
+    "FUEL-PUMP"
+   ],
+   "what": "Quantum QFS-BKCN-GM electrical bulkhead: 4 terminals (14 A each) through a keyed 10 mm hole in the hanger's top plate, O-ring sealed, stainless lock clip",
+   "maker": "Quantum Fuel Systems",
+   "maker_pn": "QFS-BKCN-GM",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 27.6,
+    "w": 23.0,
+    "h": 37.6
+   },
+   "frame": "the lid seat at z = 0, the harness shroud up (+Z), the in-tank blades down",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#c4bc46",
+     "from": "QFS-BKCN-GM.jpg: the yellow body, median of its pixels"
+    },
+    "o-ring": {
+     "hex": "#402316",
+     "from": "QFS-BKCN-GM.jpg: the brown O-ring, median"
+    },
+    "clip": {
+     "hex": "#868582",
+     "from": "QFS-BKCN-GM.jpg: the stainless clip, median"
+    },
+    "blades": {
+     "hex": "#c8c9c4",
+     "from": "tin-plated terminals (colour assumed)"
+    }
+   },
+   "attach": [
+    {
+     "n": "harness",
+     "ep": "FUEL-PUMP",
+     "at": [
+      0.0,
+      0.0,
+      24.9
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "4-way harness shroud (pump +, pump -, sender, sender ground)"
+    },
+    {
+     "n": "harness_level",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      0.0,
+      0.0,
+      24.9
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "the same 4-way shroud"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "fuel system (in-tank)",
+   "pieces": [
+    "QFS-BKCN-GM"
+   ],
+   "missing": []
+  },
+  "QFS-H882": {
+   "endpoints": [
+    "FUEL-LEVEL",
+    "FUEL-PUMP"
+   ],
+   "what": "Quantum QFS-H882 fuel pump hanger (1973-91 Blazer, 31 gal tank): top plate, 8AN / 6AN tubes, level sender and float, P367 pump holder, QFS-BKCN-GM bulkhead",
+   "maker": "Quantum Fuel Systems",
+   "maker_pn": "QFS-H882",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 267.3,
+    "w": 122.1,
+    "h": 350.8
+   },
+   "frame": "the top plate's underside at z = 0 (the tank top), +Z out of the tank, the pump holder 12 in down",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "hanger": {
+     "hex": "#b9a24e",
+     "from": "H882 product photos: the yellow-zinc (gold) plating"
+    },
+    "float": {
+     "hex": "#1d1d1f",
+     "from": "H882 product photos: black float"
+    },
+    "sender": {
+     "hex": "#e8e6de",
+     "from": "H882 product photos: the white sender housing"
+    },
+    "pump": {
+     "hex": "#8d8f91",
+     "from": "assumed: a bare steel pump body (not photographed)"
+    }
+   },
+   "attach": [
+    {
+     "n": "bulkhead",
+     "ep": "FUEL-PUMP",
+     "at": [
+      24.0,
+      8.0,
+      26.4
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "QFS-BKCN-GM shroud"
+    },
+    {
+     "n": "bulkhead_level",
+     "ep": "FUEL-LEVEL",
+     "at": [
+      24.0,
+      8.0,
+      26.4
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "QFS-BKCN-GM shroud"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "fuel system (in-tank)",
+   "pieces": [
+    "QFS-H882",
+    "QFS-BKCN-GM"
    ],
    "missing": []
   },

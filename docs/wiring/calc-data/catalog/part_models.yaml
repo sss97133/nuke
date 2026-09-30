@@ -20,7 +20,7 @@
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
 ends_covered: 161
-ends_complete: 126
+ends_complete: 128
 ends_total: 179
 ends_unmodelled_with_reason: 17
 ends_by_shape_basis:
@@ -389,10 +389,9 @@ ends:
     - DT04-2P
     - DT06-2S
     - FUEL-LEVEL
-    complete: false
-    missing:
-    - QFS-BKCN-GM bulkhead
-    - QFS-H882 hanger and level sender
+    - QFS-BKCN-GM
+    - QFS-H882
+    complete: true
   FUEL-PUMP:
     models:
     - 0460-204-12141
@@ -400,10 +399,9 @@ ends:
     - DTP04-2P
     - DTP06-2S
     - FUEL-PUMP
-    complete: false
-    missing:
-    - QFS-BKCN-GM bulkhead
-    - QFS-H882 hanger and P367 pump
+    - QFS-BKCN-GM
+    - QFS-H882
+    complete: true
   FUELP:
     models:
     - FUELP
@@ -416,37 +414,55 @@ ends:
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   FUSE-IBOOST_PERM:
     models: []
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   FUSE-ISO_PWR:
     models: []
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   FUSE-ISO_SW_PWR:
     models: []
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   FUSE-PCS_BATT:
     models: []
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   FUSE-TRANS_BATT:
     models: []
     complete: false
     missing:
     - 'Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing (''There is no documentation for this product'',
-      bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale'
+      bluesea.com 2026-09-29), and every listing photo checked (eBay ''blue sea 5065'', 2026-09-29) is Blue Sea''s own stock
+      photo, the holder open and empty. The ruler is ready: Littelfuse''s 257 Series ATO data sheet (DigiKey''s mirror) prints
+      19.1 (.75") and 5.1 (.20"), which DigiKey labels L and W. Needs: a photo with a fuse seated, calipers, or a photo of
+      the part with a scale'
   GND-BANK-CAB:
     models:
     - '9906'
@@ -31210,7 +31226,6 @@ parts:
     from TE) with 1 at +X. Read the moulded numbers off the part before pinning it.'
   - Shroud length, bridge / lock arm, seal ring and nose depth are photo proportions (+-10-15 %); the mated length follows
     the nose depth (11.4 mm).
-  - 'Still to model for this end: QFS-H882 hanger and level sender; QFS-BKCN-GM bulkhead'
   cross_checks: []
   notes:
   - 'pieces: DT06-2S, DT04-2P (each is also its own model)'
@@ -31219,9 +31234,7 @@ parts:
   pieces:
   - DT06-2S
   - DT04-2P
-  missing:
-  - QFS-H882 hanger and level sender
-  - QFS-BKCN-GM bulkhead
+  missing: []
   script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
 - id: FUEL-PUMP
   endpoints:
@@ -31466,7 +31479,6 @@ parts:
     from TE) with 1 at +X. Read the moulded numbers off the part before pinning it.'
   - Shroud length, bridge / lock arm, seal ring and nose depth are photo proportions (+-10-15 %); the mated length follows
     the nose depth (13.9 mm).
-  - 'Still to model for this end: QFS-H882 hanger and P367 pump; QFS-BKCN-GM bulkhead'
   cross_checks: []
   notes:
   - 'pieces: DTP06-2S, DTP04-2P (each is also its own model)'
@@ -31475,9 +31487,7 @@ parts:
   pieces:
   - DTP06-2S
   - DTP04-2P
-  missing:
-  - QFS-H882 hanger and P367 pump
-  - QFS-BKCN-GM bulkhead
+  missing: []
   script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
 - id: WIDEBAND
   endpoints:
@@ -31784,6 +31794,351 @@ parts:
   - DTM04-4P
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: QFS-BKCN-GM
+  endpoints:
+  - FUEL-LEVEL
+  - FUEL-PUMP
+  what: 'Quantum QFS-BKCN-GM electrical bulkhead: 4 terminals (14 A each) through a keyed 10 mm hole in the hanger''s top
+    plate, O-ring sealed, stainless lock clip'
+  maker: Quantum Fuel Systems
+  maker_pn: QFS-BKCN-GM
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 27.6
+    w: 23.0
+    h: 37.6
+  dims_note: about 28 x 23 x 38 (photo-scaled)
+  frame: the lid seat at z = 0, the harness shroud up (+Z), the in-tank blades down
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#c4bc46'
+      from: 'QFS-BKCN-GM.jpg: the yellow body, median of its pixels'
+    o-ring:
+      hex: '#402316'
+      from: 'QFS-BKCN-GM.jpg: the brown O-ring, median'
+    clip:
+      hex: '#868582'
+      from: 'QFS-BKCN-GM.jpg: the stainless clip, median'
+    blades:
+      hex: '#c8c9c4'
+      from: tin-plated terminals (colour assumed)
+  attach:
+  - n: harness
+    ep: FUEL-PUMP
+    at:
+    - 0.0
+    - 0.0
+    - 24.9
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: 4-way harness shroud (pump +, pump -, sender, sender ground)
+  - n: harness_level
+    ep: FUEL-LEVEL
+    at:
+    - 0.0
+    - 0.0
+    - 24.9
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: the same 4-way shroud
+  mount: []
+  params:
+  - name: hole
+    value: 10.0
+    source: 'reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md:
+      ''a keyed 10mm hole'''
+    basis: vendor
+    note: the lid hole the stem passes
+  - name: oring_od
+    value: 14.4
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-20 %
+  - name: oring_cs
+    value: 2.2
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-25 %
+  - name: boss_d
+    value: 20.0
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-20 %: the flange round the O-ring'
+  - name: boss_t
+    value: 2.5
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-30 %
+  - name: body_w
+    value: 27.6
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-20 %: across the oval shroud'
+  - name: body_d
+    value: 15.0
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-25 %: front to back'
+  - name: shroud_h
+    value: 14.8
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-25 %: the oval harness shroud'
+  - name: neck_h
+    value: 7.6
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-25 %
+  - name: wall
+    value: 1.5
+    source: not on file
+    basis: assumed
+    note: 'red: the shroud''s wall'
+  - name: stem_l
+    value: 4.0
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-30 %: the stem below the lid seat'
+  - name: blade_l
+    value: 8.7
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-25 %
+  - name: blade_w
+    value: 1.45
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: +-25 %
+  - name: blade_t
+    value: 0.6
+    source: not on file
+    basis: assumed
+    note: 'red: the blades'' thickness'
+  - name: blade_pitch
+    value: 3.2
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-25 %: the 2 x 2 blades'' spacing'
+  - name: clip_d
+    value: 23.0
+    source: reference_documents/product_images/QFS-BKCN-GM.jpg, scaled from the O-ring's 172 px inside, taken as the 'keyed
+      10mm hole' (reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md)
+    basis: photo
+    note: '+-20 %: the stainless lock clip''s star washer'
+  - name: clip_t
+    value: 0.5
+    source: not on file
+    basis: assumed
+    note: 'red: the clip''s sheet'
+  checks:
+  - check: stem fits the keyed 10 mm hole (vendor)
+    model: 9.6
+    drawing: 9.6
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Sized off the vendor's photo from the 'keyed 10mm hole' it fits (the O-ring's inside), +-20 %; the photo is a three-quarter
+    view.
+  - The mating harness plug is not on file (the registry routes the pump pair to a DTP 2-way and the sender pair to a DT 2-way
+    above the lid).
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: fuel system (in-tank)
+  pieces:
+  - QFS-BKCN-GM
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_fuel.py
+- id: QFS-H882
+  endpoints:
+  - FUEL-LEVEL
+  - FUEL-PUMP
+  what: 'Quantum QFS-H882 fuel pump hanger (1973-91 Blazer, 31 gal tank): top plate, 8AN / 6AN tubes, level sender and float,
+    P367 pump holder, QFS-BKCN-GM bulkhead'
+  maker: Quantum Fuel Systems
+  maker_pn: QFS-H882
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 267.3
+    w: 122.1
+    h: 350.8
+  dims_note: about 267 x 122 x 351 (photo-scaled)
+  frame: the top plate's underside at z = 0 (the tank top), +Z out of the tank, the pump holder 12 in down
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    hanger:
+      hex: '#b9a24e'
+      from: 'H882 product photos: the yellow-zinc (gold) plating'
+    float:
+      hex: '#1d1d1f'
+      from: 'H882 product photos: black float'
+    sender:
+      hex: '#e8e6de'
+      from: 'H882 product photos: the white sender housing'
+    pump:
+      hex: '#8d8f91'
+      from: 'assumed: a bare steel pump body (not photographed)'
+  attach:
+  - n: bulkhead
+    ep: FUEL-PUMP
+    at:
+    - 24.0
+    - 8.0
+    - 26.4
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: QFS-BKCN-GM shroud
+  - n: bulkhead_level
+    ep: FUEL-LEVEL
+    at:
+    - 24.0
+    - 8.0
+    - 26.4
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: QFS-BKCN-GM shroud
+  mount: []
+  params:
+  - name: drop
+    value: 304.8
+    source: 'reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md:
+      Q&A ''The measurement is 12 inches from the top plate to the bottom of the fuel housing that holds the fuel pump'''
+    basis: vendor
+  - name: plate_d
+    value: 106.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-20 %: the top plate'
+  - name: plate_t
+    value: 1.5
+    source: not on file
+    basis: assumed
+    note: red
+  - name: tube_od
+    value: 9.8
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-20 %: the stand and fuel tubes as photographed; the listing names 8AN / 6AN'
+  - name: an_reach
+    value: 144.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-20 %: the AN ends from the plate''s centre'
+  - name: an_rise
+    value: 35.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-25 %: the tubes'' height above the plate'
+  - name: an_hex
+    value: 19.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-25 %: the AN fittings'' hex'
+  - name: foot_od
+    value: 47.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-20 %: the pump holder''s ring'
+  - name: pump_d
+    value: 38.0
+    source: no photo shows the pump
+    basis: assumed
+    note: 'red: the P367 pump''s body'
+  - name: pump_l
+    value: 130.0
+    source: no photo shows the pump
+    basis: assumed
+    note: red
+  - name: card_h
+    value: 50.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-25 %: the level sender''s card'
+  - name: arm_l
+    value: 100.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: '+-25 %: the float arm'
+  - name: float_l
+    value: 45.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: +-25 %
+  - name: float_d
+    value: 25.0
+    source: the H882 side-view photo (product page image 633481), scaled from the vendor's 12 in, top plate to the pump housing's
+      bottom (505 px; reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+      Q&A)
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: top plate to the pump holder's bottom (vendor 12 in)
+    model: 304.8
+    drawing: 304.8
+    tol: 0.1
+    ok: true
+  branding: {}
+  unknowns:
+  - The hanger is scaled off the vendor's side-view photo from its own 12 in (top plate to the pump housing's bottom), +-20
+    %; the tubes' AN sizes (8AN / 6AN) are the listing's, their drawn OD is the photo's.
+  - 'The P367 pump is in no product photo: its body (38 x 130) is ASSUMED (red).'
+  - The kit's own pigtail (black loom, a 2-pin plug and a ring lug in the photos) is not drawn; the registry routes the pairs
+    to its DT and DTP connectors.
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: fuel system (in-tank)
+  pieces:
+  - QFS-H882
+  - QFS-BKCN-GM
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_fuel.py
 - id: FI114961
   endpoints: &id001
   - INJ-1
