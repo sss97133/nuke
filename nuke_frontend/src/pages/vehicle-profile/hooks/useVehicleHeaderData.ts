@@ -10,6 +10,7 @@ import { useVINProofs } from '../../../hooks/useVINProofs';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { Vehicle, VehicleHeaderProps } from '../types';
 import { parseMoneyNumber, normalizePartyHandle, isValidUsername, formatRemaining } from '../vehicleHeaderUtils';
+import { useSecondClock } from '../../../hooks/useSecondClock';
 
 // ---- Popover data hook ----
 export function usePopoverData(
@@ -745,43 +746,8 @@ export function useTransferStatus(vehicleId: string | undefined) {
 
 // ---- Auction timer hook ----
 export function useAuctionTimer(auctionEndDateForTimer: string | null) {
-  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
-  const lastUpdateRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    if (!auctionEndDateForTimer) return;
-    const tick = () => {
-      const now = Date.now();
-      setAuctionNow(now);
-      lastUpdateRef.current = now;
-    };
-    tick();
-    const id = window.setInterval(() => {
-      const isVisible = document.visibilityState === 'visible';
-      const now = Date.now();
-      if (isVisible) {
-        tick();
-      } else {
-        if (now - lastUpdateRef.current >= 10000) {
-          tick();
-        }
-      }
-    }, 1000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        tick();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [auctionEndDateForTimer]);
-
-  return auctionNow;
+  // The page's one shared 1-second clock; off the clock when there is no end date.
+  return useSecondClock(Boolean(auctionEndDateForTimer));
 }
 
 // ---- Location display hook ----
