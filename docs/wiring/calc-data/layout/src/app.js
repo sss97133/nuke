@@ -157,13 +157,14 @@ function renderStrip() {
   $('#decs').innerHTML = (D.dec || []).map(d => `<button type="button" class="dec" data-sel="o:${esc(d.open)}" aria-pressed="${S.sel === 'o:' + d.open}" title="${esc(d.text)}"><b>${d.n}</b>${esc(d.title)}<span class="need">${esc(d.need || '')}</span></button>`).join('');
   const c = D.cov || {};
   $('#cov').innerHTML = [
-    ['m3d', `<b>${c.m3d}</b> of <b>${c.ends}</b> ends modelled in 3D`, ''],
+    ['m3d', `<b>${c.m3d}</b> of <b>${c.ends}</b> ends modelled in 3D, <b>${c.m3d_complete == null ? '—' : c.m3d_complete}</b> complete`, '',
+      Object.entries(c.m3d_basis || {}).filter(([, n]) => n).map(([b, n]) => `${n} ${b}`).join(' · ')],
     ['drawn', `<b>${c.drawn}</b> drawn to size`, ''],
     ['segs', `<b>${c.segs}</b> route segments`, ''],
     ['routed', `<b>${c.routed}</b>/<b>${c.wires}</b> wires routed`, ''],
     ['off', `<b>${c.off}</b> route landings outside margin`, c.off ? 'w' : ''],
     ['open', `<b>${c.open}</b> open items`, ''],
-  ].map(([k, h, cls]) => `<button type="button" data-cov="${k}" class="${cls}">${h}</button>`).join('');
+  ].map(([k, h, cls, tip]) => `<button type="button" data-cov="${k}" class="${cls}"${tip ? ` title="Modelled ends by the best source of their shape: ${esc(tip)}"` : ''}>${h}</button>`).join('');
 }
 (function vehicleData() {
   const V = D.vdata; if (!V) return;
@@ -337,7 +338,7 @@ function renderTools() {
     t.innerHTML = `<div class="grp"><label class="lab" for="schsel">Circuit</label><select class="inp" id="schsel" style="width:auto">${opts}</select></div>`
       + `<span class="sp"></span><div class="grp"><button type="button" class="btn" data-sz="out" aria-label="Zoom out">−</button><button type="button" class="btn" data-sz="in" aria-label="Zoom in">+</button><button type="button" class="btn" data-sz="fit">Fit</button></div>`;
   } else {
-    t.innerHTML = `<div class="grp"><span class="lab">Library</span><span class="muted">${LIB.length} parts modelled in 3D · ${(D.cov || {}).m3d} of ${(D.cov || {}).ends} ends complete</span></div>`
+    t.innerHTML = `<div class="grp"><span class="lab">Library</span><span class="muted">${LIB.length} parts modelled in 3D · ${(D.cov || {}).m3d} of ${(D.cov || {}).ends} ends modelled, ${(D.cov || {}).m3d_complete} complete · by source of shape: ${esc(Object.entries((D.cov || {}).m3d_basis || {}).filter(([, n]) => n).map(([b, n]) => n + ' ' + b).join(', '))}</span></div>`
       + `<span class="sp"></span><div class="grp"><button type="button" class="btn" id="l-front">Front</button><button type="button" class="btn" id="l-wires">Wire side</button><button type="button" class="tg" id="l-plugs" aria-pressed="true">Plugs</button><button type="button" class="tg" id="l-keep" aria-pressed="false">Keep-out</button></div>`;
   }
 }

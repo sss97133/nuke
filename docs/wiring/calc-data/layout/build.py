@@ -762,7 +762,7 @@ PL_BY = {p["id"]: p for p in PL}
 
 # the part-model index: every modelled end (nuke_frontend/public/wiring/part-models/index.json); the audited batch branch first
 PMI, PMI_SRC = {"parts": {}}, None
-for ref in ("origin/wiring/part-families", "origin/main"):
+for ref in ("origin/main",):                           # the merged index only: audited batches land here
     subprocess.run(["git", "-C", REPO, "fetch", "origin", ref.split("/", 1)[1], "--quiet"], capture_output=True)
     r = subprocess.run(["git", "-C", REPO, "show", ref + ":nuke_frontend/public/wiring/part-models/index.json"], capture_output=True)
     if r.returncode == 0:
@@ -1149,7 +1149,20 @@ if rows:
                         {"kind": "Wires in the registry", "n": len(WIRES), "updated": git_date("docs/wiring/calc-data/k5_registry.json"), "src": "k5_registry.json (main)"}]}
     VEHICLE_DATA["total"] = sum(r["n"] for r in VEHICLE_DATA["db"] if not r["table"].startswith(("harness_", "vehicle_custom", "wire_term", "wiring_")))
 
+# 3D coverage by basis: each end counts once, at the best shape basis among its models (maker drawing first, not sourced last)
+BASIS_ORDER = ["maker drawing", "datasheet dims", "scaled from photo", "twin object", "not sourced"]
+PM_ENDS = PMI.get("ends") or {}
+def best_basis(ep):
+    bs = [(PMI["parts"].get(pid) or {}).get("shape_basis") for pid in MODELLED.get(ep, [])]
+    bs = [b for b in bs if b in BASIS_ORDER]
+    return min(bs, key=BASIS_ORDER.index) if bs else None
+m3d_basis = {b: 0 for b in BASIS_ORDER}
+for i in items:
+    b = best_basis(i["id"]) if i["m3d"] else None
+    if b:
+        m3d_basis[b] += 1
 cov = {"ends": len(items), "drawn": sum(1 for i in items if i.get("drawn")), "cad": len(LIB), "m3d": sum(1 for i in items if i["m3d"]),
+       "m3d_complete": sum(1 for i in items if (PM_ENDS.get(i["id"]) or {}).get("complete")), "m3d_basis": m3d_basis,
        "pm_src": PMI_SRC, "pm_parts": len(PMI["parts"]), "segs": len((routes or {}).get("segments", [])),
        "wires": len(WIRES), "routed": sum(1 for w in WIRES.values() if w.get("segs")), "off": sum(1 for n in (routes or {}).get("nodes", []) if n.get("off")),
        "open": len(OPEN), "decisions": len(sizes_m.DECISIONS)}
