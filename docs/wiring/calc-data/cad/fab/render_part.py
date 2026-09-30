@@ -160,6 +160,8 @@ scene.collection.objects.link(cam)
 scene.camera = cam
 cam_d.lens = 85
 cam_d.sensor_width = 36
+cam_d.clip_start = 0.0005      # Blender's 0.1 m default clips parts under ~30 mm (a 7 mm stub splice rendered blank)
+cam_d.clip_end = 200.0
 
 scene.render.engine = "CYCLES"
 scene.cycles.samples = 16 if FAST else 160
