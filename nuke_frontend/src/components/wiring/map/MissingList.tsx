@@ -7,7 +7,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
-import { SECTIONS, type WiringMapData } from './useWiringMap';
+import { SECTIONS, type MapWire, type WiringMapData } from './useWiringMap';
 import { mask, modelsOf, publicName, type PartModelIndex, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 
 type Kind = 'model' | 'partial' | 'end';
@@ -42,7 +42,7 @@ function endWords(t: string | null): string {
   return s.length > 60 ? s.slice(0, 59).trimEnd() + '…' : s;
 }
 
-function missingOf(map: WiringMapData, ix: WsIndex, site: SiteFiles): MissingItem[] {
+export function missingOf(map: WiringMapData, ix: WsIndex, site: SiteFiles): MissingItem[] {
   const out: MissingItem[] = [];
   const idx = site.models;
   if (idx) Object.keys(site.ends).forEach(code => {
@@ -57,26 +57,29 @@ function missingOf(map: WiringMapData, ix: WsIndex, site: SiteFiles): MissingIte
     }
   });
   map.wires.forEach(w => {
-    const hops = ix.chain.get(w.code) ?? [];
-    if (hops.length > 1) return;
-    let closes: string;
-    if (!hops.length) {
-      closes = `both ends (${endWords(w.fromText) || '?'} → ${endWords(w.toText) || '?'}) — connection points not on file`;
-    } else {
-      // which end is open: the side the one end on file isn't; a wire-end row with no matching link falls back to the words
-      const k = hops[0].code, f = ix.byId.get(w.fromId ?? '')?.code, t = ix.byId.get(w.toId ?? '')?.code;
-      const kIsTo = (w.toText ?? '').startsWith(k) && !(w.fromText ?? '').startsWith(k);
-      const toOpen = f === k && t !== k ? true : t === k && f !== k ? false : !kIsTo;
-      const at = toOpen ? t : f;
-      closes = at ? `${at} — cavity not on file` : `${endWords(toOpen ? w.toText : w.fromText) || 'the other end'} — connection point not on file`;
-    }
-    out.push({ sel: 'w:' + w.code, kind: 'end', code: '#' + w.code, name: w.name, closes, notes: [], section: w.section });
+    const closes = openEndOf(w, ix);
+    if (closes) out.push({ sel: 'w:' + w.code, kind: 'end', code: '#' + w.code, name: w.name, closes, notes: [], section: w.section });
   });
   return out;
 }
 
-export function MissingList({ cw, map, ix, site, sel, isOwner, narrow, onSelect }: {
-  cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; sel: string | null; isOwner: boolean; narrow: boolean; onSelect: (id: string) => void;
+/** What closes a wire's open end, in words, or null when both ends are on a connection point on file. The list and the
+ *  wire card both read it here, so they say the same thing. */
+export function openEndOf(w: MapWire, ix: WsIndex): string | null {
+  const hops = ix.chain.get(w.code) ?? [];
+  if (hops.length > 1) return null;
+  if (!hops.length) return `both ends (${endWords(w.fromText) || '?'} → ${endWords(w.toText) || '?'}) — connection points not on file`;
+  // which end is open: the side the one end on file isn't; a wire-end row with no matching link falls back to the words
+  const k = hops[0].code, f = ix.byId.get(w.fromId ?? '')?.code, t = ix.byId.get(w.toId ?? '')?.code;
+  const kIsTo = (w.toText ?? '').startsWith(k) && !(w.fromText ?? '').startsWith(k);
+  const toOpen = f === k && t !== k ? true : t === k && f !== k ? false : !kIsTo;
+  const at = toOpen ? t : f;
+  return at ? `${at} — cavity not on file` : `${endWords(toOpen ? w.toText : w.fromText) || 'the other end'} — connection point not on file`;
+}
+
+// full: the list is its door's whole page (brief step 4), so it doesn't cap its height or offer to hide itself
+export function MissingList({ cw, map, ix, site, sel, isOwner, narrow, full, onSelect }: {
+  cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; sel: string | null; isOwner: boolean; narrow: boolean; full?: boolean; onSelect: (id: string) => void;
 }) {
   const [hidden, setHidden] = useState(false);
   const [shut, setShut] = useState<Set<string>>(new Set());
@@ -99,14 +102,16 @@ export function MissingList({ cw, map, ix, site, sel, isOwner, narrow, onSelect 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 10px', flexWrap: 'wrap', padding: '6px 12px' }}>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: cw.ink }}>WHAT'S STILL MISSING</span>
         <b style={{ fontFamily: cw.fontMono, fontSize: 13 }}>{items.length}</b>
-        <span style={{ fontSize: 12.5, color: cw.inkMuted }}>{tally(items)}. Select one to find it in the workspace below.</span>
-        <button onClick={() => setHidden(h => !h)} aria-expanded={!hidden} style={{ marginLeft: 'auto', border: frame(cw), background: cw.surface, color: cw.ink,
-          fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {hidden ? 'SHOW THE LIST ▾' : 'HIDE THE LIST ▴'}
-        </button>
+        <span style={{ fontSize: 12.5, color: cw.inkMuted }}>{tally(items)}. {full ? 'Select a part to see it on the truck, or a wire to follow it.' : 'Select one to find it in the workspace below.'}</span>
+        {!full && (
+          <button onClick={() => setHidden(h => !h)} aria-expanded={!hidden} style={{ marginLeft: 'auto', border: frame(cw), background: cw.surface, color: cw.ink,
+            fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {hidden ? 'SHOW THE LIST ▾' : 'HIDE THE LIST ▴'}
+          </button>
+        )}
       </div>
-      {!hidden && (
-        <div style={{ maxHeight: narrow ? '60vh' : '34vh', overflowY: 'auto', borderTop: rule(cw) }}>
+      {(full || !hidden) && (
+        <div style={{ maxHeight: full ? undefined : narrow ? '60vh' : '34vh', overflowY: full ? undefined : 'auto', borderTop: rule(cw) }}>
           {groups.map(g => (
             <div key={g.id || 'none'}>
               <button onClick={() => toggle(g.id)} aria-expanded={!shut.has(g.id)} style={{ display: 'flex', alignItems: 'baseline', gap: '2px 10px', flexWrap: 'wrap',

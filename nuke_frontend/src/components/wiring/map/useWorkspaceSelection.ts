@@ -30,9 +30,10 @@ export interface PartModelIndex {
   ends_by_shape_basis?: Record<string, number>;   // the index's own split (index_v5), when it carries one
   parts: Record<string, PartModel>;
 }
-export interface SiteFiles { loaded: boolean; ends: Record<string, SiteEnd>; segs: SiteSeg[]; models: PartModelIndex | null }
+// routesOn: the date the loom routes were drawn on the twin (the routes file's own `generated`), the basis a length cites
+export interface SiteFiles { loaded: boolean; ends: Record<string, SiteEnd>; segs: SiteSeg[]; models: PartModelIndex | null; routesOn: string | null }
 
-const EMPTY_SITE: SiteFiles = { loaded: false, ends: {}, segs: [], models: null };
+const EMPTY_SITE: SiteFiles = { loaded: false, ends: {}, segs: [], models: null, routesOn: null };
 const getJson = (u: string) => fetch(u).then(r => (r.ok ? r.json() : null)).catch(() => null);
 
 /** The vehicle's public design files; each carries its vehicle id, so another vehicle reads none of them.
@@ -53,6 +54,7 @@ export function useSiteFiles(vehicleId: string | undefined): SiteFiles {
           ends,
           segs: mine(rts) ? (rts.segments ?? []) : [],
           models: mine(pos) && pm ? pm : null,
+          routesOn: mine(rts) && typeof rts.generated === 'string' ? rts.generated : null,
         });
       });
     return () => { cancelled = true; };

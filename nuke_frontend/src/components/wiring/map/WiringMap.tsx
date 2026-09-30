@@ -2,8 +2,11 @@
 // section → device → connector → cavity), one centre view (plan, 3D by zone, connector face, schematic, parts library),
 // the selection's properties and the linked tables (wire list, pin list, connectors), all lit by one selection.
 // Earlier layout: every node on one plan, worked one target at a time (owner, 2026-09-27; plan vivid-hugging-globe.md).
-// The first screen answers "how far along is it?": a status line, then what's still missing by system (MissingList),
-// then the workspace (brief docs/wiring/research/2026-09-30_map-progressive-disclosure-brief.md, step 2).
+// The first screen answers "how far along is it?": a status line, then four doors, each a sentence (brief
+// docs/wiring/research/2026-09-30_map-progressive-disclosure-brief.md, steps 2 and 4). A door opens only what its task
+// needs: See the truck (the plan and 3D), Follow a wire (one search box, then the wire's card), Read the manual (the
+// diagram by system, connector end views, the parts library), What's still missing (MissingList). The tree and the
+// tables stay one click away inside a door, as drawers. ?door= names the open door.
 //
 // Everyone sees the results. The owner (the profile's owner check) also sees what needs him, the open calls and
 // decisions, and each record's proof and sources (NodeCard, CallCard, WireRecords below).
@@ -37,7 +40,8 @@ import { SchematicBlock } from './SchematicBlock';
 import { WorkspaceTables } from './WorkspaceTables';
 import { WorkspaceProps } from './WorkspaceProps';
 import { PartLibrary } from './PartLibrary';
-import { MissingList } from './MissingList';
+import { MissingList, missingOf } from './MissingList';
+import { WireSearch } from './WireSearch';
 import { needsOwner } from './ownerLayer';
 
 const WORK_WORD: Record<WorkStatus, string> = {
@@ -82,7 +86,19 @@ function statusColor(cw: Colorway, s: WorkStatus): string {
 }
 
 type View = 'plan' | '3d' | 'face' | 'sch' | 'lib';
-const VIEWS: [View, string][] = [['plan', 'PLAN'], ['3d', '3D'], ['face', 'CONNECTOR'], ['sch', 'SCHEMATIC'], ['lib', 'LIBRARY']];
+// each view lives in one door: the truck's two, and the manual's three (a GM book's wiring diagrams, connector end views
+// and parts list)
+const TRUCK_VIEWS: [View, string][] = [['plan', 'PLAN'], ['3d', '3D']];
+const MANUAL_VIEWS: [View, string][] = [['sch', 'WIRING DIAGRAM'], ['face', 'CONNECTOR END VIEW'], ['lib', 'PARTS']];
+
+type Door = 'truck' | 'wire' | 'manual' | 'missing';
+const DOORS: { id: Door; title: string; line: string }[] = [
+  { id: 'truck', title: 'See the truck', line: 'Where every part and loom run sits, on the plan or in 3D.' },
+  { id: 'wire', title: 'Follow a wire', line: 'Search a part or a wire and read its card: both ends, gauge, colour, length, terminals.' },
+  { id: 'manual', title: 'Read the manual', line: 'The wiring diagram system by system, the connector end views and the parts.' },
+  { id: 'missing', title: "What's still missing", line: 'Every open item by system, each with what closes it.' },
+];
+const isDoor = (d: string | null): d is Door => DOORS.some(x => x.id === d);
 const ZoneModels3D = React.lazy(() => import('./ZoneModels3D'));   // three.js loads only when the 3D view opens
 
 function useNarrow(px: number): boolean {
@@ -141,7 +157,20 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const cov = useMemo(() => coverage(site), [site]);
 
   const k = kindOf(sel), v = valOf(sel);
-  const view: View = VIEWS.find(x => x[0] === params.get('view'))?.[0] ?? 'plan';
+  // the open door; an older link with a view or a selection (?view=, ?sel=, ?node=, ?call=) opens the door that holds it
+  const rawDoor = params.get('door'), rawView = params.get('view');
+  const door: Door | null = isDoor(rawDoor) ? rawDoor
+    : rawView ? (MANUAL_VIEWS.some(x => x[0] === rawView) ? 'manual' : 'truck')
+    : sel ? (k === 'w' ? 'wire' : 'truck') : null;
+  useEffect(() => { if (door && !isDoor(rawDoor)) set({ door }); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const doorViews = door === 'manual' ? MANUAL_VIEWS : TRUCK_VIEWS;
+  const view: View = doorViews.find(x => x[0] === rawView)?.[0] ?? doorViews[0][0];
+  const [tablesOpen, setTablesOpen] = useState(false);
+  // one URL write per click (two in the same tick would each start from the same URL and the second would win)
+  const go = (d: Door | null, id?: string | null) => {
+    set({ door: d, view: null, ...(id !== undefined ? { sel: id, node: null, call: null } : {}) });
+    setTreeOpen(false); setTablesOpen(false);
+  };
   const withWires = SECTIONS.filter(s => map.wires.some(w => w.section === s.id));
   const selSection = k === 'n' ? ix.byCode.get(v)?.section : k === 'w' ? ix.wireByCode.get(v)?.section : k === 'y' ? v
     : k === 'p' ? ix.byCode.get(v.split('|')[0])?.section : null;
@@ -151,7 +180,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const sys = selSys ?? lastSys ?? withWires[0]?.id ?? 'power_spine';
   const faceCode = k === 'n' ? v : k === 'p' ? v.split('|')[0] : k === 'w' ? (ix.chain.get(v) ?? [])[0]?.code ?? null
     : k === 'd' ? map.nodes.find(n => ix.devOf(n.code) === v)?.code ?? null : null;
-  const pick = (id: string) => { setSel(id); if (narrow) setTreeOpen(false); };
+  const pick = (id: string) => { setSel(id); setTreeOpen(false); };
   const clearSel = React.useCallback(() => setSel(null), [setSel]);
 
   // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
@@ -170,12 +199,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const centre = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, minWidth: 0 }}>
       <div role="tablist" style={{ display: 'flex', alignItems: 'stretch', borderBottom: rule(cw), background: cw.bg, flexShrink: 0, overflowX: 'auto' }}>
-        {narrow && (
-          <button onClick={() => setTreeOpen(true)} style={{ border: 'none', borderRight: rule(cw), background: cw.surface, color: cw.ink,
-            fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: '8px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>TREE ▸</button>
-        )}
-        {VIEWS.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={view === id} onClick={() => set({ view: id === 'plan' ? null : id })} style={{
+        {doorViews.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={view === id} onClick={() => set({ view: id === doorViews[0][0] ? null : id })} style={{
             border: 'none', borderBottom: `2px solid ${view === id ? cw.accent : 'transparent'}`, background: view === id ? cw.surface : 'transparent',
             color: view === id ? cw.ink : cw.inkMuted, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
             padding: '8px 12px', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -208,28 +233,79 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           fontFamily: cw.fontBody, fontSize: 10, fontWeight: 700, padding: '2px 6px', cursor: 'pointer' }}>CLEAR</button>
       )}
       {sel
-        ? <WorkspaceProps cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} onSelect={pick} ownerExtra={records} />
-        : <AtRest cw={cw} map={map} ix={ix} site={site} vehicleId={vehicleId} isOwner={isOwner} rollupFacts={facts} calls={raw.calls} />}
+        ? <WorkspaceProps cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} onSelect={pick} ownerExtra={records}
+            onShowOnTruck={door === 'wire' && k === 'w' ? () => go('truck') : undefined} />
+        : door === 'wire'
+          ? <div style={{ color: cw.inkMuted, fontSize: 13, lineHeight: 1.5 }}>Search, or pick a system, then choose a wire: its card shows here, with both ends, the hops between, gauge, colour, spec, cut length, and each end's terminal, seal and crimp tool.</div>
+          : <AtRest cw={cw} map={map} ix={ix} site={site} vehicleId={vehicleId} isOwner={isOwner} rollupFacts={facts} calls={raw.calls} />}
     </div>
   );
   const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />;
 
+  // the landing: four doors, each a sentence; "What's still missing" says how much, counted the way its list counts
+  const missingCount = useMemo(() => (map.loaded && site.loaded ? missingOf(map, ix, site).length : null), [map, ix, site]);
+  const landing = (
+    <nav aria-label="Where to start" style={{ padding: 12, display: 'grid', gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+      gap: 10, alignContent: 'start', maxWidth: 1040 }}>
+      {DOORS.map(d => (
+        <button key={d.id} onClick={() => go(d.id)} style={{ textAlign: 'left', border: frame(cw), background: cw.surface, color: cw.ink,
+          padding: '14px 16px', cursor: 'pointer', fontFamily: cw.fontBody, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 18, fontWeight: 700 }}>{d.title} ▸</span>
+          <span style={{ display: 'block', fontSize: 14, lineHeight: 1.45, color: cw.inkMuted, marginTop: 4 }}>
+            {d.id === 'missing' && missingCount != null ? `${missingCount} open items by system, each with what closes it.` : d.line}
+          </span>
+        </button>
+      ))}
+    </nav>
+  );
+  const barBtn = (on: boolean): React.CSSProperties => ({
+    border: frame(cw), background: on ? cw.ink : cw.surface, color: on ? textOn(cw.ink) : cw.ink,
+    fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap',
+  });
+  // inside a door: the way back, the door's name, and the tools it can open (the tree and the tables); the colourway
+  // switch waits here too, off the first screen
+  const doorBar = door && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px 8px', flexWrap: 'wrap', padding: '5px 12px', borderBottom: frame(cw), background: cw.bg, flexShrink: 0 }}>
+      <button onClick={() => go(null, null)} style={barBtn(false)}>◂ ALL FOUR</button>
+      <span style={{ fontSize: 15, fontWeight: 700 }}>{DOORS.find(d => d.id === door)?.title}</span>
+      <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {door !== 'missing' && (
+          <>
+            <button onClick={() => setTreeOpen(true)} style={barBtn(treeOpen)}>TREE ▸</button>
+            <button onClick={() => setTablesOpen(o => !o)} aria-expanded={tablesOpen} style={barBtn(tablesOpen)}>{tablesOpen ? 'TABLES ▾' : 'TABLES ▴'}</button>
+          </>
+        )}
+        {COLORWAY_LIST.map(c => (
+          <button key={c.id} onClick={() => setColorway(c.id)} title={`${c.label} colours`} style={{
+            background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
+            border: frame(cw), fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
+          }}>{c.label}</button>
+        ))}
+      </span>
+    </div>
+  );
+  const treeDrawer = treeOpen && (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
+      <div style={{ width: 'min(86vw, 360px)', height: '100%', background: cw.surface, borderRight: frame(cw), display: 'flex', flexDirection: 'column' }}>
+        <button onClick={() => setTreeOpen(false)} style={{ border: 'none', borderBottom: rule(cw), background: cw.bg, color: cw.ink, textAlign: 'left',
+          fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '10px 12px', cursor: 'pointer' }}>◂ CLOSE THE TREE</button>
+        <div style={{ flex: 1, minHeight: 0 }}>{tree}</div>
+      </div>
+      <div onClick={() => setTreeOpen(false)} style={{ flex: 1, background: 'rgba(0,0,0,0.35)' }} />
+    </div>
+  );
+  const search = <WireSearch cw={cw} map={map} ix={ix} site={site} sel={sel} narrow={narrow} onSelect={pick}
+    card={narrow && sel ? <div style={{ background: cw.surface, borderBottom: frame(cw) }}>{props}</div> : undefined} />;
+  const missing = <MissingList cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} narrow={narrow} full
+    onSelect={id => go(kindOf(id) === 'w' ? 'wire' : 'truck', id)} />;
+
   return (
     <ColorwayContext.Provider value={cw}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: cw.bg, color: cw.ink, fontFamily: cw.fontBody,
-        overflowY: narrow ? 'auto' : 'hidden', overflowX: 'hidden' }}>
+        overflowY: narrow || !door ? 'auto' : 'hidden', overflowX: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderBottom: frame(cw), background: cw.surface, flexShrink: 0 }}>
           <Summary cw={cw} map={map} ix={ix} site={site} cov={cov} isOwner={isOwner} />
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-            {COLORWAY_LIST.map(c => (
-              <button key={c.id} onClick={() => setColorway(c.id)} title={c.label} style={{
-                background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
-                border: frame(cw), fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
-              }}>{c.label}</button>
-            ))}
-          </span>
         </div>
-        {!loading && !map.error && <MissingList cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} narrow={narrow} onSelect={pick} />}
         {needCalls.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', padding: '5px 12px', borderBottom: `2px solid ${cw.warn}`, background: cw.bg, flexShrink: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, color: cw.warn, whiteSpace: 'nowrap' }}>NEEDS YOU ({needCalls.length}) · OWNER ONLY</span>
@@ -241,30 +317,44 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         )}
         {loading && <div style={{ padding: 16, fontSize: 13, color: cw.inkFaint }}>READING THE MAP…</div>}
         {map.error && <div style={{ padding: 16, fontSize: 13, color: cw.danger }}>DATABASE READ FAILED: {map.error}</div>}
-        {!loading && !map.error && (narrow ? (
+        {!loading && !map.error && !door && landing}
+        {!loading && !map.error && door && (
           <>
-            <div style={{ height: '62vh', minHeight: 320, flexShrink: 0, borderBottom: frame(cw) }}>{centre}</div>
-            <div style={{ background: cw.surface, borderBottom: frame(cw), flexShrink: 0 }}>{props}</div>
-            <div style={{ height: '70vh', minHeight: 320, flexShrink: 0, background: cw.surface }}>{tables}</div>
-            {treeOpen && (
-              <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
-                <div style={{ width: 'min(86vw, 360px)', height: '100%', background: cw.surface, borderRight: frame(cw), display: 'flex', flexDirection: 'column' }}>
-                  <button onClick={() => setTreeOpen(false)} style={{ border: 'none', borderBottom: rule(cw), background: cw.bg, color: cw.ink, textAlign: 'left',
-                    fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '10px 12px', cursor: 'pointer' }}>◂ CLOSE THE TREE</button>
-                  <div style={{ flex: 1, minHeight: 0 }}>{tree}</div>
-                </div>
-                <div onClick={() => setTreeOpen(false)} style={{ flex: 1, background: 'rgba(0,0,0,0.35)' }} />
+            {doorBar}
+            {door === 'missing' ? (
+              <div style={{ flex: narrow ? undefined : 1, minHeight: 0, overflowY: narrow ? undefined : 'auto' }}>{missing}</div>
+            ) : narrow ? (
+              <>
+                {door === 'wire' ? <div style={{ flexShrink: 0 }}>{search}</div> : (
+                  <>
+                    <div style={{ height: '62vh', minHeight: 320, flexShrink: 0, borderBottom: frame(cw) }}>{centre}</div>
+                    <div style={{ background: cw.surface, borderBottom: frame(cw), flexShrink: 0 }}>{props}</div>
+                  </>
+                )}
+                {tablesOpen && <div style={{ height: '70vh', minHeight: 320, flexShrink: 0, background: cw.surface, borderTop: frame(cw) }}>{tables}</div>}
+              </>
+            ) : (
+              <div style={{ flex: 1, minHeight: 0, display: 'grid',
+                gridTemplateColumns: door === 'wire' ? 'minmax(320px, 420px) minmax(0, 1fr)' : 'minmax(0, 1fr) 360px',
+                gridTemplateRows: tablesOpen ? 'minmax(0, 58fr) minmax(0, 42fr)' : 'minmax(0, 1fr)' }}>
+                {door === 'wire' ? (
+                  <>
+                    <div style={{ gridRow: 1, gridColumn: 1, minHeight: 0, overflowY: 'auto', borderRight: frame(cw), background: cw.bg }}>{search}</div>
+                    <div style={{ gridRow: 1, gridColumn: 2, minHeight: 0, overflowY: 'auto', background: cw.surface }}><div style={{ maxWidth: 760 }}>{props}</div></div>
+                    {tablesOpen && <div style={{ gridRow: 2, gridColumn: '1 / span 2', minHeight: 0, minWidth: 0, borderTop: frame(cw), background: cw.surface }}>{tables}</div>}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ gridRow: 1, gridColumn: 1, minHeight: 0, minWidth: 0 }}>{centre}</div>
+                    {tablesOpen && <div style={{ gridRow: 2, gridColumn: 1, minHeight: 0, minWidth: 0, borderTop: frame(cw), background: cw.surface }}>{tables}</div>}
+                    <div style={{ gridRow: tablesOpen ? '1 / span 2' : 1, gridColumn: 2, minHeight: 0, overflowY: 'auto', borderLeft: frame(cw), background: cw.surface }}>{props}</div>
+                  </>
+                )}
               </div>
             )}
+            {treeDrawer}
           </>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '250px minmax(0, 1fr) 360px', gridTemplateRows: 'minmax(0, 60fr) minmax(0, 40fr)' }}>
-            <div style={{ gridRow: '1 / span 2', gridColumn: 1, minHeight: 0, borderRight: frame(cw), background: cw.surface }}>{tree}</div>
-            <div style={{ gridRow: 1, gridColumn: 2, minHeight: 0, minWidth: 0 }}>{centre}</div>
-            <div style={{ gridRow: 2, gridColumn: 2, minHeight: 0, minWidth: 0, borderTop: frame(cw), background: cw.surface }}>{tables}</div>
-            <div style={{ gridRow: '1 / span 2', gridColumn: 3, minHeight: 0, overflowY: 'auto', borderLeft: frame(cw), background: cw.surface }}>{props}</div>
-          </div>
-        ))}
+        )}
       </div>
     </ColorwayContext.Provider>
   );
@@ -412,7 +502,7 @@ function AtRest({ cw, map, ix, site, vehicleId, isOwner, rollupFacts, calls }: {
   return (
     <div>
       <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted }}>WHOLE TRUCK</div>
-      <div style={{ fontSize: 12.5, margin: '2px 0 8px' }}>SELECT ANYTHING IN THE TREE, A VIEW OR A TABLE; EVERY PANE LIGHTS WHAT IT LINKS TO.</div>
+      <div style={{ fontSize: 12.5, margin: '2px 0 8px' }}>SELECT ANYTHING IN THE VIEW, OR OPEN THE TREE OR THE TABLES FROM THE BAR ABOVE; EVERY PANE LIGHTS WHAT IT LINKS TO.</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>SECTION</th><th style={th}>CONN.</th><th style={th}>PLACED</th><th style={th}>WIRES</th>{isOwner && <th style={th}>DECIDED</th>}<th style={th}>BOTH ENDS</th></tr></thead>
         <tbody>{rows.map(r => (

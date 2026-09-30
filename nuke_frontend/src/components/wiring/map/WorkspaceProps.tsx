@@ -1,12 +1,17 @@
 // map/WorkspaceProps.tsx — the MAP workspace's properties: structured attributes for whatever is selected (a
 // connector, a wire, a pin, a loom segment, a device, a section). Results only; the owner also gets the records card
 // (proof, notes, sources, open calls) through `ownerExtra`, which the MAP tab passes only after its owner check.
+// A wire gets the builder's card (brief 2026-09-30 §4, "Follow a wire"): its ends and the hops between, gauge, colour and
+// spec, the cut length with its ± and its basis, then per end the terminal, seal and crimp tool. All of it comes from the
+// rows the MAP reads (vehicle_custom_circuits, wire_termination_specs) and the loom routes; a gap reads
+// "not on file: <what closes it>", never a blank.
 
 import React from 'react';
 import type { Colorway } from '../connector-inspector/colorways';
 import { rule } from '../connector-inspector/colorways';
 import { DevicePhoto, WhereOnTruck } from './MountsPanel';
-import { SECTIONS, type WiringMapData } from './useWiringMap';
+import { SECTIONS, type MapEnd, type WiringMapData } from './useWiringMap';
+import { openEndOf } from './MissingList';
 import { kindOf, mask, modelsOf, partNo, publicName, valOf, weakestBasis, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 
 const FRONT_AXLE = -1.853, IN = 0.0254;
@@ -23,12 +28,26 @@ function F({ cw, k, children }: { cw: Colorway; k: string; children: React.React
 function H({ cw, children }: { cw: Colorway; children: React.ReactNode }) {
   return <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted, margin: '12px 0 4px', paddingTop: 8, borderTop: rule(cw) }}>{children}</div>;
 }
+// a gap on the wire card, in words: what isn't on file and what closes it
+const NotOnFile = ({ cw, closes }: { cw: Colorway; closes: string }) => <span style={{ color: cw.warn }}>not on file: {closes}</span>;
+const GAP = {
+  gauge: 'a gauge sized for this circuit in the registry',
+  color: 'a colour assigned to this circuit in the registry',
+  spec: 'the wire spec (insulation type) in the registry',
+  length: 'a loom route for this wire, or a measurement on the formboard or the truck',
+  measure: 'a measurement on the formboard or the truck (it replaces the estimate and its ±)',
+  allowance: "the strip length at each end and any service loop, from the formboard or the terminal maker's sheet",
+  terminal: "the terminal's part number for this cavity, from the connector maker's drawing",
+  seal: "the cavity seal's part number from the connector maker's drawing, or a note that this cavity takes none",
+  tool: 'the crimp tool the terminal maker specifies for this terminal',
+};
 const Link = ({ cw, id, children, onSelect }: { cw: Colorway; id: string; children: React.ReactNode; onSelect: (id: string) => void }) => (
   <button onClick={() => onSelect(id)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: cw.accent, fontFamily: cw.fontMono, fontSize: 12.5, textAlign: 'left' }}>{children}</button>
 );
 
-export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, ownerExtra }: {
+export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, ownerExtra, onShowOnTruck }: {
   cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; sel: string | null; isOwner: boolean; onSelect: (id: string) => void; ownerExtra?: React.ReactNode;
+  onShowOnTruck?: () => void;   // the wire card's "show it on the truck": the plan with the wire lit
 }) {
   const k = kindOf(sel), v = valOf(sel);
   const mono = { fontFamily: cw.fontMono };
@@ -116,17 +135,63 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
   if (k === 'w') {
     const w = ix.wireByCode.get(v); if (!w) return null;
     const ch = ix.chain.get(v) ?? [], L = lenOf(v), segs = (ix.segsByWire.get(v) ?? []).map(s => ix.segById.get(s)!).filter(Boolean);
+    const open = openEndOf(w, ix);
+    // each point on the chain with its own end row (wire_termination_specs), matched by connector, then by cavity
+    const mine = map.ends.filter(e => e.circuitId === w.id), used = new Set<MapEnd>();
+    const endAt = (h: { code: string; cav: string | null }) => {
+      const at = mine.filter(e => !used.has(e) && ix.byId.get(e.endpointId)?.code === h.code);
+      const e = at.find(x => (x.cavity ?? '').startsWith(h.cav ?? '')) ?? at[0];
+      if (e) used.add(e);
+      return e;
+    };
+    const points = ch.map((h, i) => ({ h, e: endAt(h), role: i === 0 ? 'END A' : i === ch.length - 1 ? 'END B' : 'VIA' }));
+    const nameOf = (code: string) => site.ends[code]?.dev_name || publicName(ix.byCode.get(code)?.name);
+    const pn = (val: string | null | undefined, gap: string) => {
+      const t = partNo(val);
+      return t === '—' ? <NotOnFile cw={cw} closes={gap} /> : <span style={mono}>{t}</span>;
+    };
     return (
       <div>
-        {head('WIRE', w.code, w.name)}
-        <F cw={cw} k="SECTION">{secWord(w.section)}</F>
-        <F cw={cw} k="GAUGE"><span style={mono}>{w.gauge != null ? `${w.gauge} AWG` : '—'}</span></F>
-        <F cw={cw} k="SPEC"><span style={mono}>{w.spec ?? '—'}</span></F>
-        <F cw={cw} k="COLOR">{w.color ?? '—'}</F>
-        <F cw={cw} k="FROM">{ch[0] ? endLink(ch[0]) : '—'}</F>
-        <F cw={cw} k="TO">{ch.length > 1 ? endLink(ch[ch.length - 1]) : pending}</F>
-        {ch.length > 2 && <F cw={cw} k="VIA">{ch.slice(1, -1).map((h, i) => <span key={i}>{i ? ' · ' : ''}{endLink(h)}</span>)}</F>}
-        <F cw={cw} k="LENGTH">{L ? <><span style={mono}>{L.mm} ± {L.pm} MM</span> ROUTED THROUGH {L.n} SEGMENTS</> : '—'}</F>
+        {head('WIRE', '#' + w.code, w.name)}
+        <F cw={cw} k="SYSTEM">{secWord(w.section)}</F>
+
+        <H cw={cw}>ITS ENDS, AND THE HOPS BETWEEN</H>
+        {points.map(({ h, role }, i) => (
+          <F key={i} cw={cw} k={role}>{endLink(h)} <span style={{ color: cw.inkMuted }}>{nameOf(h.code)}</span></F>
+        ))}
+        {open && <F cw={cw} k={ch.length ? 'OPEN END' : 'ENDS'}><NotOnFile cw={cw} closes={open} /></F>}
+
+        <H cw={cw}>THE WIRE</H>
+        <F cw={cw} k="GAUGE">{w.gauge != null ? <span style={mono}>{w.gauge} AWG</span> : <NotOnFile cw={cw} closes={GAP.gauge} />}</F>
+        <F cw={cw} k="COLOUR">{w.color ? w.color : <NotOnFile cw={cw} closes={GAP.color} />}</F>
+        <F cw={cw} k="SPEC">{w.spec ? <span style={mono}>{w.spec}</span> : <NotOnFile cw={cw} closes={GAP.spec} />}</F>
+        <F cw={cw} k="CUT LENGTH">{L ? <span style={mono}>{L.mm} ± {L.pm} MM</span> : <NotOnFile cw={cw} closes={GAP.length} />}</F>
+        {L && (
+          <>
+            <F cw={cw} k="BASIS">
+              Estimated: routed along the loom drawn on the truck's 3D twin, through {L.n} segment{L.n === 1 ? '' : 's'}
+              {site.routesOn ? ` (routes of ${site.routesOn})` : ''}. The ± is the segments' drawing margins combined.
+            </F>
+            <F cw={cw} k="MEASURED"><NotOnFile cw={cw} closes={GAP.measure} /></F>
+          </>
+        )}
+        <F cw={cw} k="ALLOWANCES"><NotOnFile cw={cw} closes={GAP.allowance} /></F>
+        {onShowOnTruck && (
+          <button onClick={onShowOnTruck} style={{ marginTop: 8, border: `2px solid ${cw.border}`, background: cw.surface, color: cw.ink,
+            fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: '4px 10px', cursor: 'pointer' }}>SHOW IT ON THE TRUCK ▸</button>
+        )}
+
+        {points.length > 0 && <H cw={cw}>AT EACH END: TERMINAL, SEAL, CRIMP TOOL</H>}
+        {points.map(({ h, e, role }, i) => (
+          <div key={i} style={{ padding: '4px 0', borderBottom: rule(cw) }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.7, color: cw.inkMuted }}>
+              {role} · <span style={{ ...mono, fontSize: 12, color: cw.ink }}>{h.code}{h.cav ? ':' + h.cav : ''}</span>
+            </div>
+            <F cw={cw} k="TERMINAL">{pn(e?.terminal, GAP.terminal)}</F>
+            <F cw={cw} k="SEAL">{pn(e?.seal, GAP.seal)}</F>
+            <F cw={cw} k="CRIMP TOOL">{pn(e?.tool, GAP.tool)}</F>
+          </div>
+        ))}
         {isOwner && <F cw={cw} k="STATUS">{w.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}</F>}
         {segs.length > 0 && <>
           <H cw={cw}>ROUTE ({segs.length})</H>
