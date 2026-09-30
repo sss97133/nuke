@@ -6,6 +6,14 @@ on:
       - main
   workflow_dispatch:  # Allow manual trigger
 
+# One production deploy at a time, in push order. Two overlapping `vercel deploy --prod` runs race for the
+# nuke.ag alias and the last to finish wins: on 2026-09-30 #460's run (started 14 s before #458's, built from a
+# commit without #458) finished last, so nuke.ag served the old MAP tab for ~25 min while #458's own deployment
+# was ready. A queued run waits; a newer push replaces an older pending one, so the newest commit deploys last.
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
