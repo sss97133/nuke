@@ -71,3 +71,23 @@ What it asks of the front door, next to the treemap rules above and memory `feed
   lots while its price read cold.
 - Status: captured, not built. market-home isn't running (LANES.md). The live-auction data it needs, comments and bids pulled on
   a schedule, is the bat-data audit's P1 (#450, held for a daytime rollout).
+
+### The building block (owner, 2026-09-30, in the lead window)
+
+Pointing at the live homepage's strip "SAME TIME ON WEDNESDAYS · LAST 11 WEEKS · $27.0M ├ ticks ┤ $50.3M · HIGHER THAN
+8 OF 11 WEDNESDAYS AT THIS HOUR", the owner said: "this is the most interesting thing happening on the homepage".
+
+What the strip does:
+- It places one number in its own history, the same hour on the same weekday.
+- It draws that history as a strip: the range at each end, a tick for each past value, a bold tick for now.
+- It gives a plain verdict: "higher than 8 of 11".
+- It has no list, no adjectives, and it carries its own basis.
+
+That's the form for "edge cases across markets":
+- **Homepage:** a short stack of these strips, and only for things currently at an edge of their own history. A segment's
+  sale pace, a make's volume, a price band's sell-through, each compared with the same hour on the same weekday. The list of
+  cars is replaced.
+- **Live-auction card:** the same strip, twice. The live bid against comparable lots at the same time to close, and the lot's
+  bids and comments against the same comparables. This is the percentile reading in `docs/features/ask-nuke/THEORY.md`
+  (owner notes, 2026-09-29).
+- **Every strip states its basis:** window, count and comparison set. The verdict is a count, not a label.
