@@ -3,6 +3,7 @@ centres, wheels and firewall station drawn as thin grey references (render only;
 
     /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python \
         docs/wiring/calc-data/cad/fab/render_frame.py -- <out_dir> <a.glb> [<b.glb> ...] [--px 2000]
+        [--prefix sheetmetal_] [--no-marker]
 """
 import math
 import sys
@@ -13,7 +14,9 @@ from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 px = int(argv[argv.index("--px") + 1]) if "--px" in argv else 2000
-args = [a for i, a in enumerate(argv) if not a.startswith("--") and (i == 0 or argv[i - 1] != "--px")]
+prefix = argv[argv.index("--prefix") + 1] if "--prefix" in argv else ""
+marker = "--no-marker" not in argv
+args = [a for i, a in enumerate(argv) if not a.startswith("--") and (i == 0 or argv[i - 1] not in ("--px", "--prefix"))]
 out, glbs = Path(args[0]).expanduser(), [Path(a).expanduser() for a in args[1:]]
 out.mkdir(parents=True, exist_ok=True)
 FRONT_AXLE, REAR_AXLE, FIREWALL, WHEEL_R, TRACK = -1.896, 0.807, -1.46, 0.406, 1.72   # twin constants; wheel from the
@@ -50,10 +53,11 @@ for y in (FRONT_AXLE, REAR_AXLE):
     bpy.ops.mesh.primitive_cylinder_add(radius=0.035, depth=TRACK, location=(0, y, WHEEL_R - 0.01),
                                         rotation=(0, math.radians(90), 0))
     bpy.context.active_object.data.materials.append(ref)
-bpy.ops.mesh.primitive_cube_add(size=1, location=(0, FIREWALL, 1.2))    # a thin marker at the firewall station
-fw = bpy.context.active_object
-fw.scale = (1.5, 0.012, 0.6)
-fw.data.materials.append(mat("fw", (0.35, 0.55, 0.85, 1.0)))
+if marker:
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, FIREWALL, 1.2))    # a thin marker at the firewall station
+    fw = bpy.context.active_object
+    fw.scale = (1.5, 0.012, 0.6)
+    fw.data.materials.append(mat("fw", (0.35, 0.55, 0.85, 1.0)))
 bpy.ops.mesh.primitive_plane_add(size=12, location=(0, -0.5, -0.012))
 bpy.context.active_object.data.materials.append(mat("floor", (0.9, 0.9, 0.91, 1)))
 
@@ -103,7 +107,7 @@ def shoot(name, direction, right=None, ortho=None, w=px, h=int(px * 0.56), dist=
         ry = d.cross(rx).normalized()
         cam.rotation_euler = Matrix((rx, ry, d)).transposed().to_euler()
     scene.render.resolution_x, scene.render.resolution_y = w, h
-    scene.render.filepath = str(out / f"{name}.png")
+    scene.render.filepath = str(out / f"{prefix}{name}.png")
     bpy.ops.render.render(write_still=True)
     print("wrote", scene.render.filepath)
 
