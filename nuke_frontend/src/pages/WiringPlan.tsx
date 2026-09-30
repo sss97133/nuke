@@ -6,6 +6,8 @@
 
 import React, { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { supabase } from '../lib/supabase';
 import type { ManifestDevice } from '../components/wiring/overlayCompute';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
@@ -101,6 +103,14 @@ export default function WiringPlan() {
     const t = new URLSearchParams(window.location.search).get('tab');
     return TABS.some(x => x.id === t) ? (t as ViewTab) : 'formboard';
   });
+  // Visitors see results only (owner 2026-09-29: "the only thing a real other human may see is the results not the in
+  // process slop"). The legacy tabs are the owner's: their shared header carried the parts cost total and a stale ECU
+  // line, and DATA / WORKBENCH list per-part prices (live, logged out, 2026-09-30: "COST $23,590"). A visitor always
+  // gets the MAP tab, whatever ?tab= says; the owner keeps every tab. Same owner check as the MAP tab.
+  const { session } = useAuth();
+  const { isOwner } = useVehiclePermissions(vehicleId ?? null, session, null);
+  const shownTab: ViewTab = isOwner ? activeTab : 'map';
+  const visibleTabs = isOwner ? TABS : TABS.filter(t => t.id === 'map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
   const [selectedWireId, setSelectedWireId] = useState<number | null>(null);
@@ -343,7 +353,7 @@ export default function WiringPlan() {
         {/* The chips below come from the older compute-wiring-overlay engine (it recommends an M150 and counts
             the April device list). The MAP tab reads the typed rows and carries its own counts, so on the map
             these would contradict it (owner saw "ECU M150" on 2026-09-29; the locked ECU is the M130). */}
-        {activeTab === 'map' ? (
+        {shownTab === 'map' ? (
           <span style={{ color: C.label, fontFamily: 'Arial', fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
             COUNTS ARE ON THE MAP BELOW (TYPED ROWS)
           </span>
@@ -385,15 +395,15 @@ export default function WiringPlan() {
         background: C.bg,
         borderBottom: `2px solid ${C.border}`,
       }}>
-        {TABS.map(tab => (
+        {visibleTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              background: activeTab === tab.id ? C.elevated : 'transparent',
-              color: activeTab === tab.id ? C.active : C.label,
+              background: shownTab === tab.id ? C.elevated : 'transparent',
+              color: shownTab === tab.id ? C.active : C.label,
               border: 'none',
-              borderBottom: activeTab === tab.id ? `2px solid ${C.active}` : '2px solid transparent',
+              borderBottom: shownTab === tab.id ? `2px solid ${C.active}` : '2px solid transparent',
               padding: '0 16px',
               fontFamily: 'Arial, sans-serif',
               fontSize: 9,
@@ -435,7 +445,7 @@ export default function WiringPlan() {
             LOADING VIEW...
           </div>
         }>
-          {activeTab === 'formboard' && (
+          {shownTab === 'formboard' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <FormboardCanvas
                 vehicleId={vehicleId || ''}
@@ -447,37 +457,37 @@ export default function WiringPlan() {
               />
             </div>
           )}
-          {activeTab === 'schematics' && (
+          {shownTab === 'schematics' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <SchematicView {...viewProps} cameraRef={cameraRefs.current.schematics} />
             </div>
           )}
-          {activeTab === '3d' && (
+          {shownTab === '3d' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <HarnessView3D {...viewProps} />
             </div>
           )}
-          {activeTab === 'data' && (
+          {shownTab === 'data' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <DataView {...viewProps} overlay={overlay} />
             </div>
           )}
-          {activeTab === 'workbench' && (
+          {shownTab === 'workbench' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <HarnessWorkbench devices={overlay.devices} />
             </div>
           )}
-          {activeTab === 'connectors' && (
+          {shownTab === 'connectors' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <ConnectorInspector devices={overlay.devices} vehicleId={vehicleId} />
             </div>
           )}
-          {activeTab === 'map' && (
+          {shownTab === 'map' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <WiringMap vehicleId={vehicleId} />
             </div>
           )}
-          {activeTab === 'topology' && (
+          {shownTab === 'topology' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <TopologyView
                 devices={overlay.devices}
