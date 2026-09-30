@@ -17,37 +17,26 @@ export const ZONES: { id: ZoneId; label: string; short: string; url: string }[] 
 export const zoneOfY = (y: number): ZoneId => (y < -1.46 ? 'bay' : y < 0.1 ? 'cab' : 'rear');
 
 // ── Layer GLBs from other lanes. Each loads only if its file is published; while it is shown, the zone GLBs' nodes it
-// replaces are hidden by name ("Name*" = every name starting with "Name"). Each file is drawn in the zones' frame.
-// Extend `hides` when a layer draws more of the truck; the other v4 engine nodes are listed in ENGINE_NODES_KEPT.
-export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[] }
+// replaces are hidden by name ("Name*" = every name starting with "Name"), except the names in `keeps`. Each file is in
+// the zones' frame (twin metres, glTF Y-up), so it is drawn as published. Extend `hides` when a layer draws more.
+// (The MAP tab does not load k5-blazer.glb, so its Under_Frame_Blazer needs no entry here.)
+export interface LayerDef { id: string; label: string; url: string; lane: string; hides: string[]; keeps?: string[] }
 export const LAYERS: LayerDef[] = [
   {
-    id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d',
+    id: 'frame', label: 'FRAME', url: '/models/k5-frame.glb', lane: 'chassis-3d (#470)',
+    // the harness pass-through runs FIREWALL-ENGINE_seg* / FIREWALL-CABIN_seg0 are not sheet metal: they stay
     hides: ['CTX-frame-rail-web-driver', 'CTX-frame-rail-web-passenger'],
   },
   {
-    id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d',
-    hides: [
-      // long block
-      'E3_Block_Crankcase', 'E3_Block_Bank_L', 'E3_Block_Bank_R', 'E3_Head_L', 'E3_Head_R', 'E3_ValveCover_L', 'E3_ValveCover_R',
-      'E3_ValleyCover', 'E3_FrontCover', 'E3_RearCover', 'E3_OilPan_Shallow', 'E3_OilPan_Sump',
-      // intake and fuel
-      'E3_Intake_Plenum', 'E3_Intake_CarbPad', 'E3_Intake_ValleyPan', 'E3_Intake_Runner_*', 'E3_Intake_PortFlange_*',
-      'E3_FuelRail_L', 'E3_FuelRail_R', 'E3_FuelPressReg_asbuilt', 'E3_TB_Adapter',
-      // front drive (the pulleys and belt, not the devices on it)
-      'E3_CrankPulley', 'E3_Damper', 'E3_Damper_Hub', 'E3_Belt', 'E3_Idler_Lower', 'E3_Tensioner_Body', 'E3_Tensioner_Pulley',
-      'E3_WaterPump_Pulley', 'E3_WaterPump_Snout', 'E3_MidMount_WaterPumpManifold', 'E3_PS_Pulley', 'E3_PS_Pump', 'E3_PS_Reservoir',
-    ],
+    id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
+    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+  },
+  {
+    id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
+    // every v4 twin-engine node; the new engine has no starter or regulator, so those stay
+    hides: ['E3_*'], keeps: ['E3_Starter_DFSR-8715', 'E3_Starter_Solenoid', 'E3_FuelPressReg_asbuilt'],
   },
 ];
-// v4 engine nodes no layer hides yet: devices that carry a harness end (selectable until a layer names its nodes by end
-// code), the exhaust, and the transmission. Move a group into LAYERS' hides when a layer draws it.
-export const ENGINE_NODES_KEPT = {
-  devices: ['E3_Alternator_197-302', 'E3_Alternator_Fan', 'E3_Alternator_Pulley', 'E3_AC_Compressor_SD7_planned', 'E3_AC_Clutch_planned',
-    'E3_Starter_DFSR-8715', 'E3_Starter_Solenoid', 'E3_Injector_*'],
-  exhaust: ['E3_Header_*', 'E3_Collector_L', 'E3_Collector_R', 'E3_ExhFlange_*', 'E3_O2_Bung_L', 'E3_O2_Bung_R', 'E3_Exhaust_Tail_L', 'E3_Exhaust_Tail_R'],
-  transmission: ['E3_6L90_Bell', 'E3_6L90_Case', 'E3_6L90_Pan'],
-};
 export const nameMatcher = (pats: string[]) => {
   const exact = new Set(pats.filter(p => !p.endsWith('*'))), pre = pats.filter(p => p.endsWith('*')).map(p => p.slice(0, -1));
   return (name: string) => exact.has(name) || pre.some(p => name.startsWith(p));
@@ -60,6 +49,8 @@ export const nameMatcher = (pats: string[]) => {
 export interface TruePart {
   code: string; url: string; zone: ZoneId; hides: string[];
   z: [number, number, number]; y: [number, number, number]; at?: [number, number, number];
+  // when this layer is drawn, the part stands on this node of it instead (origin on the node, z along the node's +Y)
+  mount?: { layer: string; node: string; why: string };
   why: string; assumed?: string;
 }
 export const TRUE_PARTS: TruePart[] = [
@@ -83,6 +74,7 @@ export const TRUE_PARTS: TruePart[] = [
     code: 'TB', url: '/models/part-library/TB.glb', zone: 'bay',
     hides: ['E3_ThrottleBody_12699160', 'E3_TB_Bore', 'E3_TB_MotorHousing', 'E3_TB_Blade'],
     z: [0, 0, 1], y: [1, 0, 0], at: [-25, -115, 35],
+    mount: { layer: 'engine', node: 'tb_flange', why: "on the engine layer's TB flange (the adapter top, 25 mm over the 4150 pad), bore up" },
     why: 'stands on the 4-bolt adapter at the 4150 pad, bore vertical (twin engine v3); its plug on the tps anchor',
     assumed: 'which side the electronics housing faces (the twin anchor is an estimate)',
   },
@@ -110,6 +102,17 @@ export function partMatrix(p: TruePart, spot: [number, number, number]): THREE.M
   // file X = part x, file Y = part z, file Z = -(part y)
   const m = new THREE.Matrix4().makeBasis(xS, zS, yS.clone().negate());
   m.setPosition(toScene(spot).sub(off));
+  return m;
+}
+
+/** The same, standing on a layer's mount node: the part origin on the node, its z along the node's +Y. */
+export function partMatrixOn(p: TruePart, node: THREE.Object3D): THREE.Matrix4 {
+  node.updateWorldMatrix(true, false);
+  const zS = new THREE.Vector3(0, 1, 0).transformDirection(node.matrixWorld);
+  const y0 = toScene(p.y).normalize(), yS = y0.sub(zS.clone().multiplyScalar(y0.dot(zS))).normalize();
+  const xS = new THREE.Vector3().crossVectors(yS, zS);
+  const m = new THREE.Matrix4().makeBasis(xS, zS, yS.clone().negate());
+  m.setPosition(new THREE.Vector3().setFromMatrixPosition(node.matrixWorld));
   return m;
 }
 

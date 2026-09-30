@@ -279,7 +279,17 @@ function chipStyle(cw: Colorway, on: boolean): React.CSSProperties {
 function Summary({ cw, map, ix, site, cov, isOwner }: {
   cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; cov: ReturnType<typeof coverage>; isOwner: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  // the split opens on hover with a mouse, and on click or tap anywhere (a tap sets no hover); a tap outside closes it
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hover || pinned;
+  const wrap = React.useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!pinned) return;
+    const off = (e: PointerEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setPinned(false); };
+    document.addEventListener('pointerdown', off);
+    return () => document.removeEventListener('pointerdown', off);
+  }, [pinned]);
   const decided = map.wires.filter(w => w.designStatus === 'decided').length;
   const withEnds = map.wires.filter(w => (ix.chain.get(w.code) ?? []).length > 1).length;
   const placed = map.nodes.filter(n => site.ends[n.code]).length;
@@ -296,8 +306,9 @@ function Summary({ cw, map, ix, site, cov, isOwner }: {
       </span>
       {site.segs.length > 0 && <span style={item} title="k5-routes.json"><B>{site.segs.length}</B> LOOM SEGMENTS · <B>{lenM.toFixed(1)}</B> M</span>}
       {site.models && (
-        <span style={{ position: 'relative' }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-          <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
+        <span ref={wrap} style={{ position: 'relative' }}
+          onPointerEnter={e => { if (e.pointerType === 'mouse') setHover(true); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setHover(false); }}>
+          <button onClick={() => setPinned(p => !p)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
             background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: cw.fontBody }}>
             <B>{cov.modelled.length}</B> OF <B>{cov.total}</B> ENDS MODELLED IN 3D, <B>{cov.complete.length}</B> COMPLETE ▾
           </button>

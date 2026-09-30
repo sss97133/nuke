@@ -16,7 +16,7 @@ import { frame, rule } from '../connector-inspector/colorways';
 import { SECTIONS } from './useWiringMap';
 import { publicName, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 import {
-  HOME_DIR, LAYERS, TRUCK_TWIN, TRUE_PARTS, VIEWS, ZONES, ZONE_TWIN, fitDistance, nameMatcher, objectLabel, partMatrix, twinBox, zoneOfY,
+  HOME_DIR, LAYERS, TRUCK_TWIN, TRUE_PARTS, VIEWS, ZONES, ZONE_TWIN, fitDistance, nameMatcher, objectLabel, partMatrix, partMatrixOn, twinBox, zoneOfY,
   type TruePart, type ViewId, type ZoneId,
 } from './scene3d';
 
@@ -34,6 +34,8 @@ class Registry {
   add(owner: string, root: THREE.Object3D, items: Item[]) { this.owners.set(owner, { root, items }); this.bump(); }
   remove(owner: string) { if (this.owners.delete(owner)) this.bump(); }
   has(owner: string) { return this.owners.has(owner); }
+  find(owner: string, name: string) { return this.owners.get(owner)?.root.getObjectByName(name) ?? null; }
+  rootOf(owner: string) { return this.owners.get(owner)?.root ?? null; }
   bump() { this.version += 1; this.subs.forEach(f => f()); }
   subscribe(f: () => void) { this.subs.add(f); return () => { this.subs.delete(f); }; }
   roots() { return [...this.owners.values()].map(o => o.root); }
@@ -70,9 +72,10 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);        // a list row that is not a workspace selection
   const [listOpen, setListOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [q, setQ] = useState('');
   const [note, setNote] = useState<string | null>(null);
-  const narrow = useNarrowPane(640);   // a phone: views in one menu, shorter toggles, no help line
+  const narrow = useNarrowPane(640);   // a phone: the shortest labels
   const rig = useRef<RigApi | null>(null);
   const pending = useRef<{ fitSel?: boolean } | null>(null);
   const homed = useRef(false);
@@ -80,11 +83,14 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const [layerOn, setLayerOn] = useState<Record<string, boolean>>({});
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
-  const hidePats: string[] = [];
-  LAYERS.forEach(l => { if (layerOn[l.id] !== false && reg.has('layer:' + l.id)) hidePats.push(...l.hides); });
+  const hidePats: string[] = [], keepPats: string[] = [];
+  LAYERS.forEach(l => { if (layerOn[l.id] !== false && reg.has('layer:' + l.id)) { hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? [])); } });
   TRUE_PARTS.forEach(p => { if (reg.has('part:' + p.code)) hidePats.push(...p.hides); });
-  const hideKey = hidePats.join('|');
-  const hides = useMemo(() => nameMatcher(hideKey ? hideKey.split('|') : []), [hideKey]);
+  const hideKey = hidePats.join('|') + '#' + keepPats.join('|');
+  const hides = useMemo(() => {
+    const h = nameMatcher(hidePats), k = nameMatcher(keepPats);
+    return (name: string) => h(name) && !k(name);
+  }, [hideKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const labelOf = (key: string): string => {
     const k = key.slice(0, 1), v = key.slice(2);
@@ -102,7 +108,8 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
       : k === 'y' ? SECTIONS.find(x => x.id === v)?.label ?? v
       : '';
     const part = k === 'n' ? TRUE_PARTS.find(p => p.code === v && reg.has('part:' + p.code)) : undefined;
-    return first ? [first, ...(part ? [`TRUE SIZE · ${part.assumed ? 'ORIENTATION ASSUMED: ' + part.assumed.toUpperCase() : 'ORIENTATION FROM ITS MOUNT'}`] : [])] : [];
+    const mounted = !!(part && reg.rootOf('part:' + part.code)?.userData.mounted);
+    return first ? [first, ...(part ? [`TRUE SIZE${mounted ? ' · ON THE ENGINE LAYER\'S TB FLANGE' : ''} · ${part.assumed ? 'ORIENTATION ASSUMED: ' + part.assumed.toUpperCase() : 'ORIENTATION FROM ITS MOUNT'}`] : [])] : [];
   };
   const selPred = (): ((it: Item) => boolean) | null => {
     if (!sel) return null;
@@ -116,7 +123,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
     const p = pending.current;
     if (!rig.current) return;
     // the first view waits for a zone (a part alone is too small to frame) and for the orbit controls
-    if (!homed.current && ZONES.some(z => reg.has('zone:' + z.id)) && rig.current.fit(allBox(), HOME_DIR)) homed.current = true;
+    if (!homed.current && ZONES.some(z => reg.has('zone:' + z.id)) && rig.current.fit(homeBox(), HOME_DIR)) homed.current = true;
     if (!p) return;
     if (p.fitSel) {
       const pr = selPred(); if (!pr) { pending.current = null; return; }
@@ -126,6 +133,8 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   }, [ver]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const allBox = () => { const b = reg.box(() => true), c = b.clone().intersect(TRUCK_BOX); return c.isEmpty() ? b : c; };
+  // the first view and RESET frame the open harness zones (a frame layer runs the truck's whole length)
+  const homeBox = () => { const b = new THREE.Box3(); zones.forEach(z => b.union(twinBox(ZONE_TWIN[z]))); return b; };
   const runView = (id: ViewId) => {
     const v = VIEWS.find(x => x.id === id); if (!v || !rig.current) return;
     if (v.zone) {   // a zone view frames the zone's stations and loads its harness if it isn't open
@@ -180,7 +189,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
     background: on ? cw.ink : cw.surface, color: on ? cw.surface : cw.ink, border: frame(cw), fontFamily: cw.fontBody,
     fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, padding: '3px 7px', cursor: 'pointer', whiteSpace: 'nowrap',
   });
-  const padBtn: React.CSSProperties = { ...btn(), width: 30, height: 26, padding: 0, fontSize: 13 };
+  const padBtn: React.CSSProperties = { ...btn(), width: 28, height: 24, padding: 0, fontSize: 12 };
 
   return (
     <div style={{ position: 'relative', height: '100%', background: cw.surface, overflow: 'hidden' }}>
@@ -193,7 +202,10 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
           <Suspense key={z.id} fallback={null}><ZoneScene zone={z.id} url={z.url} ix={ix} reg={reg} hides={hides} /></Suspense>
         ))}
         {TRUE_PARTS.filter(p => zones.has(p.zone) && site.ends[p.code]).map(p => (
-          <Suspense key={p.code} fallback={null}><PartScene part={p} spot={site.ends[p.code].xyz} ix={ix} reg={reg} /></Suspense>
+          <Suspense key={p.code} fallback={null}>
+            <PartScene part={p} spot={site.ends[p.code].xyz} ix={ix} reg={reg}
+              mountAt={p.mount && layerOn[p.mount.layer] !== false ? reg.find('layer:' + p.mount.layer, p.mount.node) : null} />
+          </Suspense>
         ))}
         {LAYERS.filter(l => layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
           <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} reg={reg} /></Suspense>
@@ -205,57 +217,59 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
         <Rig ref={rig} />
       </Canvas>
 
-      {/* views, fit, zones */}
-      <div style={{ position: 'absolute', left: 8, right: 8, top: 8, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', pointerEvents: 'none', zIndex: 10 }}>
-        <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', pointerEvents: 'auto' }}>
-          <button style={btn(listOpen)} onClick={() => setListOpen(o => !o)} aria-expanded={listOpen}>OBJECTS {rows.length}</button>
-          <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted, alignSelf: 'center', marginLeft: 4 }}>SHOW</span>
-          {ZONES.map(z => (
-            <button key={z.id} style={btn(zones.has(z.id))} aria-pressed={zones.has(z.id)} title={`${zones.has(z.id) ? 'Hide' : 'Load'} the ${z.label.toLowerCase()} harness`}
-              onClick={() => setZones(s => { const n = new Set(s); if (n.has(z.id)) { if (n.size > 1) n.delete(z.id); } else n.add(z.id); return n; })}>
-              {zones.has(z.id) ? '☑' : '☐'} {z.short}{narrow ? '' : ' HARNESS'}
-            </button>
-          ))}
-          {LAYERS.filter(l => layerFiles[l.id]).map(l => (
-            <button key={l.id} style={btn(layerOn[l.id] !== false)} aria-pressed={layerOn[l.id] !== false}
-              onClick={() => setLayerOn(s => ({ ...s, [l.id]: s[l.id] === false }))}>{l.label}</button>
+      {/* one compact view picker and FIT; the rest waits behind MORE (owner 2026-09-30: "you need to ease into it case by
+          case"), and the object list stays shut until asked for */}
+      <div style={{ position: 'absolute', left: 8, top: 8, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', zIndex: 10, maxWidth: 'calc(100% - 16px)' }}>
+        <span role="group" aria-label="View" style={{ display: 'inline-flex' }}>
+          {PICK.map((id, i) => (
+            <button key={id} style={{ ...btn(), borderLeftWidth: i ? 0 : 2 }} onClick={() => runView(id)}>{id === 'bay' && narrow ? 'BAY' : VIEW_WORD[id]}</button>
           ))}
         </span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', pointerEvents: 'auto' }}>
-          <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted, alignSelf: 'center' }}>VIEW</span>
-          {narrow ? (
-            <select aria-label="View" value="" onChange={e => { if (e.target.value) runView(e.target.value as ViewId); }}
-              style={{ ...btn(), padding: '2px 4px' }}>
-              <option value="">CHOOSE…</option>
-              {VIEWS.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-            </select>
-          ) : VIEWS.map(v => <button key={v.id} style={btn()} onClick={() => runView(v.id)}>{v.label}</button>)}
-          <button style={btn()} onClick={() => rig.current?.fit(allBox())}>FIT ALL</button>
-          <button style={{ ...btn(), opacity: sel ? 1 : 0.45 }} disabled={!sel} onClick={fitSelection}>{narrow ? 'FIT SEL.' : 'FIT SELECTION'}</button>
-          <button style={btn()} onClick={() => rig.current?.fit(allBox(), HOME_DIR)}>RESET</button>
-        </span>
+        <button style={btn()} title={sel ? 'Fit the selection' : 'Fit everything drawn'} onClick={() => (sel ? fitSelection() : rig.current?.fit(allBox()))}>FIT</button>
+        <button style={btn(moreOpen)} aria-expanded={moreOpen} onClick={() => { setMoreOpen(o => !o); setListOpen(false); }}>MORE {moreOpen ? '▴' : '▾'}</button>
+        <button style={btn(listOpen)} aria-expanded={listOpen} onClick={() => { setListOpen(o => !o); setMoreOpen(false); }}>OBJECTS</button>
       </div>
-
-      {/* orbit, pan and zoom for trackpads */}
-      <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'grid', gridTemplateColumns: 'repeat(3, 30px)', gap: 3, background: cw.surface, padding: 4, border: frame(cw), zIndex: 10 }}>
-        <span style={{ gridColumn: '1 / span 3', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted, textAlign: 'center' }}>TURN</span>
-        <span />
-        <button style={padBtn} title="Turn up" onClick={() => rig.current?.orbit(0, -0.26)}>▲</button>
-        <span />
-        <button style={padBtn} title="Turn left" onClick={() => rig.current?.orbit(-0.26, 0)}>◀</button>
-        <button style={padBtn} title="Zoom in" onClick={() => rig.current?.zoom(0.75)}>+</button>
-        <button style={padBtn} title="Turn right" onClick={() => rig.current?.orbit(0.26, 0)}>▶</button>
-        <span />
-        <button style={padBtn} title="Turn down" onClick={() => rig.current?.orbit(0, 0.26)}>▼</button>
-        <button style={padBtn} title="Zoom out" onClick={() => rig.current?.zoom(1.33)}>−</button>
-        <span style={{ gridColumn: '1 / span 3', fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted, textAlign: 'center', marginTop: 2 }}>PAN</span>
-        <span />
-        <button style={padBtn} title="Pan up" onClick={() => rig.current?.pan(0, 0.12)}>↑</button>
-        <span />
-        <button style={padBtn} title="Pan left" onClick={() => rig.current?.pan(-0.12, 0)}>←</button>
-        <button style={padBtn} title="Pan down" onClick={() => rig.current?.pan(0, -0.12)}>↓</button>
-        <button style={padBtn} title="Pan right" onClick={() => rig.current?.pan(0.12, 0)}>→</button>
-      </div>
+      {moreOpen && (
+        <div style={{ position: 'absolute', left: 8, top: 40, zIndex: 11, background: cw.surface, border: frame(cw), padding: '6px 8px', display: 'grid', gap: 6, maxWidth: 'calc(100% - 16px)' }}>
+          <MoreRow cw={cw} label="VIEW">
+            {MORE_VIEWS.map(id => <button key={id} style={btn()} onClick={() => runView(id)}>{VIEW_WORD[id]}</button>)}
+            <button style={btn()} onClick={() => rig.current?.fit(homeBox(), HOME_DIR)}>RESET</button>
+          </MoreRow>
+          <MoreRow cw={cw} label="HARNESS">
+            {ZONES.map(z => (
+              <button key={z.id} style={btn(zones.has(z.id))} aria-pressed={zones.has(z.id)} title={`${zones.has(z.id) ? 'Hide' : 'Load'} the ${z.label.toLowerCase()} harness`}
+                onClick={() => setZones(s => { const n = new Set(s); if (n.has(z.id)) { if (n.size > 1) n.delete(z.id); } else n.add(z.id); return n; })}>
+                {zones.has(z.id) ? '☑' : '☐'} {z.short}
+              </button>
+            ))}
+          </MoreRow>
+          {LAYERS.some(l => layerFiles[l.id]) && (
+            <MoreRow cw={cw} label="LAYERS">
+              {LAYERS.filter(l => layerFiles[l.id]).map(l => (
+                <button key={l.id} style={btn(layerOn[l.id] !== false)} aria-pressed={layerOn[l.id] !== false}
+                  onClick={() => setLayerOn(s => ({ ...s, [l.id]: s[l.id] === false }))}>{layerOn[l.id] !== false ? '☑' : '☐'} {l.label}</button>
+              ))}
+            </MoreRow>
+          )}
+          <MoreRow cw={cw} label="TURN">
+            <button style={padBtn} title="Turn left" onClick={() => rig.current?.orbit(-0.26, 0)}>◀</button>
+            <button style={padBtn} title="Turn right" onClick={() => rig.current?.orbit(0.26, 0)}>▶</button>
+            <button style={padBtn} title="Turn up" onClick={() => rig.current?.orbit(0, -0.26)}>▲</button>
+            <button style={padBtn} title="Turn down" onClick={() => rig.current?.orbit(0, 0.26)}>▼</button>
+            <span style={{ width: 6 }} />
+            <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted }}>ZOOM</span>
+            <button style={padBtn} title="Zoom in" onClick={() => rig.current?.zoom(0.75)}>+</button>
+            <button style={padBtn} title="Zoom out" onClick={() => rig.current?.zoom(1.33)}>−</button>
+          </MoreRow>
+          <MoreRow cw={cw} label="PAN">
+            <button style={padBtn} title="Pan left" onClick={() => rig.current?.pan(-0.12, 0)}>←</button>
+            <button style={padBtn} title="Pan right" onClick={() => rig.current?.pan(0.12, 0)}>→</button>
+            <button style={padBtn} title="Pan up" onClick={() => rig.current?.pan(0, 0.12)}>↑</button>
+            <button style={padBtn} title="Pan down" onClick={() => rig.current?.pan(0, -0.12)}>↓</button>
+          </MoreRow>
+          <div style={{ fontSize: 10, color: cw.inkMuted, maxWidth: 330 }}>DRAG TO TURN · RIGHT-DRAG TO PAN · SCROLL OR PINCH TO ZOOM · CLICK A PART OR LOOM · ESC CLEARS</div>
+        </div>
+      )}
 
       {/* the object list: every thing drawn; a row flies there */}
       {listOpen && (
@@ -290,11 +304,21 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
       {note && (
         <div style={{ position: 'absolute', left: '50%', top: 48, transform: 'translateX(-50%)', zIndex: 12, background: cw.surface, border: frame(cw), padding: '3px 8px', fontSize: 11, fontWeight: 700 }}>{note}</div>
       )}
-      {!narrow && (
-        <div style={{ position: 'absolute', left: 8, bottom: 8, fontSize: 10.5, color: cw.inkMuted, background: cw.surface, padding: '2px 6px', maxWidth: 'calc(100% - 140px)' }}>
-          DRAG TO TURN · RIGHT-DRAG TO PAN · SCROLL OR PINCH TO ZOOM · CLICK A PART OR LOOM · ESC CLEARS
-        </div>
-      )}
+    </div>
+  );
+}
+
+// the picker's views, and the rest behind MORE
+const PICK: ViewId[] = ['front', 'driver', 'top', 'bay'];
+const MORE_VIEWS: ViewId[] = ['rear', 'passenger', 'cab', 'rearbody'];
+const VIEW_WORD: Record<ViewId, string> = {
+  front: 'FRONT', driver: 'SIDE', top: 'TOP', bay: 'ENGINE BAY', rear: 'REAR', passenger: 'OTHER SIDE', cab: 'CAB', rearbody: 'REAR BODY', home: 'RESET',
+};
+function MoreRow({ cw, label, children }: { cw: Colorway; label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+      <span style={{ width: 58, fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted }}>{label}</span>
+      {children}
     </div>
   );
 }
@@ -363,15 +387,22 @@ function ZoneScene({ zone, url, ix, reg, hides }: { zone: ZoneId; url: string; i
 }
 
 // a true-size part at its end's spot, in its mount's orientation; its keep-out volume is not drawn
-function PartScene({ part, spot, ix, reg }: { part: TruePart; spot: [number, number, number]; ix: WsIndex; reg: Registry }) {
+function PartScene({ part, spot, ix, reg, mountAt }: {
+  part: TruePart; spot: [number, number, number]; ix: WsIndex; reg: Registry; mountAt: THREE.Object3D | null;
+}) {
   const { scene } = useGLTF(part.url);
   const root = useMemo(() => {
     const c = ownMaterials(scene);
     c.matrixAutoUpdate = false;
-    c.matrix.copy(partMatrix(part, spot));
     c.traverse(o => { if (/^keep-out/i.test(o.name)) o.visible = false; });
     return c;
-  }, [scene, part, spot]);
+  }, [scene]);
+  useLayoutEffect(() => {   // on the layer's mount node when that layer is drawn, else at the end's spot
+    root.matrix.copy(mountAt ? partMatrixOn(part, mountAt) : partMatrix(part, spot));
+    root.matrixWorldNeedsUpdate = true;
+    root.userData.mounted = !!mountAt;
+    reg.bump();
+  }, [root, part, spot, mountAt, reg]);
   useLayoutEffect(() => {
     const items: Item[] = [];
     root.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.userData.key = 'n:' + part.code; items.push({ mesh: m, key: 'n:' + part.code, kind: 'part', label: publicName(ix.byCode.get(part.code)?.name) }); } });
@@ -387,12 +418,13 @@ function LayerScene({ id, url, reg }: { id: string; url: string; reg: Registry }
   const root = useMemo(() => ownMaterials(scene), [scene]);
   useLayoutEffect(() => {
     const items: Item[] = [];
-    root.children.forEach(top => top.traverse(o => {
+    root.traverse(o => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      m.userData.key = `o:layer-${id}:${top.name || id}`;
-      items.push({ mesh: m, key: m.userData.key as string, kind: 'other', label: objectLabel(top.name || id) });
-    }));
+      const nm = m.name || m.parent?.name || id;
+      m.userData.key = `o:layer-${id}:${nm}`;
+      items.push({ mesh: m, key: m.userData.key as string, kind: 'other', label: objectLabel(nm) });
+    });
     reg.add('layer:' + id, root, items);
     return () => reg.remove('layer:' + id);
   }, [root, id, reg]);

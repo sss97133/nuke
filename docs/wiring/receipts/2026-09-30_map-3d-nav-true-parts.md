@@ -24,13 +24,24 @@
 
 ## Navigation
 
-- **Views:** front, rear, driver side, passenger side, top (front to the left, driver side down, as on the plan), engine
-  bay, cab and rear body.
-  - The first five frame what is drawn, kept inside the truck's envelope in twin metres (y from -2.97 to +1.86).
+The owner said on 2026-09-30 that the site nav "is overwhelming". So the 3D view's own controls stay minimal and
+contextual, inside the 3D view only.
+
+- **Always shown:** one compact picker (FRONT · SIDE · TOP · ENGINE BAY), FIT, MORE and OBJECTS. FIT fits the
+  selection, or everything drawn when nothing is selected.
+- **Behind MORE:**
+  - the other views (REAR, OTHER SIDE, CAB, REAR BODY) and RESET;
+  - the harness zones;
+  - the layers that are published;
+  - turn, zoom and pan buttons for trackpads (15° turns, zoom ×0.75 / ×1.33, pans of 12% of the view);
+  - the help line.
+- **The object list** stays shut until OBJECTS is pressed.
+- **Framing:**
+  - Front, side, top and the other direction views frame what is drawn, kept inside the truck's envelope in twin
+    metres (y from -2.97 to +1.86).
   - The zone views frame that zone's station box in twin metres and load its harness if it isn't open. The boxes use
     firewall y -1.46 and cab rear y +0.1 (the plan's stations).
-- **Fit:** fit all, fit selection (an end in a zone that isn't open loads that zone first), and reset.
-- **Turn, pan and zoom buttons** for trackpads: 15° turns, pans of 12% of the view, zoom ×0.75 / ×1.33.
+  - The first view and RESET frame the open zones.
 - **Camera moves:** every move is a 0.5 s eased flight of the camera and its orbit target. The distance is fitted to the
   box's extents across the view, not to a bounding sphere.
 
@@ -51,17 +62,19 @@
 
 ## Layer GLBs (from other lanes)
 
-The view reads `LAYERS` in `scene3d.ts`:
-- `k5-frame.glb` (chassis-3d). While it is shown, the zone nodes `CTX-frame-rail-web-driver` and `-passenger` are
-  hidden.
-- `k5-engine-ls3.glb` (engine-3d). While it is shown, the v4 twin engine's long block, intake, fuel rails and front-drive
-  nodes are hidden (`E3_*`, listed by name).
-  - `ENGINE_NODES_KEPT` lists the v4 engine nodes still drawn: the devices that carry a harness end, the exhaust and the
-    6L90. Move a group into `hides` when a layer draws it.
+`LAYERS` in `scene3d.ts` is one table. Each file loads only if a HEAD request answers with something other than the site's
+page, and each is drawn as published: twin metres, glTF Y-up, the zones' frame.
 
-Each file loads only if a HEAD request answers with something other than the site's page. Neither file is published
-yet, so today nothing changes. The frame and engine geometry are those lanes' work; this change only hides the old
-nodes while their files are shown.
+| Layer | File (lane) | Zone nodes hidden while it is shown |
+|---|---|---|
+| FRAME | `k5-frame.glb` (chassis-3d, #470) | `CTX-frame-rail-web-driver`, `CTX-frame-rail-web-passenger` |
+| SHEET METAL | `k5-front-sheetmetal.glb` (chassis-3d, #470) | `CTX-core-support-face`, `CTX-firewall-face`, `CTX-inner-fender-wall-driver`, `CTX-inner-fender-wall-passenger` |
+| ENGINE | `k5-engine-ls3.glb` (engine-3d, #468) | every `E3_*` node except `E3_Starter_DFSR-8715`, `E3_Starter_Solenoid` and `E3_FuelPressReg_asbuilt` (the new engine has no starter or regulator) |
+
+- The harness pass-through runs (`FIREWALL-ENGINE_seg*`, `FIREWALL-CABIN_seg0`) are never hidden.
+- The MAP tab doesn't load `k5-blazer.glb`, so its `Under_Frame_Blazer` needs no entry.
+- Those lanes' geometry is untouched; this change only hides the old nodes while their files are shown.
+- Tested with the three files from #468 and #470, copied locally and not committed.
 
 ## True-size parts
 
@@ -77,11 +90,27 @@ file (X, Y, Z) = part (x, z, -y), as each `pins.json` says.
 
 - **TB check:** the TB's flange centre lands at twin (0.003, -1.725, 1.113). The twin's own throttle-body base is at
   (0, -1.720, 1.108), which is within 6 mm.
+- **On the engine layer:** when the engine layer is drawn, the TB stands on that GLB's `tb_flange` node instead. That is
+  twin (0, -1.640, 1.1077), the adapter top 25 mm over `intake_4150_pad`, with the bore along the node's +Y. The tag says
+  so. That flange is 85 mm aft of the `tps` anchor the harness is routed to. For the next registry pass, the engine
+  lane's TB position and the harness end need to agree.
 - **Hidden placeholders:** `HEADLIGHT-L`, `HEADLIGHT-R`, `FAN`, and `E3_ThrottleBody_12699160` / `E3_TB_Bore` /
   `E3_TB_MotorHousing` / `E3_TB_Blade`.
 - **Keep-out volumes** in the part files are not drawn.
 - **GLB checks:** extras stripped, bytes scanned for `blendermcp`, `api_key`, `apikey`, `sketchfab`: clean. No
   textures or images.
+
+## Wiring page (approved additions, 2026-09-30)
+
+- **The shown tab is in the URL.** Switching tabs writes `?tab=<name>` as a replace (no new history entry), so the
+  owner can link to and reload a tab.
+  - It is written through the router, so the MAP tab's own `?sel=` writes keep it.
+  - A visitor's `?tab=formboard` reads back as `?tab=map`.
+  - The visitor gate itself is the lead's (#469). It is unchanged apart from a dev-only `?asOwner=1` preview for the
+    owner screenshots. `import.meta.env.DEV` guards it, so a build never honours it.
+- **The coverage split** ("N OF 179 ENDS MODELLED IN 3D ▾") opens on click and tap as well as mouse hover. A tap outside
+  closes it.
+- **The page lands at the top** (`scrollTo(0, 0)` on mount), so the site header stays in view.
 
 ## Verification
 
@@ -90,17 +119,21 @@ file (X, Y, Z) = part (x, z, -y), as each `pins.json` says.
   (lights, `primitive`), the same gap `HarnessView3D.tsx` has.
 - `eslint` on the changed files: 0 errors, 0 warnings.
 - `npm run build`: exit 0; `check-client-secrets` is clean. Chunk sizes:
-  - `ZoneModels3D` 22.2 kB (8.6 kB gzip). It loads only when the 3D view opens.
-  - `WiringMap` 85.4 kB.
+  - `ZoneModels3D` 22.8 kB (8.9 kB gzip). It loads only when the 3D view opens.
+  - `WiringMap` 85.7 kB; `WiringPlan` 45.0 kB.
 - Local dev server against the production database, logged out, in headless Chromium (SwiftShader WebGL):
   - each view;
   - fit all with all three zones;
   - each true-size part through the object list, and its tag;
   - hover, a click-pick at the canvas centre (picked TB);
   - Escape, which cleared the selection;
-  - the turn, pan and zoom buttons;
+  - the turn, pan and zoom buttons behind MORE;
   - fit selection on a rear end with only the bay open (it loaded the rear harness and flew there);
-  - a phone at 390 px.
+  - a phone at 390 px;
+  - the visitor tab bar (MAP only), `?tab=formboard` rewritten to `?tab=map`, and the page at scroll 0;
+  - the coverage split opened by a click and by a tap;
+  - the owner preview: every tab, each switch writing `?tab=`, and a reload keeping it.
+- The MAP tab's text, logged out, has 0 "$", 0 "COST" and 0 "M150".
 - Found and fixed: Escape was lost after a pick. The wiring page's own Escape handler re-rendered the view mid-event, so
   a listener re-added on every render was dropped before it ran. The listener is now added once and reads the latest
   callback.
