@@ -26,9 +26,9 @@ ends_unmodelled_with_reason: 17
 ends_by_shape_basis:
   maker drawing: 40
   datasheet dims: 36
-  scaled from photo: 42
+  scaled from photo: 43
   twin object: 11
-  not sourced: 32
+  not sourced: 31
 ends:
   AC-CLUTCH:
     models:
@@ -2647,18 +2647,19 @@ parts:
 - id: BLOWER-RES
   endpoints:
   - BLOWER-RES
-  what: 'Blower resistor, factory A/C (GM 336403; Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT
-    / M1 / M2 / BLO'
+  what: 'Blower resistor, factory A/C (GM 336403; Wells 3A1044, Four Seasons 20083, SMP RU67) on the blower-evaporator case:
+    4 blades BAT / M1 / M2 / BLO'
   maker: GM
-  maker_pn: GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)
-  shape_basis: not sourced
+  maker_pn: GM 336403 (Wells 3A1044, Four Seasons 20083, SMP RU67, LMC 32-2406)
+  shape_basis: scaled from photo
   dims_mm:
-    l: 46.0
-    w: 84.0
+    l: 72.4
+    w: 46.0
     h: 102.6
-  dims_note: 'no size in any source: Four Seasons'' photo''s proportions at an assumed 70 mm hole pitch (±15)'
-  frame: origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), strips and
-    coils inside (-Z), +Y through the two holes
+  dims_note: the plate scaled off Wells' face-on photo against its 0.250 in blades (±8%); the strips and coils behind it are
+    assumed
+  frame: origin between the plate's two holes on its back face (on the evaporator case); +Z out of the case (the blades),
+    strips and coils inside (-Z), +X through the two holes, +Y toward the plate's narrower side (up in Wells' photo)
   axes:
     mount_normal: +Z
     maker_up: +Y
@@ -2680,130 +2681,158 @@ parts:
   - n: BAT
     ep: BLOWER-RES
     at:
-    - -4.5
-    - 5.5
+    - 0.8
+    - 4.7
     - 10.6
     dir:
     - 0
     - 0
     - 1
     kind: blade
-    note: BAT
+    note: BAT on the blade printed 1 (order assumed)
   - n: M1
     ep: BLOWER-RES
     at:
-    - 4.5
-    - 5.5
+    - 2.3
+    - -8.2
     - 10.6
     dir:
     - 0
     - 0
     - 1
     kind: blade
-    note: M1
+    note: M1 on the blade printed 2 (order assumed)
   - n: M2
     ep: BLOWER-RES
     at:
-    - -4.5
-    - -5.5
+    - 0.1
+    - -0.6
     - 10.6
     dir:
     - 0
     - 0
     - 1
     kind: blade
-    note: M2
+    note: M2 on the blade printed 3 (order assumed)
   - n: BLO
     ep: BLOWER-RES
     at:
-    - 4.5
-    - -5.5
+    - -5.0
+    - -6.7
     - 10.6
     dir:
     - 0
     - 0
     - 1
     kind: blade
-    note: BLO
+    note: BLO on the blade printed 4 (order assumed)
   mount:
-  - n: screw_top
+  - n: screw_left
     at:
+    - -28.4
     - 0
-    - 35.0
     - 0
     dir:
     - 0
     - 0
     - -1
-    d: 5.5
+    d: 4.6
     note: screw into the evaporator case
-  - n: screw_bottom
+  - n: screw_right
     at:
+    - 28.4
     - 0
-    - -35.0
     - 0
     dir:
     - 0
     - 0
     - -1
-    d: 5.5
+    d: 4.6
     note: screw into the evaporator case
   params:
   - name: hole_pitch
-    value: 70.0
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-    note: the plate's two mounting holes
-    fit: fit-critical
+    value: 56.8
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 1119 px'
+    basis: photo
+    note: the two mounting holes, centre to centre
   - name: plate_l
-    value: 84.0
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-    note: diamond plate, tip to tip
-  - name: plate_w
-    value: 46.0
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-    note: at its widest
+    value: 72.4
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 1426 px'
+    basis: photo
+    note: plate, tip to tip along the holes
+  - name: plate_up
+    value: 19.2
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 378 px'
+    basis: photo
+    note: plate edge above the hole line
+  - name: plate_dn
+    value: 26.8
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 528 px'
+    basis: photo
+    note: plate edge below the hole line
+  - name: hole_d
+    value: 4.6
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 90 px'
+    basis: photo
+    note: mounting holes
+  - name: rivet_d
+    value: 4.1
+    source: 'sized off Wells 3A1044 photo (RockAuto) (face-on) against the blade''s 0.250 in Packard 56 width, 125 px (0.0508
+      mm/px, ±8%): 80 px'
+    basis: photo
+    note: rivets
   - name: plate_t
     value: 1.6
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    source: 'not in Wells 3A1044 photo (RockAuto): assumed'
     basis: assumed
     note: phenolic plate
-  - name: hole_d
-    value: 5.5
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-  - name: strip_l
-    value: 92.0
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-    note: steel strips into the case
-  - name: coil_d
-    value: 11.0
-    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
-    basis: assumed
-    note: resistor coils
   - name: blade_w
     value: 6.35
     source: '1978 C/K wiring booklet p.16 sheet A-4 (registry): C60 blower resistor, four terminals BAT / M1 / M2 / BLO (family
       gm_blade: the 0.250 in Packard 56 tab)'
     basis: vendor
+  - name: blade_l
+    value: 9.0
+    source: 'not in Wells 3A1044 photo (RockAuto) (end-on): assumed'
+    basis: assumed
+    note: blade out of the plate
+  - name: strip_l
+    value: 92.0
+    source: 'not in Wells 3A1044 photo (RockAuto): assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    basis: assumed
+    note: steel strips into the case
+  - name: coil_d
+    value: 11.0
+    source: 'not in Wells 3A1044 photo (RockAuto): assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    basis: assumed
+    note: resistor coils
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: hole pitch
+    model: 56.8
+    drawing: 56.8
+    tol: 0.05
+    ok: true
+  - check: plate length along the holes
+    model: 72.4
+    drawing: 72.4
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every size and the blade order: read the resistor on the truck.'
+  - Which printed blade (1-4) is BAT, M1, M2 and BLO.
+  - The strips' length and the coils behind the plate.
   cross_checks:
   - Four Seasons, SMP, Wells and UMP list 4 male blades; the registry lands 4 (BAT, M1, M2, BLO).
+  - Wells lists 2 bolt holes, as the photo shows.
   notes: []
   margin_mm:
-    mm: 15.0
-    why: no size published; proportions from the maker's photo
+    mm: 6.0
+    why: photo scale from the blades (±8%); the strips' length is assumed
   registry:
     BLOWER-RES:
       device: factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 factory
@@ -2833,8 +2862,8 @@ parts:
         BLOWER_M2: M2
         BLOWER_MOT: BLO
   photo:
-    url: https://www.rockauto.com/info/52/20083.jpg
-    page: https://www.rockauto.com/en/moreinfo.php?pk=1312672
+    url: https://www.rockauto.com/info/903/3A1044.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=1189637
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/BLOWER-RES.py
 - id: BLOWER-SW

@@ -397,71 +397,105 @@ def gm_wiper(end="WIPER-MOTOR"):
 
 def gm_blower_resistor(end="BLOWER-RES"):
     """GM 336403 A/C blower resistor (A/C without the heavy-duty heater: Four Seasons 20083, SMP RU67, Wells 3A1044, UMP
-    BMR11, Holstein 2BMR0020 on RockAuto's 1977 K5 listing; LMC 32-2406), drawn off Four Seasons' 20083 photo at an
-    assumed size: a black diamond plate with two holes and four blades, the steel strips and coils inside the case."""
+    BMR11, Holstein 2BMR0020 on RockAuto's 1977 K5 listing; LMC 32-2406). The plate is scaled off Wells' face-on
+    3A1044 photo against its blades, which stand in the plate's plane as the 0.250 in Packard 56 tab (the registry's
+    gm_blade family). The steel strips and coils behind the plate are not in that photo: they follow Four Seasons'
+    20083 photo at an assumed length."""
     BK = "1978 C/K wiring booklet p.16 sheet A-4 (registry): C60 blower resistor, four terminals BAT / M1 / M2 / BLO"
-    PH = "Four Seasons 20083 photo (RockAuto)"
-    A = f"no size in any source: assumed; proportions off {PH}"
-    P = {"hole_pitch": Dim(70.0, A, "assumed", "the plate's two mounting holes", "fit-critical"),
-         "plate_l": Dim(84.0, A, "assumed", "diamond plate, tip to tip"), "plate_w": Dim(46.0, A, "assumed", "at its widest"),
-         "plate_t": Dim(1.6, A, "assumed", "phenolic plate"), "hole_d": Dim(5.5, A, "assumed"),
-         "strip_l": Dim(92.0, A, "assumed", "steel strips into the case"), "coil_d": Dim(11.0, A, "assumed", "resistor coils"),
-         "blade_w": Dim(6.35, f"{BK} (family gm_blade: the 0.250 in Packard 56 tab)", "vendor")}
-    C = {"plate": ("#2f2f2e", f"{PH}: black plate (k-means)"), "strip": ("#80909f", f"{PH}: zinc strips (k-means, lit face)"),
-         "coil": ("#8e8f8d", f"{PH}: coils"), "blade": ("#b9bfc4", "blades: drawn tin")}
+    PH = "Wells 3A1044 photo (RockAuto)"
+    k = 6.35 / 125                             # a blade is 125 px wide in the photo
+    SRC = f"sized off {PH} (face-on) against the blade's 0.250 in Packard 56 width, 125 px ({k:.4f} mm/px, ±8%)"
+    PH2 = "Four Seasons 20083 photo (RockAuto)"
+    A = f"not in {PH}: assumed; proportions off {PH2}"
+
+    def ph(px, note=""):
+        return Dim(round(px * k, 1), f"{SRC}: {px} px", "photo", note)
+    P = {"hole_pitch": ph(1119, "the two mounting holes, centre to centre"), "plate_l": ph(1426, "plate, tip to tip along the holes"),
+         "plate_up": ph(378, "plate edge above the hole line"), "plate_dn": ph(528, "plate edge below the hole line"),
+         "hole_d": ph(90, "mounting holes"), "rivet_d": ph(80, "rivets"), "plate_t": Dim(1.6, f"not in {PH}: assumed", "assumed", "phenolic plate"),
+         "blade_w": Dim(6.35, f"{BK} (family gm_blade: the 0.250 in Packard 56 tab)", "vendor"),
+         "blade_l": Dim(9.0, f"not in {PH} (end-on): assumed", "assumed", "blade out of the plate"),
+         "strip_l": Dim(92.0, A, "assumed", "steel strips into the case"), "coil_d": Dim(11.0, A, "assumed", "resistor coils")}
+    C = {"plate": ("#2f2f2e", f"{PH2}: black plate (k-means)"), "strip": ("#80909f", f"{PH2}: zinc strips (k-means, lit face)"),
+         "coil": ("#8e8f8d", f"{PH2}: coils"), "blade": ("#b9bfc4", "blades: drawn tin")}
     v = K.v
+    # photo features in the plate frame (mm): x along the holes, y across (+ up in the photo), +Z toward the camera
+    BL = {"1": (0.8, 4.7), "2": (2.3, -8.2), "3": (0.1, -0.6), "4": (-5.0, -6.7)}       # printed numbers on the plate
+    RIV = [(-8.9, 4.0), (10.4, 6.2), (-8.1, -9.5), (3.6, -11.9)]
+    TILT = -11.3                                 # the blades run along the photo's horizontal, 11.3 deg off the hole line
     NAMES = ("BAT", "M1", "M2", "BLO")
-    BP = [(-4.5, 5.5), (4.5, 5.5), (-4.5, -5.5), (4.5, -5.5)]      # the photo's 2 x 2 cluster
+    ORDER = ("1", "2", "3", "4")                 # registry order onto the printed numbers: assumed
 
     def build():
         from build123d import Sketch, Circle, make_hull, extrude
-        L_, W_ = v(P["plate_l"]), v(P["plate_w"])
-        pts = [(0, L_ / 2 - 7.0), (0, -(L_ / 2 - 7.0)), (W_ / 2 - 7.0, 0), (-(W_ / 2 - 7.0), 0)]
-        hull = make_hull((Sketch() + [Pos(x, y) * Circle(7.0) for x, y in pts]).edges())
+        hp, up, dn = v(P["hole_pitch"]), v(P["plate_up"]), v(P["plate_dn"])
+        rt = v(P["plate_l"]) / 2 - hp / 2
+        pts = [(hp / 2, 0, rt), (-hp / 2, 0, rt), (12.0, up - 6.0, 6.0), (-12.0, up - 6.0, 6.0), (13.0, -(dn - 6.0), 6.0), (-13.0, -(dn - 6.0), 6.0)]
+        hull = make_hull((Sketch() + [Pos(x, y) * Circle(r) for x, y, r in pts]).edges())
         plate = extrude(hull, amount=v(P["plate_t"]))
         for sy in (-1, 1):
-            plate -= D.cyl(v(P["hole_d"]), 5, at=(0, sy * v(P["hole_pitch"]) / 2, -1))
-        rivets = Compound(children=[D.cyl(4.0, 1.0, at=(x, y, v(P["plate_t"]))) for x, y in ((-9.5, 12.0), (9.5, 12.0), (-9.5, -12.0), (9.5, -12.0))]).fuse()
-        strips = Compound(children=[Pos(sx * 7.0, 0, -v(P["strip_l"])) * Box(2.0, 12.0, v(P["strip_l"]), align=D.BASE) for sx in (-1, 1)]).fuse()
-        coils = Compound(children=[D.cyl(v(P["coil_d"]), 16.0, at=(sx * 7.0, sy * 9.0, -v(P["strip_l"]) + 2.0), axis="x")
+            plate -= D.cyl(v(P["hole_d"]), 5, at=(sy * hp / 2, 0, -1))
+        rivets = Compound(children=[D.cyl(v(P["rivet_d"]), 1.0, at=(x, y, v(P["plate_t"]))) for x, y in RIV]).fuse()
+        strips = Compound(children=[Pos(-0.5, -2.7 + sy * 7.0, -v(P["strip_l"])) * Box(12.0, 2.0, v(P["strip_l"]), align=D.BASE) for sy in (-1, 1)]).fuse()
+        coils = Compound(children=[D.cyl(v(P["coil_d"]), 16.0, at=(sx * 9.0 - 8.0, -2.7 + sy * 7.0, -v(P["strip_l"]) + 2.0), axis="x")
                                    for sx in (-1, 1) for sy in (-1, 1)]).fuse()
-        blades = Compound(children=[D.blade((x, y, v(P["plate_t"])), axis="z", w=v(P["blade_w"]), l=9.0) for x, y in BP]).fuse()
+        blades = Compound(children=[Pos(x, y, 0) * D.blade((0, 0, v(P["plate_t"])), axis="z", w=v(P["blade_w"]), l=v(P["blade_l"])).rotate(Axis.Z, TILT)
+                                    for x, y in BL.values()]).fuse()
         return [K.body(plate, f"{end} diamond plate", C["plate"][0]), K.body(rivets, f"{end} rivets", C["strip"][0], finish="metal"),
                 K.body(strips, f"{end} steel strips (inside the case)", C["strip"][0], finish="metal"),
                 K.body(coils, f"{end} resistor coils (inside the case)", C["coil"][0], finish="metal"),
-                K.body(blades, f"{end} blades BAT / M1 / M2 / BLO", C["blade"][0], finish="metal")], [], []
+                K.body(blades, f"{end} blades 1-4 (BAT / M1 / M2 / BLO)", C["blade"][0], finish="metal")], [], []
+
+    def _at(n):
+        x, y = BL[n]
+        return (x, y, v(P["plate_t"]))
 
     def attach_points():
-        return [{"n": t, "ep": end, "at": [x, y, round(v(P["plate_t"]) + 9.0, 2)], "dir": [0, 0, 1], "kind": "blade", "note": t}
-                for t, (x, y) in zip(NAMES, BP)]
+        return [{"n": t, "ep": end, "at": [round(c, 2) for c in (_at(n)[0], _at(n)[1], v(P["plate_t"]) + v(P["blade_l"]))], "dir": [0, 0, 1],
+                 "kind": "blade", "note": f"{t} on the blade printed {n} (order assumed)"} for t, n in zip(NAMES, ORDER)]
 
     def terminals():
-        return [{"pin": t, "endpoint": end, "name": t, "kind": "blade", "match": rf"^{t}$", "at": (x, y, v(P["plate_t"])), "dir": (0, 0, 1)}
-                for t, (x, y) in zip(NAMES, BP)]
+        return [{"pin": t, "endpoint": end, "name": t, "kind": "blade", "match": rf"^{t}$", "at": _at(n), "dir": (0, 0, 1)}
+                for t, n in zip(NAMES, ORDER)]
 
     def mount_points():
-        return [{"n": f"screw_{s_}", "at": [0, sy * v(P["hole_pitch"]) / 2, 0], "dir": [0, 0, -1], "d": v(P["hole_d"]),
-                 "note": "screw into the evaporator case"} for s_, sy in (("top", 1), ("bottom", -1))]
+        return [{"n": f"screw_{s_}", "at": [round(sx * v(P["hole_pitch"]) / 2, 2), 0, 0], "dir": [0, 0, -1], "d": v(P["hole_d"]),
+                 "note": "screw into the evaporator case"} for s_, sx in (("left", -1), ("right", 1))]
 
-    ns = _assumed_part(end, "GM A/C blower resistor (336403 pattern; Four Seasons 20083)", "Blower resistor, factory A/C (GM 336403; "
-                       "Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
-                       "GM", "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
-                       {"l": v(P["plate_w"]), "w": v(P["plate_l"]), "h": round(v(P["strip_l"]) + v(P["plate_t"]) + 9.0, 1)},
-                       "no size in any source: Four Seasons' photo's proportions at an assumed 70 mm hole pitch (±15)",
-                       {"mm": 15.0, "why": "no size published; proportions from the maker's photo"},
-                       "origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), "
-                       "strips and coils inside (-Z), +Y through the two holes",
+    def _pitch(b):
+        from build123d import GeomType
+        pl = [x for x in b if "diamond plate" in x.label][0]
+        cs = sorted({round(e.arc_center.X, 2) for e in pl.edges() if e.geom_type == GeomType.CIRCLE and abs(e.radius - v(P["hole_d"]) / 2) < 0.01})
+        return cs[-1] - cs[0]
+
+    def _len(b):
+        return [x for x in b if "diamond plate" in x.label][0].bounding_box().size.X
+
+    ns = _assumed_part(end, "GM A/C blower resistor (336403 pattern; Wells 3A1044)", "Blower resistor, factory A/C (GM 336403; "
+                       "Wells 3A1044, Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
+                       "GM", "GM 336403 (Wells 3A1044, Four Seasons 20083, SMP RU67, LMC 32-2406)",
+                       {"l": v(P["plate_l"]), "w": round(v(P["plate_up"]) + v(P["plate_dn"]), 1),
+                        "h": round(v(P["strip_l"]) + v(P["plate_t"]) + v(P["blade_l"]), 1)},
+                       "the plate scaled off Wells' face-on photo against its 0.250 in blades (±8%); the strips and coils "
+                       "behind it are assumed",
+                       {"mm": 6.0, "why": "photo scale from the blades (±8%); the strips' length is assumed"},
+                       "origin between the plate's two holes on its back face (on the evaporator case); +Z out of the case (the "
+                       "blades), strips and coils inside (-Z), +X through the two holes, +Y toward the plate's narrower side (up in Wells' photo)",
                        [("[1]", "RockAuto 336403", "RockAuto 1977 K5 Blazer blower resistor listing: GM 336403 for A/C without the "
-                                                   "heavy-duty heater (Four Seasons 20083, SMP RU67, Wells 3A1044 '2 bolt holes, 4 blades')"),
-                        ("[2]", "LMC 32-2406", "LMC catalogue (database, ccComplete.pdf): 32-2406 blower resistor, W/AC 1973-87"),
-                        ("[3]", "1978 C/K wiring booklet", "1978 booklet p.16 sheet A-4 via the registry")],
-                       [("BAT = BLOWER_BAT, M1 = BLOWER_MED, M2 = BLOWER_M2, BLO = BLOWER_MOT (registry).", "#10151a"),
-                        ("Every size is assumed (red); the blades' order in the cluster is drawn in the registry's order.", "assumed")],
-                       ["Every size and the blade order: read the resistor on the truck."],
-                       P, C, build, attach_points, terminals, mount_points, [("drawn at the assumed envelope", lambda b: 1.0, 1.0)],
-                       photo={"url": f"{RA}/info/52/20083.jpg", "page": f"{RA}/en/moreinfo.php?pk=1312672", "fetched": "2026-09-29"})
+                                                   "heavy-duty heater (Wells 3A1044 '2 bolt holes, 4 blades', Four Seasons 20083, SMP RU67)"),
+                        ("[2]", "Wells 3A1044", "Wells 3A1044 photo, face-on: the plate, holes, rivets and the blades' printed numbers"),
+                        ("[3]", "LMC 32-2406", "LMC catalogue (database, ccComplete.pdf): 32-2406 blower resistor, W/AC 1973-87"),
+                        ("[4]", "1978 C/K wiring booklet", "1978 booklet p.16 sheet A-4 via the registry")],
+                       [("BAT = BLOWER_BAT, M1 = BLOWER_MED, M2 = BLOWER_M2, BLO = BLOWER_MOT (registry). They are drawn on the "
+                         "blades printed 1-4 in that order: an assumption until read on the resistor.", "#10151a")],
+                       ["Which printed blade (1-4) is BAT, M1, M2 and BLO.", "The strips' length and the coils behind the plate."],
+                       P, C, build, attach_points, terminals, mount_points,
+                       [("hole pitch", _pitch, v(P["hole_pitch"])), ("plate length along the holes", _len, v(P["plate_l"]))],
+                       photo={"url": f"{RA}/info/903/3A1044.jpg", "page": f"{RA}/en/moreinfo.php?pk=1189637", "fetched": "2026-09-29"})
     ns["PART"]["photo_short"] = PH
-    ns["PART"]["cross_checks"] = ["Four Seasons, SMP, Wells and UMP list 4 male blades; the registry lands 4 (BAT, M1, M2, BLO)."]
+    ns["PART"]["shape_basis"] = "scaled from photo"
+    ns["PART"]["cross_checks"] = ["Four Seasons, SMP, Wells and UMP list 4 male blades; the registry lands 4 (BAT, M1, M2, BLO).",
+                                  "Wells lists 2 bolt holes, as the photo shows."]
     return ns
 
 
