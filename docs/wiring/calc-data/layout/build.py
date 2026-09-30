@@ -1084,7 +1084,10 @@ for L in LIB:
 for i in items:
     if i["id"] in LIB_OF:
         i["lib"] = LIB_OF[i["id"]]
-    i["m3d"] = MODELLED.get(i["id"], [])          # complete = a part in the part-model index carries this end (owner: no 3D, not complete)
+    i["m3d"] = MODELLED.get(i["id"], [])          # modelled = a part in the part-model index carries this end (owner: no 3D, not complete)
+    _pe = (PMI.get("ends") or {}).get(i["id"]) or {}
+    i["m3d_done"] = bool(_pe.get("complete"))     # complete = the index says nothing is missing on this end
+    i["m3d_missing"] = _pe.get("missing") or []
 for d in DEVS.values():
     d["lib"] = next((LIB_OF[c] for c in d["conns"] if c in LIB_OF), None)
 OPEN_BY = {}
