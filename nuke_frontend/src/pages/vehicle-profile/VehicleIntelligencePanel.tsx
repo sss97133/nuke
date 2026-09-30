@@ -182,8 +182,14 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
   const mods = di.mods || [];
   const docs = di.documentation || [];
 
-  const hasContent = di.condition_note || di.title_status || di.matching_numbers != null ||
-    di.condition || di.owner_count != null || flags.length > 0 || mods.length > 0 || docs.length > 0;
+  // owner_count and title_status are raw extraction output: owners sometimes arrives as a
+  // list of owner records ({notes, previous_owner}, {name, ...}) and title as an object.
+  // Only a number is a count and only a string is a title; anything else is skipped.
+  const ownerCount = typeof di.owner_count === 'number' ? di.owner_count : null;
+  const docTitleStatus = typeof di.title_status === 'string' ? di.title_status : null;
+
+  const hasContent = di.condition_note || docTitleStatus || di.matching_numbers != null ||
+    di.condition || ownerCount != null || flags.length > 0 || mods.length > 0 || docs.length > 0;
   if (!hasContent) return null;
 
   return (
@@ -203,8 +209,8 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
 
         {/* Quick Badges */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
-          {(liveTitleStatus || di.title_status) && (
-            <span style={BADGE}>{liveTitleStatus ? liveTitleStatus.toUpperCase() : di.title_status}</span>
+          {(liveTitleStatus || docTitleStatus) && (
+            <span style={BADGE}>{liveTitleStatus ? liveTitleStatus.toUpperCase() : docTitleStatus}</span>
           )}
           {di.matching_numbers != null && (
             <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : 'var(--vp-danger)' }}>
@@ -212,7 +218,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
             </span>
           )}
           {di.condition && <span style={BADGE}>{di.condition}</span>}
-          {di.owner_count != null && <span style={BADGE}>{di.owner_count} OWNER{di.owner_count !== 1 ? 'S' : ''}</span>}
+          {ownerCount != null && <span style={BADGE}>{ownerCount} OWNER{ownerCount !== 1 ? 'S' : ''}</span>}
         </div>
 
         {/* Red Flags */}
