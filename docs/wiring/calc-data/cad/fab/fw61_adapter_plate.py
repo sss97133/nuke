@@ -39,6 +39,9 @@ K_DIM = 1.759 * IN
 # Same page: "P Max Rear Panel" .125 (3.2) for every shell size; "Max panel thickness will ensure proper coupling clearance".
 PANEL_MAX = 0.125 * IN
 JAM_NUT_D = 2.323 * IN            # across the corners (see above)
+# MILNEC catalog p.B-15 (PDF p.35), "Accessory & Jam Nut Torque", shell 25, aluminium and stainless steel: jam nut
+# torque 120 min, 130 max in-lb (13.6, 14.7 N-m).
+JAM_NUT_TORQUE = "120-130 in-lb (13.6-14.7 N-m), MILNEC p.B-15, shell 25 aluminium"
 
 # ---- the truck: the original fuse-block punch-out. The trait table models it as a 4.0 in round opening
 # (nuke_frontend/src/components/wiring/objectTraits.ts, factory_holes FB), which cites no source. No document reached on
@@ -102,7 +105,7 @@ def params():
     """The inputs the outputs depend on, in a fixed order (mm)."""
     return (f"FB_OPENING={FB_BASIS}; FB_H_RIGHT={FB_H_RIGHT:.3f}; FB_H_LEFT={FB_H_LEFT:.3f}; FB_W={FB_W:.3f}; "
             f"FB_R={FB_R:.3f}; FB_A1=({FB_A1[0]:.2f}, {FB_A1[1]:.2f}); FB_A2=({FB_A2[0]:.2f}, {FB_A2[1]:.2f}); "
-            f"FB_FASTENERS={FB_FASTENERS}; THICK={THICK:.3f}; "
+            f"FB_FASTENERS={FB_FASTENERS}; JAM_NUT_TORQUE={JAM_NUT_TORQUE}; THICK={THICK:.3f}; "
             f"PANEL_MAX={PANEL_MAX:.3f}; SPOTFACE_T={SPOTFACE_T:.3f}; SPOTFACE_D={SPOTFACE_D:.3f}; "
             f"GASKET_T={GASKET_T:.3f}; GASKET_INSET={GASKET_INSET:.3f}; SIDE={SIDE:.3f}; CORNER_R={CORNER_R:.3f}; "
             f"HOLE_D={HOLE_D:.3f}; HOLE_OFF={HOLE_OFF:.3f}; CUT_D={CUT_D:.3f}; CUT_FLAT={CUT_FLAT:.3f}")
@@ -254,6 +257,7 @@ def drawing_svg(path):
     el.append(f'<text x="{cx}" y="{cy - FLANGE_W / 2 + 4}" font-size="3" text-anchor="middle" fill="#6b747d" font-family="Helvetica, Arial">flange Ø{FLANGE_W:.1f} (W)</text>')
     notes = [(4.2, ink, "bold", f"61-PIN FIREWALL ADAPTER PLATE · 1977 K5 · 5052-H32 AL {THICK:.2f} mm (1/8 in) · + {GASKET_T} mm neoprene gasket ring"),
              (3.4, ink, "normal", "Cutout: D38999 Series III jam-nut receptacle, shell 25 (MILNEC TX07 p.B-25). Flat at 12 o'clock. Units mm."),
+             (3.4, ink, "normal", f"Jam nut torque: {JAM_NUT_TORQUE}."),
              (3.4, "#7a3db8", "normal", f"Spot face Ø{SPOTFACE_D:.0f} to {SPOTFACE_T:.2f} on the jam-nut face (drawn: the face away from the gasket): "
                                        f"clamped thickness under TX07 p.B-25's .125 max, with margin for sheet tolerance ({PANEL_MARGIN:.2f})."),
              (3.4, "#2e7d32", "normal", f"Gasket: a perimeter ring, outer edge the plate outline, inner edge the opening + {GASKET_INSET:.0f}; "
