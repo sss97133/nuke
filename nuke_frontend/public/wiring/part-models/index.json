@@ -4,9 +4,9 @@
  "ends_by_shape_basis": {
   "maker drawing": 40,
   "datasheet dims": 36,
-  "scaled from photo": 42,
+  "scaled from photo": 43,
   "twin object": 11,
-  "not sourced": 32
+  "not sourced": 31
  },
  "ends": {
   "AC-CLUTCH": {
@@ -2300,16 +2300,16 @@
    "endpoints": [
     "BLOWER-RES"
    ],
-   "what": "Blower resistor, factory A/C (GM 336403; Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
+   "what": "Blower resistor, factory A/C (GM 336403; Wells 3A1044, Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
    "maker": "GM",
-   "maker_pn": "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
-   "shape_basis": "not sourced",
+   "maker_pn": "GM 336403 (Wells 3A1044, Four Seasons 20083, SMP RU67, LMC 32-2406)",
+   "shape_basis": "scaled from photo",
    "dims_mm": {
-    "l": 46.0,
-    "w": 84.0,
+    "l": 72.4,
+    "w": 46.0,
     "h": 102.6
    },
-   "frame": "origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), strips and coils inside (-Z), +Y through the two holes",
+   "frame": "origin between the plate's two holes on its back face (on the evaporator case); +Z out of the case (the blades), strips and coils inside (-Z), +X through the two holes, +Y toward the plate's narrower side (up in Wells' photo)",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
@@ -2338,8 +2338,8 @@
      "n": "BAT",
      "ep": "BLOWER-RES",
      "at": [
-      -4.5,
-      5.5,
+      0.8,
+      4.7,
       10.6
      ],
      "dir": [
@@ -2348,14 +2348,14 @@
       1
      ],
      "kind": "blade",
-     "note": "BAT"
+     "note": "BAT on the blade printed 1 (order assumed)"
     },
     {
      "n": "M1",
      "ep": "BLOWER-RES",
      "at": [
-      4.5,
-      5.5,
+      2.3,
+      -8.2,
       10.6
      ],
      "dir": [
@@ -2364,14 +2364,14 @@
       1
      ],
      "kind": "blade",
-     "note": "M1"
+     "note": "M1 on the blade printed 2 (order assumed)"
     },
     {
      "n": "M2",
      "ep": "BLOWER-RES",
      "at": [
-      -4.5,
-      -5.5,
+      0.1,
+      -0.6,
       10.6
      ],
      "dir": [
@@ -2380,14 +2380,14 @@
       1
      ],
      "kind": "blade",
-     "note": "M2"
+     "note": "M2 on the blade printed 3 (order assumed)"
     },
     {
      "n": "BLO",
      "ep": "BLOWER-RES",
      "at": [
-      4.5,
-      -5.5,
+      -5.0,
+      -6.7,
       10.6
      ],
      "dir": [
@@ -2396,15 +2396,15 @@
       1
      ],
      "kind": "blade",
-     "note": "BLO"
+     "note": "BLO on the blade printed 4 (order assumed)"
     }
    ],
    "mount": [
     {
-     "n": "screw_top",
+     "n": "screw_left",
      "at": [
+      -28.4,
       0,
-      35.0,
       0
      ],
      "dir": [
@@ -2412,14 +2412,14 @@
       0,
       -1
      ],
-     "d": 5.5,
+     "d": 4.6,
      "note": "screw into the evaporator case"
     },
     {
-     "n": "screw_bottom",
+     "n": "screw_right",
      "at": [
+      28.4,
       0,
-      -35.0,
       0
      ],
      "dir": [
@@ -2427,7 +2427,7 @@
       0,
       -1
      ],
-     "d": 5.5,
+     "d": 4.6,
      "note": "screw into the evaporator case"
     }
    ]
