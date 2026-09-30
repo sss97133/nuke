@@ -1,8 +1,8 @@
 # BaT data coverage audit (2026-09-30)
 
-Measured 2026-09-29 22:32–23:30Z by the data-audit agent for the lead. Everything below is read-only except
-the one re-queue in §6. Counts are exact unless marked "sample" (a 10% systematic sample: every 10th lot of
-the archive, 26,475 lots, 23,841 of them cars). All times UTC.
+Measured 2026-09-29 22:32Z – 09-30 00:30Z by the data-audit agent for the lead. Everything below is
+read-only except the re-queue and the live-lot sample in §6. Counts are exact unless marked "sample" (a 10%
+systematic sample: every 10th lot of the archive, 26,475 lots, 23,841 of them cars). All times UTC.
 
 ## The answer
 
@@ -17,6 +17,10 @@ the archive, 26,475 lots, 23,841 of them cars). All times UTC.
 - **Analysis stopped in the spring.** Per-lot comment analysis last ran on 2026-02-15, per-comment sentiment
   on 03-06 and analysis_signals on 04-14. `vehicle_pulse` has 0 rows. The per-lot bid series stopped on
   2026-07-22. None of the roughly 2.9M comments loaded on 09-28 and 09-29 has been analysed.
+- **First fix: a scheduled pull of every live lot** through the existing `extract-bat-core` (§7). It was
+  measured on 14 live lots, and the migration is ready and paused
+  (`supabase/migrations/20260930000000_bat_live_pull.sql`, draft PR #450). It must wait for two reader fixes;
+  without them, each read mislabels a running auction and truncates its end time.
 
 ## 1. The target, and where the number comes from
 
@@ -107,6 +111,14 @@ atlas's "read-only" label for it is stale. Two defects in this path are covered 
 ## 4. The leaks
 
 ### 4.1 Silent failures (the job succeeds; no rows, or wrong rows)
+
+**Since this audit** (deployed by CI on 2026-09-29, each run a success; not yet re-measured):
+- **#446 (23:48:40Z)** stops item 3, the settlement double-write.
+- **#447 (23:51:57Z)** retires item 1's snapshot path.
+- **#448 (23:56:10Z)** fixes item 2's resolver and skips comments already held by BaT id.
+
+Re-measure item 3 on the lots settled after the 09-30 06:50Z sync, and item 2 once lots are within 6 h of
+closing again, from about 11:00Z.
 
 Every BaT job in `v_job_health` reads `succeeded`, because success only means the HTTP call was sent.
 
@@ -202,8 +214,15 @@ overlap with §4.2 and §4.5.
 - **Duplicate cars.** 3,350 car lots have 2+ live vehicles, and 3,578 lots have events on 2+ vehicles.
 - **A live bid can go backwards.** The SL500's lot page had $8,888 from 22:20Z. The 22:30Z sync from BaT's
   /auctions/ page wrote $7,900 over it, and the 22:45Z sync wrote $8,888.
-- **A live lot carries a sale price.** The SL500 row carries `canonical_sold_price` 7,900 while it is
-  still live.
+- **Live lots carry a sale price.** 1,164 of 1,204 live BaT rows have `canonical_sold_price` set (the SL500:
+  7,900), while none reads `sold`. Readers of `canonical_sold_price` present a running bid as a sale.
+- **A read of a running lot writes the wrong state** (measured in §6, on 14 lots, while their auctions ran):
+  - `auction_events.outcome` = `bid_to` for all 14. For a reserve lot below its reserve, the reader also
+    writes `reserve_not_met` into `auction_events` and `vehicles.auction_outcome`, per its code.
+  - `vehicles.auction_end_date` is superseded from the timestamp to the bare date through the chokepoint.
+    At 00:04Z the logged-out board had dropped the 2006 Tundra (`1b5cb8be`, ending 09-30 18:23Z); its end
+    read as 09-30 00:00, already past. Two others showed an end of 10-01 00:00. The 15-minute sync restores
+    the timestamp, and the next read truncates it again, adding one more correction record each time.
 
 ## 5. The temperature
 
@@ -230,6 +249,9 @@ $17,500 is for all R129 SL500s, 745 comps; the car's 110,000 miles never reach t
 doesn't state them. At the true bid of $8,888 the board reads 0.89, "in line". Everything that says demand
 was left out: 48 comments, 29 bids from 13 bidders, 586 watchers, 3,825 views, no reserve. None of it is
 stored for live lots.
+
+The lead compared it with 389 past SL500 lots on BaT at 19 h or more before the close: median 23 bids
+(p75 32) and median 11 bidders. On activity, then, this lot ran above typical while the board called it cold.
 
 **Engagement adds signal the tag misses.** Split each price tag by where the lot's comments so far rank
 against its peers (same price tier, same hours left), then look at the share that finished above the
@@ -266,11 +288,8 @@ was measured.
 3. **UI:** the board, the vehicle page and the feed show "not measured" instead of "cold" when those
    inputs are absent. `computeHeatScore` returns null, not "cold", when it had no inputs.
 
-**What it takes.** Read each live lot's page during the auction: once at first sight, every 6 h, then
-hourly in the last 24 h. That is about 1,150 lots × about 12 reads ≈ 14K fetches a day, within the
-1,150–1,850 calls an hour the loaders sustained. This is the 09-29 07:44Z bat-data proposal (sync hands
-each new lot to `extract-bat-core`, throttled back-fill), still waiting on Skylar's yes. Fixes P2 and P3
-below repair the two existing hooks that were supposed to do part of it.
+**What it takes.** Every live lot's page has to be read during the auction. That is the live pull in §7:
+about 4,000 reads a day, measured and ready as a migration.
 
 ## 6. What I changed
 
@@ -290,34 +309,133 @@ stopped part-way on a defect.
   carry 886 duplicate rows from defect §4.1 item 3.
 - **Held, 23:26:36Z.** So as not to add about 35–40K more duplicates, I set the other 937 rows to
   `pending_review`, with the reason in `error_message`; `claim_import_queue_batch` takes only `pending`.
-  To release them after P1:
+  #446 has since deployed (23:48:40Z). Releasing a first 10 at 00:08Z was refused by the permission check,
+  so the release is the lead's. To release them:
 
   ```sql
   update import_queue set status = 'pending', error_message = null
    where raw_data->>'source' = 'data-audit-2026-09-29' and status = 'pending_review';
   ```
 
-## 7. The fix plan (in priority order)
+**The live-lot sample (for §7), 2026-09-29 23:46Z – 09-30 00:03Z.** I read 14 live no-reserve lots through
+the deployed `extract-bat-core` (`{"url", "prefer_snapshot": false}`), one at a time, 2 s apart. They were
+picked from the logged-out board across bid levels: 7 end in 12–48 h and 7 beyond 48 h. At 23:4xZ no lot
+ended within 12 h, because BaT's closes cluster in the US afternoon. No-reserve lots were chosen so the
+reader couldn't write `reserve_not_met` onto a running car.
+
+| Measure | First read (23:47–23:49Z) | Re-read (23:51–23:53Z) |
+|---|---|---|
+| Succeeded | 14 of 14 | 14 of 14 |
+| Wall time p50 (max) | 9.3 s (11.1 s) | 3.8 s (5.1 s) |
+| Reader phases after the BaT fetch, p50 | 7.9 s (vehicle_write 4.75 s; timeline 0.72; images 0.58; comments 0.54) | 2.4 s (vehicle_write 0.78 s) |
+| BaT fetch p50 | 0.60 s | 0.63 s |
+| DB exec for the pass (`pg_stat_statements` delta, all activity) | 20.1 s over 5,214 statements, ≤ 1.4 s a lot | 3.8 s over 2,020, ≤ 0.27 s a lot |
+| Rows written | +341 comments (90 bids), +2,159 image links, +14 `auction_events`, +14 `vehicle_events`, +42 `timeline_events`, +14 observations; 12 lots gained a VIN | +2 comments, nothing else |
+| `bids_written` (`bat_bids`) | 0: no `bat_listings` row | 0 |
+| Duplicate comment rows | 0 | 0 |
+| REST p50 afterwards (anon, 10 samples) | 0.209 s (0.210 s before) | 0.207 s |
+
+- **Third read of 3 lots, 00:02Z.** This came after the 00:00Z sync had put the precise end times back.
+  Wall 4.6–8.7 s, vehicle_write 1.2–1.6 s. Each read truncated the end time again: a second correction
+  record per lot, and at 00:04Z the Tundra was off the logged-out board (§4.5). The 00:15Z sync puts them
+  back.
+- **Left behind.** 14 `auction_events` rows read `bid_to` until each lot's settlement read sets its result.
+
+## 7. The live pull: first in the plan
+
+The live card's percentile and activity need every live lot's comments and bids during the auction. Today
+nothing collects them. The pull reads them through the existing, sanctioned `extract-bat-core` on a
+schedule.
+
+- **Migration:** `supabase/migrations/20260930000000_bat_live_pull.sql`, on branch `bat/live-pull-cron`,
+  draft PR #450. For the lead to ship; I have not applied it, and both jobs are created paused.
+- **Lots:** every live BaT row on the board, 1,213–1,258 on the night of 09-29. At that time 428 ended in
+  12–48 h, 784 beyond 48 h (401 beyond 120 h) and none within 12 h.
+- **Priority:** lots ending within 48 h first (never-read, then soonest end), then the rest.
+- **Cadence:**
+  - first read at once;
+  - every 24 h while more than 48 h are left;
+  - every 6 h from 48 h to 12 h;
+  - hourly in the last 12 h.
+
+  About 24 reads a lot. With about 170 lots closing a day (169 over 08-28..09-26 in the archive), that is
+  about 4,000 reads a day. The first pass
+  over the current board takes about 7 h, with the 48 h lots done in the first 2.5 h.
+- **Throttle:** 3 lots a run, a run every minute, a ceiling of 180 an hour. A pass is at most 3 reads of
+  about 4–11 s each, so it finishes well inside the minute. The run also skips when any lot dispatched in
+  the last 150 s hasn't been read yet, so passes never overlap. BaT fetches run at 3 a minute (the BaT
+  row's limit is 20).
+- **Load, from the sample:**
+  - DB exec ≈ 170 first reads × 1.4 s + about 3,900 re-reads × 0.27 s ≈ 22 min a day.
+  - The dispatcher itself, rehearsed in a forced rollback: 14 ms a run, 74 ms for the schedule sync every
+    5th minute, 858 ms for the one-time initial sync of 1,258 lots.
+  - REST p50 didn't move at one read per 11 s: 0.210 → 0.209 → 0.207 s.
+  - Rows: about 185 on a lot's first read (24 comments, 154 image links, 6 events, timeline rows and
+    observations), then new comments only. Settlement would write the same rows at the close anyway, so
+    the pull moves them into the auction week rather than adding to them.
+- **Pause rule:** as the loader's. Every run fires one REST probe (GET `vehicles?select=id&limit=1`,
+  timed from dispatch to the pg_net response row) and keeps the last 10. When their p50 is above 2 s the
+  run dispatches nothing, and the health row reads `degraded` with the reason.
+- **Success check, rows landed rather than exit 0:**
+  - Each run accounts the previous pass. A lot counts as read when its `auction_events` row was written
+    after dispatch, and rows landed = new `auction_comments`. Both go into the health row
+    (`live_auction_sources` 'bat': `last_run`, `last_successful_sync`, `consecutive_failures`,
+    `health_status`).
+  - `bat-live-pull-check` (every 15 min) fails, so it shows in `v_job_health` with the counts in
+    `last_error`, when:
+    - fewer than half the lots dispatched 10–70 min ago were read;
+    - 30+ reads in 3 h landed 0 comment rows;
+    - 25+ lots are 2 h overdue;
+    - the pull hasn't run for 10 min, or has stayed paused for 2 h.
+- **The `bat_listings` precondition:** not handled. 0 of 1,213 live lots have a `bat_listings` row, so bids
+  stay comment-only during the auction (`auction_comments.comment_type = 'bid'`, with amount, time and
+  bidder, which is what the card needs). `bat_bids` receives them at settlement, when bat-closed-lots-sync
+  creates the row.
+  - That settlement path covers only recent closes. Of the car lots that ended 08-01..09-27, 450 of 8,848
+    (5.1%) have a `bat_listings` row; for all 2026 closes it is 44.7%, and for every car lot 56.6%. Lots
+    without one get no `bat_bids` rows from any reader.
+- **Reader preconditions, which block enabling** (§4.5; `extract-bat-core`, bat-data lane):
+  1. Write `auction_events.outcome = 'live'` while the end time is in the future, and leave
+     `vehicles.auction_outcome` alone.
+  2. Stop superseding `vehicles.auction_end_date` with the date-only value (compare at date level, or write
+     `auction_end_at`).
+
+  Without them, every scheduled read mislabels the auction and truncates its end time: about 4,000
+  bad corrections a day, and lots ending the same day vanishing from the board.
+- **Existing tables only** (SCHEMA_LAW §1): `monitored_auctions` (per-lot schedule, dormant since
+  2026-02-18) and `live_auction_sources` (the health row). No new table.
+
+With the pull running, two broken hooks become redundant:
+- sync-live-auctions' 6-hour `extract-auction-comments` trigger (§4.1 item 2);
+- the 15-minute `bat_bids` snapshots (§4.1 item 1). The comments carry every bid with its exact time.
+
+Retire both rather than fix them.
+
+## 8. The fix plan (in priority order)
 
 | # | Fix | Expected yield | Risk | Owner |
 |---|---|---|---|---|
-| P1 | `process-import-queue`: stop chaining `extract-auction-comments` after `extract-bat-core` for BaT, then retire the duplicates with `retire_rows` | stops about 36% duplicate rows on every settled lot (≈150–250 lots/day); about 21K rows to retire (estimate) plus 886 from §6 | low: removes a redundant call | bat-data |
-| P2 | `extract-auction-comments`: resolve by `listing_url` too (or have the sync pass `vehicle_id`) | the 6-hour trigger starts working: comments and bids for the 10 lots closest to closing, every 15 min (it failed 368 times on 09-29) | low: one lookup | bat-data |
-| P3 | `recordBidSnapshots`: key on the live `vehicles` row, not on `active` `vehicle_events` capped at 1,000 | restores the bid series: about 1,100 lots × 4 an hour ≈ 100K rows a day (store only changes to cut that) | low | bat-data |
-| P4 | Live-lot reads (the 07:44Z proposal) | comments, bids, VIN, mileage and photos for about 1,150 live lots (today 1); makes §5 computable | medium: BaT fetch rate; needs Skylar's yes | bat-data → Skylar |
-| P5 | Re-read the 3,604 absent car lots (957 queued in §6: 20 done, 937 held behind P1; 255 need their old rows reset; 2,392 older ones not queued) | about 3,600 auction events, about 180K comments + 103K bids, 3,000 sold results | low once P1 lands | bat-data |
-| P6 | `validate_import_url`: whole-word keywords, or skip the check for bringatrailer.com (the reader classifies non-vehicles itself); re-queue the skipped settlement rows | about 1% of closing car lots (2–3 a day) plus 18 skipped since 09-27 | low | bat-data |
-| P7 | Settle `vehicle_events` from `auction_events` (which agrees with BaT 99.3%) through a sanctioned writer: 18,063 `ended` without price, 1,051 stale `active`, 1,757 false `sold`; close the 2,912 past-due `active` rows | the /cohort terminal gains about 25.7K sales and loses about 1.8K false ones | medium: bulk write; profile first; needs a writer | bat-data (writer) + market-home (reader) |
-| P8 | Write the missing `auction_events` for 18,226 lots that have a vehicle but no event (re-read or derive) | 18K events for the timeline bands and comment links | low | bat-data |
-| P9 | Quarantine: normalisers in `valuesMatch` (number words, L/-Liter, 0 as empty for counts), fix the make/model split in the proposer, then a resolution pass (needs a sanctioned writer for `bat_quarantine.resolved`); adjudicate mileage (6,333) and high_bid (4,679) | about 80% less noise; about 11K live field disputes surfaced | low / medium | bat-data |
-| P10 | False sales: 143 same-day same-price matches (and 160 unexplained) via `correct_vehicle_sale_provenance_batch` | about 150–300 wrong comps removed | low | bat-data |
-| P11 | UI: "not measured" instead of "cold" (board tag semantics; `computeHeatScore` returns null without inputs; the feed card) | stops about 487K cars reading "cold" on no data | low | market-home (not running; the lead assigns) |
-| P12 | Demand reading (§5): archive reference distributions, backtest, then ship | a defensible temperature | medium | market-home, after P2–P4 |
-| P13 | Re-run comment analysis on the comments loaded since February | analysis for the about 47% of lots with none | cost: LLM spend (Skylar decides) | market-home / deal |
-| P14 | Fix `pipeline-heartbeat` (8 consecutive timeouts) | the alarm that should have caught §4.1 | low | setup / lead |
+| P0a | `extract-bat-core`: a lot whose end time is in the future is `live`. Write `auction_events.outcome = 'live'` (not `bid_to` / `reserve_not_met`) and leave `vehicles.auction_outcome` alone | running auctions stop being written as ended | low: one condition | bat-data |
+| P0b | `extract-bat-core`: don't supersede `vehicles.auction_end_date` with the date-only value (compare at date level, or write `auction_end_at`) | ends the per-read truncation and correction records; lots ending today stay on the board | low | bat-data |
+| **P0** | **The live pull** (§7): ship `20260930000000_bat_live_pull.sql` (PR #450), enable both jobs after P0a and P0b | comments and bids for all ~1,200 live lots (today 1); about 4,000 reads a day, ≈ 22 min of DB exec a day; the live card and the §5 demand reading become computable | medium: new steady load; paused by REST p50 > 2 s; checked into `v_job_health` | the lead ships; bat-data owns the reader |
+| P1 | Settlement double-write: **deployed as #446** (23:48:40Z). Left to do: re-measure on the 09-30 settlement, retire the duplicates with `retire_rows`, then release the 937 held rows (SQL in §6; release 10 first and check they land without duplicates) | stops about 36% duplicate rows on every settled lot (≈150–250 lots/day); about 21K rows to retire (estimate) plus 886 from §6 | low | bat-data; the release is the lead's (my release was refused by the permission check) |
+| P2 | Bid snapshots **retired (#447)**; the 6-hour trigger's resolver **fixed (#448)**. Once P0 runs, the trigger only duplicates P0's last-hours reads, and #448's BaT-id rule keeps them from duplicating rows; keep it or retire it | 0 rows a run replaced; 368 HTTP 500s a day gone (to verify from about 11:00Z) | low | bat-data |
+| P3 | Re-read the 3,604 absent car lots (957 queued in §6: 20 done, 937 held behind P1; 255 need their old rows reset; 2,392 older ones not queued) | about 3,600 auction events, about 180K comments + 103K bids, 3,000 sold results | low once P1 lands | bat-data |
+| P4 | `validate_import_url`: whole-word keywords, or skip the check for bringatrailer.com (the reader classifies non-vehicles itself); re-queue the skipped settlement rows | about 1% of closing car lots (2–3 a day) plus 18 skipped since 09-27 | low | bat-data |
+| P5 | Settle `vehicle_events` from `auction_events` (which agrees with BaT 99.3%) through a sanctioned writer: 18,063 `ended` without price, 1,051 stale `active`, 1,757 false `sold`; close the 2,912 past-due `active` rows | the /cohort terminal gains about 25.7K sales and loses about 1.8K false ones | medium: bulk write; profile first; needs a writer | bat-data (writer) + market-home (reader) |
+| P6 | `canonical_sold_price` stays null until a sale; today 1,164 of 1,204 live rows carry their running bid there | no running bid read as a sale price | low | bat-data |
+| P7 | Write the missing `auction_events` for 18,226 lots that have a vehicle but no event (re-read or derive) | 18K events for the timeline bands and comment links | low | bat-data |
+| P8 | Quarantine: normalisers in `valuesMatch` (number words, L/-Liter, 0 as empty for counts), fix the make/model split in the proposer, then a resolution pass (needs a sanctioned writer for `bat_quarantine.resolved`); adjudicate mileage (6,333) and high_bid (4,679) | about 80% less noise; about 11K live field disputes surfaced | low / medium | bat-data |
+| P9 | False sales: 143 same-day same-price matches (and 160 unexplained) via `correct_vehicle_sale_provenance_batch` | about 150–300 wrong comps removed | low | bat-data |
+| P10 | UI: "not measured" instead of "cold" (board tag semantics; `computeHeatScore` returns null without inputs; the feed card) | stops about 487K cars reading "cold" on no data | low | market-home (not running; the lead assigns) |
+| P11 | Demand reading (§5): archive reference distributions, backtest, then ship on P0's data | a defensible temperature | medium | market-home, after P0 |
+| P12 | Re-run comment analysis on the comments loaded since February | analysis for the about 47% of lots with none | cost: LLM spend (Skylar decides) | market-home / deal |
+| P13 | Fix `pipeline-heartbeat` (8 consecutive timeouts) | the alarm that should have caught §4.1 | low | setup / lead |
 
-The order matters: P1 has to land before P5 releases any more rows, and P2–P4 have to land before P12 can
-be backtested.
+The order matters:
+- P0a and P0b before P0 is enabled;
+- P1 before P3 releases any more rows;
+- P0 running before P11 can be backtested on live lots.
 
 ## Appendix: method and queries
 
@@ -375,3 +493,14 @@ Terciles of comments and bidders so far are taken within the same checkpoint and
 
 **Function logs.** `function_edge_logs` and `function_logs` for 2026-09-29, read through the Supabase log
 query.
+
+**Live-lot sample.** `~/nuke-logs/bat-coverage-0929/live-sample/`: `probe.sh` (anon REST p50, 10 samples
+2 s apart), `counts.sh` (rows per vehicle before and after), `pss.sh` (`pg_stat_statements` totals) and
+`pass.sh` (sequential `extract-bat-core` calls, 2 s apart). DB exec per pass is the `pg_stat_statements`
+delta across the pass. That covers every statement cluster-wide, so it is an upper bound.
+
+**Migration rehearsal.** Every statement of `20260930000000_bat_live_pull.sql` ran with `EXECUTE` inside one
+`DO` block. The block then called `bat_live_pull_run(0)` twice and `bat_live_pull_run(0, true)` once, called
+`bat_live_pull_check()`, and ended in `RAISE EXCEPTION`. Afterwards cron.job had no `bat-live-pull%` rows,
+there were no `bat_live_pull%` functions, the `bat` `scraping_config` was `{}` and there were 211
+`monitored_auctions` rows, all as before.
