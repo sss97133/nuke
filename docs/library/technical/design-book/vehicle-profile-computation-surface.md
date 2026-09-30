@@ -333,6 +333,28 @@ built yet. The wiring workspace moves into the profile once this design is set.
 | Financial, labour and means-of-production data | Show costs, labour and tools on the profile, with values that accumulate over time. |
 | Options as toggles with instant recalculation | A customer builds their harness in a live 3D view, and the counts and fits recalculate as each option toggles. The engine exists in Python today (`catalog/options.yaml` and `options_v5.py` capacity verdicts). Live means porting it to the frontend or an edge function. |
 
+### Owner notes, 2026-09-30: the wiring page is overwhelming
+
+Relayed word for word from the pieces lane's window. The owner, after using the live K5 wiring page: "the site nav is
+overwhelming. you need to run sims on it see what they think becasue its a rough ride". His picture is a workshop where all the
+tools and parts are already out, which doesn't help anyone get started: "you need to ease into it case by case". He says
+agent-made design crammed in useful-seeming things, left old conflicting pieces in place, and ended up with "a pdf page in the
+horizontally long frame".
+
+Three cold user simulations (visitor, harness builder, owner) confirmed it on the live page:
+- 40 controls on the first screen, with duplicate tab rows;
+- no answer to "how far along";
+- one wire with three different specs across tabs;
+- no crimp tool anywhere.
+
+The answer, adopted as the plan: `docs/wiring/research/2026-09-30_map-progressive-disclosure-brief.md`.
+- One status line and four doors: See the truck, Follow a wire, Read the manual, What's still missing.
+- Tools appear per task.
+- One source of truth for every number.
+- A portrait reader for the manual.
+- The legacy views are retired as each function moves.
+- Each step ships alone and is re-tested with the same sims.
+
 ---
 
 *This document is the canonical reference for all vehicle profile work. Read it before touching profile code. If your change contradicts this document, stop and reconsider.*
