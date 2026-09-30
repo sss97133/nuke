@@ -456,7 +456,10 @@ def build():
 
     BY = v("belt_y")
     DD = v("damper_d")
-    join("balancer", [ribbed((0, BY, 0), DD, 30), cyl((0, (BY + 15 + (-L - FT)) / 2, 0), 92, abs((-L - FT) - (BY + 15))),
+    # damper inertia ring at the cover, the one-piece pulley out on the belt plane, a dished web between
+    y_ring = -L - FT - 20
+    join("balancer", [ribbed((0, BY, 0), DD, 30), cyl((0, y_ring, 0), DD + 10, 36),
+                      cyl((0, (BY + 15 + y_ring - 18) / 2, 0), 92, abs((y_ring - 18) - (BY + 15)), d2=150),
                       cyl((0, BY - 17, 0), 60, 6)], "damper", bevel=0)
 
     # oil pan: shallow front, rear sump (model not on record)
@@ -545,6 +548,9 @@ def build():
           cyl((WX, yc_ - 4, WZ), 190, D_ + 8),                                      # water-pump boss
           cyl((-240, yc_, 118), 70, D_),                                            # thermostat housing (passenger end)
           post(IX, IZ, 34), post(TX, TZ - 45, 56)]                                  # idler post, tensioner arm boss
+    for sig in (1, -1):   # legs back to the heads' front faces, where the pump bolts over the coolant outlets
+        hf = HEAD_Y[sig] - v("head_len") / 2
+        mm.append(cyl((sig * 125, (FACE + hf) / 2 + 2, 185), 56, abs(hf - FACE) + 4))
     join("midmount_bracket", mm, "manifold", bevel=4)
     join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
 
@@ -614,7 +620,7 @@ def build():
         ye = v("downpipe_end_y")
         dp = [Vector((sig * LX, y_out + 4, OZ - 8)), Vector((sig * (LX + 8), y_out + 50, OZ - 75)),
               Vector((sig * (LX + 15), y_out + 180, OZ - 100)), Vector((sig * (LX + 15), ye, OZ - 105))]
-        join(f"downpipe_{tag}", [tube(f"downpipe_{tag}", dp, v("downpipe_d"), "pipe")], "pipe")
+        join(f"downpipe_{tag}", [tube(f"downpipe_{tag}", dp, v("downpipe_d"), "pipe", res=16)], "pipe")
     return dict(length=length, arcs=arcs, inj=inj_pos, ports=ports, pad_z=PAD_Z, belt_y=BY)
 
 
