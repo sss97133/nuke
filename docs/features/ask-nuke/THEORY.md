@@ -433,3 +433,45 @@ bid-curve share). At 1.25× or more it reads hot; at 0.8× or less, cold. There'
   happened with the SL500.
 
 This follows the 2026-07-09 ruling above: data handling is the product, and the prediction comes free with it.
+
+## Owner notes, 2026-09-30: hot is a calibrated spectrum, with its why
+
+Skylar, typed directly to the lead from the airport, looking at the live homepage (the Porsche drill: "RUNNING HOT 200",
+"HOT 1.6×" tags on the ending-next list, timers reading "2h 19m"), word for word:
+
+> running hot should run hot should show the metrics what hot means should show how much outside the regular patterns its
+> operating and why... this is so easy to do just not being done cuz of data... running hot means the comments are highly
+> engaging the bid pattern is outside typical ranges, the profile of bidders and commenters are highly weighed. thats why we
+> need to make sure the data behind the is actually there... otherwise we have a list of shitty autotrader tiny images and
+> blah text even if its accurate. the timers should be clicking the second. need to see some type of movement. the dead
+> space could be showing the bids or comments and their weighs weight being how far outside the average balance they
+> are... does this make sense does it lead you to a type of practice in data hygiene, data quantification etc the hot cold
+> should actually be a spectrum that is calibrated by the entire group of all data and breaks down as you drill in to
+> departments... a mustang bidding at 12k is cold compared to a single porsche bid of 175k but maybe the porsche deal ends
+> at that lets say the mustang is a crazy battle and comments and then bidding picks up and ends at 20-30k. its a vibrant
+> auction for its niveau. its just small hands at the black jack table. compared to the big table.. thats the issue im
+> seeing with the homepage its completely weighed out by the high end market. but all that means is we are prioritizing
+> certain weighs that make it boring and hard to connect to.. looking at a picture of a gold bar is a lot different
+> experience than holding one and in turn than owning one...
+
+**The practice it names (the lead's reading, stated back to him the same day):**
+1. **Temperature is relative to the lot's own table.** A lot is scored only against lots like it: same model (widening to
+   make, then department, only when too few), at the same hours to close. Price is one input. The others are bids,
+   distinct bidders, comment pace, and how heavy those bidders and commenters are (their own history on the platform).
+   A $20k Mustang battle and a quiet $175k Porsche are each scored inside their own table, so dollar size never sets the
+   heat.
+2. **One spectrum, calibrated on all the data, drillable.** The score is a percentile against the whole comparable set,
+   so it means the same thing on every table. The homepage ranks by it, not by dollars. Drilling into a department
+   re-ranks inside the department.
+3. **Every label prints its why.** "HOT" carries the measures that put it there, each as a count against typical
+   ("33 bids vs 23 typical at 5 h out · 14 bidders vs 11 · bid 23rd percentile"), plus the comparison set's size.
+4. **Hygiene before display.** Each measure states its coverage: how many comparables carry full bid and comment
+   history. Below the floor (8 comparables, as in `live_lot_temperature`, PR #482), the measure says so and draws
+   nothing. An accurate list of small photos and plain text is not the product.
+5. **Movement.** Timers tick by the second. The space beside a live lot shows its latest bids and comments, each
+   weighted by how far it sits from the lot's usual pace (a bid's jump against the typical increment, a comment burst
+   against the typical rate).
+
+**Built so far:** PR #482 (price and activity against same-model lots at the same hours to close, one read-only
+function). Next: comments and bidder weight in the score, the score precomputed for every live lot on the live pull's
+cadence (a schema decision, SCHEMA_LAW first), the ticking timers, and the weighted bid/comment stream.
