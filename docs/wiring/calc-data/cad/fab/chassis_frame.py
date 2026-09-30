@@ -455,7 +455,12 @@ def strip_and_scan(path):
     js = json.dumps(j, separators=(",", ":")).encode()
     js += b" " * ((4 - len(js) % 4) % 4)
     raw = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(js) + len(rest)) + struct.pack("<I4s", len(js), b"JSON") + js + rest
-    hits = [w for w in (b"blendermcp", b"api_key", b"sketchfab") if w in raw.lower()]
+    # the lead's GLB rules (2026-09-30): no credential words, no 32-hex runs, no Draco (prod's CSP blocks the decoder)
+    import re
+    low = raw.lower()
+    hits = [w for w in (b"api_key", b"token", b"secret", b"blendermcp", b"sketchfab") if w in low]
+    hits += [b"hex32"] if re.search(rb"[0-9a-fA-F]{32}", raw) else []
+    hits += [b"draco"] if b"KHR_draco" in raw else []
     if hits:
         raise SystemExit(f"refusing to ship {path}: found {hits}")
     path.write_bytes(raw)
