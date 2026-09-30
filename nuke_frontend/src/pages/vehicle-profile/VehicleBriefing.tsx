@@ -16,7 +16,7 @@ import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
-import { useVehiclePriceFacts, type PriceFacts } from './hooks/useVehiclePriceFacts';
+import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
 // ---------------------------------------------------------------------------
 // Eye read — the evidence-graded appraisal (vehicle_condition_scores).
@@ -63,6 +63,23 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
     return () => { alive = false; };
   }, [vehicleId]);
   return read;
+}
+
+// ---------------------------------------------------------------------------
+// Market event: what a model estimate or a deal verdict is defended against
+// (owner rule: never show a price you can't defend). The typed price says which exists:
+// - a price: a proven sale, a bid or a current ask (price_kind sold / bid / ask);
+// - a listing with no price yet: a live or upcoming auction, or a for-sale listing
+//   (outcome active / for_sale).
+// The estimate needs either one; the deal verdict needs a price. A car that isn't
+// listed, such as an owner's build, has neither, so it shows no estimate and no
+// verdict. sale_status alone can't tell: 'available' is also carried by unlisted cars.
+// ---------------------------------------------------------------------------
+
+function marketDefends(p: PriceFacts | null): { estimate: boolean; deal: boolean } {
+  const priced = priceKindLabel(p) !== null;
+  const listed = p?.outcome === 'active' || p?.outcome === 'for_sale';
+  return { estimate: priced || listed, deal: priced };
 }
 
 // ---------------------------------------------------------------------------
@@ -195,8 +212,8 @@ function generateHeadline(
     };
   }
 
-  // Priority 6: Estimate available
-  if (estimate && estimate > 0) {
+  // Priority 6: Estimate available, and a market event to defend it
+  if (estimate && estimate > 0 && marketDefends(priceFacts).estimate) {
     const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
     return {
       text: `Estimated value: ${fmt(estimate)}`,
@@ -297,6 +314,7 @@ const VehicleBriefing: React.FC = () => {
   const comps = vehicleIntel?.recent_comps;
   const apparitions = vehicleIntel?.apparitions;
   const sentiment = vehicleIntel?.comment_intel;
+  const defended = marketDefends(priceFacts);
 
   // Compute stat pills
   const pills: StatPillProps[] = [];
@@ -315,7 +333,7 @@ const VehicleBriefing: React.FC = () => {
     if (eyeRead.frames) {
       pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
     }
-  } else if (estimate && estimate > 0) {
+  } else if (estimate && estimate > 0 && defended.estimate) {
     // Legacy model estimate only when no evidence read exists — and labeled as such.
     pills.push({
       label: 'MODEL EST',
@@ -323,7 +341,7 @@ const VehicleBriefing: React.FC = () => {
     });
   }
 
-  if (scores?.deal_score != null && scores.deal_score !== 0) {
+  if (defended.deal && scores?.deal_score != null && scores.deal_score !== 0) {
     const ds = scores.deal_score;
     const label = ds > 50 ? 'GOOD DEAL' : ds > 0 ? 'FAIR' : 'ABOVE MKT';
     const accent = ds > 50 ? 'var(--vp-brg, #004225)' : ds > 0 ? 'var(--text)' : 'var(--vp-danger, #d13438)';
