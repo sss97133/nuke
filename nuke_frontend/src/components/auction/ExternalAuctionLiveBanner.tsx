@@ -3,6 +3,7 @@ import { useExternalAuctionSync } from '../../hooks/useExternalAuctionSync';
 import { supabase } from '../../lib/supabase';
 import PlatformCredentialForm from '../bidding/PlatformCredentialForm';
 import { formatCurrencyAmount } from '../../utils/currency';
+import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 
 interface ExternalAuctionLiveBannerProps {
   /** External listing ID */
@@ -68,15 +69,8 @@ function formatTimeRemaining(endDate: string | null): { text: string; urgency: U
   else if (diff <= 900000) urgency = 'urgent';         // < 15 min - orange
   else if (diff <= 3600000) urgency = 'gettingClose';  // < 1 hour - coral/warm
 
-  if (days > 0) {
-    return { text: `${days}d ${hours}h`, urgency, ended: false };
-  } else if (hours > 0) {
-    return { text: `${hours}h ${minutes}m`, urgency, ended: false };
-  } else if (minutes > 0) {
-    return { text: `${minutes}m ${seconds}s`, urgency, ended: false };
-  } else {
-    return { text: `${seconds}s`, urgency, ended: false };
-  }
+  if (days === 0 && hours === 0 && minutes === 0) return { text: `${seconds}s`, urgency, ended: false };
+  return { text: timeLeft(diff), urgency, ended: false };
 }
 
 // Color mapping for urgency levels - NO YELLOW
@@ -159,18 +153,10 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   }, [platform, isActive]);
 
   // Live countdown timer
-  const [timeState, setTimeState] = useState(() => formatTimeRemaining(endDate));
+  // Ticks on the page's one shared 1-second clock.
+  useSecondClock(Boolean(endDate));
+  const timeState = formatTimeRemaining(endDate);
   const [pulsePhase, setPulsePhase] = useState(0);
-
-  useEffect(() => {
-    if (!endDate) return;
-
-    const update = () => setTimeState(formatTimeRemaining(endDate));
-    update();
-
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [endDate]);
 
   // Pulsing effect for critical urgency
   useEffect(() => {

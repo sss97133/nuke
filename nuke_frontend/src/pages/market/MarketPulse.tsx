@@ -2,7 +2,9 @@ import React, { createContext, useCallback, useContext, useEffect, useLayoutEffe
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
+import { useLotMovement, weigh, type LotMovement, type MovementItem } from './useLotMovement';
 import { NO_MAKE, useMarketPulse, useSameHourReadings, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
@@ -52,16 +54,13 @@ function usd(n: number | null | undefined, compact = false): string {
   return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
-function left(ms: number): string {
-  if (ms <= 0) return 'ENDED';
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m ${String(sec).padStart(2, '0')}s`;
+const left = timeLeft;
+
+// "2 h out", "40 min out", "3.5 days out": where in the auction a measure was taken.
+function out(hours: number): string {
+  if (hours >= 48) return `${(hours / 24).toFixed(1)} days out`;
+  if (hours >= 1) return `${Math.round(hours)} h out`;
+  return `${Math.max(1, Math.round(hours * 60))} min out`;
 }
 
 // In the viewer's own time zone.
@@ -73,15 +72,10 @@ function title(a: LiveAuction): string {
   return a.title ?? [a.year, a.make === NO_MAKE ? null : a.make, a.model].filter(Boolean).join(' ');
 }
 
-// A clock that ticks every second while the auction is in its last hour, every
-// 30 s before that. The countdown is the only thing on the page that moves on its own.
+// Every countdown ticks by the second on the page's one shared clock (useSecondClock).
 function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
-  const [now, setNow] = useState(() => Date.now());
+  const now = useSecondClock();
   const remaining = endsAt - now;
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), remaining < HOUR ? 1000 : 30_000);
-    return () => window.clearInterval(id);
-  }, [remaining < HOUR]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <span style={{ ...mono, fontWeight: strong || remaining < HOUR ? 700 : 400, color: remaining < HOUR ? 'var(--text)' : 'var(--text-secondary)' }}>
       {left(remaining)}
@@ -359,11 +353,16 @@ function explainHeat(a: LiveAuction, heat: Heat): string {
 // attribute stays for mouse users. Tags sit inside row links, so the tap must not open the car.
 const ExplainContext = createContext<((a: LiveAuction, heat: Heat) => void) | null>(null);
 
-function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat | null | undefined }) {
+// The tag carries its why: the measure, where in the auction it was taken, and the comparison set's size.
+function heatWhy(a: LiveAuction, heat: Heat): string {
+  return `${heat.state === 'hot' ? 'Hot' : 'Cold'} · bid ${multiple(heat.ratio)} typical at ${out(heat.hoursLeft)} · ${a.band?.comps ?? 0} comps`;
+}
+
+function HeatTag({ a, heat, style }: { a: LiveAuction; heat: Heat | null | undefined; style?: React.CSSProperties }) {
   const explain = useContext(ExplainContext);
   if (!heat || heat.state === 'in line') return null;
   const hot = heat.state === 'hot';
-  const text = `${hot ? 'Hot' : 'Cold'} ${multiple(heat.ratio)}`;
+  const text = heatWhy(a, heat);
   const open = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -377,7 +376,7 @@ function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat | null | undefined })
       aria-label={explain ? `${text}: why` : undefined}
       onClick={explain ? open : undefined}
       onKeyDown={explain ? (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); } : undefined}
-      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', flexShrink: 0, whiteSpace: 'nowrap', cursor: explain ? 'pointer' : undefined }}
+      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', minWidth: 0, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: explain ? 'pointer' : undefined, ...style }}
     >
       {text}
     </span>
@@ -602,8 +601,74 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   );
 }
 
+// ---- Movement -----------------------------------------------------------------------------------
+// Under each lot in Ending next: its latest bids and comments (auction_comments), each with its weight against the
+// lot's own pace. A bid's weight is its step over the lot's previous bid against the median step in view; the
+// comment line counts the last hour against the lot's average hour since it opened. Amounts and times only.
+
+function ago(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+const KIND: Record<MovementItem['kind'], string> = { bid: 'Bid', comment: 'Comment', question: 'Question', seller: 'Seller' };
+
+// Weight as a bar: 1x (the lot's usual) fills a quarter, 4x or more fills it; 1.5x or more is drawn strong.
+function WeightBar({ w, title: t }: { w: number; title: string }) {
+  return (
+    <span title={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      <span style={{ position: 'relative', width: 32, height: 6, background: 'var(--border)' }}>
+        <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(1, w / 4) * 100}%`, background: w >= 1.5 ? 'var(--success)' : 'var(--text-secondary)' }} />
+      </span>
+      <span style={{ ...mono, fontWeight: w >= 1.5 ? 700 : 400 }}>{w.toFixed(1)}×</span>
+    </span>
+  );
+}
+
+const MOVEMENT_ITEMS = 3;
+
+function Movement({ m }: { m: LotMovement }) {
+  const now = useSecondClock();
+  const items = m.items.slice(0, MOVEMENT_ITEMS);
+  if (items.length === 0) return null;
+  const pace = m.total != null && m.hoursListed ? m.total / m.hoursListed : null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
+      {items.map((it, i) => (
+        <div key={`${it.at}-${i}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', minWidth: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0, color: it.kind === 'bid' ? 'var(--text)' : 'var(--text-secondary)' }}>{KIND[it.kind]}</span>
+          {it.amount != null && <span style={{ ...mono, color: 'var(--text)' }}>{usd(it.amount, true)}</span>}
+          {it.step != null && <span style={mono}>+{usd(it.step, true)}</span>}
+          {it.weight != null && m.medianStep != null && (
+            <WeightBar w={it.weight} title={`A +${usd(it.step)} step against a median step of ${usd(m.medianStep)} over this lot's ${m.steps} bid steps in view`} />
+          )}
+          <span style={{ ...mono, marginLeft: 'auto', flexShrink: 0 }}>{ago(now - it.at)}</span>
+        </div>
+      ))}
+      {m.burst != null && pace != null && m.lastHour > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
+          <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0 }}>Last hour</span>
+          <span style={mono}>{m.lastHourFloor ? '≥' : ''}{m.lastHour} posted</span>
+          <WeightBar w={m.burst} title={`${m.lastHour} comments and bids in the last hour against this lot's average of ${pace.toFixed(1)} an hour (${m.total} over ${Math.round(m.hoursListed as number)} h since it opened, BaT's 7-day run)`} />
+          <span>vs {pace.toFixed(1)}/h usual</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction[]; risenIds: Set<string>; stale: boolean; heat: Map<string, Heat | null> }) {
   const next = auctions.slice(0, 8);
+  const key = next.map((a) => a.id).join(',');
+  const ids = useMemo(() => (key ? key.split(',') : []), [key]);
+  const { data: rows, dataUpdatedAt } = useLotMovement(ids);
+  const movement = useMemo(
+    () => (rows ? weigh(rows, new Map(next.map((a) => [a.id, a.endsAt])), dataUpdatedAt || Date.now()) : null),
+    [rows, dataUpdatedAt] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   if (next.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -611,18 +676,19 @@ function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction
         <Link
           key={a.id}
           to={`/vehicle/${a.id}`}
-          style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 8px', borderBottom: '2px solid var(--border)', textDecoration: 'none', color: 'var(--text)' }}
+          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 8px', borderBottom: '2px solid var(--border)', textDecoration: 'none', color: 'var(--text)' }}
         >
           <Thumb src={a.imageUrl} size={54} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11, marginTop: 2 }}>
-              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                <BidCell auction={a} risen={risenIds.has(a.id)} stale={stale} />
-                <HeatTag a={a} heat={heat.get(a.id)} />
-              </span>
+              <BidCell auction={a} risen={risenIds.has(a.id)} stale={stale} />
               <Countdown endsAt={a.endsAt} strong />
             </div>
+            {heat.get(a.id) && heat.get(a.id)?.state !== 'in line' && (
+              <div style={{ display: 'flex', marginTop: 3 }}><HeatTag a={a} heat={heat.get(a.id)} /></div>
+            )}
+            {movement?.get(a.id) && <Movement m={movement.get(a.id) as LotMovement} />}
           </div>
         </Link>
       ))}
@@ -640,7 +706,7 @@ function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: bo
   const name = <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 8 : 10, padding: '0 8px', height: narrow ? ROW_H_NARROW : ROW_H, boxSizing: 'border-box', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
-      <div style={{ width: narrow ? 58 : 84, flexShrink: 0 }}>
+      <div style={{ width: narrow ? 74 : 84, flexShrink: 0 }}>
         <Countdown endsAt={a.endsAt} />
       </div>
       <Link to={`/vehicle/${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, textDecoration: 'none', color: 'var(--text)' }}>
@@ -649,11 +715,11 @@ function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: bo
           // A phone has no room for tags beside the title: they go under it.
           <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             {name}
-            {tagged && <span style={{ display: 'flex', gap: 4 }}><HeatTag a={a} heat={heat} />{nr}</span>}
+            {tagged && <span style={{ display: 'flex', gap: 4, minWidth: 0 }}><HeatTag a={a} heat={heat} />{nr}</span>}
           </span>
         ) : name}
       </Link>
-      {!narrow && <HeatTag a={a} heat={heat} />}
+      {!narrow && <HeatTag a={a} heat={heat} style={{ flexShrink: 0 }} />}
       {!narrow && nr}
       <div style={{ width: narrow ? 76 : 104, textAlign: 'right', flexShrink: 0 }}>
         <BidCell auction={a} risen={risen} stale={stale} />
@@ -824,6 +890,9 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         </section>
         <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
+          <div style={{ fontSize: 9, color: 'var(--text-secondary)', padding: '4px 8px', borderBottom: '2px solid var(--border)' }}>
+            Latest bids and comments. × = against the lot's own usual: a bid's step vs its median step in view; the last hour vs its average hour since it opened.
+          </div>
           <EndingNext auctions={live.filter((a) => make == null || a.make === make)} risenIds={risenIds} stale={syncBehind} heat={heat} />
         </section>
       </div>

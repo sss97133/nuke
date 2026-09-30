@@ -23,6 +23,7 @@ import { factoryMsrp } from './factoryMsrp';
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { CommentsPopup } from '../../components/popups/CommentsPopup';
 import { BidsPopup } from '../../components/popups/BidsPopup';
+import { timeLeft } from '../../hooks/useSecondClock';
 
 // Extracted pure utilities (no React dependencies)
 import {
@@ -457,24 +458,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const end = new Date(iso).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - auctionNow;
-    // For very long auctions (>30 days), show days/hours format instead of full countdown
-    const veryLongThreshold = 30 * 24 * 60 * 60 * 1000;
     const maxReasonable = 60 * 24 * 60 * 60 * 1000; // Allow up to 60 days
     if (diff > maxReasonable) return null;
     // Don't show redundant "Ended" when SOLD badge is already visible
     if (diff <= 0) return skipEndedText ? null : 'Ended';
-    const totalSeconds = Math.floor(diff / 1000);
-    const d = Math.floor(totalSeconds / 86400);
-    const h = Math.floor((totalSeconds % 86400) / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    // For very long auctions, show simplified format (e.g., "19d 18h")
-    if (diff > veryLongThreshold) {
-      return `${d}d ${h}h`;
-    }
-    if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
-    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    // Seconds under 24 h ("2h 19m 04s"), days and hours beyond: the same clock face as the homepage.
+    return timeLeft(diff);
   };
 
   // Same computation as auctionEndDateForTimer above — alias to avoid duplicate useMemo
