@@ -102,7 +102,7 @@ P = {
     "pad_bolts": D("5.16 x 5.625 in", H10690 + ": 'Carburetor Flange - Standard 4150'", "maker", 0.0),
     "pad_w": D(146.0, "4150 flange outline (bolt pattern 131 x 143 plus bosses)", "derived", 5.0),
     "pad_y": D(-240.0, PH31 + " / " + PH32 + ": the 4150 pad sits at mid-rear of the plenum", "photo", 40.0),
-    "plenum_len": D(300.0, PH31 + ": plenum between the runner rows", "photo", 40.0),
+    "plenum_len": D(200.0, PH31 + ": plenum under the TB riser, the runners radiating from it", "photo", 40.0),
     "plenum_w": D(170.0, PH31 + ": plenum between the rails", "photo", 25.0),
     "runner_d": D(56.0, "runners drawn round at the port's area-equivalent size (29.2 x 63.5 port); the casting's runners are rectangular", "derived", 8.0),
     "adapter_h": D(25.0, "Delmo Speed 4150-to-4-bolt truck TB adapter (order record obs:a58db14b), docs/wiring/twin/build_engine_v3.py 'tb_adapter_h' (photo)", "photo", 8.0),
@@ -359,6 +359,29 @@ def tube(name, pts, d, key, closed=False, res=10):
     return bm
 
 
+def text_mesh(body, size, depth):
+    """raised lettering in the XY plane (reads along +X, up +Y, raised along +Z), centred on the origin"""
+    cu = bpy.data.curves.new("text", "FONT")
+    cu.body = body
+    cu.size = size
+    cu.extrude = depth / 2
+    cu.resolution_u = 2          # keeps the lettering to a few thousand triangles
+    cu.align_x, cu.align_y = "CENTER", "CENTER"
+    for f in ("/System/Library/Fonts/Supplemental/Brush Script.ttf",):   # a script face like the covers'; Blender's own font otherwise
+        if Path(f).exists():
+            cu.font = bpy.data.fonts.load(f)
+    ob = bpy.data.objects.new("text", cu)
+    bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(ob)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bpy.data.meshes.remove(me)
+    bmesh.ops.translate(bm, vec=Vector((0, 0, depth / 2)), verts=bm.verts)
+    return bm
+
+
 def empty(name, p_local, note=""):
     ob = bpy.data.objects.new(name, None)
     ob.empty_display_type = "ARROWS"
@@ -395,6 +418,14 @@ def build():
         join(f"head_{tag}", [bank_box(sig, 0, HH, -HW / 2, HW / 2, yc - HL / 2, yc + HL / 2)], "block", bevel=4)
         CW, CH = v("cover_w"), v("cover_h")
         join(f"valve_cover_{tag}", [bank_box(sig, HH, HH + CH, -CW / 2, CW / 2, yc - HL / 2 + 8, yc + HL / 2 - 8)], "cover", bevel=14)
+        # the covers' embossed "Chevrolet" script on the outer face (IMG_6530 / IMG_6532), redrawn, cosmetic
+        n3 = Vector((sig * S45, 0, C45))
+        t3 = Vector((sig * C45, 0, -S45))
+        rot = Matrix((Vector((0, sig, 0)), n3, t3)).transposed().to_4x4()
+        txt = text_mesh("Chevrolet", 64.0, 2.5)
+        bmesh.ops.transform(txt, matrix=rot, verts=txt.verts)
+        bmesh.ops.translate(txt, vec=bank_pt(sig, HH + CH / 2, CW / 2 + 1.0, yc), verts=txt.verts)
+        join(f"valve_cover_script_{tag}", [txt], "cover")
 
     # front cover (Gen IV timing cover) and the balancer
     FT = v("front_cover_t")
@@ -415,7 +446,8 @@ def build():
     # ---- intake
     PAD_Y, PL, PW = v("pad_y"), v("plenum_len"), v("plenum_w")
     PAD_Z = VZ + v("pad_above_valley")
-    parts = [box((0, PAD_Y + 20, (VZ + 12 + PAD_Z - 12) / 2), (PW, PL, PAD_Z - 12 - VZ - 12)),
+    PZ0 = VZ + 12                                                   # plenum floor, on the valley plate
+    parts = [box((0, PAD_Y, (PZ0 + PAD_Z - 12) / 2), (PW, PL, PAD_Z - 12 - PZ0)),
              box((0, PAD_Y, PAD_Z - 6), (v("pad_w"), v("pad_w") + 12, 12)),
              box((0, HEAD_Y[1] / 2 + HEAD_Y[-1] / 2, VZ + 6), (2 * inner[0] - 20, v("head_len") - 30, 12))]
     RD = v("runner_d")
@@ -424,10 +456,15 @@ def build():
         sig = BANK[cyl_n]
         p0 = bank_pt(sig, v("port_s"), -HW / 2 - 4, y)
         into = Vector((-t_(sig)[0], 0, -t_(sig)[1]))
-        p1 = p0 + into * 45
-        yend = PAD_Y + 20 + (y - (PAD_Y + 20)) * 0.55
-        p2 = Vector((sig * (PW / 2 + 15), (y + yend) / 2, PAD_Z - 33))
-        p3 = Vector((sig * (PW / 2 - 30), yend, PAD_Z - 41))
+        p1 = p0 + into * 40
+        # runners radiate from the plenum as in IMG_6531: each enters the plenum wall on the line from the plenum
+        # centre to its port (the front pair through the front face, the Λ in the photo; the rest through the sides)
+        dx, dy = p0.x, y - PAD_Y
+        k = min((PW / 2) / abs(dx), (PL / 2) / abs(dy) if dy else 9e9)
+        ex, ey = dx * k, PAD_Y + dy * k
+        z_in = (PZ0 + PAD_Z - 12) / 2 + 8
+        p3 = Vector((ex * 0.8, PAD_Y + (ey - PAD_Y) * 0.8, z_in))
+        p2 = Vector((ex + (p1.x - ex) * 0.45, ey + (y - ey) * 0.45, z_in + 6))
         parts.append(tube(f"runner_{cyl_n}", [p0, p1, p2, p3], RD, "intake"))
         # port flange boss on the head's intake face
         parts.append(bank_box(sig, v("port_s") - 42, v("port_s") + 42, -HW / 2 - 14, -HW / 2, y - 26, y + 26))
