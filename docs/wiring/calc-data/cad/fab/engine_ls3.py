@@ -111,6 +111,8 @@ P = {
     "rail_xz": D((150.0, 372.0), PH31 + " / " + PH32 + ": rails ride just inboard of the valve covers, above the injector bosses", "photo", 20.0),
     # ---- Holley Mid-Mount, A/C delete (receipt 835f0223)
     "mm_bolt": D(115.0, H335 + " p.2 hardware: 'Flange Head Bolt, M8 x 1.25 x 115 - Manifold to Engine Block' (x5)", "maker", 0.0),
+    "mm_outline": D("18-point front outline", H335_BELT + " (the casting's front outline traced at the same scale; the A/C adapter corner removed for the A/C-delete 85R9913)", "scaled", 10.0),
+    "pk_rib": D(3.56, "PK (6PK) belt rib pitch; the grooved pulleys are drawn with 6 grooves 2.4 deep", "derived", 0.5),
     "mm_depth": D(95.0, "M8 x 115 bolt less ~20 mm thread engagement = the manifold's depth at its bolt bosses", "derived", 8.0),
     "belt_y": D(-690.0, "belt plane: the 190 mm alternator (pulley front to rear cover) must clear the driver head's front face (-512); "
                 "rear cover 6 mm ahead of it puts the pulley centre at -690", "derived", 20.0),
@@ -134,8 +136,8 @@ P = {
     "tens_xz": D((-168.0, 240.0), "x off " + PH31 + " (scaled against the alternator offset); z solved so the belt path closes at the 6PK1539 length", "derived", 15.0),
     # ---- shorty cast headers (owner testimony; PN unknown)
     "hdr_port_s": D(40.0, "exhaust port centre above the deck, on the head's exhaust face; not dimensioned", "assumed", 12.0),
-    "hdr_primary_d": D(48.0, PH30 + " / " + PH32 + ": cast primaries against the port pitch (111.76)", "photo", 8.0),
-    "hdr_log_d": D(62.0, PH30 + " / " + PH32 + ": the lower log the primaries merge into", "photo", 10.0),
+    "hdr_primary_d": D(54.0, PH30 + " / " + PH32 + ": cast primaries against the port pitch (111.76)", "photo", 8.0),
+    "hdr_log_d": D(66.0, PH30 + " / " + PH32 + ": the lower log the primaries merge into", "photo", 10.0),
     "hdr_log_x": D(300.0, PH30 + " / " + PH32 + "; stays inside the frame rails' inside faces at +-353 (" + FR88 + ")", "photo", 20.0),
     "hdr_log_z": D(0.0, PH30 + " / " + PH32 + ": the log runs at about crank height", "photo", 35.0),
     "hdr_outlet_z": D(-70.0, PH30 + ": collector flange at the rear bottom, facing down", "photo", 30.0),
@@ -273,6 +275,26 @@ def cyl(c, d, length, axis="y", seg=40, d2=None):
     bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=d / 2, radius2=(d2 or d) / 2, depth=length)
     rot = {"z": Matrix.Identity(3), "y": Matrix.Rotation(math.radians(-90), 3, "X"), "x": Matrix.Rotation(math.radians(90), 3, "Y")}[axis]
     bmesh.ops.transform(bm, matrix=rot.to_4x4(), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=Vector(c), verts=bm.verts)
+    return bm
+
+
+def ribbed(c, d, width, ribs=6, depth=2.4, seg=56):
+    """a grooved (poly-V) pulley along y: a lathe profile with `ribs` grooves across the belt width, centred at c"""
+    bm = bmesh.new()
+    R, w = d / 2, width
+    pitch = v("pk_rib")
+    band = min(w, ribs * pitch)
+    prof = [(0.01, -w / 2), (R, -w / 2), (R, -band / 2)]
+    for i in range(ribs):
+        y0 = -band / 2 + i * pitch
+        prof += [(R - depth, y0 + pitch / 2), (R, y0 + pitch)]
+    prof += [(R, w / 2), (0.01, w / 2)]
+    vs = [bm.verts.new((r, y, 0.0)) for r, y in prof]
+    es = [bm.edges.new((vs[i], vs[i + 1])) for i in range(len(vs) - 1)]
+    bmesh.ops.spin(bm, geom=vs + es, cent=(0, 0, 0), axis=(0, 1, 0), angle=2 * math.pi, steps=seg, use_merge=True)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.02)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bmesh.ops.translate(bm, vec=Vector(c), verts=bm.verts)
     return bm
 
@@ -434,7 +456,7 @@ def build():
 
     BY = v("belt_y")
     DD = v("damper_d")
-    join("balancer", [cyl((0, BY, 0), DD, 30), cyl((0, (BY + 15 + (-L - FT)) / 2, 0), 92, abs((-L - FT) - (BY + 15))),
+    join("balancer", [ribbed((0, BY, 0), DD, 30), cyl((0, (BY + 15 + (-L - FT)) / 2, 0), 92, abs((-L - FT) - (BY + 15))),
                       cyl((0, BY - 17, 0), 60, 6)], "damper", bevel=0)
 
     # oil pan: shallow front, rear sump (model not on record)
@@ -514,14 +536,17 @@ def build():
     D_ = FACE - MF                                                               # manifold depth ahead of the cover
     yc_ = (MF + FACE) / 2
     post = lambda x, z, d: cyl((x, (MF + BY + 13) / 2, z), d, abs(MF - (BY + 13)))
-    mm = [cyl((WX, yc_, WZ), 190, D_),                                             # water-pump housing
-          box((0, yc_ + 8, 100), (300, D_ - 16, 80)),                               # lower web over the timing cover
-          box((-137, yc_ + 5, 215), (195, D_ - 10, 130)),                           # passenger arm (tensioner, idler)
-          box((142, yc_ + 8, 118), (165, D_ - 16, 95)),                             # driver low arm (P/S pump)
-          box((105, yc_ + 8, 200), (90, D_ - 16, 60)),                              # driver ear pad under the alternator
+    # front outline of the casting traced off the 199R11335 p.12 render at the same scale (1.453 px/mm, crank at
+    # render px 425, 574), with the A/C adapter corner removed for the A/C-delete 85R9913
+    outline = [(-65, 116), (65, 116), (93, 168), (127, 189), (148, 223), (134, 271), (93, 292), (52, 271), (0, 278),
+               (-65, 271), (-114, 237), (-155, 223), (-189, 189), (-224, 168), (-265, 147), (-265, 92), (-189, 85),
+               (-120, 106)]
+    mm = [prism_xz(outline, MF, FACE),
+          cyl((WX, yc_ - 4, WZ), 190, D_ + 8),                                      # water-pump boss
+          cyl((-240, yc_, 118), 70, D_),                                            # thermostat housing (passenger end)
           post(IX, IZ, 34), post(TX, TZ - 45, 56)]                                  # idler post, tensioner arm boss
     join("midmount_bracket", mm, "manifold", bevel=4)
-    join("midmount_fittings", [cyl((-95, MF - 20, 212), 19, 45), cyl((-215, MF - 18, 150), 38, 40)], "chrome")
+    join("midmount_fittings", [cyl((-95, MF - 20, 225), 19, 45), cyl((-240, MF - 18, 110), 38, 40)], "chrome")   # heater barb, inlet (IMG_6531)
 
     join("water_pump", [cyl((WX, BY, WZ), v("wp_d"), 30), cyl((WX, (BY + MF) / 2, WZ), 70, abs(MF - BY) + 4),
                         cyl((WX, BY - 16, WZ), 44, 6)], "anod", bevel=0)
@@ -530,15 +555,15 @@ def build():
     y_front = BY - 14
     join("alternator_197-302", [cyl((AX, y_front + 28 + (AL - 28) / 2, AZ), ACD, AL - 28),
                                 cyl((AX, y_front + 28 + 12, AZ), ACD + 10, 18)], "alt", bevel=3)
-    join("alternator_pulley", [cyl((AX, BY, AZ), APD, 28), cyl((AX, BY - 15, AZ), 30, 4)], "anod")
+    join("alternator_pulley", [ribbed((AX, BY, AZ), APD, 28), cyl((AX, BY - 15, AZ), 30, 4)], "anod")
 
     PSD = v("ps_pulley_d")
-    join("ps_pulley", [cyl((PX, BY, PZ), PSD, 26), cyl((PX, BY + 8, PZ), 50, 40)], "anod")
+    join("ps_pulley", [ribbed((PX, BY, PZ), PSD, 26), cyl((PX, BY + 8, PZ), 50, 40)], "anod")
     RES = v("res_d")
     join("ps_pump", [cyl((PX, BY + 30 + 55, PZ), v("ps_body_d"), 110),
                      cyl((PX + 55, BY + 95, PZ + 55), RES, 105, axis="z"),
                      cyl((PX + 55, BY + 95, PZ + 55 + 58), 60, 12, axis="z")], "plastic", bevel=2)
-    join("tensioner", [cyl((TX, BY, TZ), v("tens_d"), 26), box((TX + 8, BY + 30, TZ - 40), (40, 30, 90))], "anod", bevel=2)
+    join("tensioner", [ribbed((TX, BY, TZ), v("tens_d"), 26), box((TX + 8, BY + 30, TZ - 40), (40, 30, 90))], "anod", bevel=2)
     join("idler", [cyl((IX, BY, IZ), v("idler_d"), 26)], "anod")
 
     # belt path (6PK1539): solve the tangents around the pulleys, loop CCW seen from the front
