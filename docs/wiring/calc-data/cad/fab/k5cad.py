@@ -22,7 +22,8 @@ from pathlib import Path
 
 from build123d import Color, Compound, GeomType, Location, export_step
 
-BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "photo": "#7b3fa0", "design": "#2e7d32", "assumed": "#b3261e"}
+BASIS_COLOR = {"maker": "#1f5fbf", "scaled": "#c46a00", "photo": "#7b3fa0", "design": "#2e7d32", "assumed": "#b3261e",
+               "vendor": "#00838f"}   # vendor: a number only a distributor page states, not the maker
 
 
 @dataclass
@@ -273,7 +274,7 @@ class Sheet:
         if text is None:
             val = v(dimv) if dimv is not None else meas
             text = f"{val:.2f}".rstrip("0").rstrip(".")
-        if basis in ("scaled", "photo"):
+        if basis in ("scaled", "photo", "vendor"):
             text = "≈" + text
         text = prefix + text
         mid = ((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)
@@ -395,7 +396,8 @@ def meta_for(mod, bodies):
                          "basis": "branding, redrawn from photo: text and shapes sized off the maker's product photo; fonts "
                                   "are stand-ins; cosmetic, never used for fit; no maker artwork used",
                          "source": A.get("photo_short", "")} if A.get("branding") else {},
-            "unknowns": A.get("unknowns", []), "cross_checks": A.get("cross_checks", []), "notes": A.get("notes", [])}
+            "unknowns": A.get("unknowns", []), "cross_checks": A.get("cross_checks", []), "notes": A.get("notes", []),
+            **{k: A[k] for k in ("kind", "family", "mates", "pieces", "missing", "cavities", "numbering", "option") if k in A}}
 
 
 def _extent(view, shapes):
@@ -427,7 +429,7 @@ def auto_drawing(mod, bodies, extra, meta, path):
     rw, th_ = rh[0] - rl[0], th[1] - tl[1]
     avail_w, avail_h = 230.0, 230.0
     scale = 1.0
-    for s in (1.0, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05):
+    for s in (3.0, 2.0, 1.0, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05):     # small parts (connectors) draw enlarged
         if (fw + rw) * s + 60 <= avail_w and (fhh + th_) * s + 70 <= avail_h:
             scale = s
             break
@@ -447,14 +449,16 @@ def auto_drawing(mod, bodies, extra, meta, path):
     if hasattr(mod, "annotate"):
         mod.annotate(S, {"front": front, "right": right, "top": top})
     tx, ty = 272, 18
-    ratio = {1.0: "1:1", 0.5: "1:2", 0.4: "1:2.5", 0.25: "1:4", 0.2: "1:5", 0.1: "1:10", 0.05: "1:20"}[scale]
+    ratio = {3.0: "3:1", 2.0: "2:1", 1.0: "1:1", 0.5: "1:2", 0.4: "1:2.5", 0.25: "1:4", 0.2: "1:5", 0.1: "1:10",
+             0.05: "1:20"}[scale]
     S.text((tx, ty), A["title"], size=5.0, anchor="start", weight="bold")
     S.text((tx, ty + 6), f"K5 harness reference model (build123d) · mm · {ratio} · third-angle projection", size=2.8, anchor="start")
     S.text((tx, ty + 10.5), f"Redrawn from {A['maker']}'s published numbers, not a {A['maker']} drawing. Endpoints "
                             f"{', '.join(A['endpoints'])}.", size=2.8, anchor="start")
     S.text((tx, ty + 15), "Origin: " + A["frame"][:120], size=2.6, anchor="start")
     S.text((tx, ty + 21), "blue = printed by the maker · orange ≈ scaled off the maker's drawing · purple ≈ sized off a photo · "
-                          "green = our clearance · red = assumed", size=2.6, anchor="start", weight="bold")
+                          "teal ≈ a distributor's number · green = our clearance · red = assumed", size=2.6, anchor="start",
+           weight="bold")
     y = S.table(mod.P, tx, ty + 28, A["refs"])
     S.text((tx, y + 2), "Colours: " + ", ".join(f"{k} {c[0]}" for k, c in mod.COLORS.items())[:150], size=2.3, anchor="start")
     yy = y + 5.5
@@ -504,7 +508,7 @@ def registry():
         reg = json.loads((CALC / "k5_registry.json").read_text())
         wires = {w["id"]: w for w in reg.get("implied", [])}
         wires.update({w["id"]: w for w in reg["wires"]})
-        _REG.update({"wires": wires, "terminations": reg["terminations"]})
+        _REG.update({"wires": wires, "terminations": reg["terminations"], "endpoints": reg.get("endpoints", {})})
     return _REG
 
 
@@ -525,21 +529,41 @@ def glb_dir(d):
     return [x, z, -y]
 
 
+DOUBLED = {"doubled": True, "doubled_note": "the conductor is folded back on itself in the crimp (registry `doubled`): a "
+                                             "22 AWG wire crimps as 18 AWG, MoTeC C125 manual p.21"}
+
+
 def write_pins(mod, out):
     """<id>.pins.json for a part whose ends are studs or terminals: mod.terminals() -> [{pin, name, at, dir,
-    endpoint, match (regex on the registry termination's cavity text)}]."""
+    endpoint, match (regex on the registry termination's cavity text), part_prefix (optional: only terminations whose
+    contact part number starts with it, e.g. '0460' pins vs '0462' sockets on the two halves of a Deutsch pair), wire
+    (optional: only that wire's termination, e.g. one ring of a stud stack)}]. A row's stud-stack keys (stud, stack, ring,
+    order_basis, note) are copied into pins.json as given, and mod.PINS_EXTRA (optional) is added at the top level."""
     A = mod.PART
     rows = []
     terms = registry()["terminations"]
     for tm in mod.terminals():
         rx = re.compile(tm["match"], re.I)
-        ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))]
+        pref = tm.get("part_prefix")
+        hits = [x for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
+                and (not pref or str(x.get("part") or "").startswith(pref)) and (not tm.get("wire") or x["wire"] == tm["wire"])]
+        ids = [x["wire"] for x in hits]
+        dbl = {x["wire"] for x in hits if x.get("doubled")}
+        if not ids and tm.get("endpoint_cavities"):
+            # no termination rows for this end (implied wires, e.g. a candidate option): the registry endpoint's own
+            # wire -> cavity map, used only on the half that carries the harness wires
+            cav = (registry()["endpoints"].get(tm["endpoint"]) or {}).get("cavities") or {}
+            ids = [w for w, c in cav.items() if rx.search(str(c))]
+            dbl = set()
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
-                     "exit_dir_glb": glb_dir(tm["dir"]), "wires": wire_rows(ids)})
+                     "exit_dir_glb": glb_dir(tm["dir"]), "wires": [dict(w, **(DOUBLED if w["id"] in dbl else {}))
+                                                             for w in wire_rows(ids)],
+                     **{k: tm[k] for k in ("stud", "stack", "ring", "order_basis", "note") if k in tm}})
     (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
         {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug or wire lands, "
                                   "exit_dir = the way the cable leaves",
-         "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text)", "cavities": rows},
+         "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text)",
+         **(getattr(mod, "PINS_EXTRA", None) or {}), "cavities": rows},
         indent=1, ensure_ascii=False))
     return rows

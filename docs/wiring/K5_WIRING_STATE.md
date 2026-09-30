@@ -28,7 +28,7 @@ These are settled. Do not re-propose alternatives unless Skylar reopens.
 | Intake: Holley 300-131 | locked | install doc IMG_9324 |
 | ~~Throttle body: 90mm DBW (GM 12605109)~~ → **Throttle body: DBW GM 12699160** (Skylar ref "for 22-23 Silverado 2500"), mounted where the carb would be. Cut list #4c–#4f pin letters came from 12605109 — re-derive against the 12699160 connector before terminating | 2026-09-24 | Skylar, Gemini thread T75; receipt `2026-09-24_gemini-thread-distillation.md` §2d |
 | Coil bracket: DEL-Stributor, central mount, 8× D510C | locked | `K5_coil_mapping.md`, cut list note |
-| Brake booster: Bosch iBooster Gen 2 (Tesla salvage + Tulay connector) | locked | `chapters/appendix-d-k5-build.md` |
+| Brake booster: Bosch iBooster **Gen 1**, Tesla Model S 1037123-00-B from salvage, with the Tulay Gen-1 harness planned, not bought (corrected 2026-09-29 from "Gen 2": order record obs:a7276b88 and the part label in the owner's photo 40e5e5f9 both read 1037123-00-B, which openinverter lists as Model S/X Gen 1; the registry pin table `catalog/pin_tables/IBOOSTER.yaml` was already Gen 1) | locked | `chapters/appendix-d-k5-build.md`; receipt `receipts/2026-09-29_substrate-correction-ibooster-gen1.md` |
 | Fuel sender: GM 0–90 ohm → AV input + 270 Ω pull-up | locked | `K5_wire_spec_and_costs.md` Job 1 |
 | Length pad on cuts: 15% body, 20% engine bay | 2026-05-11 | Skylar approved in receipt |
 | Color reassignment allowed at mockup time (heat-shrink labels carry circuit ID) | 2026-05-11 | Skylar verbal |

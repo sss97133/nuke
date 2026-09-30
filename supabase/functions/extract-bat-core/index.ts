@@ -1613,9 +1613,17 @@ Deno.serve(async (req) => {
       const hasExtractedSale = typeof extractedSalePrice === "number" && Number.isFinite(extractedSalePrice) && extractedSalePrice > 0;
       const hasExtractedBid = typeof extractedHighBid === "number" && Number.isFinite(extractedHighBid) && extractedHighBid > 0;
 
-      // Always keep auction_end_date in sync when we have it (it's used for auction state and display).
-      if (extractedEndDate && listingIsLatestOrEqual && (!existing?.auction_end_date || existing?.auction_end_date !== extractedEndDate)) {
-        updatePayload.auction_end_date = extractedEndDate;
+      // Keep auction_end_date in sync (auction state and display), with the full end time when the page gives one.
+      // A bare date lands as midnight UTC, which reads as ended for a lot still running: a 2006 Tundra left the live
+      // board 00:04-00:15Z on 2026-09-30 until the next sync restored it (bat-data coverage audit, P0b). A date-only
+      // value never overwrites a known time on the same day.
+      const extractedEndAt = essentials.auction_end_at || null;
+      const extractedEndValue = extractedEndAt || extractedEndDate;
+      if (extractedEndValue && listingIsLatestOrEqual) {
+        const existingEnd = existing?.auction_end_date ? String(existing.auction_end_date) : null;
+        const sameInstant = existingEnd != null && Date.parse(existingEnd) === Date.parse(extractedEndValue);
+        const wouldTruncate = !extractedEndAt && existingEnd != null && existingEnd.slice(0, 10) === extractedEndDate;
+        if (!sameInstant && !wouldTruncate) updatePayload.auction_end_date = extractedEndValue;
       }
 
       // Reserve status: if we have a confident extraction, allow overwriting stale/wrong values.
@@ -2474,8 +2482,14 @@ Deno.serve(async (req) => {
     if (vehicleId) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      // A lot whose end time is still ahead has no result yet: it is 'live' (auction_events_outcome_check allows it).
+      // Reading one wrote 'bid_to' on 15 running lots on 2026-09-29 (bat-data coverage audit, P0a).
+      const endMsForOutcome = essentials.auction_end_at ? Date.parse(essentials.auction_end_at) : NaN;
+      const stillRunning = !hasSale && Number.isFinite(endMsForOutcome) && endMsForOutcome > Date.now();
       const outcome = hasSale
         ? "sold"
+        : stillRunning
+        ? "live"
         : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : (hasBid ? "bid_to" : "no_sale"));
 
       const endAt = essentials.auction_end_at ||

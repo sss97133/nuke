@@ -11,6 +11,7 @@ Bosch Motorsport data sheet 69034379 (M18x1.5, wrench 22, 950 mm lead with the a
 Frame (mm): origin at the centre of the LTCD's back (the mounting face). +Z out of the back toward the logo face, +Y up
 (holes at the top, looms leave the bottom edge), +X right. The two sensors are drawn beside the box at +X (display
 position only: they sit in the exhaust bungs, wire up, on their own 950 mm leads).
+The record id is LTCD-61301: the WIDEBAND end's own id is its DTM mated pair (fam_deutsch).
     ~/k5-harness-pull/parts/.venv/bin/python docs/wiring/calc-data/cad/fab/WIDEBAND.py <out_dir>
 """
 import sys
@@ -75,7 +76,7 @@ COLORS = {
     "lsu_sleeve": ("#c9c2b3", f"fibre-glass / silicone sleeve ({BDS} 'Sleeve fiber glass / silicone coated'): drawn natural"),
 }
 PART = {
-    "pid": "WIDEBAND", "endpoints": ["WIDEBAND"], "maker": "MoTeC (sensors: Bosch)", "pn": "61301 LTCD + 2 x Bosch LSU 4.9",
+    "pid": "LTCD-61301", "endpoints": ["WIDEBAND"], "maker": "MoTeC (sensors: Bosch)", "pn": "61301 LTCD + 2 x Bosch LSU 4.9",
     "title": "MoTeC LTCD dual lambda controller with two Bosch LSU 4.9 sensors",
     "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 through the builder)",
     "shape_basis": "maker drawing", "viewset": "wall",
