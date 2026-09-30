@@ -556,7 +556,7 @@ def write_pins(mod, out):
             ids = [w for w, c in cav.items() if rx.search(str(c))]
             dbl = set()
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
-                     "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
+                     "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm.get("wire_at", tm["at"])),
                      "exit_dir_glb": glb_dir(tm["dir"]), "wires": [dict(w, **(DOUBLED if w["id"] in dbl else {}))
                                                              for w in wire_rows(ids)],
                      **{k: tm[k] for k in ("stud", "stack", "ring", "order_basis", "note") if k in tm}})

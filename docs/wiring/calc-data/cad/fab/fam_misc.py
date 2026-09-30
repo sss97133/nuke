@@ -95,6 +95,41 @@ TX06 = {"A": D(48.0, f"{MIL} p.43 (TX06 / D38999/26 plug) shell 25 'A 1.890 (48.
 ADAPT = {"C": D(36.6, "catalog/families.yaml d38999_20: M85049/69-25N, 'Amphenol PCD datasheet: C dia max 1.44 in'"),
          "L": D(22.0, "M85049/69-25N length: not on file", "assumed", "+-8: drawn so the shell has its adapter; confirm")}
 OD_COL = ("#5b5c3d", f"{MIL} p.45 finish code 'W  Aluminum, olive drab cadmium' (D38999/24WJ61SN, /26WJ61PN)")
+# The 25-61 insert arrangement: every contact's centre and letter read from the vectors of MILNEC's insert arrangement
+# page (the contact circles and the letter text, located with pdftocairo and pdftotext), lettered by the drawing's own
+# spiral (A-Z without I O Q round the outside from the top right, then a-z without l o, then AA-PP inward); every printed
+# letter sits within 4.5 pt of the contact it names. Figure frame: x right, y up, pt, from the centre contact PP, as the
+# page draws the front face of the PIN insert. Positions are exact to the drawing; the absolute SCALE is assumed.
+IA = CD + "MILNEC_D38999_insert_arrangements.pdf p.B-22 (PDF p.4), 25-61, 'Front face of pin insert shown'"
+ARR_25_61_PT = {
+    "A": (10.53, 24.46), "B": (16.40, 21.42), "C": (20.97, 16.63), "D": (24.67, 10.55), "E": (26.62, 4.24),
+    "F": (27.49, -2.28), "G": (26.41, -8.91), "H": (22.93, -15.11), "J": (19.01, -19.90), "K": (14.01, -23.60),
+    "L": (8.57, -26.21), "M": (0.00, -27.40), "N": (-8.39, -26.64), "P": (-14.70, -23.60), "R": (-19.70, -19.90),
+    "S": (-23.61, -15.11), "T": (-26.43, -8.92), "U": (-27.52, -2.28), "V": (-27.31, 4.24), "W": (-25.35, 10.54),
+    "X": (-21.65, 16.63), "Y": (-17.09, 20.98), "Z": (-11.21, 24.03), "a": (-4.91, 22.07), "b": (4.22, 22.07),
+    "c": (9.34, 17.61), "d": (14.88, 13.37), "e": (18.69, 8.26), "f": (20.21, 1.52), "g": (20.75, -4.89),
+    "h": (18.14, -11.20), "i": (13.36, -15.98), "j": (7.92, -19.35), "k": (0.00, -20.01), "m": (-8.17, -19.35),
+    "n": (-14.04, -15.98), "p": (-17.96, -11.41), "q": (-20.78, -5.33), "r": (-20.89, 1.52), "s": (-19.37, 7.83),
+    "t": (-15.56, 13.37), "u": (-10.02, 17.61), "v": (0.00, 16.31), "w": (8.14, 10.76), "x": (12.58, 5.80),
+    "y": (14.01, -1.19), "z": (11.62, -7.28), "AA": (7.27, -12.07), "BB": (0.00, -13.92), "CC": (-7.95, -12.07),
+    "DD": (-12.30, -7.28), "EE": (-14.70, -1.19), "FF": (-13.28, 5.43), "GG": (-8.82, 10.33), "HH": (0.00, 9.57),
+    "JJ": (5.20, 4.03), "KK": (7.38, -2.17), "LL": (0.00, -7.18), "MM": (-8.06, -2.17), "NN": (-6.54, 4.03),
+    "PP": (0.00, -0.00)
+}
+ARR_CIRCLE_PT = 65.80              # the drawn insert circle's diameter, pt
+INSERT_D = D(38.2, "the insert diameter the batch-5 receptacle model draws (TX07 M 43.4 less 2 x 2.6)", "assumed",
+             "red: the absolute scale of the arrangement; needs the MIL-STD-1560 sheet for 25-61, or calipers on the insert")
+CAV_D = D(1.2, "not on file", "assumed", "red: the cavity holes are drawn 1.2 across; the M39029 contacts are not drawn")
+CAV_DEPTH = D(3.0, "not on file", "assumed", "red: the holes' drawn depth")
+
+
+def cavity_xy(kind, letter):
+    """A cavity's centre in the half's own frame (mating face toward -Z, wires +Z, Y up), mm. Seen from its mating face
+    (from -Z) the viewer's right is -X, so the pin face as drawn maps x -> -X on the plug. The socket face is the pin face
+    mirrored, so the same letter meets its mate: x -> +X on the receptacle."""
+    sc = K.v(INSERT_D) / ARR_CIRCLE_PT
+    x, y = ARR_25_61_PT[letter]
+    return (round((-x if kind == "plug" else x) * sc, 3), round(y * sc, 3))
 
 
 def d38999_bodies(kind):
@@ -108,15 +143,23 @@ def d38999_bodies(kind):
         nut = Pos(0, 0, 3.0 + tv["P"]) * extrude(RegularPolygon(tv["D"] / 2, 6), amount=5.0) - cyl_z(tv["K"] / 2 + 0.2, -1, 20, 0, 0)
         out += [K.body(body, "D38999/24WJ61SN shell (jam-nut receptacle)", OD_COL[0], finish="paint"),
                 K.body(nut, "D38999/24WJ61SN jam nut", OD_COL[0], finish="paint")]
-        out.append(K.body(cyl_z(tv["M"] / 2 - 2.6, -11.0, tv["L"] - 13.0, 0, 0), "D38999 25-61 insert (61 x #20 sockets)", "#2a2a2a"))
+        ins = cyl_z(tv["M"] / 2 - 2.6, -11.0, tv["L"] - 13.0, 0, 0)
+        for k in ARR_25_61_PT:
+            x, y = cavity_xy(kind, k)
+            ins -= cyl_z(K.v(CAV_D) / 2, -11.0 - 1.0, -11.0 + K.v(CAV_DEPTH), x, y)
+        out.append(K.body(ins, "D38999 25-61 insert (61 x #20 sockets)", "#2a2a2a"))
         za = tv["L"] - 12.0
     else:
         ring = cyl_z(pv["A"] / 2, 0.0, 16.0, 0, 0) - cyl_z(pv["A"] / 2 - 3.0, -1, 17, 0, 0)
         body = cyl_z(pv["A"] / 2 - 3.0, 0.0, pv["L"], 0, 0) - cyl_z(pv["A"] / 2 - 5.5, -1, 8.0, 0, 0)
         body += cyl_z(pv["V"] / 2, pv["L"] - 6.0, pv["L"], 0, 0)
         out += [K.body(ring, "D38999/26WJ61PN coupling ring", OD_COL[0], finish="paint"),
-                K.body(body, "D38999/26WJ61PN shell (plug)", OD_COL[0], finish="paint"),
-                K.body(cyl_z(pv["A"] / 2 - 5.6, 1.0, pv["L"] - 7.0, 0, 0), "D38999 25-61 insert (61 x #20 pins)", "#2a2a2a")]
+                K.body(body, "D38999/26WJ61PN shell (plug)", OD_COL[0], finish="paint")]
+        ins = cyl_z(pv["A"] / 2 - 5.6, 1.0, pv["L"] - 7.0, 0, 0)
+        for k in ARR_25_61_PT:
+            x, y = cavity_xy(kind, k)
+            ins -= cyl_z(K.v(CAV_D) / 2, 0.0, 1.0 + K.v(CAV_DEPTH), x, y)
+        out.append(K.body(ins, "D38999 25-61 insert (61 x #20 pins)", "#2a2a2a"))
         za = pv["L"]
     av = {k: K.v(d) for k, d in ADAPT.items()}
     ad = cyl_z(av["C"] / 2, za, za + av["L"], 0, 0) - cyl_z(av["C"] / 2 - 3.0, za - 1, za + av["L"] + 1, 0, 0)
@@ -270,11 +313,22 @@ def pieces():
         cav = _reg_cavities(end)
         P = dict(TX07 if kind == "receptacle" else TX06)
         P.update({f"adapter_{k}": d for k, d in ADAPT.items()})
-        rows = [{"pin": k, "endpoint": end, "name": f"{pn} cavity {k}", "match": rf"^{k}$", "at": (0.0, 0.0, 30.0), "dir": (0, 0, 1),
-                 "full_name": f"{pn} cavity {k} (61-pin 25-61 arrangement; the cavity's position on the insert is not mapped here)"}
-                for k in cav]
+        P.update({"insert_d": INSERT_D, "cavity_d": CAV_D, "cavity_depth": CAV_DEPTH})
+        z_face = -11.0 if kind == "receptacle" else 1.0
+        z_rear = (K.v(TX07["L"]) - 13.0) if kind == "receptacle" else (K.v(TX06["L"]) - 7.0)
+        rows = []
+        for k in ARR_25_61_PT:
+            x, y = cavity_xy(kind, k)
+            rows.append({"pin": k, "endpoint": end, "name": f"{pn} cavity {k}", "match": rf"(?-i:^{k}$)",   # a and A differ
+                         "at": (x, y, z_face), "wire_at": (x, y, z_rear), "dir": (0, 0, 1),
+                         "full_name": f"{pn} cavity {k}: 25-61 position from MILNEC's arrangement (exact to the drawing), "
+                                      f"scale assumed (insert Ø{K.v(INSERT_D):g})"
+                                      + ("" if k in cav else "; no registry wire (empty)")})
         chk = ([("flange square W (MILNEC)", lambda b: round(b[0].bounding_box().size.X, 2), tv["W"], 0.05)] if kind == "receptacle" else
                [("coupling ring A (MILNEC)", lambda b: round(b[0].bounding_box().size.X, 2), K.v(TX06["A"]), 0.05)])
+        chk.append(("25-61 cavities cut in the insert",
+                    lambda b: sum(1 for f in [x for x in b if "25-61 insert" in (x.label or "")][0].faces()
+                                  if f.geom_type.name == "CYLINDER") - 1, 61, 0))
         out.append(_ns(end, [end], f"{pn} ({'jam-nut receptacle, sockets' if kind == 'receptacle' else 'plug, pins'}), shell 25, 61 x #20, "
                        "olive drab, with its M85049/69-25N adapter", "MIL-DTL-38999 Series III (MILNEC TX07 / TX06 dims)", pn, P,
                        {"shell": OD_COL, "insert": ("#2a2a2a", "insert: dark (catalog photos)")}, "datasheet dims",
@@ -286,8 +340,12 @@ def pieces():
                        extra={"pieces": [pn, "M85049/69-25N"], "missing": ["202K163-25-0 shrink boot (dimensions not on file)",
                                                                            "M39029 size-20 contacts (slash-sheet dimensions not on file)"],
                               "unknowns": ["The M85049/69-25N length is assumed (22 +-8); its diameter is the families.yaml figure.",
-                                           "The 61 cavity positions (25-61 arrangement, MILNEC insert arrangements p.4) are not mapped: "
-                                           "pins.json lists each registry cavity at the bundle exit."]}, rows=rows))
+                                           "The 61 cavity positions are from MILNEC's 25-61 arrangement (exact to the drawing); "
+                                           f"the absolute scale is ASSUMED (insert Ø{K.v(INSERT_D):g} from the batch-5 model). Needs: "
+                                           "the MIL-STD-1560 sheet for 25-61, or calipers on the insert.",
+                                           "The socket face is the pin face mirrored so each letter meets its mate: seen from its "
+                                           "mating face, the plug's cavity x is the figure's -x and the receptacle's is +x.",
+                                           "The cavity holes (Ø1.2, 3 deep) are drawn, not the M39029 contacts."]}, rows=rows))
     kv = {k: K.v(d) for k, d in KOSP.items()}
     out.append(_ns("TRANS-CASE", ["TRANS-CASE"], "6L90 external case connector: Kostal LKS 1.5 16-cavity pin housing (case side) mated "
                    "with the socket housing GM 19303772 (Kostal 09430010) on the PCS harness", "Kostal", "09330004 + 09430010 (GM 19303772)",

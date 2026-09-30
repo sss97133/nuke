@@ -35711,17 +35711,40 @@ parts:
     source: 'M85049/69-25N length: not on file'
     basis: assumed
     note: '+-8: drawn so the shell has its adapter; confirm'
+  - name: insert_d
+    value: 38.2
+    source: the insert diameter the batch-5 receptacle model draws (TX07 M 43.4 less 2 x 2.6)
+    basis: assumed
+    note: 'red: the absolute scale of the arrangement; needs the MIL-STD-1560 sheet for 25-61, or calipers on the insert'
+  - name: cavity_d
+    value: 1.2
+    source: not on file
+    basis: assumed
+    note: 'red: the cavity holes are drawn 1.2 across; the M39029 contacts are not drawn'
+  - name: cavity_depth
+    value: 3.0
+    source: not on file
+    basis: assumed
+    note: 'red: the holes'' drawn depth'
   checks:
   - check: flange square W (MILNEC)
     model: 55.6
     drawing: 55.6
     tol: 0.05
     ok: true
+  - check: 25-61 cavities cut in the insert
+    model: 61
+    drawing: 61
+    tol: 0
+    ok: true
   branding: {}
   unknowns:
   - The M85049/69-25N length is assumed (22 +-8); its diameter is the families.yaml figure.
-  - 'The 61 cavity positions (25-61 arrangement, MILNEC insert arrangements p.4) are not mapped: pins.json lists each registry
-    cavity at the bundle exit.'
+  - 'The 61 cavity positions are from MILNEC''s 25-61 arrangement (exact to the drawing); the absolute scale is ASSUMED (insert
+    Ø38.2 from the batch-5 model). Needs: the MIL-STD-1560 sheet for 25-61, or calipers on the insert.'
+  - 'The socket face is the pin face mirrored so each letter meets its mate: seen from its mating face, the plug''s cavity
+    x is the figure''s -x and the receptacle''s is +x.'
+  - The cavity holes (Ø1.2, 3 deep) are drawn, not the M39029 contacts.
   cross_checks: []
   notes: []
   kind: assembly
@@ -35795,17 +35818,40 @@ parts:
     source: 'M85049/69-25N length: not on file'
     basis: assumed
     note: '+-8: drawn so the shell has its adapter; confirm'
+  - name: insert_d
+    value: 38.2
+    source: the insert diameter the batch-5 receptacle model draws (TX07 M 43.4 less 2 x 2.6)
+    basis: assumed
+    note: 'red: the absolute scale of the arrangement; needs the MIL-STD-1560 sheet for 25-61, or calipers on the insert'
+  - name: cavity_d
+    value: 1.2
+    source: not on file
+    basis: assumed
+    note: 'red: the cavity holes are drawn 1.2 across; the M39029 contacts are not drawn'
+  - name: cavity_depth
+    value: 3.0
+    source: not on file
+    basis: assumed
+    note: 'red: the holes'' drawn depth'
   checks:
   - check: coupling ring A (MILNEC)
     model: 48.0
     drawing: 48.0
     tol: 0.05
     ok: true
+  - check: 25-61 cavities cut in the insert
+    model: 61
+    drawing: 61
+    tol: 0
+    ok: true
   branding: {}
   unknowns:
   - The M85049/69-25N length is assumed (22 +-8); its diameter is the families.yaml figure.
-  - 'The 61 cavity positions (25-61 arrangement, MILNEC insert arrangements p.4) are not mapped: pins.json lists each registry
-    cavity at the bundle exit.'
+  - 'The 61 cavity positions are from MILNEC''s 25-61 arrangement (exact to the drawing); the absolute scale is ASSUMED (insert
+    Ø38.2 from the batch-5 model). Needs: the MIL-STD-1560 sheet for 25-61, or calipers on the insert.'
+  - 'The socket face is the pin face mirrored so each letter meets its mate: seen from its mating face, the plug''s cavity
+    x is the figure''s -x and the receptacle''s is +x.'
+  - The cavity holes (Ø1.2, 3 deep) are drawn, not the M39029 contacts.
   cross_checks: []
   notes: []
   kind: assembly
