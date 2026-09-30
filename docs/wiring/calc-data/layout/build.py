@@ -1250,10 +1250,22 @@ if "--export-site" in ARGS:
             m = ITEM[i["grouped"]].get("margin") or {}
         return m.get("mm")
 
+    def no_status(t):
+        """Results only in public files (owner 2026-09-29: others see results, not the in-process state): the basis and the
+        device name keep what the spot IS, never where the call stands. 'candidate spot' reads 'estimated spot'; status
+        asides and clauses ('(candidate)', 'decided', 'concept', 'locked 2026-05-14') are cut."""
+        t = str(t or "")
+        t = re.sub(r"(?i)\bcandidate spot\b", "estimated spot", t)
+        t = re.sub(r"(?i)\s*\((?:candidate|concept|decided|not decided|proposed)\)", "", t)
+        t = re.sub(r"(?i)[:;,]?\s*\b(?:candidate|concept|not decided|decided|proposed)\b(?=\s*[;,.]|\s*$)", "", t)
+        t = re.sub(r"(?i)[,;]?\s*locked \d{4}-\d{2}-\d{2}", "", t)
+        t = re.sub(r"(?i)\b(?:candidate|decided|proposed|concept)\s+(?=[a-z])", "", t)   # the word as an adjective
+        return re.sub(r"\s{2,}", " ", t).strip(" ;,")
+
     ends_out = {}
     for i in items:
-        e = {"xyz": [round(v, 3) for v in i["xyz"]], "basis": mask(re.sub(r",?\s*ruled by \w+ \d{4}-\d{2}-\d{2}", "", i["basis"].split(" (")[0])), "margin_mm": eff_mm(i),
-             "dev": i["dev"], "dev_name": mask(DEVS[i["dev"]]["name"])}
+        e = {"xyz": [round(v, 3) for v in i["xyz"]], "basis": no_status(mask(re.sub(r",?\s*ruled by \w+ \d{4}-\d{2}-\d{2}", "", i["basis"].split(" (")[0]))), "margin_mm": eff_mm(i),
+             "dev": i["dev"], "dev_name": no_status(mask(DEVS[i["dev"]]["name"]))}
         if i.get("drawn") == "own" and i.get("fp"):
             e["size"] = {k: i["fp"].get(k) for k in ("shape", "dx", "dy", "dz", "d", "t", "axis") if i["fp"].get(k) is not None}
             if i["fp"].get("top"):
