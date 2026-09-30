@@ -409,9 +409,11 @@ ENDS = {  # end id -> the pieces that make it complete (both halves, the gasket)
     "IBST-DIAG": (["DTM06-4S", "DTM04-4P"], []),
     "FUEL-LEVEL": (["DT06-2S", "DT04-2P"], ["QFS-H882 hanger and level sender", "QFS-BKCN-GM bulkhead"]),
     "FUEL-PUMP": (["DTP06-2S", "DTP04-2P"], ["QFS-H882 hanger and P367 pump", "QFS-BKCN-GM bulkhead"]),
-    "WIDEBAND": (["DTM06-4S", "DTM04-4P"], ["MoTeC LTCD 61301 box", "2 x Bosch LSU 4.9 sensors and their plugs"]),
+    "WIDEBAND": (["DTM06-4S", "DTM04-4P"], []),
 }
 END_NEEDS = {e: list(p) + list(o) for e, (p, o) in ENDS.items()}
+# the device lane's record for the LTCD box and its two sensors (WIDEBAND.py, id LTCD-61301) completes the end
+END_NEEDS["WIDEBAND"].append("LTCD-61301")
 # ends whose wires the registry keeps only in its endpoint cavity map (implied wires): the half they land in
 HARNESS_HALF = {"IBST-DIAG": "DTM06-4S"}   # endpoints.yaml: "harness half DTM 4-pin (F) MoTeC #68054"
 
