@@ -1,8 +1,8 @@
 import React from 'react';
 
 // The history strip (docs/schematics/homepage.md, "The building block"): one number placed in its own history or
-// cohort. The range at each end, a tick for each past value, a block for now, and a counted verdict. First drawn as
-// the homepage's "same time on <weekday>s" bar (RangeBar in MarketPulse.tsx), which now renders through this.
+// cohort. The range at each end, a tick for each past value, a block for now, and a counted verdict. The same form
+// as the homepage's "same time on <weekday>s" bar (RangeBar in MarketPulse.tsx).
 
 const label: React.CSSProperties = {
   fontFamily: 'Arial, sans-serif',

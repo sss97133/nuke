@@ -3,9 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { squarify } from '../../lib/squarify';
-import { NO_MAKE, useMarketPulse, type BidCurve, type BoardReading, type LiveAuction, type SameHourRange } from './useMarketPulse';
-import { HistoryStrip } from './HistoryStrip';
-import LiveLotStrips from './LiveLotStrips';
+import { NO_MAKE, useMarketPulse, useSameHourReadings, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Every figure is computed from the rows market_pulse_live() returns, and every
@@ -111,40 +109,167 @@ function signed(pct: number): string {
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
+// "Higher than 8 of 11": where now ranks among its own past readings, counted, never labelled.
+function rankOf(value: number, readings: { v: number }[]): { below: number; above: number; n: number; text: string | null } {
+  const n = readings.length;
+  const below = readings.filter((r) => value > r.v).length;
+  const above = readings.filter((r) => value < r.v).length;
+  const text = n === 0 ? null
+    : below === n ? `higher than all ${n}`
+    : above === n ? `lower than all ${n}`
+    : below >= above ? `higher than ${below} of ${n}` : `lower than ${above} of ${n}`;
+  return { below, above, n, text };
+}
+
 // Each earlier week at this weekday and hour is a tick; now is the block. The sentence ranks now among them.
-function RangeBar({ value, range }: { value: number; range: SameHourRange }) {
-  const beaten = range.readings.filter((r) => value > r.bids).length;
-  const n = range.readings.length;
-  const rank = n === 0 ? null : beaten === n ? `higher than all ${n}` : beaten === 0 ? `lower than all ${n}` : `higher than ${beaten} of ${n}`;
+function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number }) {
+  const lo = Math.min(value, ...readings.map((r) => r.v));
+  const hi = Math.max(value, ...readings.map((r) => r.v));
+  const span = hi - lo;
+  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5);
+  const { n, text: rank } = rankOf(value, readings);
   return (
-    <HistoryStrip
-      caption={`Same time on ${range.weekdayUtc}s · last ${range.weeks} weeks`}
-      value={value}
-      // low/high come with the range; the readings are the same values, so the ends match the old bar.
-      ticks={range.readings.map((r) => ({ key: r.day, value: r.bids, title: `${r.day}: ${usd(r.bids)}` }))}
-      format={(v) => usd(v, true)}
-      verdict={rank ? `${rank} ${range.weekdayUtc}s at this hour` : null}
-      nowTitle={`Now: ${usd(value)}`}
-      title={`Current bids at this hour (${range.hourUtc}:00 UTC) on ${range.weekdayUtc}s, ${range.weeks} weeks since ${range.firstDay}. Readings before 27 Sep are rebuilt from BaT bid history (96% of auctions) and may run up to ~4% low.`}
-    />
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <span style={label}>Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</span>
+      <span style={{ ...mono, fontSize: 11 }}>{fmt(lo, true)}</span>
+      <span style={{ position: 'relative', width: 160, height: 12 }}>
+        <span style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 2, background: 'var(--border)' }} />
+        {readings.map((r) => (
+          <span
+            key={r.day}
+            title={`${r.day}: ${fmt(r.v)}`}
+            style={{ position: 'absolute', top: 2, left: `calc(${x(r.v) * 100}% - 1px)`, width: 2, height: 8, background: 'var(--text-secondary)' }}
+          />
+        ))}
+        <span title={`Now: ${fmt(value)}`} style={{ position: 'absolute', top: 0, left: `calc(${x(value) * 100}% - 3px)`, width: 6, height: 12, background: 'var(--text)' }} />
+      </span>
+      <span style={{ ...mono, fontSize: 11 }}>{fmt(hi, true)}</span>
+      {rank && <span style={{ ...label, color: 'var(--text)' }}>{rank} {weekdayUtc}s at this hour</span>}
+    </span>
   );
 }
 
-// What the headline is relative to: the same board a week ago, and its range at this time of the week.
-function Relativity({ value, weekAgo, sameHour }: { value: number; weekAgo: BoardReading | null; sameHour: SameHourRange | null }) {
+// What the headline is relative to: the same board a week ago. Its range at this time of the week is a strip below.
+function Relativity({ value, weekAgo }: { value: number; weekAgo: BoardReading | null }) {
   const pct = weekAgo ? pctChange(value, weekAgo.bids) : null;
   const rebuilt = weekAgo?.source === 'archive';
+  if (!weekAgo || pct == null) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', alignItems: 'center', padding: '6px 10px', border: '2px solid var(--border)', borderTop: 'none', marginTop: -12, marginBottom: 12 }}>
-      {weekAgo && pct != null ? (
-        <span title={`${usd(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${rebuilt ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
-          <span style={label}>vs same time last week </span>
-          <span style={{ ...mono, fontWeight: 700, color: pct >= 0 ? 'var(--success)' : 'var(--error)' }}>{rebuilt ? '≈' : ''}{signed(pct)}</span>
-          <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}> from {usd(weekAgo.bids, true)}</span>
-        </span>
-      ) : null}
-      {sameHour && <RangeBar value={value} range={sameHour} />}
+      <span title={`${usd(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${rebuilt ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+        <span style={label}>vs same time last week </span>
+        <span style={{ ...mono, fontWeight: 700, color: pct >= 0 ? 'var(--success)' : 'var(--error)' }}>{rebuilt ? '≈' : ''}{signed(pct)}</span>
+        <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}> from {usd(weekAgo.bids, true)}</span>
+      </span>
     </div>
+  );
+}
+
+// ---- Edges --------------------------------------------------------------------------------------
+// The strip above is a generator: any series with a reading at this weekday and hour in earlier weeks gets one. The
+// page scans them all and shows only those whose value now sits in the top or bottom 2 of its own readings (higher,
+// or lower, than all or all but one), most extreme first. Series: the whole board's current bids, auctions with a
+// bid, and bid per auction; and, once 6 weeks of live readings carry them (from 2026-09-27), the same per make.
+interface Series {
+  key: string;
+  what: string; // what is measured
+  set: string; // the comparison set
+  value: number; // now
+  readings: { day: string; v: number }[]; // the same weekday and hour in earlier weeks
+  fmt: (n: number, compact?: boolean) => string;
+}
+
+interface Edge extends Series { depth: number; beyond: number }
+
+const EDGE_MIN_READINGS = 6;
+const EDGE_MAX = 6;
+const MAKE_MIN_AUCTIONS = 5;
+
+function count(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function edgeOf(s: Series): Edge | null {
+  const { below, above, n } = rankOf(s.value, s.readings);
+  if (n < EDGE_MIN_READINGS) return null;
+  const top = below >= n - 1;
+  const bottom = above >= n - 1;
+  if (!top && !bottom) return null;
+  const vs = s.readings.map((r) => r.v);
+  const lo = Math.min(...vs);
+  const hi = Math.max(...vs);
+  const span = hi - lo || Math.abs(hi) || 1;
+  // depth 0 = beyond every reading, 1 = beyond all but one; beyond = how far past the far end, in spans.
+  return { ...s, depth: n - Math.max(below, above), beyond: top ? (s.value - hi) / span : (lo - s.value) / span };
+}
+
+function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
+  const bidded = live.filter((a) => a.currentBid != null);
+  const bids = bidded.reduce((s, a) => s + (a.currentBid ?? 0), 0);
+  const withN = readings.filter((r) => r.n != null && (r.n as number) > 0);
+  const out: Series[] = [
+    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: usd },
+    { key: 'n', what: 'Auctions with a bid', set: 'all live BaT auctions', value: bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.n as number })), fmt: count },
+  ];
+  if (bidded.length > 0) {
+    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => usd(v) });
+  }
+  const byMake = readings.filter((r) => r.byMake != null);
+  if (byMake.length >= EDGE_MIN_READINGS) {
+    const now = new Map<string, [number, number]>();
+    for (const a of bidded) {
+      const m = now.get(a.make) ?? [0, 0];
+      now.set(a.make, [m[0] + (a.currentBid ?? 0), m[1] + 1]);
+    }
+    const makes = new Set([...now.keys(), ...byMake.flatMap((r) => Object.keys(r.byMake as object))]);
+    for (const make of makes) {
+      if (make === NO_MAKE) continue;
+      const past = byMake.map((r) => ({ day: r.day, bm: (r.byMake as Record<string, [number, number]>)[make] ?? [0, 0] }));
+      const cur = now.get(make) ?? [0, 0];
+      if (Math.max(cur[1], ...past.map((p) => p.bm[1])) < MAKE_MIN_AUCTIONS) continue;
+      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: usd });
+      out.push({ key: `n:${make}`, what: `${make} · auctions with a bid`, set: `live BaT auctions of ${make}`, value: cur[1], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[1]) })), fmt: count });
+    }
+  }
+  return out;
+}
+
+function shortDay(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string> }) {
+  const edges = useMemo(
+    () => series.map(edgeOf).filter((e): e is Edge => e != null).sort((a, b) => a.depth - b.depth || b.beyond - a.beyond).slice(0, EDGE_MAX),
+    [series]
+  );
+  if (series.length === 0) return null;
+  const scanned = `${series.length} series scanned, each against its own readings at ${hourUtc}:00 UTC on earlier ${weekdayUtc}s`;
+  return (
+    <section style={{ border: '2px solid var(--border)', marginBottom: 12 }}>
+      <div style={{ ...label, padding: '6px 8px', borderBottom: edges.length ? '2px solid var(--border)' : 'none' }}>
+        {edges.length ? `Top or bottom 2 of its own history now · ${edges.length} of ${scanned}` : `None in the top or bottom 2 of its own history now · ${scanned}`}
+      </div>
+      {edges.map((e, i) => {
+        const weeks = Math.round((Date.now() - Date.parse(`${e.readings[0].day}T00:00:00Z`)) / (7 * DAY));
+        const rebuilt = e.readings.filter((r) => archiveDays.has(r.day)).length;
+        return (
+          <div key={e.key} style={{ padding: '8px', borderTop: i ? '2px solid var(--border)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{e.what}</span>
+              <span style={{ ...mono, fontSize: 13, fontWeight: 700 }}>{e.fmt(e.value)}</span>
+              <span style={{ ...label, fontWeight: 400 }}>now</span>
+            </div>
+            <RangeBar value={e.value} readings={e.readings} fmt={e.fmt} weekdayUtc={weekdayUtc} weeks={weeks} />
+            <div style={{ fontSize: 9, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Window: {hourUtc}:00 UTC on {weekdayUtc}s, {shortDay(e.readings[0].day)} to {shortDay(e.readings[e.readings.length - 1].day)}, and now.
+              {' '}Count: {e.readings.length} readings.
+              {' '}Set: {e.set} (BAT-LIVE-BIDS index, read hourly from the live board{rebuilt ? `; ${rebuilt} of the readings rebuilt from BaT bid history, 96% of auctions` : ''}).
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -309,8 +434,6 @@ function ExplainSheet({ item, onClose, narrow }: { item: { a: LiveAuction; heat:
       </div>
       {x.beyond && <p style={{ margin: '10px 0 0' }}>{x.beyond}</p>}
       {x.outcome && <p style={{ margin: '10px 0 0' }}><span style={label}>Track record</span> {x.outcome}</p>}
-      {/* The percentile reading for this one lot: one RPC, only when the sheet is open. Renders nothing without data. */}
-      <LiveLotStrips vehicleId={a.id} style={{ marginTop: 10 }} />
       <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
         <Link to={`/vehicle/${a.id}`} style={{ ...label, color: 'var(--text)' }}>Open the car</Link>
         {a.listingUrl && (
@@ -630,6 +753,20 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const openBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
+  // Every series placed against its own readings at this UTC weekday and hour; only the ones at an edge are drawn.
+  const nowIso = new Date(now).toISOString();
+  const hourUtc = nowIso.slice(11, 13);
+  const weekdayUtc = new Date(now).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+  const sameHour = useSameHourReadings(hourUtc, nowIso.slice(0, 10));
+  const readings = useMemo<HourReading[]>(
+    () => sameHour.data ?? (data?.sameHour?.readings ?? []).map((r) => ({ day: r.day, bids: r.bids, n: null, byMake: null, source: '' })),
+    [sameHour.data, data]
+  );
+  const series = useMemo(() => (live.length && readings.length ? edgeSeries(live, readings) : []), [live, readings]);
+  const archiveDays = useMemo(() => new Set(readings.filter((r) => r.source === 'archive').map((r) => r.day)), [readings]);
+  // The full board is a long list of cars: it opens below the strips on request, or when a figure filters it.
+  const showBoard = params.get('board') === '1' || win !== 'all';
+
   const board = useMemo(() => {
     const rows = live.filter((a) => (make == null || a.make === make) && inWindow(a, win, now, heat.get(a.id)));
     const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
@@ -658,6 +795,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         )}
       </div>
 
+      {!isLoading && <EdgeStrips series={series} hourUtc={hourUtc} weekdayUtc={weekdayUtc} archiveDays={archiveDays} />}
+
       {/* Figures. Each one is a filter on the board below. */}
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
         <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of the current high bid on every live auction" compact={narrow} />
@@ -677,9 +816,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         ))}
       </div>
 
-      {!isLoading && (data?.weekAgo || data?.sameHour) && (
-        <Relativity value={openBids} weekAgo={data?.weekAgo ?? null} sameHour={data?.sameHour ?? null} />
-      )}
+      {!isLoading && data?.weekAgo && <Relativity value={openBids} weekAgo={data.weekAgo} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
@@ -691,7 +828,14 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         </section>
       </div>
 
-      <section ref={boardRef} style={{ border: '2px solid var(--border)' }}>
+      <div ref={boardRef}>
+      {!showBoard && (
+        <button onClick={() => setParam('board', '1')} style={{ ...label, color: 'var(--text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>
+          All {board.length.toLocaleString('en-US')} live auctions{make ? ` · ${make}` : ''}, as a list ↓
+        </button>
+      )}
+
+      {showBoard && <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
             {board.length.toLocaleString('en-US')} auctions · {usd(boardBids, true)} bid
@@ -719,7 +863,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
           </div>
         </div>
         {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} />}
-      </section>
+      </section>}
+      </div>
 
       {data?.source && (
         <div style={{ ...label, marginTop: 8 }}>
