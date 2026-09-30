@@ -91,3 +91,6 @@ That's the form for "edge cases across markets":
   bids and comments against the same comparables. This is the percentile reading in `docs/features/ask-nuke/THEORY.md`
   (owner notes, 2026-09-29).
 - **Every strip states its basis:** window, count and comparison set. The verdict is a count, not a label.
+- **It's a generator, not one strip** (owner, same day: "that reps a huge other examples of data"). The same form fits
+  any series that has its own history or cohort. The homepage scans many of them (segments, makes, price bands, platforms,
+  single live lots) and shows only the few that sit at an edge right now, each as one strip.
