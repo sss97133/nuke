@@ -143,6 +143,8 @@ def lint(parts, ends):
 def main():
     parts, ends, needs = load_parts()
     errors = lint(parts, ends)
+    import fw61_adapter_plate as FW      # tracked fabrication outputs: their stamps must match the script (lead, 2026-09-29)
+    errors += FW.check_outputs()
     seen = {}
     for p in parts:
         if p["id"] in seen:
