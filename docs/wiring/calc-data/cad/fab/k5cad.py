@@ -536,7 +536,9 @@ DOUBLED = {"doubled": True, "doubled_note": "the conductor is folded back on its
 def write_pins(mod, out):
     """<id>.pins.json for a part whose ends are studs or terminals: mod.terminals() -> [{pin, name, at, dir,
     endpoint, match (regex on the registry termination's cavity text), part_prefix (optional: only terminations whose
-    contact part number starts with it, e.g. '0460' pins vs '0462' sockets on the two halves of a Deutsch pair)}]."""
+    contact part number starts with it, e.g. '0460' pins vs '0462' sockets on the two halves of a Deutsch pair), wire
+    (optional: only that wire's termination, e.g. one ring of a stud stack)}]. A row's stud-stack keys (stud, stack, ring,
+    order_basis, note) are copied into pins.json as given, and mod.PINS_EXTRA (optional) is added at the top level."""
     A = mod.PART
     rows = []
     terms = registry()["terminations"]
@@ -544,7 +546,7 @@ def write_pins(mod, out):
         rx = re.compile(tm["match"], re.I)
         pref = tm.get("part_prefix")
         hits = [x for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
-                and (not pref or str(x.get("part") or "").startswith(pref))]
+                and (not pref or str(x.get("part") or "").startswith(pref)) and (not tm.get("wire") or x["wire"] == tm["wire"])]
         ids = [x["wire"] for x in hits]
         dbl = {x["wire"] for x in hits if x.get("doubled")}
         if not ids and tm.get("endpoint_cavities"):
@@ -556,10 +558,12 @@ def write_pins(mod, out):
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
                      "exit_dir_glb": glb_dir(tm["dir"]), "wires": [dict(w, **(DOUBLED if w["id"] in dbl else {}))
-                                                             for w in wire_rows(ids)]})
+                                                             for w in wire_rows(ids)],
+                     **{k: tm[k] for k in ("stud", "stack", "ring", "order_basis", "note") if k in tm}})
     (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
         {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug or wire lands, "
                                   "exit_dir = the way the cable leaves",
-         "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text)", "cavities": rows},
+         "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text)",
+         **(getattr(mod, "PINS_EXTRA", None) or {}), "cavities": rows},
         indent=1, ensure_ascii=False))
     return rows

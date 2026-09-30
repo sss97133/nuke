@@ -8,6 +8,13 @@
    ],
    "complete": true
   },
+  "AMP-BLOCK": {
+   "models": [
+    "238LTP",
+    "DL438"
+   ],
+   "complete": true
+  },
   "AMP-PASS": {
    "models": [
     "1003"
@@ -112,7 +119,7 @@
    "models": [],
    "complete": false,
    "missing": [
-    "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
+    "ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud size in the LS3 documents on file)'"
    ]
   },
   "DCDC": {
@@ -163,7 +170,10 @@
   },
   "FAN-JUNCTION": {
    "models": [
-    "2103"
+    "2103",
+    "838TP",
+    "9918",
+    "FAN-JUNCTION"
    ],
    "complete": true
   },
@@ -210,6 +220,26 @@
    ],
    "complete": true
   },
+  "FIREWALL-CABIN": {
+   "models": [
+    "FIREWALL-CABIN"
+   ],
+   "complete": false,
+   "missing": [
+    "202K163-25-0 shrink boot (dimensions not on file)",
+    "M39029 size-20 contacts (slash-sheet dimensions not on file)"
+   ]
+  },
+  "FIREWALL-ENGINE": {
+   "models": [
+    "FIREWALL-ENGINE"
+   ],
+   "complete": false,
+   "missing": [
+    "202K163-25-0 shrink boot (dimensions not on file)",
+    "M39029 size-20 contacts (slash-sheet dimensions not on file)"
+   ]
+  },
   "FIREWALL-GROMMET": {
    "models": [
     "1003"
@@ -242,6 +272,15 @@
    "missing": [
     "QFS-BKCN-GM bulkhead",
     "QFS-H882 hanger and P367 pump"
+   ]
+  },
+  "FUELP": {
+   "models": [
+    "FUELP"
+   ],
+   "complete": false,
+   "missing": [
+    "the kit's mating Packard 3-pin plug (AEM: 'Each sensor comes with a mating connector plug and pin kit'; it names no part number and prints no drawing, so it is not drawn)"
    ]
   },
   "FUSE-DAK_CONST": {
@@ -287,24 +326,38 @@
    ]
   },
   "GND-BANK-CAB": {
-   "models": [],
+   "models": [
+    "9906",
+    "9912",
+    "9918",
+    "GND-BANK-CAB"
+   ],
    "complete": false,
    "missing": [
-    "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
    ]
   },
   "GND-BANK-ENG": {
-   "models": [],
+   "models": [
+    "238LTP",
+    "638TP",
+    "838TP",
+    "9906",
+    "9912",
+    "9918",
+    "GND-BANK-ENG"
+   ],
    "complete": false,
    "missing": [
-    "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
+    "one ring for the AMP Research kit lead (the registry: gauge unknown, IM75146 names none)",
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
    ]
   },
   "GND-SPLICE-REAR": {
    "models": [],
    "complete": false,
    "missing": [
-    "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
+    "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'"
    ]
   },
   "IAT": {
@@ -443,9 +496,14 @@
   },
   "PDM15-STUD": {
    "models": [
-    "PDM15-A"
+    "DL214",
+    "PDM15-A",
+    "PDM15-STUD"
    ],
-   "complete": true
+   "complete": false,
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
   },
   "PDM30-A": {
    "models": [
@@ -461,15 +519,40 @@
   },
   "PDM30-STUD": {
    "models": [
-    "PDM30-A"
+    "9916",
+    "DL214",
+    "PDM30-A",
+    "PDM30-STUD"
+   ],
+   "complete": false,
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
+  },
+  "PORT-ETH": {
+   "models": [
+    "NE8FDP"
+   ],
+   "complete": true
+  },
+  "PORT-UTC": {
+   "models": [
+    "NC5FD-L-1"
    ],
    "complete": true
   },
   "PS-STUDS": {
-   "models": [],
+   "models": [
+    "238LTP",
+    "2516LTP",
+    "610TP",
+    "838TP",
+    "9918",
+    "DL438"
+   ],
    "complete": false,
    "missing": [
-    "the DC primary lugs land on six different studs; the lug set per stud is not picked (endpoints.yaml PS-STUDS)"
+    "AMP-KIT-RING (the AMP Research kit's own ring)"
    ]
   },
   "RAIL-COIL_PWR": {
@@ -615,8 +698,14 @@
    "models": [],
    "complete": false,
    "missing": [
-    "ring terminal and stud bank not picked (families.yaml ring_small: 'UNKNOWN: ring PN per stud size + gauge')"
+    "S-terminal ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'"
    ]
+  },
+  "TRANS-CASE": {
+   "models": [
+    "TRANS-CASE"
+   ],
+   "complete": true
   },
   "WIDEBAND": {
    "models": [
@@ -11308,6 +11397,498 @@
    ],
    "missing": []
   },
+  "NC5FD-L-1": {
+   "endpoints": [
+    "PORT-UTC"
+   ],
+   "what": "Neutrik NC5FD-L-1 5-pole female XLR receptacle, D-size flange (the MoTeC UTC port)",
+   "maker": "Neutrik",
+   "maker_pn": "NC5FD-L-1",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 32.3,
+    "w": 26.0,
+    "h": 31.0
+   },
+   "frame": "the flange's rear face at z = 0 (panel side), +Z toward the rear (wires); front toward -Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "housing": {
+     "hex": "#23262a",
+     "from": "Neutrik NC5FD-L-1: black metal housing (Neutrik datasheet 'Housing: Zinc diecast, black chrome')"
+    },
+    "contacts": {
+     "hex": "#d6b56a",
+     "from": "gold-plated contacts (Neutrik datasheet)"
+    }
+   },
+   "attach": [
+    {
+     "n": "c1",
+     "ep": "PORT-UTC",
+     "at": [
+      4.1,
+      1.2,
+      20.3
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c2",
+     "ep": "PORT-UTC",
+     "at": [
+      3.2,
+      -2.5,
+      20.3
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c3",
+     "ep": "PORT-UTC",
+     "at": [
+      0.0,
+      -4.3,
+      20.3
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c4",
+     "ep": "PORT-UTC",
+     "at": [
+      -3.3,
+      -2.5,
+      20.3
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c5",
+     "ep": "PORT-UTC",
+     "at": [
+      -4.2,
+      1.2,
+      20.3
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "panel ports, bulkheads, case connectors"
+  },
+  "NE8FDP": {
+   "endpoints": [
+    "PORT-ETH"
+   ],
+   "what": "Neutrik NE8FDP etherCON RJ45 feedthrough, D-size flange (the M130 laptop port)",
+   "maker": "Neutrik",
+   "maker_pn": "NE8FDP",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 34.5,
+    "w": 26.0,
+    "h": 31.0
+   },
+   "frame": "the flange's rear face at z = 0 (panel side), +Z toward the rear (wires); front toward -Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "housing": {
+     "hex": "#23262a",
+     "from": "Neutrik NE8FDP: black metal housing (Neutrik datasheet)"
+    },
+    "contacts": {
+     "hex": "#d6b56a",
+     "from": "gold-plated contacts (Neutrik datasheet)"
+    }
+   },
+   "attach": [
+    {
+     "n": "c1",
+     "ep": "PORT-ETH",
+     "at": [
+      -3.57,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c2",
+     "ep": "PORT-ETH",
+     "at": [
+      -2.55,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c3",
+     "ep": "PORT-ETH",
+     "at": [
+      -1.53,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c4",
+     "ep": "PORT-ETH",
+     "at": [
+      -0.51,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c5",
+     "ep": "PORT-ETH",
+     "at": [
+      0.51,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c6",
+     "ep": "PORT-ETH",
+     "at": [
+      1.53,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c7",
+     "ep": "PORT-ETH",
+     "at": [
+      2.55,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    },
+    {
+     "n": "c8",
+     "ep": "PORT-ETH",
+     "at": [
+      3.57,
+      2.0,
+      20.05
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "solder / rear contact"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "panel ports, bulkheads, case connectors"
+  },
+  "FIREWALL-CABIN": {
+   "endpoints": [
+    "FIREWALL-CABIN"
+   ],
+   "what": "D38999/24WJ61SN (jam-nut receptacle, sockets), shell 25, 61 x #20, olive drab, with its M85049/69-25N adapter",
+   "maker": "MIL-DTL-38999 Series III (MILNEC TX07 / TX06 dims)",
+   "maker_pn": "D38999/24WJ61SN",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 54.5,
+    "w": 59.0,
+    "h": 55.6
+   },
+   "frame": "the receptacle's flange face at z = 0 (+Z toward the cabin wires)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "shell": {
+     "hex": "#5b5c3d",
+     "from": "reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 finish code 'W  Aluminum, olive drab cadmium' (D38999/24WJ61SN, /26WJ61PN)"
+    },
+    "insert": {
+     "hex": "#2a2a2a",
+     "from": "insert: dark (catalog photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "bundle",
+     "ep": "FIREWALL-CABIN",
+     "at": [
+      0.0,
+      0.0,
+      30.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "61-way bundle through the adapter"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "panel ports, bulkheads, case connectors",
+   "pieces": [
+    "D38999/24WJ61SN",
+    "M85049/69-25N"
+   ],
+   "missing": [
+    "202K163-25-0 shrink boot (dimensions not on file)",
+    "M39029 size-20 contacts (slash-sheet dimensions not on file)"
+   ]
+  },
+  "FIREWALL-ENGINE": {
+   "endpoints": [
+    "FIREWALL-ENGINE"
+   ],
+   "what": "D38999/26WJ61PN (plug, pins), shell 25, 61 x #20, olive drab, with its M85049/69-25N adapter",
+   "maker": "MIL-DTL-38999 Series III (MILNEC TX07 / TX06 dims)",
+   "maker_pn": "D38999/26WJ61PN",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 53.3,
+    "w": 48.0,
+    "h": 48.0
+   },
+   "frame": "the plug's coupling face at z = 0 (+Z toward the engine loom)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "shell": {
+     "hex": "#5b5c3d",
+     "from": "reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf p.45 finish code 'W  Aluminum, olive drab cadmium' (D38999/24WJ61SN, /26WJ61PN)"
+    },
+    "insert": {
+     "hex": "#2a2a2a",
+     "from": "insert: dark (catalog photos)"
+    }
+   },
+   "attach": [
+    {
+     "n": "bundle",
+     "ep": "FIREWALL-ENGINE",
+     "at": [
+      0.0,
+      0.0,
+      30.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "61-way bundle through the adapter"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "panel ports, bulkheads, case connectors",
+   "pieces": [
+    "D38999/26WJ61PN",
+    "M85049/69-25N"
+   ],
+   "missing": [
+    "202K163-25-0 shrink boot (dimensions not on file)",
+    "M39029 size-20 contacts (slash-sheet dimensions not on file)"
+   ]
+  },
+  "TRANS-CASE": {
+   "endpoints": [
+    "TRANS-CASE"
+   ],
+   "what": "6L90 external case connector: Kostal LKS 1.5 16-cavity pin housing (case side) mated with the socket housing GM 19303772 (Kostal 09430010) on the PCS harness",
+   "maker": "Kostal",
+   "maker_pn": "09330004 + 09430010 (GM 19303772)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 86.7,
+    "w": 50.3,
+    "h": 39.2
+   },
+   "frame": "the mating plane at z = 0; the case side toward -Z, the harness socket toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "housings": {
+     "hex": "#1f2022",
+     "from": "reference_documents/component_drawings/Kostal_LKS_1_5_Connector_POP.pdf p.2 (Kostal, 'DIMENSIONS' / 'TECHNICAL DATA'): product photos, black"
+    }
+   },
+   "attach": [
+    {
+     "n": "harness",
+     "ep": "TRANS-CASE",
+     "at": [
+      0.0,
+      0.0,
+      39.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "16-way harness exit"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "panel ports, bulkheads, case connectors",
+   "pieces": [
+    "09330004",
+    "09430010"
+   ],
+   "missing": []
+  },
+  "FUELP": {
+   "endpoints": [
+    "FUELP"
+   ],
+   "what": "AEM 30-2131-100 fuel pressure sensor, 0-100 psig, 1/8-27 NPT, Packard 3-pin (its mating plug comes in the kit)",
+   "maker": "AEM Electronics",
+   "maker_pn": "30-2131-100",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 54.6,
+    "w": 27.5,
+    "h": 23.8
+   },
+   "frame": "the NPT thread's end at z = 0 (into the fuel fitting), the connector up (+Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "brass": {
+     "hex": "#c9a45a",
+     "from": "reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions 10-2131 Rev C): 'Body Material: Brass'"
+    },
+    "connector": {
+     "hex": "#1c1c1c",
+     "from": "reference_documents/component_drawings/AEM_30-2131 p.2 Figure 1 photo: the mating plug is black (the sensor's own connector colour is not shown: drawn black)"
+    },
+    "blades": {
+     "hex": "#c8c9c4",
+     "from": "tin-plated terminals (colour assumed)"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "FUELP",
+     "at": [
+      0.0,
+      0.0,
+      54.6
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Packard 3-pin"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "panel ports, bulkheads, case connectors",
+   "pieces": [
+    "30-2131-100"
+   ],
+   "missing": [
+    "the kit's mating Packard 3-pin plug (AEM: 'Each sensor comes with a mating connector plug and pin kit'; it names no part number and prints no drawing, so it is not drawn)"
+   ]
+  },
   "1003": {
    "endpoints": [
     "FIREWALL-GROMMET",
@@ -11488,6 +12069,1817 @@
    "mount": [],
    "kind": "piece",
    "family": "power hardware"
+  },
+  "238LTP": {
+   "endpoints": [
+    "PS-STUDS",
+    "GND-BANK-ENG",
+    "AMP-BLOCK"
+   ],
+   "what": "ProWire 238LTP: heavy-duty tinned-copper lug, 2 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "238LTP",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 42.9,
+    "w": 16.5,
+    "h": 10.8
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/238LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      34.67,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "2516LTP": {
+   "endpoints": [
+    "PS-STUDS"
+   ],
+   "what": "ProWire 2516LTP: heavy-duty tinned-copper lug, 2 AWG, 5/16\" (M8) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "2516LTP",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 42.9,
+    "w": 16.5,
+    "h": 10.8
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/2516LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      34.67,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.34,
+     "note": "5/16\" (M8)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "838TP": {
+   "endpoints": [
+    "PS-STUDS",
+    "GND-BANK-ENG",
+    "FAN-JUNCTION"
+   ],
+   "what": "ProWire 838TP: heavy-duty tinned-copper lug, 8 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "838TP",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 28.7,
+    "w": 14.5,
+    "h": 6.3
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      21.46,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "638TP": {
+   "endpoints": [
+    "GND-BANK-ENG"
+   ],
+   "what": "ProWire 638TP: heavy-duty tinned-copper lug, 6 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "638TP",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 33.5,
+    "w": 13.5,
+    "h": 7.5
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/638TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      26.8,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "610TP": {
+   "endpoints": [
+    "PS-STUDS"
+   ],
+   "what": "ProWire 610TP: heavy-duty tinned-copper lug, 6 AWG, #10 (M5) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "610TP",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 33.5,
+    "w": 12.0,
+    "h": 7.5
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/610TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      27.51,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.23,
+     "note": "#10 (M5)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "DL438": {
+   "endpoints": [
+    "PS-STUDS",
+    "AMP-BLOCK"
+   ],
+   "what": "ProWire DL438: heavy-duty tinned-copper lug, 4 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "DL438",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 42.7,
+    "w": 17.8,
+    "h": 10.8
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL438 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      33.78,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "DL214": {
+   "endpoints": [
+    "PDM30-STUD",
+    "PDM15-STUD"
+   ],
+   "what": "ProWire DL214: heavy-duty tinned-copper lug, 2 AWG, 1/4\" (M6) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "DL214",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 54.1,
+    "w": 17.5,
+    "h": 12.2
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PDM30-STUD",
+     "at": [
+      45.34,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.75,
+     "note": "1/4\" (M6)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "9906": {
+   "endpoints": [
+    "GND-BANK-ENG",
+    "GND-BANK-CAB"
+   ],
+   "what": "ProWire 9906: hi-temp non-insulated ring terminal, 22-18 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "9906",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 25.8,
+    "w": 17.4,
+    "h": 3.3
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      17.12,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "9912": {
+   "endpoints": [
+    "GND-BANK-ENG",
+    "GND-BANK-CAB"
+   ],
+   "what": "ProWire 9912: hi-temp non-insulated ring terminal, 16-14 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "9912",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 25.8,
+    "w": 17.4,
+    "h": 4.0
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      17.12,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "9918": {
+   "endpoints": [
+    "PS-STUDS",
+    "GND-BANK-ENG",
+    "GND-BANK-CAB",
+    "FAN-JUNCTION"
+   ],
+   "what": "ProWire 9918: hi-temp non-insulated ring terminal, 12-10 AWG, 3/8\" (M9) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "9918",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 25.8,
+    "w": 17.4,
+    "h": 5.2
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PS-STUDS",
+     "at": [
+      17.12,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.925,
+     "note": "3/8\" (M9)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "9916": {
+   "endpoints": [
+    "PDM30-STUD"
+   ],
+   "what": "ProWire 9916: hi-temp non-insulated ring terminal, 12-10 AWG, 1/4\" (M6) stud",
+   "maker": "ProWire USA",
+   "maker_pn": "9916",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 17.6,
+    "w": 11.8,
+    "h": 5.2
+   },
+   "frame": "tang on z = 0, stud hole at the origin, barrel toward +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "wire": "+X"
+    }
+   },
+   "colors": {
+    "metal": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "PDM30-STUD",
+     "at": [
+      11.64,
+      0.0,
+      1.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.75,
+     "note": "1/4\" (M6)"
+    }
+   ],
+   "kind": "piece",
+   "family": "rings and lugs"
+  },
+  "FAN-JUNCTION": {
+   "endpoints": [
+    "FAN-JUNCTION"
+   ],
+   "what": "FAN-JUNCTION: the rings on the stud in their stack order, with the wire on each (3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8\"-16 x 3/4\"'))",
+   "maker": "(assembly)",
+   "maker_pn": "838TP + 9918 + 9918",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 83.8,
+    "w": 44.5,
+    "h": 51.0
+   },
+   "frame": "the post's base at z = 0, the stud up (+Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "base": {
+     "hex": "#1c1c1e",
+     "from": "reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page): 'Base Material is Black Nylon 8231 GHS'"
+    },
+    "stud": {
+     "hex": "#c7c9c6",
+     "from": "reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page): 3/8\" stud (tin-plated copper assumed colour: not stated)"
+    },
+    "838TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      32.3
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "838TP (21)"
+    },
+    {
+     "n": "ring2",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      33.57
+     ],
+     "dir": [
+      -0.5,
+      0.866,
+      0
+     ],
+     "kind": "9918 (FAN_LEG1)"
+    },
+    {
+     "n": "ring3",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      34.57
+     ],
+     "dir": [
+      -0.5,
+      -0.866,
+      0
+     ],
+     "kind": "9918 (FAN_LEG2)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.525,
+     "note": "3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8\"-16 x 3/4\"')"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "2103",
+    "838TP",
+    "9918"
+   ],
+   "missing": []
+  },
+  "PDM30-STUD": {
+   "endpoints": [
+    "PDM30-STUD"
+   ],
+   "what": "PDM30-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +')))",
+   "maker": "(assembly)",
+   "maker_pn": "DL214 + 9916 + 9916 + 9916",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 57.0,
+    "w": 23.3,
+    "h": 18.7
+   },
+   "frame": "the PDM's flat case front at z = 0, the stud up (+Z) out of it",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo: the stud's nut reads zinc-plated steel (as motec_pdm.py, PR #443)"
+    },
+    "stud base": {
+     "hex": "#1d1d1f",
+     "from": "reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black insulating hex base"
+    },
+    "DL214": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "9916": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      6.5
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "DL214 (PDM_BPOS)"
+    },
+    {
+     "n": "ring2",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      9.573
+     ],
+     "dir": [
+      0.0,
+      1.0,
+      0
+     ],
+     "kind": "9916 (DAK_CONST_FH)"
+    },
+    {
+     "n": "ring3",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      10.573
+     ],
+     "dir": [
+      -1.0,
+      0.0,
+      0
+     ],
+     "kind": "9916 (PCS_BATT_FH)"
+    },
+    {
+     "n": "ring4",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      11.573
+     ],
+     "dir": [
+      -0.0,
+      -1.0,
+      0
+     ],
+     "kind": "9916 (TRANS_BATT_FH)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +'))"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "9916",
+    "DL214"
+   ],
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
+  },
+  "PDM15-STUD": {
+   "endpoints": [
+    "PDM15-STUD"
+   ],
+   "what": "PDM15-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +')))",
+   "maker": "(assembly)",
+   "maker_pn": "DL214",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 54.1,
+    "w": 17.5,
+    "h": 18.7
+   },
+   "frame": "the PDM's flat case front at z = 0, the stud up (+Z) out of it",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo: the stud's nut reads zinc-plated steel (as motec_pdm.py, PR #443)"
+    },
+    "stud base": {
+     "hex": "#1d1d1f",
+     "from": "reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black insulating hex base"
+    },
+    "DL214": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "PDM15-STUD",
+     "at": [
+      0.0,
+      0.0,
+      6.5
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "DL214 (PDM15_BPOS)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +'))"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "DL214"
+   ],
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
+  },
+  "GND-BANK-ENG": {
+   "endpoints": [
+    "GND-BANK-ENG"
+   ],
+   "what": "GND-BANK-ENG: every ring the registry lands here, with its wire (layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack))",
+   "maker": "(assembly)",
+   "maker_pn": "24 rings",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 569.4,
+    "w": 43.4,
+    "h": 10.8
+   },
+   "frame": "layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack); ring 1 at the origin, along +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "9906": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9912": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "838TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "638TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/638TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "238LTP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/238LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM_GND1)"
+    },
+    {
+     "n": "ring2",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      24.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM_GND2)"
+    },
+    {
+     "n": "ring3",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      48.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM15_GND1)"
+    },
+    {
+     "n": "ring4",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      72.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM15_GND2)"
+    },
+    {
+     "n": "ring5",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      96.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LTCD_GND)"
+    },
+    {
+     "n": "ring6",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      120.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (PUMP_GND)"
+    },
+    {
+     "n": "ring7",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      144.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HL_L_GND)"
+    },
+    {
+     "n": "ring8",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      168.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HL_R_GND)"
+    },
+    {
+     "n": "ring9",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      192.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PT_LF_GND)"
+    },
+    {
+     "n": "ring10",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      216.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PT_RF_GND)"
+    },
+    {
+     "n": "ring11",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      240.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MK_LF_GND)"
+    },
+    {
+     "n": "ring12",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      264.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MK_RF_GND)"
+    },
+    {
+     "n": "ring13",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      288.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HORN_GND)"
+    },
+    {
+     "n": "ring14",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      312.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (WASH_GND)"
+    },
+    {
+     "n": "ring15",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      336.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (UH_GND)"
+    },
+    {
+     "n": "ring16",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      360.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIPER_GND)"
+    },
+    {
+     "n": "ring17",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      384.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (BLOWER_GND)"
+    },
+    {
+     "n": "ring18",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      408.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (ISO_GND)"
+    },
+    {
+     "n": "ring19",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      432.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "OPEN: ring for the 3/8 in stud, wire gauge unknown (kit lead, gauge per kit (AMP Research IM75146 names none)) (STEP_GND)"
+    },
+    {
+     "n": "ring20",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      456.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "838TP (FAN_GND)"
+    },
+    {
+     "n": "ring21",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      480.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "638TP (DCDC_GND)"
+    },
+    {
+     "n": "ring22",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      504.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "238LTP (AMP_GND)"
+    },
+    {
+     "n": "ring23",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      528.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "638TP (IBOOST_GND)"
+    },
+    {
+     "n": "ring24",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      552.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (TRANS_GND)"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "238LTP",
+    "638TP",
+    "838TP",
+    "9906",
+    "9912",
+    "9918"
+   ],
+   "missing": [
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
+   ]
+  },
+  "GND-BANK-CAB": {
+   "endpoints": [
+    "GND-BANK-CAB"
+   ],
+   "what": "GND-BANK-CAB: every ring the registry lands here, with its wire (layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack))",
+   "maker": "(assembly)",
+   "maker_pn": "21 rings",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 497.4,
+    "w": 25.8,
+    "h": 5.2
+   },
+   "frame": "layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack); ring 1 at the origin, along +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "9906": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9912": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (123)"
+    },
+    {
+     "n": "ring2",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      24.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIN_GND_L)"
+    },
+    {
+     "n": "ring3",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      48.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIN_GND_R)"
+    },
+    {
+     "n": "ring4",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      72.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LOCK_GND_L)"
+    },
+    {
+     "n": "ring5",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      96.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LOCK_GND_R)"
+    },
+    {
+     "n": "ring6",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      120.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (TGR_M_GND)"
+    },
+    {
+     "n": "ring7",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      144.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MIRROR_GND)"
+    },
+    {
+     "n": "ring8",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      168.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_L_GND)"
+    },
+    {
+     "n": "ring9",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      192.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_C_GND)"
+    },
+    {
+     "n": "ring10",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      216.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_R_GND)"
+    },
+    {
+     "n": "ring11",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      240.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (DOME_GND)"
+    },
+    {
+     "n": "ring12",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      264.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (UD_GND)"
+    },
+    {
+     "n": "ring13",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      288.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (FW_GND)"
+    },
+    {
+     "n": "ring14",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      312.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (USB_GND)"
+    },
+    {
+     "n": "ring15",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      336.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (OUT12V_GND)"
+    },
+    {
+     "n": "ring16",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      360.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (RADIO_GND)"
+    },
+    {
+     "n": "ring17",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      384.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (GSS_GND)"
+    },
+    {
+     "n": "ring18",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      408.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (TCASE_SW_GND)"
+    },
+    {
+     "n": "ring19",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      432.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIPER_SW_GND)"
+    },
+    {
+     "n": "ring20",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      456.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PCS_GND)"
+    },
+    {
+     "n": "ring21",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      480.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (GND_RET_REAR)"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "9906",
+    "9912",
+    "9918"
+   ],
+   "missing": [
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
+   ]
   }
  }
 }
