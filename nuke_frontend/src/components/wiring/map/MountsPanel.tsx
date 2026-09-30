@@ -197,7 +197,9 @@ const END_WORD: Record<string, string> = {
   fixed_by_engine: 'FIXED BY THE ENGINE / FACTORY', decided: 'DECIDED', proposed: 'PROPOSED', open: 'NOT DECIDED', flag: 'BREAKS A RULE',
 };
 
-export function WhereOnTruck({ code, cw }: { code: string; cw: Colorway }) {
+// showWhy: the reasons, their sources and what is still open are the owner's working record (the MAP workspace shows
+// them to the owner only); the spot itself is a result.
+export function WhereOnTruck({ code, cw, showWhy = true }: { code: string; cw: Colorway; showWhy?: boolean }) {
   const [e, setE] = useState<EndRec | null>(null);
   const [more, setMore] = useState(false);
   useEffect(() => { let c = false; loadEnds().then(f => { if (!c) setE(f.ends[code] ?? null); }); return () => { c = true; }; }, [code]);
@@ -210,13 +212,13 @@ export function WhereOnTruck({ code, cw }: { code: string; cw: Colorway }) {
         <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', background: t, color: textOn(t) }}>{END_WORD[e.status] ?? e.status.toUpperCase()}</span>
       </div>
       <div style={{ fontSize: 14, marginTop: 3 }}>{e.where}</div>
-      {(!!e.why?.length || !!e.open?.length) && (
+      {showWhy && (!!e.why?.length || !!e.open?.length) && (
         <button onClick={() => setMore(m => !m)} style={{ marginTop: 4, background: 'transparent', border: 'none', padding: 0,
           color: cw.accent, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
           {more ? 'HIDE WHY' : 'WHY / SOURCES'}
         </button>
       )}
-      {more && (
+      {showWhy && more && (
         <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
           {(e.why ?? []).map((w, i) => (
             <div key={i} style={{ marginTop: 2 }}>{w.text} <span style={{ color: cw.inkFaint, fontFamily: cw.fontMono, fontSize: 10 }}>[{w.source}]</span></div>

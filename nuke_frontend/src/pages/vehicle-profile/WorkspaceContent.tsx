@@ -37,6 +37,7 @@ const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/Pric
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
 const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
+const WiringWidgetLink = React.lazy(() => import('./WiringWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
 
@@ -374,6 +375,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           <React.Suspense fallback={null}>
             <InventoryWidgetLink vehicleId={vehicle.id} />
           </React.Suspense>
+
+          {/* Wiring map for visitors: the harness results (the owner gets the harness builder below) */}
+          {!(isRowOwner || isVerifiedOwner) && (
+            <React.Suspense fallback={null}>
+              <WiringWidgetLink vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (

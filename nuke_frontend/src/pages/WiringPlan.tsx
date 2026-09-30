@@ -378,10 +378,10 @@ export default function WiringPlan() {
         </>)}
       </div>
 
-      {/* ── Tab Bar ── */}
+      {/* ── Tab Bar ── (scrolls sideways on a phone, so every tab stays reachable) */}
       <div style={{
         display: 'flex', alignItems: 'stretch',
-        height: 28, flexShrink: 0,
+        height: 28, flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
         background: C.bg,
         borderBottom: `2px solid ${C.border}`,
       }}>

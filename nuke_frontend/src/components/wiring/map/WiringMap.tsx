@@ -1,18 +1,19 @@
-// map/WiringMap.tsx — MAP tab: every wire end, plug and open call of the vehicle's harness on one plan, worked
-// one target at a time (owner, 2026-09-27; plan ~/.claude/plans/vivid-hugging-globe.md).
+// map/WiringMap.tsx — MAP tab: the vehicle's harness as one engineering workspace (owner 2026-09-29): the tree (harness
+// section → device → connector → cavity), one centre view (plan, 3D by zone, connector face, schematic, parts library),
+// the selection's properties and the linked tables (wire list, pin list, connectors), all lit by one selection.
+// Earlier layout: every node on one plan, worked one target at a time (owner, 2026-09-27; plan vivid-hugging-globe.md).
 //
-// Layers: TRUCK → SECTION → NODE (plug / device / splice / stud) → WIRE END. Each node is a target: click it and the
-// card shows what it takes, its wires with their paper (vehicle_observations via useWiringFacts), its wire ends,
-// and the open calls it's coupled with. Open calls (M130 location, …) are targets too; selecting one highlights
-// what it's coupled with (the design structure matrix). Nodes without a twin position sit in their section's tray
-// — never drawn at an invented spot.
+// Everyone sees the results. The owner (the profile's owner check) also sees what needs him, the open calls and
+// decisions, and each record's proof and sources (NodeCard, CallCard, WireRecords below).
 //
-// Reads typed rows only (useWiringMap). Plan drawing shared with the WORKBENCH plan view (planGeometry).
-// Chrome from the connector inspector's colorways (PAPER default). URL-addressable: ?tab=map&sec=&node=&call=
+// Reads typed rows only (useWiringMap) plus the vehicle's public design files (useSiteFiles: end positions, loom
+// routes, the part-model index). Chrome from the connector inspector's colorways (PAPER default).
+// URL-addressable: ?tab=map&view=&sel= (older ?node= and ?call= still open).
 
-import React, { useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { VBW, VBH, sx, sy, PlanEnvelope } from '../planGeometry';
+import { useAuth } from '../../../hooks/useAuth';
+import { useVehiclePermissions } from '../../../hooks/useVehiclePermissions';
 import {
   COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext, DEFAULT_COLORWAY,
   frame, isColorwayId, rule, textOn, type Colorway, type ColorwayId,
@@ -22,8 +23,18 @@ import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
 import { DevicePhoto, EnginePhoto, MountsPanel, PartPhotos, WhereOnTruck } from './MountsPanel';
 import {
-  SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
+  SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WiringMapData, type WorkStatus,
 } from './useWiringMap';
+import {
+  SHAPE_ORDER, coverage, kindOf, mask, publicName, relOf, useSelection, useSiteFiles, useWsIndex, valOf,
+  type SiteFiles, type WsIndex,
+} from './useWorkspaceSelection';
+import { WorkspaceTree } from './WorkspaceTree';
+import { ConnectorFace, PlanView } from './WorkspaceViews';
+import { SchematicBlock } from './SchematicBlock';
+import { WorkspaceTables } from './WorkspaceTables';
+import { WorkspaceProps } from './WorkspaceProps';
+import { PartLibrary } from './PartLibrary';
 
 const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
@@ -66,6 +77,25 @@ function statusColor(cw: Colorway, s: WorkStatus): string {
   return s === 'done' ? cw.ok : s === 'needs_owner' ? cw.warn : s === 'blocked' ? cw.danger : s === 'in_progress' ? cw.accent : cw.ink;
 }
 
+type View = 'plan' | '3d' | 'face' | 'sch' | 'lib';
+const VIEWS: [View, string][] = [['plan', 'PLAN'], ['3d', '3D'], ['face', 'CONNECTOR'], ['sch', 'SCHEMATIC'], ['lib', 'LIBRARY']];
+const ZoneModels3D = React.lazy(() => import('./ZoneModels3D'));   // three.js loads only when the 3D view opens
+
+function useNarrow(px: number): boolean {
+  const q = `(max-width: ${px - 1}px)`;
+  const [n, setN] = useState(() => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(q).matches);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const m = window.matchMedia(q), f = () => setN(m.matches);
+    f(); m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, [q]);
+  return n;
+}
+
+// The MAP workspace (owner 2026-09-29: "imagine a zuken engineer looks at the software and data presentation"): a tree,
+// one centre view, the selection's properties and the linked tables, all lit by one selection (?sel=). Everyone sees
+// the results; the owner also sees what needs him, the open calls and decisions, and each record's proof and sources.
 export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const [params, setParams] = useSearchParams();
   const rawCw = params.get('cw');
@@ -73,13 +103,6 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   try { storedCw = window.localStorage.getItem(COLORWAY_STORAGE_KEY); } catch { /* private mode */ }
   const colorwayId: ColorwayId = isColorwayId(rawCw) ? rawCw : isColorwayId(storedCw) ? storedCw : DEFAULT_COLORWAY;
   const cw = COLORWAYS[colorwayId];
-
-  const map = useWiringMap(vehicleId);
-  const facts = useWiringFacts(vehicleId);
-
-  const sec = (params.get('sec') as Section | null) || null;
-  const nodeCode = params.get('node');
-  const callSlug = params.get('call');
   const set = (patch: Record<string, string | null>) => setParams(prev => {
     const p = new URLSearchParams(prev);
     for (const [k, v] of Object.entries(patch)) { if (v === null) p.delete(k); else p.set(k, v); }
@@ -90,24 +113,254 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
     set({ cw: id });
   };
 
-  const byId = useMemo(() => new Map(map.nodes.map(n => [n.id, n])), [map.nodes]);
-  const openCalls = map.calls.filter(c => !c.decided);
-  const locked = map.calls.filter(c => c.decided);
-  const node = nodeCode ? map.nodes.find(n => n.code === nodeCode) ?? null : null;
-  const call = callSlug ? map.calls.find(c => c.slug === callSlug) ?? null : null;
+  // The owner's layer takes the profile's owner check (useVehiclePermissions: the profile's isRowOwner). ?asOwner=1
+  // previews it on the dev server only (import.meta.env.DEV), for local screenshots; a build never honours it.
+  const { session } = useAuth();
+  const { isOwner: isRowOwner } = useVehiclePermissions(vehicleId ?? null, session, null);
+  const isOwner = isRowOwner || (import.meta.env.DEV && params.get('asOwner') === '1');
 
-  // what the selected call is coupled with (lit on the plan)
-  const coupled = useMemo(() => new Set((call?.links ?? []).map(l => l.endpointId).filter(Boolean) as string[]), [call]);
+  const raw = useWiringMap(vehicleId);
+  const facts = useWiringFacts(isOwner ? vehicleId : undefined);
+  const site = useSiteFiles(vehicleId);
+  // the workspace draws results: names without the buying story (the owner's records card keeps the full text)
+  const map = useMemo(() => ({
+    ...raw,
+    nodes: raw.nodes.map(n => ({ ...n, name: publicName(n.name) || n.code })),
+    wires: raw.wires.map(w => ({ ...w, name: publicName(w.name) || w.code })),
+  }), [raw]);
+  const ix = useWsIndex(map, site);
+  const [sel, setSel] = useSelection();
+  const rel = useMemo(() => relOf(sel, ix, map), [sel, ix, map]);
+  const narrow = useNarrow(900);
+  const [treeOpen, setTreeOpen] = useState(false);
+  const byId = useMemo(() => new Map(raw.nodes.map(n => [n.id, n])), [raw.nodes]);
+  const cov = useMemo(() => coverage(site), [site]);
 
-  // rollups per section (the group-context layer)
+  const k = kindOf(sel), v = valOf(sel);
+  const view: View = VIEWS.find(x => x[0] === params.get('view'))?.[0] ?? 'plan';
+  const withWires = SECTIONS.filter(s => map.wires.some(w => w.section === s.id));
+  const selSection = k === 'n' ? ix.byCode.get(v)?.section : k === 'w' ? ix.wireByCode.get(v)?.section : k === 'y' ? v
+    : k === 'p' ? ix.byCode.get(v.split('|')[0])?.section : null;
+  const selSys = withWires.some(s => s.id === selSection) ? (selSection as string) : null;
+  const [lastSys, setLastSys] = useState<string | null>(null);
+  useEffect(() => { if (selSys) setLastSys(selSys); }, [selSys]);
+  const sys = selSys ?? lastSys ?? withWires[0]?.id ?? 'power_spine';
+  const faceCode = k === 'n' ? v : k === 'p' ? v.split('|')[0] : k === 'w' ? (ix.chain.get(v) ?? [])[0]?.code ?? null
+    : k === 'd' ? map.nodes.find(n => ix.devOf(n.code) === v)?.code ?? null : null;
+  const pick = (id: string) => { setSel(id); if (narrow) setTreeOpen(false); };
+
+  // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
+  const rawNode = k === 'n' ? raw.nodes.find(n => n.code === v) : undefined;
+  const rawWire = k === 'w' ? raw.wires.find(w => w.code === v) : undefined;
+  const rawCall = k === 'k' ? raw.calls.find(c => c.slug === v) : undefined;
+  const records = !isOwner ? undefined
+    : rawNode ? <NodeCard cw={cw} n={rawNode} map={raw} byId={byId} facts={facts} recordsOnly onNode={c => pick('n:' + c)} onCall={s => pick('k:' + s)} />
+    : rawWire ? <WireRecords cw={cw} w={rawWire} facts={facts} />
+    : rawCall ? <CallCard cw={cw} c={rawCall} map={raw} byId={byId} onNode={c => pick('n:' + c)} />
+    : undefined;
+  const needCalls = isOwner ? raw.calls.filter(c => !c.decided && c.workStatus === 'needs_owner') : [];
+  const needNodes = isOwner ? raw.nodes.filter(n => n.workStatus === 'needs_owner') : [];
+
+  const loading = !map.loaded;
+  const tree = <WorkspaceTree cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />;
+  const centre = (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, minWidth: 0 }}>
+      <div role="tablist" style={{ display: 'flex', alignItems: 'stretch', borderBottom: rule(cw), background: cw.bg, flexShrink: 0, overflowX: 'auto' }}>
+        {narrow && (
+          <button onClick={() => setTreeOpen(true)} style={{ border: 'none', borderRight: rule(cw), background: cw.surface, color: cw.ink,
+            fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: '8px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>TREE ▸</button>
+        )}
+        {VIEWS.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={view === id} onClick={() => set({ view: id === 'plan' ? null : id })} style={{
+            border: 'none', borderBottom: `2px solid ${view === id ? cw.accent : 'transparent'}`, background: view === id ? cw.surface : 'transparent',
+            color: view === id ? cw.ink : cw.inkMuted, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+            padding: '8px 12px', cursor: 'pointer', whiteSpace: 'nowrap',
+          }}>{label}</button>
+        ))}
+        {view === 'sch' && (
+          <select value={sys} onChange={e => pick('y:' + e.target.value)} aria-label="System" style={{ margin: '4px 8px', maxWidth: 240, border: `2px solid ${cw.border}`,
+            background: cw.surface, color: cw.ink, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700 }}>
+            {withWires.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        )}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', background: cw.surface }}>
+        {view === 'plan' && <PlanView cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
+        {view === '3d' && (
+          <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: cw.inkMuted }}>LOADING THE 3D HARNESS…</div>}>
+            <ZoneModels3D cw={cw} ix={ix} sel={sel} rel={rel} onSelect={pick} />
+          </Suspense>
+        )}
+        {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
+        {view === 'sch' && <SchematicBlock cw={cw} map={map} ix={ix} section={sys} sel={sel} rel={rel} onSelect={pick} />}
+        {view === 'lib' && <PartLibrary cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
+      </div>
+    </div>
+  );
+  const props = (
+    <div style={{ padding: '10px 12px' }}>
+      {sel && (
+        <button onClick={() => setSel(null)} style={{ float: 'right', border: frame(cw), background: cw.surface, color: cw.ink,
+          fontFamily: cw.fontBody, fontSize: 10, fontWeight: 700, padding: '2px 6px', cursor: 'pointer' }}>CLEAR</button>
+      )}
+      {sel
+        ? <WorkspaceProps cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} onSelect={pick} ownerExtra={records} />
+        : <AtRest cw={cw} map={map} ix={ix} site={site} vehicleId={vehicleId} isOwner={isOwner} rollupFacts={facts} calls={raw.calls} />}
+    </div>
+  );
+  const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />;
+
+  return (
+    <ColorwayContext.Provider value={cw}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: cw.bg, color: cw.ink, fontFamily: cw.fontBody,
+        overflowY: narrow ? 'auto' : 'hidden', overflowX: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderBottom: frame(cw), background: cw.surface, flexShrink: 0 }}>
+          <Summary cw={cw} map={map} ix={ix} site={site} cov={cov} />
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            {COLORWAY_LIST.map(c => (
+              <button key={c.id} onClick={() => setColorway(c.id)} title={c.label} style={{
+                background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
+                border: frame(cw), fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
+              }}>{c.label}</button>
+            ))}
+          </span>
+        </div>
+        {(needCalls.length > 0 || needNodes.length > 0) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', padding: '5px 12px', borderBottom: `2px solid ${cw.warn}`, background: cw.bg, flexShrink: 0 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, color: cw.warn, whiteSpace: 'nowrap' }}>NEEDS YOU ({needCalls.length + needNodes.length}) · OWNER ONLY</span>
+            {needCalls.slice(0, 8).map(c => (
+              <button key={c.id} onClick={() => pick('k:' + c.slug)} title={mask(c.subject)} style={{ ...chipStyle(cw, sel === 'k:' + c.slug), borderColor: cw.warn, ...oneLine }}>{mask(c.subject).toUpperCase()}</button>
+            ))}
+            {needNodes.slice(0, 6).map(n => (
+              <button key={n.id} onClick={() => pick('n:' + n.code)} style={{ ...chipStyle(cw, sel === 'n:' + n.code), fontFamily: cw.fontMono, ...oneLine }}>{n.code}</button>
+            ))}
+            {needCalls.length + needNodes.length > 14 && (
+              <span style={{ fontSize: 11, color: cw.inkMuted, whiteSpace: 'nowrap' }}>
+                +{Math.max(0, needCalls.length - 8) + Math.max(0, needNodes.length - 6)} MORE IN THE CALLS AND CONNECTORS TABLES
+              </span>
+            )}
+          </div>
+        )}
+        {loading && <div style={{ padding: 16, fontSize: 13, color: cw.inkFaint }}>READING THE MAP…</div>}
+        {map.error && <div style={{ padding: 16, fontSize: 13, color: cw.danger }}>DATABASE READ FAILED: {map.error}</div>}
+        {!loading && !map.error && (narrow ? (
+          <>
+            <div style={{ height: '62vh', minHeight: 320, flexShrink: 0, borderBottom: frame(cw) }}>{centre}</div>
+            <div style={{ background: cw.surface, borderBottom: frame(cw), flexShrink: 0 }}>{props}</div>
+            <div style={{ height: '70vh', minHeight: 320, flexShrink: 0, background: cw.surface }}>{tables}</div>
+            {treeOpen && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
+                <div style={{ width: 'min(86vw, 360px)', height: '100%', background: cw.surface, borderRight: frame(cw), display: 'flex', flexDirection: 'column' }}>
+                  <button onClick={() => setTreeOpen(false)} style={{ border: 'none', borderBottom: rule(cw), background: cw.bg, color: cw.ink, textAlign: 'left',
+                    fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '10px 12px', cursor: 'pointer' }}>◂ CLOSE THE TREE</button>
+                  <div style={{ flex: 1, minHeight: 0 }}>{tree}</div>
+                </div>
+                <div onClick={() => setTreeOpen(false)} style={{ flex: 1, background: 'rgba(0,0,0,0.35)' }} />
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '250px minmax(0, 1fr) 360px', gridTemplateRows: 'minmax(0, 60fr) minmax(0, 40fr)' }}>
+            <div style={{ gridRow: '1 / span 2', gridColumn: 1, minHeight: 0, borderRight: frame(cw), background: cw.surface }}>{tree}</div>
+            <div style={{ gridRow: 1, gridColumn: 2, minHeight: 0, minWidth: 0 }}>{centre}</div>
+            <div style={{ gridRow: 2, gridColumn: 2, minHeight: 0, minWidth: 0, borderTop: frame(cw), background: cw.surface }}>{tables}</div>
+            <div style={{ gridRow: '1 / span 2', gridColumn: 3, minHeight: 0, overflowY: 'auto', borderLeft: frame(cw), background: cw.surface }}>{props}</div>
+          </div>
+        ))}
+      </div>
+    </ColorwayContext.Provider>
+  );
+}
+
+const oneLine: React.CSSProperties = { whiteSpace: 'nowrap', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 };
+
+function chipStyle(cw: Colorway, on: boolean): React.CSSProperties {
+  return {
+    background: on ? cw.ink : cw.surface, color: on ? textOn(cw.ink) : cw.ink, border: frame(cw),
+    fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
+  };
+}
+
+// the headline counts, each from its file; the 3D count opens its split by where each end's shape comes from
+function Summary({ cw, map, ix, site, cov }: {
+  cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; cov: ReturnType<typeof coverage>;
+}) {
+  const [open, setOpen] = useState(false);
+  const decided = map.wires.filter(w => w.designStatus === 'decided').length;
+  const withEnds = map.wires.filter(w => (ix.chain.get(w.code) ?? []).length > 1).length;
+  const placed = map.nodes.filter(n => site.ends[n.code]).length;
+  const lenM = site.segs.reduce((a, s) => a + (s.len ?? 0), 0);
+  const B = ({ children }: { children: React.ReactNode }) => <b style={{ fontFamily: cw.fontMono, fontSize: 13 }}>{children}</b>;
+  const item: React.CSSProperties = { fontSize: 11, letterSpacing: 0.3, color: cw.ink, whiteSpace: 'nowrap' };
+  const ASSUMED = new Set(['twin object', 'not sourced']);
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px 16px', flexWrap: 'wrap', minWidth: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted }}>WIRING HARNESS</span>
+      <span style={item} title="harness_endpoints; placed = has a position in k5-positions.json"><B>{map.nodes.length}</B> CONNECTORS · <B>{placed}</B> PLACED</span>
+      <span style={item} title="vehicle_custom_circuits; ends = wire_termination_specs"><B>{map.wires.length}</B> WIRES · <B>{decided}</B> DECIDED · <B>{withEnds}</B> WITH BOTH ENDS</span>
+      {site.segs.length > 0 && <span style={item} title="k5-routes.json"><B>{site.segs.length}</B> LOOM SEGMENTS · <B>{lenM.toFixed(1)}</B> M</span>}
+      {site.models && (
+        <span style={{ position: 'relative' }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+          <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
+            background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: cw.fontBody }}>
+            <B>{cov.modelled.length}</B> OF <B>{cov.total}</B> ENDS MODELLED IN 3D, <B>{cov.complete.length}</B> COMPLETE ▾
+          </button>
+          {open && (
+            <div role="tooltip" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 40, marginTop: 4, width: 320, maxWidth: '86vw',
+              background: cw.surface, border: frame(cw), padding: '8px 10px', color: cw.ink }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted, marginBottom: 4 }}>WHERE EACH END'S SHAPE COMES FROM</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <tbody>
+                  {SHAPE_ORDER.map(b => (
+                    <tr key={b}>
+                      <td style={{ padding: '2px 0', borderBottom: rule(cw) }}>{b.toUpperCase()}{ASSUMED.has(b) ? ' (ASSUMED)' : ''}</td>
+                      <td style={{ padding: '2px 0', borderBottom: rule(cw), textAlign: 'right', fontFamily: cw.fontMono }}>{cov.bySource[b]}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td style={{ padding: '4px 0 2px', fontWeight: 700 }}>FROM A SOURCED SHAPE · FROM AN ASSUMED ONE</td>
+                    <td style={{ padding: '4px 0 2px', textAlign: 'right', fontFamily: cw.fontMono, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {SHAPE_ORDER.filter(b => !ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)} · {SHAPE_ORDER.filter(b => ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '2px 0', color: cw.warn, fontWeight: 700 }}>NO 3D MODEL YET</td>
+                    <td style={{ padding: '2px 0', textAlign: 'right', fontFamily: cw.fontMono, color: cw.warn, fontWeight: 700 }}>{cov.total - cov.modelled.length}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ fontSize: 10.5, lineHeight: 1.45, color: cw.inkMuted, marginTop: 6 }}>
+                AN END COUNTS ONCE, AT THE WEAKEST SOURCE AMONG ITS MODELS, SO AN ASSUMED SHAPE NEVER COUNTS AS A SOURCED ONE. COMPLETE: EVERY PIECE THE END
+                NEEDS IS MODELLED. FROM THE PART-MODEL INDEX{site.models.generated ? ` OF ${site.models.generated}` : ''} AND THE {cov.total} PLACED ENDS.
+              </div>
+            </div>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// nothing selected: where the harness stands by section (results), the real engine with its plugs; the owner also gets
+// the proof rollup and where each box goes with its reasons
+function AtRest({ cw, map, ix, site, vehicleId, isOwner, rollupFacts, calls }: {
+  cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; vehicleId?: string; isOwner: boolean;
+  rollupFacts: ReturnType<typeof useWiringFacts>; calls: MapCall[];
+}) {
+  const rows = SECTIONS.map(s => {
+    const nodes = map.nodes.filter(n => n.section === s.id), wires = map.wires.filter(w => w.section === s.id);
+    return { s, nodes: nodes.length, placed: nodes.filter(n => site.ends[n.code]).length, wires: wires.length,
+      decided: wires.filter(w => w.designStatus === 'decided').length, ends: wires.filter(w => (ix.chain.get(w.code) ?? []).length > 1).length };
+  }).filter(r => r.nodes + r.wires > 0);
   const rollup = useMemo(() => {
     const r: Record<string, SectionRollup> = {};
+    if (!isOwner) return r;
     for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, linedUp: 0, bought: 0, installed: 0, right: 0, wrong: 0, incomplete: 0 };
     for (const n of map.nodes) {
       const x = n.section && r[n.section];
       if (!x) continue;
-      x.nodes += 1; if (n.x != null) x.placed += 1; if (n.workStatus === 'done') x.done += 1; if (n.workStatus === 'needs_owner') x.needs += 1;
-      const dp = deviceProof(facts, n.code);
+      x.nodes += 1; if (site.ends[n.code]) x.placed += 1; if (n.workStatus === 'done') x.done += 1; if (n.workStatus === 'needs_owner') x.needs += 1;
+      const dp = deviceProof(rollupFacts, n.code);
       if (dp.some(f => f.level === 'lined_up')) x.linedUp += 1;
       if (dp.some(f => f.level === 'bought')) x.bought += 1;
       if (dp.some(f => f.level === 'installed')) x.installed += 1;
@@ -117,196 +370,53 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
       if (!x) continue;
       if (w.designStatus === 'decided') {
         x.decided += 1;
-        const v = verdictOf(w);
-        if (v === 'RIGHT') x.right += 1; else if (v === 'WRONG') x.wrong += 1; else if (v === 'INCOMPLETE') x.incomplete += 1;
+        const vd = verdictOf(w);
+        if (vd === 'RIGHT') x.right += 1; else if (vd === 'WRONG') x.wrong += 1; else if (vd === 'INCOMPLETE') x.incomplete += 1;
       } else x.concept += 1;
     }
     return r;
-  }, [map.nodes, map.wires, facts]);
-
-  const visible = map.nodes.filter(n => !sec || n.section === sec);
-  const placed = visible.filter(n => n.x != null && n.y != null);
-  const unplaced = visible.filter(n => n.x == null || n.y == null);
-
-  // nodes sharing one anchor fan out in a small ring, so each stays clickable (display only; data keeps the anchor)
-  const drawn = useMemo(() => {
-    const groups = new Map<string, MapNode[]>();
-    for (const n of placed) {
-      const k = `${n.x!.toFixed(3)},${n.y!.toFixed(3)}`;
-      groups.set(k, [...(groups.get(k) ?? []), n]);
-    }
-    const out: { n: MapNode; px: number; py: number; lx: number; ly: number; solo: boolean; lead: boolean; more: number }[] = [];
-    for (const g of groups.values()) {
-      const cx = sx(g[0].y!), cy = sy(g[0].x!);
-      g.forEach((n, i) => {
-        const a = (i / Math.max(1, g.length)) * Math.PI * 2 - Math.PI / 2;
-        const r = g.length > 1 ? 10 + g.length * 1.8 : 0;
-        const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
-        // a cluster gets ONE label above it (first code + how many more); each node still has its own tooltip + click
-        out.push({ n, px, py, lx: cx, ly: cy - r - 9, solo: g.length === 1, lead: i === 0, more: g.length - 1 });
-      });
-    }
-    return out;
-  }, [placed]);
-
-  const loading = !map.loaded;
+  }, [isOwner, map.nodes, map.wires, rollupFacts, site.ends]);
+  const th: React.CSSProperties = { textAlign: 'right', fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted, padding: '3px 4px', borderBottom: `2px solid ${cw.border}` };
+  const td: React.CSSProperties = { textAlign: 'right', fontFamily: cw.fontMono, padding: '3px 4px', borderBottom: rule(cw) };
   return (
-    <ColorwayContext.Provider value={cw}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: cw.bg, color: cw.ink, fontFamily: cw.fontBody }}>
-        {/* ── header: layers + colorway ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: rule(cw), flexWrap: 'wrap' }}>
-          <Tab cw={cw} on={!sec} onClick={() => set({ sec: null, node: null, call: null })} label="TRUCK" sub={`${map.nodes.length} NODES`} />
-          {SECTIONS.map(s => {
-            const r = rollup[s.id];
-            if (!r || r.nodes + r.decided + r.concept === 0) return null;
-            return (
-              <Tab key={s.id} cw={cw} on={sec === s.id} onClick={() => set({ sec: s.id, node: null, call: null })} label={s.label}
-                sub={`${r.done}/${r.nodes} DONE · ${r.decided + r.concept} WIRES${r.concept ? ` (${r.concept} CONCEPT)` : ''}`} />
-            );
-          })}
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-            {COLORWAY_LIST.map(c => (
-              <button key={c.id} onClick={() => setColorway(c.id)} title={c.label} style={{
-                background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
-                border: frame(cw), fontFamily: cw.fontBody, fontSize: 14, fontWeight: 700, padding: '2px 8px', cursor: 'pointer',
-              }}>{c.label}</button>
-            ))}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          {/* ── plan + calls + trays ── */}
-          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '8px 12px' }}>
-            {loading && <div style={{ fontSize: 14, color: cw.inkFaint }}>READING THE MAP…</div>}
-            {map.error && <div style={{ fontSize: 14, color: cw.danger }}>DATABASE READ FAILED: {map.error}</div>}
-            {!loading && !map.error && (
-              <>
-                <svg viewBox={`0 0 ${VBW} ${VBH}`} style={{ width: '100%', display: 'block', border: frame(cw), background: cw.surface }}>
-                  <PlanEnvelope body={cw.faceStroke} border={cw.border} muted={cw.inkFaint} font={cw.fontBody} />
-                  {drawn.map(({ n, px, py, lx, ly, solo, lead, more }) => {
-                    const sel = node?.id === n.id;
-                    const lit = coupled.has(n.id);
-                    const c = statusColor(cw, n.workStatus);
-                    return (
-                      <g key={n.id} style={{ cursor: 'pointer' }} onClick={() => set({ node: n.code, call: null, sec: n.section ?? sec })}>
-                        <rect x={px - 5} y={py - 5} width={10} height={10}
-                          fill={n.designStatus === 'decided' ? c : cw.surface} stroke={lit ? cw.warn : c}
-                          strokeWidth={sel || lit ? 3 : 1.5}>
-                          <title>{`${n.code} — ${n.name} · ${WORK_WORD[n.workStatus]} · ${n.posSource ?? ''}`}</title>
-                        </rect>
-                        {(sel || lit) && !solo && (
-                          <text x={px} y={py - 8} fontFamily={cw.fontMono} fontSize={9} fontWeight={700} fill={lit ? cw.warn : cw.accent}
-                            textAnchor="middle" style={{ pointerEvents: 'none' }}>{n.code}</text>
-                        )}
-                        {!!sec && (solo || lead) && !((sel || lit) && !solo) && (
-                          <text x={solo ? px : lx} y={solo ? py - 8 : ly} fontFamily={cw.fontMono} fontSize={9} fontWeight={700}
-                            fill={lit ? cw.warn : cw.ink} textAnchor="middle" style={{ pointerEvents: 'none' }}>
-                            {n.code}{!solo && more > 0 ? ` +${more}` : ''}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                {/* the real engine with each plug named where it sits (K5 only) */}
-                {!sec && <EnginePhoto vehicleId={vehicleId} cw={cw} />}
-
-                {/* where each box goes (the K5's mounts list; nothing for other vehicles) */}
-                {!sec && <MountsPanel vehicleId={vehicleId} cw={cw} />}
-
-                {/* open calls: targets too */}
-                {openCalls.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
-                      OPEN CALLS ({openCalls.length})
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {openCalls.map(c => (
-                        <button key={c.id} onClick={() => set({ call: c.slug, node: null })} style={{
-                          background: call?.id === c.id ? cw.warn : cw.surface, color: call?.id === c.id ? textOn(cw.warn) : cw.ink,
-                          border: `2px solid ${cw.warn}`, fontFamily: cw.fontBody, fontSize: 14, padding: '3px 8px', cursor: 'pointer',
-                        }}>
-                          {c.subject.toUpperCase()}{c.options.length ? ` · ${c.options.length} OPTIONS` : ''}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* locked decisions: enforced on the rows; each lists what it rules out */}
-                {locked.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
-                      LOCKED ({locked.length}) — DECIDED; ROWS THAT CONTRADICT THEM ARE RETIRED
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {locked.map(c => {
-                        const out = c.links.filter(l => l.relation === 'blocks').length;
-                        return (
-                          <button key={c.id} onClick={() => set({ call: c.slug, node: null })} style={{
-                            background: call?.id === c.id ? cw.ink : cw.surface, color: call?.id === c.id ? textOn(cw.ink) : cw.ink,
-                            border: `2px solid ${cw.ink}`, fontFamily: cw.fontBody, fontSize: 14, padding: '3px 8px', cursor: 'pointer',
-                          }}>
-                            {c.subject.toUpperCase()}{out ? ` · RULES OUT ${out}` : ''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* trays: nodes that aren't placed yet, by section */}
-                {unplaced.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
-                      NOT PLACED YET ({unplaced.length}) — NO POSITION ON THE TRUCK
-                    </div>
-                    {SECTIONS.filter(s => !sec || s.id === sec).map(s => {
-                      const list = unplaced.filter(n => n.section === s.id);
-                      if (!list.length) return null;
-                      return (
-                        <div key={s.id} style={{ marginBottom: 8 }}>
-                          <div style={{ fontSize: 14, color: cw.inkFaint, marginBottom: 3 }}>{s.label} ({list.length})</div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {list.map(n => (
-                              <button key={n.id} onClick={() => set({ node: n.code, call: null })} title={n.name} style={{
-                                background: node?.id === n.id ? cw.accent : cw.surface, color: node?.id === n.id ? cw.onAccent : cw.ink,
-                                border: rule(cw), borderLeft: `4px solid ${statusColor(cw, n.workStatus)}`,
-                                fontFamily: cw.fontMono, fontSize: 14, padding: '2px 6px', cursor: 'pointer',
-                              }}>{n.code}</button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* ── the target card ── */}
-          <div style={{ width: 400, flexShrink: 0, borderLeft: frame(cw), background: cw.surface, overflowY: 'auto', padding: '12px 14px' }}>
-            {node && <NodeCard cw={cw} n={node} map={map} byId={byId} facts={facts} onNode={c => set({ node: c })} onCall={s => set({ call: s, node: null })} />}
-            {!node && call && <CallCard cw={cw} c={call} map={map} byId={byId} onNode={c => set({ node: c, call: null })} />}
-            {!node && !call && <Rollup cw={cw} sec={sec} rollup={rollup} calls={map.calls} />}
-          </div>
-        </div>
-      </div>
-    </ColorwayContext.Provider>
+    <div>
+      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted }}>WHOLE TRUCK</div>
+      <div style={{ fontSize: 12.5, margin: '2px 0 8px' }}>SELECT ANYTHING IN THE TREE, A VIEW OR A TABLE; EVERY PANE LIGHTS WHAT IT LINKS TO.</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead><tr><th style={{ ...th, textAlign: 'left' }}>SECTION</th><th style={th}>CONN.</th><th style={th}>PLACED</th><th style={th}>WIRES</th><th style={th}>DECIDED</th><th style={th}>BOTH ENDS</th></tr></thead>
+        <tbody>{rows.map(r => (
+          <tr key={r.s.id}>
+            <td style={{ padding: '3px 4px', borderBottom: rule(cw) }}>{r.s.label}</td>
+            <td style={td}>{r.nodes}</td><td style={td}>{r.placed}</td><td style={td}>{r.wires}</td><td style={td}>{r.decided}</td><td style={td}>{r.ends}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+      <EnginePhoto vehicleId={vehicleId} cw={cw} />
+      {isOwner && (
+        <>
+          <Head cw={cw}>RECORDS (OWNER)</Head>
+          <Rollup cw={cw} sec={null} rollup={rollup} calls={calls} />
+          <MountsPanel vehicleId={vehicleId} cw={cw} />
+        </>
+      )}
+    </div>
   );
 }
 
-function Tab({ cw, on, onClick, label, sub }: { cw: Colorway; on: boolean; onClick: () => void; label: string; sub: string }) {
+// the owner's records on a wire: the registry's rule checks and the paper behind it
+function WireRecords({ cw, w, facts }: { cw: Colorway; w: MapWire; facts: ReturnType<typeof useWiringFacts> }) {
+  const checks = Object.entries(w.checks ?? {}).filter(([, x]) => x[0] !== 'PASS');
   return (
-    <button onClick={onClick} style={{
-      background: on ? cw.accent : cw.surface, color: on ? cw.onAccent : cw.ink, border: frame(cw),
-      fontFamily: cw.fontBody, padding: '3px 8px', cursor: 'pointer', textAlign: 'left',
-    }}>
-      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 12, opacity: 0.85 }}>{sub}</div>
-    </button>
+    <div>
+      <WireVerdict cw={cw} w={w} />
+      {checks.map(([key, x]) => (
+        <Field key={key} cw={cw} label={RULE_WORD[key] ?? key}>
+          <span style={{ color: x[0] === 'FAIL' ? cw.danger : cw.warn, fontWeight: 700 }}>{x[0] === 'FAIL' ? 'WRONG' : 'OPEN'}</span>{' — '}{x[1]}
+        </Field>
+      ))}
+      {w.name && <Field cw={cw} label="AS RECORDED">{w.name}</Field>}
+      <WireEvidence wireId={w.code} facts={facts} cw={cw} />
+    </div>
   );
 }
 
@@ -323,9 +433,9 @@ function Head({ cw, children }: { cw: Colorway; children: React.ReactNode }) {
   return <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, margin: '12px 0 4px', borderTop: rule(cw), paddingTop: 8 }}>{children}</div>;
 }
 
-function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
+function NodeCard({ cw, n, map, byId, facts, recordsOnly, onNode, onCall }: {
   cw: Colorway; n: MapNode; map: ReturnType<typeof useWiringMap>; byId: Map<string, MapNode>;
-  facts: ReturnType<typeof useWiringFacts>; onNode: (code: string) => void; onCall: (slug: string) => void;
+  facts: ReturnType<typeof useWiringFacts>; recordsOnly?: boolean; onNode: (code: string) => void; onCall: (slug: string) => void;
 }) {
   // a wire touches this node if one of its ends is here (wire_termination_specs, every end of every wire) or its
   // from/to link points here; its path is all its ends in order: M130/PDM -> 61-pin -> device
@@ -343,11 +453,15 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
   const [open, setOpen] = React.useState<string | null>(null);
   return (
     <div>
-      <div style={{ fontFamily: cw.fontMono, fontSize: 19, fontWeight: 700, color: cw.accent }}>{n.code}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{n.name}</div>
-      <DevicePhoto cw={cw} code={n.code} />
-      <WhereOnTruck cw={cw} code={n.code} />
-      <Field cw={cw} label="TYPE">{n.type.toUpperCase()}{n.family && n.family !== 'unknown' ? ` · ${n.family.toUpperCase()}` : ''}</Field>
+      {recordsOnly ? <Field cw={cw} label="AS RECORDED">{n.name}</Field> : (
+        <>
+          <div style={{ fontFamily: cw.fontMono, fontSize: 19, fontWeight: 700, color: cw.accent }}>{n.code}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{n.name}</div>
+          <DevicePhoto cw={cw} code={n.code} />
+          <WhereOnTruck cw={cw} code={n.code} />
+          <Field cw={cw} label="TYPE">{n.type.toUpperCase()}{n.family && n.family !== 'unknown' ? ` · ${n.family.toUpperCase()}` : ''}</Field>
+        </>
+      )}
       <Field cw={cw} label="STATUS">
         <span style={{ color: statusColor(cw, n.workStatus), fontWeight: 700 }}>{WORK_WORD[n.workStatus]}</span>
         {' · '}{n.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}
