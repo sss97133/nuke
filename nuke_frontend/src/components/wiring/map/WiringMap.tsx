@@ -266,7 +266,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // switch waits here too, off the first screen
   const doorBar = door && (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px 8px', flexWrap: 'wrap', padding: '5px 12px', borderBottom: frame(cw), background: cw.bg, flexShrink: 0 }}>
-      <button onClick={() => go(null)} style={barBtn(false)}>◂ ALL FOUR</button>
+      <button onClick={() => go(null, null)} style={barBtn(false)}>◂ ALL FOUR</button>
       <span style={{ fontSize: 15, fontWeight: 700 }}>{DOORS.find(d => d.id === door)?.title}</span>
       <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {door !== 'missing' && (
