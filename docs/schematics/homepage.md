@@ -94,3 +94,9 @@ That's the form for "edge cases across markets":
 - **It's a generator, not one strip** (owner, same day: "that reps a huge other examples of data"). The same form fits
   any series that has its own history or cohort. The homepage scans many of them (segments, makes, price bands, platforms,
   single live lots) and shows only the few that sit at an edge right now, each as one strip.
+- **Only what our structure can see** (owner, same day: "the data only visible with our structure"). Prefer series that
+  exist only because of how Nuke records things:
+  - each comment and bid timed against its own auction's clock, so pace can be compared at the same time to close;
+  - each sale tied to the vehicle's full history across platforms: relists, prior results, owner records;
+  - evidence-backed facts, not listing claims.
+  A total that anyone could compute from a listings page isn't a strip.
