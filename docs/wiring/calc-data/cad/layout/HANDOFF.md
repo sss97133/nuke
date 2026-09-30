@@ -1,45 +1,51 @@
-# Pieces lane handoff (2026-09-29, stopped at the usage limit)
+# Pieces lane handoff (2026-09-30, final push before the owner's flight)
 
-The pieces lane places every K5 harness end, checks each part and each other lane's work against its sources, and
-publishes the results for Skylar. This folder keeps the scripts that were only in a session scratchpad: the ends list,
-the world positions, the true-size footprints, the layout-page data builder and the parts-library page builder.
-Paths inside them are local (the session scratchpad, ~/k5-harness-pull); re-point them before running.
+The pieces lane places every K5 harness end, audits each part and each other lane's work against its sources, and
+publishes the results for Skylar. This folder keeps the scripts that otherwise live only in a session scratchpad: the
+ends list, the world positions and the true-size footprints. Paths inside them are local (the session scratchpad,
+~/k5-harness-pull); re-point them before running. The layout page's builder lives on branch `wiring/layout-ui`
+(docs/wiring/calc-data/layout/, its own HANDOFF.md).
 
-## What's done
-- **Ends.** `ends.py` writes the `ends:` list in `docs/wiring/calc-data/catalog/mounts.yaml`: 178 ends, each with a
-  status and sources. `pos.py` gives each end a world position (metres, +x driver, -y forward, +z up) with its basis,
-  written to `positions.json`.
-- **Pages.** The layout page is now owned by layout-ui; it copies these files on every build.
-  - K5 Harness Layout: https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh
-  - K5 Parts Library (six parts in 3D, pin by pin, from `parts_library_build.py`): https://claude.ai/artifact/Uc2jqtPXMJGnS2sehMZRha
-  - M130 sample review: https://claude.ai/artifact/QRPb6gWysP14kFNgTLCBFF
-  - Engine bay sample in 3D: https://claude.ai/artifact/UhYPPsjVRc1c5PjTKBP9Lf
-- **Audited and passed.** Every claim sampled matched its saved source:
-  - PRs #413, #416, #417, #420, #421, #422, #423, #426, #428, #430 and #431;
-  - harness-cad's bay sample;
-  - the parts-library parts: all pin names and wires checked.
-- **Found and escalated.**
-  - The API key in the public engine-bay GLB (PR #418).
-  - The order numbers, amounts and buyer data in public wiring docs (main's redaction branch).
-  - The Deutsch seal ranges against the M22759/32 wire diameters (state 0ai).
-  - The 13 wires with no firewall crossing: no shell-25 insert has more than 61 size-20 contacts (MILNEC catalog p.B-19).
+## Where things stand (all merged unless noted)
+- **3D coverage** (part-model index on main): 195 models; 161 of 179 ends modelled, 128 complete. By the weakest source
+  of shape per end: maker drawing 40, datasheet dims 36, scaled from photo 43, twin object 11, not sourced 31.
+- **nuke.ag MAP tab** (#458): live, results only for visitors (lead and pieces both checked logged out, 2026-09-30):
+  https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map
+- **Workspace artifact** v20: https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh (private). Coverage split by source,
+  "modelled, not complete: <missing>" per end, the 61-pin cavity map (#460), the service-manual sections.
+- **Firewall** (#452, state 0aj): insert 25-61 stays. The isolator's 16 AWG control circuit stays in the bay on two
+  relays; 4 x 22 AWG signals cross; FAN_PWM moves to the bay PDM (61 of 61). The Dakota senders move to CAN only when a
+  wheel-speed or fuel-temperature option is built (owner's call on his dual-sender lock).
+- **Adapter plate** (#457, #459, #463): stamped outputs (12-hex blob + parameters, --check lint), spot face to 2.794 mm,
+  ring gasket, jam nut 120-130 in-lb. The fuse-panel opening is a rounded trapezoid (AAW 510351 illustration) at an
+  ASSUMED 4.0 in; the tape measure closes it.
 
-## The exact step in progress
-Reconciling the 22 route landings that sit more than an end's margin from its `pos.py` position (layout-ui's list:
-CKP 638 mm, MARKER-LF 514, M130-A 373, ODYSSEY 314, ISOLATOR 262-275, CLT-ECU 205-213, HL-SW 181, TG-SW-KEY 180,
-headlights 59, and others). harness-cad was asked for its position and basis for each. Rule end by end: the
-better-sourced position wins, then update `pos.py` and the ends map.
+## Stopped agents' next steps (stopped by the owner 2026-09-30, no handoff of their own)
+- **parts-artist** (fam_* generators, cad/fab/):
+  1. The ends with no model: KNOCK-1/2, OILP-ECU, AC-LP-SW, GSS-SENSOR, BRAKE-FLUID-LVL (BRAKE-WARN-SW: switch body
+     only, if sourced). CAN-BUS, PCS-HARNESS-4610(-CASE), COIL-GROUND-RINGS, GND-SPLICE-REAR need a pick first. The
+     six FUSE-* stay reasons until the 5065 can be sized (ruler sourced: Littelfuse 257 ATO; no seated-fuse photo).
+  2. M39029/58-363 and /56-351 contacts: TE's QRG and Preci-dip's brochure give cross-references only (56-351 =
+     Preci-dip 83021-1P4-7110-B1), no dimensions. Find a text source.
+  3. Builder check: whether the /24WJ61SN body flat sits on the master-keyway side (MILNEC p.B-15 puts the key at 12).
+- **harness-cad** (brake job, never pushed): the brief is saved in the lane scratchpad as brake_brief.md. Master
+  cylinder (Gen 1 iBooster) -> the valve on the front crossmember (owner testimony; factory spot by the master cylinder,
+  LTSM p.385, photo 896767b8) -> front hoses -> frame-rail line; BRAKE-WARN-SW at the valve; tube OD from the LTSM or
+  ASSUMED. Then the body and interior accuracy pass.
 
-## Next actions
-1. Finish the 22-landing reconciliation above.
-2. Publish harness-cad's per-zone GLBs as they land, after checking each has no "blendermcp" or "api_key" strings.
-3. After Skylar's verdict on the six sample parts, restart parts-artist on the rest of batch 1, biggest first.
+## For the registry pass (the lead's queue)
+12084200 + 15324974 on CKP/CMP/MAP; name the M27500 conductor spec; split PS-STUDS by owning device; the ring picks
+already in the terminations (families.yaml ring_small is stale); PDM stud caps; the D-609 stub caps (15 device ends wait
+on it); SPL-ISO-YEL and SPL-PDM30-OUT5 splice mismatches; D-609 with no gauge on MIRROR-MON and RADIO; the AC-HP-SW plug;
+the QFS kit pigtail vs our DT/DTP at the tank; the isolator rewire per #452; retire FIREWALL-BODY-A/B/C/P; the 14 public
+harness_endpoints names with purchase stories (clean endpoints.yaml at the source, mask the live rows by migration); the
+3 owner items as DB calls with kinds money/hands/credentials.
 
 ## Waiting on Skylar
-- His verdict on the parts samples.
-- The tape items T-01 to T-04 at the fuse-box opening.
-- Rotating the Sketchfab key.
-- The 13-wire firewall decision, with Dave.
-- The second-PDM decision.
-- The coil part numbers.
-- The questions batched in each lane's research file.
+- Send the Blue Sea question (the lead has the draft).
+- A tape measure on the bare fuse-panel opening, and the proportioning valve's part number, next time at the truck.
+
+## Audit rules learned the hard way
+- Compare cavity names case-sensitively (the 25-61 insert has A and a). My #445 audit lowercased them and missed a
+  crossed map that #460 fixed.
+- Read a part's unknowns from part_models.yaml; index.json's slim records don't carry them.

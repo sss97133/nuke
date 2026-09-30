@@ -37,11 +37,11 @@
 },
 "CLT-ECU": {
 "xyz": [
-0.286,
--1.869,
-0.84
+0.182,
+-1.994,
+0.965
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: front of the driver head (Swap Specialties p.6); the v3 anchor sat inside the #1 header flange",
 "cat": "sensor"
 },
 "DAK-CTS": {
@@ -118,11 +118,11 @@
 },
 "COIL-1": {
 "xyz": [
--0.097,
--1.556,
-1.023
+0.011,
+-1.467,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-2": {
@@ -136,11 +136,11 @@
 },
 "COIL-2": {
 "xyz": [
--0.032,
--1.556,
-1.023
+-0.034,
+-1.467,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-3": {
@@ -154,11 +154,11 @@
 },
 "COIL-3": {
 "xyz": [
-0.032,
--1.556,
-1.023
+0.082,
+-1.396,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-4": {
@@ -172,11 +172,11 @@
 },
 "COIL-4": {
 "xyz": [
-0.097,
--1.556,
-1.023
+-0.104,
+-1.396,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-5": {
@@ -190,11 +190,11 @@
 },
 "COIL-5": {
 "xyz": [
--0.097,
--1.464,
-1.023
+0.082,
+-1.351,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-6": {
@@ -208,11 +208,11 @@
 },
 "COIL-6": {
 "xyz": [
--0.032,
--1.464,
-1.023
+-0.104,
+-1.351,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-7": {
@@ -226,11 +226,11 @@
 },
 "COIL-7": {
 "xyz": [
-0.032,
--1.464,
-1.023
+0.011,
+-1.281,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "INJ-8": {
@@ -244,29 +244,29 @@
 },
 "COIL-8": {
 "xyz": [
-0.097,
--1.464,
-1.023
+-0.034,
+-1.281,
+1.016
 ],
-"basis": "twin v3 engine anchor",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)",
 "cat": "actuator"
 },
 "FUELP": {
 "xyz": [
 0.0,
--1.4,
-1.12
+-2.052,
+0.983
 ],
-"basis": "candidate spot (not decided) (rail or regulator port)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: AEM sensor in the Aeromotive 13139's gauge port, front of the valley (fuel-system PR #423, IMG_6531)",
 "cat": "sensor"
 },
 "COIL-GROUND-RINGS": {
 "xyz": [
-0.0,
--1.42,
-1.02
+0.15,
+-1.468,
+1.0
 ],
-"basis": "placed from the sourced spot (back of the heads)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: back of the driver head (mounts.yaml; PR #434 per-half rings; the passenger ring is at x -0.15)",
 "cat": "power"
 },
 "ALTERNATOR-SENSE": {
@@ -298,11 +298,11 @@
 },
 "AC-HP-SW": {
 "xyz": [
--0.55,
--2.3,
-1.0
+-0.62,
+-2.08,
+1.05
 ],
-"basis": "candidate spot (not decided) (liquid line, not plumbed)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: candidate; clear of the Odyssey",
 "cat": "sensor"
 },
 "AC-LP-SW": {
@@ -317,10 +317,10 @@
 "FAN": {
 "xyz": [
 0.0,
--2.36,
+-2.3,
 0.95
 ],
-"basis": "1978 Blazer body model (radiator core)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: the hub on the engine side of the core (mounts.yaml FAN)",
 "cat": "actuator"
 },
 "IBOOSTER": {
@@ -350,6 +350,15 @@
 "basis": "placed from the sourced spot (in the booster's reservoir)",
 "cat": "sensor"
 },
+"BRAKE-WARN-SW": {
+"xyz": [
+0.0,
+-2.25,
+0.6
+],
+"basis": "candidate spot (not decided) (owner: on the front crossmember under the radiator; x and height not read, +/-150 mm)",
+"cat": "sensor"
+},
 "WIDEBAND": {
 "xyz": [
 -0.4,
@@ -372,18 +381,18 @@
 "xyz": [
 0.0,
 -1.47,
-1.3
+1.22
 ],
-"basis": "placed from the sourced spot (factory wiper hole, under the cowl)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: below the twin's cowl skin (z 1.25)",
 "cat": "actuator"
 },
 "WASHER-PUMP": {
 "xyz": [
-0.72,
--2.15,
-1.0
+0.03,
+-1.482,
+1.2
 ],
-"basis": "candidate spot (not decided) (driver inner fender)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: the factory pump rides on the wiper motor (1977 LTSM p.803 Fig. 8-16)",
 "cat": "actuator"
 },
 "BLOWER-MOTOR": {
@@ -415,38 +424,38 @@
 },
 "HEADLIGHT-L": {
 "xyz": [
-0.73,
+0.789,
 -2.52,
 1.05
 ],
-"basis": "1978 Blazer body model",
+"basis": "body model mesh Headlights, bucket centre +/-15 mm",
 "cat": "lamp"
 },
 "HEADLIGHT-R": {
 "xyz": [
--0.73,
+-0.789,
 -2.52,
 1.05
 ],
-"basis": "1978 Blazer body model",
+"basis": "body model mesh Headlights, bucket centre +/-15 mm",
 "cat": "lamp"
 },
 "PARK-TURN-LF": {
 "xyz": [
-0.75,
+0.788,
 -2.555,
 0.853
 ],
-"basis": "1978 Blazer body model",
+"basis": "body model mesh park/turn lamp, centre +/-15 mm",
 "cat": "lamp"
 },
 "PARK-TURN-RF": {
 "xyz": [
--0.75,
+-0.788,
 -2.555,
 0.853
 ],
-"basis": "1978 Blazer body model",
+"basis": "body model mesh park/turn lamp, centre +/-15 mm",
 "cat": "lamp"
 },
 "MARKER-LF": {
@@ -469,29 +478,29 @@
 },
 "ODYSSEY": {
 "xyz": [
--0.62,
--2.26,
-0.95
+-0.6,
+-2.3,
+1.11
 ],
-"basis": "candidate: GM's battery tray spot (1977 manual p.122), right side at the radiator support",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: GM tray spot (1977 LTSM p.122) with the parts-lane model; base at z 1.01 (tray height not published)",
 "cat": "power"
 },
 "ACC-BATT": {
 "xyz": [
-0.62,
--2.26,
-0.95
+0.6,
+-2.3,
+1.11
 ],
-"basis": "candidate: GM's battery tray spot (1977 manual p.122), the auxiliary left-side spot",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: as ODYSSEY, driver side",
 "cat": "power"
 },
 "ISOLATOR": {
 "xyz": [
--0.5,
--2.18,
-1.06
+-0.43,
+-2.429,
+0.992
 ],
-"basis": "placed from the sourced spot (on the Odyssey positive)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: Blue Sea 7700 drawing; studs on the core support face ahead of the Odyssey + post",
 "cat": "power"
 },
 "PS-STUDS": {
@@ -505,20 +514,20 @@
 },
 "GND-BANK-ENG": {
 "xyz": [
--0.68,
--2.04,
-0.86
+-0.48,
+-2.06,
+0.915
 ],
-"basis": "candidate spot (not decided) (beside the batteries)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: below the distribution stud, beside the batteries (the reviewed bay sample)",
 "cat": "power"
 },
 "DCDC": {
 "xyz": [
-0.66,
+0.51,
 -2.0,
-1.06
+0.955
 ],
-"basis": "candidate spot (not decided) (driver inner fender behind the YellowTop it charges: flagged, Victron says keep it dry)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: proposed: parts-lane model on the engine side of the driver inner-fender wall",
 "cat": "power"
 },
 "PDM15-A": {
@@ -559,20 +568,20 @@
 },
 "M130-A": {
 "xyz": [
-0.3,
--1.4,
-0.95
+0.671,
+-1.431,
+0.941
 ],
-"basis": "candidate spot (not decided) (cab face of the firewall, inboard of the 61-pin)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: proposed: M130 plugs-down behind the dash, outboard of the 61-pin; 130 mm of upright firewall; needs 90-degree boots and tape T-04",
 "cat": "module"
 },
 "PDM30-A": {
 "xyz": [
-0.1,
--1.38,
-0.88
+0.261,
+-1.431,
+0.941
 ],
-"basis": "candidate spot (not decided) (beside the M130, air gap between them)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: proposed: PDM30 plugs-down inboard of the 61-pin, outboard of the centre dish",
 "cat": "module"
 },
 "APS": {
@@ -775,11 +784,11 @@
 },
 "GND-BANK-CAB": {
 "xyz": [
-0.0,
--1.32,
-0.84
+0.37,
+-1.44,
+1.06
 ],
-"basis": "candidate spot (not decided) (beside the PDM30)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: proposed: firewall cab face between the PDM30 and the 61-pin plate, clear of the toe board",
 "cat": "power"
 },
 "DOME-LAMP": {
@@ -1144,11 +1153,11 @@
 },
 "AMP-BLOCK": {
 "xyz": [
-0.72,
-1.32,
-1.18
+0.74,
+1.4,
+1.14
 ],
-"basis": "candidate spot (not decided) (beside the amp)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: proposed: behind the amplifier's rear end",
 "cat": "power"
 },
 "AMP-PASS": {
@@ -1180,11 +1189,11 @@
 },
 "GND-SPLICE-REAR": {
 "xyz": [
-0.55,
+0.6,
 1.5,
-0.74
+0.88
 ],
-"basis": "candidate spot (not decided) (inside the rear body)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: inside the rear body (mounts.yaml), above the cargo floor",
 "cat": "power"
 },
 "FUEL-PUMP": {
@@ -1207,11 +1216,11 @@
 },
 "SPL-FUEL-SND": {
 "xyz": [
-0.1,
-1.24,
-0.86
+0.15,
+1.3,
+0.84
 ],
-"basis": "placed from the sourced spot (above the tank lid)",
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: on the tank lid by the hanger",
 "cat": "connector"
 },
 "VSS-SENDER": {
@@ -1279,23 +1288,21 @@
 },
 "RAIL-COIL_PWR": {
 "xyz": [
--0.097,
--1.556,
-1.023
+0.045,
+-1.395,
+0.985
 ],
-"basis": "grouped with COIL-1",
-"cat": "harness",
-"grouped": "COIL-1"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: the coil-power splices at the ring's Y (PR #434 harness zone)",
+"cat": "harness"
 },
 "RAIL-INJ_PWR": {
 "xyz": [
-0.159,
--1.899,
-1.076
+0.0,
+-1.515,
+1.14
 ],
-"basis": "grouped with INJ-1",
-"cat": "harness",
-"grouped": "INJ-1"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: the feed point at the intake hub (a modelling choice)",
+"cat": "harness"
 },
 "FAN-JUNCTION": {
 "xyz": [
@@ -1469,43 +1476,39 @@
 },
 "FIREWALL-BODY-C": {
 "xyz": [
-0.55,
-1.3,
-0.7
+0.18,
+-0.62,
+0.68
 ],
-"basis": "grouped with AMP-PASS",
-"cat": "harness",
-"grouped": "AMP-PASS"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: mounts.yaml: floor or kick panel near the transfer case",
+"cat": "harness"
 },
 "M130-B": {
 "xyz": [
-0.3,
--1.4,
-0.95
+0.636,
+-1.431,
+0.941
 ],
-"basis": "grouped with M130-A",
-"cat": "harness",
-"grouped": "M130-A"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: as M130-A (plug B)",
+"cat": "harness"
 },
 "PDM30-B": {
 "xyz": [
-0.1,
--1.38,
-0.88
+0.226,
+-1.431,
+0.941
 ],
-"basis": "grouped with PDM30-A",
-"cat": "harness",
-"grouped": "PDM30-A"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: as PDM30-A (plug B)",
+"cat": "harness"
 },
 "PDM30-STUD": {
 "xyz": [
-0.1,
--1.38,
-0.88
+0.245,
+-1.427,
+1.051
 ],
-"basis": "grouped with PDM30-A",
-"cat": "harness",
-"grouped": "PDM30-A"
+"basis": "harness-cad v4 placement, ruled by pieces 2026-09-29: as PDM30-A (M6 stud)",
+"cat": "harness"
 },
 "SPL-PDM30-OUT1": {
 "xyz": [

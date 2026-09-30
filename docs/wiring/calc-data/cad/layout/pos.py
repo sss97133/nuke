@@ -50,6 +50,7 @@ put("FAN", (0.0, -2.36, 0.95), B + " (radiator core)", "actuator")
 put("IBOOSTER", (0.40, -1.52, 1.05), S + " (driver firewall; twin object K5H_iBooster)", "actuator")
 put("IBST-DIAG", (0.55, -1.56, 1.14), C, "connector")
 put("BRAKE-FLUID-LVL", (0.40, -1.62, 1.18), S + " (in the booster's reservoir)", "sensor")
+put("BRAKE-WARN-SW", (0.0, -2.25, 0.60), C + " (owner: on the front crossmember under the radiator; x and height not read, +/-150 mm)", "sensor")
 put("WIDEBAND", AN["ANCHOR_ltcd_candidate_B"], A + " (LTCD candidate B)", "module")
 put("HORN", (0.55, -2.50, 0.90), S + " (radiator support; which side is not read)", "actuator")
 put("WIPER-MOTOR", (0.0, -1.47, 1.30), S + " (factory wiper hole, under the cowl)", "actuator")
@@ -170,6 +171,46 @@ for code, box in FOLLOW.items():
     tgt = BOX_AT.get(box, box)
     if tgt in P:
         P[code] = {"xyz": P[tgt]["xyz"], "basis": "grouped with " + tgt, "cat": "harness", "grouped": tgt}
+
+# ---- ruling 2026-09-29 (pieces): where harness-cad's v4 placement is better sourced or checked against the twin, it wins.
+# Each basis says why. The headlights keep the body model's bucket spots (+/-0.789) above; harness-cad takes those.
+HC = "harness-cad v4 placement, ruled by pieces 2026-09-29: "
+_coil = {  # DEL-Stributor ring: calc-data/cad/delstributor_geometry.yaml (PR #434) axis_world + plug_tip z 1.0157
+    "COIL-1": (0.0115, -1.4666), "COIL-3": (0.0818, -1.3964), "COIL-5": (0.0818, -1.3510), "COIL-7": (0.0115, -1.2808),
+    "COIL-8": (-0.0338, -1.2808), "COIL-6": (-0.1040, -1.3510), "COIL-4": (-0.1040, -1.3964), "COIL-2": (-0.0338, -1.4666)}
+OVERRIDE = {
+    "FIREWALL-BODY-C": ((0.18, -0.62, 0.68), "mounts.yaml: floor or kick panel near the transfer case"),
+    "WASHER-PUMP": ((0.03, -1.482, 1.20), "the factory pump rides on the wiper motor (1977 LTSM p.803 Fig. 8-16)"),
+    "FUELP": ((0.0, -2.052, 0.983), "AEM sensor in the Aeromotive 13139's gauge port, front of the valley (fuel-system PR #423, IMG_6531)"),
+    "GND-BANK-CAB": ((0.37, -1.44, 1.06), "proposed: firewall cab face between the PDM30 and the 61-pin plate, clear of the toe board"),
+    "M130-A": ((0.671, -1.431, 0.941), "proposed: M130 plugs-down behind the dash, outboard of the 61-pin; 130 mm of upright firewall; needs 90-degree boots and tape T-04"),
+    "M130-B": ((0.636, -1.431, 0.941), "as M130-A (plug B)"),
+    "PDM30-A": ((0.261, -1.431, 0.941), "proposed: PDM30 plugs-down inboard of the 61-pin, outboard of the centre dish"),
+    "PDM30-B": ((0.226, -1.431, 0.941), "as PDM30-A (plug B)"),
+    "PDM30-STUD": ((0.245, -1.427, 1.051), "as PDM30-A (M6 stud)"),
+    "ODYSSEY": ((-0.60, -2.30, 1.11), "GM tray spot (1977 LTSM p.122) with the parts-lane model; base at z 1.01 (tray height not published)"),
+    "ACC-BATT": ((0.60, -2.30, 1.11), "as ODYSSEY, driver side"),
+    "ISOLATOR": ((-0.430, -2.429, 0.992), "Blue Sea 7700 drawing; studs on the core support face ahead of the Odyssey + post"),
+    "DCDC": ((0.510, -2.000, 0.955), "proposed: parts-lane model on the engine side of the driver inner-fender wall"),
+    "RAIL-COIL_PWR": ((0.045, -1.395, 0.985), "the coil-power splices at the ring's Y (PR #434 harness zone)"),
+    "COIL-GROUND-RINGS": ((0.15, -1.468, 1.00), "back of the driver head (mounts.yaml; PR #434 per-half rings; the passenger ring is at x -0.15)"),
+    "RAIL-INJ_PWR": ((0.0, -1.515, 1.14), "the feed point at the intake hub (a modelling choice)"),
+    "CLT-ECU": ((0.182, -1.994, 0.965), "front of the driver head (Swap Specialties p.6); the v3 anchor sat inside the #1 header flange"),
+    "AC-HP-SW": ((-0.62, -2.08, 1.05), "candidate; clear of the Odyssey"),
+    "GND-BANK-ENG": ((-0.48, -2.06, 0.915), "below the distribution stud, beside the batteries (the reviewed bay sample)"),
+    "GND-SPLICE-REAR": ((0.60, 1.50, 0.88), "inside the rear body (mounts.yaml), above the cargo floor"),
+    "AMP-BLOCK": ((0.74, 1.40, 1.14), "proposed: behind the amplifier's rear end"),
+    "SPL-FUEL-SND": ((0.15, 1.30, 0.84), "on the tank lid by the hanger"),
+}
+for code, xy in _coil.items():
+    OVERRIDE[code] = ((xy[0], xy[1], 1.0157), "DEL-Stributor ring, plug tip (delstributor_geometry.yaml, PR #434; +/-6 mm to the post)")
+if "WIPER-MOTOR" in P:
+    x, y, z = P["WIPER-MOTOR"]["xyz"]; OVERRIDE["WIPER-MOTOR"] = ((x, y, 1.22), "below the twin's cowl skin (z 1.25)")
+if "FAN" in P:
+    x, y, z = P["FAN"]["xyz"]; OVERRIDE["FAN"] = ((x, -2.30, z), "the hub on the engine side of the core (mounts.yaml FAN)")
+for code, (xyz, why) in OVERRIDE.items():
+    if code in P or code in [e["id"] for e in ends.ENDS]:
+        put(code, xyz, HC + why, P.get(code, {}).get("cat", "harness"))
 
 missing = [e["id"] for e in ends.ENDS if e["id"] not in P]
 if __name__ == "__main__":

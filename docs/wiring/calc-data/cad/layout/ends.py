@@ -134,6 +134,11 @@ E("IBST-DIAG", "iBooster diagnostic port (DTM 4-way)", "Beside the booster, reac
   [("A sealed port near the booster for a USB CAN logger.", REG + " IBST-DIAG")])
 E("BRAKE-FLUID-LVL", "Brake-fluid level sensor (candidate)", "In the iBooster's fluid reservoir", "engine", "proposed",
   [("The sensor is part of the booster's reservoir.", REG + " BRAKE-FLUID-LVL")], ["It is an option, not decided."])
+E("BRAKE-WARN-SW", "Brake warning switch on the proportioning valve (one wire)", "On the proportioning valve, on the front crossmember under the radiator where the brake lines meet", "engine", "proposed",
+  [("Owner 2026-09-29: \"proportioning valve has a sensor on it a one wire situtation ... its mounted on a cross member under the radiator where all the brake lines go\".", "owner, 2026-09-29"),
+   ("The switch grounds through the valve body: jumpering its wire to ground lights the brake warning lamp.", LTSM + " PDF p.406 (Testing Electrical Circuit of Combination Valve)"),
+   ("It is read on the engine PDM15, next to the valve, with no firewall crossing.", REG + " BRAKE-WARN-SW")],
+  ["Which valve is on the truck and its part number: read the valve body.", "Its exact spot on the crossmember: from the owner's photos or the brake-line render."])
 E("WIDEBAND", "Lambda controller (MoTeC LTCD) and two sensors", "Under the truck, on the inside of a frame rail near the two O2 bungs", "underbody", "proposed",
   [("See the LTCD box.", BOXES + " LTCD")], ["The exhaust is not built, so the bungs are not placed."], follows="LTCD")
 
