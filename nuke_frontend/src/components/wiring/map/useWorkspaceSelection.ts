@@ -75,9 +75,13 @@ export interface WsIndex {
   devOf: (code: string) => string;
 }
 
-// a cavity as the page shows it: the cavity itself. A working note after it (" — pin order OPEN until …") or beside it
-// ("(AEM pin letter unknown until …)", "(ZGP p.11)") stays on the row.
-const cavOf = (c: string | null) => (c ? c.split(' — ')[0].split(' (')[0].trim() : c);
+// a cavity as the page shows it: the cavity itself. A working note after it (" — pin order OPEN until …"), beside it
+// ("(AEM pin letter unknown until …)", "(ZGP p.11)") or a status clause (", candidate alternative to …") stays on the row.
+const cavOf = (c: string | null) => {
+  if (!c) return c;
+  const parts = c.split(' — ')[0].split(' (')[0].split(/\s*[,;]\s*/);
+  return [parts[0], ...parts.slice(1).filter(x => !HIDE.test(x))].join(', ').trim();
+};
 const RANK = (c: string) => (/^(M130|PDM)/.test(c) ? 0 : /^(SPL-|RAIL-)/.test(c) ? 1 : /^FIREWALL-CABIN/.test(c) ? 2 : /^FIREWALL/.test(c) ? 3 : 4);
 
 export function useWsIndex(map: WiringMapData, site: SiteFiles): WsIndex {
@@ -178,12 +182,14 @@ export function mask(t: string | null | undefined): string {
 // not the result, and so is a decision status ("candidate", "proposed", "not decided"). A public name keeps what the
 // part is: story and status clauses and asides go (an aside cut off by the row's length too), the first clause stays.
 const STORY = /\$|\b(?:lined up|re-?ordered|ordered|on order|backorder(?:ed)?|bought|owned|delivered|paid|invoice|receipt|seller|state row)\b/i;
-const STATUS = /\b(?:candidate|proposed|proposal|concept|decided|undecided|tbd|to be decided|pending|placeholder)\b/i;
+const STATUS = /\b(?:candidate|proposed|proposal|concept|decided|undecided|tbd|to be decided|pending|placeholder|yet|database|(?:locked|owner)\s+\d{4}-\d{2}-\d{2})\b/i;
 const HIDE = { test: (t: string) => STORY.test(t) || STATUS.test(t) };
+// an aside keeps its clauses that are about the part: "(dual input LOW / HIGH + ground; locked 2026-05-14)" → "(dual input …)"
+const aside = (inner: string) => inner.split(/\s*;\s*/).filter(c => !HIDE.test(c)).join('; ');
 export function publicName(t: string | null | undefined): string {
   const s = String(t ?? '')
-    .replace(/\s*\(([^()]*)\)/g, (m, inner: string) => (HIDE.test(inner) ? '' : m))
-    .replace(/\s*\(([^()]*)$/, (m, inner: string) => (HIDE.test(inner) ? '' : m));
+    .replace(/\s*\(([^()]*)\)/g, (_m, inner: string) => { const k = aside(inner); return k ? ` (${k})` : ''; })
+    .replace(/\s*\(([^()]*)$/, (_m, inner: string) => { const k = aside(inner); return k ? ` (${k}` : ''; });
   const parts = s.split(/(\s*;\s*|\s+—\s+)/);
   let out = parts[0];
   const cut = out.search(STORY);

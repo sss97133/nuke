@@ -34,7 +34,8 @@ still open.
 | `.../map/PartLibrary.tsx` | every part in the part-model index (185 after #443): maker, maker part number, source of shape, size, ends (new) |
 | `.../map/WorkspaceTables.tsx` | wire list, pin list, connectors; calls and decisions for the owner (new) |
 | `.../map/WorkspaceProps.tsx` | the selection's attributes: 3D model, part number, position, wires, route (new) |
-| `.../map/MountsPanel.tsx` | `WhereOnTruck` takes `showWhy`: the reasons and sources show to the owner only (edit) |
+| `.../map/ownerLayer.ts` | `needsOwner(call)`: the one rule for which calls are the owner's (new) |
+| `.../map/MountsPanel.tsx` | `WhereOnTruck` takes `showWhy` and `showStatus`, and `DevicePhoto` takes `captionOf`: reasons, sources and the status pill show to the owner only (edit) |
 | `nuke_frontend/src/pages/vehicle-profile/WiringWidgetLink.tsx` | a visitor's link from the profile to the MAP tab, with the wire count; renders nothing without wiring rows (new) |
 | `nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx` | shows that link to anyone the owner tools are hidden from (edit) |
 | `nuke_frontend/src/pages/WiringPlan.tsx` | the tab bar scrolls sideways on a phone, so the MAP tab is reachable (edit) |
@@ -55,22 +56,35 @@ part-model index. TODO: the end positions move into `harness_endpoints` in the n
   notes, sources), the proof rollup, and where each box goes with its reasons. The profile's other flag,
   `vehicle.ownership_verified`, is not used: it belongs to the vehicle, not the viewer, so it would open the owner's
   layer to a logged-out visitor.
+- **Status words are the owner's; results are public.** A visitor sees no decision status anywhere:
+  - no WHERE ON THE TRUCK status pill;
+  - no decided/concept on a wire;
+  - no DECIDED counts in the strip, a section, or the at-rest table;
+  - no ENDS PENDING, and no ENDS column in the wire list;
+  - no dashed concept wires on the schematic.
+
+  Names, device names, photo captions and cavity labels also drop status asides and clauses: "(CANDIDATE)",
+  "— the candidate", "locked 2026-05-14", ", candidate alternative to …".
+- **NEEDS YOU keeps only the calls the owner makes.** That is kinds money, hands, legal and credentials
+  (`ownerLayer.ts`, `needsOwner`). Owner 2026-09-29: "engineering calls are made by the system". The rows still carry
+  engineering kinds (architecture 62, part_choice 4, placement 2, policy 1), so the strip shows nothing until the
+  reclassify pass writes the owner's kinds.
 - `?asOwner=1` previews the owner's layer on the dev server only (`import.meta.env.DEV`). The production bundle does
   not contain it.
 
 ## 3D coverage
 
-The page shows "137 of 179 ends modelled in 3D, 125 complete", from main's part-model index after #443 and the placed
-ends. Each end counts once, at the weakest source of shape among its models, so an assumed shape never counts as a
-sourced one.
+The page reads main's part-model index as served, so the count moves as part batches merge. At main `b69bb0fec`
+(after #456) it reads "161 of 179 ends modelled in 3D, 126 complete". Each end counts once, at the weakest source of
+shape among its models, so an assumed shape never counts as a sourced one.
 
 - The index carries its own split (`ends_by_shape_basis`), and the page shows it:
-  - maker drawing 19;
+  - maker drawing 40;
   - datasheet dims 36;
-  - scaled from photo 36;
+  - scaled from photo 39;
   - twin object 11;
   - not sourced 35.
-- That is 91 ends from a sourced shape and 46 from an assumed one. 42 ends have no model yet.
+- That is 115 ends from a sourced shape and 46 from an assumed one. 18 ends have no model yet.
 - The same split, computed from the index's parts, matches. The page computes it that way only when the index doesn't
   carry one.
 - "Complete" means the index lists nothing missing for the end.
@@ -112,7 +126,7 @@ sourced one.
   untouched lines of `MountsPanel.tsx`.
 - `npm run build`: exit 0; `check-client-secrets` is clean. Chunk sizes:
   - `WiringPlan` 44.5 kB (14.0 kB gzip).
-  - `WiringMap` 84.8 kB (25.9 kB gzip).
+  - `WiringMap` 85.1 kB (26.2 kB gzip).
   - `ZoneModels3D` 2.8 kB. It pulls three.js only when the 3D view opens.
 - Local dev server against the production database, logged out and as the owner preview:
   - desktop 1600 × 1000 and phone 390 × 844;
@@ -121,4 +135,9 @@ sourced one.
   - the owner's calls table with a call's card;
   - the profile's visitor link, which opens the MAP tab.
 - The counts above were recomputed from the files with a separate script, and they match.
+- Status scan: 13 views logged out, reading the page text plus the SVG titles and labels. It found:
+  - 0 status words (decided, concept, pending, proposed, candidate, locked, needs you, open calls and the rest);
+  - 0 dashed schematic wires.
+
+  The same 13 views as the owner show them.
 - The screenshots stay local, because the owner frames show his records.
