@@ -6,6 +6,7 @@ import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanne
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
 const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner'));
 const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/MergeProposalsPanel'));
+const LiveLotStrips = React.lazy(() => import('../market/LiveLotStrips'));
 
 export interface VehicleBannersProps {
   onMergeComplete: () => void;
@@ -77,6 +78,18 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
             currencyCode={auctionCurrency}
           /></React.Suspense>
         </div>
+      )}
+
+      {/* A live BaT lot's price and activity against comparable lots at the same time to close
+          (live_lot_temperature). Renders nothing until the function returns a reading. */}
+      {vehicle.sale_status === 'auction_live' && (
+        <React.Suspense fallback={null}>
+          <LiveLotStrips
+            vehicleId={vehicle.id}
+            outer={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}
+            style={{ border: '2px solid var(--border)', padding: '6px 10px' }}
+          />
+        </React.Suspense>
       )}
 
       {/* Orphaned Vehicle Banner - Visible to all users */}

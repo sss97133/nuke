@@ -4,6 +4,8 @@ import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { squarify } from '../../lib/squarify';
 import { NO_MAKE, useMarketPulse, type BidCurve, type BoardReading, type LiveAuction, type SameHourRange } from './useMarketPulse';
+import { HistoryStrip } from './HistoryStrip';
+import LiveLotStrips from './LiveLotStrips';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Every figure is computed from the rows market_pulse_live() returns, and every
@@ -111,34 +113,20 @@ function signed(pct: number): string {
 
 // Each earlier week at this weekday and hour is a tick; now is the block. The sentence ranks now among them.
 function RangeBar({ value, range }: { value: number; range: SameHourRange }) {
-  const lo = Math.min(range.low, value);
-  const hi = Math.max(range.high, value);
-  const span = hi - lo;
-  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5);
   const beaten = range.readings.filter((r) => value > r.bids).length;
   const n = range.readings.length;
   const rank = n === 0 ? null : beaten === n ? `higher than all ${n}` : beaten === 0 ? `lower than all ${n}` : `higher than ${beaten} of ${n}`;
   return (
-    <span
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+    <HistoryStrip
+      caption={`Same time on ${range.weekdayUtc}s · last ${range.weeks} weeks`}
+      value={value}
+      // low/high come with the range; the readings are the same values, so the ends match the old bar.
+      ticks={range.readings.map((r) => ({ key: r.day, value: r.bids, title: `${r.day}: ${usd(r.bids)}` }))}
+      format={(v) => usd(v, true)}
+      verdict={rank ? `${rank} ${range.weekdayUtc}s at this hour` : null}
+      nowTitle={`Now: ${usd(value)}`}
       title={`Current bids at this hour (${range.hourUtc}:00 UTC) on ${range.weekdayUtc}s, ${range.weeks} weeks since ${range.firstDay}. Readings before 27 Sep are rebuilt from BaT bid history (96% of auctions) and may run up to ~4% low.`}
-    >
-      <span style={label}>Same time on {range.weekdayUtc}s · last {range.weeks} weeks</span>
-      <span style={{ ...mono, fontSize: 11 }}>{usd(lo, true)}</span>
-      <span style={{ position: 'relative', width: 160, height: 12 }}>
-        <span style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 2, background: 'var(--border)' }} />
-        {range.readings.map((r) => (
-          <span
-            key={r.day}
-            title={`${r.day}: ${usd(r.bids)}`}
-            style={{ position: 'absolute', top: 2, left: `calc(${x(r.bids) * 100}% - 1px)`, width: 2, height: 8, background: 'var(--text-secondary)' }}
-          />
-        ))}
-        <span title={`Now: ${usd(value)}`} style={{ position: 'absolute', top: 0, left: `calc(${x(value) * 100}% - 3px)`, width: 6, height: 12, background: 'var(--text)' }} />
-      </span>
-      <span style={{ ...mono, fontSize: 11 }}>{usd(hi, true)}</span>
-      {rank && <span style={{ ...label, color: 'var(--text)' }}>{rank} {range.weekdayUtc}s at this hour</span>}
-    </span>
+    />
   );
 }
 
@@ -321,6 +309,8 @@ function ExplainSheet({ item, onClose, narrow }: { item: { a: LiveAuction; heat:
       </div>
       {x.beyond && <p style={{ margin: '10px 0 0' }}>{x.beyond}</p>}
       {x.outcome && <p style={{ margin: '10px 0 0' }}><span style={label}>Track record</span> {x.outcome}</p>}
+      {/* The percentile reading for this one lot: one RPC, only when the sheet is open. Renders nothing without data. */}
+      <LiveLotStrips vehicleId={a.id} style={{ marginTop: 10 }} />
       <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
         <Link to={`/vehicle/${a.id}`} style={{ ...label, color: 'var(--text)' }}>Open the car</Link>
         {a.listingUrl && (
