@@ -334,11 +334,12 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
 
           {/* Quick badges */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4, marginBottom: 4 }}>
-            {di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="var(--vp-brg, #004225)" />}
+            {/* title_status / owner_count are raw extraction output and can arrive as objects or lists */}
+            {typeof di.title_status === 'string' && di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="var(--vp-brg, #004225)" />}
             {di.matching_numbers === true && <IntelBadge label="MATCHING NUMBERS" color="var(--vp-brg, #004225)" />}
             {di.matching_numbers === false && <IntelBadge label="NOT MATCHING" color="var(--vp-danger, #8a0020)" />}
             {di.condition && <IntelBadge label={di.condition.toUpperCase()} color="#1a1a1a" />}
-            {di.owner_count != null && <IntelBadge label={`${di.owner_count} OWNER${di.owner_count !== 1 ? 'S' : ''}`} color="#666" />}
+            {typeof di.owner_count === 'number' && <IntelBadge label={`${di.owner_count} OWNER${di.owner_count !== 1 ? 'S' : ''}`} color="#666" />}
           </div>
 
           {/* Red flags */}
