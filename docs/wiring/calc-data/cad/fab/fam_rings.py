@@ -110,6 +110,220 @@ def load():
     return
 
 
+# ------------------------------------------------------------------------------------------ stud stacks (pins.json)
+MAN = "reference_documents/component_drawings/motec_pdm_user_manual.pdf"
+P47 = f"{MAN} PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30)"
+P47S = f"{P47}, side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)"
+PCON = f"{MAN} PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +')"
+ORDER = ("proposed, the builder's call: the ring that carries the stud's whole current sits on the seat, the others follow "
+         "in the registry's order. No source on file gives a stacking order, and the registry gives none.")
+CLOCK = "design: the barrels are drawn spread round the stud so they clear; the real clocking follows the cable runs"
+PDM_STUD = {"stud_l": D(17.9, f"{P47}: the M6 stud stands 17.9 out of the flat case front", "maker"),
+            "stud_d": D(6.0, f"{P47}: 'M6 Stud'", "maker"),
+            "base_af": D(14.0, P47S, "scaled", "the black insulating hex base, across flats"),
+            "base_t": D(6.5, P47S, "scaled", "the hex base's height: the rings seat on it"),
+            "nut_af": D(10.0, P47S, "scaled", "the M6 nut, across flats"),
+            "nut_t": D(5.0, P47S, "scaled", "the nut's height")}
+STACKS = {
+    "FAN-JUNCTION": {"base": "2103", "order": ["21", "FAN_LEG1", "FAN_LEG2"],
+                     "stud": "3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8\"-16 x 3/4\"')",
+                     "torque": "140 in-lb (15.82 Nm): reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16"
+                               "_Stud.md 'Terminal Stud Torque'",
+                     "nut": "Blue Sea's own split lock washer and terminal nut (drawn as the 2101-2103 drawing shows them)"},
+    "PDM30-STUD": {"base": "PDM", "order": ["PDM_BPOS", "DAK_CONST_FH", "PCS_BATT_FH", "TRANS_BATT_FH"],
+                   "stud": f"M6, 17.9 out of the case front ({P47}; {PCON})",
+                   "torque": {"unknown": True, "needs": "MoTeC's torque for the M6 battery stud: neither the PDM user manual "
+                                                        "nor the PDM30 data sheet on file prints one"},
+                   "nut": f"M6 nut ({PCON}); no part named in the registry",
+                   "cap": f"{P47}: 'Cover power stud with insulating cap'; the registry names no cap"},
+    "PDM15-STUD": {"base": "PDM", "order": ["PDM15_BPOS"],
+                   "stud": f"M6, 17.9 out of the case front ({P47}; {PCON})",
+                   "torque": {"unknown": True, "needs": "MoTeC's torque for the M6 battery stud: neither the PDM user manual "
+                                                        "nor the PDM30 data sheet on file prints one"},
+                   "nut": f"M6 nut ({PCON}); no part named in the registry",
+                   "cap": f"{P47}: 'Cover power stud with insulating cap'; the registry names no cap"},
+}
+CAP_MISSING = "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+BANK_LAYOUT = ("layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order "
+               "(no stud, no stack)")
+
+
+def _term(end, wire):
+    for t in K.registry()["terminations"]:
+        if t["endpoint"] == end and t["wire"] == wire:
+            return t
+    raise KeyError((end, wire))
+
+
+def _placed(pn, label, z, ang_deg, x=0.0):
+    from build123d import Pos, Rot
+    b = lug_bodies(pn)[0]
+    s_ = LUGS.get(pn) or RINGS.get(pn)
+    return K.body(Pos(x, 0, z) * Rot(0, 0, ang_deg) * b, label, s_["colour"][0], finish="metal")
+
+
+def stack_module(end):
+    import math
+    from build123d import Pos, RegularPolygon, extrude
+    st = STACKS[end]
+    order = st["order"]
+    rings = [(w, _term(end, w)["part"]) for w in order]
+    n = len(rings)
+    angs = [i * 360.0 / n for i in range(n)] if n > 1 else [0.0]
+    P, COLORS = {}, {}
+    if st["base"] == "2103":
+        import fam_power as FP
+        base_P = dict(FP.PP)
+        seat = K.v(FP.PP["seat_z"])
+        P.update({k: FP.PP[k] for k in ("A", "stud_d", "stud_l", "seat_z", "hex0_h", "washer_t", "washer_d", "nut_ac", "nut_h")})
+        COLORS.update({k: FP.COL[k] for k in ("base", "stud")})
+    else:
+        seat = K.v(PDM_STUD["base_t"])
+        P.update(PDM_STUD)
+        COLORS["stud"] = ("#bab1a8", "MoTeC product photo: the stud's nut reads zinc-plated steel (as motec_pdm.py, PR #443)")
+        COLORS["stud base"] = ("#1d1d1f", f"{P47S}: the black insulating hex base")
+    zs, z = [], seat
+    for w, pn in rings:
+        s_ = LUGS.get(pn) or RINGS.get(pn)
+        P[f"T_{pn}"] = s_["T"]
+        zs.append(z)
+        z += K.v(s_["T"])
+    top = z
+    for w, pn in rings:
+        COLORS[pn] = (LUGS.get(pn) or RINGS.get(pn))["colour"]
+
+    def build_bodies():
+        out = []
+        if st["base"] == "2103":
+            import fam_power as FP
+            out += FP.powerpost_bodies(stack_h=top - seat)
+        else:
+            v = {k: K.v(d) for k, d in PDM_STUD.items()}
+            hexb = extrude(RegularPolygon(v["base_af"] / 2 / math.cos(math.pi / 6), 6), amount=v["base_t"])
+            stud = cyl_z(v["stud_d"] / 2, v["base_t"], v["stud_l"], 0, 0)
+            nut = Pos(0, 0, top) * extrude(RegularPolygon(v["nut_af"] / 2 / math.cos(math.pi / 6), 6), amount=v["nut_t"])
+            nut -= cyl_z(v["stud_d"] / 2, 0, 99, 0, 0)
+            out += [K.body(hexb, f"{end}: MoTeC insulating hex base (black)", "#1d1d1f"),
+                    K.body(stud, f"{end}: M6 stud", "#bab1a8", finish="metal"),
+                    K.body(nut, f"{end}: M6 nut", "#bab1a8", finish="metal")]
+        for i, ((w, pn), zi, a) in enumerate(zip(rings, zs, angs)):
+            out.append(_placed(pn, f"{end}: ring {i + 1} of {n}, {pn} ({w})", zi, a))
+        return out
+
+    rows = []
+    for i, ((w, pn), zi, a) in enumerate(zip(rings, zs, angs)):
+        rows.append({"pin": f"ring {i + 1}", "endpoint": end, "wire": w, "match": ".",
+                     "name": f"{pn} ({w})", "full_name": f"ring {i + 1} of {n} from the seat: {pn} on {w}",
+                     "at": (0.0, 0.0, round(zi, 3)), "dir": (round(math.cos(math.radians(a)), 4), round(math.sin(math.radians(a)), 4), 0),
+                     "stud": st["stud"], "stack": f"{i + 1} of {n} (1 = on the seat)", "ring": pn,
+                     "order_basis": ORDER if n > 1 else "one ring"})
+    if st["base"] == "2103":
+        import fam_power as FP
+        v = {k: K.v(d) for k, d in FP.PP.items()}
+        thread = v["A"] - seat
+        used = (top - seat) + v["washer_t"] + v["nut_h"]
+    else:
+        v = {k: K.v(d) for k, d in PDM_STUD.items()}
+        thread = v["stud_l"] - v["base_t"]
+        used = (top - seat) + v["nut_t"]
+    photo = [pn for _, pn in rings if pn in RINGS]
+    fit = (f"the rings{', washer' if st['base'] == '2103' else ''} and nut take {used:.2f} of the {thread:.2f} mm of stud "
+           f"above the seat"
+           + (f"; {', '.join(sorted(set(photo)))} thickness is photo-scaled (+-25 %), so the margin is +-{0.25 * sum(K.v(RINGS[p]['T']) for p in photo):.2f}"
+              if photo else ""))
+    m = types.SimpleNamespace()
+    m.P, m.COLORS = P, COLORS
+    bb = Compound(children=build_bodies()).bounding_box()
+    pieces_ = ([st["base"]] if st["base"] == "2103" else []) + sorted({pn for _, pn in rings})
+    missing = [CAP_MISSING] if "cap" in st else []
+    m.PART = {"pid": end, "endpoints": [end], "maker": "(assembly)", "pn": " + ".join(pn for _, pn in rings),
+              "title": f"{end} stud stack", "kind": "assembly", "family": "rings and lugs",
+              "what": f"{end}: the rings on the stud in their stack order, with the wire on each ({st['stud']})",
+              "shape_basis": "datasheet dims", "viewset": "floor",
+              "dims_mm": {"l": round(bb.size.X, 1), "w": round(bb.size.Y, 1), "h": round(bb.size.Z, 1)},
+              "dims_note": f"{n} ring(s) on the stud; {fit}",
+              "frame": ("the post's base at z = 0, the stud up (+Z)" if st["base"] == "2103"
+                        else "the PDM's flat case front at z = 0, the stud up (+Z) out of it"),
+              "axes": {"mount_normal": "+Z", "maker_up": "+Z", "faces": {}},
+              "refs": [("[1]", "prowireusa.com", "ProWire product pages"), ("[2]", "k5_registry.json", "terminations")],
+              "pieces": pieces_, "missing": missing,
+              "unknowns": ([] if n == 1 else [f"Stack order {ORDER}", f"Clocking {CLOCK}"])
+                          + ([f"Torque: {st['torque']['needs']}"] if isinstance(st["torque"], dict) else []),
+              "notes": [f"stud: {st['stud']}", f"torque: {st['torque'] if isinstance(st['torque'], str) else 'unknown'}",
+                        f"nut: {st['nut']}", f"fit: {fit}"] + ([f"cap: {st['cap']}"] if "cap" in st else [])}
+    m.build = lambda: (build_bodies(), [], [])
+    m.attach_points = lambda: [{"n": f"ring{i + 1}", "ep": end, "at": [0.0, 0.0, round(zi, 3)],
+                                "dir": [round(math.cos(math.radians(a)), 4), round(math.sin(math.radians(a)), 4), 0],
+                                "kind": f"{pn} ({w})"} for i, ((w, pn), zi, a) in enumerate(zip(rings, zs, angs))]
+    m.mount_points = lambda: [{"n": "stud", "at": [0.0, 0.0, 0.0], "dir": [0, 0, -1], "d": 6.0 if st["base"] != "2103" else 9.525,
+                               "note": st["stud"]}]
+    m.terminals = lambda: rows
+    m.PINS_EXTRA = {"stud": st["stud"], "torque": st["torque"], "stack_order": ORDER if n > 1 else "one ring",
+                    "clocking": CLOCK, "nut": st["nut"], "fit": fit, **({"cap": st["cap"]} if "cap" in st else {})}
+    nring = n
+    m.CHECKS = [("rings on the stud (registry terminations)", lambda b: sum(1 for x in b if ": ring " in (x.label or "")), nring, 0),
+                ("top ring's seat above the stud's seat (the rings below it)",
+                 lambda b: round(max(x.bounding_box().min.Z for x in b if ": ring " in (x.label or "")) - seat, 2),
+                 round(zs[-1] - seat, 2), 0.02)]
+    return m
+
+
+def bank_module(end):
+    import math
+    terms = [t for t in K.registry()["terminations"] if t["endpoint"] == end]
+    terms.sort(key=lambda t: int(re.sub(r"\D", "", str(t.get("cavity"))) or 0))
+    pitch = 24.0
+    P = {"pitch": D(pitch, "layout only: the rings are spaced 24 apart in a row", "design")}
+    COLORS = {}
+    placed = []
+    for i, t in enumerate(terms):
+        pn = str(t.get("part") or "")
+        if pn in LUGS or pn in RINGS:
+            COLORS[pn] = (LUGS.get(pn) or RINGS.get(pn))["colour"]
+        placed.append((t, pn, i * pitch))
+
+    def build_bodies():
+        out = []
+        for t, pn, x in placed:
+            if pn in LUGS or pn in RINGS:
+                out.append(_placed(pn, f"{end}: {t['cavity']}, {pn} ({t['wire']})", 0.0, 90.0, x))
+        return out
+
+    rows = []
+    for t, pn, x in placed:
+        ok = pn in LUGS or pn in RINGS
+        rows.append({"pin": str(t["cavity"]), "endpoint": end, "wire": t["wire"], "match": ".",
+                     "name": f"{pn if ok else 'ring OPEN'} ({t['wire']})", "full_name": f"{t['cavity']}: {pn} on {t['wire']}",
+                     "at": (x, 0.0, 0.0), "dir": (0, 1, 0), "stud": "not assigned: the bank's studs are not picked",
+                     "stack": "open", "ring": pn if ok else None,
+                     **({} if ok else {"note": f"the registry: {pn}"})})
+    bb = Compound(children=build_bodies()).bounding_box()
+    nr = sum(1 for _, pn, _x in placed if pn in LUGS or pn in RINGS)
+    m = types.SimpleNamespace()
+    m.P, m.COLORS = P, COLORS
+    m.PART = {"pid": end, "endpoints": [end], "maker": "(assembly)", "pn": f"{len(terms)} rings",
+              "title": f"{end} ring layout", "kind": "assembly", "family": "rings and lugs",
+              "what": f"{end}: every ring the registry lands here, with its wire ({BANK_LAYOUT})",
+              "shape_basis": "datasheet dims", "viewset": "floor",
+              "dims_mm": {"l": round(bb.size.X, 1), "w": round(bb.size.Y, 1), "h": round(bb.size.Z, 1)},
+              "dims_note": f"{nr} rings drawn of {len(terms)} terminations", "frame": f"{BANK_LAYOUT}; ring 1 at the origin, along +X",
+              "axes": {"mount_normal": "+Z", "maker_up": "+Z", "faces": {}},
+              "refs": [("[1]", "prowireusa.com", "ProWire product pages"), ("[2]", "k5_registry.json", "terminations")],
+              "pieces": sorted({pn for _, pn, _x in placed if pn in LUGS or pn in RINGS}), "missing": [BANK],
+              "unknowns": ["Which ring sits on which stud, and in what order, waits on the stud bank (receipt "
+                           "2026-09-29_part-models-batch5 proposes Blue Sea 2103 posts)."],
+              "notes": [BANK_LAYOUT]}
+    m.build = lambda: (build_bodies(), [], [])
+    m.attach_points = lambda: [{"n": f"ring{i + 1}", "ep": end, "at": [x, 0.0, 0.0], "dir": [0, 1, 0], "kind": f"{pn} ({t['wire']})"}
+                               for i, (t, pn, x) in enumerate(placed)]
+    m.mount_points = lambda: []
+    m.terminals = lambda: rows
+    m.PINS_EXTRA = {"stud": "not assigned: the bank's studs are not picked", "stack_order": "open (waits on the stud bank)",
+                    "layout": BANK_LAYOUT}
+    m.CHECKS = [("rings drawn (registry terminations with a ring picked)", lambda b: len(b), nr, 0)]
+    return m
+
+
 def pieces():
     out = []
     use = {}
@@ -122,6 +336,10 @@ def pieces():
     for pn in list(LUGS) + list(RINGS):
         if pn in use:
             out.append(module(pn, use[pn]))
+    for end in STACKS:
+        out.append(stack_module(end))
+    for end in ("GND-BANK-ENG", "GND-BANK-CAB"):
+        out.append(bank_module(end))
     return out
 
 
@@ -131,6 +349,8 @@ END_NEEDS = {"GND-BANK-ENG": ["9906", "9912", "9918", "638TP", "838TP", "238LTP"
              "GND-BANK-CAB": ["9906", "9912", "9918", BANK],
              "PS-STUDS": ["238LTP", "2516LTP", "DL438", "838TP", "610TP", "9918", "AMP-KIT-RING (the AMP Research kit's own ring)"],
              "FAN-JUNCTION": ["9918", "838TP"], "PDM30-STUD": ["DL214", "9916"], "PDM15-STUD": ["DL214"]}
+for _e in ("FAN-JUNCTION", "PDM30-STUD", "PDM15-STUD", "GND-BANK-ENG", "GND-BANK-CAB"):
+    END_NEEDS[_e].append(_e)          # the stack (or layout) assembly with its pins.json
 
 
 def main(argv):

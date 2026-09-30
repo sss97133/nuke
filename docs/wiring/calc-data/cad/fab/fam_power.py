@@ -24,6 +24,7 @@ BS1003 = ("d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/100
           "1.385 Inch', fetched 2026-09-29)")
 BS2103 = "reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea)"
 BS2103P = "reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page)"
+BS2103_FV = f"{BS2103} front view, scaled at the printed 83.82 (237 px) and A 51 (144 px)"
 TE327 = "reference_documents/web_snapshots/www.te.com__product-327583.md (TE product page 327583)"
 
 
@@ -44,7 +45,14 @@ PP = {"L": D(83.82, f"{BS2103}: '3.300 [83.82]'"), "W": D(44.45, f"{BS2103}: '1.
       "stud_d": D(9.525, f"{BS2103}: table '3/8\"-16 UNC X 3/4\"'; {BS2103P} 'Stud dimensions: 3/8\" x 3/4\"'"),
       "stud_l": D(19.05, f"{BS2103}: table '3/8\"-16 UNC X 3/4\"'"),
       "ring_d": D(38.0, f"scaled off {BS2103} top view at the printed 44.45", "scaled", "the round terminal ring"),
-      "screw_n": D(8, f"{BS2103} top view: eight screw terminals round the stud", "scaled")}
+      "screw_n": D(8, f"{BS2103} top view: eight screw terminals round the stud", "scaled"),
+      "seat_z": D(32.3, f"{BS2103_FV}", "scaled", "+-0.5: the top of the lower hex, where the rings seat"),
+      "hex0_h": D(2.8, f"{BS2103_FV}", "scaled", "+-0.5: the lower hex"),
+      "washer_t": D(2.9, f"{BS2103_FV}", "scaled", "+-0.5: the split lock washer (its split shows in the front view)"),
+      "washer_d": D(17.7, f"{BS2103_FV}", "scaled", "+-1"),
+      "nut_ac": D(20.3, f"{BS2103_FV}", "scaled", "+-1: across the corners (the front view shows three faces of each hex)"),
+      "nut_h": D(6.2, f"{BS2103_FV}", "scaled", "+-0.5: the upper (terminal) nut")}
+PP_TORQUE = f"{BS2103P}: 'Terminal Stud Torque | 140 in-lb (15.82 Nm)'"
 PIDG = {"L": D(32.13, f"{TE327}: 'Product Length 32.13 mm [1.265 in]'"),
         "id": D(3.89, f"{TE327}: 'Recovered Inside Diameter 3.89 mm [.153 in]'"),
         "od": D(6.4, f"{TE327}: the insulation sleeve, scaled from the 3.89 recovered ID (TE photo)", "photo", "+-15 %"),
@@ -72,7 +80,7 @@ UNMODELLED = {
     "GND-SPLICE-REAR": "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'",
     "COIL-GROUND-RINGS": ("ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud "
                           "size in the LS3 documents on file)'"),
-    "STARTER-S": "ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'",
+    "STARTER-S": "S-terminal ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'",
 }
 
 
@@ -94,7 +102,9 @@ def cableclam_bodies():
             K.body(seal, "CableClam 1003 seal insert", COL["clam seal"][0], finish="rubber")]
 
 
-def powerpost_bodies():
+def powerpost_bodies(stack_h=0.0):
+    """As Blue Sea draws it: the lower hex, the split lock washer and the terminal nut on the stud. stack_h lifts the
+    washer and the nut by the height of the rings seated on the lower hex (the FAN-JUNCTION stack)."""
     import math
     v = {k: K.v(d) for k, d in PP.items()}
     r_lobe = v["L"] / 2 - v["hole_x"] / 2                       # the lobes end at the printed 83.82
@@ -109,11 +119,16 @@ def powerpost_bodies():
         a = math.radians(45 * i + 22.5)
         screws.append(cyl_z(2.6, v["top_h"], v["top_h"] + 1.6, 14.0 * math.cos(a), 14.0 * math.sin(a)))
     stud = cyl_z(v["stud_d"] / 2, v["top_h"] - 3.0, v["A"], 0, 0)
-    nut = Pos(0, 0, v["A"] - v["stud_l"] + 0.5) * extrude(RegularPolygon(14.3 / 2 / 0.866, 6), amount=8.0)
+    hex0 = Pos(0, 0, v["seat_z"] - v["hex0_h"]) * extrude(RegularPolygon(v["nut_ac"] / 2, 6), amount=v["hex0_h"])
+    z_w = v["seat_z"] + stack_h
+    washer = cyl_z(v["washer_d"] / 2, z_w, z_w + v["washer_t"], 0, 0) - cyl_z(v["stud_d"] / 2 + 0.2, 0, 99, 0, 0)
+    nut = Pos(0, 0, z_w + v["washer_t"]) * extrude(RegularPolygon(v["nut_ac"] / 2, 6), amount=v["nut_h"])
+    nut -= cyl_z(v["stud_d"] / 2, 0, 99, 0, 0)
     out = [K.body(base, "PowerPost Plus 2103 base (black nylon)", COL["base"][0]),
            K.body(ring + screws[0] + screws[1] + screws[2] + screws[3] + screws[4] + screws[5] + screws[6] + screws[7],
                   "PowerPost Plus 2103 terminal ring and screws", COL["stud"][0], finish="metal"),
-           K.body(stud + nut, "PowerPost Plus 2103 3/8-16 stud and nut", COL["stud"][0], finish="metal")]
+           K.body(stud + hex0, "PowerPost Plus 2103 3/8-16 stud and its lower hex", COL["stud"][0], finish="metal"),
+           K.body(washer + nut, "PowerPost Plus 2103 split lock washer and terminal nut", COL["stud"][0], finish="metal")]
     return out
 
 
@@ -169,7 +184,11 @@ def pieces():
                    [{"n": "stud", "ep": "FAN-JUNCTION", "at": [0.0, 0.0, ppv["A"]], "dir": [0, 0, 1], "kind": "3/8-16 stud (lugs)"}],
                    [("length (drawing)", lambda b: round(b[0].bounding_box().size.X, 2), ppv["L"], 0.05),
                     ("width (drawing)", lambda b: round(b[0].bounding_box().size.Y, 2), ppv["W"], 0.05),
-                    ("stud tip height A (drawing)", lambda b: round(b[2].bounding_box().max.Z, 2), ppv["A"], 0.05)]))
+                    ("stud tip height A (drawing)", lambda b: round(b[2].bounding_box().max.Z, 2), ppv["A"], 0.05)],
+                   extra={"notes": [f"stud torque: {PP_TORQUE}",
+                                    "the product page's specification table says 'Color | Red' while its feature list says "
+                                    "'Base Material is Black Nylon 8231 GHS': the base is drawn black; the table's red is "
+                                    "not resolved (the included 4004 PowerPost Insulator is not drawn)"]}))
     pv = {k: K.v(d) for k, d in PIDG.items()}
     out.append(_ns("327583", ["SPL-PDM15-OUT13"], "TE PIDG 327583 step-down butt splice, 16-14 / 22-18 AWG, blue translucent nylon",
                    "TE Connectivity (AMP)", "327583", dict(PIDG), {k: COL[k] for k in ("pidg", "pidg barrel")}, "datasheet dims",

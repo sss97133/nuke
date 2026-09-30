@@ -91,7 +91,8 @@ def load_parts():
 
 def end_table(parts, ends, needs):
     """Per end: the records that cover it and whether it is complete (a model under the end's own id with nothing
-    missing, or every piece its family lists)."""
+    missing, or every piece its family lists). A family's UNMODELLED reason is always carried under missing, also when
+    another lane's model covers the end (e.g. the device is drawn and its termination is not)."""
     by_id = {p["id"]: p for p in parts}
     out = {}
     for e in sorted(ends):
@@ -100,9 +101,11 @@ def end_table(parts, ends, needs):
         own = by_id.get(e)
         if own is not None:
             missing = sorted(set(missing) | set(own.get("missing", [])))
+        if e in UNMODELLED:
+            missing = sorted(set(missing) | {UNMODELLED[e]})
         if not recs:
             if e in UNMODELLED:
-                out[e] = {"models": [], "complete": False, "missing": [UNMODELLED[e]]}
+                out[e] = {"models": [], "complete": False, "missing": missing}
             continue
         out[e] = {"models": recs, "complete": not missing, **({"missing": missing} if missing else {})}
     return out

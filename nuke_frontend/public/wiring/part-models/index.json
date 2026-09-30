@@ -172,7 +172,8 @@
    "models": [
     "2103",
     "838TP",
-    "9918"
+    "9918",
+    "FAN-JUNCTION"
    ],
    "complete": true
   },
@@ -279,7 +280,7 @@
    ],
    "complete": false,
    "missing": [
-    "the kit's mating Packard 3-pin plug (not drawn)"
+    "the kit's mating Packard 3-pin plug (AEM: 'Each sensor comes with a mating connector plug and pin kit'; it names no part number and prints no drawing, so it is not drawn)"
    ]
   },
   "FUSE-DAK_CONST": {
@@ -328,7 +329,8 @@
    "models": [
     "9906",
     "9912",
-    "9918"
+    "9918",
+    "GND-BANK-CAB"
    ],
    "complete": false,
    "missing": [
@@ -342,12 +344,13 @@
     "838TP",
     "9906",
     "9912",
-    "9918"
+    "9918",
+    "GND-BANK-ENG"
    ],
    "complete": false,
    "missing": [
-    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)",
-    "one ring for the AMP Research kit lead (the registry: gauge unknown, IM75146 names none)"
+    "one ring for the AMP Research kit lead (the registry: gauge unknown, IM75146 names none)",
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
    ]
   },
   "GND-SPLICE-REAR": {
@@ -494,9 +497,13 @@
   "PDM15-STUD": {
    "models": [
     "DL214",
-    "PDM15-A"
+    "PDM15-A",
+    "PDM15-STUD"
    ],
-   "complete": true
+   "complete": false,
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
   },
   "PDM30-A": {
    "models": [
@@ -514,9 +521,13 @@
    "models": [
     "9916",
     "DL214",
-    "PDM30-A"
+    "PDM30-A",
+    "PDM30-STUD"
    ],
-   "complete": true
+   "complete": false,
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
   },
   "PORT-ETH": {
    "models": [
@@ -687,7 +698,7 @@
    "models": [],
    "complete": false,
    "missing": [
-    "ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'"
+    "S-terminal ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'"
    ]
   },
   "TRANS-CASE": {
@@ -11842,13 +11853,13 @@
      "hex": "#c9a45a",
      "from": "reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions 10-2131 Rev C): 'Body Material: Brass'"
     },
-    "body": {
-     "hex": "#b9bcbd",
-     "from": "AEM photo: steel body"
-    },
     "connector": {
      "hex": "#1c1c1c",
-     "from": "AEM photo: black connector"
+     "from": "reference_documents/component_drawings/AEM_30-2131 p.2 Figure 1 photo: the mating plug is black (the sensor's own connector colour is not shown: drawn black)"
+    },
+    "blades": {
+     "hex": "#c8c9c4",
+     "from": "tin-plated terminals (colour assumed)"
     }
    },
    "attach": [
@@ -11875,7 +11886,7 @@
     "30-2131-100"
    ],
    "missing": [
-    "the kit's mating Packard 3-pin plug (not drawn)"
+    "the kit's mating Packard 3-pin plug (AEM: 'Each sensor comes with a mating connector plug and pin kit'; it names no part number and prints no drawing, so it is not drawn)"
    ]
   },
   "1003": {
@@ -12773,6 +12784,1102 @@
    ],
    "kind": "piece",
    "family": "rings and lugs"
+  },
+  "FAN-JUNCTION": {
+   "endpoints": [
+    "FAN-JUNCTION"
+   ],
+   "what": "FAN-JUNCTION: the rings on the stud in their stack order, with the wire on each (3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8\"-16 x 3/4\"'))",
+   "maker": "(assembly)",
+   "maker_pn": "838TP + 9918 + 9918",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 83.8,
+    "w": 44.5,
+    "h": 51.0
+   },
+   "frame": "the post's base at z = 0, the stud up (+Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "base": {
+     "hex": "#1c1c1e",
+     "from": "reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page): 'Base Material is Black Nylon 8231 GHS'"
+    },
+    "stud": {
+     "hex": "#c7c9c6",
+     "from": "reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page): 3/8\" stud (tin-plated copper assumed colour: not stated)"
+    },
+    "838TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      32.3
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "838TP (21)"
+    },
+    {
+     "n": "ring2",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      33.57
+     ],
+     "dir": [
+      -0.5,
+      0.866,
+      0
+     ],
+     "kind": "9918 (FAN_LEG1)"
+    },
+    {
+     "n": "ring3",
+     "ep": "FAN-JUNCTION",
+     "at": [
+      0.0,
+      0.0,
+      34.57
+     ],
+     "dir": [
+      -0.5,
+      -0.866,
+      0
+     ],
+     "kind": "9918 (FAN_LEG2)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 9.525,
+     "note": "3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8\"-16 x 3/4\"')"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "2103",
+    "838TP",
+    "9918"
+   ],
+   "missing": []
+  },
+  "PDM30-STUD": {
+   "endpoints": [
+    "PDM30-STUD"
+   ],
+   "what": "PDM30-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +')))",
+   "maker": "(assembly)",
+   "maker_pn": "DL214 + 9916 + 9916 + 9916",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 57.0,
+    "w": 23.3,
+    "h": 18.7
+   },
+   "frame": "the PDM's flat case front at z = 0, the stud up (+Z) out of it",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo: the stud's nut reads zinc-plated steel (as motec_pdm.py, PR #443)"
+    },
+    "stud base": {
+     "hex": "#1d1d1f",
+     "from": "reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black insulating hex base"
+    },
+    "DL214": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "9916": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      6.5
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "DL214 (PDM_BPOS)"
+    },
+    {
+     "n": "ring2",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      9.573
+     ],
+     "dir": [
+      0.0,
+      1.0,
+      0
+     ],
+     "kind": "9916 (DAK_CONST_FH)"
+    },
+    {
+     "n": "ring3",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      10.573
+     ],
+     "dir": [
+      -1.0,
+      0.0,
+      0
+     ],
+     "kind": "9916 (PCS_BATT_FH)"
+    },
+    {
+     "n": "ring4",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      0.0,
+      11.573
+     ],
+     "dir": [
+      -0.0,
+      -1.0,
+      0
+     ],
+     "kind": "9916 (TRANS_BATT_FH)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +'))"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "9916",
+    "DL214"
+   ],
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
+  },
+  "PDM15-STUD": {
+   "endpoints": [
+    "PDM15-STUD"
+   ],
+   "what": "PDM15-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +')))",
+   "maker": "(assembly)",
+   "maker_pn": "DL214",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 54.1,
+    "w": 17.5,
+    "h": 18.7
+   },
+   "frame": "the PDM's flat case front at z = 0, the stud up (+Z) out of it",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo: the stud's nut reads zinc-plated steel (as motec_pdm.py, PR #443)"
+    },
+    "stud base": {
+     "hex": "#1d1d1f",
+     "from": "reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black insulating hex base"
+    },
+    "DL214": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "PDM15-STUD",
+     "at": [
+      0.0,
+      0.0,
+      6.5
+     ],
+     "dir": [
+      1.0,
+      0.0,
+      0
+     ],
+     "kind": "DL214 (PDM15_BPOS)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, 'Mounting Dimensions', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: 'M6 stud', 'Mating: eyelet and M6 nut', 'C_1 Battery +'))"
+    }
+   ],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "DL214"
+   ],
+   "missing": [
+    "the stud's insulating cap (MoTeC p.47: 'Cover power stud with insulating cap'; not named in the registry)"
+   ]
+  },
+  "GND-BANK-ENG": {
+   "endpoints": [
+    "GND-BANK-ENG"
+   ],
+   "what": "GND-BANK-ENG: every ring the registry lands here, with its wire (layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack))",
+   "maker": "(assembly)",
+   "maker_pn": "24 rings",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 569.4,
+    "w": 43.4,
+    "h": 10.8
+   },
+   "frame": "layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack); ring 1 at the origin, along +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "9906": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9912": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "838TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "638TP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/638TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    },
+    "238LTP": {
+     "hex": "#c8c9c4",
+     "from": "prowireusa.com/238LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM_GND1)"
+    },
+    {
+     "n": "ring2",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      24.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM_GND2)"
+    },
+    {
+     "n": "ring3",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      48.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM15_GND1)"
+    },
+    {
+     "n": "ring4",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      72.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PDM15_GND2)"
+    },
+    {
+     "n": "ring5",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      96.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LTCD_GND)"
+    },
+    {
+     "n": "ring6",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      120.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (PUMP_GND)"
+    },
+    {
+     "n": "ring7",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      144.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HL_L_GND)"
+    },
+    {
+     "n": "ring8",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      168.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HL_R_GND)"
+    },
+    {
+     "n": "ring9",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      192.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PT_LF_GND)"
+    },
+    {
+     "n": "ring10",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      216.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PT_RF_GND)"
+    },
+    {
+     "n": "ring11",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      240.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MK_LF_GND)"
+    },
+    {
+     "n": "ring12",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      264.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MK_RF_GND)"
+    },
+    {
+     "n": "ring13",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      288.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (HORN_GND)"
+    },
+    {
+     "n": "ring14",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      312.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (WASH_GND)"
+    },
+    {
+     "n": "ring15",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      336.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (UH_GND)"
+    },
+    {
+     "n": "ring16",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      360.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIPER_GND)"
+    },
+    {
+     "n": "ring17",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      384.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (BLOWER_GND)"
+    },
+    {
+     "n": "ring18",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      408.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (ISO_GND)"
+    },
+    {
+     "n": "ring19",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      432.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "OPEN: ring for the 3/8 in stud, wire gauge unknown (kit lead, gauge per kit (AMP Research IM75146 names none)) (STEP_GND)"
+    },
+    {
+     "n": "ring20",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      456.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "838TP (FAN_GND)"
+    },
+    {
+     "n": "ring21",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      480.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "638TP (DCDC_GND)"
+    },
+    {
+     "n": "ring22",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      504.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "238LTP (AMP_GND)"
+    },
+    {
+     "n": "ring23",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      528.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "638TP (IBOOST_GND)"
+    },
+    {
+     "n": "ring24",
+     "ep": "GND-BANK-ENG",
+     "at": [
+      552.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (TRANS_GND)"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "238LTP",
+    "638TP",
+    "838TP",
+    "9906",
+    "9912",
+    "9918"
+   ],
+   "missing": [
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
+   ]
+  },
+  "GND-BANK-CAB": {
+   "endpoints": [
+    "GND-BANK-CAB"
+   ],
+   "what": "GND-BANK-CAB: every ring the registry lands here, with its wire (layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack))",
+   "maker": "(assembly)",
+   "maker_pn": "21 rings",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 497.4,
+    "w": 25.8,
+    "h": 5.2
+   },
+   "frame": "layout only: the bank's studs are not picked, so the rings lie in a row in the registry's ring order (no stud, no stack); ring 1 at the origin, along +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "9906": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9912": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    },
+    "9918": {
+     "hex": "#c9c8c2",
+     "from": "prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ring1",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (123)"
+    },
+    {
+     "n": "ring2",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      24.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIN_GND_L)"
+    },
+    {
+     "n": "ring3",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      48.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIN_GND_R)"
+    },
+    {
+     "n": "ring4",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      72.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LOCK_GND_L)"
+    },
+    {
+     "n": "ring5",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      96.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (LOCK_GND_R)"
+    },
+    {
+     "n": "ring6",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      120.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (TGR_M_GND)"
+    },
+    {
+     "n": "ring7",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      144.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (MIRROR_GND)"
+    },
+    {
+     "n": "ring8",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      168.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_L_GND)"
+    },
+    {
+     "n": "ring9",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      192.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_C_GND)"
+    },
+    {
+     "n": "ring10",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      216.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (CL_R_GND)"
+    },
+    {
+     "n": "ring11",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      240.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (DOME_GND)"
+    },
+    {
+     "n": "ring12",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      264.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (UD_GND)"
+    },
+    {
+     "n": "ring13",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      288.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (FW_GND)"
+    },
+    {
+     "n": "ring14",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      312.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (USB_GND)"
+    },
+    {
+     "n": "ring15",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      336.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (OUT12V_GND)"
+    },
+    {
+     "n": "ring16",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      360.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (RADIO_GND)"
+    },
+    {
+     "n": "ring17",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      384.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (GSS_GND)"
+    },
+    {
+     "n": "ring18",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      408.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (TCASE_SW_GND)"
+    },
+    {
+     "n": "ring19",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      432.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9912 (WIPER_SW_GND)"
+    },
+    {
+     "n": "ring20",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      456.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9906 (PCS_GND)"
+    },
+    {
+     "n": "ring21",
+     "ep": "GND-BANK-CAB",
+     "at": [
+      480.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "9918 (GND_RET_REAR)"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "rings and lugs",
+   "pieces": [
+    "9906",
+    "9912",
+    "9918"
+   ],
+   "missing": [
+    "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
+   ]
   }
  }
 }

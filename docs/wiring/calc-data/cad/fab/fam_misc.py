@@ -143,22 +143,74 @@ def kostal_bodies():
 
 
 # ------------------------------------------------------------------------------------------ AEM 30-2131-100
-AEMP = {"L": D(54.6, f"{AEM} drawing '2.15' in overall"), "hex_l": D(19.3, f"{AEM} drawing '0.76' in", note="the hex and body"),
+AEMS = "scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view, 300 dpi render"
+AEMF = ("scaled off the p.1 pinout view ('Pinout Shown Looking At Sensor', undimensioned) at the connector OD: the outer "
+        "circle is 379.5 px")
+AEMP = {"L": D(54.6, f"{AEM} drawing '2.15' in overall"),
+        "hex_l": D(19.3, f"{AEM} drawing '0.76' in", note="the hex with its lip and its chamfer"),
         "thread_l": D(10.2, f"{AEM} drawing '0.40' in thread", note="1/8-27 NPT"),
         "hex": D(23.8, f"{AEM} drawing '15/16' in hex across flats"),
-        "thread_d": D(10.3, f"{AEM} '1/8\" Male NPT' (1/8-27 NPT major diameter 0.405 in)"),
-        "conn_d": D(20.0, f"{AEM} drawing, scaled at its printed 2.15", "scaled", "+-2: the Packard 3-pin connector end")}
+        "thread_d": D(10.2, f"{AEM} side view, {AEMS}", "scaled",
+                      "+-0.3: the sheet names the thread '1/8\" - 27 NPT' and prints no diameter"),
+        "lip_l": D(2.1, f"{AEM} side view, {AEMS}", "scaled", "+-0.3: the rounded lip behind the hex"),
+        "chamfer_l": D(2.5, f"{AEM} side view, {AEMS}", "scaled", "+-0.3: the hex's taper to the thread"),
+        "neck_d": D(11.2, f"{AEM} side view, {AEMS}", "scaled", "+-0.5"),
+        "conn_d": D(17.0, f"{AEM} side view, {AEMS}", "scaled", "+-0.5: the Packard 3-pin connector end, 150.5 px tall"),
+        "conn_l": D(10.1, f"{AEM} side view, {AEMS}", "scaled", "+-0.5"),
+        "bore_d": D(12.9, f"{AEM} {AEMF}", "scaled", "+-20 %: the second circle, the shroud's bore"),
+        "tower_w": D(8.4, f"{AEM} {AEMF}", "scaled", "+-20 %: the keyed terminal tower (188 px wide)"),
+        "tower_h": D(8.6, f"{AEM} {AEMF}", "scaled", "+-20 %: 191.5 px tall"),
+        "cav_l": D(3.05, f"{AEM} {AEMF}", "scaled", "+-20 %: each terminal's recess, 68 x 30 px"),
+        "cav_w": D(1.34, f"{AEM} {AEMF}", "scaled", "+-20 %"),
+        "blade_w": D(1.75, f"{AEM} {AEMF}", "scaled", "+-20 %: the blade line inside each recess, 39 px"),
+        "gnd_x": D(-1.99, f"{AEM} {AEMF}: SIG GND upper left", "scaled", "+-0.4"),
+        "pwr_x": D(1.95, f"{AEM} {AEMF}: 5 VOLTS upper right", "scaled", "+-0.4"),
+        "top_y": D(1.75, f"{AEM} {AEMF}: the two upper blades", "scaled", "+-0.4"),
+        "sig_x": D(-0.45, f"{AEM} {AEMF}: Signal (Input), the vertical blade", "scaled",
+                   "+-0.4: drawn 10 px left of the centre; kept as drawn"),
+        "sig_y": D(-2.31, f"{AEM} {AEMF}", "scaled", "+-0.4"),
+        "key_w": D(1.66, f"{AEM} {AEMF}: the key at the top", "scaled", "+-20 %"),
+        "key_r": D(7.50, f"{AEM} {AEMF}: the key's outer edge", "scaled", "+-20 %"),
+        "bore_depth": D(8.0, "not printed", "assumed", "red: the bore's depth"),
+        "tower_gap": D(1.0, "not printed", "assumed", "red: the tower stops 1.0 below the mouth"),
+        "cav_depth": D(2.0, "not printed", "assumed", "red: the recess depth"),
+        "blade_t": D(0.6, "not printed", "assumed", "red: the blade's thickness")}
+AEM_PINS = (("SIG GND", "gnd_x", "top_y", "h", r"^0 V", "Signal Ground (SIG GND): upper left, looking at the sensor"),
+            ("5 V", "pwr_x", "top_y", "h", r"^5 V", "Sensor Power (5 VOLTS): upper right, looking at the sensor"),
+            ("Signal", "sig_x", "sig_y", "v", r"^signal", "Signal (Input): the vertical blade below, looking at the sensor"))
 
 
 def aem_bodies():
+    """Frame: the thread's end at z = 0, the connector's mouth at z = L; looking at the sensor (from +Z) the key is at
+    +Y and +X is to the right, as the pinout view shows it."""
     v = {k: K.v(d) for k, d in AEMP.items()}
-    thread = cyl_z(v["thread_d"] / 2, 0.0, v["thread_l"], 0, 0)
-    hexb = Pos(0, 0, v["thread_l"]) * extrude(RegularPolygon(v["hex"] / 2 / 0.866, 6), amount=6.0)
-    body = cyl_z(v["hex"] / 2 - 1.5, v["thread_l"] + 6.0, v["thread_l"] + v["hex_l"], 0, 0)
-    conn = cyl_z(v["conn_d"] / 2, v["thread_l"] + v["hex_l"], v["L"], 0, 0) - cyl_z(v["conn_d"] / 2 - 1.6, v["L"] - 9, v["L"] + 1, 0, 0)
-    return [K.body(thread + hexb, "AEM 30-2131-100 brass body and 1/8 NPT thread", "#c9a45a", finish="metal"),
-            K.body(body, "AEM 30-2131-100 sensor body", "#b9bcbd", finish="metal"),
-            K.body(conn, "AEM 30-2131-100 Packard 3-pin connector", "#1c1c1c")]
+    L = v["L"]
+    z_hex0 = v["thread_l"]
+    z_hex1 = v["thread_l"] + v["hex_l"]
+    z_conn = L - v["conn_l"]
+    thread = cyl_z(v["thread_d"] / 2, 0.0, z_hex0, 0, 0)
+    af = v["hex"]
+    hexb = Pos(0, 0, z_hex0 + v["chamfer_l"]) * extrude(RegularPolygon(af / 2 / math.cos(math.pi / 6), 6, major_radius=True),
+                                                         amount=v["hex_l"] - v["chamfer_l"] - v["lip_l"])
+    taper = cyl_z(af / 2 * 0.8, z_hex0, z_hex0 + v["chamfer_l"], 0, 0)
+    lip = cyl_z(af / 2 * 0.93, z_hex1 - v["lip_l"], z_hex1, 0, 0)
+    neck = cyl_z(v["neck_d"] / 2, z_hex1, z_conn, 0, 0)
+    shell = cyl_z(v["conn_d"] / 2, z_conn, L, 0, 0) - cyl_z(v["bore_d"] / 2, L - v["bore_depth"], L + 1, 0, 0)
+    shell -= box(-v["key_w"] / 2, v["key_w"] / 2, 0.0, v["key_r"], L - 3.0, L + 1)
+    z_tt = L - v["tower_gap"]
+    tower = box(-v["tower_w"] / 2, v["tower_w"] / 2, -v["tower_h"] / 2, v["tower_h"] / 2, L - v["bore_depth"], z_tt)
+    blades = None
+    for _, kx, ky, o, _m, _n in AEM_PINS:
+        x, y = v[kx], v[ky]
+        cl, cw = (v["cav_l"], v["cav_w"]) if o == "h" else (v["cav_w"], v["cav_l"])
+        tower -= box(x - cl / 2, x + cl / 2, y - cw / 2, y + cw / 2, z_tt - v["cav_depth"], z_tt + 1)
+        bl, bt = (v["blade_w"], v["blade_t"]) if o == "h" else (v["blade_t"], v["blade_w"])
+        b = box(x - bl / 2, x + bl / 2, y - bt / 2, y + bt / 2, z_tt - v["cav_depth"] - 0.5, z_tt)
+        blades = b if blades is None else blades + b
+    return [K.body(thread + taper + hexb + lip, "AEM 30-2131-100 brass body, hex and 1/8-27 NPT thread", "#c9a45a", finish="metal"),
+            K.body(neck + shell, "AEM 30-2131-100 Packard 3-pin connector shell", "#1c1c1c"),
+            K.body(tower, "AEM 30-2131-100 terminal tower", "#232323"),
+            K.body(blades, "AEM 30-2131-100 terminal blades (SIG GND, 5 V, Signal)", "#c8c9c4", finish="metal")]
 
 
 # ------------------------------------------------------------------------------------------ part objects
@@ -247,17 +299,30 @@ def pieces():
                                            "unknowns": ["Only the envelopes are Kostal's; the round body, bayonet and lever are "
                                                         "drawn from the POP photos without a scale (shape only)."]}))
     av = {k: K.v(d) for k, d in AEMP.items()}
-    rows = [{"pin": k, "endpoint": "FUELP", "name": f"AEM pin {k}", "match": nm, "at": (0.0, 0.0, av["L"]), "dir": (0, 0, 1)}
-            for k, nm in (("1", r"^0 V"), ("2", r"^5 V"), ("3", r"^signal"))]
+    rows = [{"pin": k, "endpoint": "FUELP", "name": k, "full_name": f"{nm} ({AEM}, pinout view)", "match": rx,
+             "at": (av[kx], av[ky], av["L"] - av["tower_gap"]), "dir": (0, 0, 1)}
+            for k, kx, ky, _o, rx, nm in AEM_PINS]
     out.append(_ns("FUELP", ["FUELP"], "AEM 30-2131-100 fuel pressure sensor, 0-100 psig, 1/8-27 NPT, Packard 3-pin (its mating plug "
                    "comes in the kit)", "AEM Electronics", "30-2131-100", dict(AEMP),
-                   {"brass": ("#c9a45a", f"{AEM}: 'Body Material: Brass'"), "body": ("#b9bcbd", "AEM photo: steel body"),
-                    "connector": ("#1c1c1c", "AEM photo: black connector")}, "datasheet dims",
+                   {"brass": ("#c9a45a", f"{AEM}: 'Body Material: Brass'"),
+                    "connector": ("#1c1c1c", f"{CD}AEM_30-2131 p.2 Figure 1 photo: the mating plug is black (the sensor's "
+                                  "own connector colour is not shown: drawn black)"),
+                    "blades": ("#c8c9c4", "tin-plated terminals (colour assumed)")}, "datasheet dims",
                    "the NPT thread's end at z = 0 (into the fuel fitting), the connector up (+Z)", aem_bodies,
                    [{"n": "plug", "ep": "FUELP", "at": [0.0, 0.0, av["L"]], "dir": [0, 0, 1], "kind": "Packard 3-pin"}],
                    [("overall length (AEM)", lambda b: round(Compound(children=b).bounding_box().size.Z, 2), av["L"], 0.1),
-                    ("hex across flats (AEM)", lambda b: round(b[0].bounding_box().size.Y, 2), av["hex"], 0.05)],
-                   kind="assembly", extra={"pieces": ["30-2131-100"], "missing": ["the kit's mating Packard 3-pin plug (not drawn)"]},
+                    ("hex across flats (AEM)", lambda b: round(b[0].bounding_box().size.Y, 2), av["hex"], 0.05),
+                    ("connector OD (scaled)", lambda b: round(b[1].bounding_box().size.X, 2), av["conn_d"], 0.05)],
+                   kind="assembly",
+                   extra={"pieces": ["30-2131-100"],
+                          "missing": ["the kit's mating Packard 3-pin plug (AEM: 'Each sensor comes with a mating connector plug "
+                                      "and pin kit'; it names no part number and prints no drawing, so it is not drawn)"],
+                          "unknowns": ["AEM prints no pin numbers or letters. The pins are named by the function and place its "
+                                       "p.1 pinout view shows, looking at the sensor: SIG GND upper left, 5 VOLTS upper "
+                                       "right, Signal (Input) the vertical blade below. Each wire takes its pin from the "
+                                       "function in the registry's cavity text (0 V, 5 V, signal).",
+                                       "The connector face is scaled off an undimensioned pinout view (+-20 %); the bore "
+                                       "depth, the tower height, the recess depth and the blade thickness are assumed (red)."]},
                    rows=rows))
     return out
 

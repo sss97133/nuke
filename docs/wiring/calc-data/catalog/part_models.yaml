@@ -19,8 +19,8 @@
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
 ends_covered: 59
-ends_complete: 50
-ends_total: 178
+ends_complete: 48
+ends_total: 179
 ends_unmodelled_with_reason: 28
 ends:
   ACC-BATT:
@@ -155,6 +155,7 @@ ends:
     - '2103'
     - 838TP
     - '9918'
+    - FAN-JUNCTION
     complete: true
   FIREWALL-BODY-A:
     models:
@@ -236,7 +237,8 @@ ends:
     - FUELP
     complete: false
     missing:
-    - the kit's mating Packard 3-pin plug (not drawn)
+    - 'the kit''s mating Packard 3-pin plug (AEM: ''Each sensor comes with a mating connector plug and pin kit''; it names
+      no part number and prints no drawing, so it is not drawn)'
   FUSE-DAK_CONST:
     models: []
     complete: false
@@ -278,6 +280,7 @@ ends:
     - '9906'
     - '9912'
     - '9918'
+    - GND-BANK-CAB
     complete: false
     missing:
     - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
@@ -289,10 +292,11 @@ ends:
     - '9906'
     - '9912'
     - '9918'
+    - GND-BANK-ENG
     complete: false
     missing:
-    - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
     - 'one ring for the AMP Research kit lead (the registry: gauge unknown, IM75146 names none)'
+    - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
   GND-SPLICE-REAR:
     models: []
     complete: false
@@ -402,7 +406,10 @@ ends:
     models:
     - DL214
     - PDM15-A
-    complete: true
+    - PDM15-STUD
+    complete: false
+    missing:
+    - 'the stud''s insulating cap (MoTeC p.47: ''Cover power stud with insulating cap''; not named in the registry)'
   PDM30-A:
     models:
     - PDM30-A
@@ -416,7 +423,10 @@ ends:
     - '9916'
     - DL214
     - PDM30-A
-    complete: true
+    - PDM30-STUD
+    complete: false
+    missing:
+    - 'the stud''s insulating cap (MoTeC p.47: ''Cover power stud with insulating cap''; not named in the registry)'
   PORT-ETH:
     models:
     - NE8FDP
@@ -577,7 +587,7 @@ ends:
     models: []
     complete: false
     missing:
-    - 'ring not picked: the registry says ''read the S-terminal stud off the starter (bench)'''
+    - 'S-terminal ring not picked: the registry says ''read the S-terminal stud off the starter (bench)'''
   TRANS-CASE:
     models:
     - TRANS-CASE
@@ -21478,12 +21488,13 @@ parts:
       hex: '#c9a45a'
       from: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
         10-2131 Rev C): ''Body Material: Brass'''
-    body:
-      hex: '#b9bcbd'
-      from: 'AEM photo: steel body'
     connector:
       hex: '#1c1c1c'
-      from: 'AEM photo: black connector'
+      from: 'reference_documents/component_drawings/AEM_30-2131 p.2 Figure 1 photo: the mating plug is black (the sensor''s
+        own connector colour is not shown: drawn black)'
+    blades:
+      hex: '#c8c9c4'
+      from: tin-plated terminals (colour assumed)
   attach:
   - n: plug
     ep: FUELP
@@ -21508,7 +21519,7 @@ parts:
     source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
       10-2131 Rev C) drawing '0.76' in
     basis: maker
-    note: the hex and body
+    note: the hex with its lip and its chamfer
   - name: thread_l
     value: 10.2
     source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
@@ -21521,16 +21532,158 @@ parts:
       10-2131 Rev C) drawing '15/16' in hex across flats
     basis: maker
   - name: thread_d
-    value: 10.3
+    value: 10.2
     source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
-      10-2131 Rev C) '1/8" Male NPT' (1/8-27 NPT major diameter 0.405 in)
-    basis: maker
-  - name: conn_d
-    value: 20.0
-    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
-      10-2131 Rev C) drawing, scaled at its printed 2.15
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
     basis: scaled
-    note: '+-2: the Packard 3-pin connector end'
+    note: '+-0.3: the sheet names the thread ''1/8" - 27 NPT'' and prints no diameter'
+  - name: lip_l
+    value: 2.1
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
+    basis: scaled
+    note: '+-0.3: the rounded lip behind the hex'
+  - name: chamfer_l
+    value: 2.5
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
+    basis: scaled
+    note: '+-0.3: the hex''s taper to the thread'
+  - name: neck_d
+    value: 11.2
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
+    basis: scaled
+    note: +-0.5
+  - name: conn_d
+    value: 17.0
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
+    basis: scaled
+    note: '+-0.5: the Packard 3-pin connector end, 150.5 px tall'
+  - name: conn_l
+    value: 10.1
+    source: reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) side view, scaled at the printed 15/16 in hex (211 px) and 2.15 in overall (483 px) of the side view,
+      300 dpi render
+    basis: scaled
+    note: +-0.5
+  - name: bore_d
+    value: 12.9
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: '+-20 %: the second circle, the shroud''s bore'
+  - name: tower_w
+    value: 8.4
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: '+-20 %: the keyed terminal tower (188 px wide)'
+  - name: tower_h
+    value: 8.6
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: '+-20 %: 191.5 px tall'
+  - name: cav_l
+    value: 3.05
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: '+-20 %: each terminal''s recess, 68 x 30 px'
+  - name: cav_w
+    value: 1.34
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: +-20 %
+  - name: blade_w
+    value: 1.75
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: '+-20 %: the blade line inside each recess, 39 px'
+  - name: gnd_x
+    value: -1.99
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: SIG GND upper left'
+    basis: scaled
+    note: +-0.4
+  - name: pwr_x
+    value: 1.95
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: 5 VOLTS upper right'
+    basis: scaled
+    note: +-0.4
+  - name: top_y
+    value: 1.75
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: the two upper blades'
+    basis: scaled
+    note: +-0.4
+  - name: sig_x
+    value: -0.45
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: Signal (Input), the vertical blade'
+    basis: scaled
+    note: '+-0.4: drawn 10 px left of the centre; kept as drawn'
+  - name: sig_y
+    value: -2.31
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px'
+    basis: scaled
+    note: +-0.4
+  - name: key_w
+    value: 1.66
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: the key at the top'
+    basis: scaled
+    note: +-20 %
+  - name: key_r
+    value: 7.5
+    source: 'reference_documents/component_drawings/AEM_30-2131_Pressure_Sensor_Instructions_10-2131C.pdf p.1 (AEM instructions
+      10-2131 Rev C) scaled off the p.1 pinout view (''Pinout Shown Looking At Sensor'', undimensioned) at the connector OD:
+      the outer circle is 379.5 px: the key''s outer edge'
+    basis: scaled
+    note: +-20 %
+  - name: bore_depth
+    value: 8.0
+    source: not printed
+    basis: assumed
+    note: 'red: the bore''s depth'
+  - name: tower_gap
+    value: 1.0
+    source: not printed
+    basis: assumed
+    note: 'red: the tower stops 1.0 below the mouth'
+  - name: cav_depth
+    value: 2.0
+    source: not printed
+    basis: assumed
+    note: 'red: the recess depth'
+  - name: blade_t
+    value: 0.6
+    source: not printed
+    basis: assumed
+    note: 'red: the blade''s thickness'
   checks:
   - check: overall length (AEM)
     model: 54.6
@@ -21542,8 +21695,18 @@ parts:
     drawing: 23.8
     tol: 0.05
     ok: true
+  - check: connector OD (scaled)
+    model: 17.0
+    drawing: 17.0
+    tol: 0.05
+    ok: true
   branding: {}
-  unknowns: []
+  unknowns:
+  - 'AEM prints no pin numbers or letters. The pins are named by the function and place its p.1 pinout view shows, looking
+    at the sensor: SIG GND upper left, 5 VOLTS upper right, Signal (Input) the vertical blade below. Each wire takes its pin
+    from the function in the registry''s cavity text (0 V, 5 V, signal).'
+  - The connector face is scaled off an undimensioned pinout view (+-20 %); the bore depth, the tower height, the recess depth
+    and the blade thickness are assumed (red).
   cross_checks: []
   notes: []
   kind: assembly
@@ -21551,7 +21714,8 @@ parts:
   pieces:
   - 30-2131-100
   missing:
-  - the kit's mating Packard 3-pin plug (not drawn)
+  - 'the kit''s mating Packard 3-pin plug (AEM: ''Each sensor comes with a mating connector plug and pin kit''; it names no
+    part number and prints no drawing, so it is not drawn)'
   script: docs/wiring/calc-data/cad/fab/fam_misc.py
 - id: '1003'
   endpoints:
@@ -21747,6 +21911,42 @@ parts:
     source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) top view: eight screw
       terminals round the stud'
     basis: scaled
+  - name: seat_z
+    value: 32.3
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the top of the lower hex, where the rings seat'
+  - name: hex0_h
+    value: 2.8
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the lower hex'
+  - name: washer_t
+    value: 2.9
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the split lock washer (its split shows in the front view)'
+  - name: washer_d
+    value: 17.7
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: +-1
+  - name: nut_ac
+    value: 20.3
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-1: across the corners (the front view shows three faces of each hex)'
+  - name: nut_h
+    value: 6.2
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the upper (terminal) nut'
   checks:
   - check: length (drawing)
     model: 83.82
@@ -21766,7 +21966,11 @@ parts:
   branding: {}
   unknowns: []
   cross_checks: []
-  notes: []
+  notes:
+  - 'stud torque: reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page):
+    ''Terminal Stud Torque | 140 in-lb (15.82 Nm)'''
+  - 'the product page''s specification table says ''Color | Red'' while its feature list says ''Base Material is Black Nylon
+    8231 GHS'': the base is drawn black; the table''s red is not resolved (the included 4004 PowerPost Insulator is not drawn)'
   kind: piece
   family: power hardware
   script: docs/wiring/calc-data/cad/fab/fam_power.py
@@ -22980,4 +23184,1109 @@ parts:
   - 'lands on: PDM30-STUD'
   kind: piece
   family: rings and lugs
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: FAN-JUNCTION
+  endpoints:
+  - FAN-JUNCTION
+  what: 'FAN-JUNCTION: the rings on the stud in their stack order, with the wire on each (3/8-16 UNC x 3/4 in (Blue Sea 2101-2103
+    drawing table; product page ''Stud Size 3/8"-16 x 3/4"''))'
+  maker: (assembly)
+  maker_pn: 838TP + 9918 + 9918
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 83.8
+    w: 44.5
+    h: 51.0
+  dims_note: 3 ring(s) on the stud; the rings, washer and nut take 12.37 of the 18.70 mm of stud above the seat; 9918 thickness
+    is photo-scaled (+-25 %), so the margin is +-0.50
+  frame: the post's base at z = 0, the stud up (+Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    base:
+      hex: '#1c1c1e'
+      from: 'reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page):
+        ''Base Material is Black Nylon 8231 GHS'''
+    stud:
+      hex: '#c7c9c6'
+      from: 'reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page):
+        3/8" stud (tin-plated copper assumed colour: not stated)'
+    838TP:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+    '9918':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: ring1
+    ep: FAN-JUNCTION
+    at:
+    - 0.0
+    - 0.0
+    - 32.3
+    dir:
+    - 1.0
+    - 0.0
+    - 0
+    kind: 838TP (21)
+  - n: ring2
+    ep: FAN-JUNCTION
+    at:
+    - 0.0
+    - 0.0
+    - 33.57
+    dir:
+    - -0.5
+    - 0.866
+    - 0
+    kind: 9918 (FAN_LEG1)
+  - n: ring3
+    ep: FAN-JUNCTION
+    at:
+    - 0.0
+    - 0.0
+    - 34.57
+    dir:
+    - -0.5
+    - -0.866
+    - 0
+    kind: 9918 (FAN_LEG2)
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 9.525
+    note: 3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page 'Stud Size 3/8"-16 x 3/4"')
+  params:
+  - name: A
+    value: 51.0
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table, 2103 dimension
+      A ''2.0 [51]'' to the stud tip'
+    basis: maker
+  - name: stud_d
+    value: 9.525
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table ''3/8"-16 UNC
+      X 3/4"''; reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md (Blue Sea product page)
+      ''Stud dimensions: 3/8" x 3/4"'''
+    basis: maker
+  - name: stud_l
+    value: 19.05
+    source: 'reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea): table ''3/8"-16 UNC
+      X 3/4"'''
+    basis: maker
+  - name: seat_z
+    value: 32.3
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the top of the lower hex, where the rings seat'
+  - name: hex0_h
+    value: 2.8
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the lower hex'
+  - name: washer_t
+    value: 2.9
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the split lock washer (its split shows in the front view)'
+  - name: washer_d
+    value: 17.7
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: +-1
+  - name: nut_ac
+    value: 20.3
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-1: across the corners (the front view shows three faces of each hex)'
+  - name: nut_h
+    value: 6.2
+    source: reference_documents/component_drawings/BlueSea_2101-2103_PowerPost_Plus_dim.jpg (Blue Sea) front view, scaled
+      at the printed 83.82 (237 px) and A 51 (144 px)
+    basis: scaled
+    note: '+-0.5: the upper (terminal) nut'
+  - name: T_838TP
+    value: 1.27
+    source: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29)Tang Thickness (T): .05 in'
+    basis: vendor
+  - name: T_9918
+    value: 1.0
+    source: prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      3/8" (M9) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: rings on the stud (registry terminations)
+    model: 3
+    drawing: 3
+    tol: 0
+    ok: true
+  - check: top ring's seat above the stud's seat (the rings below it)
+    model: 2.27
+    drawing: 2.27
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Stack order proposed, the builder''s call: the ring that carries the stud''s whole current sits on the seat, the others
+    follow in the registry''s order. No source on file gives a stacking order, and the registry gives none.'
+  - 'Clocking design: the barrels are drawn spread round the stud so they clear; the real clocking follows the cable runs'
+  cross_checks: []
+  notes:
+  - 'stud: 3/8-16 UNC x 3/4 in (Blue Sea 2101-2103 drawing table; product page ''Stud Size 3/8"-16 x 3/4"'')'
+  - 'torque: 140 in-lb (15.82 Nm): reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md ''Terminal
+    Stud Torque'''
+  - 'nut: Blue Sea''s own split lock washer and terminal nut (drawn as the 2101-2103 drawing shows them)'
+  - 'fit: the rings, washer and nut take 12.37 of the 18.70 mm of stud above the seat; 9918 thickness is photo-scaled (+-25
+    %), so the margin is +-0.50'
+  kind: assembly
+  family: rings and lugs
+  pieces:
+  - '2103'
+  - 838TP
+  - '9918'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: PDM30-STUD
+  endpoints:
+  - PDM30-STUD
+  what: 'PDM30-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf
+    PDF p.50 (printed p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf
+    PDF p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +'')))'
+  maker: (assembly)
+  maker_pn: DL214 + 9916 + 9916 + 9916
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 57.0
+    w: 23.3
+    h: 18.7
+  dims_note: 4 ring(s) on the stud; the rings and nut take 11.07 of the 11.40 mm of stud above the seat; 9916 thickness is
+    photo-scaled (+-25 %), so the margin is +-0.75
+  frame: the PDM's flat case front at z = 0, the stud up (+Z) out of it
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    stud:
+      hex: '#bab1a8'
+      from: 'MoTeC product photo: the stud''s nut reads zinc-plated steel (as motec_pdm.py, PR #443)'
+    stud base:
+      hex: '#1d1d1f'
+      from: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+        PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black
+        insulating hex base'
+    DL214:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+    '9916':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: ring1
+    ep: PDM30-STUD
+    at:
+    - 0.0
+    - 0.0
+    - 6.5
+    dir:
+    - 1.0
+    - 0.0
+    - 0
+    kind: DL214 (PDM_BPOS)
+  - n: ring2
+    ep: PDM30-STUD
+    at:
+    - 0.0
+    - 0.0
+    - 9.573
+    dir:
+    - 0.0
+    - 1.0
+    - 0
+    kind: 9916 (DAK_CONST_FH)
+  - n: ring3
+    ep: PDM30-STUD
+    at:
+    - 0.0
+    - 0.0
+    - 10.573
+    dir:
+    - -1.0
+    - 0.0
+    - 0
+    kind: 9916 (PCS_BATT_FH)
+  - n: ring4
+    ep: PDM30-STUD
+    at:
+    - 0.0
+    - 0.0
+    - 11.573
+    dir:
+    - -0.0
+    - -1.0
+    - 0
+    kind: 9916 (TRANS_BATT_FH)
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 6.0
+    note: 'M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed
+      p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF
+      p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +''))'
+  params:
+  - name: stud_l
+    value: 17.9
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30): the M6 stud stands 17.9 out of the flat case front'
+    basis: maker
+  - name: stud_d
+    value: 6.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30): ''M6 Stud'''
+    basis: maker
+  - name: base_af
+    value: 14.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the black insulating hex base, across flats
+  - name: base_t
+    value: 6.5
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: 'the hex base''s height: the rings seat on it'
+  - name: nut_af
+    value: 10.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the M6 nut, across flats
+  - name: nut_t
+    value: 5.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the nut's height
+  - name: T_DL214
+    value: 3.073
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Tang Thickness (T): .121 in'
+    basis: vendor
+  - name: T_9916
+    value: 1.0
+    source: prowireusa.com/9916 (ProWire product page, read 2026-09-29) photo, scaled from the hole that clears its STUD SIZE
+      1/4" (M6) stud
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: rings on the stud (registry terminations)
+    model: 4
+    drawing: 4
+    tol: 0
+    ok: true
+  - check: top ring's seat above the stud's seat (the rings below it)
+    model: 5.07
+    drawing: 5.07
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Stack order proposed, the builder''s call: the ring that carries the stud''s whole current sits on the seat, the others
+    follow in the registry''s order. No source on file gives a stacking order, and the registry gives none.'
+  - 'Clocking design: the barrels are drawn spread round the stud so they clear; the real clocking follows the cable runs'
+  - 'Torque: MoTeC''s torque for the M6 battery stud: neither the PDM user manual nor the PDM30 data sheet on file prints
+    one'
+  cross_checks: []
+  notes:
+  - 'stud: M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed
+    p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF
+    p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +''))'
+  - 'torque: unknown'
+  - 'nut: M6 nut (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: ''M6 stud'',
+    ''Mating: eyelet and M6 nut'', ''C_1 Battery +'')); no part named in the registry'
+  - 'fit: the rings and nut take 11.07 of the 11.40 mm of stud above the seat; 9916 thickness is photo-scaled (+-25 %), so
+    the margin is +-0.75'
+  - 'cap: reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+    PDM15 and PDM30): ''Cover power stud with insulating cap''; the registry names no cap'
+  kind: assembly
+  family: rings and lugs
+  pieces:
+  - '9916'
+  - DL214
+  missing:
+  - 'the stud''s insulating cap (MoTeC p.47: ''Cover power stud with insulating cap''; not named in the registry)'
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: PDM15-STUD
+  endpoints:
+  - PDM15-STUD
+  what: 'PDM15-STUD: the rings on the stud in their stack order, with the wire on each (M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf
+    PDF p.50 (printed p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf
+    PDF p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +'')))'
+  maker: (assembly)
+  maker_pn: DL214
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 54.1
+    w: 17.5
+    h: 18.7
+  dims_note: 1 ring(s) on the stud; the rings and nut take 8.07 of the 11.40 mm of stud above the seat
+  frame: the PDM's flat case front at z = 0, the stud up (+Z) out of it
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    stud:
+      hex: '#bab1a8'
+      from: 'MoTeC product photo: the stud''s nut reads zinc-plated steel (as motec_pdm.py, PR #443)'
+    stud base:
+      hex: '#1d1d1f'
+      from: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+        PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443): the black
+        insulating hex base'
+    DL214:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: ring1
+    ep: PDM15-STUD
+    at:
+    - 0.0
+    - 0.0
+    - 6.5
+    dir:
+    - 1.0
+    - 0.0
+    - 0
+    kind: DL214 (PDM15_BPOS)
+  mount:
+  - n: stud
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 6.0
+    note: 'M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed
+      p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF
+      p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +''))'
+  params:
+  - name: stud_l
+    value: 17.9
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30): the M6 stud stands 17.9 out of the flat case front'
+    basis: maker
+  - name: stud_d
+    value: 6.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30): ''M6 Stud'''
+    basis: maker
+  - name: base_af
+    value: 14.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the black insulating hex base, across flats
+  - name: base_t
+    value: 6.5
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: 'the hex base''s height: the rings seat on it'
+  - name: nut_af
+    value: 10.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the M6 nut, across flats
+  - name: nut_t
+    value: 5.0
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+      PDM15 and PDM30), side view of the stud, scaled at its printed 17.9 (the values motec_pdm.py uses, PR #443)'
+    basis: scaled
+    note: the nut's height
+  - name: T_DL214
+    value: 3.073
+    source: 'prowireusa.com/DL214 (ProWire product page, read 2026-09-29)Tang Thickness (T): .121 in'
+    basis: vendor
+  checks:
+  - check: rings on the stud (registry terminations)
+    model: 1
+    drawing: 1
+    tol: 0
+    ok: true
+  - check: top ring's seat above the stud's seat (the rings below it)
+    model: 0.0
+    drawing: 0.0
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Torque: MoTeC''s torque for the M6 battery stud: neither the PDM user manual nor the PDM30 data sheet on file prints
+    one'
+  cross_checks: []
+  notes:
+  - 'stud: M6, 17.9 out of the case front (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed
+    p.47, ''Mounting Dimensions'', PDM15 and PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF
+    p.46-47 (connector C: ''M6 stud'', ''Mating: eyelet and M6 nut'', ''C_1 Battery +''))'
+  - 'torque: unknown'
+  - 'nut: M6 nut (reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.46-47 (connector C: ''M6 stud'',
+    ''Mating: eyelet and M6 nut'', ''C_1 Battery +'')); no part named in the registry'
+  - 'fit: the rings and nut take 8.07 of the 11.40 mm of stud above the seat'
+  - 'cap: reference_documents/component_drawings/motec_pdm_user_manual.pdf PDF p.50 (printed p.47, ''Mounting Dimensions'',
+    PDM15 and PDM30): ''Cover power stud with insulating cap''; the registry names no cap'
+  kind: assembly
+  family: rings and lugs
+  pieces:
+  - DL214
+  missing:
+  - 'the stud''s insulating cap (MoTeC p.47: ''Cover power stud with insulating cap''; not named in the registry)'
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: GND-BANK-ENG
+  endpoints:
+  - GND-BANK-ENG
+  what: 'GND-BANK-ENG: every ring the registry lands here, with its wire (layout only: the bank''s studs are not picked, so
+    the rings lie in a row in the registry''s ring order (no stud, no stack))'
+  maker: (assembly)
+  maker_pn: 24 rings
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 569.4
+    w: 43.4
+    h: 10.8
+  dims_note: 23 rings drawn of 24 terminations
+  frame: 'layout only: the bank''s studs are not picked, so the rings lie in a row in the registry''s ring order (no stud,
+    no stack); ring 1 at the origin, along +X'
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    '9906':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+    '9912':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+    '9918':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+    838TP:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/838TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+    638TP:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/638TP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+    238LTP:
+      hex: '#c8c9c4'
+      from: 'prowireusa.com/238LTP (ProWire product page, read 2026-09-29): Material: Tinned Copper (tin colour)'
+  attach:
+  - n: ring1
+    ep: GND-BANK-ENG
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PDM_GND1)
+  - n: ring2
+    ep: GND-BANK-ENG
+    at:
+    - 24.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PDM_GND2)
+  - n: ring3
+    ep: GND-BANK-ENG
+    at:
+    - 48.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PDM15_GND1)
+  - n: ring4
+    ep: GND-BANK-ENG
+    at:
+    - 72.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PDM15_GND2)
+  - n: ring5
+    ep: GND-BANK-ENG
+    at:
+    - 96.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (LTCD_GND)
+  - n: ring6
+    ep: GND-BANK-ENG
+    at:
+    - 120.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (PUMP_GND)
+  - n: ring7
+    ep: GND-BANK-ENG
+    at:
+    - 144.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (HL_L_GND)
+  - n: ring8
+    ep: GND-BANK-ENG
+    at:
+    - 168.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (HL_R_GND)
+  - n: ring9
+    ep: GND-BANK-ENG
+    at:
+    - 192.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PT_LF_GND)
+  - n: ring10
+    ep: GND-BANK-ENG
+    at:
+    - 216.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PT_RF_GND)
+  - n: ring11
+    ep: GND-BANK-ENG
+    at:
+    - 240.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (MK_LF_GND)
+  - n: ring12
+    ep: GND-BANK-ENG
+    at:
+    - 264.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (MK_RF_GND)
+  - n: ring13
+    ep: GND-BANK-ENG
+    at:
+    - 288.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (HORN_GND)
+  - n: ring14
+    ep: GND-BANK-ENG
+    at:
+    - 312.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (WASH_GND)
+  - n: ring15
+    ep: GND-BANK-ENG
+    at:
+    - 336.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (UH_GND)
+  - n: ring16
+    ep: GND-BANK-ENG
+    at:
+    - 360.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (WIPER_GND)
+  - n: ring17
+    ep: GND-BANK-ENG
+    at:
+    - 384.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9918 (BLOWER_GND)
+  - n: ring18
+    ep: GND-BANK-ENG
+    at:
+    - 408.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (ISO_GND)
+  - n: ring19
+    ep: GND-BANK-ENG
+    at:
+    - 432.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 'OPEN: ring for the 3/8 in stud, wire gauge unknown (kit lead, gauge per kit (AMP Research IM75146 names none))
+      (STEP_GND)'
+  - n: ring20
+    ep: GND-BANK-ENG
+    at:
+    - 456.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 838TP (FAN_GND)
+  - n: ring21
+    ep: GND-BANK-ENG
+    at:
+    - 480.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 638TP (DCDC_GND)
+  - n: ring22
+    ep: GND-BANK-ENG
+    at:
+    - 504.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 238LTP (AMP_GND)
+  - n: ring23
+    ep: GND-BANK-ENG
+    at:
+    - 528.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 638TP (IBOOST_GND)
+  - n: ring24
+    ep: GND-BANK-ENG
+    at:
+    - 552.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (TRANS_GND)
+  mount: []
+  params:
+  - name: pitch
+    value: 24.0
+    source: 'layout only: the rings are spaced 24 apart in a row'
+    basis: design
+  checks:
+  - check: rings drawn (registry terminations with a ring picked)
+    model: 23
+    drawing: 23
+    tol: 0
+    ok: true
+  branding: {}
+  unknowns:
+  - Which ring sits on which stud, and in what order, waits on the stud bank (receipt 2026-09-29_part-models-batch5 proposes
+    Blue Sea 2103 posts).
+  cross_checks: []
+  notes:
+  - 'layout only: the bank''s studs are not picked, so the rings lie in a row in the registry''s ring order (no stud, no stack)'
+  kind: assembly
+  family: rings and lugs
+  pieces:
+  - 238LTP
+  - 638TP
+  - 838TP
+  - '9906'
+  - '9912'
+  - '9918'
+  missing:
+  - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
+  script: docs/wiring/calc-data/cad/fab/fam_rings.py
+- id: GND-BANK-CAB
+  endpoints:
+  - GND-BANK-CAB
+  what: 'GND-BANK-CAB: every ring the registry lands here, with its wire (layout only: the bank''s studs are not picked, so
+    the rings lie in a row in the registry''s ring order (no stud, no stack))'
+  maker: (assembly)
+  maker_pn: 21 rings
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 497.4
+    w: 25.8
+    h: 5.2
+  dims_note: 21 rings drawn of 21 terminations
+  frame: 'layout only: the bank''s studs are not picked, so the rings lie in a row in the registry''s ring order (no stud,
+    no stack); ring 1 at the origin, along +X'
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    '9906':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9906 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+    '9912':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9912 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+    '9918':
+      hex: '#c9c8c2'
+      from: 'prowireusa.com/9918 (ProWire product page, read 2026-09-29) photo: bare tinned ring (reads silver)'
+  attach:
+  - n: ring1
+    ep: GND-BANK-CAB
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (123)
+  - n: ring2
+    ep: GND-BANK-CAB
+    at:
+    - 24.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (WIN_GND_L)
+  - n: ring3
+    ep: GND-BANK-CAB
+    at:
+    - 48.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (WIN_GND_R)
+  - n: ring4
+    ep: GND-BANK-CAB
+    at:
+    - 72.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (LOCK_GND_L)
+  - n: ring5
+    ep: GND-BANK-CAB
+    at:
+    - 96.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (LOCK_GND_R)
+  - n: ring6
+    ep: GND-BANK-CAB
+    at:
+    - 120.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (TGR_M_GND)
+  - n: ring7
+    ep: GND-BANK-CAB
+    at:
+    - 144.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (MIRROR_GND)
+  - n: ring8
+    ep: GND-BANK-CAB
+    at:
+    - 168.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (CL_L_GND)
+  - n: ring9
+    ep: GND-BANK-CAB
+    at:
+    - 192.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (CL_C_GND)
+  - n: ring10
+    ep: GND-BANK-CAB
+    at:
+    - 216.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (CL_R_GND)
+  - n: ring11
+    ep: GND-BANK-CAB
+    at:
+    - 240.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (DOME_GND)
+  - n: ring12
+    ep: GND-BANK-CAB
+    at:
+    - 264.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (UD_GND)
+  - n: ring13
+    ep: GND-BANK-CAB
+    at:
+    - 288.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (FW_GND)
+  - n: ring14
+    ep: GND-BANK-CAB
+    at:
+    - 312.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (USB_GND)
+  - n: ring15
+    ep: GND-BANK-CAB
+    at:
+    - 336.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9918 (OUT12V_GND)
+  - n: ring16
+    ep: GND-BANK-CAB
+    at:
+    - 360.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (RADIO_GND)
+  - n: ring17
+    ep: GND-BANK-CAB
+    at:
+    - 384.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (GSS_GND)
+  - n: ring18
+    ep: GND-BANK-CAB
+    at:
+    - 408.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (TCASE_SW_GND)
+  - n: ring19
+    ep: GND-BANK-CAB
+    at:
+    - 432.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9912 (WIPER_SW_GND)
+  - n: ring20
+    ep: GND-BANK-CAB
+    at:
+    - 456.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9906 (PCS_GND)
+  - n: ring21
+    ep: GND-BANK-CAB
+    at:
+    - 480.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: 9918 (GND_RET_REAR)
+  mount: []
+  params:
+  - name: pitch
+    value: 24.0
+    source: 'layout only: the rings are spaced 24 apart in a row'
+    basis: design
+  checks:
+  - check: rings drawn (registry terminations with a ring picked)
+    model: 21
+    drawing: 21
+    tol: 0
+    ok: true
+  branding: {}
+  unknowns:
+  - Which ring sits on which stud, and in what order, waits on the stud bank (receipt 2026-09-29_part-models-batch5 proposes
+    Blue Sea 2103 posts).
+  cross_checks: []
+  notes:
+  - 'layout only: the bank''s studs are not picked, so the rings lie in a row in the registry''s ring order (no stud, no stack)'
+  kind: assembly
+  family: rings and lugs
+  pieces:
+  - '9906'
+  - '9912'
+  - '9918'
+  missing:
+  - 'stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)'
   script: docs/wiring/calc-data/cad/fab/fam_rings.py
