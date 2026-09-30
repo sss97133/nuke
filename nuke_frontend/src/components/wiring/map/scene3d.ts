@@ -29,14 +29,37 @@ export const LAYERS: LayerDef[] = [
   },
   {
     id: 'sheetmetal', label: 'SHEET METAL', url: '/models/k5-front-sheetmetal.glb', lane: 'chassis-3d (#470)',
-    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
+    hides: ['CTX-core-support-face', 'CTX-firewall-face', 'CTX-toe-board', 'CTX-inner-fender-wall-driver', 'CTX-inner-fender-wall-passenger'],
   },
   {
     id: 'engine', label: 'ENGINE', url: '/models/k5-engine-ls3.glb', lane: 'engine-3d (#468)',
-    // every v4 twin-engine node; the new engine has no starter or regulator, so those stay
-    hides: ['E3_*'], keeps: ['E3_Starter_DFSR-8715', 'E3_Starter_Solenoid', 'E3_FuelPressReg_asbuilt'],
+    // 82 of the zones' 92 E3 nodes. Still drawn: E3_Starter_DFSR-8715, E3_Starter_Solenoid, E3_FuelPressReg_asbuilt and
+    // E3_6L90_Bell / _Case / _Pan (the new model has no starter, regulator or transmission); the four TB nodes go with
+    // the TB part swap. E3_AC_* goes because the old planned compressor sits driver-low, off the new belt plane.
+    hides: [
+      'E3_Block_*', 'E3_Head_*', 'E3_ValveCover_*', 'E3_ValleyCover', 'E3_FrontCover', 'E3_RearCover', 'E3_OilPan_*', 'E3_Intake_*',
+      'E3_Injector_*', 'E3_FuelRail_*', 'E3_TB_Adapter', 'E3_MidMount_*', 'E3_WaterPump_*', 'E3_Damper*', 'E3_CrankPulley',
+      'E3_Alternator_*', 'E3_PS_*', 'E3_Tensioner_*', 'E3_Idler_Lower', 'E3_AC_*', 'E3_Belt', 'E3_Header_*', 'E3_ExhFlange_*',
+      'E3_Collector_*', 'E3_Exhaust_Tail_*', 'E3_O2_Bung_*',
+    ],
   },
 ];
+
+// A layer node that draws a harness end is selectable as that end; a node for several ends gets a name that says which.
+export const LAYER_NODES: Record<string, Record<string, { end?: string; label?: string }>> = {
+  engine: {
+    'alternator_197-302': { end: 'ALTERNATOR-SENSE' },
+    alternator_pulley: { end: 'ALTERNATOR-SENSE' },
+    injectors_L: { label: 'injectors, driver bank (INJ-1, 3, 5, 7)' },     // one mesh per bank: odd cylinders on the driver side
+    injectors_R: { label: 'injectors, passenger bank (INJ-2, 4, 6, 8)' },
+  },
+};
+
+// Zone nodes never drawn. COIL-1..8 and their _plug meshes sit on a 1.37 m ring centred near twin (0, -0.10), some
+// outside the body, while their towers sit on the real cap ring behind the intake (r about 0.095 m): a scale error in
+// the twin's coil ring. No wire runs to the parked bodies, and the towers still select n:COIL-n. Exact names only, so
+// COIL-n_tower, DROP-COIL-n, COIL-GROUND-RINGS* and ENG-COILS* stay. The fix is the 12611424 true parts on the plate.
+export const ZONE_HIDES: string[] = [1, 2, 3, 4, 5, 6, 7, 8].flatMap(n => [`COIL-${n}`, `COIL-${n}_plug`]);
 export const nameMatcher = (pats: string[]) => {
   const exact = new Set(pats.filter(p => !p.endsWith('*'))), pre = pats.filter(p => p.endsWith('*')).map(p => p.slice(0, -1));
   return (name: string) => exact.has(name) || pre.some(p => name.startsWith(p));

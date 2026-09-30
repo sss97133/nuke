@@ -16,7 +16,8 @@ import { frame, rule } from '../connector-inspector/colorways';
 import { SECTIONS } from './useWiringMap';
 import { publicName, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 import {
-  HOME_DIR, LAYERS, TRUCK_TWIN, TRUE_PARTS, VIEWS, ZONES, ZONE_TWIN, fitDistance, nameMatcher, objectLabel, partMatrix, partMatrixOn, twinBox, zoneOfY,
+  HOME_DIR, LAYERS, LAYER_NODES, TRUCK_TWIN, TRUE_PARTS, VIEWS, ZONES, ZONE_HIDES, ZONE_TWIN, fitDistance, nameMatcher, objectLabel, partMatrix, partMatrixOn,
+  twinBox, zoneOfY,
   type TruePart, type ViewId, type ZoneId,
 } from './scene3d';
 
@@ -83,7 +84,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const [layerOn, setLayerOn] = useState<Record<string, boolean>>({});
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
-  const hidePats: string[] = [], keepPats: string[] = [];
+  const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [];
   LAYERS.forEach(l => { if (layerOn[l.id] !== false && reg.has('layer:' + l.id)) { hidePats.push(...l.hides); keepPats.push(...(l.keeps ?? [])); } });
   TRUE_PARTS.forEach(p => { if (reg.has('part:' + p.code)) hidePats.push(...p.hides); });
   const hideKey = hidePats.join('|') + '#' + keepPats.join('|');
@@ -103,7 +104,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
     const k = sel.slice(0, 1), v = sel.slice(2);
     const first = k === 'n' || k === 's' ? labelOf(sel)
       : k === 'w' ? `${v} · ${ix.wireByCode.get(v)?.name ?? ''}`
-      : k === 'p' ? v.replace('|', ':')
+      : k === 'p' ? v.replace(/\|/g, ':')
       : k === 'd' ? v
       : k === 'y' ? SECTIONS.find(x => x.id === v)?.label ?? v
       : '';
@@ -208,7 +209,7 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
           </Suspense>
         ))}
         {LAYERS.filter(l => layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
-          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} reg={reg} /></Suspense>
+          <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} /></Suspense>
         ))}
         <Highlighter reg={reg} ver={ver} sel={sel} rel={rel} hover={hover?.key ?? null} focus={focus} accent={cw.accent} />
         <Picker reg={reg} onHover={setHover} onPick={key => { setFocus(null); onSelect(key); }} />
@@ -413,7 +414,7 @@ function PartScene({ part, spot, ix, reg, mountAt }: {
 }
 
 // another lane's layer (frame, engine): drawn as published, listed by its node names
-function LayerScene({ id, url, reg }: { id: string; url: string; reg: Registry }) {
+function LayerScene({ id, url, ix, reg }: { id: string; url: string; ix: WsIndex; reg: Registry }) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => ownMaterials(scene), [scene]);
   useLayoutEffect(() => {
@@ -422,12 +423,18 @@ function LayerScene({ id, url, reg }: { id: string; url: string; reg: Registry }
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       const nm = m.name || m.parent?.name || id;
+      const map = LAYER_NODES[id]?.[nm] ?? LAYER_NODES[id]?.[m.parent?.name ?? ''];
+      if (map?.end && ix.byCode.has(map.end)) {   // selectable as its harness end
+        m.userData.key = 'n:' + map.end;
+        items.push({ mesh: m, key: 'n:' + map.end, kind: 'end', label: '' });
+        return;
+      }
       m.userData.key = `o:layer-${id}:${nm}`;
-      items.push({ mesh: m, key: m.userData.key as string, kind: 'other', label: objectLabel(nm) });
+      items.push({ mesh: m, key: m.userData.key as string, kind: 'other', label: map?.label ?? objectLabel(nm) });
     });
     reg.add('layer:' + id, root, items);
     return () => reg.remove('layer:' + id);
-  }, [root, id, reg]);
+  }, [root, id, ix, reg]);
   return <primitive object={root} />;
 }
 
