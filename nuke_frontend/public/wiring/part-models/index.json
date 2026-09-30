@@ -2,11 +2,36 @@
  "generated": "2026-09-29",
  "source": "docs/wiring/calc-data/catalog/part_models.yaml",
  "ends": {
+  "AC-HP-SW": {
+   "models": [
+    "AC-HP-SW"
+   ],
+   "complete": false,
+   "missing": [
+    "the mating terminals for the two spades: the registry's terminations say 'open (connector not picked)', and its open list says the plug type is not on the Summit page"
+   ]
+  },
+  "AC-LP-SW": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "GM 15035084 cycling switch: GM's page states no thread or size"
+   ]
+  },
   "ACC-BATT": {
    "models": [
     "ACC-BATT"
    ],
    "complete": true
+  },
+  "ALTERNATOR-SENSE": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
   },
   "AMP-BLOCK": {
    "models": [
@@ -21,6 +46,38 @@
    ],
    "complete": true
   },
+  "APS": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "BRAKE-FLUID-LVL": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "sensor part number not recorded (part_media: 'read the unit')"
+   ]
+  },
+  "CAN-BUS": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "the 100 / 120 ohm terminators are not picked (endpoints.yaml CAN-BUS kit 'CAN-TERM-100R')"
+   ]
+  },
+  "CARGO-LAMP": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
   "CKP": {
    "models": [
     "12084200",
@@ -30,6 +87,33 @@
     "CKP"
    ],
    "complete": true
+  },
+  "CLEARANCE-C": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "CLEARANCE-L": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "CLEARANCE-R": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
   },
   "CLT-ECU": {
    "models": [
@@ -120,6 +204,36 @@
    "complete": false,
    "missing": [
     "ring not picked: the registry's 18 terminations say 'read the head's ground boss thread at the bench (no stud size in the LS3 documents on file)'"
+   ]
+  },
+  "DAK-CTS": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "Dakota SEN-04-5: '1/8 NPT' is the only size stated, and a pipe thread's designation is not its diameter; needs a thread table or a caliper reading to scale the photo",
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "DAK-OILP": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "Dakota SEN-03-8: as DAK-CTS (1/8 NPT only)",
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "DAKOTA-VHX": {
+   "models": [
+    "D-609-03",
+    "D-609-04"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
    ]
   },
   "DCDC": {
@@ -246,6 +360,24 @@
    ],
    "complete": true
   },
+  "FLOOR-DIMMER": {
+   "models": [
+    "D-609-05"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "FOOTWELL-LAMPS": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
   "FUEL-LEVEL": {
    "models": [
     "0460-202-16141",
@@ -360,6 +492,13 @@
     "ring not picked: the registry's 13 terminations say 'the rear stud bus is not picked, so its stud size is unknown'"
    ]
   },
+  "GSS-SENSOR": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "Dakota GSS-3000 sensor: the manual and page give the kit hardware (M8 x 30 bolts, M3 rod) but no sensor size, and no photo of the sensor alone is on file"
+   ]
+  },
   "IAT": {
    "models": [
     "12191818",
@@ -444,6 +583,29 @@
    ],
    "complete": true
   },
+  "ISOLATOR": {
+   "models": [
+    "D-609-04"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "KNOCK-1": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "GM 12623730 knock sensor: no sourced dimension on the sensor (GM prints none) and its plug's housing part number is not on file (ProWire 68201 kit). Needs: the bolt size or a caliper reading"
+   ]
+  },
+  "KNOCK-2": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "as KNOCK-1 (GM 12623730)"
+   ]
+  },
   "M130-A": {
    "models": [
     "M130-A"
@@ -466,11 +628,28 @@
    ],
    "complete": true
   },
+  "MIRROR-MON": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)",
+    "a D-609 stub splice: the registry names it without a gauge, so its size is not picked"
+   ]
+  },
   "ODYSSEY": {
    "models": [
     "ODYSSEY"
    ],
    "complete": true
+  },
+  "OILP-ECU": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "GM 12673134 oil pressure sensor: no sourced dimension (thread and hex not in the documents on file); its round 3-way plug's housing part number is not on file (ICT WC0IL40)"
+   ]
   },
   "OILT": {
    "models": [
@@ -481,6 +660,29 @@
     "OILT"
    ],
    "complete": true
+  },
+  "OUTLET-12V": {
+   "models": [
+    "D-609-05"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "PCS-HARNESS-4610": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "the PCS TCM-4610 harness is bought complete; PCS prints no connector or loom dimensions"
+   ]
+  },
+  "PCS-HARNESS-4610-CASE": {
+   "models": [],
+   "complete": false,
+   "missing": [
+    "as PCS-HARNESS-4610"
+   ]
   },
   "PDM15-A": {
    "models": [
@@ -555,40 +757,55 @@
     "AMP-KIT-RING (the AMP Research kit's own ring)"
    ]
   },
-  "RAIL-COIL_PWR": {
-   "models": [],
+  "RADIO": {
+   "models": [
+    "D-609-03",
+    "D-609-04"
+   ],
    "complete": false,
    "missing": [
-    "Raychem MiniSeal (D-609-05 x 7): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
+    "a heat-shrink cap for each stub splice (not named in the registry)",
+    "a D-609 stub splice: the registry names it without a gauge, so its size is not picked"
+   ]
+  },
+  "RAIL-COIL_PWR": {
+   "models": [
+    "D-609-05"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
    ]
   },
   "RAIL-INJ_PWR": {
-   "models": [],
+   "models": [
+    "D-609-05"
+   ],
    "complete": false,
    "missing": [
-    "Raychem MiniSeal (D-609-05 x 7): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
+    "a heat-shrink cap for each stub splice (not named in the registry)"
    ]
   },
   "SPL-FUEL-SND": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-2): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-2"
+   ],
+   "complete": true
   },
   "SPL-ISO-YEL": {
-   "models": [],
+   "models": [
+    "D-609-03"
+   ],
    "complete": false,
    "missing": [
-    "Raychem MiniSeal (D-609-04): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
+    "a heat-shrink cap for each stub splice (not named in the registry)"
    ]
   },
   "SPL-PDM15-OUT1": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT13": {
    "models": [
@@ -597,102 +814,91 @@
    "complete": true
   },
   "SPL-PDM15-OUT2": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT3": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT4": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT5": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT6": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM15-OUT7": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT1": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT2": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT3": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT4": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT5": {
-   "models": [],
+   "models": [
+    "D-609-05"
+   ],
    "complete": false,
    "missing": [
-    "Raychem MiniSeal (D-609-05): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
+    "a heat-shrink cap for each stub splice (not named in the registry)"
    ]
   },
   "SPL-PDM30-OUT6": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT7": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "SPL-PDM30-OUT8": {
-   "models": [],
-   "complete": false,
-   "missing": [
-    "Raychem MiniSeal (M81824/1-3): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or calipers on a splice from the ProWire order"
-   ]
+   "models": [
+    "M81824-1-3"
+   ],
+   "complete": true
   },
   "STARTER-S": {
    "models": [],
@@ -701,11 +907,49 @@
     "S-terminal ring not picked: the registry says 'read the S-terminal stud off the starter (bench)'"
    ]
   },
+  "TB": {
+   "models": [
+    "TB"
+   ],
+   "complete": false,
+   "missing": [
+    "the ICT WCTHB50 kit plug (its housing part number is not on file)"
+   ]
+  },
   "TRANS-CASE": {
    "models": [
     "TRANS-CASE"
    ],
    "complete": true
+  },
+  "UNDERDASH-LAMPS": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "USB-PORT": {
+   "models": [
+    "D-609-03"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
+  },
+  "VSS-SENDER": {
+   "models": [
+    "D-609-03",
+    "D-609-04",
+    "VSS-SENDER"
+   ],
+   "complete": false,
+   "missing": [
+    "a heat-shrink cap for each stub splice (not named in the registry)"
+   ]
   },
   "WIDEBAND": {
    "models": [
@@ -12070,6 +12314,329 @@
    "kind": "piece",
    "family": "power hardware"
   },
+  "M81824-1-2": {
+   "endpoints": [
+    "SPL-FUEL-SND"
+   ],
+   "what": "M81824/1-2 (TE D-436-37) sealed in-line crimp splice, SAE AS81824/1, blue code",
+   "maker": "TE Connectivity (Raychem)",
+   "maker_pn": "M81824/1-2 (D-436-37)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 3.5,
+    "w": 3.5,
+    "h": 27.9
+   },
+   "frame": "the splice axis is Z, centred on z = 0",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "sleeve": {
+     "hex": "#8fb6e8",
+     "from": "TE Customer Drawing D-436-36/-37/-38 'Sealed In-Line Crimp Splice, SAE AS81824/1', rev F1 (2022-02-17), Table I (read in a browser by the pieces lane, 2026-09-29, from te.com/en/product-650076-000.html): the stated finish, transparent blue PVDF"
+    },
+    "barrel": {
+     "hex": "#c9c6bf",
+     "from": "the barrel's plating colour is assumed (tin)"
+    },
+    "code ring": {
+     "hex": "#2f6fd0",
+     "from": "TE Customer Drawing D-436-36/-37/-38 'Sealed In-Line Crimp Splice, SAE AS81824/1', rev F1 (2022-02-17), Table I (read in a browser by the pieces lane, 2026-09-29, from te.com/en/product-650076-000.html): colour-coded sealing ring (blue)"
+    }
+   },
+   "attach": [
+    {
+     "n": "end_a",
+     "ep": "SPL-FUEL-SND",
+     "at": [
+      0.0,
+      0.0,
+      -13.97
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "wire entry"
+    },
+    {
+     "n": "end_b",
+     "ep": "SPL-FUEL-SND",
+     "at": [
+      0.0,
+      0.0,
+      13.97
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "wire entry"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "power hardware"
+  },
+  "M81824-1-3": {
+   "endpoints": [
+    "SPL-PDM15-OUT2",
+    "SPL-PDM15-OUT3",
+    "SPL-PDM15-OUT5",
+    "SPL-PDM30-OUT7",
+    "SPL-PDM15-OUT1",
+    "SPL-PDM15-OUT4",
+    "SPL-PDM30-OUT1",
+    "SPL-PDM30-OUT2",
+    "SPL-PDM30-OUT3",
+    "SPL-PDM30-OUT4",
+    "SPL-PDM30-OUT6",
+    "SPL-PDM30-OUT8",
+    "SPL-PDM15-OUT6",
+    "SPL-PDM15-OUT7"
+   ],
+   "what": "M81824/1-3 (TE D-436-38) sealed in-line crimp splice, SAE AS81824/1, yellow code",
+   "maker": "TE Connectivity (Raychem)",
+   "maker_pn": "M81824/1-3 (D-436-38)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 5.0,
+    "w": 5.0,
+    "h": 27.9
+   },
+   "frame": "the splice axis is Z, centred on z = 0",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "sleeve": {
+     "hex": "#8fb6e8",
+     "from": "TE Customer Drawing D-436-36/-37/-38 'Sealed In-Line Crimp Splice, SAE AS81824/1', rev F1 (2022-02-17), Table I (read in a browser by the pieces lane, 2026-09-29, from te.com/en/product-650076-000.html): the stated finish, transparent blue PVDF"
+    },
+    "barrel": {
+     "hex": "#c9c6bf",
+     "from": "the barrel's plating colour is assumed (tin)"
+    },
+    "code ring": {
+     "hex": "#e8c21c",
+     "from": "TE Customer Drawing D-436-36/-37/-38 'Sealed In-Line Crimp Splice, SAE AS81824/1', rev F1 (2022-02-17), Table I (read in a browser by the pieces lane, 2026-09-29, from te.com/en/product-650076-000.html): colour-coded sealing ring (yellow)"
+    }
+   },
+   "attach": [
+    {
+     "n": "end_a",
+     "ep": "SPL-PDM15-OUT2",
+     "at": [
+      0.0,
+      0.0,
+      -13.97
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "wire entry"
+    },
+    {
+     "n": "end_b",
+     "ep": "SPL-PDM15-OUT2",
+     "at": [
+      0.0,
+      0.0,
+      13.97
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "wire entry"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "power hardware"
+  },
+  "D-609-03": {
+   "endpoints": [
+    "MIRROR-MON",
+    "VSS-SENDER",
+    "DAK-CTS",
+    "DAK-OILP",
+    "ALTERNATOR-SENSE",
+    "APS",
+    "DAKOTA-VHX",
+    "UNDERDASH-LAMPS",
+    "FOOTWELL-LAMPS",
+    "CLEARANCE-L",
+    "CLEARANCE-C",
+    "CLEARANCE-R",
+    "USB-PORT",
+    "RADIO",
+    "CARGO-LAMP",
+    "SPL-ISO-YEL"
+   ],
+   "what": "TE D-609-03 (680104-000) stub crimp splicer, bare, tin-plated copper, closed one end",
+   "maker": "TE Connectivity (Raychem)",
+   "maker_pn": "D-609-03 (680104-000)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 2.1,
+    "w": 2.1,
+    "h": 7.1
+   },
+   "frame": "the barrel's closed end at z = 0, the open end (wires in) toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "barrel": {
+     "hex": "#c9c6bf",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: tin-plated copper alloy"
+    },
+    "code": {
+     "hex": "#d23b2f",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: red"
+    }
+   },
+   "attach": [
+    {
+     "n": "open_end",
+     "ep": "MIRROR-MON",
+     "at": [
+      0.0,
+      0.0,
+      7.11
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "wires in"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "power hardware"
+  },
+  "D-609-04": {
+   "endpoints": [
+    "VSS-SENDER",
+    "DAKOTA-VHX",
+    "RADIO",
+    "ISOLATOR"
+   ],
+   "what": "TE D-609-04 (680105-000) stub crimp splicer, bare, tin-plated copper, closed one end",
+   "maker": "TE Connectivity (Raychem)",
+   "maker_pn": "D-609-04 (680105-000)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 2.7,
+    "w": 2.7,
+    "h": 7.1
+   },
+   "frame": "the barrel's closed end at z = 0, the open end (wires in) toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "barrel": {
+     "hex": "#c9c6bf",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: tin-plated copper alloy"
+    },
+    "code": {
+     "hex": "#2f6fd0",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: blue"
+    }
+   },
+   "attach": [
+    {
+     "n": "open_end",
+     "ep": "VSS-SENDER",
+     "at": [
+      0.0,
+      0.0,
+      7.11
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "wires in"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "power hardware"
+  },
+  "D-609-05": {
+   "endpoints": [
+    "SPL-PDM30-OUT5",
+    "OUTLET-12V",
+    "RAIL-COIL_PWR",
+    "RAIL-INJ_PWR",
+    "FLOOR-DIMMER"
+   ],
+   "what": "TE D-609-05 (680106-000) stub crimp splicer, bare, tin-plated copper, closed one end",
+   "maker": "TE Connectivity (Raychem)",
+   "maker_pn": "D-609-05 (680106-000)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 3.9,
+    "w": 3.9,
+    "h": 7.1
+   },
+   "frame": "the barrel's closed end at z = 0, the open end (wires in) toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "barrel": {
+     "hex": "#c9c6bf",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: tin-plated copper alloy"
+    },
+    "code": {
+     "hex": "#e8c21c",
+     "from": "TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000: yellow"
+    }
+   },
+   "attach": [
+    {
+     "n": "open_end",
+     "ep": "SPL-PDM30-OUT5",
+     "at": [
+      0.0,
+      0.0,
+      7.11
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "wires in"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "power hardware"
+  },
   "238LTP": {
    "endpoints": [
     "PS-STUDS",
@@ -13880,6 +14447,193 @@
    "missing": [
     "stud bank hardware: not picked (proposed for the registry pass: see receipt 2026-09-29_part-models-batch5)"
    ]
+  },
+  "TB": {
+   "endpoints": [
+    "TB"
+   ],
+   "what": "GM/Hitachi 12699160 electronic throttle body, 92 mm, SENT position sensor, 5-way connector",
+   "maker": "GM / Hitachi",
+   "maker_pn": "12699160",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 150.0,
+    "w": 190.0,
+    "h": 70.0
+   },
+   "frame": "stands on the inlet flange at z = 0, the bore along Z; the electronics housing toward -Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#b9bcbe",
+     "from": "GM photo: cast aluminium"
+    },
+    "cover": {
+     "hex": "#1d1e20",
+     "from": "GM photo: black electronics cover"
+    },
+    "plate": {
+     "hex": "#c5a86a",
+     "from": "GM photo: brass-coloured throttle plate"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "TB",
+     "at": [
+      -25.0,
+      -115.0,
+      35.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "5-way connector (ICT WCTHB50 kit plug not drawn)"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "sensors",
+   "pieces": [
+    "12699160"
+   ],
+   "missing": [
+    "the ICT WCTHB50 kit plug (its housing part number is not on file)"
+   ]
+  },
+  "VSS-SENDER": {
+   "endpoints": [
+    "VSS-SENDER"
+   ],
+   "what": "Dakota Digital SEN-01-5 speed sender (7/8-18 GM thread, 3 wires)",
+   "maker": "Dakota Digital",
+   "maker_pn": "SEN-01-5",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 27.0,
+    "w": 27.0,
+    "h": 60.0
+   },
+   "frame": "the thread face at z = 0 (on the transmission's speedometer drive), the pigtail up (+Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#c9ccce",
+     "from": "Summit photo: knurled aluminium"
+    },
+    "connector": {
+     "hex": "#1c1c1c",
+     "from": "Summit photo: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "pigtail",
+     "ep": "VSS-SENDER",
+     "at": [
+      0.0,
+      0.0,
+      60.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "3-wire pigtail"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "sensors",
+   "pieces": [
+    "SEN-01-5"
+   ],
+   "missing": []
+  },
+  "AC-HP-SW": {
+   "endpoints": [
+    "AC-HP-SW"
+   ],
+   "what": "Vintage Air 11079-VUS binary pressure switch, 30 / 406 psi, 3/8-24 male, two spade terminals",
+   "maker": "Vintage Air",
+   "maker_pn": "11079-VUS",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 25.4,
+    "w": 24.0,
+    "h": 41.0
+   },
+   "frame": "the thread end at z = 0 (into the A/C line fitting), the terminals up (+Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "hex": {
+     "hex": "#c3a34f",
+     "from": "Summit photo: brass hex"
+    },
+    "cap": {
+     "hex": "#6c6f71",
+     "from": "Summit photo: grey cap"
+    },
+    "terminals": {
+     "hex": "#c47a3f",
+     "from": "Summit photo: copper spades"
+    }
+   },
+   "attach": [
+    {
+     "n": "t1",
+     "ep": "AC-HP-SW",
+     "at": [
+      -4.1,
+      0.0,
+      41.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "spade terminal"
+    },
+    {
+     "n": "t2",
+     "ep": "AC-HP-SW",
+     "at": [
+      4.1,
+      0.0,
+      41.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "spade terminal"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "sensors",
+   "pieces": [
+    "11079-VUS"
+   ],
+   "missing": []
   }
  }
 }

@@ -65,15 +65,7 @@ COL = {"cableclam": ("#1b1c1e", "Blue Sea CableClam: black (the drawing and the 
        "pidg barrel": ("#c9c6bf", f"{TE327}: 'Terminal Plating Material Tin'")}
 
 # ends in this lane that cannot be drawn yet, and why (index_v5 lists them)
-_MS = ("Raychem MiniSeal ({pn}): no dimension on file. TE's data sheet (2347480-1, linked from DigiKey 680106-000 = "
-       "D-609-05) opens only in a browser; ProWire and DigiKey print none. Needs: the data sheet read in a browser, or "
-       "calipers on a splice from the ProWire order")
 UNMODELLED = {
-    **{f"SPL-PDM15-OUT{i}": _MS.format(pn="M81824/1-3") for i in range(1, 8)},
-    **{f"SPL-PDM30-OUT{i}": _MS.format(pn="M81824/1-3") for i in (1, 2, 3, 4, 6, 7, 8)},
-    "SPL-PDM30-OUT5": _MS.format(pn="D-609-05"), "SPL-FUEL-SND": _MS.format(pn="M81824/1-2"),
-    "SPL-ISO-YEL": _MS.format(pn="D-609-04"), "RAIL-COIL_PWR": _MS.format(pn="D-609-05 x 7"),
-    "RAIL-INJ_PWR": _MS.format(pn="D-609-05 x 7"),
     **{e: ("Blue Sea 5065 in-line ATO/ATC fuse holder: Blue Sea publishes no drawing ('There is no documentation for this "
            "product', bluesea.com 2026-09-29). Needs: calipers or a photo of the part with a scale")
        for e in ("FUSE-IBOOST_PERM", "FUSE-ISO_PWR", "FUSE-ISO_SW_PWR", "FUSE-DAK_CONST", "FUSE-PCS_BATT", "FUSE-TRANS_BATT")},
@@ -163,6 +155,101 @@ def _ns(pid, endpoints, what, maker, pn, P, COLORS, shape_basis, frame, fn, atta
     return m
 
 
+# ------------------------------------------------------------------------------------------ MIL / Raychem splices
+TEIN = ("TE Customer Drawing D-436-36/-37/-38 'Sealed In-Line Crimp Splice, SAE AS81824/1', rev F1 (2022-02-17), Table I "
+        "(read in a browser by the pieces lane, 2026-09-29, from te.com/en/product-650076-000.html)")
+TESTUB = ("TE Specification Control Drawing D-609-03/-04/-05 'Crimp Splicer, Stub', issue 1 (read in a browser by the pieces "
+          "lane, 2026-09-29); length from TE's product pages 680104-000 / 680105-000 / 680106-000")
+INLINE = {  # MIL part: (TE part, sleeve ID as received, barrel ID max/min, barrel OD max/min, C max/min, D max/min, colour band)
+    "M81824/1-2": ("D-436-37", 2.79, (1.75, 1.63), (2.70, 2.57), (14.86, 14.35), (7.11, 6.60), ("#2f6fd0", "blue")),
+    "M81824/1-3": ("D-436-38", 4.32, (2.60, 2.46), (3.89, 3.73), (14.86, 14.35), (7.11, 6.60), ("#e8c21c", "yellow")),
+}
+STUBS = {  # D-609: (TE part, ID max/min, OD max/min, length, colour)
+    "D-609-03": ("680104-000", (1.27, 1.13), (2.03, 1.90), 7.11, ("#d23b2f", "red")),
+    "D-609-04": ("680105-000", (1.75, 1.62), (2.69, 2.56), 7.11, ("#2f6fd0", "blue")),
+    "D-609-05": ("680106-000", (2.59, 2.46), (3.89, 3.73), 7.11, ("#e8c21c", "yellow")),
+}
+CAP = "a heat-shrink cap for each stub splice (not named in the registry)"
+UNSIZED = "a D-609 stub splice: the registry names it without a gauge, so its size is not picked"
+
+
+def _splice_ends():
+    """Every end whose registry terminations (or endpoint kit) name one of these splices, in registry order."""
+    out = {pn: [] for pn in list(INLINE) + list(STUBS)}
+    unsized = []
+    reg = K.registry()
+    for t in reg["terminations"]:
+        pn = str(t.get("part") or "")
+        if pn in out and t["endpoint"] not in out[pn]:
+            out[pn].append(t["endpoint"])
+        elif pn.startswith("D-609 (") and t["endpoint"] not in unsized:
+            unsized.append(t["endpoint"])
+    for e, ep in (reg.get("endpoints") or {}).items():
+        for pn in (ep.get("kit") or {}):
+            if pn in out and e not in out[pn]:
+                out[pn].append(e)
+    return out, unsized
+
+
+SPLICE_ENDS, UNSIZED_ENDS = _splice_ends()
+
+
+def _mid(t):
+    return round((t[0] + t[1]) / 2, 3)
+
+
+def inline_P(mil):
+    te, sid, bid, bod, c, d, col = INLINE[mil]
+    return {"sleeve_l": Dim(27.94, f"{TEIN}: sleeve length 27.94 +-1.27 (1.10 +-0.05)", "maker"),
+            "sleeve_id": Dim(sid, f"{TEIN}: {te} sleeve ID 'a' (min as received)", "maker"),
+            "sleeve_wall": Dim(0.35, "the drawing prints no sleeve OD", "assumed", "red: a 0.35 wall is drawn"),
+            "ring_w": Dim(2.4, "the drawing gives no ring size or place", "assumed", "red: each sealing ring's width"),
+            "ring_in": Dim(3.0, "the drawing gives no ring size or place", "assumed",
+                           "red: each ring's centre from the sleeve's end, beyond the barrel"),
+            "barrel_id": Dim(_mid(bid), f"{TEIN}: {te} dia A {bid[0]}/{bid[1]} (the mid value)", "maker"),
+            "barrel_od": Dim(_mid(bod), f"{TEIN}: {te} dia B {bod[0]}/{bod[1]} (the mid value)", "maker"),
+            "barrel_l": Dim(_mid(c), f"{TEIN}: {te} C {c[0]}/{c[1]} (the mid value)", "maker"),
+            "half_l": Dim(_mid(d), f"{TEIN}: {te} D {d[0]}/{d[1]} x 2 (each half)", "maker")}
+
+
+def inline_bodies(mil, label=None):
+    v = {k: K.v(x) for k, x in inline_P(mil).items()}
+    col = INLINE[mil][6]
+    L = v["sleeve_l"]
+    sleeve = cyl_z(v["sleeve_id"] / 2 + v["sleeve_wall"], -L / 2, L / 2, 0, 0) - cyl_z(v["sleeve_id"] / 2, -L, L, 0, 0)
+    barrel = cyl_z(v["barrel_od"] / 2, -v["barrel_l"] / 2, v["barrel_l"] / 2, 0, 0) - cyl_z(v["barrel_id"] / 2, -L, L, 0, 0)
+    rings = []
+    hw = v["ring_w"] / 2
+    for z, c in ((-L / 2 + v["ring_in"], ("#e9ecef", "clear")), (L / 2 - v["ring_in"], col)):
+        rings.append((cyl_z(v["sleeve_id"] / 2 - 0.05, z - hw, z + hw, 0, 0) - cyl_z(v["barrel_od"] / 2 - 0.2, -L, L, 0, 0), c))
+    lab = label or mil
+    out = [K.body(sleeve, f"{lab} heat-shrink sleeve (transparent blue PVDF)", "#8fb6e8", alpha=0.45, finish="lens"),
+           K.body(barrel, f"{lab} crimp barrel", "#c9c6bf", finish="metal")]
+    for i, (r, c) in enumerate(rings):
+        out.append(K.body(r, f"{lab} sealing ring {i + 1} ({c[1]})", c[0], alpha=0.8, finish="rubber"))
+    return out
+
+
+def stub_P(pn):
+    te, idd, od, L, col = STUBS[pn]
+    return {"id": Dim(_mid(idd), f"{TESTUB}: {pn} ID {idd[0]}/{idd[1]} (mid)", "maker"),
+            "od": Dim(_mid(od), f"{TESTUB}: {pn} OD {od[0]}/{od[1]} (mid)", "maker"),
+            "length": Dim(L, f"{TESTUB}: {pn} ({te}) length {L}", "maker"),
+            "end_wall": Dim(0.6, "not printed", "assumed", "red: the closed end's wall"),
+            "band_w": Dim(1.0, "the drawing states the colour code, not its form", "assumed",
+                          "red: the colour code is drawn as a 1.0 band next to the closed end")}
+
+
+def stub_bodies(pn, label=None):
+    v = {k: K.v(x) for k, x in stub_P(pn).items()}
+    col = STUBS[pn][4]
+    barrel = cyl_z(v["od"] / 2, 0.0, v["length"], 0, 0) - cyl_z(v["id"] / 2, v["end_wall"], v["length"] + 1, 0, 0)
+    band = cyl_z(v["od"] / 2 + 0.05, 0.3, 0.3 + v["band_w"], 0, 0) - cyl_z(v["od"] / 2 - 0.1, -1, 3, 0, 0)
+    lab = label or pn
+    return [K.body(barrel, f"{lab} stub barrel (tin-plated copper, closed end)", "#c9c6bf", finish="metal"),
+            K.body(band, f"{lab} colour code ({col[1]})", col[0], finish="paint")]
+
+
 def pieces():
     ccv = {k: K.v(d) for k, d in CC.items()}
     ppv = {k: K.v(d) for k, d in PP.items()}
@@ -196,10 +283,46 @@ def pieces():
                    [{"n": "big_end", "ep": "SPL-PDM15-OUT13", "at": [0.0, 0.0, 0.0], "dir": [0, 0, -1], "kind": "16-14 AWG end"},
                     {"n": "small_end", "ep": "SPL-PDM15-OUT13", "at": [0.0, 0.0, pv["L"]], "dir": [0, 0, 1], "kind": "22-18 AWG end"}],
                    [("length (TE)", lambda b: round(b[0].bounding_box().size.Z, 2), pv["L"], 0.05)]))
+    for mil in INLINE:
+        pv_ = {k: K.v(x) for k, x in inline_P(mil).items()}
+        ends = SPLICE_ENDS[mil]
+        out.append(_ns(mil.replace("/", "-"), ends, f"{mil} (TE {INLINE[mil][0]}) sealed in-line crimp splice, SAE AS81824/1, "
+                       f"{INLINE[mil][6][1]} code", "TE Connectivity (Raychem)", f"{mil} ({INLINE[mil][0]})", inline_P(mil),
+                       {"sleeve": ("#8fb6e8", f"{TEIN}: the stated finish, transparent blue PVDF"),
+                        "barrel": ("#c9c6bf", "the barrel's plating colour is assumed (tin)"),
+                        "code ring": (INLINE[mil][6][0], f"{TEIN}: colour-coded sealing ring ({INLINE[mil][6][1]})")},
+                       "maker drawing", "the splice axis is Z, centred on z = 0", lambda mil=mil: inline_bodies(mil),
+                       [{"n": "end_a", "ep": ends[0], "at": [0.0, 0.0, -pv_["sleeve_l"] / 2], "dir": [0, 0, -1], "kind": "wire entry"},
+                        {"n": "end_b", "ep": ends[0], "at": [0.0, 0.0, pv_["sleeve_l"] / 2], "dir": [0, 0, 1], "kind": "wire entry"}],
+                       [("sleeve length (TE)", lambda b: round(b[0].bounding_box().size.Z, 2), 27.94, 0.05),
+                        ("barrel length C (TE, mid)", lambda b, pv_=pv_: round(b[1].bounding_box().size.Z, 2), pv_["barrel_l"], 0.05)],
+                       extra={"unknowns": ["The sleeve's OD is not printed: a 0.35 wall is assumed (red).",
+                                           "The two sealing rings' size and place are not printed: each is drawn 2.4 wide, "
+                                           "3.0 in from its end of the sleeve (red); the clear one at -Z, the coded one at +Z."]}))
+    for pn in STUBS:
+        sv = {k: K.v(x) for k, x in stub_P(pn).items()}
+        ends = SPLICE_ENDS[pn]
+        out.append(_ns(pn, ends, f"TE {pn} ({STUBS[pn][0]}) stub crimp splicer, bare, tin-plated copper, closed one end",
+                       "TE Connectivity (Raychem)", f"{pn} ({STUBS[pn][0]})", stub_P(pn),
+                       {"barrel": ("#c9c6bf", f"{TESTUB}: tin-plated copper alloy"), "code": (STUBS[pn][4][0], f"{TESTUB}: {STUBS[pn][4][1]}")},
+                       "maker drawing", "the barrel's closed end at z = 0, the open end (wires in) toward +Z", lambda pn=pn: stub_bodies(pn),
+                       [{"n": "open_end", "ep": ends[0], "at": [0.0, 0.0, sv["length"]], "dir": [0, 0, 1], "kind": "wires in"}],
+                       [("length (TE)", lambda b: round(b[0].bounding_box().size.Z, 2), sv["length"], 0.02),
+                        ("OD (TE, mid)", lambda b: round(b[0].bounding_box().size.X, 3), sv["od"], 0.02)],
+                       extra={"unknowns": [f"The registry names no sealing cap for this bare stub (registry-pass item: {CAP}).",
+                                           "The closed end's wall (0.6) and the colour code's form (a 1.0 band) are assumed (red)."]}))
     return out
 
 
 END_NEEDS = {"FIREWALL-GROMMET": ["1003"], "AMP-PASS": ["1003"], "FAN-JUNCTION": ["2103"], "SPL-PDM15-OUT13": ["327583"]}
+for _pn, _ends in SPLICE_ENDS.items():
+    for _e in _ends:
+        _n = END_NEEDS.setdefault(_e, [])
+        for _x in [_pn.replace("/", "-")] + ([CAP] if _pn in STUBS else []):
+            if _x not in _n:
+                _n.append(_x)
+for _e in UNSIZED_ENDS:
+    END_NEEDS.setdefault(_e, []).extend([x for x in (UNSIZED, CAP) if x not in END_NEEDS.get(_e, [])])
 
 
 def main(argv):
