@@ -1,6 +1,6 @@
 # K5 Harness Layout: the workspace builder
 
-**Live:** https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 15 (2026-09-29, the v14 manual build; version 14 was the same page with only part of its files), private to the owner.
+**Live:** https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 20 (2026-09-30), private to the owner. The nuke.ag MAP-tab port is merged and live (#458): https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map. The next export regeneration ships the status-word scrub (eb8213f25).
 The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one-line pointers to it.
 
 **Lane:** layout-ui. **Paused 2026-09-29:** the slot went to the BaT data audit. The pieces lane resumes this lane, first in line.
