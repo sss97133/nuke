@@ -581,6 +581,154 @@
     }
    ]
   },
+  "APS": {
+   "endpoints": [
+    "APS"
+   ],
+   "what": "Accelerator pedal, drive-by-wire: GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired, ICT WPAPP30 pigtail",
+   "maker": "GM (aftermarket kit)",
+   "maker_pn": "OE 15751307 family",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 110.0,
+    "w": 330.0,
+    "h": 150.0
+   },
+   "frame": "origin at the centre of the pedal bracket on the firewall (driver footwell); +Z out of the firewall into the cab, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "pedal: black (eBay listing photo)"
+    },
+    "metal": {
+     "hex": "#2a2b2c",
+     "from": "arm: black steel"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "pins: tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "APS",
+     "at": [
+      61.0,
+      1.25,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "G: APS_T1_5V"
+    },
+    {
+     "n": "pin_2",
+     "ep": "APS",
+     "at": [
+      61.0,
+      4.75,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "F: APS_T1_SIG"
+    },
+    {
+     "n": "pin_3",
+     "ep": "APS",
+     "at": [
+      61.0,
+      8.25,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "E: APS_T1_GND"
+    },
+    {
+     "n": "pin_4",
+     "ep": "APS",
+     "at": [
+      61.0,
+      11.75,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "D: APS_T2_GND"
+    },
+    {
+     "n": "pin_5",
+     "ep": "APS",
+     "at": [
+      61.0,
+      15.25,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "C: APS_T2_SIG"
+    },
+    {
+     "n": "pin_6",
+     "ep": "APS",
+     "at": [
+      61.0,
+      18.75,
+      34.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "WPAPP30 pigtail lead (MiniSeal splice)",
+     "note": "B: APS_T2_5V"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "BLOWER-MOTOR": {
    "endpoints": [
     "BLOWER-MOTOR"
@@ -872,6 +1020,166 @@
       -1
      ],
      "note": "screw into the evaporator case"
+    }
+   ]
+  },
+  "BLOWER-SW": {
+   "endpoints": [
+    "BLOWER-SW"
+   ],
+   "what": "Blower switch, factory Four-Season control head: LO, M1, M2 through the resistor; HI as a PDM30 input",
+   "maker": "GM (factory)",
+   "maker_pn": "factory",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 50.0,
+    "w": 38.0,
+    "h": 65.0
+   },
+   "frame": "origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "BLOWER-SW",
+     "at": [
+      0.0,
+      -12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "leads: 51, 45, BLOWER_BAT, BLOWER_MED, BLOWER_M2"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "BRAKE-SW": {
+   "endpoints": [
+    "BRAKE-SW"
+   ],
+   "what": "Brake light switch, factory, at the pedal: switches 0V (PDM30 A28) into DIG14",
+   "maker": "GM (factory)",
+   "maker_pn": "factory (connector 2984235)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 30.0,
+    "w": 30.0,
+    "h": 72.0
+   },
+   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "BRAKE-SW",
+     "at": [
+      -3.5,
+      0.0,
+      -55.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "140 feed cavity: BRK_SW_0V"
+    },
+    {
+     "n": "pin_2",
+     "ep": "BRAKE-SW",
+     "at": [
+      3.5,
+      0.0,
+      -55.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "17 output cavity: 53"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -1499,6 +1807,410 @@
     }
    ]
   },
+  "DAKOTA-VHX": {
+   "endpoints": [
+    "DAKOTA-VHX"
+   ],
+   "what": "Gauge control box, Dakota Digital VHX (for the VHX-73C-PU cluster)",
+   "maker": "Dakota Digital",
+   "maker_pn": "VHX control box (VHX-73C-PU)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 139.7,
+    "w": 88.9,
+    "h": 25.4
+   },
+   "frame": "origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "housing: black plastic (Dakota: 'black plastic housing')"
+    },
+    "strip": {
+     "hex": "#2f7a3a",
+     "from": "screw-terminal strip: drawn green"
+    },
+    "tab": {
+     "hex": "#c9ccd0",
+     "from": "screws: zinc"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -59.04,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "ACC. POWER: 71"
+    },
+    {
+     "n": "pin_2",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -53.42,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "WTR SND: 114"
+    },
+    {
+     "n": "pin_3",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -47.79,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "OIL SND: 115"
+    },
+    {
+     "n": "pin_4",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -42.17,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "TACH: 116"
+    },
+    {
+     "n": "pin_5",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -36.55,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "FUEL SND: 117"
+    },
+    {
+     "n": "pin_6",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -30.92,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "GROUND: 123"
+    },
+    {
+     "n": "pin_7",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -25.3,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "DIM (+): 39"
+    },
+    {
+     "n": "pin_8",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -19.68,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "4x4 (-): 55"
+    },
+    {
+     "n": "pin_9",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -14.06,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "LEFT (+): 119"
+    },
+    {
+     "n": "pin_10",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -8.43,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "RIGHT (+): 120"
+    },
+    {
+     "n": "pin_11",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      -2.81,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "HIGH (+): 121"
+    },
+    {
+     "n": "pin_12",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      2.81,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "CONST. POWER: DAK_CONST"
+    },
+    {
+     "n": "pin_13",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      8.43,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "SPD +: VSS_PWR"
+    },
+    {
+     "n": "pin_14",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      14.06,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "SPD -: VSS_GND"
+    },
+    {
+     "n": "pin_15",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      19.68,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "SPD SND: VSS_DAK"
+    },
+    {
+     "n": "pin_16",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      25.3,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "FUEL -: FUEL_SND_GND"
+    },
+    {
+     "n": "pin_17",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      30.92,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "WTR -: DAK_CTS_RET"
+    },
+    {
+     "n": "pin_18",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      36.55,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "OIL +: DAK_OILP_5V"
+    },
+    {
+     "n": "pin_19",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      42.17,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "OIL -: DAK_OILP_GND"
+    },
+    {
+     "n": "pin_20",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      47.79,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "CHECK ENG (-): DAK_CEL"
+    },
+    {
+     "n": "pin_21",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      53.42,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "BRAKE (-): DAK_BRAKE"
+    },
+    {
+     "n": "pin_22",
+     "ep": "DAKOTA-VHX",
+     "at": [
+      59.04,
+      -54.45,
+      12.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "GEAR (1 WIRE): DAK_GEAR"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "DCDC": {
    "endpoints": [
     "DCDC"
@@ -1776,6 +2488,150 @@
     }
    ]
   },
+  "DOOR-JAMB-L": {
+   "endpoints": [
+    "DOOR-JAMB-L"
+   ],
+   "what": "Driver door jamb switch, factory pin switch (grounds through the body)",
+   "maker": "GM (factory)",
+   "maker_pn": "factory pin switch (terminal 2984369)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 27.0,
+    "w": 27.0,
+    "h": 57.0
+   },
+   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "DOOR-JAMB-L",
+     "at": [
+      0.0,
+      0.0,
+      -40.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "switch terminal: 42, STEP_DOOR_L"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "DOOR-JAMB-R": {
+   "endpoints": [
+    "DOOR-JAMB-R"
+   ],
+   "what": "Passenger door jamb switch, factory pin switch (grounds through the body)",
+   "maker": "GM (factory)",
+   "maker_pn": "factory pin switch (terminal 2984369)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 27.0,
+    "w": 27.0,
+    "h": 57.0
+   },
+   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "DOOR-JAMB-R",
+     "at": [
+      0.0,
+      0.0,
+      -40.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "switch terminal: 43, STEP_DOOR_R"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "E-STOPP": {
    "endpoints": [
     "E-STOPP"
@@ -2022,6 +2878,110 @@
     }
    ]
   },
+  "FLOOR-DIMMER": {
+   "endpoints": [
+    "FLOOR-DIMMER"
+   ],
+   "what": "Headlamp dimmer switch, factory floor switch: feed, LOW and HIGH (GM connector 8900855)",
+   "maker": "GM (factory)",
+   "maker_pn": "factory (connector 8900855)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 76.0,
+    "w": 50.0,
+    "h": 78.0
+   },
+   "frame": "origin at the centre of the flange on the floor pan; +Z up into the cab (the plunger), body below the floor",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "FLOOR-DIMMER",
+     "at": [
+      -7.0,
+      0.0,
+      -54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "10 feed cavity: 85, 86"
+    },
+    {
+     "n": "pin_2",
+     "ep": "FLOOR-DIMMER",
+     "at": [
+      0.0,
+      0.0,
+      -54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "12 LOW cavity: 85a, 86a"
+    },
+    {
+     "n": "pin_3",
+     "ep": "FLOOR-DIMMER",
+     "at": [
+      7.0,
+      0.0,
+      -54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "11 HIGH cavity: 85b, 86b, 121"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "FOOTWELL-LAMPS": {
    "endpoints": [
     "FOOTWELL-LAMPS"
@@ -2106,6 +3066,154 @@
      ],
      "d": 4.0,
      "note": "screw through the end cap"
+    }
+   ]
+  },
+  "GSS-3000": {
+   "endpoints": [
+    "GSS-3000"
+   ],
+   "what": "Gear shift sender decoder, Dakota Digital GSS-3000 (its sensor on the transmission detent shaft, 10 ft cable)",
+   "maker": "Dakota Digital",
+   "maker_pn": "GSS-3000",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 100.0,
+    "w": 60.0,
+    "h": 25.0
+   },
+   "frame": "origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "housing: black plastic (Dakota: 'black plastic housing')"
+    },
+    "strip": {
+     "hex": "#2f7a3a",
+     "from": "screw-terminal strip: drawn green"
+    },
+    "tab": {
+     "hex": "#c9ccd0",
+     "from": "screws: zinc"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "GSS-3000",
+     "at": [
+      -35.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "1-WIRE: DAK_GEAR"
+    },
+    {
+     "n": "pin_2",
+     "ep": "GSS-3000",
+     "at": [
+      -21.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "IGNITION+ (+12 V ignition): GSS_PWR"
+    },
+    {
+     "n": "pin_3",
+     "ep": "GSS-3000",
+     "at": [
+      -7.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "GROUND-: GSS_GND"
+    },
+    {
+     "n": "pin_4",
+     "ep": "GSS-3000",
+     "at": [
+      7.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "RED: GSS_SENS_R"
+    },
+    {
+     "n": "pin_5",
+     "ep": "GSS-3000",
+     "at": [
+      21.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "GREEN (sensor wire green or white): GSS_SENS_G"
+    },
+    {
+     "n": "pin_6",
+     "ep": "GSS-3000",
+     "at": [
+      35.0,
+      -40.0,
+      12.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "BLACK: GSS_SENS_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -2272,6 +3380,186 @@
       -1
      ],
      "note": "flange on the bucket's adjuster ring, retaining ring over it"
+    }
+   ]
+  },
+  "HL-SW": {
+   "endpoints": [
+    "HL-SW"
+   ],
+   "what": "Headlight switch, USA1 Industries 1973-87 square-body, factory style (push-pull)",
+   "maker": "USA1 Industries",
+   "maker_pn": "16603",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 64.0,
+    "w": 40.0,
+    "h": 100.0
+   },
+   "frame": "origin at the centre of the dash panel's back face at the knob shaft; +Z toward the driver (the knob), body behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    },
+    "knob": {
+     "hex": "#1a1a1b",
+     "from": "knob: black (USA1 photo)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "HL-SW",
+     "at": [
+      -10.0,
+      -20.0,
+      -45.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "1 BAT FEED: HL_SW_0V"
+    },
+    {
+     "n": "pin_2",
+     "ep": "HL-SW",
+     "at": [
+      0.0,
+      -20.0,
+      -45.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "6 HEAD LP: HL_SW_HEAD"
+    },
+    {
+     "n": "pin_3",
+     "ep": "HL-SW",
+     "at": [
+      10.0,
+      -20.0,
+      -45.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "TAIL LP: HL_SW_PARK"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "HORN-SW": {
+   "endpoints": [
+    "HORN-SW"
+   ],
+   "what": "Horn button, factory (grounds through the column) on PDM30 DIG6",
+   "maker": "GM (factory)",
+   "maker_pn": "factory",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 60.0,
+    "w": 60.0,
+    "h": 12.0
+   },
+   "frame": "origin at the centre of the part on the steering column's axis; +Z toward the driver",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "HORN-SW",
+     "at": [
+      0.0,
+      -35.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "column connector cavity",
+     "note": "28 HORN: HORN_SW"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -2476,6 +3764,110 @@
      ],
      "d": 8.5,
      "note": "M8 stud through the firewall (72 x 72 square), nut inside the cab"
+    }
+   ]
+  },
+  "IGN-SWITCH": {
+   "endpoints": [
+    "IGN-SWITCH"
+   ],
+   "what": "Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column",
+   "maker": "OER (GM pattern)",
+   "maker_pn": "1990096",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 70.0,
+    "w": 38.0,
+    "h": 30.0
+   },
+   "frame": "origin at the centre of the switch's mounting face on top of the steering column jacket; +Z up off the column, +X along the column",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#e6dfcc",
+     "from": "switch body: natural (the listing photo)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "IGN-SWITCH",
+     "at": [
+      -7.0,
+      -19.0,
+      12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "blade",
+     "note": "BAT 2: IGN_SW_0V"
+    },
+    {
+     "n": "pin_2",
+     "ep": "IGN-SWITCH",
+     "at": [
+      0.0,
+      -19.0,
+      12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "blade",
+     "note": "IGN 1: IGN_RUN_B"
+    },
+    {
+     "n": "pin_3",
+     "ep": "IGN-SWITCH",
+     "at": [
+      7.0,
+      -19.0,
+      12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "blade",
+     "note": "SOL: IGN_START"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -2913,6 +4305,142 @@
       -1
      ],
      "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "LOCK-SW-L": {
+   "endpoints": [
+    "LOCK-SW-L"
+   ],
+   "what": "Driver lock rocker (reversing, rests to ground): not picked, drawn as a Nu-Relics chrome switch",
+   "maker": "Nu-Relics",
+   "maker_pn": "not picked",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 36.5,
+    "w": 44.45,
+    "h": 48.0
+   },
+   "frame": "origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "chrome": {
+     "hex": "#d7dadc",
+     "from": "Nu-Relics photo (chrome switches)"
+    },
+    "body": {
+     "hex": "#1f1f21",
+     "from": "switch body: drawn black"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "LOCK-SW-L",
+     "at": [
+      0.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "leads: 38, LOCK_GND_L, LOCK_BUS_A, LOCK_BUS_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "LOCK-SW-R": {
+   "endpoints": [
+    "LOCK-SW-R"
+   ],
+   "what": "Passenger lock rocker (reversing, rests to ground): not picked, drawn as a Nu-Relics chrome switch",
+   "maker": "Nu-Relics",
+   "maker_pn": "not picked",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 36.5,
+    "w": 44.45,
+    "h": 48.0
+   },
+   "frame": "origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "chrome": {
+     "hex": "#d7dadc",
+     "from": "Nu-Relics photo (chrome switches)"
+    },
+    "body": {
+     "hex": "#1f1f21",
+     "from": "switch body: drawn black"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "LOCK-SW-R",
+     "at": [
+      0.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "leads: LOCK_FEED_R, LOCK_GND_R, LOCK_BUS_A, LOCK_BUS_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -4002,6 +5530,74 @@
       -1
      ],
      "note": "housing screws / nuts into the body opening (not dimensioned)"
+    }
+   ]
+  },
+  "PCS-TCM": {
+   "endpoints": [
+    "PCS-TCM"
+   ],
+   "what": "Transmission controller, PCS TCM-2650 (the TCM-4610 kit harness plugs into it)",
+   "maker": "Powertrain Control Solutions",
+   "maker_pn": "TCM-2650",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 165.0,
+    "w": 115.0,
+    "h": 40.0
+   },
+   "frame": "origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "housing: black anodised (ZGP photo)"
+    },
+    "strip": {
+     "hex": "#262628",
+     "from": "plug: black"
+    },
+    "tab": {
+     "hex": "#c9ccd0",
+     "from": "screws: zinc"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "PCS-TCM",
+     "at": [
+      0,
+      -67.5,
+      20.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "TCM plug (kit harness)",
+     "note": "the TCM-4610 kit harness plugs in here; none of our wires land on the TCM (registry)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -5590,6 +7186,194 @@
     }
    ]
   },
+  "TCASE-4WD-SW": {
+   "endpoints": [
+    "TCASE-4WD-SW"
+   ],
+   "what": "4WD indicator switch, Torque King QU30048 weather-proof NP205 (normally ON, in a front-output poppet port; 15/16 hex, 16 lb-ft max) with the QU90002 pigtail",
+   "maker": "Torque King",
+   "maker_pn": "QU30048",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 23.8,
+    "w": 23.8,
+    "h": 58.0
+   },
+   "frame": "origin on the switch's axis at the hex's seat on the transfer case; +Z out of the case, thread and plunger into it (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#d9c9a0",
+     "from": "Torque King photo QU30048_side.jpg (the sealed connector boot, tan)"
+    },
+    "metal": {
+     "hex": "#c9ccd0",
+     "from": "Torque King photo QU30048_side.jpg (zinc-plated hex, body and thread)"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "pins: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TCASE-4WD-SW",
+     "at": [
+      0.0,
+      0.0,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "twin-pin sealed connector (QU90002 pigtail)",
+     "note": "leads: 55, TCASE_SW_GND"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "TG-CUTOUT": {
+   "endpoints": [
+    "TG-CUTOUT"
+   ],
+   "what": "Tailgate-closed cutout switch, normally open, GM connector 2977647, in the window UP line",
+   "maker": "GM (factory)",
+   "maker_pn": "factory (connector 2977647)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 30.0,
+    "w": 30.0,
+    "h": 67.0
+   },
+   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TG-CUTOUT",
+     "at": [
+      -10.5,
+      0.0,
+      -50.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "183C (from splice 183): TG_CUT_IN"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TG-CUTOUT",
+     "at": [
+      -3.5,
+      0.0,
+      -50.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "183E (to motor UP-1): TG_MOT_A"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TG-CUTOUT",
+     "at": [
+      3.5,
+      0.0,
+      -50.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "183C, candidate alternative to TG_CUT_IN (the keyed reversing switch's lead A; only one is built): TGR_CUT_IN"
+    },
+    {
+     "n": "pin_4",
+     "ep": "TG-CUTOUT",
+     "at": [
+      10.5,
+      0.0,
+      -50.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "183E, candidate alternative to TG_MOT_A (to the ACI motor pole A; only one is built): TGR_MOT_A"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "TG-MOTOR-ACI": {
    "endpoints": [
     "TG-MOTOR-ACI"
@@ -5666,6 +7450,602 @@
       -1
      ],
      "note": "bolts into the factory tailgate regulator holes"
+    }
+   ]
+  },
+  "TG-SW-DASH": {
+   "endpoints": [
+    "TG-SW-DASH"
+   ],
+   "what": "Tailgate window switch at the dash, Motor City K5 MCK5REARWINDOWSWITCH, 6 blades (top or bottom 3 used)",
+   "maker": "Motor City K5",
+   "maker_pn": "MCK5REARWINDOWSWITCH",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 38.0,
+    "w": 22.0,
+    "h": 40.0
+   },
+   "frame": "origin at the centre of the bezel's back on the dash; +Z toward the driver",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TG-SW-DASH",
+     "at": [
+      -7.0,
+      0.0,
+      -28.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "4 FEED: TG_KEY_FEED, TG_FEED"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TG-SW-DASH",
+     "at": [
+      0.0,
+      0.0,
+      -28.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "5 UP: TG_BUS_UP"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TG-SW-DASH",
+     "at": [
+      7.0,
+      0.0,
+      -28.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "3 DOWN: TG_BUS_DN"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "TG-SW-KEY-REV": {
+   "endpoints": [
+    "TG-SW-KEY-REV"
+   ],
+   "what": "Tailgate keyed switch as the second reversing switch in series (candidate; no keyed reversing switch picked): drawn at the factory key switch's envelope",
+   "maker": "not picked",
+   "maker_pn": "not picked (drawn as 8900713)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 40.0,
+    "w": 30.0,
+    "h": 55.0
+   },
+   "frame": "origin at the centre of the cylinder's face on the tailgate outer skin; +Z out of the tailgate, switch inside (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      -16.25,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "master UP in (pin unknown: keyed reversing switch not picked): TGR_UP"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      -9.75,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "master DOWN in (pin unknown: keyed reversing switch not picked): TGR_DN"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      -3.25,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "feed (pin unknown: keyed reversing switch not picked): TGR_KEY_FEED"
+    },
+    {
+     "n": "pin_4",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      3.25,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "ground (pin unknown: keyed reversing switch not picked): TGR_KEY_GND"
+    },
+    {
+     "n": "pin_5",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      9.75,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "motor A out (pin unknown: keyed reversing switch not picked): TGR_CUT_IN"
+    },
+    {
+     "n": "pin_6",
+     "ep": "TG-SW-KEY-REV",
+     "at": [
+      16.25,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "motor B out (pin unknown: keyed reversing switch not picked): TGR_MOT_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "TG-SW-KEY": {
+   "endpoints": [
+    "TG-SW-KEY"
+   ],
+   "what": "Tailgate key switch, factory 8900713: FEED switched to CLOSE or OPEN, in parallel with the dash switch",
+   "maker": "GM (factory)",
+   "maker_pn": "8900713",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 40.0,
+    "w": 30.0,
+    "h": 55.0
+   },
+   "frame": "origin at the centre of the cylinder's face on the tailgate outer skin; +Z out of the tailgate, switch inside (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TG-SW-KEY",
+     "at": [
+      -6.5,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "FEED terminal: TG_KEY_FEED"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TG-SW-KEY",
+     "at": [
+      0.0,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "CLOSE terminal: TG_CUT_IN, TG_BUS_UP"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TG-SW-KEY",
+     "at": [
+      6.5,
+      -15.0,
+      -46.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "OPEN terminal: TG_BUS_DN, TG_MOT_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "TG-SW-MASTER": {
+   "endpoints": [
+    "TG-SW-MASTER"
+   ],
+   "what": "Tailgate window master switch at the dash, Nu-Relics reverse-polarity switch (#121 single, candidate)",
+   "maker": "Nu-Relics",
+   "maker_pn": "121",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 36.5,
+    "w": 44.45,
+    "h": 48.0
+   },
+   "frame": "origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "chrome": {
+     "hex": "#d7dadc",
+     "from": "Nu-Relics photo (chrome switches)"
+    },
+    "body": {
+     "hex": "#1f1f21",
+     "from": "switch body: drawn black"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TG-SW-MASTER",
+     "at": [
+      -10.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "feed (+12 V) — candidate alternative end of TG_FEED: TG_FEED"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TG-SW-MASTER",
+     "at": [
+      -5.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "feed (+12 V, spliced with TG_FEED): TGR_KEY_FEED"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TG-SW-MASTER",
+     "at": [
+      0.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "ground: TGR_M_GND"
+    },
+    {
+     "n": "pin_4",
+     "ep": "TG-SW-MASTER",
+     "at": [
+      5.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "UP output: TGR_UP"
+    },
+    {
+     "n": "pin_5",
+     "ep": "TG-SW-MASTER",
+     "at": [
+      10.0,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "DOWN output: TGR_DN"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "TURN-SW": {
+   "endpoints": [
+    "TURN-SW"
+   ],
+   "what": "Turn and hazard switch, factory column (column connector): turn and hazard feeds on PDM30 0V, front outputs to DIG4 / DIG5",
+   "maker": "GM (factory)",
+   "maker_pn": "factory",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 110.0,
+    "w": 110.0,
+    "h": 18.0
+   },
+   "frame": "origin at the centre of the part on the steering column's axis; +Z toward the driver",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "TURN-SW",
+     "at": [
+      -8.0,
+      -60.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "column connector cavity",
+     "note": "14 LT FRT LP: 33"
+    },
+    {
+     "n": "pin_2",
+     "ep": "TURN-SW",
+     "at": [
+      0.0,
+      -60.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "column connector cavity",
+     "note": "15 RT FRT LP: TURN_SW_R"
+    },
+    {
+     "n": "pin_3",
+     "ep": "TURN-SW",
+     "at": [
+      8.0,
+      -60.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "column connector cavity",
+     "note": "16 FLSHR + 27 HAZ WARN, jumpered: TURN_SW_0V"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },
@@ -6334,6 +8714,302 @@
     }
    ]
   },
+  "WIN-SW-L": {
+   "endpoints": [
+    "WIN-SW-L"
+   ],
+   "what": "Driver door switch panel: window master (both windows) + lock rocker, Nu-Relics 17383-2 chrome reverse-polarity switches",
+   "maker": "Nu-Relics",
+   "maker_pn": "201",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 73.0,
+    "w": 44.45,
+    "h": 48.0
+   },
+   "frame": "origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "chrome": {
+     "hex": "#d7dadc",
+     "from": "Nu-Relics photo (chrome switches)"
+    },
+    "body": {
+     "hex": "#1f1f21",
+     "from": "switch body: drawn black"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "WIN-SW-L",
+     "at": [
+      -12.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "red (orange) 12 V hot feed lead of the Nu-Relics switch harness: 34"
+    },
+    {
+     "n": "pin_2",
+     "ep": "WIN-SW-L",
+     "at": [
+      -7.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "black ground lead of the Nu-Relics switch harness: WIN_GND_L"
+    },
+    {
+     "n": "pin_3",
+     "ep": "WIN-SW-L",
+     "at": [
+      -2.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "passenger UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_R_UP"
+    },
+    {
+     "n": "pin_4",
+     "ep": "WIN-SW-L",
+     "at": [
+      2.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "passenger DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_R_DN"
+    },
+    {
+     "n": "pin_5",
+     "ep": "WIN-SW-L",
+     "at": [
+      7.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "driver motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_MOT_L_A"
+    },
+    {
+     "n": "pin_6",
+     "ep": "WIN-SW-L",
+     "at": [
+      12.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "driver motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_MOT_L_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
+  "WIN-SW-R": {
+   "endpoints": [
+    "WIN-SW-R"
+   ],
+   "what": "Passenger door window switch (in series with the master), Nu-Relics 17383-2",
+   "maker": "Nu-Relics",
+   "maker_pn": "201",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 73.0,
+    "w": 44.45,
+    "h": 48.0
+   },
+   "frame": "origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "chrome": {
+     "hex": "#d7dadc",
+     "from": "Nu-Relics photo (chrome switches)"
+    },
+    "body": {
+     "hex": "#1f1f21",
+     "from": "switch body: drawn black"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "WIN-SW-R",
+     "at": [
+      -12.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "red (orange) 12 V hot feed lead of the Nu-Relics switch harness: 35"
+    },
+    {
+     "n": "pin_2",
+     "ep": "WIN-SW-R",
+     "at": [
+      -7.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "black ground lead of the Nu-Relics switch harness: WIN_GND_R"
+    },
+    {
+     "n": "pin_3",
+     "ep": "WIN-SW-R",
+     "at": [
+      -2.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "master UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_R_UP"
+    },
+    {
+     "n": "pin_4",
+     "ep": "WIN-SW-R",
+     "at": [
+      2.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "master DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_R_DN"
+    },
+    {
+     "n": "pin_5",
+     "ep": "WIN-SW-R",
+     "at": [
+      7.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "passenger motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_MOT_R_A"
+    },
+    {
+     "n": "pin_6",
+     "ep": "WIN-SW-R",
+     "at": [
+      12.5,
+      0.0,
+      -38.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "switch harness lead",
+     "note": "passenger motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2): WIN_MOT_R_B"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
+    }
+   ]
+  },
   "WIPER-MOTOR": {
    "endpoints": [
     "WIPER-MOTOR",
@@ -6448,6 +9124,126 @@
       -1
      ],
      "note": "gear box to the cowl"
+    }
+   ]
+  },
+  "WIPER-SW": {
+   "endpoints": [
+    "WIPER-SW"
+   ],
+   "what": "Wiper and washer switch, factory grounding type (grounds through its mounting)",
+   "maker": "GM (factory)",
+   "maker_pn": "factory",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 50.0,
+    "w": 38.0,
+    "h": 65.0
+   },
+   "frame": "origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d1d1f",
+     "from": "factory switch body: drawn black (no photo on file)"
+    },
+    "metal": {
+     "hex": "#b9bcbf",
+     "from": "metal: drawn zinc"
+    },
+    "chrome": {
+     "hex": "#d3d6d8",
+     "from": "chrome: drawn"
+    },
+    "tab": {
+     "hex": "#c7c2b4",
+     "from": "terminals: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_1",
+     "ep": "WIPER-SW",
+     "at": [
+      -12.0,
+      -12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "terminal-1 lead (cavity OPEN): WIPER_T1"
+    },
+    {
+     "n": "pin_2",
+     "ep": "WIPER-SW",
+     "at": [
+      -4.0,
+      -12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "terminal-3 lead (cavity OPEN): WIPER_T3"
+    },
+    {
+     "n": "pin_3",
+     "ep": "WIPER-SW",
+     "at": [
+      4.0,
+      -12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "washer contact (cavity OPEN): 46"
+    },
+    {
+     "n": "pin_4",
+     "ep": "WIPER-SW",
+     "at": [
+      12.0,
+      -12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "blade",
+     "note": "switch mounting (ground lug under a mount screw; not a cavity): WIPER_SW_GND"
+    }
+   ],
+   "mount": [
+    {
+     "n": "mount",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "mounting face"
     }
    ]
   },

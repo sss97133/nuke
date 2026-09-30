@@ -1146,6 +1146,209 @@ parts:
     page: https://www.crutchfield.com/p_136VX7005I/JL-Audio-VX700-5i.html
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/AMP.py
+- id: APS
+  endpoints:
+  - APS
+  what: 'Accelerator pedal, drive-by-wire: GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired, ICT WPAPP30
+    pigtail'
+  maker: GM (aftermarket kit)
+  maker_pn: OE 15751307 family
+  shape_basis: not sourced
+  dims_mm:
+    l: 110.0
+    w: 330.0
+    h: 150.0
+  dims_note: 'no size on file for the pedal: envelope assumed (±30)'
+  frame: origin at the centre of the pedal bracket on the firewall (driver footwell); +Z out of the firewall into the cab,
+    +Y up
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'pedal: black (eBay listing photo)'
+    metal:
+      hex: '#2a2b2c'
+      from: 'arm: black steel'
+    tab:
+      hex: '#c7c2b4'
+      from: 'pins: tin'
+  attach:
+  - n: pin_1
+    ep: APS
+    at:
+    - 61.0
+    - 1.25
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'G: APS_T1_5V'
+  - n: pin_2
+    ep: APS
+    at:
+    - 61.0
+    - 4.75
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'F: APS_T1_SIG'
+  - n: pin_3
+    ep: APS
+    at:
+    - 61.0
+    - 8.25
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'E: APS_T1_GND'
+  - n: pin_4
+    ep: APS
+    at:
+    - 61.0
+    - 11.75
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'D: APS_T2_GND'
+  - n: pin_5
+    ep: APS
+    at:
+    - 61.0
+    - 15.25
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'C: APS_T2_SIG'
+  - n: pin_6
+    ep: APS
+    at:
+    - 61.0
+    - 18.75
+    - 34.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: WPAPP30 pigtail lead (MiniSeal splice)
+    note: 'B: APS_T2_5V'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: arm_l
+    value: 300.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+    note: pedal arm, pivot to the pad
+  - name: pad_w
+    value: 70.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+  - name: pad_h
+    value: 50.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+  - name: housing_w
+    value: 90.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+    note: pivot housing with the sensor
+  - name: housing_h
+    value: 80.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+  - name: housing_d
+    value: 60.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+  - name: bracket_w
+    value: 110.0
+    source: 'the pedal listing (eBay) and GM give no size: a GM Gen III truck DBW pedal envelope, assumed'
+    basis: assumed
+    note: firewall bracket
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: no printed size.'
+  - Cavity letters read off the WPAPP30 plug (registry).
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: no printed size
+  registry:
+    APS:
+      device: 'DBW pedal : ''72-98 C10 Square Body OBS LS Swap DBW'' pedal — GM Gen III truck pedal (OE 15751307 family),
+        9-cavity plug with 6 wired; the third sensor''s 3 cavities stay empty'
+      family: miniseal
+      where: cabin
+      wires:
+      - id: APS_T1_5V
+        label: APS Track 1 5V Reference
+        color: orange
+        awg: 22
+      - id: APS_T1_SIG
+        label: APS Track 1 Signal
+        color: green/violet
+        awg: 22
+      - id: APS_T1_GND
+        label: APS Track 1 Ground
+        color: brown
+        awg: 22
+      - id: APS_T2_GND
+        label: APS Track 2 Ground
+        color: white/blue
+        awg: 22
+      - id: APS_T2_SIG
+        label: APS Track 2 Signal
+        color: green/gray
+        awg: 22
+      - id: APS_T2_5V
+        label: APS Track 2 5V Reference
+        color: orange/black
+        awg: 22
+      cavities:
+        APS_T1_5V: G
+        APS_T1_SIG: F
+        APS_T1_GND: E
+        APS_T2_GND: D
+        APS_T2_SIG: C
+        APS_T2_5V: B
+  photo:
+    url: https://i.ebayimg.com/images/g/zycAAOSwI2lmXXQv/s-l1600.jpg
+    page: part_media APS
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/APS.py
 - id: BLOWER-MOTOR
   endpoints:
   - BLOWER-MOTOR
@@ -1565,6 +1768,260 @@ parts:
         BLOWER_M2: M2
         BLOWER_MOT: BLO
   script: docs/wiring/calc-data/cad/fab/BLOWER-RES.py
+- id: BLOWER-SW
+  endpoints:
+  - BLOWER-SW
+  what: 'Blower switch, factory Four-Season control head: LO, M1, M2 through the resistor; HI as a PDM30 input'
+  maker: GM (factory)
+  maker_pn: factory
+  shape_basis: not sourced
+  dims_mm:
+    l: 50.0
+    w: 38.0
+    h: 65.0
+  dims_note: 'no part number or size on file: envelope assumed (±15)'
+  frame: origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: BLOWER-SW
+    at:
+    - 0.0
+    - -12.0
+    - -35.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'leads: 51, 45, BLOWER_BAT, BLOWER_MED, BLOWER_M2'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_w
+    value: 50.0
+    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_h
+    value: 38.0
+    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: body_d
+    value: 35.0
+    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: shaft_l
+    value: 30.0
+    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: control shaft / lever
+  - name: knob_d
+    value: 20.0
+    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  - 'Which cavity carries which wire: read at the bench (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: factory part, nothing on file
+  registry:
+    BLOWER-SW:
+      device: factory Four-Season blower switch in the control head — LO, M1, M2 through the resistor; HI as a PDM30 input
+        (DIG7)
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '51'
+        label: Heater Blower Motor
+        color: red
+        awg: 12
+      - id: '45'
+        label: Blower switch HI contact -> PDM30 DIG7
+        color: gray
+        awg: 20
+      - id: BLOWER_BAT
+        label: Blower switch LOW lead to the resistor BAT terminal
+        color: white
+        awg: 16
+      - id: BLOWER_MED
+        label: Blower switch M1 lead to the resistor
+        color: white
+        awg: 16
+      - id: BLOWER_M2
+        label: Blower switch M2 lead to the resistor
+        color: white
+        awg: 16
+      cavities:
+        '51': null
+        '45': null
+        BLOWER_BAT: null
+        BLOWER_MED: null
+        BLOWER_M2: null
+  script: docs/wiring/calc-data/cad/fab/BLOWER-SW.py
+- id: BRAKE-SW
+  endpoints:
+  - BRAKE-SW
+  what: 'Brake light switch, factory, at the pedal: switches 0V (PDM30 A28) into DIG14'
+  maker: GM (factory)
+  maker_pn: factory (connector 2984235)
+  shape_basis: not sourced
+  dims_mm:
+    l: 30.0
+    w: 30.0
+    h: 72.0
+  dims_note: 'no part number or size on file: envelope assumed (±12)'
+  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
+    striker
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: BRAKE-SW
+    at:
+    - -3.5
+    - 0.0
+    - -55.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '140 feed cavity: BRK_SW_0V'
+  - n: pin_2
+    ep: BRAKE-SW
+    at:
+    - 3.5
+    - 0.0
+    - -55.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '17 output cavity: 53'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_d
+    value: 22.0
+    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_l
+    value: 55.0
+    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_l
+    value: 14.0
+    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: plunger out of the body
+  - name: flange_d
+    value: 30.0
+    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: mounting flange / nut
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 12.0
+    why: factory part, nothing on file
+  registry:
+    BRAKE-SW:
+      device: factory brake light switch at the pedal — switches 0V (PDM30 A28) into PDM30 DIG14
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: BRK_SW_0V
+        label: Brake light switch feed terminal to PDM30 0V (it now switches 0V into DIG14)
+        color: black
+        awg: 20
+      - id: '53'
+        label: Brake Light Switch
+        color: gray
+        awg: 20
+      cavities:
+        BRK_SW_0V: 140 feed cavity
+        '53': 17 output cavity
+  script: docs/wiring/calc-data/cad/fab/BRAKE-SW.py
 - id: Backup_Camera
   endpoints:
   - Backup_Camera
@@ -2588,6 +3045,461 @@ parts:
     page: https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/CLEARANCE-R.py
+- id: DAKOTA-VHX
+  endpoints:
+  - DAKOTA-VHX
+  what: Gauge control box, Dakota Digital VHX (for the VHX-73C-PU cluster)
+  maker: Dakota Digital
+  maker_pn: VHX control box (VHX-73C-PU)
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 139.7
+    w: 88.9
+    h: 25.4
+  dims_note: 5.5 x 3.5 x 1 in (Dakota's image, relayed by the recon doc); 22 screw terminals on one edge (drawn)
+  frame: origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'housing: black plastic (Dakota: ''black plastic housing'')'
+    strip:
+      hex: '#2f7a3a'
+      from: 'screw-terminal strip: drawn green'
+    tab:
+      hex: '#c9ccd0'
+      from: 'screws: zinc'
+  attach:
+  - n: pin_1
+    ep: DAKOTA-VHX
+    at:
+    - -59.04
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'ACC. POWER: 71'
+  - n: pin_2
+    ep: DAKOTA-VHX
+    at:
+    - -53.42
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'WTR SND: 114'
+  - n: pin_3
+    ep: DAKOTA-VHX
+    at:
+    - -47.79
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'OIL SND: 115'
+  - n: pin_4
+    ep: DAKOTA-VHX
+    at:
+    - -42.17
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'TACH: 116'
+  - n: pin_5
+    ep: DAKOTA-VHX
+    at:
+    - -36.55
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'FUEL SND: 117'
+  - n: pin_6
+    ep: DAKOTA-VHX
+    at:
+    - -30.92
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'GROUND: 123'
+  - n: pin_7
+    ep: DAKOTA-VHX
+    at:
+    - -25.3
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'DIM (+): 39'
+  - n: pin_8
+    ep: DAKOTA-VHX
+    at:
+    - -19.68
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: '4x4 (-): 55'
+  - n: pin_9
+    ep: DAKOTA-VHX
+    at:
+    - -14.06
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'LEFT (+): 119'
+  - n: pin_10
+    ep: DAKOTA-VHX
+    at:
+    - -8.43
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'RIGHT (+): 120'
+  - n: pin_11
+    ep: DAKOTA-VHX
+    at:
+    - -2.81
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'HIGH (+): 121'
+  - n: pin_12
+    ep: DAKOTA-VHX
+    at:
+    - 2.81
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'CONST. POWER: DAK_CONST'
+  - n: pin_13
+    ep: DAKOTA-VHX
+    at:
+    - 8.43
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'SPD +: VSS_PWR'
+  - n: pin_14
+    ep: DAKOTA-VHX
+    at:
+    - 14.06
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'SPD -: VSS_GND'
+  - n: pin_15
+    ep: DAKOTA-VHX
+    at:
+    - 19.68
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'SPD SND: VSS_DAK'
+  - n: pin_16
+    ep: DAKOTA-VHX
+    at:
+    - 25.3
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'FUEL -: FUEL_SND_GND'
+  - n: pin_17
+    ep: DAKOTA-VHX
+    at:
+    - 30.92
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'WTR -: DAK_CTS_RET'
+  - n: pin_18
+    ep: DAKOTA-VHX
+    at:
+    - 36.55
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'OIL +: DAK_OILP_5V'
+  - n: pin_19
+    ep: DAKOTA-VHX
+    at:
+    - 42.17
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'OIL -: DAK_OILP_GND'
+  - n: pin_20
+    ep: DAKOTA-VHX
+    at:
+    - 47.79
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'CHECK ENG (-): DAK_CEL'
+  - n: pin_21
+    ep: DAKOTA-VHX
+    at:
+    - 53.42
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'BRAKE (-): DAK_BRAKE'
+  - n: pin_22
+    ep: DAKOTA-VHX
+    at:
+    - 59.04
+    - -54.45
+    - 12.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'GEAR (1 WIRE): DAK_GEAR'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: l
+    value: 139.7
+    source: 'docs/wiring/research/2026-06-09_design-inputs-recon.md: ''control box 5.5x3.5x1 in'' from dakotadigital.com/img/dVHX-73C-PU.png
+      (Dakota''s own image; the site refused a scripted read on 2026-09-29, so it is relayed, not re-read)'
+    basis: maker
+  - name: w
+    value: 88.9
+    source: 'docs/wiring/research/2026-06-09_design-inputs-recon.md: ''control box 5.5x3.5x1 in'' from dakotadigital.com/img/dVHX-73C-PU.png
+      (Dakota''s own image; the site refused a scripted read on 2026-09-29, so it is relayed, not re-read)'
+    basis: maker
+  - name: h
+    value: 25.4
+    source: 'docs/wiring/research/2026-06-09_design-inputs-recon.md: ''control box 5.5x3.5x1 in'' from dakotadigital.com/img/dVHX-73C-PU.png
+      (Dakota''s own image; the site refused a scripted read on 2026-09-29, so it is relayed, not re-read)'
+    basis: maker
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Terminal order along the strip: read the box (drawn in the registry''s order).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 5.0
+    why: the envelope is Dakota's, relayed; the terminal strip's layout is drawn, not read
+  registry:
+    DAKOTA-VHX:
+      device: Dakota Digital VHX control box
+      family: miniseal
+      where: cabin
+      wires:
+      - id: '71'
+        label: Dakota Digital Gauge Cluster
+        color: red
+        awg: 18
+      - id: '114'
+        label: Dakota temp sender (SEN-04-5) -> VHX WTR SND
+        color: yellow/blue
+        awg: 22
+      - id: '115'
+        label: Dakota oil sensor (SEN-03-8) signal -> VHX OIL SND
+        color: green/white
+        awg: 22
+      - id: '116'
+        label: Dakota Tach Signal
+        color: white/orange
+        awg: 22
+      - id: '117'
+        label: Dakota Fuel Level Sender
+        color: green/blue
+        awg: 20
+      - id: '123'
+        label: Dakota VHX ground -> cab ground bank
+        color: black
+        awg: 18
+      - id: '39'
+        label: Park/tail feed -> Dakota VHX DIM (+) night dimming
+        color: gray
+        awg: 22
+      - id: '55'
+        label: NP205 4WD indicator switch -> Dakota VHX 4x4 (-)
+        color: gray
+        awg: 22
+      - id: '119'
+        label: Dakota Turn Signal Left Input
+        color: red
+        awg: 22
+      - id: '120'
+        label: Dakota Turn Signal Right Input
+        color: red
+        awg: 22
+      - id: '121'
+        label: 'High beam tap (dimmer HIGH out, with #85b/#86b) -> Dakota VHX HIGH (+)'
+        color: red
+        awg: 20
+      - id: DAK_CONST
+        label: Dakota VHX CONST. POWER (always-hot, fused)
+        color: red
+        awg: 18
+      - id: VSS_PWR
+        label: Speed sender power from the Dakota box (SPD +)
+        color: red
+        awg: 20
+      - id: VSS_GND
+        label: Speed sender ground (SPD -)
+        color: black
+        awg: 20
+      - id: VSS_DAK
+        label: Speed sender signal to the Dakota SPD SND input
+        color: white
+        awg: 20
+      - id: FUEL_SND_GND
+        label: Fuel level sender return to the Dakota FUEL - (sender ground output)
+        color: black
+        awg: 20
+      - id: DAK_CTS_RET
+        label: Dakota temp sender (SEN-04-5) second wire -> VHX WTR -
+        color: white
+        awg: 22
+      - id: DAK_OILP_5V
+        label: Dakota oil sensor (SEN-03-8) +5 V (red) from VHX OIL +
+        color: white
+        awg: 22
+      - id: DAK_OILP_GND
+        label: Dakota oil sensor (SEN-03-8) ground (black + bare shield) to VHX OIL -
+        color: black
+        awg: 22
+      - id: DAK_CEL
+        label: M130 check-engine output to the Dakota CHECK ENG (-) input
+        color: white
+        awg: 22
+      - id: DAK_BRAKE
+        label: E-Stopp green wire (brake indicator) to the Dakota BRAKE (-) input
+        color: green
+        awg: 22
+      - id: DAK_GEAR
+        label: Dakota GSS-3000 1-WIRE to the VHX GEAR input
+        color: white
+        awg: 22
+      cavities:
+        '71': ACC. POWER
+        '114': WTR SND
+        '115': OIL SND
+        '116': TACH
+        '117': FUEL SND
+        '123': GROUND
+        '39': DIM (+)
+        '55': 4x4 (-)
+        '119': LEFT (+)
+        '120': RIGHT (+)
+        '121': HIGH (+)
+        DAK_CONST: CONST. POWER
+        VSS_PWR: SPD +
+        VSS_GND: SPD -
+        VSS_DAK: SPD SND
+        FUEL_SND_GND: FUEL -
+        DAK_CTS_RET: WTR -
+        DAK_OILP_5V: OIL +
+        DAK_OILP_GND: OIL -
+        DAK_CEL: CHECK ENG (-)
+        DAK_BRAKE: BRAKE (-)
+        DAK_GEAR: GEAR (1 WIRE)
+  photo:
+    url: https://static.summitracing.com/global/images/prod/xlarge/dak-vhx-73c-pu_xl.jpg
+    page: part_media DAKOTA-VHX
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/DAKOTA-VHX.py
 - id: DCDC
   endpoints:
   - DCDC
@@ -3133,6 +4045,228 @@ parts:
         '67': battery-feed terminal
         DOME_GND: switched-ground terminal
   script: docs/wiring/calc-data/cad/fab/DOME-LAMP.py
+- id: DOOR-JAMB-L
+  endpoints:
+  - DOOR-JAMB-L
+  what: Driver door jamb switch, factory pin switch (grounds through the body)
+  maker: GM (factory)
+  maker_pn: factory pin switch (terminal 2984369)
+  shape_basis: not sourced
+  dims_mm:
+    l: 27.0
+    w: 27.0
+    h: 57.0
+  dims_note: 'no part number or size on file: envelope assumed (±12)'
+  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
+    striker
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: DOOR-JAMB-L
+    at:
+    - 0.0
+    - 0.0
+    - -40.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'switch terminal: 42, STEP_DOOR_L'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_d
+    value: 19.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_l
+    value: 40.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_l
+    value: 14.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: plunger out of the body
+  - name: flange_d
+    value: 27.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: mounting flange / nut
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 12.0
+    why: factory part, nothing on file
+  registry:
+    DOOR-JAMB-L:
+      device: driver door jamb switch (factory pin switch, grounds through the body) — PDM30 DIG12 + AMP Research trigger
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '42'
+        label: Driver door jamb switch -> PDM30 DIG12
+        color: gray
+        awg: 20
+      - id: STEP_DOOR_L
+        label: 'Driver door signal to the AMP Research harness (tap of #42)'
+        color: white
+        awg: 20
+      cavities:
+        '42': switch terminal
+        STEP_DOOR_L: switch terminal
+  script: docs/wiring/calc-data/cad/fab/DOOR-JAMB-L.py
+- id: DOOR-JAMB-R
+  endpoints:
+  - DOOR-JAMB-R
+  what: Passenger door jamb switch, factory pin switch (grounds through the body)
+  maker: GM (factory)
+  maker_pn: factory pin switch (terminal 2984369)
+  shape_basis: not sourced
+  dims_mm:
+    l: 27.0
+    w: 27.0
+    h: 57.0
+  dims_note: 'no part number or size on file: envelope assumed (±12)'
+  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
+    striker
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: DOOR-JAMB-R
+    at:
+    - 0.0
+    - 0.0
+    - -40.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'switch terminal: 43, STEP_DOOR_R'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_d
+    value: 19.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_l
+    value: 40.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_l
+    value: 14.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: plunger out of the body
+  - name: flange_d
+    value: 27.0
+    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: mounting flange / nut
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 12.0
+    why: factory part, nothing on file
+  registry:
+    DOOR-JAMB-R:
+      device: passenger door jamb switch — PDM30 DIG13 + AMP Research trigger
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '43'
+        label: Passenger door jamb switch -> PDM30 DIG13
+        color: gray
+        awg: 20
+      - id: STEP_DOOR_R
+        label: 'Passenger door signal to the AMP Research harness (tap of #43)'
+        color: white
+        awg: 20
+      cavities:
+        '43': switch terminal
+        STEP_DOOR_R: switch terminal
+  script: docs/wiring/calc-data/cad/fab/DOOR-JAMB-R.py
 - id: E-STOPP
   endpoints:
   - E-STOPP
@@ -3640,6 +4774,170 @@ parts:
     page: https://wizardcooling.com/i-30504347-16-brushless-fan-300-watts-drop-in-style.html
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/FAN.py
+- id: FLOOR-DIMMER
+  endpoints:
+  - FLOOR-DIMMER
+  what: 'Headlamp dimmer switch, factory floor switch: feed, LOW and HIGH (GM connector 8900855)'
+  maker: GM (factory)
+  maker_pn: factory (connector 8900855)
+  shape_basis: not sourced
+  dims_mm:
+    l: 76.0
+    w: 50.0
+    h: 78.0
+  dims_note: 'no part number or size on file: envelope assumed (±15)'
+  frame: origin at the centre of the flange on the floor pan; +Z up into the cab (the plunger), body below the floor
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: FLOOR-DIMMER
+    at:
+    - -7.0
+    - 0.0
+    - -54.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '10 feed cavity: 85, 86'
+  - n: pin_2
+    ep: FLOOR-DIMMER
+    at:
+    - 0.0
+    - 0.0
+    - -54.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '12 LOW cavity: 85a, 86a'
+  - n: pin_3
+    ep: FLOOR-DIMMER
+    at:
+    - 7.0
+    - 0.0
+    - -54.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '11 HIGH cavity: 85b, 86b, 121'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_d
+    value: 50.0
+    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_h
+    value: 40.0
+    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_d
+    value: 16.0
+    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_l
+    value: 22.0
+    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: foot plunger above the floor
+  - name: flange_w
+    value: 76.0
+    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: mounting flange
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file. Read the switch on the truck.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: factory part, nothing on file
+  registry:
+    FLOOR-DIMMER:
+      device: factory floor dimmer switch (feed + LOW and HIGH outputs; light blue and tan wires)
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '85'
+        label: LED Headlight Left
+        color: red
+        awg: 20
+      - id: '86'
+        label: LED Headlight Right
+        color: red
+        awg: 20
+      - id: 85a
+        label: LED Headlight Left LOW Beam
+        color: red
+        awg: 16
+      - id: 86a
+        label: LED Headlight Right LOW Beam
+        color: red
+        awg: 16
+      - id: 85b
+        label: LED Headlight Left HIGH Beam
+        color: red
+        awg: 16
+      - id: 86b
+        label: LED Headlight Right HIGH Beam
+        color: red
+        awg: 16
+      - id: '121'
+        label: 'High beam tap (dimmer HIGH out, with #85b/#86b) -> Dakota VHX HIGH (+)'
+        color: red
+        awg: 20
+      cavities:
+        '85': 10 feed cavity
+        '86': 10 feed cavity
+        85a: 12 LOW cavity
+        86a: 12 LOW cavity
+        85b: 11 HIGH cavity
+        86b: 11 HIGH cavity
+        '121': 11 HIGH cavity
+  script: docs/wiring/calc-data/cad/fab/FLOOR-DIMMER.py
 - id: FOOTWELL-LAMPS
   endpoints:
   - FOOTWELL-LAMPS
@@ -3787,6 +5085,187 @@ parts:
     page: https://www.lumiteclighting.com/mini-rail2-led-utility-light-2
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/FOOTWELL-LAMPS.py
+- id: GSS-3000
+  endpoints:
+  - GSS-3000
+  what: Gear shift sender decoder, Dakota Digital GSS-3000 (its sensor on the transmission detent shaft, 10 ft cable)
+  maker: Dakota Digital
+  maker_pn: GSS-3000
+  shape_basis: not sourced
+  dims_mm:
+    l: 100.0
+    w: 60.0
+    h: 25.0
+  dims_note: 'no size in the manual: a 100 x 60 x 25 decoder, assumed (±20)'
+  frame: origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'housing: black plastic (Dakota: ''black plastic housing'')'
+    strip:
+      hex: '#2f7a3a'
+      from: 'screw-terminal strip: drawn green'
+    tab:
+      hex: '#c9ccd0'
+      from: 'screws: zinc'
+  attach:
+  - n: pin_1
+    ep: GSS-3000
+    at:
+    - -35.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: '1-WIRE: DAK_GEAR'
+  - n: pin_2
+    ep: GSS-3000
+    at:
+    - -21.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'IGNITION+ (+12 V ignition): GSS_PWR'
+  - n: pin_3
+    ep: GSS-3000
+    at:
+    - -7.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'GROUND-: GSS_GND'
+  - n: pin_4
+    ep: GSS-3000
+    at:
+    - 7.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'RED: GSS_SENS_R'
+  - n: pin_5
+    ep: GSS-3000
+    at:
+    - 21.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'GREEN (sensor wire green or white): GSS_SENS_G'
+  - n: pin_6
+    ep: GSS-3000
+    at:
+    - 35.0
+    - -40.0
+    - 12.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: 'BLACK: GSS_SENS_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: l
+    value: 100.0
+    source: 'Dakota Digital''s GSS-3000 manual on file gives no decoder size: envelope assumed'
+    basis: assumed
+  - name: w
+    value: 60.0
+    source: 'Dakota Digital''s GSS-3000 manual on file gives no decoder size: envelope assumed'
+    basis: assumed
+  - name: h
+    value: 25.0
+    source: 'Dakota Digital''s GSS-3000 manual on file gives no decoder size: envelope assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: no printed size. The sensor on the transmission is not drawn here.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: no printed size
+  registry:
+    GSS-3000:
+      device: 'Dakota Digital GSS-3000 gear shift sender: decoder under the dash; its sensor sits on the transmission detent
+        shaft and comes with a 10 ft 3-wire cable'
+      family: screw_terminal
+      where: cabin
+      wires:
+      - id: DAK_GEAR
+        label: Dakota GSS-3000 1-WIRE to the VHX GEAR input
+        color: white
+        awg: 22
+      - id: GSS_PWR
+        label: 'GSS-3000 decoder +12 V ignition (second wire on #71''s output)'
+        color: red
+        awg: 20
+      - id: GSS_GND
+        label: GSS-3000 decoder ground
+        color: black
+        awg: 20
+      - id: GSS_SENS_R
+        label: GSS-3000 sensor cable, red (kit cable, 10 ft)
+        color: null
+        awg: null
+      - id: GSS_SENS_G
+        label: GSS-3000 sensor cable, green or white (kit cable, 10 ft)
+        color: null
+        awg: null
+      - id: GSS_SENS_B
+        label: GSS-3000 sensor cable, black (kit cable, 10 ft)
+        color: null
+        awg: null
+      cavities:
+        DAK_GEAR: 1-WIRE
+        GSS_PWR: IGNITION+ (+12 V ignition)
+        GSS_GND: GROUND-
+        GSS_SENS_R: RED
+        GSS_SENS_G: GREEN (sensor wire green or white)
+        GSS_SENS_B: BLACK
+  photo:
+    url: https://static.summitracing.com/global/images/prod/xlarge/dak-gss-3000_xl.jpg
+    page: part_media GSS-3000
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/GSS-3000.py
 - id: HEADLIGHT-L
   endpoints:
   - HEADLIGHT-L
@@ -4163,6 +5642,256 @@ parts:
     page: https://www.truck-lite.com/
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/HEADLIGHT-R.py
+- id: HL-SW
+  endpoints:
+  - HL-SW
+  what: Headlight switch, USA1 Industries 1973-87 square-body, factory style (push-pull)
+  maker: USA1 Industries
+  maker_pn: '16603'
+  shape_basis: not sourced
+  dims_mm:
+    l: 64.0
+    w: 40.0
+    h: 100.0
+  dims_note: 'no size published: a 64 x 40 x 45 body with a push-pull knob, assumed (±15)'
+  frame: origin at the centre of the dash panel's back face at the knob shaft; +Z toward the driver (the knob), body behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+    knob:
+      hex: '#1a1a1b'
+      from: 'knob: black (USA1 photo)'
+  attach:
+  - n: pin_1
+    ep: HL-SW
+    at:
+    - -10.0
+    - -20.0
+    - -45.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '1 BAT FEED: HL_SW_0V'
+  - n: pin_2
+    ep: HL-SW
+    at:
+    - 0.0
+    - -20.0
+    - -45.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '6 HEAD LP: HL_SW_HEAD'
+  - n: pin_3
+    ep: HL-SW
+    at:
+    - 10.0
+    - -20.0
+    - -45.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'TAIL LP: HL_SW_PARK'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_w
+    value: 64.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+    note: switch body
+  - name: body_h
+    value: 40.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+  - name: body_d
+    value: 45.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+  - name: shaft_d
+    value: 6.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+    note: knob shaft (push-pull, rotates for the dash dimmer)
+  - name: shaft_l
+    value: 55.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+  - name: knob_d
+    value: 32.0
+    source: 'no dimension on file for this part (USA1''s 16603 page gives no size): envelope assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: USA1 publishes no size. Terminal positions are drawn in a row (not read).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: USA1's page gives no size
+  registry:
+    HL-SW:
+      device: USA1 Industries 1973-87 square-body headlight switch, factory style ('connecting directly to your existing wiring
+        harness')
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: HL_SW_0V
+        label: Headlight switch battery-feed terminal to PDM30 0V (it now switches 0V)
+        color: black
+        awg: 20
+      - id: HL_SW_HEAD
+        label: Headlight switch HEAD output -> PDM30 DIG3
+        color: white
+        awg: 20
+      - id: HL_SW_PARK
+        label: Headlight switch PARK output -> PDM30 DIG2
+        color: white
+        awg: 20
+      cavities:
+        HL_SW_0V: 1 BAT FEED
+        HL_SW_HEAD: 6 HEAD LP
+        HL_SW_PARK: TAIL LP
+  photo:
+    url: https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/1280x1280/products/4929/4601/1973-91-Square_body-Chevy-GMC-Truck-Headlight-Switch-USA1-Industries.jpg
+    page: part_media HL-SW
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/HL-SW.py
+- id: HORN-SW
+  endpoints:
+  - HORN-SW
+  what: Horn button, factory (grounds through the column) on PDM30 DIG6
+  maker: GM (factory)
+  maker_pn: factory
+  shape_basis: not sourced
+  dims_mm:
+    l: 60.0
+    w: 60.0
+    h: 12.0
+  dims_note: 'no part number or size on file: envelope assumed (±20)'
+  frame: origin at the centre of the part on the steering column's axis; +Z toward the driver
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: HORN-SW
+    at:
+    - 0.0
+    - -35.0
+    - 0.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: column connector cavity
+    note: '28 HORN: HORN_SW'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: d
+    value: 60.0
+    source: 'no dimension on file for this part (the factory horn button has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: horn button
+  - name: t
+    value: 12.0
+    source: 'no dimension on file for this part (the factory horn button has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: 'no dimension on file for this part (the factory horn button has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: harness to the column connector
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  - Column connector cavities read at the bench (registry).
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: factory part, nothing on file
+  registry:
+    HORN-SW:
+      device: factory horn button (grounds through the column) on PDM30 DIG6
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: HORN_SW
+        label: Horn button -> PDM30 DIG6 (the button grounds through the column)
+        color: white
+        awg: 20
+      cavities:
+        HORN_SW: 28 HORN
+  script: docs/wiring/calc-data/cad/fab/HORN-SW.py
 - id: HORN
   endpoints:
   - HORN
@@ -4608,6 +6337,158 @@ parts:
     page: Nuke vehicle e08bf694 images
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/IBOOSTER.py
+- id: IGN-SWITCH
+  endpoints:
+  - IGN-SWITCH
+  what: Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column
+  maker: OER (GM pattern)
+  maker_pn: '1990096'
+  shape_basis: not sourced
+  dims_mm:
+    l: 70.0
+    w: 38.0
+    h: 30.0
+  dims_note: 'the listing gives only the package (5 x 2 x 5 in): a 70 x 38 x 25 body, assumed (±12)'
+  frame: origin at the centre of the switch's mounting face on top of the steering column jacket; +Z up off the column, +X
+    along the column
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#e6dfcc'
+      from: 'switch body: natural (the listing photo)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: IGN-SWITCH
+    at:
+    - -7.0
+    - -19.0
+    - 12.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: blade
+    note: 'BAT 2: IGN_SW_0V'
+  - n: pin_2
+    ep: IGN-SWITCH
+    at:
+    - 0.0
+    - -19.0
+    - 12.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: blade
+    note: 'IGN 1: IGN_RUN_B'
+  - n: pin_3
+    ep: IGN-SWITCH
+    at:
+    - 7.0
+    - -19.0
+    - 12.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: blade
+    note: 'SOL: IGN_START'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_l
+    value: 70.0
+    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    basis: assumed
+    note: switch body along the column
+  - name: body_w
+    value: 38.0
+    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    basis: assumed
+  - name: body_h
+    value: 25.0
+    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    basis: assumed
+  - name: slider_l
+    value: 20.0
+    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    basis: assumed
+    note: actuator rod slider
+  - name: screw_pitch
+    value: 40.0
+    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    basis: assumed
+    note: two screws to the column
+    fit: fit-critical, scaled
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: only the package size is published.'
+  - 'Factory column connector vs splice: under-dash chapter (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 12.0
+    why: no size published for the switch itself
+  registry:
+    IGN-SWITCH:
+      device: OER 1990096 9-blade GM-pattern ignition switch for the TILT column (1977 K5)
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: IGN_SW_0V
+        label: Ignition switch battery terminal to PDM30 0V (the switch now switches 0V)
+        color: black
+        awg: 20
+      - id: IGN_RUN_B
+        label: Ignition RUN to the body PDM (switch-to-ground input)
+        color: white
+        awg: 20
+      - id: IGN_START
+        label: Ignition START to the body PDM (crank request; relayed to the engine PDM over CAN)
+        color: white
+        awg: 20
+      cavities:
+        IGN_SW_0V: BAT 2
+        IGN_RUN_B: IGN 1
+        IGN_START: SOL
+  photo:
+    url: reference_documents/product_images/1990096.jpg (camarodepot.ca, fetched 2026-09-28)
+    page: reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
+      (the listing gives only a 5 x 2 x 5 in package)
+    fetched: '2026-09-28'
+  script: docs/wiring/calc-data/cad/fab/IGN-SWITCH.py
 - id: ISO-SWITCH
   endpoints:
   - ISO-SWITCH
@@ -5482,6 +7363,256 @@ parts:
         '92': feed lead
         LIC_GND: ''
   script: docs/wiring/calc-data/cad/fab/LICENSE-LAMP.py
+- id: LOCK-SW-L
+  endpoints:
+  - LOCK-SW-L
+  what: 'Driver lock rocker (reversing, rests to ground): not picked, drawn as a Nu-Relics chrome switch'
+  maker: Nu-Relics
+  maker_pn: not picked
+  shape_basis: not sourced
+  dims_mm:
+    l: 36.5
+    w: 44.45
+    h: 48.0
+  dims_note: 'a single chrome switch at half the #201 double''s width (assumed); depth assumed'
+  frame: origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    chrome:
+      hex: '#d7dadc'
+      from: Nu-Relics photo (chrome switches)
+    body:
+      hex: '#1f1f21'
+      from: 'switch body: drawn black'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: LOCK-SW-L
+    at:
+    - 0.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'leads: 38, LOCK_GND_L, LOCK_BUS_A, LOCK_BUS_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: bezel_w
+    value: 36.5
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''); a single switch drawn at half the double''s width'
+    basis: assumed
+  - name: bezel_h
+    value: 44.45
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_w
+    value: 28.6
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_h
+    value: 31.75
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: depth
+    value: 38.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''): the depth behind the panel is not printed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Depth behind the panel is not printed.
+  - 'Switch-plug terminal map: the harness-bag sheet at the bench (registry).'
+  - 'The switch is not picked (registry): drawn as a Nu-Relics chrome switch.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: the single switch's size is not printed
+  registry:
+    LOCK-SW-L:
+      device: driver lock rocker (reversing, rests to ground)
+      family: open
+      where: cabin
+      wires:
+      - id: '38'
+        label: Lock feed to the lock rockers (both doors)
+        color: red
+        awg: 16
+      - id: LOCK_GND_L
+        label: Driver lock rocker ground
+        color: black
+        awg: 16
+      - id: LOCK_BUS_A
+        label: 'Lock bus A: both rockers and both actuators (lock)'
+        color: white
+        awg: 16
+      - id: LOCK_BUS_B
+        label: 'Lock bus B: both rockers and both actuators (unlock)'
+        color: white
+        awg: 16
+      cavities:
+        '38': null
+        LOCK_GND_L: null
+        LOCK_BUS_A: null
+        LOCK_BUS_B: null
+  photo:
+    url: https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg
+    page: https://www.nu-relics.com/201
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/LOCK-SW-L.py
+- id: LOCK-SW-R
+  endpoints:
+  - LOCK-SW-R
+  what: 'Passenger lock rocker (reversing, rests to ground): not picked, drawn as a Nu-Relics chrome switch'
+  maker: Nu-Relics
+  maker_pn: not picked
+  shape_basis: not sourced
+  dims_mm:
+    l: 36.5
+    w: 44.45
+    h: 48.0
+  dims_note: 'a single chrome switch at half the #201 double''s width (assumed); depth assumed'
+  frame: origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    chrome:
+      hex: '#d7dadc'
+      from: Nu-Relics photo (chrome switches)
+    body:
+      hex: '#1f1f21'
+      from: 'switch body: drawn black'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: LOCK-SW-R
+    at:
+    - 0.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'leads: LOCK_FEED_R, LOCK_GND_R, LOCK_BUS_A, LOCK_BUS_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: bezel_w
+    value: 36.5
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''); a single switch drawn at half the double''s width'
+    basis: assumed
+  - name: bezel_h
+    value: 44.45
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_w
+    value: 28.6
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_h
+    value: 31.75
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: depth
+    value: 38.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''): the depth behind the panel is not printed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Depth behind the panel is not printed.
+  - 'Switch-plug terminal map: the harness-bag sheet at the bench (registry).'
+  - 'The switch is not picked (registry): drawn as a Nu-Relics chrome switch.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: the single switch's size is not printed
+  registry:
+    LOCK-SW-R:
+      device: passenger lock rocker (reversing, rests to ground)
+      family: open
+      where: cabin
+      wires:
+      - id: LOCK_FEED_R
+        label: 'Lock feed to the passenger lock rocker (second wire on #38''s pin)'
+        color: red
+        awg: 16
+      - id: LOCK_GND_R
+        label: Passenger lock rocker ground
+        color: black
+        awg: 16
+      - id: LOCK_BUS_A
+        label: 'Lock bus A: both rockers and both actuators (lock)'
+        color: white
+        awg: 16
+      - id: LOCK_BUS_B
+        label: 'Lock bus B: both rockers and both actuators (unlock)'
+        color: white
+        awg: 16
+      cavities:
+        LOCK_FEED_R: null
+        LOCK_GND_R: null
+        LOCK_BUS_A: null
+        LOCK_BUS_B: null
+  photo:
+    url: https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg
+    page: https://www.nu-relics.com/201
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/LOCK-SW-R.py
 - id: M130-A
   endpoints:
   - M130-A
@@ -7805,6 +9936,96 @@ parts:
         '82': turn filament lead
         PT_RF_GND: ground lead
   script: docs/wiring/calc-data/cad/fab/PARK-TURN-RF.py
+- id: PCS-TCM
+  endpoints:
+  - PCS-TCM
+  what: Transmission controller, PCS TCM-2650 (the TCM-4610 kit harness plugs into it)
+  maker: Powertrain Control Solutions
+  maker_pn: TCM-2650
+  shape_basis: not sourced
+  dims_mm:
+    l: 165.0
+    w: 115.0
+    h: 40.0
+  dims_note: 'no size on file: a 165 x 115 x 40 box, assumed (±30)'
+  frame: origin at the centre of the housing's mounting face; +Z out of it, the terminal side faces -Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'housing: black anodised (ZGP photo)'
+    strip:
+      hex: '#262628'
+      from: 'plug: black'
+    tab:
+      hex: '#c9ccd0'
+      from: 'screws: zinc'
+  attach:
+  - n: plug
+    ep: PCS-TCM
+    at:
+    - 0
+    - -67.5
+    - 20.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: TCM plug (kit harness)
+    note: the TCM-4610 kit harness plugs in here; none of our wires land on the TCM (registry)
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: l
+    value: 165.0
+    source: 'PCS''s TCM-2650 pages and the ZGP setup guide rev2 on file give no case size (layout-ui TODO): envelope assumed'
+    basis: assumed
+  - name: w
+    value: 115.0
+    source: 'PCS''s TCM-2650 pages and the ZGP setup guide rev2 on file give no case size (layout-ui TODO): envelope assumed'
+    basis: assumed
+  - name: h
+    value: 40.0
+    source: 'PCS''s TCM-2650 pages and the ZGP setup guide rev2 on file give no case size (layout-ui TODO): envelope assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: no printed size; the spot under the dash is open.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 30.0
+    why: no printed size
+  registry:
+    PCS-TCM:
+      device: PCS TCM-2650 transmission controller — owned; the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)
+      family: open
+      where: cabin
+      wires: []
+      cavities: {}
+  photo:
+    url: https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg
+    page: part_media PCS-TCM
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/PCS-TCM.py
 - id: PDM15-A
   endpoints:
   - PDM15-A
@@ -11465,6 +13686,294 @@ parts:
     page: https://www.crutchfield.com/p_109CL102SL/JBL-Club-102SL.html
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/SUB.py
+- id: TCASE-4WD-SW
+  endpoints:
+  - TCASE-4WD-SW
+  what: 4WD indicator switch, Torque King QU30048 weather-proof NP205 (normally ON, in a front-output poppet port; 15/16 hex,
+    16 lb-ft max) with the QU90002 pigtail
+  maker: Torque King
+  maker_pn: QU30048
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 23.8
+    w: 23.8
+    h: 58.0
+  dims_note: 15/16 in hex (Torque King); thread, body and plunger sized off its photo (±4)
+  frame: origin on the switch's axis at the hex's seat on the transfer case; +Z out of the case, thread and plunger into it
+    (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#d9c9a0'
+      from: Torque King photo QU30048_side.jpg (the sealed connector boot, tan)
+    metal:
+      hex: '#c9ccd0'
+      from: Torque King photo QU30048_side.jpg (zinc-plated hex, body and thread)
+    tab:
+      hex: '#c7c2b4'
+      from: 'pins: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TCASE-4WD-SW
+    at:
+    - 0.0
+    - 0.0
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: twin-pin sealed connector (QU90002 pigtail)
+    note: 'leads: 55, TCASE_SW_GND'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: hex
+    value: 23.8
+    source: 'reference_documents/web_snapshots/torqueking.com__qu30048-weather-proof-np205c-transfer-case-indicator-switch.md:
+      ''The 15/16" hex head'''
+    basis: maker
+  - name: torque
+    value: 21.7
+    source: 'reference_documents/web_snapshots/torqueking.com__qu30048-weather-proof-np205c-transfer-case-indicator-switch.md:
+      ''Maximum torque is 16 lb.ft.'' (21.7 Nm; not a size)'
+    basis: maker
+  - name: thread_d
+    value: 15.9
+    source: sized off Torque King's photos (reference_documents/product_images/QU30048_side.jpg) against the printed 15/16
+      in hex
+    basis: photo
+    note: thread into the NP205 poppet port
+  - name: thread_l
+    value: 12.0
+    source: sized off Torque King's photos (reference_documents/product_images/QU30048_side.jpg) against the printed 15/16
+      in hex
+    basis: photo
+  - name: body_l
+    value: 28.0
+    source: sized off Torque King's photos (reference_documents/product_images/QU30048_side.jpg) against the printed 15/16
+      in hex
+    basis: photo
+    note: switch body above the hex
+  - name: body_d
+    value: 20.0
+    source: sized off Torque King's photos (reference_documents/product_images/QU30048_side.jpg) against the printed 15/16
+      in hex
+    basis: photo
+  - name: plunger_l
+    value: 8.0
+    source: sized off Torque King's photos (reference_documents/product_images/QU30048_side.jpg) against the printed 15/16
+      in hex
+    basis: photo
+    note: plunger below the thread
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Thread size: sized off the photo (the NP205 poppet port is to be confirmed on this 1977 case, registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 4.0
+    why: only the hex is printed; the rest sized off Torque King's photos
+  registry:
+    TCASE-4WD-SW:
+      device: Torque King QU30048 weather-proof NP205 indicator switch (normally ON, in place of a front-output poppet plug;
+        15/16 hex, max 16 lb-ft) + QU90002 pigtail
+      family: open
+      where: chassis
+      wires:
+      - id: '55'
+        label: NP205 4WD indicator switch -> Dakota VHX 4x4 (-)
+        color: gray
+        awg: 22
+      - id: TCASE_SW_GND
+        label: 4WD indicator switch ground side, in the loom to the cab ground bank
+        color: black
+        awg: 20
+      cavities:
+        '55': null
+        TCASE_SW_GND: null
+  photo:
+    url: https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg
+    page: https://torqueking.com/products/qu30048
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/TCASE-4WD-SW.py
+- id: TG-CUTOUT
+  endpoints:
+  - TG-CUTOUT
+  what: Tailgate-closed cutout switch, normally open, GM connector 2977647, in the window UP line
+  maker: GM (factory)
+  maker_pn: factory (connector 2977647)
+  shape_basis: not sourced
+  dims_mm:
+    l: 30.0
+    w: 30.0
+    h: 67.0
+  dims_note: 'no part number or size on file: envelope assumed (±12)'
+  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
+    striker
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TG-CUTOUT
+    at:
+    - -10.5
+    - 0.0
+    - -50.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '183C (from splice 183): TG_CUT_IN'
+  - n: pin_2
+    ep: TG-CUTOUT
+    at:
+    - -3.5
+    - 0.0
+    - -50.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '183E (to motor UP-1): TG_MOT_A'
+  - n: pin_3
+    ep: TG-CUTOUT
+    at:
+    - 3.5
+    - 0.0
+    - -50.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '183C, candidate alternative to TG_CUT_IN (the keyed reversing switch''s lead A; only one is built): TGR_CUT_IN'
+  - n: pin_4
+    ep: TG-CUTOUT
+    at:
+    - 10.5
+    - 0.0
+    - -50.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '183E, candidate alternative to TG_MOT_A (to the ACI motor pole A; only one is built): TGR_MOT_A'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_d
+    value: 22.0
+    source: 'no dimension on file for this part (the factory cutout switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_l
+    value: 50.0
+    source: 'no dimension on file for this part (the factory cutout switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: plunger_l
+    value: 14.0
+    source: 'no dimension on file for this part (the factory cutout switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: plunger out of the body
+  - name: flange_d
+    value: 30.0
+    source: 'no dimension on file for this part (the factory cutout switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: mounting flange / nut
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 12.0
+    why: factory part, nothing on file
+  registry:
+    TG-CUTOUT:
+      device: tailgate-closed cutout switch, normally open, GM connector 2977647 — in the window UP line (183C in, 183E out
+        to motor UP-1); the window goes up only with the tailgate shut
+      family: open
+      where: rear
+      wires:
+      - id: TG_CUT_IN
+        label: 'Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit
+          183C)'
+        color: white
+        awg: 14
+      - id: TG_MOT_A
+        label: Tailgate-closed cutout switch -> window motor UP (circuit 183E)
+        color: white
+        awg: 14
+      - id: TGR_CUT_IN
+        label: Keyed switch motor lead A -> tailgate-closed cutout (183C)
+        color: white
+        awg: 14
+      - id: TGR_MOT_A
+        label: Tailgate-closed cutout (183E) -> ACI motor pole A
+        color: white
+        awg: 14
+      cavities:
+        TG_CUT_IN: 183C (from splice 183)
+        TG_MOT_A: 183E (to motor UP-1)
+        TGR_CUT_IN: 183C, candidate alternative to TG_CUT_IN (the keyed reversing switch's lead A; only one is built)
+        TGR_MOT_A: 183E, candidate alternative to TG_MOT_A (to the ACI motor pole A; only one is built)
+  script: docs/wiring/calc-data/cad/fab/TG-CUTOUT.py
 - id: TG-MOTOR-ACI
   endpoints:
   - TG-MOTOR-ACI
@@ -11625,6 +14134,814 @@ parts:
     page: https://www.nu-relics.com/17383-1
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/TG-MOTOR-ACI.py
+- id: TG-SW-DASH
+  endpoints:
+  - TG-SW-DASH
+  what: Tailgate window switch at the dash, Motor City K5 MCK5REARWINDOWSWITCH, 6 blades (top or bottom 3 used)
+  maker: Motor City K5
+  maker_pn: MCK5REARWINDOWSWITCH
+  shape_basis: not sourced
+  dims_mm:
+    l: 38.0
+    w: 22.0
+    h: 40.0
+  dims_note: 'the listing gives only the package: envelope assumed (±10)'
+  frame: origin at the centre of the bezel's back on the dash; +Z toward the driver
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TG-SW-DASH
+    at:
+    - -7.0
+    - 0.0
+    - -28.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '4 FEED: TG_KEY_FEED, TG_FEED'
+  - n: pin_2
+    ep: TG-SW-DASH
+    at:
+    - 0.0
+    - 0.0
+    - -28.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '5 UP: TG_BUS_UP'
+  - n: pin_3
+    ep: TG-SW-DASH
+    at:
+    - 7.0
+    - 0.0
+    - -28.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: '3 DOWN: TG_BUS_DN'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: face_w
+    value: 38.0
+    source: 'no dimension of the switch on file (Motor City K5 MCK5REARWINDOWSWITCH listing (part_media; the page gives only
+      a 2 x 0.5 x 2 in package)): envelope assumed'
+    basis: assumed
+    note: switch face
+  - name: face_h
+    value: 22.0
+    source: 'no dimension of the switch on file (Motor City K5 MCK5REARWINDOWSWITCH listing (part_media; the page gives only
+      a 2 x 0.5 x 2 in package)): envelope assumed'
+    basis: assumed
+  - name: body_d
+    value: 28.0
+    source: 'no dimension of the switch on file (Motor City K5 MCK5REARWINDOWSWITCH listing (part_media; the page gives only
+      a 2 x 0.5 x 2 in package)): envelope assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: only the package size is published.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 10.0
+    why: no size published
+  registry:
+    TG-SW-DASH:
+      device: 'Motor City K5 MCK5REARWINDOWSWITCH dash tailgate window switch: 6 blades, ''only top or bottom 3 will be used'';
+        loose blade terminals (''will not accept stock harness pigtail'')'
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: TG_KEY_FEED
+        label: Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed
+        color: red
+        awg: 14
+      - id: TG_FEED
+        label: Tailgate window feed to the factory dash switch
+        color: red
+        awg: 14
+      - id: TG_BUS_UP
+        label: 'Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal'
+        color: white
+        awg: 14
+      - id: TG_BUS_DN
+        label: 'Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal'
+        color: white
+        awg: 14
+      cavities:
+        TG_KEY_FEED: 4 FEED
+        TG_FEED: 4 FEED
+        TG_BUS_UP: 5 UP
+        TG_BUS_DN: 3 DOWN
+  photo:
+    url: https://www.motorcityk5.com/images/F22904.jpg
+    page: part_media TG-SW-DASH
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/TG-SW-DASH.py
+- id: TG-SW-KEY-REV
+  endpoints:
+  - TG-SW-KEY-REV
+  what: 'Tailgate keyed switch as the second reversing switch in series (candidate; no keyed reversing switch picked): drawn
+    at the factory key switch''s envelope'
+  maker: not picked
+  maker_pn: not picked (drawn as 8900713)
+  shape_basis: not sourced
+  dims_mm:
+    l: 40.0
+    w: 30.0
+    h: 55.0
+  dims_note: 'no drawing on file: envelope assumed (±15); the part is not picked'
+  frame: origin at the centre of the cylinder's face on the tailgate outer skin; +Z out of the tailgate, switch inside (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TG-SW-KEY-REV
+    at:
+    - -16.25
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'master UP in (pin unknown: keyed reversing switch not picked): TGR_UP'
+  - n: pin_2
+    ep: TG-SW-KEY-REV
+    at:
+    - -9.75
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'master DOWN in (pin unknown: keyed reversing switch not picked): TGR_DN'
+  - n: pin_3
+    ep: TG-SW-KEY-REV
+    at:
+    - -3.25
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'feed (pin unknown: keyed reversing switch not picked): TGR_KEY_FEED'
+  - n: pin_4
+    ep: TG-SW-KEY-REV
+    at:
+    - 3.25
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'ground (pin unknown: keyed reversing switch not picked): TGR_KEY_GND'
+  - n: pin_5
+    ep: TG-SW-KEY-REV
+    at:
+    - 9.75
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'motor A out (pin unknown: keyed reversing switch not picked): TGR_CUT_IN'
+  - n: pin_6
+    ep: TG-SW-KEY-REV
+    at:
+    - 16.25
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'motor B out (pin unknown: keyed reversing switch not picked): TGR_MOT_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: cyl_d
+    value: 24.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file; the keyed
+      reversing switch is not picked): envelope assumed'
+    basis: assumed
+    note: lock cylinder
+  - name: cyl_l
+    value: 30.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file; the keyed
+      reversing switch is not picked): envelope assumed'
+    basis: assumed
+  - name: sw_w
+    value: 40.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file; the keyed
+      reversing switch is not picked): envelope assumed'
+    basis: assumed
+    note: switch body
+  - name: sw_h
+    value: 30.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file; the keyed
+      reversing switch is not picked): envelope assumed'
+    basis: assumed
+  - name: sw_d
+    value: 22.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file; the keyed
+      reversing switch is not picked): envelope assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The keyed reversing switch is not picked: its pins are unknown (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 25.0
+    why: no drawing on file; part not picked
+  registry:
+    TG-SW-KEY-REV:
+      device: 'tailgate keyed switch as the SECOND reversing switch in series (like the passenger door switch): master UP/DOWN
+        in, motor A/B out, its own feed and ground (CANDIDATE)'
+      family: open
+      where: rear
+      wires:
+      - id: TGR_UP
+        label: Tailgate master switch UP line -> keyed switch in series
+        color: white
+        awg: 14
+      - id: TGR_DN
+        label: Tailgate master switch DOWN line -> keyed switch in series
+        color: white
+        awg: 14
+      - id: TGR_KEY_FEED
+        label: Keyed switch feed, branched at the master switch feed
+        color: red
+        awg: 14
+      - id: TGR_KEY_GND
+        label: Keyed switch ground to the rear ground bus
+        color: black
+        awg: 14
+      - id: TGR_CUT_IN
+        label: Keyed switch motor lead A -> tailgate-closed cutout (183C)
+        color: white
+        awg: 14
+      - id: TGR_MOT_B
+        label: Keyed switch motor lead B -> ACI motor pole B
+        color: white
+        awg: 14
+      cavities:
+        TGR_UP: 'master UP in (pin unknown: keyed reversing switch not picked)'
+        TGR_DN: 'master DOWN in (pin unknown: keyed reversing switch not picked)'
+        TGR_KEY_FEED: 'feed (pin unknown: keyed reversing switch not picked)'
+        TGR_KEY_GND: 'ground (pin unknown: keyed reversing switch not picked)'
+        TGR_CUT_IN: 'motor A out (pin unknown: keyed reversing switch not picked)'
+        TGR_MOT_B: 'motor B out (pin unknown: keyed reversing switch not picked)'
+  script: docs/wiring/calc-data/cad/fab/TG-SW-KEY-REV.py
+- id: TG-SW-KEY
+  endpoints:
+  - TG-SW-KEY
+  what: 'Tailgate key switch, factory 8900713: FEED switched to CLOSE or OPEN, in parallel with the dash switch'
+  maker: GM (factory)
+  maker_pn: '8900713'
+  shape_basis: not sourced
+  dims_mm:
+    l: 40.0
+    w: 30.0
+    h: 55.0
+  dims_note: 'no drawing on file: envelope assumed (±15)'
+  frame: origin at the centre of the cylinder's face on the tailgate outer skin; +Z out of the tailgate, switch inside (-Z)
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TG-SW-KEY
+    at:
+    - -6.5
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'FEED terminal: TG_KEY_FEED'
+  - n: pin_2
+    ep: TG-SW-KEY
+    at:
+    - 0.0
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'CLOSE terminal: TG_CUT_IN, TG_BUS_UP'
+  - n: pin_3
+    ep: TG-SW-KEY
+    at:
+    - 6.5
+    - -15.0
+    - -46.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'OPEN terminal: TG_BUS_DN, TG_MOT_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: cyl_d
+    value: 24.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: lock cylinder
+  - name: cyl_l
+    value: 30.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: sw_w
+    value: 40.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: sw_h
+    value: 30.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: sw_d
+    value: 22.0
+    source: 'no dimension on file for this part (the factory tailgate key switch 8900713 has no drawing on file): envelope
+      assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 1977-specific key switch drawing not on file (1978 booklet used; same body).
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: no drawing on file
+  registry:
+    TG-SW-KEY:
+      device: 'factory tailgate key switch 8900713 — IN PARALLEL with the dash switch: FEED (circuit 60) switched to CLOSE
+        (183) or OPEN (184); the dash switch outputs join at its CLOSE/OPEN terminals (factory splices 183/184)'
+      family: gm_blade
+      where: rear
+      wires:
+      - id: TG_KEY_FEED
+        label: Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed
+        color: red
+        awg: 14
+      - id: TG_CUT_IN
+        label: 'Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit
+          183C)'
+        color: white
+        awg: 14
+      - id: TG_BUS_UP
+        label: 'Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal'
+        color: white
+        awg: 14
+      - id: TG_BUS_DN
+        label: 'Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal'
+        color: white
+        awg: 14
+      - id: TG_MOT_B
+        label: Splice 184 (key switch OPEN terminal) -> window motor DOWN (circuit 184C)
+        color: white
+        awg: 14
+      cavities:
+        TG_KEY_FEED: FEED terminal
+        TG_CUT_IN: CLOSE terminal
+        TG_BUS_UP: CLOSE terminal
+        TG_BUS_DN: OPEN terminal
+        TG_MOT_B: OPEN terminal
+  script: docs/wiring/calc-data/cad/fab/TG-SW-KEY.py
+- id: TG-SW-MASTER
+  endpoints:
+  - TG-SW-MASTER
+  what: Tailgate window master switch at the dash, Nu-Relics reverse-polarity switch (#121 single, candidate)
+  maker: Nu-Relics
+  maker_pn: '121'
+  shape_basis: not sourced
+  dims_mm:
+    l: 36.5
+    w: 44.45
+    h: 48.0
+  dims_note: 'a single chrome switch at half the #201 double''s width (assumed); depth assumed'
+  frame: origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    chrome:
+      hex: '#d7dadc'
+      from: Nu-Relics photo (chrome switches)
+    body:
+      hex: '#1f1f21'
+      from: 'switch body: drawn black'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TG-SW-MASTER
+    at:
+    - -10.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'feed (+12 V) — candidate alternative end of TG_FEED: TG_FEED'
+  - n: pin_2
+    ep: TG-SW-MASTER
+    at:
+    - -5.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'feed (+12 V, spliced with TG_FEED): TGR_KEY_FEED'
+  - n: pin_3
+    ep: TG-SW-MASTER
+    at:
+    - 0.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'ground: TGR_M_GND'
+  - n: pin_4
+    ep: TG-SW-MASTER
+    at:
+    - 5.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'UP output: TGR_UP'
+  - n: pin_5
+    ep: TG-SW-MASTER
+    at:
+    - 10.0
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'DOWN output: TGR_DN'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: bezel_w
+    value: 36.5
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''); a single switch drawn at half the double''s width'
+    basis: assumed
+  - name: bezel_h
+    value: 44.45
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_w
+    value: 28.6
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: cut_h
+    value: 31.75
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: assumed
+  - name: depth
+    value: 38.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''): the depth behind the panel is not printed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Depth behind the panel is not printed.
+  - 'Switch-plug terminal map: the harness-bag sheet at the bench (registry).'
+  - 'The switch is not picked (registry): drawn as a Nu-Relics chrome switch.'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: the single switch's size is not printed
+  registry:
+    TG-SW-MASTER:
+      device: 'tailgate window master switch at the dash, Nu-Relics reverse-polarity switch — option #121 ''Standard Chrome
+        Switches - 1 single switches'' on the 17383-1 page (CANDIDATE; replaces the factory 3-pole dash switch in this configuration)'
+      family: open
+      where: cabin
+      wires:
+      - id: TG_FEED
+        label: Tailgate window feed to the factory dash switch
+        color: red
+        awg: 14
+      - id: TGR_KEY_FEED
+        label: Keyed switch feed, branched at the master switch feed
+        color: red
+        awg: 14
+      - id: TGR_M_GND
+        label: Tailgate master switch ground (rests the motor leads to ground)
+        color: black
+        awg: 14
+      - id: TGR_UP
+        label: Tailgate master switch UP line -> keyed switch in series
+        color: white
+        awg: 14
+      - id: TGR_DN
+        label: Tailgate master switch DOWN line -> keyed switch in series
+        color: white
+        awg: 14
+      cavities:
+        TG_FEED: feed (+12 V) — candidate alternative end of TG_FEED
+        TGR_KEY_FEED: feed (+12 V, spliced with TG_FEED)
+        TGR_M_GND: ground
+        TGR_UP: UP output
+        TGR_DN: DOWN output
+  photo:
+    url: https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg
+    page: https://www.nu-relics.com/201
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/TG-SW-MASTER.py
+- id: TURN-SW
+  endpoints:
+  - TURN-SW
+  what: 'Turn and hazard switch, factory column (column connector): turn and hazard feeds on PDM30 0V, front outputs to DIG4
+    / DIG5'
+  maker: GM (factory)
+  maker_pn: factory
+  shape_basis: not sourced
+  dims_mm:
+    l: 110.0
+    w: 110.0
+    h: 18.0
+  dims_note: 'no part number or size on file: envelope assumed (±20)'
+  frame: origin at the centre of the part on the steering column's axis; +Z toward the driver
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: TURN-SW
+    at:
+    - -8.0
+    - -60.0
+    - 0.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: column connector cavity
+    note: '14 LT FRT LP: 33'
+  - n: pin_2
+    ep: TURN-SW
+    at:
+    - 0.0
+    - -60.0
+    - 0.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: column connector cavity
+    note: '15 RT FRT LP: TURN_SW_R'
+  - n: pin_3
+    ep: TURN-SW
+    at:
+    - 8.0
+    - -60.0
+    - 0.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: column connector cavity
+    note: '16 FLSHR + 27 HAZ WARN, jumpered: TURN_SW_0V'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: d
+    value: 110.0
+    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
+      envelope assumed'
+    basis: assumed
+    note: switch plate
+  - name: t
+    value: 18.0
+    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
+      envelope assumed'
+    basis: assumed
+  - name: lead_l
+    value: 150.0
+    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
+      envelope assumed'
+    basis: assumed
+    note: harness to the column connector
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  - Column connector cavities read at the bench (registry).
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 20.0
+    why: factory part, nothing on file
+  registry:
+    TURN-SW:
+      device: factory column turn/hazard switch (column connector) — turn and hazard feeds on PDM30 0V, front outputs to DIG4
+        / DIG5
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: '33'
+        label: Turn switch left-front output -> PDM30 DIG4
+        color: gray
+        awg: 20
+      - id: TURN_SW_R
+        label: Turn switch right-front output -> PDM30 DIG5
+        color: white
+        awg: 20
+      - id: TURN_SW_0V
+        label: Turn and hazard feed terminals (column connector) to PDM30 0V
+        color: black
+        awg: 20
+      cavities:
+        '33': 14 LT FRT LP
+        TURN_SW_R: 15 RT FRT LP
+        TURN_SW_0V: 16 FLSHR + 27 HAZ WARN, jumpered
+  script: docs/wiring/calc-data/cad/fab/TURN-SW.py
 - id: Tail_Light_Left
   endpoints:
   - Tail_Light_Left
@@ -12920,6 +16237,411 @@ parts:
     page: https://www.motec.com.au/products/LTCD
     fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/WIDEBAND.py
+- id: WIN-SW-L
+  endpoints:
+  - WIN-SW-L
+  what: 'Driver door switch panel: window master (both windows) + lock rocker, Nu-Relics 17383-2 chrome reverse-polarity switches'
+  maker: Nu-Relics
+  maker_pn: '201'
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 73.0
+    w: 44.45
+    h: 48.0
+  dims_note: 'bezel 2-7/8 x 1-3/4 in, cut-out 2-1/4 x 1-1/4 in (Nu-Relics #201); depth assumed'
+  frame: origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    chrome:
+      hex: '#d7dadc'
+      from: Nu-Relics photo (chrome switches)
+    body:
+      hex: '#1f1f21'
+      from: 'switch body: drawn black'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: WIN-SW-L
+    at:
+    - -12.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'red (orange) 12 V hot feed lead of the Nu-Relics switch harness: 34'
+  - n: pin_2
+    ep: WIN-SW-L
+    at:
+    - -7.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'black ground lead of the Nu-Relics switch harness: WIN_GND_L'
+  - n: pin_3
+    ep: WIN-SW-L
+    at:
+    - -2.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'passenger UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_R_UP'
+  - n: pin_4
+    ep: WIN-SW-L
+    at:
+    - 2.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'passenger DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_R_DN'
+  - n: pin_5
+    ep: WIN-SW-L
+    at:
+    - 7.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'driver motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_MOT_L_A'
+  - n: pin_6
+    ep: WIN-SW-L
+    at:
+    - 12.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'driver motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_MOT_L_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: bezel_w
+    value: 73.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: bezel_h
+    value: 44.45
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: cut_w
+    value: 57.15
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: cut_h
+    value: 31.75
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: depth
+    value: 38.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''): the depth behind the panel is not printed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Depth behind the panel is not printed.
+  - 'Switch-plug terminal map: the harness-bag sheet at the bench (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 5.0
+    why: bezel and cut-out printed by Nu-Relics; depth assumed
+  registry:
+    WIN-SW-L:
+      device: driver door switch panel — window master (both windows) + lock rocker, Nu-Relics 17383-2 chrome reverse-polarity
+        switches
+      family: open
+      where: cabin
+      wires:
+      - id: '34'
+        label: Driver window switch feed (reversing master)
+        color: red
+        awg: 14
+      - id: WIN_GND_L
+        label: Driver window/lock switch panel ground
+        color: black
+        awg: 14
+      - id: WIN_R_UP
+        label: 'Master switch to passenger switch: passenger window UP line'
+        color: white
+        awg: 14
+      - id: WIN_R_DN
+        label: 'Master switch to passenger switch: passenger window DOWN line'
+        color: white
+        awg: 14
+      - id: WIN_MOT_L_A
+        label: Driver window motor lead A
+        color: white
+        awg: 14
+      - id: WIN_MOT_L_B
+        label: Driver window motor lead B
+        color: white
+        awg: 14
+      cavities:
+        '34': red (orange) 12 V hot feed lead of the Nu-Relics switch harness
+        WIN_GND_L: black ground lead of the Nu-Relics switch harness
+        WIN_R_UP: passenger UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_R_DN: passenger DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_MOT_L_A: driver motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_MOT_L_B: driver motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+  photo:
+    url: https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg
+    page: https://www.nu-relics.com/201
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/WIN-SW-L.py
+- id: WIN-SW-R
+  endpoints:
+  - WIN-SW-R
+  what: Passenger door window switch (in series with the master), Nu-Relics 17383-2
+  maker: Nu-Relics
+  maker_pn: '201'
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 73.0
+    w: 44.45
+    h: 48.0
+  dims_note: 'bezel 2-7/8 x 1-3/4 in, cut-out 2-1/4 x 1-1/4 in (Nu-Relics #201); depth assumed'
+  frame: origin at the centre of the bezel's back on the door panel (or dash); +Z toward the occupant, bodies behind
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    chrome:
+      hex: '#d7dadc'
+      from: Nu-Relics photo (chrome switches)
+    body:
+      hex: '#1f1f21'
+      from: 'switch body: drawn black'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: WIN-SW-R
+    at:
+    - -12.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'red (orange) 12 V hot feed lead of the Nu-Relics switch harness: 35'
+  - n: pin_2
+    ep: WIN-SW-R
+    at:
+    - -7.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'black ground lead of the Nu-Relics switch harness: WIN_GND_R'
+  - n: pin_3
+    ep: WIN-SW-R
+    at:
+    - -2.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'master UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_R_UP'
+  - n: pin_4
+    ep: WIN-SW-R
+    at:
+    - 2.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'master DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_R_DN'
+  - n: pin_5
+    ep: WIN-SW-R
+    at:
+    - 7.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'passenger motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_MOT_R_A'
+  - n: pin_6
+    ep: WIN-SW-R
+    at:
+    - 12.5
+    - 0.0
+    - -38.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: switch harness lead
+    note: 'passenger motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read; ''Nu-Relics
+      wire harness have all the wires labeled for correct position'', General Instructions p.2): WIN_MOT_R_B'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: bezel_w
+    value: 73.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: bezel_h
+    value: 44.45
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: cut_w
+    value: 57.15
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: cut_h
+    value: 31.75
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in'')'
+    basis: maker
+  - name: depth
+    value: 38.0
+    source: 'reference_documents/web_snapshots/www.nu-relics.com__201.md (#201 Standard Chrome Switches Double: ''Bezel 2-7/8
+      x 1-3/4 in, cutout 2-1/4 x 1-1/4 in''): the depth behind the panel is not printed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Depth behind the panel is not printed.
+  - 'Switch-plug terminal map: the harness-bag sheet at the bench (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 5.0
+    why: bezel and cut-out printed by Nu-Relics; depth assumed
+  registry:
+    WIN-SW-R:
+      device: passenger door window switch (in series with the master), Nu-Relics 17383-2
+      family: open
+      where: cabin
+      wires:
+      - id: '35'
+        label: Passenger window switch feed
+        color: red
+        awg: 14
+      - id: WIN_GND_R
+        label: Passenger window/lock switch ground
+        color: black
+        awg: 14
+      - id: WIN_R_UP
+        label: 'Master switch to passenger switch: passenger window UP line'
+        color: white
+        awg: 14
+      - id: WIN_R_DN
+        label: 'Master switch to passenger switch: passenger window DOWN line'
+        color: white
+        awg: 14
+      - id: WIN_MOT_R_A
+        label: Passenger window motor lead A
+        color: white
+        awg: 14
+      - id: WIN_MOT_R_B
+        label: Passenger window motor lead B
+        color: white
+        awg: 14
+      cavities:
+        '35': red (orange) 12 V hot feed lead of the Nu-Relics switch harness
+        WIN_GND_R: black ground lead of the Nu-Relics switch harness
+        WIN_R_UP: master UP line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_R_DN: master DOWN line lead of the Nu-Relics switch harness (label unknown until the harness-bag sheet is read;
+          'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_MOT_R_A: passenger motor lead A of the Nu-Relics switch harness (label unknown until the harness-bag sheet is
+          read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+        WIN_MOT_R_B: passenger motor lead B of the Nu-Relics switch harness (label unknown until the harness-bag sheet is
+          read; 'Nu-Relics wire harness have all the wires labeled for correct position', General Instructions p.2)
+  photo:
+    url: https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg
+    page: https://www.nu-relics.com/201
+    fetched: '2026-09-29'
+  script: docs/wiring/calc-data/cad/fab/WIN-SW-R.py
 - id: WIPER-MOTOR
   endpoints:
   - WIPER-MOTOR
@@ -13138,6 +16860,167 @@ parts:
         '50': '93B cavity: solenoid feed side (1978 booklet 18 YEL/BLK-93B, the wiper motor feed)'
         WASH_GND: '94 cavity: solenoid switch side (1978 booklet 18 DK BLU-94, ''Windshield Washer Sw. to Washer'')'
   script: docs/wiring/calc-data/cad/fab/WIPER-MOTOR.py
+- id: WIPER-SW
+  endpoints:
+  - WIPER-SW
+  what: Wiper and washer switch, factory grounding type (grounds through its mounting)
+  maker: GM (factory)
+  maker_pn: factory
+  shape_basis: not sourced
+  dims_mm:
+    l: 50.0
+    w: 38.0
+    h: 65.0
+  dims_note: 'no part number or size on file: envelope assumed (±15)'
+  frame: origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces: {}
+  colors:
+    body:
+      hex: '#1d1d1f'
+      from: 'factory switch body: drawn black (no photo on file)'
+    metal:
+      hex: '#b9bcbf'
+      from: 'metal: drawn zinc'
+    chrome:
+      hex: '#d3d6d8'
+      from: 'chrome: drawn'
+    tab:
+      hex: '#c7c2b4'
+      from: 'terminals: drawn tin'
+  attach:
+  - n: pin_1
+    ep: WIPER-SW
+    at:
+    - -12.0
+    - -12.0
+    - -35.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'terminal-1 lead (cavity OPEN): WIPER_T1'
+  - n: pin_2
+    ep: WIPER-SW
+    at:
+    - -4.0
+    - -12.0
+    - -35.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'terminal-3 lead (cavity OPEN): WIPER_T3'
+  - n: pin_3
+    ep: WIPER-SW
+    at:
+    - 4.0
+    - -12.0
+    - -35.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'washer contact (cavity OPEN): 46'
+  - n: pin_4
+    ep: WIPER-SW
+    at:
+    - 12.0
+    - -12.0
+    - -35.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: blade
+    note: 'switch mounting (ground lug under a mount screw; not a cavity): WIPER_SW_GND'
+  mount:
+  - n: mount
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: mounting face
+  params:
+  - name: body_w
+    value: 50.0
+    source: 'no dimension on file for this part (the factory wiper/washer switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: switch body
+  - name: body_h
+    value: 38.0
+    source: 'no dimension on file for this part (the factory wiper/washer switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: body_d
+    value: 35.0
+    source: 'no dimension on file for this part (the factory wiper/washer switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  - name: shaft_l
+    value: 30.0
+    source: 'no dimension on file for this part (the factory wiper/washer switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+    note: control shaft / lever
+  - name: knob_d
+    value: 26.0
+    source: 'no dimension on file for this part (the factory wiper/washer switch has no part number or drawing on file): envelope
+      assumed'
+    basis: assumed
+  checks:
+  - check: drawn at the assumed envelope
+    model: 1.0
+    drawing: 1.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Every dimension: factory part with no number on file.'
+  - 'Which cavity carries which wire: read at the bench (registry).'
+  cross_checks: []
+  notes: []
+  margin_mm:
+    mm: 15.0
+    why: factory part, nothing on file
+  registry:
+    WIPER-SW:
+      device: factory wiper/washer dash switch (grounding type, grounds through its mounting)
+      family: gm_blade
+      where: cabin
+      wires:
+      - id: WIPER_T1
+        label: Wiper switch to motor terminal 1 (series field + armature)
+        color: white
+        awg: 16
+      - id: WIPER_T3
+        label: Wiper switch to motor terminal 3 (shunt field)
+        color: white
+        awg: 18
+      - id: '46'
+        label: Wiper switch washer contact -> PDM30 DIG9
+        color: gray
+        awg: 20
+      - id: WIPER_SW_GND
+        label: Wiper dash switch ground (the motor current returns through the switch)
+        color: black
+        awg: 16
+      cavities:
+        WIPER_T1: terminal-1 lead (cavity OPEN)
+        WIPER_T3: terminal-3 lead (cavity OPEN)
+        '46': washer contact (cavity OPEN)
+        WIPER_SW_GND: switch mounting (ground lug under a mount screw; not a cavity)
+  script: docs/wiring/calc-data/cad/fab/WIPER-SW.py
 - id: lock_actuator_DS
   endpoints:
   - lock_actuator_DS
