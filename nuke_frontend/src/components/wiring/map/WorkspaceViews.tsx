@@ -157,10 +157,10 @@ export function ConnectorFace({ cw, ix, site, code, sel, rel, onSelect }: {
                   strokeWidth={pitch * (on || linked ? 0.1 : 0.04)} strokeDasharray={pin ? undefined : `${pitch * 0.12} ${pitch * 0.08}`} />
                 <text x={p[0]} y={-p[1]} textAnchor="middle" dominantBaseline="central" fontFamily={cw.fontMono} fontWeight={700}
                   fontSize={pitch * (cav.length > 2 ? 0.24 : 0.3)} fill={on ? cw.onAccent : cw.ink}>{cav}</text>
-                {pin && (() => {   // the wire under its cavity, sized to stay inside one pitch (monospace is ~0.6 em a character)
+                {pin && (() => {   // the wire under its cavity, sized to keep a gap to the next cavity's label (~0.62 em a character)
                   const label = pin.wires[0] + (pin.wires.length > 1 ? ` +${pin.wires.length - 1}` : '');
                   return <text x={p[0]} y={-p[1] + r + pitch * 0.26} textAnchor="middle" fontFamily={cw.fontMono} fill={cw.inkMuted}
-                    fontSize={Math.min(pitch * 0.2, (pitch * 0.92) / (0.6 * label.length))}>{label}</text>;
+                    fontSize={Math.min(pitch * 0.2, (pitch * 0.8) / (0.62 * label.length))}>{label}</text>;
                 })()}
               </g>
             );
