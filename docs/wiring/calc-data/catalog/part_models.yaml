@@ -2633,7 +2633,7 @@ parts:
   - BLOWER-RES
   what: 'Blower resistor, factory A/C (GM 336403; Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT
     / M1 / M2 / BLO'
-  maker: GM (factory pattern; Four Seasons 20083 photographed)
+  maker: GM
   maker_pn: GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)
   shape_basis: not sourced
   dims_mm:
@@ -2826,7 +2826,7 @@ parts:
   - BLOWER-SW
   what: 'Blower switch, factory A/C control head (GM 469368; Four Seasons 37566, SMP HS435): LO, M1, M2 through the resistor;
     HI as a PDM30 input'
-  maker: GM (factory pattern; Four Seasons 37566 photographed)
+  maker: GM
   maker_pn: GM 469368 (Four Seasons 37566, SMP HS435)
   shape_basis: not sourced
   dims_mm:
@@ -3009,7 +3009,7 @@ parts:
   endpoints:
   - BRAKE-SW
   what: 'Brake light switch, factory pattern at the pedal (SMP SLS66, GM 1362835 family): switches 0V (PDM30 A28) into DIG14'
-  maker: GM (factory pattern; SMP SLS66 photographed)
+  maker: GM
   maker_pn: GM 1362835 family (SMP SLS66, Wells 1S5238, Rostra 620014)
   shape_basis: scaled from photo
   dims_mm:
@@ -5204,7 +5204,7 @@ parts:
   - DOOR-JAMB-L
   what: 'Driver door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through
     the body'
-  maker: GM (factory pattern; SMP DS173 photographed)
+  maker: GM
   maker_pn: GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)
   shape_basis: not sourced
   dims_mm:
@@ -5346,7 +5346,7 @@ parts:
   - DOOR-JAMB-R
   what: 'Passenger door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through
     the body'
-  maker: GM (factory pattern; SMP DS173 photographed)
+  maker: GM
   maker_pn: GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)
   shape_basis: not sourced
   dims_mm:
@@ -5994,7 +5994,7 @@ parts:
   endpoints:
   - FLOOR-DIMMER
   what: 'Headlamp dimmer switch, factory floor switch (GM 1997037 / 12338706; SMP DS72): feed, LOW and HIGH blades'
-  maker: GM (factory pattern; SMP DS72 photographed)
+  maker: GM
   maker_pn: GM 1997037 (SMP DS72, Wells 1S4829, Rostra 650003)
   shape_basis: scaled from photo
   dims_mm:
@@ -7219,7 +7219,7 @@ parts:
   - HORN
   what: Horn, factory, one terminal (connector 12004267), grounds through its bracket; the registry names no horn, so SMP's
     HN16 low-tone snail is drawn
-  maker: GM (factory; SMP HN16 photographed)
+  maker: GM (factory)
   maker_pn: unknown (registry names none; drawn as SMP HN16)
   shape_basis: not sourced
   dims_mm:
@@ -16226,7 +16226,7 @@ parts:
   - TURN-SW
   what: 'Turn and hazard switch, factory column (GM 1997985; SMP TW45): turn and hazard feeds on PDM30 0V, front outputs to
     DIG4 / DIG5, at the column connector'
-  maker: GM (factory pattern; SMP TW45 photographed)
+  maker: GM
   maker_pn: GM 1997985 (SMP TW45, Wells 1S1074, Rostra 710002)
   shape_basis: not sourced
   dims_mm:

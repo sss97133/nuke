@@ -215,7 +215,7 @@ def gm_floor_dimmer(end="FLOOR-DIMMER"):
     return switch_part(end, {
         "title": "GM floor dimmer switch (1997037 pattern, SMP DS72)",
         "what": "Headlamp dimmer switch, factory floor switch (GM 1997037 / 12338706; SMP DS72): feed, LOW and HIGH blades",
-        "maker": "GM (factory pattern; SMP DS72 photographed)", "pn": "GM 1997037 (SMP DS72, Wells 1S4829, Rostra 650003)",
+        "maker": "GM", "pn": "GM 1997037 (SMP DS72, Wells 1S4829, Rostra 650003)",
         "shape_basis": "scaled from photo", "dims": P, "colors": C, "body": body, "blade_pos": bpos, "blade_axis": "y",
         "blade_l": v(P["blade_l"]), "viewset": "wall",
         "dims_mm": {"l": round(L_ALL, 1), "w": round(v(P["depth"]), 1), "h": round(H_ALL, 1)},
@@ -229,7 +229,7 @@ def gm_floor_dimmer(end="FLOOR-DIMMER"):
         "axes": {"mount_normal": "+Z", "maker_up": "+Y", "faces": {"plunger": "+X", "blades": "+Y", "ear": "-X"}},
         "photo": {"url": f"{RA}/info/154/DS-72_Front.jpg", "page": f"{RA}/en/moreinfo.php?pk=43128", "fetched": "2026-09-29"},
         "photo_short": PH,
-        "dims_draw": [("front", "x", "can_l", -10)],
+        "dims_draw": [("front", (xn1, YA + R, ZC), (xc1, YA + R, ZC), "can_l", 8)],
         "refs": [("[1]", "SMP DS72", "RockAuto 1977 K5 Blazer dimmer switch listing: SMP DS72 (3 blades, floor mounted, bolt on, "
                                       "cast, gray), GM Genuine D808 (1997037, 12338706), Rostra 650003, Wells 1S4829"),
                  ("[2]", "Packard 56", "catalog/families.yaml gm_blade: 0.250 in tab (the photo's scale)")],
@@ -291,7 +291,7 @@ def gm_blower_switch(end="BLOWER-SW"):
         "title": "GM A/C blower switch (469368 pattern; Four Seasons 37566, SMP HS435)",
         "what": "Blower switch, factory A/C control head (GM 469368; Four Seasons 37566, SMP HS435): LO, M1, M2 through the "
                 "resistor; HI as a PDM30 input",
-        "maker": "GM (factory pattern; Four Seasons 37566 photographed)", "pn": "GM 469368 (Four Seasons 37566, SMP HS435)",
+        "maker": "GM", "pn": "GM 469368 (Four Seasons 37566, SMP HS435)",
         "shape_basis": "not sourced", "dims": P, "colors": C, "body": body, "blade_pos": bpos, "blade_axis": "-x",
         "blade_l": v(P["blade_l"]), "blade_w": v(P["blade_w"]),
         "dims_mm": {"l": round(X(1459) - X(28), 1), "w": round(Y(183) - Y(1000), 1), "h": round(CD, 1)},
@@ -416,7 +416,7 @@ def oer_ignition_switch(end="IGN-SWITCH"):
                    for s_, sx in (("L", -1), ("R", 1))],
         "photo": {"url": "reference_documents/product_images/1990096.jpg (camarodepot.ca, fetched 2026-09-28)", "page": CD, "fetched": "2026-09-28"},
         "photo_short": "camarodepot photo 1990096",
-        "dims_draw": [("front", "x", "body_l", -10)],
+        "dims_draw": [("front", (X(58), Y(380), ZF), (X(58) + v(P["body_l"]), Y(380), ZF), "body_l", -8)],
         "checks": [("switch body and end cap along the column", _len, round(L_BODY, 2))],
         "refs": [("[1]", "1990096 photo", "camarodepot.ca OER 1990096 listing photo (face-on; package size only in the text)"),
                  ("[2]", "SMP US105", "RockAuto 1977 K5 Blazer ignition switch listing: SMP US105 w/ tilt (9 blades; interchange "
@@ -467,7 +467,7 @@ def gm_turn_switch(end="TURN-SW"):
         "title": "GM column turn and hazard switch (1997985 pattern; SMP TW45)",
         "what": "Turn and hazard switch, factory column (GM 1997985; SMP TW45): turn and hazard feeds on PDM30 0V, front outputs "
                 "to DIG4 / DIG5, at the column connector",
-        "maker": "GM (factory pattern; SMP TW45 photographed)", "pn": "GM 1997985 (SMP TW45, Wells 1S1074, Rostra 710002)",
+        "maker": "GM", "pn": "GM 1997985 (SMP TW45, Wells 1S1074, Rostra 710002)",
         "shape_basis": "not sourced", "dims": P, "colors": C, "body": body, "cosmetic": cosmetic, "blades": False,
         "blade_pos": bpos,
         "dims_mm": {"l": round(v(P["plate_d"]) + 30.0 + v(P["conn_w"]), 1), "w": round(v(P["plate_d"]), 1), "h": round(v(P["plate_t"]) + 4.0, 1)},
@@ -557,7 +557,7 @@ def gm_brake_switch(end="BRAKE-SW"):
     return switch_part(end, {
         "title": "GM stop lamp switch, no cruise (SMP SLS66)",
         "what": "Brake light switch, factory pattern at the pedal (SMP SLS66, GM 1362835 family): switches 0V (PDM30 A28) into DIG14",
-        "maker": "GM (factory pattern; SMP SLS66 photographed)", "pn": "GM 1362835 family (SMP SLS66, Wells 1S5238, Rostra 620014)",
+        "maker": "GM", "pn": "GM 1362835 family (SMP SLS66, Wells 1S5238, Rostra 620014)",
         "shape_basis": "scaled from photo", "dims": P, "colors": C, "body": body, "blade_pos": bpos, "blade_axis": "-z",
         "blade_l": v(P["blade_l"]),
         "dims_mm": {"l": round(v(P["body_d"]), 1), "w": round(v(P["body_d"]), 1), "h": round(L_ALL, 1)},
@@ -572,7 +572,7 @@ def gm_brake_switch(end="BRAKE-SW"):
                             "locknut's finger; set for 1/16 in free plunger travel (SMP GF8592B)"}],
         "photo": {"url": f"{RA}/info/154/SLS-66_Front.jpg", "page": f"{RA}/en/moreinfo.php?pk=44657", "fetched": "2026-09-29"},
         "photo_short": PH,
-        "dims_draw": [("front", "z", "thread_l", -10)],
+        "dims_draw": [("right", (0, v(P["thread_d"]) / 2, -TL), (0, v(P["thread_d"]) / 2, 0), "thread_l", 8)],
         "checks": [("overall length, plunger to blade tips", _len, round(L_ALL, 2))],
         "refs": [("[1]", "SMP SLS66", "RockAuto 1977 K5 Blazer brake light switch listing: SMP SLS66 w/o cruise (2 blades, push-in, "
                                         "black / white plastic), Wells 1S5238, Rostra 620014 ('w/ 2 Terminals'), SKP SKSLS66"),
@@ -617,7 +617,7 @@ def gm_jamb_switch(end):
         "title": f"GM door jamb pin switch ({'driver' if left else 'passenger'}; SMP DS173 pattern)",
         "what": f"{'Driver' if left else 'Passenger'} door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet "
                 "terminal, grounds through the body",
-        "maker": "GM (factory pattern; SMP DS173 photographed)", "pn": "GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)",
+        "maker": "GM", "pn": "GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)",
         "shape_basis": "not sourced", "dims": P, "colors": C, "body": body, "blades": False,
         "dims_mm": {"l": v(P["hex_af"]), "w": v(P["hex_af"]), "h": v(P["length"])},
         "checks": [("length, disc head to terminal tip", lambda b: Compound(children=b).bounding_box().size.Z, v(P["length"]))],

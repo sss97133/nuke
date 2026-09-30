@@ -304,7 +304,7 @@ def gm_horn(end="HORN"):
 
     ns = _assumed_part(end, "Horn (factory location on the radiator support; drawn as SMP HN16)", "Horn, factory, one terminal (connector "
                        "12004267), grounds through its bracket; the registry names no horn, so SMP's HN16 low-tone snail is drawn",
-                       "GM (factory; SMP HN16 photographed)", "unknown (registry names none; drawn as SMP HN16)",
+                       "GM (factory)", "unknown (registry names none; drawn as SMP HN16)",
                        {"l": round(v(P["d"]) / 2 + v(P["snail_w"]) * 0.62, 1), "w": round(v(P["bracket_l"]) + v(P["d"]) - 10.0, 1),
                         "h": round(3.0 + v(P["depth"]) + v(P["snail_d"]), 1)},
                        "no horn named and no size on file: SMP HN16's proportions at an assumed size (±25)",
@@ -445,7 +445,7 @@ def gm_blower_resistor(end="BLOWER-RES"):
 
     ns = _assumed_part(end, "GM A/C blower resistor (336403 pattern; Four Seasons 20083)", "Blower resistor, factory A/C (GM 336403; "
                        "Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
-                       "GM (factory pattern; Four Seasons 20083 photographed)", "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
+                       "GM", "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
                        {"l": v(P["plate_w"]), "w": v(P["plate_l"]), "h": round(v(P["strip_l"]) + v(P["plate_t"]) + 9.0, 1)},
                        "no size in any source: Four Seasons' photo's proportions at an assumed 70 mm hole pitch (±15)",
                        {"mm": 15.0, "why": "no size published; proportions from the maker's photo"},
