@@ -2,6 +2,8 @@
 // section → device → connector → cavity), one centre view (plan, 3D by zone, connector face, schematic, parts library),
 // the selection's properties and the linked tables (wire list, pin list, connectors), all lit by one selection.
 // Earlier layout: every node on one plan, worked one target at a time (owner, 2026-09-27; plan vivid-hugging-globe.md).
+// The first screen answers "how far along is it?": a status line, then what's still missing by system (MissingList),
+// then the workspace (brief docs/wiring/research/2026-09-30_map-progressive-disclosure-brief.md, step 2).
 //
 // Everyone sees the results. The owner (the profile's owner check) also sees what needs him, the open calls and
 // decisions, and each record's proof and sources (NodeCard, CallCard, WireRecords below).
@@ -35,6 +37,7 @@ import { SchematicBlock } from './SchematicBlock';
 import { WorkspaceTables } from './WorkspaceTables';
 import { WorkspaceProps } from './WorkspaceProps';
 import { PartLibrary } from './PartLibrary';
+import { MissingList } from './MissingList';
 import { needsOwner } from './ownerLayer';
 
 const WORK_WORD: Record<WorkStatus, string> = {
@@ -226,6 +229,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
             ))}
           </span>
         </div>
+        {!loading && !map.error && <MissingList cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} narrow={narrow} onSelect={pick} />}
         {needCalls.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', padding: '5px 12px', borderBottom: `2px solid ${cw.warn}`, background: cw.bg, flexShrink: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, color: cw.warn, whiteSpace: 'nowrap' }}>NEEDS YOU ({needCalls.length}) · OWNER ONLY</span>
@@ -275,7 +279,8 @@ function chipStyle(cw: Colorway, on: boolean): React.CSSProperties {
   };
 }
 
-// the headline counts, each from its file; the 3D count opens its split by where each end's shape comes from
+// the status line (brief 2026-09-30): how far along it is, in plain words, from the index and the rows the page reads.
+// Its caret opens the split, which says what each word counts. It says drawn and modelled only: the records don't say more.
 function Summary({ cw, map, ix, site, cov, isOwner }: {
   cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; cov: ReturnType<typeof coverage>; isOwner: boolean;
 }) {
@@ -292,58 +297,77 @@ function Summary({ cw, map, ix, site, cov, isOwner }: {
   }, [pinned]);
   const decided = map.wires.filter(w => w.designStatus === 'decided').length;
   const withEnds = map.wires.filter(w => (ix.chain.get(w.code) ?? []).length > 1).length;
-  const placed = map.nodes.filter(n => site.ends[n.code]).length;
+  const openEnds = map.wires.length - withEnds;
   const lenM = site.segs.reduce((a, s) => a + (s.len ?? 0), 0);
-  const B = ({ children }: { children: React.ReactNode }) => <b style={{ fontFamily: cw.fontMono, fontSize: 13 }}>{children}</b>;
-  const item: React.CSSProperties = { fontSize: 11, letterSpacing: 0.3, color: cw.ink, whiteSpace: 'nowrap' };
+  const threeD = !!site.models && cov.total > 0;
+  const B = ({ children }: { children: React.ReactNode }) => <b style={{ fontFamily: cw.fontMono, fontSize: 14 }}>{children}</b>;
   const ASSUMED = new Set(['twin object', 'not sourced']);
+  const Word = ({ k, children }: { k: string; children: React.ReactNode }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '112px minmax(0, 1fr)', gap: 8, padding: '4px 0', borderBottom: rule(cw), fontSize: 12.5, lineHeight: 1.45 }}>
+      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.7, color: cw.inkMuted, paddingTop: 2 }}>{k}</span>
+      <span>{children}</span>
+    </div>
+  );
+  if (!threeD && !map.wires.length) return <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted }}>WIRING HARNESS</span>;
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px 16px', flexWrap: 'wrap', minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px 12px', flexWrap: 'wrap', minWidth: 0 }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted }}>WIRING HARNESS</span>
-      <span style={item} title="harness_endpoints; placed = has a position in k5-positions.json"><B>{map.nodes.length}</B> CONNECTORS · <B>{placed}</B> PLACED</span>
-      <span style={item} title="vehicle_custom_circuits; ends = wire_termination_specs">
-        <B>{map.wires.length}</B> WIRES{isOwner && <> · <B>{decided}</B> DECIDED</>} · <B>{withEnds}</B> WITH BOTH ENDS
-      </span>
-      {site.segs.length > 0 && <span style={item} title="k5-routes.json"><B>{site.segs.length}</B> LOOM SEGMENTS · <B>{lenM.toFixed(1)}</B> M</span>}
-      {site.models && (
-        <span ref={wrap} style={{ position: 'relative' }}
-          onPointerEnter={e => { if (e.pointerType === 'mouse') setHover(true); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setHover(false); }}>
-          <button onClick={() => setPinned(p => !p)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
-            background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: cw.fontBody }}>
-            <B>{cov.modelled.length}</B> OF <B>{cov.total}</B> ENDS MODELLED IN 3D, <B>{cov.complete.length}</B> COMPLETE ▾
-          </button>
-          {open && (
-            <div role="tooltip" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 40, marginTop: 4, width: 320, maxWidth: '86vw',
-              background: cw.surface, border: frame(cw), padding: '8px 10px', color: cw.ink }}>
-              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted, marginBottom: 4 }}>WHERE EACH END'S SHAPE COMES FROM</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <tbody>
-                  {SHAPE_ORDER.map(b => (
-                    <tr key={b}>
-                      <td style={{ padding: '2px 0', borderBottom: rule(cw) }}>{b.toUpperCase()}{ASSUMED.has(b) ? ' (ASSUMED)' : ''}</td>
-                      <td style={{ padding: '2px 0', borderBottom: rule(cw), textAlign: 'right', fontFamily: cw.fontMono }}>{cov.bySource[b]}</td>
+      <span ref={wrap} style={{ position: 'relative', minWidth: 0 }}
+        onPointerEnter={e => { if (e.pointerType === 'mouse') setHover(true); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setHover(false); }}>
+        <button onClick={() => setPinned(p => !p)} aria-expanded={open} style={{ border: 'none', borderBottom: `2px solid ${cw.accent}`, background: 'transparent',
+          padding: 0, cursor: 'pointer', fontFamily: cw.fontBody, fontSize: 14, lineHeight: 1.45, color: cw.ink, textAlign: 'left' }}>
+          {threeD && <><B>{cov.modelled.length}</B> of <B>{cov.total}</B> connection points have a 3D model (<B>{cov.complete.length}</B> complete). </>}
+          {map.wires.length > 0 && (openEnds > 0
+            ? <><B>{openEnds}</B> of <B>{map.wires.length}</B> wires still have an open end.</>
+            : <>All <B>{map.wires.length}</B> wires have both ends on a connection point.</>)}
+          {' ▾'}
+        </button>
+        {open && (
+          <div role="tooltip" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 40, marginTop: 4, width: 400, maxWidth: '86vw',
+            background: cw.surface, border: frame(cw), padding: '8px 10px', color: cw.ink }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted, marginBottom: 2 }}>WHAT EACH WORD COUNTS</div>
+            {threeD && <>
+              <Word k="CONNECTION POINTS">
+                The <b>{cov.total}</b> placed on the truck (each has a position on file).
+                {map.nodes.length > cov.total && <> <b>{map.nodes.length - cov.total}</b> more are on file but not placed yet, so they aren't counted.</>}
+              </Word>
+              <Word k="3D MODEL">
+                From the part-model index{site.models?.generated ? ` of ${site.models.generated}` : ''}. An end counts once, at the weakest source among its
+                models, so an assumed shape never counts as a sourced one.
+                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: cw.inkMuted, marginTop: 6 }}>WHERE EACH END'S SHAPE COMES FROM</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginTop: 2 }}>
+                  <tbody>
+                    {SHAPE_ORDER.map(b => (
+                      <tr key={b}>
+                        <td style={{ padding: '2px 0', borderBottom: rule(cw) }}>{b.toUpperCase()}{ASSUMED.has(b) ? ' (ASSUMED)' : ''}</td>
+                        <td style={{ padding: '2px 0', borderBottom: rule(cw), textAlign: 'right', fontFamily: cw.fontMono }}>{cov.bySource[b]}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td style={{ padding: '4px 0 2px', fontWeight: 700 }}>FROM A SOURCED SHAPE · FROM AN ASSUMED ONE</td>
+                      <td style={{ padding: '4px 0 2px', textAlign: 'right', fontFamily: cw.fontMono, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {SHAPE_ORDER.filter(b => !ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)} · {SHAPE_ORDER.filter(b => ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)}
+                      </td>
                     </tr>
-                  ))}
-                  <tr>
-                    <td style={{ padding: '4px 0 2px', fontWeight: 700 }}>FROM A SOURCED SHAPE · FROM AN ASSUMED ONE</td>
-                    <td style={{ padding: '4px 0 2px', textAlign: 'right', fontFamily: cw.fontMono, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      {SHAPE_ORDER.filter(b => !ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)} · {SHAPE_ORDER.filter(b => ASSUMED.has(b)).reduce((a, b) => a + cov.bySource[b], 0)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '2px 0', color: cw.warn, fontWeight: 700 }}>NO 3D MODEL YET</td>
-                    <td style={{ padding: '2px 0', textAlign: 'right', fontFamily: cw.fontMono, color: cw.warn, fontWeight: 700 }}>{cov.total - cov.modelled.length}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div style={{ fontSize: 10.5, lineHeight: 1.45, color: cw.inkMuted, marginTop: 6 }}>
-                AN END COUNTS ONCE, AT THE WEAKEST SOURCE AMONG ITS MODELS, SO AN ASSUMED SHAPE NEVER COUNTS AS A SOURCED ONE. COMPLETE: EVERY PIECE THE END
-                NEEDS IS MODELLED. FROM THE PART-MODEL INDEX{site.models.generated ? ` OF ${site.models.generated}` : ''} AND THE {cov.total} PLACED ENDS.
-              </div>
-            </div>
-          )}
-        </span>
-      )}
+                    <tr>
+                      <td style={{ padding: '2px 0', color: cw.warn, fontWeight: 700 }}>NO 3D MODEL YET</td>
+                      <td style={{ padding: '2px 0', textAlign: 'right', fontFamily: cw.fontMono, color: cw.warn, fontWeight: 700 }}>{cov.total - cov.modelled.length}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </Word>
+              <Word k="COMPLETE">Every piece the end needs is modelled.</Word>
+            </>}
+            {map.wires.length > 0 && (
+              <Word k="OPEN END">
+                Fewer than two of the wire's ends are on a connection point on file. <b>{withEnds}</b> of the <b>{map.wires.length}</b> wires have both ends.
+              </Word>
+            )}
+            {site.segs.length > 0 && <Word k="LOOM DRAWN"><b>{site.segs.length}</b> loom segments, <b>{lenM.toFixed(1)}</b> m.</Word>}
+            {isOwner && map.wires.length > 0 && <Word k="DECIDED (OWNER)"><b>{decided}</b> of the <b>{map.wires.length}</b> wires; the rest are concept.</Word>}
+          </div>
+        )}
+      </span>
     </div>
   );
 }

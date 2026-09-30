@@ -26,7 +26,7 @@ export interface SiteSeg {
 export interface PartModel { endpoints?: string[]; shape_basis?: string; what?: string; maker?: string; maker_pn?: string; dims_mm?: Record<string, number> }
 export interface PartModelIndex {
   generated?: string;
-  ends?: Record<string, { models: string[]; complete: boolean }>;
+  ends?: Record<string, { models: string[]; complete: boolean; missing?: string[] }>;   // missing: what the end still lacks, in words
   ends_by_shape_basis?: Record<string, number>;   // the index's own split (index_v5), when it carries one
   parts: Record<string, PartModel>;
 }
