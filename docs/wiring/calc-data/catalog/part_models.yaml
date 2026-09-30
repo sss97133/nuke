@@ -2500,28 +2500,28 @@ parts:
     value: 77.8
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Diameter: 3 1/16" (77.8mm)'''
-    basis: maker
+    basis: vendor
   - name: motor_l
     value: 108.0
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Motor Length: 4 1/4" (108mm)'''
-    basis: maker
+    basis: vendor
   - name: overall_l
     value: 127.0
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Length: 5" (127mm)'''
-    basis: maker
+    basis: vendor
     note: 127 - 108 leaves 19 of shaft past the motor; the listing's shaft length is 25.4 (measured from the boss face)
   - name: shaft_l
     value: 25.4
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Shaft Length: 1" (25.4mm)'''
-    basis: maker
+    basis: vendor
   - name: shaft_d
     value: 7.9
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Shaft Diameter: 5/16" (7.9mm)'''
-    basis: maker
+    basis: vendor
   - name: flange_d
     value: 180.0
     source: sized off the Four Seasons product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg
@@ -7450,53 +7450,53 @@ parts:
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''from flange to the end of the reservoir is 32 cm''; reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md
       (openinverter iBooster table, 1037123-00-A/-B, Gen 1): 320 x 155 x 215'
-    basis: maker
+    basis: vendor
   - name: top
     value: 125.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''Center to top is 12,5 cm'''
-    basis: maker
+    basis: vendor
   - name: bottom
     value: 90.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''to bottom is 9 cm'''
-    basis: maker
+    basis: vendor
   - name: width
     value: 155.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''Overall width is 15,5 cm'''
-    basis: maker
+    basis: vendor
   - name: ecu_edge
     value: 85.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''center to ECU edge is 8,5 cm'''
-    basis: maker
+    basis: vendor
   - name: bolt_sq
     value: 72.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): ''Firewall bolts (W x H) 72 x 72'''
-    basis: maker
+    basis: vendor
   - name: bolt_d
     value: 8.5
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): bolt Ø 8.5'
-    basis: maker
+    basis: vendor
     note: the firewall hole for each stud; the studs are drawn M8
   - name: cutout
     value: 76.35
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): cut-out ID 76.35'
-    basis: maker
+    basis: vendor
   - name: mc_bore
     value: 26.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): master cylinder 26 mm, 2 x M12x1 ports'
-    basis: maker
+    basis: vendor
   - name: port_thread
     value: 12.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): M12x1 brake line ports'
-    basis: maker
+    basis: vendor
   - name: stud_l
     value: 29.0
     source: sized off the owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' against
@@ -14587,22 +14587,22 @@ parts:
     value: 266.7
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''Frame Width 10.5'' in'
-    basis: maker
+    basis: vendor
   - name: hole_d
     value: 228.6
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''cutout diameter: 9.0"'''
-    basis: maker
+    basis: vendor
   - name: depth
     value: 82.55
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''top-mount depth: 3.25"'''
-    basis: maker
+    basis: vendor
   - name: cone_front
     value: 17.3
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''mounting height: 0.68"'' (above the mounting surface)'
-    basis: maker
+    basis: vendor
   - name: frame_t
     value: 6.0
     source: sized off reference_documents/component_drawings/JBL_Club_102SL_back_crutchfield.jpg (Crutchfield back photo)
@@ -14919,22 +14919,22 @@ parts:
     value: 266.7
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''Frame Width 10.5'' in'
-    basis: maker
+    basis: vendor
   - name: hole_d
     value: 228.6
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''cutout diameter: 9.0"'''
-    basis: maker
+    basis: vendor
   - name: depth
     value: 82.55
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''top-mount depth: 3.25"'''
-    basis: maker
+    basis: vendor
   - name: cone_front
     value: 17.3
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''mounting height: 0.68"'' (above the mounting surface)'
-    basis: maker
+    basis: vendor
   - name: frame_t
     value: 6.0
     source: sized off reference_documents/component_drawings/JBL_Club_102SL_back_crutchfield.jpg (Crutchfield back photo)

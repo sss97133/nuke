@@ -29,6 +29,7 @@ owner_words: "i need the 3d pieces all of them if a part doesnt have its 3d then
 - `render_part.py` takes `--photo-az`, so the photo-match render can take a maker's 3/4 view. The default (0) is
   unchanged.
 - LOCK-SW-L / -R and TG-SW-MASTER gain their side-by-side with the Nu-Relics 201 photo.
+- The distributor-page numbers move from `maker` to the `vendor` basis (teal): JBL Club 102SL (Crutchfield's spec table), the iBooster (EVcreate and openinverter) and the blower motor (MPParts' listing of Four Seasons 35587), 19 dimensions in all.
 
 ## Sources tried for the ends that stay not sourced
 - Where nothing gave a size:

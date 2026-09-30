@@ -28,12 +28,12 @@ PH = f"sized off the Four Seasons product photo {PHURL} against the printed 77.8
 PHOTO = f"product photo {PHURL}, k-means of the region"
 
 P = {
-    "can_d": Dim(77.8, f"{MPP}: 'Diameter: 3 1/16\" (77.8mm)'"),
-    "motor_l": Dim(108.0, f"{MPP}: 'Motor Length: 4 1/4\" (108mm)'"),
-    "overall_l": Dim(127.0, f"{MPP}: 'Length: 5\" (127mm)'", note="127 - 108 leaves 19 of shaft past the motor; the listing's shaft "
+    "can_d": Dim(77.8, f"{MPP}: 'Diameter: 3 1/16\" (77.8mm)'", "vendor"),
+    "motor_l": Dim(108.0, f"{MPP}: 'Motor Length: 4 1/4\" (108mm)'", "vendor"),
+    "overall_l": Dim(127.0, f"{MPP}: 'Length: 5\" (127mm)'", "vendor", note="127 - 108 leaves 19 of shaft past the motor; the listing's shaft "
                                                                    "length is 25.4 (measured from the boss face)"),
-    "shaft_l": Dim(25.4, f"{MPP}: 'Shaft Length: 1\" (25.4mm)'"),
-    "shaft_d": Dim(7.9, f"{MPP}: 'Shaft Diameter: 5/16\" (7.9mm)'"),
+    "shaft_l": Dim(25.4, f"{MPP}: 'Shaft Length: 1\" (25.4mm)'", "vendor"),
+    "shaft_d": Dim(7.9, f"{MPP}: 'Shaft Diameter: 5/16\" (7.9mm)'", "vendor"),
     "flange_d": Dim(180.0, PH, "photo", "mounting flange (±10)", "fit-critical, scaled"),
     "flange_t": Dim(1.2, PH, "photo", "flange sheet"),
     "flange_holes": Dim(10, PH, "photo", "screw holes round the flange rim"),
