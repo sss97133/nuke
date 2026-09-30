@@ -149,6 +149,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const faceCode = k === 'n' ? v : k === 'p' ? v.split('|')[0] : k === 'w' ? (ix.chain.get(v) ?? [])[0]?.code ?? null
     : k === 'd' ? map.nodes.find(n => ix.devOf(n.code) === v)?.code ?? null : null;
   const pick = (id: string) => { setSel(id); if (narrow) setTreeOpen(false); };
+  const clearSel = React.useCallback(() => setSel(null), [setSel]);
 
   // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
   const rawNode = k === 'n' ? raw.nodes.find(n => n.code === v) : undefined;
@@ -188,7 +189,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         {view === 'plan' && <PlanView cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
         {view === '3d' && (
           <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: cw.inkMuted }}>LOADING THE 3D HARNESS…</div>}>
-            <ZoneModels3D cw={cw} ix={ix} sel={sel} rel={rel} onSelect={pick} />
+            <ZoneModels3D cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} onClear={clearSel} />
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
