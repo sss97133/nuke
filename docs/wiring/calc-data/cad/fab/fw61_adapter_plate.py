@@ -19,8 +19,8 @@ import re
 import sys
 from pathlib import Path
 
-from build123d import (BuildPart, BuildSketch, Circle, Locations, Mode, Plane, Rectangle, RectangleRounded, Unit,
-                       export_step, extrude, ExportDXF, add)
+from build123d import (BuildPart, BuildSketch, Circle, Locations, Mode, Plane, Polygon, Rectangle, RectangleRounded, Unit,
+                       export_step, extrude, ExportDXF, add, fillet, offset)
 
 IN = 25.4
 
@@ -47,15 +47,30 @@ JAM_NUT_D = 2.323 * IN            # across the corners (see above)
 # through two stock holes (American Autowire 510351 instructions rev 1.0, sheet 1: "Locate the stock OEM bulkhead
 # connector hole in the driver side of the firewall", "Using the two mounting screws A ... attach the fuse panel to the
 # firewall"; the holes' positions are not printed).
-FB_OPENING_D = 4.0 * IN            # replace with a sourced or measured opening
-FB_BASIS = "NOT SOURCED: objectTraits.ts FB 4.0 in round, no source"
+# The SHAPE is from the same sheet's illustration, read by the lead at 300 dpi (2026-09-29): a trapezoid whose parallel
+# sides are vertical, with rounded corners, seen from the cab. The right side is the tall one (left : right = 0.73), the
+# width is 0.92 x the right side, the top and bottom edges slant symmetrically, the corner radius is 0.08 x the right
+# side. The two "A" screw holes sit on a diagonal: A1 about 12/212 of the right side right of the right edge and 28/212
+# above the top-right corner; A2 about 17/212 left of the left edge and 30/212 below the bottom-left corner; each drawn
+# about 1/15 of the right side across. The sheet is an illustration, possibly in perspective: shape only.
+# The SIZE is NOT SOURCED: the right side is drawn at the trait table's 4.0 in (ASSUMED) until a block-off plate's
+# cutout, the fuse block's screw spacing or a scaled truck photo gives one real dimension; the rest follows the ratios.
+FB_SHAPE = "shape from AAW 510351 sheet 1 illustration; size NOT SOURCED"
+FB_H_RIGHT = 4.0 * IN              # ASSUMED (the scale); everything below is this times the illustration's ratios
+FB_H_LEFT = 0.73 * FB_H_RIGHT
+FB_W = 0.92 * FB_H_RIGHT
+FB_R = 0.08 * FB_H_RIGHT
+FB_A1 = (FB_W / 2 + 12 / 212 * FB_H_RIGHT, FB_H_RIGHT / 2 + 28 / 212 * FB_H_RIGHT)
+FB_A2 = (-FB_W / 2 - 17 / 212 * FB_H_RIGHT, -FB_H_LEFT / 2 - 30 / 212 * FB_H_RIGHT)
+FB_A_D = FB_H_RIGHT / 15
+FB_BASIS = f"NOT SOURCED: {FB_SHAPE}, right side {FB_H_RIGHT:.1f} ASSUMED"
 FB_FASTENERS = "two screws in two stock holes (AAW 510351 rev 1.0 sheet 1), positions not printed"
 OVERLAP = 15.0                     # plate edge beyond the opening, mm (design choice: gasket land)
 
 # ---- the plate
 THICK = 0.125 * IN                 # 1/8 in 5052-H32 aluminium (design choice; confirm the receptacle's max panel thickness)
 CORNER_R = 10.0
-SIDE = max(FB_OPENING_D + 2 * OVERLAP, FLANGE_W + 2 * 30.0)
+SIDE = max(max(FB_W, FB_H_RIGHT) + 2 * OVERLAP, FLANGE_W + 2 * 30.0)
 SIDE = math.ceil(SIDE / 5.0) * 5.0
 HOLE_D = 6.6                       # M6 clearance (ISO 273 medium): fasteners into rivnuts in the firewall (design choice)
 HOLE_OFF = SIDE / 2 - 13.0         # 13 mm edge distance
@@ -63,7 +78,6 @@ GASKET_T = 1.5                     # neoprene gasket under the plate (design cho
 # The gasket is a perimeter ring: its outer edge is the plate's outline, its inner edge the firewall opening plus
 # GASKET_INSET all round, so the receptacle clamps bare aluminium only (the system's call, 2026-09-29, pieces lane).
 GASKET_INSET = 3.0
-GASKET_ID = FB_OPENING_D + 2 * GASKET_INSET
 # The 1/8 in plate is exactly at PANEL_MAX (the page's inch value; its 3.2 mm is rounded). The plate stays 1/8 in for
 # stiffness at the fasteners, and the receptacle land is spot-faced on the jam-nut face to SPOTFACE_T over SPOTFACE_D
 # (the jam nut is JAM_NUT_D): the clamped thickness is then under the maximum, with margin for sheet tolerance and coating
@@ -86,9 +100,11 @@ def blob12(path=SCRIPT):
 
 def params():
     """The inputs the outputs depend on, in a fixed order (mm)."""
-    return (f"FB_OPENING_D={FB_OPENING_D:.3f} ({FB_BASIS}); FB_FASTENERS={FB_FASTENERS}; THICK={THICK:.3f}; "
+    return (f"FB_OPENING={FB_BASIS}; FB_H_RIGHT={FB_H_RIGHT:.3f}; FB_H_LEFT={FB_H_LEFT:.3f}; FB_W={FB_W:.3f}; "
+            f"FB_R={FB_R:.3f}; FB_A1=({FB_A1[0]:.2f}, {FB_A1[1]:.2f}); FB_A2=({FB_A2[0]:.2f}, {FB_A2[1]:.2f}); "
+            f"FB_FASTENERS={FB_FASTENERS}; THICK={THICK:.3f}; "
             f"PANEL_MAX={PANEL_MAX:.3f}; SPOTFACE_T={SPOTFACE_T:.3f}; SPOTFACE_D={SPOTFACE_D:.3f}; "
-            f"GASKET_T={GASKET_T:.3f}; GASKET_ID={GASKET_ID:.3f}; SIDE={SIDE:.3f}; CORNER_R={CORNER_R:.3f}; "
+            f"GASKET_T={GASKET_T:.3f}; GASKET_INSET={GASKET_INSET:.3f}; SIDE={SIDE:.3f}; CORNER_R={CORNER_R:.3f}; "
             f"HOLE_D={HOLE_D:.3f}; HOLE_OFF={HOLE_OFF:.3f}; CUT_D={CUT_D:.3f}; CUT_FLAT={CUT_FLAT:.3f}")
 
 
@@ -116,11 +132,36 @@ def outline():
     return s.sketch
 
 
+def fb_opening(grow=0.0):
+    """The firewall opening (the illustration's rounded trapezoid, centred on its bounding box), grown by `grow`."""
+    pts = [(-FB_W / 2, -FB_H_LEFT / 2), (FB_W / 2, -FB_H_RIGHT / 2), (FB_W / 2, FB_H_RIGHT / 2), (-FB_W / 2, FB_H_LEFT / 2)]
+    with BuildSketch() as s:
+        Polygon(*pts, align=None)
+        fillet(s.vertices(), radius=FB_R)
+        if grow:
+            offset(amount=grow)
+    return s.sketch
+
+
+def outline_points(sketch, n=16):
+    """The sketch's outer outline as points, in order (for the drawing and the clearance checks)."""
+    w = sketch.faces()[0].outer_wire()
+    out = []
+    for e in w.order_edges():
+        out += [tuple(e.position_at(i / n))[:2] for i in range(n)]
+    return out
+
+
+def min_radius(sketch):
+    import math as _m
+    return min(_m.hypot(x, y) for x, y in outline_points(sketch, 40))
+
+
 def gasket_outline():
-    """The perimeter ring: the plate's outline and fastener holes, open inside GASKET_ID."""
+    """The perimeter ring: the plate's outline and fastener holes, open inside the opening grown by GASKET_INSET."""
     with BuildSketch() as s:
         RectangleRounded(SIDE, SIDE, CORNER_R)
-        Circle(GASKET_ID / 2, mode=Mode.SUBTRACT)
+        add(fb_opening(GASKET_INSET), mode=Mode.SUBTRACT)
         with Locations(*[(sx * HOLE_OFF, sy * HOLE_OFF) for sx in (-1, 1) for sy in (-1, 1)]):
             Circle(HOLE_D / 2, mode=Mode.SUBTRACT)
     return s.sketch
@@ -147,8 +188,10 @@ def design_errors():
                     "(MILNEC TX07 p.B-25)")
     if SPOTFACE_D <= JAM_NUT_D:
         errs.append(f"fw61: spot face {SPOTFACE_D} does not clear the jam nut {JAM_NUT_D:.1f}")
-    if SPOTFACE_D >= GASKET_ID:
+    if SPOTFACE_D / 2 >= min_radius(fb_opening(GASKET_INSET)):
         errs.append("fw61: the spot face reaches the gasket ring")
+    if max(FLANGE_W, JAM_NUT_D) / 2 >= min_radius(fb_opening()):
+        errs.append("fw61: the receptacle's flange or jam nut does not clear the opening")
     if not THICK > SPOTFACE_T > 0:
         errs.append("fw61: the spot face must leave material")
     return errs
@@ -172,12 +215,19 @@ def drawing_svg(path):
     for sx in (-1, 1):
         for sy in (-1, 1):
             el.append(f'<circle cx="{cx + sx * HOLE_OFF:.2f}" cy="{cy + sy * HOLE_OFF:.2f}" r="{HOLE_D / 2:.2f}" fill="#ffffff" stroke="{ink}" stroke-width="0.6"/>')
-    el.append(f'<circle cx="{cx}" cy="{cy}" r="{FB_OPENING_D / 2:.2f}" fill="none" stroke="{ink}" stroke-width="0.4" stroke-dasharray="3 2"/>')
+    def poly(sk, colour, dash, w=0.4):
+        pts = outline_points(sk)
+        d = " ".join(f"{'M' if i == 0 else 'L'} {cx + x:.2f} {cy - y:.2f}" for i, (x, y) in enumerate(pts)) + " Z"
+        el.append(f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="{w}" stroke-dasharray="{dash}"/>')
+    poly(fb_opening(), ink, "3 2")
+    for (ax, ay), nm in ((FB_A1, "A1"), (FB_A2, "A2")):
+        el.append(f'<circle cx="{cx + ax:.2f}" cy="{cy - ay:.2f}" r="{FB_A_D / 2:.2f}" fill="none" stroke="#b35c00" stroke-width="0.4" stroke-dasharray="1 1"/>')
+        el.append(f'<text x="{cx + ax + (4 if ax > 0 else -4):.2f}" y="{cy - ay + 1.2:.2f}" font-size="3" text-anchor="{"start" if ax > 0 else "end"}" fill="#b35c00" font-family="Helvetica, Arial">stock screw hole {nm} (illustration)</text>')
     el.append(f'<circle cx="{cx}" cy="{cy}" r="{FLANGE_W / 2:.2f}" fill="none" stroke="#8a939c" stroke-width="0.4" stroke-dasharray="1.5 1.5"/>')
     el.append(f'<circle cx="{cx}" cy="{cy}" r="{SPOTFACE_D / 2:.2f}" fill="none" stroke="#7a3db8" stroke-width="0.45" stroke-dasharray="4 1 1 1"/>')
-    el.append(f'<circle cx="{cx}" cy="{cy}" r="{GASKET_ID / 2:.2f}" fill="none" stroke="#2e7d32" stroke-width="0.4" stroke-dasharray="0.8 1.2"/>')
+    poly(fb_opening(GASKET_INSET), "#2e7d32", "0.8 1.2")
     el.append(f'<text x="{cx}" y="{cy - SPOTFACE_D / 2 - 2.0:.2f}" font-size="3" text-anchor="middle" fill="#7a3db8" font-family="Helvetica, Arial">spot face Ø{SPOTFACE_D:.0f} to {SPOTFACE_T:.2f} ({SPOTFACE_T / IN:.3f} in), jam-nut face; jam nut {JAM_NUT_D:.1f} across corners (D)</text>')
-    el.append(f'<text x="{cx}" y="{cy + GASKET_ID / 2 + 4.0:.2f}" font-size="3" text-anchor="middle" fill="#2e7d32" font-family="Helvetica, Arial">gasket ring inner edge Ø{GASKET_ID:.1f} (opening + {GASKET_INSET:.0f})</text>')
+    el.append(f'<text x="{cx}" y="{cy + FB_H_RIGHT / 2 + GASKET_INSET + 4.0:.2f}" font-size="3" text-anchor="middle" fill="#2e7d32" font-family="Helvetica, Arial">gasket ring inner edge: the opening + {GASKET_INSET:.0f}</text>')
 
     def dim_h(xa, xb, y, text):
         el.append(f'<line x1="{xa}" y1="{y}" x2="{xb}" y2="{y}" stroke="{dim}" stroke-width="0.35" marker-start="url(#a)" marker-end="url(#a)"/>')
@@ -200,7 +250,7 @@ def drawing_svg(path):
     el.append(f'<text x="{xd - 2}" y="{cy + 6.4}" font-size="3.4" text-anchor="end" fill="{dim}" font-family="Helvetica, Arial">(1.710 in)</text>')
     dim_h(cx - HOLE_OFF, cx + HOLE_OFF, m + SIDE + 10, f"{2 * HOLE_OFF:.1f} hole centres")
     el.append(f'<text x="{cx - HOLE_OFF + 5}" y="{cy - HOLE_OFF - 5}" font-size="3.6" fill="{ink}" font-family="Helvetica, Arial">4 × Ø{HOLE_D} (M6 clearance)</text>')
-    el.append(f'<text x="{cx}" y="{cy - FB_OPENING_D / 2 - 2.5}" font-size="3.2" text-anchor="middle" fill="{ink}" font-family="Helvetica, Arial">fuse-box opening (dashed), modelled Ø{FB_OPENING_D:.1f}: NOT SOURCED</text>')
+    el.append(f'<text x="{cx}" y="{cy - FB_H_LEFT / 2 + 1.0:.2f}" font-size="3.0" text-anchor="middle" fill="{ink}" font-family="Helvetica, Arial">fuse-box opening (dashed): {FB_SHAPE}</text>')
     el.append(f'<text x="{cx}" y="{cy - FLANGE_W / 2 + 4}" font-size="3" text-anchor="middle" fill="#6b747d" font-family="Helvetica, Arial">flange Ø{FLANGE_W:.1f} (W)</text>')
     notes = [(4.2, ink, "bold", f"61-PIN FIREWALL ADAPTER PLATE · 1977 K5 · 5052-H32 AL {THICK:.2f} mm (1/8 in) · + {GASKET_T} mm neoprene gasket ring"),
              (3.4, ink, "normal", "Cutout: D38999 Series III jam-nut receptacle, shell 25 (MILNEC TX07 p.B-25). Flat at 12 o'clock. Units mm."),
@@ -208,7 +258,8 @@ def drawing_svg(path):
                                        f"clamped thickness under TX07 p.B-25's .125 max, with margin for sheet tolerance ({PANEL_MARGIN:.2f})."),
              (3.4, "#2e7d32", "normal", f"Gasket: a perimeter ring, outer edge the plate outline, inner edge the opening + {GASKET_INSET:.0f}; "
                                         "the receptacle clamps bare aluminium only."),
-             (3.4, "#b35c00", "normal", f"Opening: {FB_BASIS}. Fastening: {FB_FASTENERS}."),
+             (3.4, "#b35c00", "normal", f"Opening: {FB_BASIS}; the rest follows the illustration's ratios."),
+             (3.4, "#b35c00", "normal", f"Fastening: {FB_FASTENERS}; A1 and A2 drawn where the illustration puts them."),
              (3.4, "#b35c00", "normal", "Open before cutting: the real fuse-box opening (shape, size) and its two stock screw holes.")]
     for i, (fs, col, fw, txt) in enumerate(notes):
         y = H - 3 - 5.6 * (len(notes) - 1 - i) - (1.5 if i == 0 else 0)
@@ -300,7 +351,8 @@ def main(out):
         sys.exit("\n".join(bad))
     print(f"stamped: {stamp()[:80]}...")
     print(f"receptacle max panel {PANEL_MAX:.3f} mm (MILNEC TX07 p.B-25); plate {THICK:.3f} mm, spot-faced to {CLAMPED:.3f} "
-          f"over Ø{SPOTFACE_D:.0f}; margin {PANEL_MARGIN:.3f} mm; gasket ring ID {GASKET_ID:.1f}")
+          f"over Ø{SPOTFACE_D:.0f}; margin {PANEL_MARGIN:.3f} mm; opening {FB_W:.1f} wide, {FB_H_LEFT:.1f} / {FB_H_RIGHT:.1f} "
+          f"tall (ASSUMED scale), min radius {min_radius(fb_opening()):.1f}")
     bb = plate.bounding_box()
     print(f"plate {bb.size.X:.1f} x {bb.size.Y:.1f} x {bb.size.Z:.2f} mm, volume {plate.volume / 1000:.1f} cm3, "
           f"mass {plate.volume / 1e3 * 2.68:.0f} g (5052 at 2.68 g/cm3)")
