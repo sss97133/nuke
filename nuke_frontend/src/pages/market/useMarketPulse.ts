@@ -100,6 +100,50 @@ async function fetchPulse(): Promise<MarketPulse> {
   };
 }
 
+// One BAT-LIVE-BIDS reading at an hour (market_index_values, public read): current bids and live auctions with a
+// bid across the board, and, on live readings (from 2026-09-27), the same two per make.
+export interface HourReading {
+  day: string; // value_date, UTC
+  bids: number;
+  n: number | null;
+  byMake: Record<string, [number, number]> | null; // make -> [bids, auctions with a bid]
+  source: string; // live | archive (rebuilt from BaT bid history, 96% of auctions)
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+// The same UTC weekday and hour in each of the 12 weeks before today: the window market_pulse_live() uses for
+// same_hour, read with every field of the reading instead of the bids alone.
+async function fetchSameHour(hourUtc: string, todayUtc: string): Promise<HourReading[]> {
+  const days = Array.from({ length: 12 }, (_, i) => new Date(Date.parse(todayUtc) - (i + 1) * WEEK_MS).toISOString().slice(0, 10));
+  const { data, error } = await supabase
+    .from('market_index_values')
+    .select(`value_date, h:components_snapshot->hourly->"${hourUtc}", src:calculation_metadata->sources->>"${hourUtc}", src_all:calculation_metadata->>source, market_indexes!inner(index_code)`)
+    .eq('market_indexes.index_code', 'BAT-LIVE-BIDS')
+    .in('value_date', days)
+    .order('value_date');
+  if (error) throw error;
+  return ((data ?? []) as any[])
+    .filter((r) => r.h && r.h.bids != null)
+    .map((r) => ({
+      day: String(r.value_date),
+      bids: Number(r.h.bids),
+      n: r.h.n == null ? null : Number(r.h.n),
+      byMake: r.h.by_make ?? null,
+      source: String(r.src ?? r.src_all ?? 'live'),
+    }));
+}
+
+// Re-read when the UTC hour turns; within the hour the readings don't change.
+export function useSameHourReadings(hourUtc: string, todayUtc: string) {
+  return useQuery({
+    queryKey: ['market-same-hour', todayUtc, hourUtc],
+    queryFn: () => fetchSameHour(hourUtc, todayUtc),
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+}
+
 // The live sync reads BaT every 15 minutes; a one-minute poll shows a new sync within a minute of it landing.
 const REFETCH_MS = 60_000;
 
