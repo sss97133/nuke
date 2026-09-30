@@ -95,13 +95,28 @@ def write_pins(mod, out):
                      "exit_dir_glb": K.glb_dir(tm["dir"]), "wires": K.wire_rows(ids),
                      **({"registry_endpoint": tm["registry_endpoint"]} if tm.get("registry_endpoint") else {}),
                      **({"note": tm["note"]} if tm.get("note") else {})})
+    mates = mating_halves(A["endpoints"])
     (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
         {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug, blade or lead "
                                   "leaves the part, wire_side = the lead's free end (same as pin_tip for a stud or blade), "
                                   "exit_dir = the way the wire leaves",
          "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text), or the wire ids named",
+         **({"mating_half": mates, "mating_half_source": "docs/wiring/calc-data/catalog/pin_tables/<end>.yaml `mate`"} if mates else {}),
          "cavities": rows}, indent=1, ensure_ascii=False))
     return rows
+
+
+def mating_halves(endpoints):
+    """{end: the harness half that plugs onto this part} from each end's pin table (`mate`), where one is written."""
+    import yaml
+    out = {}
+    for e in endpoints:
+        f = K.CALC / "catalog" / "pin_tables" / f"{e}.yaml"
+        if f.exists():
+            m = (yaml.safe_load(f.read_text()) or {}).get(e, {}).get("mate")
+            if m:
+                out[e] = str(m)
+    return out
 
 
 def glb_scan(path):

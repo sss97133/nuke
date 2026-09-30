@@ -209,6 +209,7 @@ def _assumed_part(end, title, what, maker, pn, dims_mm, dims_note, margin, frame
 
 
 LTSM = "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf"
+RA = "https://www.rockauto.com"
 
 
 def gm_starter(end="STARTER-S"):
@@ -265,20 +266,26 @@ def gm_starter(end="STARTER-S"):
 
 def gm_horn(end="HORN"):
     BK = "1978 C/K wiring booklet p.13 (registry): factory horn, one terminal in connector 12004267, grounds through its bracket"
-    A = "no GM dimension or part number on file for the factory horn: a GM snail horn envelope, assumed"
-    P = {"d": Dim(110.0, A, "assumed", "horn body"), "depth": Dim(70.0, A, "assumed"),
-         "bracket_l": Dim(60.0, A, "assumed", "mounting bracket"), "blade_w": Dim(6.35, f"{BK} (a Packard 56 blade, family gm_blade)", "assumed")}
-    C = {"body": ("#1c1c1d", "factory horns are black: drawn black (no photo on file)"), "bracket": ("#2a2a2b", "bracket: black"),
+    PH = "SMP HN16 photo (RockAuto)"
+    A = ("no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that "
+         f"RockAuto lists for the 1977 K5 (proportions off {PH}), size assumed")
+    P = {"d": Dim(85.0, A, "assumed", "diaphragm housing"), "depth": Dim(28.0, A, "assumed", "diaphragm housing"),
+         "snail_w": Dim(80.0, A, "assumed", "snail cover in front"), "snail_d": Dim(40.0, A, "assumed"),
+         "bracket_l": Dim(60.0, A, "assumed", "mounting bracket"), "blade_w": Dim(6.35, f"{BK} (a Packard 56 blade, family gm_blade)", "vendor")}
+    C = {"body": ("#2d2925", f"{PH}: black horn (k-means)"), "bracket": ("#5b594e", f"{PH}: gold-zinc bracket (k-means)"),
          "blade": ("#c7c2b4", "blade: drawn tin")}
     v = K.v
 
     def build():
         bracket = D.rbox(20.0, v(P["bracket_l"]), 3.0, r=4.0) - D.cyl(8.5, 10, at=(0, v(P["bracket_l"]) / 2 - 10.0, -1))
-        body = D.cyl(v(P["d"]), v(P["depth"]) - 20.0, at=(0, -v(P["bracket_l"]) / 2 - v(P["d"]) / 2 + 10.0, 3.0))
-        bell = D.cone(v(P["d"]) * 0.5, v(P["d"]) * 0.35, 20.0, at=(0, -v(P["bracket_l"]) / 2 - v(P["d"]) / 2 + 10.0, 3.0 + v(P["depth"]) - 20.0))
-        blade = D.blade((v(P["d"]) / 2 - 6.0, -v(P["bracket_l"]) / 2 - v(P["d"]) / 2 + 10.0, 3.0 + 10.0), axis="x", w=v(P["blade_w"]), l=8.0)
-        return [K.body(bracket, f"{end} mounting bracket (ground path)", C["bracket"][0], finish="paint"),
-                K.body(body + bell, f"{end} horn body", C["body"][0]), K.body(blade, f"{end} terminal blade", C["blade"][0], finish="metal")], [], []
+        cy = -v(P["bracket_l"]) / 2 - v(P["d"]) / 2 + 10.0
+        body = D.cyl(v(P["d"]), v(P["depth"]), at=(0, cy, 3.0))
+        sw = v(P["snail_w"])
+        snail = Pos(sw * 0.12, cy - sw * 0.08, 3.0 + v(P["depth"])) * D.rbox(sw, sw, v(P["snail_d"]), r=sw * 0.3, r_top=8.0)
+        bell = body + snail
+        blade = D.blade((v(P["d"]) / 2 - 6.0, cy, 3.0 + 10.0), axis="x", w=v(P["blade_w"]), l=8.0)
+        return [K.body(bracket, f"{end} mounting bracket (ground path)", C["bracket"][0], finish="metal"),
+                K.body(bell, f"{end} horn body and snail cover", C["body"][0]), K.body(blade, f"{end} terminal blade", C["blade"][0], finish="metal")], [], []
 
     def _t():
         return (v(P["d"]) / 2 - 6.0 + 8.0, -v(P["bracket_l"]) / 2 - v(P["d"]) / 2 + 10.0, 13.0)
@@ -295,16 +302,25 @@ def gm_horn(end="HORN"):
         return [{"n": "bracket", "at": [0, round(v(P["bracket_l"]) / 2 - 10.0, 2), 3.0], "dir": [0, 0, -1], "d": 8.5,
                  "note": "bolt to the radiator support (grounds through it)"}]
 
-    return _assumed_part(end, "Horn (factory, on the radiator support)", "Horn, factory, one terminal (connector 12004267), grounds through its "
-                         "bracket", "GM (factory)", "unknown", {"l": 110.0, "w": 170.0, "h": 73.0},
-                         "no GM number or size on file: a snail horn envelope, assumed (±25)",
-                         {"mm": 25.0, "why": "factory horn with no part number or dimension on file"},
-                         "origin at the centre of the bracket's face on the radiator support; +Z out of the support, +Y up",
-                         [("[1]", "1978 C/K wiring booklet", "1978 booklet p.13 via the registry"), ("[2]", "no GM dimension", "assumed")],
-                         [("#48 on the terminal; HORN_GND needs a ring under the mount bolt (registry open).", "#10151a"),
-                          ("Every size is assumed (red).", "assumed")],
-                         ["Every dimension: no part number on file. Read the horn on the truck."],
-                         P, C, build, attach_points, terminals, mount_points, [("drawn at the assumed envelope", lambda b: 1.0, 1.0)])
+    ns = _assumed_part(end, "Horn (factory location on the radiator support; drawn as SMP HN16)", "Horn, factory, one terminal (connector "
+                       "12004267), grounds through its bracket; the registry names no horn, so SMP's HN16 low-tone snail is drawn",
+                       "GM (factory)", "unknown (registry names none; drawn as SMP HN16)",
+                       {"l": round(v(P["d"]) / 2 + v(P["snail_w"]) * 0.62, 1), "w": round(v(P["bracket_l"]) + v(P["d"]) - 10.0, 1),
+                        "h": round(3.0 + v(P["depth"]) + v(P["snail_d"]), 1)},
+                       "no horn named and no size on file: SMP HN16's proportions at an assumed size (±25)",
+                       {"mm": 25.0, "why": "the registry names no horn; no dimension on file"},
+                       "origin at the centre of the bracket's face on the radiator support; +Z out of the support, +Y up",
+                       [("[1]", "1978 C/K wiring booklet", "1978 booklet p.13 via the registry"),
+                        ("[2]", "SMP HN16", "RockAuto 1977 K5 Blazer horn listing: SMP HN15 / HN16 (high / low tone, 2 terminals), "
+                                            "ACDelco E1905E, Wells 1H1001; LMC 36-2150 / 36-2152 standard horns"),
+                        ("[3]", "no size", "no dimension on file: assumed")],
+                       [("#48 on the terminal; HORN_GND needs a ring under the mount bolt (registry open).", "#10151a"),
+                        ("Every size is assumed (red).", "assumed")],
+                       ["Which horn is on the truck (the registry names none), and every dimension."],
+                       P, C, build, attach_points, terminals, mount_points, [("drawn at the assumed envelope", lambda b: 1.0, 1.0)],
+                       photo={"url": f"{RA}/info/154/HN-16_Front.jpg", "page": f"{RA}/en/moreinfo.php?pk=319740", "fetched": "2026-09-29"})
+    ns["PART"]["photo_short"] = PH
+    return ns
 
 
 def gm_wiper(end="WIPER-MOTOR"):
@@ -378,45 +394,75 @@ def gm_wiper(end="WIPER-MOTOR"):
     return ns
 
 
+
 def gm_blower_resistor(end="BLOWER-RES"):
+    """GM 336403 A/C blower resistor (A/C without the heavy-duty heater: Four Seasons 20083, SMP RU67, Wells 3A1044, UMP
+    BMR11, Holstein 2BMR0020 on RockAuto's 1977 K5 listing; LMC 32-2406), drawn off Four Seasons' 20083 photo at an
+    assumed size: a black diamond plate with two holes and four blades, the steel strips and coils inside the case."""
     BK = "1978 C/K wiring booklet p.16 sheet A-4 (registry): C60 blower resistor, four terminals BAT / M1 / M2 / BLO"
-    A = "no GM dimension or part number on file for the factory A/C blower resistor: envelope assumed"
-    P = {"plate_w": Dim(76.0, A, "assumed", "mounting plate on the case"), "plate_h": Dim(56.0, A, "assumed"),
-         "coil_l": Dim(55.0, A, "assumed", "resistor coils inside the case"), "shroud_w": Dim(30.0, A, "assumed", "4-way terminal shroud")}
-    C = {"plate": ("#b9bcbe", "plate: drawn zinc"), "coil": ("#8a5a3a", "coils: drawn nichrome on a ceramic card"),
-         "shroud": ("#2a2a2b", "terminal shroud: drawn black")}
+    PH = "Four Seasons 20083 photo (RockAuto)"
+    A = f"no size in any source: assumed; proportions off {PH}"
+    P = {"hole_pitch": Dim(70.0, A, "assumed", "the plate's two mounting holes", "fit-critical"),
+         "plate_l": Dim(84.0, A, "assumed", "diamond plate, tip to tip"), "plate_w": Dim(46.0, A, "assumed", "at its widest"),
+         "plate_t": Dim(1.6, A, "assumed", "phenolic plate"), "hole_d": Dim(5.5, A, "assumed"),
+         "strip_l": Dim(92.0, A, "assumed", "steel strips into the case"), "coil_d": Dim(11.0, A, "assumed", "resistor coils"),
+         "blade_w": Dim(6.35, f"{BK} (family gm_blade: the 0.250 in Packard 56 tab)", "vendor")}
+    C = {"plate": ("#2f2f2e", f"{PH}: black plate (k-means)"), "strip": ("#80909f", f"{PH}: zinc strips (k-means, lit face)"),
+         "coil": ("#8e8f8d", f"{PH}: coils"), "blade": ("#b9bfc4", "blades: drawn tin")}
     v = K.v
+    NAMES = ("BAT", "M1", "M2", "BLO")
+    BP = [(-4.5, 5.5), (4.5, 5.5), (-4.5, -5.5), (4.5, -5.5)]      # the photo's 2 x 2 cluster
 
     def build():
-        plate = D.rbox(v(P["plate_w"]), v(P["plate_h"]), 1.5, r=4.0)
-        for sx in (-1, 1):
-            plate -= D.cyl(5.0, 4, at=(sx * (v(P["plate_w"]) / 2 - 7.0), 0, -1))
-        card = Pos(0, 0, -v(P["coil_l"])) * Box(40.0, 3.0, v(P["coil_l"]), align=D.BASE)
-        shroud = Pos(0, 0, 1.5) * D.rbox(v(P["shroud_w"]), 22.0, 16.0, r=3.0)
-        return [K.body(plate, f"{end} mounting plate", C["plate"][0], finish="metal"),
-                K.body(card, f"{end} resistor coils (inside the case)", C["coil"][0]),
-                K.body(shroud, f"{end} 4-way terminal shroud (BAT / M1 / M2 / BLO)", C["shroud"][0])], [], []
+        from build123d import Sketch, Circle, make_hull, extrude
+        L_, W_ = v(P["plate_l"]), v(P["plate_w"])
+        pts = [(0, L_ / 2 - 7.0), (0, -(L_ / 2 - 7.0)), (W_ / 2 - 7.0, 0), (-(W_ / 2 - 7.0), 0)]
+        hull = make_hull((Sketch() + [Pos(x, y) * Circle(7.0) for x, y in pts]).edges())
+        plate = extrude(hull, amount=v(P["plate_t"]))
+        for sy in (-1, 1):
+            plate -= D.cyl(v(P["hole_d"]), 5, at=(0, sy * v(P["hole_pitch"]) / 2, -1))
+        rivets = Compound(children=[D.cyl(4.0, 1.0, at=(x, y, v(P["plate_t"]))) for x, y in ((-9.5, 12.0), (9.5, 12.0), (-9.5, -12.0), (9.5, -12.0))]).fuse()
+        strips = Compound(children=[Pos(sx * 7.0, 0, -v(P["strip_l"])) * Box(2.0, 12.0, v(P["strip_l"]), align=D.BASE) for sx in (-1, 1)]).fuse()
+        coils = Compound(children=[D.cyl(v(P["coil_d"]), 16.0, at=(sx * 7.0, sy * 9.0, -v(P["strip_l"]) + 2.0), axis="x")
+                                   for sx in (-1, 1) for sy in (-1, 1)]).fuse()
+        blades = Compound(children=[D.blade((x, y, v(P["plate_t"])), axis="z", w=v(P["blade_w"]), l=9.0) for x, y in BP]).fuse()
+        return [K.body(plate, f"{end} diamond plate", C["plate"][0]), K.body(rivets, f"{end} rivets", C["strip"][0], finish="metal"),
+                K.body(strips, f"{end} steel strips (inside the case)", C["strip"][0], finish="metal"),
+                K.body(coils, f"{end} resistor coils (inside the case)", C["coil"][0], finish="metal"),
+                K.body(blades, f"{end} blades BAT / M1 / M2 / BLO", C["blade"][0], finish="metal")], [], []
 
     def attach_points():
-        return [{"n": "plug", "ep": end, "at": [0, 0, 17.5], "dir": [0, 0, 1], "kind": "4-way plug", "note": "BAT / M1 / M2 / BLO"}]
+        return [{"n": t, "ep": end, "at": [x, y, round(v(P["plate_t"]) + 9.0, 2)], "dir": [0, 0, 1], "kind": "blade", "note": t}
+                for t, (x, y) in zip(NAMES, BP)]
 
     def terminals():
-        return [{"pin": t, "endpoint": end, "name": t, "kind": "blade", "match": rf"^{t}$", "at": (-9.0 + 6.0 * i, 0, 17.5), "dir": (0, 0, 1)}
-                for i, t in enumerate(("BAT", "M1", "M2", "BLO"))]
+        return [{"pin": t, "endpoint": end, "name": t, "kind": "blade", "match": rf"^{t}$", "at": (x, y, v(P["plate_t"])), "dir": (0, 0, 1)}
+                for t, (x, y) in zip(NAMES, BP)]
 
     def mount_points():
-        return [{"n": f"screw_{s}", "at": [sx * (v(P["plate_w"]) / 2 - 7.0), 0, 1.5], "dir": [0, 0, -1], "note": "screw into the evaporator case"}
-                for s, sx in (("L", -1), ("R", 1))]
+        return [{"n": f"screw_{s_}", "at": [0, sy * v(P["hole_pitch"]) / 2, 0], "dir": [0, 0, -1], "d": v(P["hole_d"]),
+                 "note": "screw into the evaporator case"} for s_, sy in (("top", 1), ("bottom", -1))]
 
-    return _assumed_part(end, "Factory A/C blower resistor (Four-Season case)", "Blower resistor, factory, on the blower-evaporator case: "
-                         "4 terminals BAT / M1 / M2 / BLO", "GM (factory)", "unknown", {"l": 76.0, "w": 56.0, "h": 73.0},
-                         "no GM number or size on file: envelope assumed (±20)", {"mm": 20.0, "why": "factory part, nothing on file"},
-                         "origin at the centre of the mounting plate on the evaporator case; +Z out of the case (the plug), coils inside (-Z)",
-                         [("[1]", "1978 C/K wiring booklet", "1978 booklet p.16 sheet A-4 via the registry"), ("[2]", "no GM dimension", "assumed")],
-                         [("BAT = BLOWER_BAT, M1 = BLOWER_MED, M2 = BLOWER_M2, BLO = BLOWER_MOT (registry).", "#10151a"),
-                          ("Every size is assumed (red); the terminal order on the plug is drawn in the registry's order.", "assumed")],
-                         ["Every dimension and the terminal order: read the resistor on the truck (registry: confirm 4 terminals)."],
-                         P, C, build, attach_points, terminals, mount_points, [("drawn at the assumed envelope", lambda b: 1.0, 1.0)])
+    ns = _assumed_part(end, "GM A/C blower resistor (336403 pattern; Four Seasons 20083)", "Blower resistor, factory A/C (GM 336403; "
+                       "Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
+                       "GM", "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
+                       {"l": v(P["plate_w"]), "w": v(P["plate_l"]), "h": round(v(P["strip_l"]) + v(P["plate_t"]) + 9.0, 1)},
+                       "no size in any source: Four Seasons' photo's proportions at an assumed 70 mm hole pitch (±15)",
+                       {"mm": 15.0, "why": "no size published; proportions from the maker's photo"},
+                       "origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), "
+                       "strips and coils inside (-Z), +Y through the two holes",
+                       [("[1]", "RockAuto 336403", "RockAuto 1977 K5 Blazer blower resistor listing: GM 336403 for A/C without the "
+                                                   "heavy-duty heater (Four Seasons 20083, SMP RU67, Wells 3A1044 '2 bolt holes, 4 blades')"),
+                        ("[2]", "LMC 32-2406", "LMC catalogue (database, ccComplete.pdf): 32-2406 blower resistor, W/AC 1973-87"),
+                        ("[3]", "1978 C/K wiring booklet", "1978 booklet p.16 sheet A-4 via the registry")],
+                       [("BAT = BLOWER_BAT, M1 = BLOWER_MED, M2 = BLOWER_M2, BLO = BLOWER_MOT (registry).", "#10151a"),
+                        ("Every size is assumed (red); the blades' order in the cluster is drawn in the registry's order.", "assumed")],
+                       ["Every size and the blade order: read the resistor on the truck."],
+                       P, C, build, attach_points, terminals, mount_points, [("drawn at the assumed envelope", lambda b: 1.0, 1.0)],
+                       photo={"url": f"{RA}/info/52/20083.jpg", "page": f"{RA}/en/moreinfo.php?pk=1312672", "fetched": "2026-09-29"})
+    ns["PART"]["photo_short"] = PH
+    ns["PART"]["cross_checks"] = ["Four Seasons, SMP, Wells and UMP list 4 male blades; the registry lands 4 (BAT, M1, M2, BLO)."]
+    return ns
 
 
 def amp_powerstep(end="AMP-STEP-CTRL"):

@@ -4,9 +4,9 @@
  "ends_by_shape_basis": {
   "maker drawing": 40,
   "datasheet dims": 36,
-  "scaled from photo": 39,
+  "scaled from photo": 42,
   "twin object": 11,
-  "not sourced": 35
+  "not sourced": 32
  },
  "ends": {
   "AC-CLUTCH": {
@@ -2304,16 +2304,16 @@
    "endpoints": [
     "BLOWER-RES"
    ],
-   "what": "Blower resistor, factory, on the blower-evaporator case: 4 terminals BAT / M1 / M2 / BLO",
-   "maker": "GM (factory)",
-   "maker_pn": "unknown",
+   "what": "Blower resistor, factory A/C (GM 336403; Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT / M1 / M2 / BLO",
+   "maker": "GM",
+   "maker_pn": "GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 76.0,
-    "w": 56.0,
-    "h": 73.0
+    "l": 46.0,
+    "w": 84.0,
+    "h": 102.6
    },
-   "frame": "origin at the centre of the mounting plate on the evaporator case; +Z out of the case (the plug), coils inside (-Z)",
+   "frame": "origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), strips and coils inside (-Z), +Y through the two holes",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
@@ -2321,63 +2321,117 @@
    },
    "colors": {
     "plate": {
-     "hex": "#b9bcbe",
-     "from": "plate: drawn zinc"
+     "hex": "#2f2f2e",
+     "from": "Four Seasons 20083 photo (RockAuto): black plate (k-means)"
+    },
+    "strip": {
+     "hex": "#80909f",
+     "from": "Four Seasons 20083 photo (RockAuto): zinc strips (k-means, lit face)"
     },
     "coil": {
-     "hex": "#8a5a3a",
-     "from": "coils: drawn nichrome on a ceramic card"
+     "hex": "#8e8f8d",
+     "from": "Four Seasons 20083 photo (RockAuto): coils"
     },
-    "shroud": {
-     "hex": "#2a2a2b",
-     "from": "terminal shroud: drawn black"
+    "blade": {
+     "hex": "#b9bfc4",
+     "from": "blades: drawn tin"
     }
    },
    "attach": [
     {
-     "n": "plug",
+     "n": "BAT",
      "ep": "BLOWER-RES",
      "at": [
-      0,
-      0,
-      17.5
+      -4.5,
+      5.5,
+      10.6
      ],
      "dir": [
       0,
       0,
       1
      ],
-     "kind": "4-way plug",
-     "note": "BAT / M1 / M2 / BLO"
+     "kind": "blade",
+     "note": "BAT"
+    },
+    {
+     "n": "M1",
+     "ep": "BLOWER-RES",
+     "at": [
+      4.5,
+      5.5,
+      10.6
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "blade",
+     "note": "M1"
+    },
+    {
+     "n": "M2",
+     "ep": "BLOWER-RES",
+     "at": [
+      -4.5,
+      -5.5,
+      10.6
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "blade",
+     "note": "M2"
+    },
+    {
+     "n": "BLO",
+     "ep": "BLOWER-RES",
+     "at": [
+      4.5,
+      -5.5,
+      10.6
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "blade",
+     "note": "BLO"
     }
    ],
    "mount": [
     {
-     "n": "screw_L",
+     "n": "screw_top",
      "at": [
-      -31.0,
       0,
-      1.5
+      35.0,
+      0
      ],
      "dir": [
       0,
       0,
       -1
      ],
+     "d": 5.5,
      "note": "screw into the evaporator case"
     },
     {
-     "n": "screw_R",
+     "n": "screw_bottom",
      "at": [
-      31.0,
       0,
-      1.5
+      -35.0,
+      0
      ],
      "dir": [
       0,
       0,
       -1
      ],
+     "d": 5.5,
      "note": "screw into the evaporator case"
     }
    ]
@@ -2386,37 +2440,40 @@
    "endpoints": [
     "BLOWER-SW"
    ],
-   "what": "Blower switch, factory Four-Season control head: LO, M1, M2 through the resistor; HI as a PDM30 input",
-   "maker": "GM (factory)",
-   "maker_pn": "factory",
+   "what": "Blower switch, factory A/C control head (GM 469368; Four Seasons 37566, SMP HS435): LO, M1, M2 through the resistor; HI as a PDM30 input",
+   "maker": "GM",
+   "maker_pn": "GM 469368 (Four Seasons 37566, SMP HS435)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 50.0,
-    "w": 38.0,
-    "h": 65.0
+    "l": 87.4,
+    "w": 49.9,
+    "h": 18.0
    },
-   "frame": "origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver",
+   "frame": "origin between the two ear holes on the bracket's mounting face (the control head); +Z out of the mounting face toward the case, +X from the blades toward the lever, +Y up as the maker's photo shows it",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
-    "faces": {}
+    "faces": {
+     "blades": "-X",
+     "lever": "+X"
+    }
    },
    "colors": {
-    "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
-    },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
+    "case": {
+     "hex": "#9a9c9b",
+     "from": "Four Seasons 37566 photo (RockAuto): zinc case (k-means)"
     },
     "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
+     "hex": "#c9ccce",
+     "from": "Four Seasons 37566 photo (RockAuto): chrome plate and lever"
+    },
+    "fibre": {
+     "hex": "#b0773f",
+     "from": "Four Seasons 37566 photo (RockAuto): brown fibre board between case and blades"
     },
     "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+     "hex": "#c47a4f",
+     "from": "Four Seasons 37566 photo (RockAuto): copper blades"
     }
    },
    "attach": [
@@ -2424,25 +2481,25 @@
      "n": "pin_1",
      "ep": "BLOWER-SW",
      "at": [
-      0.0,
-      -12.0,
-      -35.0
+      -27.66,
+      13.03,
+      6.3
      ],
      "dir": [
+      -1,
       0,
-      0,
-      -1
+      0
      ],
-     "kind": "blade",
+     "kind": "blade (4)",
      "note": "leads: 51, 45, BLOWER_BAT, BLOWER_MED, BLOWER_M2"
     }
    ],
    "mount": [
     {
-     "n": "mount",
+     "n": "ear_upper",
      "at": [
-      0,
-      0,
+      4.21,
+      12.3,
       0
      ],
      "dir": [
@@ -2450,7 +2507,23 @@
       0,
       -1
      ],
-     "note": "mounting face"
+     "d": 3.4,
+     "note": "screw to the control head"
+    },
+    {
+     "n": "ear_lower",
+     "at": [
+      -4.21,
+      -12.3,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 3.4,
+     "note": "screw to the control head"
     }
    ]
   },
@@ -2458,37 +2531,36 @@
    "endpoints": [
     "BRAKE-SW"
    ],
-   "what": "Brake light switch, factory, at the pedal: switches 0V (PDM30 A28) into DIG14",
-   "maker": "GM (factory)",
-   "maker_pn": "factory (connector 2984235)",
-   "shape_basis": "not sourced",
+   "what": "Brake light switch, factory pattern at the pedal (SMP SLS66, GM 1362835 family): switches 0V (PDM30 A28) into DIG14",
+   "maker": "GM",
+   "maker_pn": "GM 1362835 family (SMP SLS66, Wells 1S5238, Rostra 620014)",
+   "shape_basis": "scaled from photo",
    "dims_mm": {
-    "l": 30.0,
-    "w": 30.0,
-    "h": 72.0
+    "l": 25.8,
+    "w": 25.8,
+    "h": 115.8
    },
-   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "frame": "origin on the switch axis at the plunger end of the threaded barrel; +Z along the axis toward the plunger (the pedal arm), the body and blades toward -Z; +Y through the two blades",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
-    "faces": {}
+    "faces": {
+     "plunger": "+Z",
+     "blades": "-Z"
+    }
    },
    "colors": {
     "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
+     "hex": "#23201e",
+     "from": "SMP SLS66 photo (RockAuto): black body (k-means)"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
-    },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
+    "plunger": {
+     "hex": "#d6d8d7",
+     "from": "SMP SLS66 photo (RockAuto): white plunger (k-means)"
     },
     "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+     "hex": "#7e6e51",
+     "from": "SMP SLS66 photo (RockAuto): brass blades (k-means)"
     }
    },
    "attach": [
@@ -2496,49 +2568,50 @@
      "n": "pin_1",
      "ep": "BRAKE-SW",
      "at": [
-      -3.5,
-      0.0,
-      -55.0
+      0,
+      7.05,
+      -87.5
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "140 feed cavity: BRK_SW_0V"
     },
     {
      "n": "pin_2",
      "ep": "BRAKE-SW",
      "at": [
-      3.5,
-      0.0,
-      -55.0
+      0,
+      -7.05,
+      -87.5
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "17 output cavity: 53"
     }
    ],
    "mount": [
     {
-     "n": "mount",
+     "n": "barrel",
      "at": [
       0,
       0,
-      0
+      -22.95
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "note": "mounting face"
+     "d": 20.0,
+     "note": "the threaded barrel goes through the pedal bracket into the spring locknut, its flat on the locknut's finger; set for 1/16 in free plunger travel (SMP GF8592B)"
     }
    ]
   },
@@ -3851,37 +3924,36 @@
    "endpoints": [
     "DOOR-JAMB-L"
    ],
-   "what": "Driver door jamb switch, factory pin switch (grounds through the body)",
-   "maker": "GM (factory)",
-   "maker_pn": "factory pin switch (terminal 2984369)",
+   "what": "Driver door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through the body",
+   "maker": "GM",
+   "maker_pn": "GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 27.0,
-    "w": 27.0,
-    "h": 57.0
+    "l": 15.0,
+    "w": 15.0,
+    "h": 62.0
    },
-   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "frame": "origin on the switch axis at the pillar face (the thread's top); +Z out of the pillar toward the door (the plunger), the body inside the pillar",
    "axes": {
     "mount_normal": "+Z",
-    "maker_up": "+Y",
-    "faces": {}
+    "maker_up": "+Z",
+    "faces": {
+     "plunger": "+Z",
+     "terminal": "-Z"
+    }
    },
    "colors": {
-    "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
+    "zinc": {
+     "hex": "#a9aaa6",
+     "from": "SMP DS173 photo (RockAuto): zinc body and hex"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
+    "bronze": {
+     "hex": "#8a7a5c",
+     "from": "SMP spec table: 'Color/Finish: Bronze' (the terminal)"
     },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
-    },
-    "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+    "head": {
+     "hex": "#b8bab8",
+     "from": "SMP DS173 photo (RockAuto): plunger head"
     }
    },
    "attach": [
@@ -3891,31 +3963,32 @@
      "at": [
       0.0,
       0.0,
-      -40.0
+      -46.5
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "kind": "blade",
+     "kind": "bullet terminal",
      "note": "switch terminal: 42, STEP_DOOR_L"
     }
    ],
    "mount": [
     {
-     "n": "mount",
+     "n": "thread",
      "at": [
       0,
       0,
-      0
+      -7.0
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "note": "mounting face"
+     "d": 12.5,
+     "note": "screws into the pillar; grounds through the body (registry)"
     }
    ]
   },
@@ -3923,37 +3996,36 @@
    "endpoints": [
     "DOOR-JAMB-R"
    ],
-   "what": "Passenger door jamb switch, factory pin switch (grounds through the body)",
-   "maker": "GM (factory)",
-   "maker_pn": "factory pin switch (terminal 2984369)",
+   "what": "Passenger door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through the body",
+   "maker": "GM",
+   "maker_pn": "GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 27.0,
-    "w": 27.0,
-    "h": 57.0
+    "l": 15.0,
+    "w": 15.0,
+    "h": 62.0
    },
-   "frame": "origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's striker",
+   "frame": "origin on the switch axis at the pillar face (the thread's top); +Z out of the pillar toward the door (the plunger), the body inside the pillar",
    "axes": {
     "mount_normal": "+Z",
-    "maker_up": "+Y",
-    "faces": {}
+    "maker_up": "+Z",
+    "faces": {
+     "plunger": "+Z",
+     "terminal": "-Z"
+    }
    },
    "colors": {
-    "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
+    "zinc": {
+     "hex": "#a9aaa6",
+     "from": "SMP DS173 photo (RockAuto): zinc body and hex"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
+    "bronze": {
+     "hex": "#8a7a5c",
+     "from": "SMP spec table: 'Color/Finish: Bronze' (the terminal)"
     },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
-    },
-    "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+    "head": {
+     "hex": "#b8bab8",
+     "from": "SMP DS173 photo (RockAuto): plunger head"
     }
    },
    "attach": [
@@ -3963,31 +4035,32 @@
      "at": [
       0.0,
       0.0,
-      -40.0
+      -46.5
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "kind": "blade",
+     "kind": "bullet terminal",
      "note": "switch terminal: 43, STEP_DOOR_R"
     }
    ],
    "mount": [
     {
-     "n": "mount",
+     "n": "thread",
      "at": [
       0,
       0,
-      0
+      -7.0
      ],
      "dir": [
       0,
       0,
       -1
      ],
-     "note": "mounting face"
+     "d": 12.5,
+     "note": "screws into the pillar; grounds through the body (registry)"
     }
    ]
   },
@@ -4241,37 +4314,45 @@
    "endpoints": [
     "FLOOR-DIMMER"
    ],
-   "what": "Headlamp dimmer switch, factory floor switch: feed, LOW and HIGH (GM connector 8900855)",
-   "maker": "GM (factory)",
-   "maker_pn": "factory (connector 8900855)",
-   "shape_basis": "not sourced",
+   "what": "Headlamp dimmer switch, factory floor switch (GM 1997037 / 12338706; SMP DS72): feed, LOW and HIGH blades",
+   "maker": "GM",
+   "maker_pn": "GM 1997037 (SMP DS72, Wells 1S4829, Rostra 650003)",
+   "shape_basis": "scaled from photo",
    "dims_mm": {
-    "l": 76.0,
-    "w": 50.0,
-    "h": 78.0
+    "l": 84.5,
+    "w": 26.1,
+    "h": 59.5
    },
-   "frame": "origin at the centre of the flange on the floor pan; +Z up into the cab (the plunger), body below the floor",
+   "frame": "origin at the ear hole on the ear's mounting face; +Z out of the mounting face (the switch body), +X along the plunger axis toward the button, +Y toward the blades",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
-    "faces": {}
+    "faces": {
+     "plunger": "+X",
+     "blades": "+Y",
+     "ear": "-X"
+    }
    },
    "colors": {
-    "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
+    "can": {
+     "hex": "#a3a8a6",
+     "from": "SMP DS72 photo (RockAuto): chrome can (k-means, lit face)"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
+    "cast": {
+     "hex": "#6e716b",
+     "from": "SMP DS72 photo (RockAuto): cast body (k-means, lit face)"
     },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
+    "ins": {
+     "hex": "#1a1a18",
+     "from": "SMP DS72 photo (RockAuto): black insulator (k-means)"
     },
     "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+     "hex": "#817246",
+     "from": "SMP DS72 photo (RockAuto): brass blades (k-means)"
+    },
+    "rivet": {
+     "hex": "#7d6d51",
+     "from": "SMP DS72 photo (RockAuto): copper rivets on the insulator (k-means)"
     }
    },
    "attach": [
@@ -4279,48 +4360,48 @@
      "n": "pin_1",
      "ep": "FLOOR-DIMMER",
      "at": [
-      -7.0,
-      0.0,
-      -54.0
+      16.3,
+      35.5,
+      8.05
      ],
      "dir": [
       0,
-      0,
-      -1
+      1,
+      0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "10 feed cavity: 85, 86"
     },
     {
      "n": "pin_2",
      "ep": "FLOOR-DIMMER",
      "at": [
-      0.0,
-      0.0,
-      -54.0
+      25.2,
+      35.5,
+      8.05
      ],
      "dir": [
       0,
-      0,
-      -1
+      1,
+      0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "12 LOW cavity: 85a, 86a"
     },
     {
      "n": "pin_3",
      "ep": "FLOOR-DIMMER",
      "at": [
-      7.0,
-      0.0,
-      -54.0
+      20.75,
+      35.5,
+      18.05
      ],
      "dir": [
       0,
-      0,
-      -1
+      1,
+      0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "11 HIGH cavity: 85b, 86b, 121"
     }
    ],
@@ -4926,14 +5007,14 @@
    "endpoints": [
     "HORN"
    ],
-   "what": "Horn, factory, one terminal (connector 12004267), grounds through its bracket",
+   "what": "Horn, factory, one terminal (connector 12004267), grounds through its bracket; the registry names no horn, so SMP's HN16 low-tone snail is drawn",
    "maker": "GM (factory)",
-   "maker_pn": "unknown",
+   "maker_pn": "unknown (registry names none; drawn as SMP HN16)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 110.0,
-    "w": 170.0,
-    "h": 73.0
+    "l": 92.1,
+    "w": 135.0,
+    "h": 71.0
    },
    "frame": "origin at the centre of the bracket's face on the radiator support; +Z out of the support, +Y up",
    "axes": {
@@ -4943,12 +5024,12 @@
    },
    "colors": {
     "body": {
-     "hex": "#1c1c1d",
-     "from": "factory horns are black: drawn black (no photo on file)"
+     "hex": "#2d2925",
+     "from": "SMP HN16 photo (RockAuto): black horn (k-means)"
     },
     "bracket": {
-     "hex": "#2a2a2b",
-     "from": "bracket: black"
+     "hex": "#5b594e",
+     "from": "SMP HN16 photo (RockAuto): gold-zinc bracket (k-means)"
     },
     "blade": {
      "hex": "#c7c2b4",
@@ -4960,8 +5041,8 @@
      "n": "terminal",
      "ep": "HORN",
      "at": [
-      57.0,
-      -75.0,
+      44.5,
+      -62.5,
       13.0
      ],
      "dir": [
@@ -5130,37 +5211,40 @@
    "endpoints": [
     "IGN-SWITCH"
    ],
-   "what": "Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column",
+   "what": "Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column (interchange of SMP US105, Rostra 630003)",
    "maker": "OER (GM pattern)",
    "maker_pn": "1990096",
-   "shape_basis": "not sourced",
+   "shape_basis": "scaled from photo",
    "dims_mm": {
-    "l": 70.0,
-    "w": 38.0,
-    "h": 30.0
+    "l": 106.7,
+    "w": 26.5,
+    "h": 61.1
    },
-   "frame": "origin at the centre of the switch's mounting face on top of the steering column jacket; +Z up off the column, +X along the column",
+   "frame": "origin between the bracket's two slots on the bracket's back face (on the column); +Z out of the column toward the connector face, +X along the column (the slot line), +Y from the body up to the bracket",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
-    "faces": {}
+    "faces": {
+     "connector": "+Z",
+     "bracket": "+Y"
+    }
    },
    "colors": {
     "body": {
      "hex": "#e6dfcc",
-     "from": "switch body: natural (the listing photo)"
+     "from": "OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): natural body (k-means)"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
-    },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
+    "zinc": {
+     "hex": "#c3c8c6",
+     "from": "OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): zinc bracket"
     },
     "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+     "hex": "#c47a4f",
+     "from": "OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): copper blades"
+    },
+    "slider": {
+     "hex": "#2f7fc0",
+     "from": "OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): blue actuator slider"
     }
    },
    "attach": [
@@ -5168,56 +5252,56 @@
      "n": "pin_1",
      "ep": "IGN-SWITCH",
      "at": [
-      -7.0,
-      -19.0,
-      12.0
+      -21.74,
+      -39.08,
+      19.5
      ],
      "dir": [
       0,
       -1,
       0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "BAT 2: IGN_SW_0V"
     },
     {
      "n": "pin_2",
      "ep": "IGN-SWITCH",
      "at": [
-      0.0,
-      -19.0,
-      12.0
+      -9.69,
+      -39.08,
+      19.5
      ],
      "dir": [
       0,
       -1,
       0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "IGN 1: IGN_RUN_B"
     },
     {
      "n": "pin_3",
      "ep": "IGN-SWITCH",
      "at": [
-      7.0,
-      -19.0,
-      12.0
+      5.78,
+      -39.08,
+      19.5
      ],
      "dir": [
       0,
       -1,
       0
      ],
-     "kind": "blade",
+     "kind": "blade (Packard 56)",
      "note": "SOL: IGN_START"
     }
    ],
    "mount": [
     {
-     "n": "mount",
+     "n": "slot_L",
      "at": [
-      0,
+      -30.55,
       0,
       0
      ],
@@ -5226,7 +5310,21 @@
       0,
       -1
      ],
-     "note": "mounting face"
+     "note": "screw through the bracket slot into the column (slotted for the switch's adjustment)"
+    },
+    {
+     "n": "slot_R",
+     "at": [
+      30.55,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "screw through the bracket slot into the column (slotted for the switch's adjustment)"
     }
    ]
   },
@@ -9308,37 +9406,35 @@
    "endpoints": [
     "TURN-SW"
    ],
-   "what": "Turn and hazard switch, factory column (column connector): turn and hazard feeds on PDM30 0V, front outputs to DIG4 / DIG5",
-   "maker": "GM (factory)",
-   "maker_pn": "factory",
+   "what": "Turn and hazard switch, factory column (GM 1997985; SMP TW45): turn and hazard feeds on PDM30 0V, front outputs to DIG4 / DIG5, at the column connector",
+   "maker": "GM",
+   "maker_pn": "GM 1997985 (SMP TW45, Wells 1S1074, Rostra 710002)",
    "shape_basis": "not sourced",
    "dims_mm": {
-    "l": 110.0,
-    "w": 110.0,
-    "h": 18.0
+    "l": 139.0,
+    "w": 95.0,
+    "h": 22.0
    },
-   "frame": "origin at the centre of the part on the steering column's axis; +Z toward the driver",
+   "frame": "origin on the steering column's axis at the switch plate's face; +Z toward the driver; the connector is drawn beside the plate on a cut-short harness (it hangs 17 in down the column)",
    "axes": {
     "mount_normal": "+Z",
     "maker_up": "+Y",
-    "faces": {}
+    "faces": {
+     "connector": "-Z"
+    }
    },
    "colors": {
-    "body": {
-     "hex": "#1d1d1f",
-     "from": "factory switch body: drawn black (no photo on file)"
+    "plate": {
+     "hex": "#e8e2d0",
+     "from": "SMP TW45 photo (RockAuto): white switch plate (k-means)"
     },
-    "metal": {
-     "hex": "#b9bcbf",
-     "from": "metal: drawn zinc"
+    "block": {
+     "hex": "#1c1c1d",
+     "from": "SMP TW45 photo (RockAuto): black actuator and connector"
     },
-    "chrome": {
-     "hex": "#d3d6d8",
-     "from": "chrome: drawn"
-    },
-    "tab": {
-     "hex": "#c7c2b4",
-     "from": "terminals: drawn tin"
+    "wire": {
+     "hex": "#6c7fa6",
+     "from": "SMP TW45 photo (RockAuto): the ribbon's blue / white / brown / violet wires (drawn one colour)"
     }
    },
    "attach": [
@@ -9346,14 +9442,14 @@
      "n": "pin_1",
      "ep": "TURN-SW",
      "at": [
-      -8.0,
-      -60.0,
-      0.0
+      -77.5,
+      -27.22,
+      -12.0
      ],
      "dir": [
       0,
-      -1,
-      0
+      0,
+      -1
      ],
      "kind": "column connector cavity",
      "note": "14 LT FRT LP: 33"
@@ -9362,14 +9458,14 @@
      "n": "pin_2",
      "ep": "TURN-SW",
      "at": [
-      0.0,
-      -60.0,
-      0.0
+      -77.5,
+      -19.44,
+      -12.0
      ],
      "dir": [
       0,
-      -1,
-      0
+      0,
+      -1
      ],
      "kind": "column connector cavity",
      "note": "15 RT FRT LP: TURN_SW_R"
@@ -9378,14 +9474,14 @@
      "n": "pin_3",
      "ep": "TURN-SW",
      "at": [
-      8.0,
-      -60.0,
-      0.0
+      -77.5,
+      -11.67,
+      -12.0
      ],
      "dir": [
       0,
-      -1,
-      0
+      0,
+      -1
      ],
      "kind": "column connector cavity",
      "note": "16 FLSHR + 27 HAZ WARN, jumpered: TURN_SW_0V"

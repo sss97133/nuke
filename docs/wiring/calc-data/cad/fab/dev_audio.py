@@ -210,10 +210,10 @@ JBL_PHOTO = f"Crutchfield product photo {JBL_PHURL}, k-means of the region"
 def jbl_club_102sl(end, which):
     pid = end
     P = {
-        "frame_od": Dim(266.7, f"{JBL_SNAP}: 'Frame Width 10.5' in"),
-        "hole_d": Dim(228.6, f"{JBL_SNAP}: 'cutout diameter: 9.0\"'"),
-        "depth": Dim(82.55, f"{JBL_SNAP}: 'top-mount depth: 3.25\"'"),
-        "cone_front": Dim(17.3, f"{JBL_SNAP}: 'mounting height: 0.68\"' (above the mounting surface)"),
+        "frame_od": Dim(266.7, f"{JBL_SNAP}: 'Frame Width 10.5' in", "vendor"),
+        "hole_d": Dim(228.6, f"{JBL_SNAP}: 'cutout diameter: 9.0\"'", "vendor"),
+        "depth": Dim(82.55, f"{JBL_SNAP}: 'top-mount depth: 3.25\"'", "vendor"),
+        "cone_front": Dim(17.3, f"{JBL_SNAP}: 'mounting height: 0.68\"' (above the mounting surface)", "vendor"),
         "frame_t": Dim(6.0, JBL_PH, "photo", "frame flange"),
         "open_d": Dim(236.0, JBL_PH, "photo", "frame's inner edge"),
         "cone_d": Dim(206.0, JBL_PH, "photo", "flat cone outer (surround inner)"),

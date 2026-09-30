@@ -26,9 +26,9 @@ ends_unmodelled_with_reason: 17
 ends_by_shape_basis:
   maker drawing: 40
   datasheet dims: 36
-  scaled from photo: 39
+  scaled from photo: 42
   twin object: 11
-  not sourced: 35
+  not sourced: 32
 ends:
   AC-CLUTCH:
     models:
@@ -2500,28 +2500,28 @@ parts:
     value: 77.8
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Diameter: 3 1/16" (77.8mm)'''
-    basis: maker
+    basis: vendor
   - name: motor_l
     value: 108.0
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Motor Length: 4 1/4" (108mm)'''
-    basis: maker
+    basis: vendor
   - name: overall_l
     value: 127.0
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Length: 5" (127mm)'''
-    basis: maker
+    basis: vendor
     note: 127 - 108 leaves 19 of shaft past the motor; the listing's shaft length is 25.4 (measured from the boss face)
   - name: shaft_l
     value: 25.4
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Shaft Length: 1" (25.4mm)'''
-    basis: maker
+    basis: vendor
   - name: shaft_d
     value: 7.9
     source: 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (MPParts
       listing of Four Seasons 35587, fetched 2026-09-28): ''Shaft Diameter: 5/16" (7.9mm)'''
-    basis: maker
+    basis: vendor
   - name: flange_d
     value: 180.0
     source: sized off the Four Seasons product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg
@@ -2631,84 +2631,148 @@ parts:
 - id: BLOWER-RES
   endpoints:
   - BLOWER-RES
-  what: 'Blower resistor, factory, on the blower-evaporator case: 4 terminals BAT / M1 / M2 / BLO'
-  maker: GM (factory)
-  maker_pn: unknown
+  what: 'Blower resistor, factory A/C (GM 336403; Four Seasons 20083, SMP RU67) on the blower-evaporator case: 4 blades BAT
+    / M1 / M2 / BLO'
+  maker: GM
+  maker_pn: GM 336403 (Four Seasons 20083, SMP RU67, LMC 32-2406)
   shape_basis: not sourced
   dims_mm:
-    l: 76.0
-    w: 56.0
-    h: 73.0
-  dims_note: 'no GM number or size on file: envelope assumed (±20)'
-  frame: origin at the centre of the mounting plate on the evaporator case; +Z out of the case (the plug), coils inside (-Z)
+    l: 46.0
+    w: 84.0
+    h: 102.6
+  dims_note: 'no size in any source: Four Seasons'' photo''s proportions at an assumed 70 mm hole pitch (±15)'
+  frame: origin at the centre of the plate's back face on the evaporator case; +Z out of the case (the blades), strips and
+    coils inside (-Z), +Y through the two holes
   axes:
     mount_normal: +Z
     maker_up: +Y
     faces: {}
   colors:
     plate:
-      hex: '#b9bcbe'
-      from: 'plate: drawn zinc'
+      hex: '#2f2f2e'
+      from: 'Four Seasons 20083 photo (RockAuto): black plate (k-means)'
+    strip:
+      hex: '#80909f'
+      from: 'Four Seasons 20083 photo (RockAuto): zinc strips (k-means, lit face)'
     coil:
-      hex: '#8a5a3a'
-      from: 'coils: drawn nichrome on a ceramic card'
-    shroud:
-      hex: '#2a2a2b'
-      from: 'terminal shroud: drawn black'
+      hex: '#8e8f8d'
+      from: 'Four Seasons 20083 photo (RockAuto): coils'
+    blade:
+      hex: '#b9bfc4'
+      from: 'blades: drawn tin'
   attach:
-  - n: plug
+  - n: BAT
     ep: BLOWER-RES
     at:
-    - 0
-    - 0
-    - 17.5
+    - -4.5
+    - 5.5
+    - 10.6
     dir:
     - 0
     - 0
     - 1
-    kind: 4-way plug
-    note: BAT / M1 / M2 / BLO
+    kind: blade
+    note: BAT
+  - n: M1
+    ep: BLOWER-RES
+    at:
+    - 4.5
+    - 5.5
+    - 10.6
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: blade
+    note: M1
+  - n: M2
+    ep: BLOWER-RES
+    at:
+    - -4.5
+    - -5.5
+    - 10.6
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: blade
+    note: M2
+  - n: BLO
+    ep: BLOWER-RES
+    at:
+    - 4.5
+    - -5.5
+    - 10.6
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: blade
+    note: BLO
   mount:
-  - n: screw_L
+  - n: screw_top
     at:
-    - -31.0
     - 0
-    - 1.5
+    - 35.0
+    - 0
     dir:
     - 0
     - 0
     - -1
+    d: 5.5
     note: screw into the evaporator case
-  - n: screw_R
+  - n: screw_bottom
     at:
-    - 31.0
     - 0
-    - 1.5
+    - -35.0
+    - 0
     dir:
     - 0
     - 0
     - -1
+    d: 5.5
     note: screw into the evaporator case
   params:
+  - name: hole_pitch
+    value: 70.0
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    basis: assumed
+    note: the plate's two mounting holes
+    fit: fit-critical
+  - name: plate_l
+    value: 84.0
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    basis: assumed
+    note: diamond plate, tip to tip
   - name: plate_w
-    value: 76.0
-    source: 'no GM dimension or part number on file for the factory A/C blower resistor: envelope assumed'
+    value: 46.0
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
     basis: assumed
-    note: mounting plate on the case
-  - name: plate_h
-    value: 56.0
-    source: 'no GM dimension or part number on file for the factory A/C blower resistor: envelope assumed'
+    note: at its widest
+  - name: plate_t
+    value: 1.6
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
     basis: assumed
-  - name: coil_l
-    value: 55.0
-    source: 'no GM dimension or part number on file for the factory A/C blower resistor: envelope assumed'
+    note: phenolic plate
+  - name: hole_d
+    value: 5.5
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
     basis: assumed
-    note: resistor coils inside the case
-  - name: shroud_w
-    value: 30.0
-    source: 'no GM dimension or part number on file for the factory A/C blower resistor: envelope assumed'
+  - name: strip_l
+    value: 92.0
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
     basis: assumed
-    note: 4-way terminal shroud
+    note: steel strips into the case
+  - name: coil_d
+    value: 11.0
+    source: 'no size in any source: assumed; proportions off Four Seasons 20083 photo (RockAuto)'
+    basis: assumed
+    note: resistor coils
+  - name: blade_w
+    value: 6.35
+    source: '1978 C/K wiring booklet p.16 sheet A-4 (registry): C60 blower resistor, four terminals BAT / M1 / M2 / BLO (family
+      gm_blade: the 0.250 in Packard 56 tab)'
+    basis: vendor
   checks:
   - check: drawn at the assumed envelope
     model: 1.0
@@ -2717,12 +2781,13 @@ parts:
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension and the terminal order: read the resistor on the truck (registry: confirm 4 terminals).'
-  cross_checks: []
+  - 'Every size and the blade order: read the resistor on the truck.'
+  cross_checks:
+  - Four Seasons, SMP, Wells and UMP list 4 male blades; the registry lands 4 (BAT, M1, M2, BLO).
   notes: []
   margin_mm:
-    mm: 20.0
-    why: factory part, nothing on file
+    mm: 15.0
+    why: no size published; proportions from the maker's photo
   registry:
     BLOWER-RES:
       device: factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 factory
@@ -2751,88 +2816,138 @@ parts:
         BLOWER_MED: M1
         BLOWER_M2: M2
         BLOWER_MOT: BLO
+  photo:
+    url: https://www.rockauto.com/info/52/20083.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=1312672
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/BLOWER-RES.py
 - id: BLOWER-SW
   endpoints:
   - BLOWER-SW
-  what: 'Blower switch, factory Four-Season control head: LO, M1, M2 through the resistor; HI as a PDM30 input'
-  maker: GM (factory)
-  maker_pn: factory
+  what: 'Blower switch, factory A/C control head (GM 469368; Four Seasons 37566, SMP HS435): LO, M1, M2 through the resistor;
+    HI as a PDM30 input'
+  maker: GM
+  maker_pn: GM 469368 (Four Seasons 37566, SMP HS435)
   shape_basis: not sourced
   dims_mm:
-    l: 50.0
-    w: 38.0
-    h: 65.0
-  dims_note: 'no part number or size on file: envelope assumed (±15)'
-  frame: origin at the centre of the switch's mounting face behind the dash (or the control head); +Z toward the driver
+    l: 87.4
+    w: 49.9
+    h: 18.0
+  dims_note: 'the photo''s proportions at an assumed scale (SMP''s 34.8 mm ''overall width'' as the case across its ears):
+    ±15%'
+  frame: origin between the two ear holes on the bracket's mounting face (the control head); +Z out of the mounting face toward
+    the case, +X from the blades toward the lever, +Y up as the maker's photo shows it
   axes:
     mount_normal: +Z
     maker_up: +Y
-    faces: {}
+    faces:
+      blades: -X
+      lever: +X
   colors:
-    body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
+    case:
+      hex: '#9a9c9b'
+      from: 'Four Seasons 37566 photo (RockAuto): zinc case (k-means)'
     chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
+      hex: '#c9ccce'
+      from: 'Four Seasons 37566 photo (RockAuto): chrome plate and lever'
+    fibre:
+      hex: '#b0773f'
+      from: 'Four Seasons 37566 photo (RockAuto): brown fibre board between case and blades'
     tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+      hex: '#c47a4f'
+      from: 'Four Seasons 37566 photo (RockAuto): copper blades'
   attach:
   - n: pin_1
     ep: BLOWER-SW
     at:
-    - 0.0
-    - -12.0
-    - -35.0
+    - -27.66
+    - 13.03
+    - 6.3
     dir:
-    - 0
-    - 0
     - -1
-    kind: blade
+    - 0
+    - 0
+    kind: blade (4)
     note: 'leads: 51, 45, BLOWER_BAT, BLOWER_MED, BLOWER_M2'
   mount:
-  - n: mount
+  - n: ear_upper
     at:
-    - 0
-    - 0
+    - 4.21
+    - 12.3
     - 0
     dir:
     - 0
     - 0
     - -1
-    note: mounting face
+    d: 3.4
+    note: screw to the control head
+  - n: ear_lower
+    at:
+    - -4.21
+    - -12.3
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 3.4
+    note: screw to the control head
   params:
-  - name: body_w
-    value: 50.0
-    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
-      assumed'
+  - name: case_w
+    value: 17.8
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 292 px'
     basis: assumed
-    note: switch body
-  - name: body_h
-    value: 38.0
-    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
-      assumed'
+    note: slide-switch case
+  - name: case_h
+    value: 34.8
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 570 px'
     basis: assumed
-  - name: body_d
-    value: 35.0
-    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
-      assumed'
+    note: case across its ears
+  - name: case_d
+    value: 18.0
+    source: 'not in the photo: assumed'
     basis: assumed
-  - name: shaft_l
-    value: 30.0
-    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
-      assumed'
+  - name: ear_pitch
+    value: 26.3
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 430 px'
     basis: assumed
-    note: control shaft / lever
-  - name: knob_d
-    value: 20.0
-    source: 'no dimension on file for this part (the factory blower switch has no part number or drawing on file): envelope
-      assumed'
+    note: ear hole to ear hole
+  - name: ear_hole
+    value: 3.4
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 55 px'
+    basis: assumed
+    note: ear holes
+  - name: pivot_d
+    value: 9.2
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 150 px'
+    basis: assumed
+    note: lever pivot
+  - name: lever_l
+    value: 43.7
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 716 px'
+    basis: assumed
+    note: pivot to lever tip
+  - name: lever_w
+    value: 3.7
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 60 px'
+    basis: assumed
+    note: lever
+  - name: blade_l
+    value: 14.0
+    source: 'proportions off Four Seasons 37566 photo (RockAuto), scaled so the case across its ears is SMP HS435''s ''overall
+      width 34.8 mm (1.37 in)'' (0.0611 mm/px; SMP names no axis: assumed): 230 px'
+    basis: assumed
+    note: blades out of the case
+  - name: blade_w
+    value: 4.75
+    source: '3/16 in tab: the photo scale makes the blades 4.0 mm, so not the 0.250 in Packard 56 (assumed)'
     basis: assumed
   checks:
   - check: drawn at the assumed envelope
@@ -2842,13 +2957,16 @@ parts:
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file.'
-  - 'Which cavity carries which wire: read at the bench (registry).'
-  cross_checks: []
+  - Every size (SMP's width has no axis).
+  - Which blade takes which wire.
+  - The blades' width (3/16 or 1/4 in).
+  cross_checks:
+  - 'Scaled by SMP''s 34.8 mm, the photo''s blades come out 4.0 mm wide: a 3/16 in tab, not the 0.250 in Packard 56 that catalog/families.yaml
+    gm_blade names for the blower switch. Check at the bench.'
   notes: []
   margin_mm:
-    mm: 15.0
-    why: factory part, nothing on file
+    mm: 12.0
+    why: SMP's only size has no axis; the photo sets the proportions
   registry:
     BLOWER-SW:
       device: factory Four-Season blower switch in the control head — LO, M1, M2 through the resistor; HI as a PDM30 input
@@ -2882,112 +3000,160 @@ parts:
         BLOWER_BAT: null
         BLOWER_MED: null
         BLOWER_M2: null
+  photo:
+    url: https://www.rockauto.com/info/52/37566.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=7579660
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/BLOWER-SW.py
 - id: BRAKE-SW
   endpoints:
   - BRAKE-SW
-  what: 'Brake light switch, factory, at the pedal: switches 0V (PDM30 A28) into DIG14'
-  maker: GM (factory)
-  maker_pn: factory (connector 2984235)
-  shape_basis: not sourced
+  what: 'Brake light switch, factory pattern at the pedal (SMP SLS66, GM 1362835 family): switches 0V (PDM30 A28) into DIG14'
+  maker: GM
+  maker_pn: GM 1362835 family (SMP SLS66, Wells 1S5238, Rostra 620014)
+  shape_basis: scaled from photo
   dims_mm:
-    l: 30.0
-    w: 30.0
-    h: 72.0
-  dims_note: 'no part number or size on file: envelope assumed (±12)'
-  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
-    striker
+    l: 25.8
+    w: 25.8
+    h: 115.8
+  dims_note: sized off SMP's side-on SLS66 photo against the kit's 0.250 in male tab in the same photo (±8%)
+  frame: origin on the switch axis at the plunger end of the threaded barrel; +Z along the axis toward the plunger (the pedal
+    arm), the body and blades toward -Z; +Y through the two blades
   axes:
     mount_normal: +Z
     maker_up: +Y
-    faces: {}
+    faces:
+      plunger: +Z
+      blades: -Z
   colors:
     body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
+      hex: '#23201e'
+      from: 'SMP SLS66 photo (RockAuto): black body (k-means)'
+    plunger:
+      hex: '#d6d8d7'
+      from: 'SMP SLS66 photo (RockAuto): white plunger (k-means)'
     tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+      hex: '#7e6e51'
+      from: 'SMP SLS66 photo (RockAuto): brass blades (k-means)'
   attach:
   - n: pin_1
     ep: BRAKE-SW
     at:
-    - -3.5
-    - 0.0
-    - -55.0
+    - 0
+    - 7.05
+    - -87.5
     dir:
     - 0
     - 0
     - -1
-    kind: blade
+    kind: blade (Packard 56)
     note: '140 feed cavity: BRK_SW_0V'
   - n: pin_2
     ep: BRAKE-SW
     at:
-    - 3.5
-    - 0.0
-    - -55.0
+    - 0
+    - -7.05
+    - -87.5
     dir:
     - 0
     - 0
     - -1
-    kind: blade
+    kind: blade (Packard 56)
     note: '17 output cavity: 53'
   mount:
-  - n: mount
+  - n: barrel
     at:
     - 0
     - 0
-    - 0
+    - -22.95
     dir:
     - 0
     - 0
     - -1
-    note: mounting face
+    d: 20.0
+    note: the threaded barrel goes through the pedal bracket into the spring locknut, its flat on the locknut's finger; set
+      for 1/16 in free plunger travel (SMP GF8592B)
   params:
-  - name: body_d
-    value: 22.0
-    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
-      assumed'
-    basis: assumed
-    note: switch body
-  - name: body_l
-    value: 55.0
-    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
-      assumed'
-    basis: assumed
+  - name: plunger_d
+    value: 12.0
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 85 px'
+    basis: photo
+    note: white plunger
   - name: plunger_l
-    value: 14.0
-    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
-      assumed'
+    value: 9.2
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 65 px'
+    basis: photo
+    note: plunger out of the barrel, pedal released off it
+  - name: thread_d
+    value: 20.0
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 142 px'
+    basis: photo
+    note: threaded barrel, over the threads
+  - name: thread_l
+    value: 45.9
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 325 px'
+    basis: photo
+    note: threaded barrel
+  - name: flat
+    value: 1.5
+    source: 'SMP instruction sheet GF8592B (RockAuto): ''the flat of the threaded bushing'' (its depth: assumed)'
     basis: assumed
-    note: plunger out of the body
-  - name: flange_d
-    value: 30.0
-    source: 'no dimension on file for this part (the factory brake switch has no part number or drawing on file): envelope
-      assumed'
-    basis: assumed
-    note: mounting flange / nut
+    note: flat along the barrel
+  - name: body_d
+    value: 25.8
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 183 px'
+    basis: photo
+    note: round black body
+  - name: body_l
+    value: 41.6
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 295 px'
+    basis: photo
+    note: black body
+  - name: blade_l
+    value: 19.1
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 135 px'
+    basis: photo
+    note: blades out of the body
+  - name: blade_pitch
+    value: 14.1
+    source: 'sized off SMP SLS66 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 45
+      px wide (0.1411 mm/px, ±8%): 100 px'
+    basis: photo
+    note: blade centres
+  - name: blade_w
+    value: 6.35
+    source: the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade)
+    basis: vendor
+    note: Packard 56 tab width
+  - name: free_travel
+    value: 1.6
+    source: 'SMP instruction sheet GF8592B (RockAuto): ''allow 1/16 inch free plunger travel ... when the brake pedal is fully
+      released'''
+    basis: maker
+    note: set at the pedal (installed, not drawn)
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: overall length, plunger to blade tips
+    model: 115.8
+    drawing: 115.8
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file.'
-  cross_checks: []
+  - The flat's depth and the blades' face direction are not in the photo.
+  - 'Which blade is 140 and which is 17: read on the switch.'
+  cross_checks:
+  - 'SMP''s spec table lists 2 male blades: the registry lands 140 (feed) and 17 (output) on two.'
   notes: []
   margin_mm:
-    mm: 12.0
-    why: factory part, nothing on file
+    mm: 6.0
+    why: photo scale from one tab (±8%)
   registry:
     BRAKE-SW:
       device: factory brake light switch at the pedal — switches 0V (PDM30 A28) into PDM30 DIG14
@@ -3005,6 +3171,10 @@ parts:
       cavities:
         BRK_SW_0V: 140 feed cavity
         '53': 17 output cavity
+  photo:
+    url: https://www.rockauto.com/info/154/SLS-66_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=44657
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/BRAKE-SW.py
 - id: Backup_Camera
   endpoints:
@@ -5032,96 +5202,123 @@ parts:
 - id: DOOR-JAMB-L
   endpoints:
   - DOOR-JAMB-L
-  what: Driver door jamb switch, factory pin switch (grounds through the body)
-  maker: GM (factory)
-  maker_pn: factory pin switch (terminal 2984369)
+  what: 'Driver door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through
+    the body'
+  maker: GM
+  maker_pn: GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)
   shape_basis: not sourced
   dims_mm:
-    l: 27.0
-    w: 27.0
-    h: 57.0
-  dims_note: 'no part number or size on file: envelope assumed (±12)'
-  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
-    striker
+    l: 15.0
+    w: 15.0
+    h: 62.0
+  dims_note: 'no size in any source: SMP''s DS173 photo''s proportions at an assumed 62 mm length (±10)'
+  frame: origin on the switch axis at the pillar face (the thread's top); +Z out of the pillar toward the door (the plunger),
+    the body inside the pillar
   axes:
     mount_normal: +Z
-    maker_up: +Y
-    faces: {}
+    maker_up: +Z
+    faces:
+      plunger: +Z
+      terminal: -Z
   colors:
-    body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
-    tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+    zinc:
+      hex: '#a9aaa6'
+      from: 'SMP DS173 photo (RockAuto): zinc body and hex'
+    bronze:
+      hex: '#8a7a5c'
+      from: 'SMP spec table: ''Color/Finish: Bronze'' (the terminal)'
+    head:
+      hex: '#b8bab8'
+      from: 'SMP DS173 photo (RockAuto): plunger head'
   attach:
   - n: pin_1
     ep: DOOR-JAMB-L
     at:
     - 0.0
     - 0.0
-    - -40.0
+    - -46.5
     dir:
     - 0
     - 0
     - -1
-    kind: blade
+    kind: bullet terminal
     note: 'switch terminal: 42, STEP_DOOR_L'
   mount:
-  - n: mount
+  - n: thread
     at:
     - 0
     - 0
-    - 0
+    - -7.0
     dir:
     - 0
     - 0
     - -1
-    note: mounting face
+    d: 12.5
+    note: screws into the pillar; grounds through the body (registry)
   params:
-  - name: body_d
-    value: 19.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+  - name: length
+    value: 62.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: switch body
-  - name: body_l
-    value: 40.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    note: disc head to terminal tip
+    fit: fit-critical
+  - name: head_d
+    value: 12.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: plunger disc head
+  - name: plunger_d
+    value: 5.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
   - name: plunger_l
     value: 14.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: plunger out of the body
-  - name: flange_d
-    value: 27.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    note: plunger out of the body at rest
+  - name: thread_d
+    value: 12.5
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: mounting flange / nut
+    note: threaded body
+  - name: thread_l
+    value: 14.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+  - name: hex_af
+    value: 15.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: hex under the thread
+  - name: hex_t
+    value: 4.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+  - name: stem_d
+    value: 7.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: stem behind the hex
+  - name: bullet_d
+    value: 4.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: bullet terminal
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: length, disc head to terminal tip
+    model: 62.0
+    drawing: 62.0
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file.'
-  cross_checks: []
+  - 'Every size: no maker or vendor publishes one. Measure a switch.'
+  cross_checks:
+  - 'SMP''s spec table lists 1 terminal: the registry lands the courtesy wire and the step tap on one.'
   notes: []
   margin_mm:
-    mm: 12.0
-    why: factory part, nothing on file
+    mm: 10.0
+    why: no size published; proportions from the maker's photo
   registry:
     DOOR-JAMB-L:
       device: driver door jamb switch (factory pin switch, grounds through the body) — PDM30 DIG12 + AMP Research trigger
@@ -5139,100 +5336,131 @@ parts:
       cavities:
         '42': switch terminal
         STEP_DOOR_L: switch terminal
+  photo:
+    url: https://www.rockauto.com/info/154/DS-173_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=43035
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/DOOR-JAMB-L.py
 - id: DOOR-JAMB-R
   endpoints:
   - DOOR-JAMB-R
-  what: Passenger door jamb switch, factory pin switch (grounds through the body)
-  maker: GM (factory)
-  maker_pn: factory pin switch (terminal 2984369)
+  what: 'Passenger door jamb switch, factory pin switch (GM 1971931 family; SMP DS173): one bullet terminal, grounds through
+    the body'
+  maker: GM
+  maker_pn: GM 1971931 family (SMP DS173, Wells 1S1016, Rostra 650024)
   shape_basis: not sourced
   dims_mm:
-    l: 27.0
-    w: 27.0
-    h: 57.0
-  dims_note: 'no part number or size on file: envelope assumed (±12)'
-  frame: origin at the centre of the mounting flange on the pillar / pedal bracket / tailgate; +Z out toward the plunger's
-    striker
+    l: 15.0
+    w: 15.0
+    h: 62.0
+  dims_note: 'no size in any source: SMP''s DS173 photo''s proportions at an assumed 62 mm length (±10)'
+  frame: origin on the switch axis at the pillar face (the thread's top); +Z out of the pillar toward the door (the plunger),
+    the body inside the pillar
   axes:
     mount_normal: +Z
-    maker_up: +Y
-    faces: {}
+    maker_up: +Z
+    faces:
+      plunger: +Z
+      terminal: -Z
   colors:
-    body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
-    tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+    zinc:
+      hex: '#a9aaa6'
+      from: 'SMP DS173 photo (RockAuto): zinc body and hex'
+    bronze:
+      hex: '#8a7a5c'
+      from: 'SMP spec table: ''Color/Finish: Bronze'' (the terminal)'
+    head:
+      hex: '#b8bab8'
+      from: 'SMP DS173 photo (RockAuto): plunger head'
   attach:
   - n: pin_1
     ep: DOOR-JAMB-R
     at:
     - 0.0
     - 0.0
-    - -40.0
+    - -46.5
     dir:
     - 0
     - 0
     - -1
-    kind: blade
+    kind: bullet terminal
     note: 'switch terminal: 43, STEP_DOOR_R'
   mount:
-  - n: mount
+  - n: thread
     at:
     - 0
     - 0
-    - 0
+    - -7.0
     dir:
     - 0
     - 0
     - -1
-    note: mounting face
+    d: 12.5
+    note: screws into the pillar; grounds through the body (registry)
   params:
-  - name: body_d
-    value: 19.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+  - name: length
+    value: 62.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: switch body
-  - name: body_l
-    value: 40.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    note: disc head to terminal tip
+    fit: fit-critical
+  - name: head_d
+    value: 12.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: plunger disc head
+  - name: plunger_d
+    value: 5.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
   - name: plunger_l
     value: 14.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: plunger out of the body
-  - name: flange_d
-    value: 27.0
-    source: 'no dimension on file for this part (the factory jamb switch has no part number or drawing on file): envelope
-      assumed'
+    note: plunger out of the body at rest
+  - name: thread_d
+    value: 12.5
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
     basis: assumed
-    note: mounting flange / nut
+    note: threaded body
+  - name: thread_l
+    value: 14.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+  - name: hex_af
+    value: 15.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: hex under the thread
+  - name: hex_t
+    value: 4.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+  - name: stem_d
+    value: 7.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: stem behind the hex
+  - name: bullet_d
+    value: 4.0
+    source: 'no size in any source: assumed; proportions off SMP DS173 photo (RockAuto)'
+    basis: assumed
+    note: bullet terminal
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: length, disc head to terminal tip
+    model: 62.0
+    drawing: 62.0
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file.'
-  cross_checks: []
+  - 'Every size: no maker or vendor publishes one. Measure a switch.'
+  cross_checks:
+  - 'SMP''s spec table lists 1 terminal: the registry lands the courtesy wire and the step tap on one.'
   notes: []
   margin_mm:
-    mm: 12.0
-    why: factory part, nothing on file
+    mm: 10.0
+    why: no size published; proportions from the maker's photo
   registry:
     DOOR-JAMB-R:
       device: passenger door jamb switch — PDM30 DIG13 + AMP Research trigger
@@ -5250,6 +5478,10 @@ parts:
       cavities:
         '43': switch terminal
         STEP_DOOR_R: switch terminal
+  photo:
+    url: https://www.rockauto.com/info/154/DS-173_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=43035
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/DOOR-JAMB-R.py
 - id: E-STOPP
   endpoints:
@@ -5761,69 +5993,77 @@ parts:
 - id: FLOOR-DIMMER
   endpoints:
   - FLOOR-DIMMER
-  what: 'Headlamp dimmer switch, factory floor switch: feed, LOW and HIGH (GM connector 8900855)'
-  maker: GM (factory)
-  maker_pn: factory (connector 8900855)
-  shape_basis: not sourced
+  what: 'Headlamp dimmer switch, factory floor switch (GM 1997037 / 12338706; SMP DS72): feed, LOW and HIGH blades'
+  maker: GM
+  maker_pn: GM 1997037 (SMP DS72, Wells 1S4829, Rostra 650003)
+  shape_basis: scaled from photo
   dims_mm:
-    l: 76.0
-    w: 50.0
-    h: 78.0
-  dims_note: 'no part number or size on file: envelope assumed (±15)'
-  frame: origin at the centre of the flange on the floor pan; +Z up into the cab (the plunger), body below the floor
+    l: 84.5
+    w: 26.1
+    h: 59.5
+  dims_note: sized off SMP's DS72 photo against the 0.250 in Packard 56 blade (±8%); the depth and the third blade's place
+    are not in the photo
+  frame: origin at the ear hole on the ear's mounting face; +Z out of the mounting face (the switch body), +X along the plunger
+    axis toward the button, +Y toward the blades
   axes:
     mount_normal: +Z
     maker_up: +Y
-    faces: {}
+    faces:
+      plunger: +X
+      blades: +Y
+      ear: -X
   colors:
-    body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
+    can:
+      hex: '#a3a8a6'
+      from: 'SMP DS72 photo (RockAuto): chrome can (k-means, lit face)'
+    cast:
+      hex: '#6e716b'
+      from: 'SMP DS72 photo (RockAuto): cast body (k-means, lit face)'
+    ins:
+      hex: '#1a1a18'
+      from: 'SMP DS72 photo (RockAuto): black insulator (k-means)'
     tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+      hex: '#817246'
+      from: 'SMP DS72 photo (RockAuto): brass blades (k-means)'
+    rivet:
+      hex: '#7d6d51'
+      from: 'SMP DS72 photo (RockAuto): copper rivets on the insulator (k-means)'
   attach:
   - n: pin_1
     ep: FLOOR-DIMMER
     at:
-    - -7.0
-    - 0.0
-    - -54.0
+    - 16.3
+    - 35.5
+    - 8.05
     dir:
     - 0
+    - 1
     - 0
-    - -1
-    kind: blade
+    kind: blade (Packard 56)
     note: '10 feed cavity: 85, 86'
   - n: pin_2
     ep: FLOOR-DIMMER
     at:
-    - 0.0
-    - 0.0
-    - -54.0
+    - 25.2
+    - 35.5
+    - 8.05
     dir:
     - 0
+    - 1
     - 0
-    - -1
-    kind: blade
+    kind: blade (Packard 56)
     note: '12 LOW cavity: 85a, 86a'
   - n: pin_3
     ep: FLOOR-DIMMER
     at:
-    - 7.0
-    - 0.0
-    - -54.0
+    - 20.75
+    - 35.5
+    - 18.05
     dir:
     - 0
+    - 1
     - 0
-    - -1
-    kind: blade
+    kind: blade (Packard 56)
     note: '11 HIGH cavity: 85b, 86b, 121'
   mount:
   - n: mount
@@ -5837,48 +6077,142 @@ parts:
     - -1
     note: mounting face
   params:
-  - name: body_d
-    value: 50.0
-    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
-      assumed'
+  - name: can_d
+    value: 26.1
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 292 px'
+    basis: photo
+    note: chrome plunger can
+  - name: can_l
+    value: 29.0
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 324 px'
+    basis: photo
+    note: along the axis (the photo is 22° off the axis)
+  - name: button_d
+    value: 4.0
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 45 px'
+    basis: photo
+    note: plunger button in the can's face
+  - name: button_h
+    value: 1.5
+    source: 'not in the photo: assumed'
     basis: assumed
-    note: switch body
-  - name: body_h
-    value: 40.0
-    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
-      assumed'
+    note: button proud of the face
+  - name: neck_l
+    value: 6.2
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 69 px'
+    basis: photo
+    note: cast neck between the can and the body
+  - name: neck_d
+    value: 22.4
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 250 px'
+    basis: photo
+    note: cast neck
+  - name: body_l
+    value: 30.9
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 345 px'
+    basis: photo
+    note: cast body under the insulator
+  - name: body_up
+    value: 17.4
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 194 px'
+    basis: photo
+    note: cast body top above the can axis
+  - name: body_dn
+    value: 7.7
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 86 px'
+    basis: photo
+    note: cast body bottom below the can axis
+  - name: depth
+    value: 26.1
+    source: the can's diameter (drawn the same)
+    basis: design
+  - name: ear_l
+    value: 16.9
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 189 px'
+    basis: photo
+    note: mounting ear, body to tip
+  - name: ear_w
+    value: 12.5
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 140 px'
+    basis: photo
+    note: mounting ear
+  - name: ear_hole
+    value: 8.5
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 95 px'
+    basis: photo
+    note: ear hole
+  - name: hole_x
+    value: 5.3
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 59 px'
+    basis: photo
+    note: hole centre from the body
+  - name: ear_t
+    value: 3.0
+    source: 'not in the photo: assumed'
     basis: assumed
-  - name: plunger_d
-    value: 16.0
-    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
-      assumed'
-    basis: assumed
-  - name: plunger_l
+    note: ear thickness
+  - name: ins_h
+    value: 14.3
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 160 px'
+    basis: photo
+    note: black insulator on the body
+  - name: ins_d
     value: 22.0
-    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
-      assumed'
+    source: 'not in the photo: assumed'
     basis: assumed
-    note: foot plunger above the floor
-  - name: flange_w
-    value: 76.0
-    source: 'no dimension on file for this part (the factory floor dimmer has no part number or drawing on file): envelope
-      assumed'
-    basis: assumed
-    note: mounting flange
+    note: insulator depth
+  - name: blade_l
+    value: 14.8
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 165 px'
+    basis: photo
+    note: blade standing out of the insulator
+  - name: blade_w
+    value: 6.35
+    source: the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade)
+    basis: vendor
+    note: Packard 56 tab width
+  - name: blade_pitch
+    value: 8.9
+    source: 'sized off SMP DS72 photo (RockAuto) against the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade), 71
+      px wide (0.0894 mm/px, ±8%): 100 px'
+    basis: photo
+    note: the two visible blades, along the axis
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: chrome can diameter
+    model: 26.1
+    drawing: 26.1
+    tol: 0.05
+    ok: true
+  - check: overall length, ear tip to button
+    model: 84.5
+    drawing: 84.5
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file. Read the switch on the truck.'
-  cross_checks: []
+  - 'The photo shows two of the three blades: the third is drawn behind them (assumed).'
+  - The switch's depth and the ear's thickness are not in the photo.
+  - Which blade is COMMON, LOW or HIGH.
+  cross_checks:
+  - 'SMP''s spec table lists 3 male blade terminals: the registry lands COMMON, LOW and HIGH on three.'
   notes: []
   margin_mm:
-    mm: 15.0
-    why: factory part, nothing on file
+    mm: 7.0
+    why: photo scale from one blade (±8%); depth assumed
   registry:
     FLOOR-DIMMER:
       device: factory floor dimmer switch (feed + LOW and HIGH outputs; light blue and tan wires)
@@ -5921,6 +6255,10 @@ parts:
         85b: 11 HIGH cavity
         86b: 11 HIGH cavity
         '121': 11 HIGH cavity
+  photo:
+    url: https://www.rockauto.com/info/154/DS-72_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=43128
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/FLOOR-DIMMER.py
 - id: FOOTWELL-LAMPS
   endpoints:
@@ -6879,15 +7217,16 @@ parts:
 - id: HORN
   endpoints:
   - HORN
-  what: Horn, factory, one terminal (connector 12004267), grounds through its bracket
+  what: Horn, factory, one terminal (connector 12004267), grounds through its bracket; the registry names no horn, so SMP's
+    HN16 low-tone snail is drawn
   maker: GM (factory)
-  maker_pn: unknown
+  maker_pn: unknown (registry names none; drawn as SMP HN16)
   shape_basis: not sourced
   dims_mm:
-    l: 110.0
-    w: 170.0
-    h: 73.0
-  dims_note: 'no GM number or size on file: a snail horn envelope, assumed (±25)'
+    l: 92.1
+    w: 135.0
+    h: 71.0
+  dims_note: 'no horn named and no size on file: SMP HN16''s proportions at an assumed size (±25)'
   frame: origin at the centre of the bracket's face on the radiator support; +Z out of the support, +Y up
   axes:
     mount_normal: +Z
@@ -6895,11 +7234,11 @@ parts:
     faces: {}
   colors:
     body:
-      hex: '#1c1c1d'
-      from: 'factory horns are black: drawn black (no photo on file)'
+      hex: '#2d2925'
+      from: 'SMP HN16 photo (RockAuto): black horn (k-means)'
     bracket:
-      hex: '#2a2a2b'
-      from: 'bracket: black'
+      hex: '#5b594e'
+      from: 'SMP HN16 photo (RockAuto): gold-zinc bracket (k-means)'
     blade:
       hex: '#c7c2b4'
       from: 'blade: drawn tin'
@@ -6907,8 +7246,8 @@ parts:
   - n: terminal
     ep: HORN
     at:
-    - 57.0
-    - -75.0
+    - 44.5
+    - -62.5
     - 13.0
     dir:
     - 1
@@ -6930,24 +7269,39 @@ parts:
     note: bolt to the radiator support (grounds through it)
   params:
   - name: d
-    value: 110.0
-    source: 'no GM dimension or part number on file for the factory horn: a GM snail horn envelope, assumed'
+    value: 85.0
+    source: 'no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that
+      RockAuto lists for the 1977 K5 (proportions off SMP HN16 photo (RockAuto)), size assumed'
     basis: assumed
-    note: horn body
+    note: diaphragm housing
   - name: depth
-    value: 70.0
-    source: 'no GM dimension or part number on file for the factory horn: a GM snail horn envelope, assumed'
+    value: 28.0
+    source: 'no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that
+      RockAuto lists for the 1977 K5 (proportions off SMP HN16 photo (RockAuto)), size assumed'
+    basis: assumed
+    note: diaphragm housing
+  - name: snail_w
+    value: 80.0
+    source: 'no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that
+      RockAuto lists for the 1977 K5 (proportions off SMP HN16 photo (RockAuto)), size assumed'
+    basis: assumed
+    note: snail cover in front
+  - name: snail_d
+    value: 40.0
+    source: 'no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that
+      RockAuto lists for the 1977 K5 (proportions off SMP HN16 photo (RockAuto)), size assumed'
     basis: assumed
   - name: bracket_l
     value: 60.0
-    source: 'no GM dimension or part number on file for the factory horn: a GM snail horn envelope, assumed'
+    source: 'no horn part number in the registry and no size in any source: drawn as the SMP HN16 low-tone snail horn that
+      RockAuto lists for the 1977 K5 (proportions off SMP HN16 photo (RockAuto)), size assumed'
     basis: assumed
     note: mounting bracket
   - name: blade_w
     value: 6.35
     source: '1978 C/K wiring booklet p.13 (registry): factory horn, one terminal in connector 12004267, grounds through its
       bracket (a Packard 56 blade, family gm_blade)'
-    basis: assumed
+    basis: vendor
   checks:
   - check: drawn at the assumed envelope
     model: 1.0
@@ -6956,12 +7310,12 @@ parts:
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: no part number on file. Read the horn on the truck.'
+  - Which horn is on the truck (the registry names none), and every dimension.
   cross_checks: []
   notes: []
   margin_mm:
     mm: 25.0
-    why: factory horn with no part number or dimension on file
+    why: the registry names no horn; no dimension on file
   registry:
     HORN:
       device: horn (factory location on the core support)
@@ -6979,6 +7333,10 @@ parts:
       cavities:
         '48': horn terminal
         HORN_GND: ''
+  photo:
+    url: https://www.rockauto.com/info/154/HN-16_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=319740
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/HORN.py
 - id: IBOOSTER
   endpoints:
@@ -7092,53 +7450,53 @@ parts:
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''from flange to the end of the reservoir is 32 cm''; reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md
       (openinverter iBooster table, 1037123-00-A/-B, Gen 1): 320 x 155 x 215'
-    basis: maker
+    basis: vendor
   - name: top
     value: 125.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''Center to top is 12,5 cm'''
-    basis: maker
+    basis: vendor
   - name: bottom
     value: 90.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''to bottom is 9 cm'''
-    basis: maker
+    basis: vendor
   - name: width
     value: 155.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''Overall width is 15,5 cm'''
-    basis: maker
+    basis: vendor
   - name: ecu_edge
     value: 85.0
     source: 'reference_documents/web_snapshots/www.evcreate.com__installing-the-ibooster.md (EVcreate, ''iBooster dimensions
       and bolt pattern'', GEN1): ''center to ECU edge is 8,5 cm'''
-    basis: maker
+    basis: vendor
   - name: bolt_sq
     value: 72.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): ''Firewall bolts (W x H) 72 x 72'''
-    basis: maker
+    basis: vendor
   - name: bolt_d
     value: 8.5
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): bolt Ø 8.5'
-    basis: maker
+    basis: vendor
     note: the firewall hole for each stud; the studs are drawn M8
   - name: cutout
     value: 76.35
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): cut-out ID 76.35'
-    basis: maker
+    basis: vendor
   - name: mc_bore
     value: 26.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): master cylinder 26 mm, 2 x M12x1 ports'
-    basis: maker
+    basis: vendor
   - name: port_thread
     value: 12.0
     source: 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (openinverter iBooster table, 1037123-00-A/-B,
       Gen 1): M12x1 brake line ports'
-    basis: maker
+    basis: vendor
   - name: stud_l
     value: 29.0
     source: sized off the owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' against
@@ -7324,127 +7682,200 @@ parts:
 - id: IGN-SWITCH
   endpoints:
   - IGN-SWITCH
-  what: Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column
+  what: Ignition switch, OER 1990096 9-blade GM-pattern for the tilt column (interchange of SMP US105, Rostra 630003)
   maker: OER (GM pattern)
   maker_pn: '1990096'
-  shape_basis: not sourced
+  shape_basis: scaled from photo
   dims_mm:
-    l: 70.0
-    w: 38.0
-    h: 30.0
-  dims_note: 'the listing gives only the package (5 x 2 x 5 in): a 70 x 38 x 25 body, assumed (±12)'
-  frame: origin at the centre of the switch's mounting face on top of the steering column jacket; +Z up off the column, +X
-    along the column
+    l: 106.7
+    w: 26.5
+    h: 61.1
+  dims_note: sized off the face-on listing photo against the 0.250 in Packard 56 blades (±8%); the body's depth is not in
+    the photo
+  frame: origin between the bracket's two slots on the bracket's back face (on the column); +Z out of the column toward the
+    connector face, +X along the column (the slot line), +Y from the body up to the bracket
   axes:
     mount_normal: +Z
     maker_up: +Y
-    faces: {}
+    faces:
+      connector: +Z
+      bracket: +Y
   colors:
     body:
       hex: '#e6dfcc'
-      from: 'switch body: natural (the listing photo)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
+      from: 'OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): natural body (k-means)'
+    zinc:
+      hex: '#c3c8c6'
+      from: 'OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): zinc bracket'
     tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+      hex: '#c47a4f'
+      from: 'OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): copper blades'
+    slider:
+      hex: '#2f7fc0'
+      from: 'OER 1990096 listing photo (reference_documents/product_images/1990096.jpg): blue actuator slider'
   attach:
   - n: pin_1
     ep: IGN-SWITCH
     at:
-    - -7.0
-    - -19.0
-    - 12.0
+    - -21.74
+    - -39.08
+    - 19.5
     dir:
     - 0
     - -1
     - 0
-    kind: blade
+    kind: blade (Packard 56)
     note: 'BAT 2: IGN_SW_0V'
   - n: pin_2
     ep: IGN-SWITCH
     at:
-    - 0.0
-    - -19.0
-    - 12.0
+    - -9.69
+    - -39.08
+    - 19.5
     dir:
     - 0
     - -1
     - 0
-    kind: blade
+    kind: blade (Packard 56)
     note: 'IGN 1: IGN_RUN_B'
   - n: pin_3
     ep: IGN-SWITCH
     at:
-    - 7.0
-    - -19.0
-    - 12.0
+    - 5.78
+    - -39.08
+    - 19.5
     dir:
     - 0
     - -1
     - 0
-    kind: blade
+    kind: blade (Packard 56)
     note: 'SOL: IGN_START'
   mount:
-  - n: mount
+  - n: slot_L
     at:
-    - 0
+    - -30.55
     - 0
     - 0
     dir:
     - 0
     - 0
     - -1
-    note: mounting face
+    note: screw through the bracket slot into the column (slotted for the switch's adjustment)
+  - n: slot_R
+    at:
+    - 30.55
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: screw through the bracket slot into the column (slotted for the switch's adjustment)
   params:
   - name: body_l
-    value: 70.0
-    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
-      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
-    basis: assumed
+    value: 88.2
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 542 px'
+    basis: photo
     note: switch body along the column
-  - name: body_w
-    value: 38.0
-    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
-      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
-    basis: assumed
   - name: body_h
+    value: 39.9
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 245 px'
+    basis: photo
+    note: switch body
+  - name: body_d
     value: 25.0
-    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
-      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    source: 'not in the photo (face-on): assumed'
     basis: assumed
-  - name: slider_l
-    value: 20.0
-    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
-      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    note: body depth off the bracket
+  - name: cap_l
+    value: 10.6
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 65 px'
+    basis: photo
+    note: slider end cap
+  - name: plate_l
+    value: 79.8
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 490 px'
+    basis: photo
+    note: bracket plate
+  - name: plate_h
+    value: 21.2
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 130 px'
+    basis: photo
+    note: bracket plate above the body
+  - name: plate_t
+    value: 1.5
+    source: 'not in the photo (face-on): assumed'
     basis: assumed
-    note: actuator rod slider
-  - name: screw_pitch
-    value: 40.0
-    source: 'no dimension of the switch on file (reference_documents/web_snapshots/www.camarodepot.ca__oer-1969-2002-chevrolet-pontiac-ignition-switch-tilt-wheel-1990096.md
-      (the listing gives only a 5 x 2 x 5 in package)): envelope assumed from the GM column-switch pattern'
+    note: bracket steel
+  - name: slot_pitch
+    value: 61.1
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 375 px'
+    basis: photo
+    note: the two bracket slots, centre to centre
+  - name: slot_l
+    value: 10.6
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 65 px'
+    basis: photo
+    note: bracket slot
+  - name: slot_w
+    value: 4.1
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 25 px'
+    basis: photo
+    note: bracket slot
+  - name: recess_l
+    value: 52.9
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 325 px'
+    basis: photo
+    note: connector recess
+  - name: recess_h
+    value: 26.1
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 160 px'
+    basis: photo
+    note: connector recess
+  - name: recess_d
+    value: 8.0
+    source: 'not in the photo (face-on): assumed'
     basis: assumed
-    note: two screws to the column
-    fit: fit-critical, scaled
+    note: recess depth
+  - name: blade_w
+    value: 6.35
+    source: the 0.250 in Packard 56 tab (catalog/families.yaml gm_blade)
+    basis: vendor
+    note: Packard 56 tab width
+  - name: blade_l
+    value: 6.5
+    source: 'sized off OER 1990096 listing photo (reference_documents/product_images/1990096.jpg) against the 0.250 in Packard
+      56 tab (catalog/families.yaml gm_blade), 39 px wide (0.1628 mm/px, ±8%): 40 px'
+    basis: photo
+    note: blade showing in the recess
   checks:
-  - check: drawn at the assumed envelope
-    model: 1.0
-    drawing: 1.0
+  - check: switch body and end cap along the column
+    model: 98.8
+    drawing: 98.8
     tol: 0.05
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: only the package size is published.'
-  - 'Factory column connector vs splice: under-dash chapter (registry).'
-  cross_checks: []
+  - 'The body''s depth: the photo is face-on.'
+  - Two of the nine blades sit in the upper windows (drawn as the photo suggests).
+  - Which blade carries BAT 2, IGN 1 and SOL.
+  cross_checks:
+  - SMP US105 and Rostra 630003 list 9 male blades, as the photo shows.
+  - 'Mating halves (pin table): GM 6294642 (BAT 1 / BAT 2 / IGN 1 / ACC / SOL) and 6294641 (BAT 3 / IGN 3 / GRD 1 / GRD 2).'
   notes: []
   margin_mm:
-    mm: 12.0
-    why: no size published for the switch itself
+    mm: 8.0
+    why: photo scale from the blades (±8%); depth assumed
   registry:
     IGN-SWITCH:
       device: OER 1990096 9-blade GM-pattern ignition switch for the TILT column (1977 K5)
@@ -14156,22 +14587,22 @@ parts:
     value: 266.7
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''Frame Width 10.5'' in'
-    basis: maker
+    basis: vendor
   - name: hole_d
     value: 228.6
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''cutout diameter: 9.0"'''
-    basis: maker
+    basis: vendor
   - name: depth
     value: 82.55
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''top-mount depth: 3.25"'''
-    basis: maker
+    basis: vendor
   - name: cone_front
     value: 17.3
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''mounting height: 0.68"'' (above the mounting surface)'
-    basis: maker
+    basis: vendor
   - name: frame_t
     value: 6.0
     source: sized off reference_documents/component_drawings/JBL_Club_102SL_back_crutchfield.jpg (Crutchfield back photo)
@@ -14488,22 +14919,22 @@ parts:
     value: 266.7
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''Frame Width 10.5'' in'
-    basis: maker
+    basis: vendor
   - name: hole_d
     value: 228.6
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''cutout diameter: 9.0"'''
-    basis: maker
+    basis: vendor
   - name: depth
     value: 82.55
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''top-mount depth: 3.25"'''
-    basis: maker
+    basis: vendor
   - name: cone_front
     value: 17.3
     source: 'reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (Crutchfield specs, fetched 2026-09-28):
       ''mounting height: 0.68"'' (above the mounting surface)'
-    basis: maker
+    basis: vendor
   - name: frame_t
     value: 6.0
     source: sized off reference_documents/component_drawings/JBL_Club_102SL_back_crutchfield.jpg (Crutchfield back photo)
@@ -15793,69 +16224,69 @@ parts:
 - id: TURN-SW
   endpoints:
   - TURN-SW
-  what: 'Turn and hazard switch, factory column (column connector): turn and hazard feeds on PDM30 0V, front outputs to DIG4
-    / DIG5'
-  maker: GM (factory)
-  maker_pn: factory
+  what: 'Turn and hazard switch, factory column (GM 1997985; SMP TW45): turn and hazard feeds on PDM30 0V, front outputs to
+    DIG4 / DIG5, at the column connector'
+  maker: GM
+  maker_pn: GM 1997985 (SMP TW45, Wells 1S1074, Rostra 710002)
   shape_basis: not sourced
   dims_mm:
-    l: 110.0
-    w: 110.0
-    h: 18.0
-  dims_note: 'no part number or size on file: envelope assumed (±20)'
-  frame: origin at the centre of the part on the steering column's axis; +Z toward the driver
+    l: 139.0
+    w: 95.0
+    h: 22.0
+  dims_note: 'no size in any source: SMP''s TW45 photo''s proportions at an assumed 95 mm plate (±20); the harness is Wells''
+    17 in'
+  frame: origin on the steering column's axis at the switch plate's face; +Z toward the driver; the connector is drawn beside
+    the plate on a cut-short harness (it hangs 17 in down the column)
   axes:
     mount_normal: +Z
     maker_up: +Y
-    faces: {}
+    faces:
+      connector: -Z
   colors:
-    body:
-      hex: '#1d1d1f'
-      from: 'factory switch body: drawn black (no photo on file)'
-    metal:
-      hex: '#b9bcbf'
-      from: 'metal: drawn zinc'
-    chrome:
-      hex: '#d3d6d8'
-      from: 'chrome: drawn'
-    tab:
-      hex: '#c7c2b4'
-      from: 'terminals: drawn tin'
+    plate:
+      hex: '#e8e2d0'
+      from: 'SMP TW45 photo (RockAuto): white switch plate (k-means)'
+    block:
+      hex: '#1c1c1d'
+      from: 'SMP TW45 photo (RockAuto): black actuator and connector'
+    wire:
+      hex: '#6c7fa6'
+      from: 'SMP TW45 photo (RockAuto): the ribbon''s blue / white / brown / violet wires (drawn one colour)'
   attach:
   - n: pin_1
     ep: TURN-SW
     at:
-    - -8.0
-    - -60.0
-    - 0.0
+    - -77.5
+    - -27.22
+    - -12.0
     dir:
     - 0
-    - -1
     - 0
+    - -1
     kind: column connector cavity
     note: '14 LT FRT LP: 33'
   - n: pin_2
     ep: TURN-SW
     at:
-    - 0.0
-    - -60.0
-    - 0.0
+    - -77.5
+    - -19.44
+    - -12.0
     dir:
     - 0
-    - -1
     - 0
+    - -1
     kind: column connector cavity
     note: '15 RT FRT LP: TURN_SW_R'
   - n: pin_3
     ep: TURN-SW
     at:
-    - 8.0
-    - -60.0
-    - 0.0
+    - -77.5
+    - -11.67
+    - -12.0
     dir:
     - 0
-    - -1
     - 0
+    - -1
     kind: column connector cavity
     note: '16 FLSHR + 27 HAZ WARN, jumpered: TURN_SW_0V'
   mount:
@@ -15870,23 +16301,42 @@ parts:
     - -1
     note: mounting face
   params:
-  - name: d
-    value: 110.0
-    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
-      envelope assumed'
+  - name: plate_d
+    value: 95.0
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
     basis: assumed
-    note: switch plate
-  - name: t
+    note: C-shaped switch plate
+  - name: bore_d
+    value: 42.0
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
+    basis: assumed
+    note: column opening
+  - name: plate_t
     value: 18.0
-    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
-      envelope assumed'
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
     basis: assumed
-  - name: lead_l
-    value: 150.0
-    source: 'no dimension on file for this part (the factory turn / hazard switch has no part number or drawing on file):
-      envelope assumed'
+  - name: conn_l
+    value: 70.0
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
     basis: assumed
-    note: harness to the column connector
+    note: column connector
+  - name: conn_w
+    value: 14.0
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
+    basis: assumed
+  - name: conn_d
+    value: 12.0
+    source: 'no size in any source: assumed; proportions off SMP TW45 photo (RockAuto)'
+    basis: assumed
+  - name: harness_l
+    value: 431.8
+    source: 'Wells 1S1074 spec table (RockAuto): ''Wiring Harness Length 17.00 IN'', 8 wires, 8 blades'
+    basis: vendor
+    note: switch to connector (drawn cut short)
+  - name: shown_l
+    value: 60.0
+    source: drawn length of the harness
+    basis: design
   checks:
   - check: drawn at the assumed envelope
     model: 1.0
@@ -15895,13 +16345,14 @@ parts:
     ok: true
   branding: {}
   unknowns:
-  - 'Every dimension: factory part with no number on file.'
-  - Column connector cavities read at the bench (registry).
-  cross_checks: []
+  - Every size of the switch and its connector.
+  - 'The cavity order on the connector: read the column connector.'
+  cross_checks:
+  - SMP and Wells list 8 terminals at the column connector; the registry uses three cavities (14, 15, 16 + 27).
   notes: []
   margin_mm:
     mm: 20.0
-    why: factory part, nothing on file
+    why: no size published; proportions from the maker's photo
   registry:
     TURN-SW:
       device: factory column turn/hazard switch (column connector) — turn and hazard feeds on PDM30 0V, front outputs to DIG4
@@ -15925,6 +16376,10 @@ parts:
         '33': 14 LT FRT LP
         TURN_SW_R: 15 RT FRT LP
         TURN_SW_0V: 16 FLSHR + 27 HAZ WARN, jumpered
+  photo:
+    url: https://www.rockauto.com/info/154/TW-45_Front.jpg
+    page: https://www.rockauto.com/en/moreinfo.php?pk=43743
+    fetched: '2026-09-29'
   script: docs/wiring/calc-data/cad/fab/TURN-SW.py
 - id: Tail_Light_Left
   endpoints:
