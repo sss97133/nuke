@@ -1149,18 +1149,22 @@ if rows:
                         {"kind": "Wires in the registry", "n": len(WIRES), "updated": git_date("docs/wiring/calc-data/k5_registry.json"), "src": "k5_registry.json (main)"}]}
     VEHICLE_DATA["total"] = sum(r["n"] for r in VEHICLE_DATA["db"] if not r["table"].startswith(("harness_", "vehicle_custom", "wire_term", "wiring_")))
 
-# 3D coverage by basis: each end counts once, at the best shape basis among its models (maker drawing first, not sourced last)
+# 3D coverage by basis: each end counts once, at the WEAKEST shape basis among its models (a chain is as strong as its weakest
+# record). The part-model index writes this itself (ends_by_shape_basis, index_v5); computed here the same way only if it is absent.
 BASIS_ORDER = ["maker drawing", "datasheet dims", "scaled from photo", "twin object", "not sourced"]
 PM_ENDS = PMI.get("ends") or {}
-def best_basis(ep):
+def weakest_basis(ep):
     bs = [(PMI["parts"].get(pid) or {}).get("shape_basis") for pid in MODELLED.get(ep, [])]
     bs = [b for b in bs if b in BASIS_ORDER]
-    return min(bs, key=BASIS_ORDER.index) if bs else None
-m3d_basis = {b: 0 for b in BASIS_ORDER}
-for i in items:
-    b = best_basis(i["id"]) if i["m3d"] else None
-    if b:
-        m3d_basis[b] += 1
+    return max(bs, key=BASIS_ORDER.index) if bs else None
+if PMI.get("ends_by_shape_basis"):
+    m3d_basis = {b: int(PMI["ends_by_shape_basis"].get(b, 0)) for b in BASIS_ORDER}
+else:
+    m3d_basis = {b: 0 for b in BASIS_ORDER}
+    for i in items:
+        b = weakest_basis(i["id"]) if i["m3d"] else None
+        if b:
+            m3d_basis[b] += 1
 cov = {"ends": len(items), "drawn": sum(1 for i in items if i.get("drawn")), "cad": len(LIB), "m3d": sum(1 for i in items if i["m3d"]),
        "m3d_complete": sum(1 for i in items if (PM_ENDS.get(i["id"]) or {}).get("complete")), "m3d_basis": m3d_basis,
        "pm_src": PMI_SRC, "pm_parts": len(PMI["parts"]), "segs": len((routes or {}).get("segments", [])),
@@ -1228,3 +1232,101 @@ open(OUT_HTML, "w").write(html)
 js = open(os.path.join(src, "app.js")).read()
 open(os.path.join(D, "_check.js"), "w").write(js)
 print("ends", len(items), "drawn", drawn, "| html", len(html) // 1024, "KB | routes", bool(routes))
+
+# ------------------------------------------------------------------ the MAP tab's public files on nuke.ag: --export-site <nuke_frontend dir>
+# Public, so: no prices, no order or listing ids, no people's names; free text goes through mask(). GLBs under 10 MB each,
+# scene extras stripped, then scanned. TODO: positions move into harness_endpoints in the next registry pass.
+if "--export-site" in ARGS:
+    import struct
+    FE = ARGS[ARGS.index("--export-site") + 1]
+    today = datetime.date.today().isoformat()
+
+    def eff_mm(i):
+        m = i.get("margin") or {}
+        if m.get("mm") is None and i.get("grouped") in ITEM:
+            m = ITEM[i["grouped"]].get("margin") or {}
+        return m.get("mm")
+
+    ends_out = {}
+    for i in items:
+        e = {"xyz": [round(v, 3) for v in i["xyz"]], "basis": mask(re.sub(r",?\s*ruled by \w+ \d{4}-\d{2}-\d{2}", "", i["basis"].split(" (")[0])), "margin_mm": eff_mm(i),
+             "dev": i["dev"], "dev_name": mask(DEVS[i["dev"]]["name"])}
+        if i.get("drawn") == "own" and i.get("fp"):
+            e["size"] = {k: i["fp"].get(k) for k in ("shape", "dx", "dy", "dz", "d", "t", "axis") if i["fp"].get(k) is not None}
+            if i["fp"].get("top"):
+                e["color"] = i["fp"]["top"]
+        elif i.get("drawn") == "piece":
+            e["on"] = i["piece_of"]
+        face = {p["c"]: p["xy"] for p in PINS.get(i["id"], []) if p.get("xy")}
+        if face:
+            e["face"] = face
+        ends_out[i["id"]] = e
+    json.dump({"vehicle_id": VID, "generated": today, "frame": "twin metres: +x driver, -y forward, +z up",
+               "source": "ends.py and pos.py (%s), footprints and part models" % stamp.get("pos.py", ""),
+               "ends": ends_out}, open(os.path.join(FE, "public", "wiring", "k5-positions.json"), "w"), separators=(",", ":"))
+
+    def rdp3(pts, eps=0.004):
+        if len(pts) < 3:
+            return pts
+        a, b = pts[0], pts[-1]
+        ab = [b[k] - a[k] for k in range(3)]
+        L2 = sum(v * v for v in ab) or 1e-12
+        def dist(p):
+            ap = [p[k] - a[k] for k in range(3)]
+            t = max(0.0, min(1.0, sum(ap[k] * ab[k] for k in range(3)) / L2))
+            return math.dist(p, [a[k] + t * ab[k] for k in range(3)])
+        d = [dist(p) for p in pts[1:-1]]
+        ix = max(range(len(d)), key=d.__getitem__)
+        if d[ix] > eps:
+            return rdp3(pts[:ix + 2], eps)[:-1] + rdp3(pts[ix + 1:], eps)
+        return [a, b]
+
+    def cov_of(t):   # the covering's name, and whether its size is an estimate; the working notes stay in routes.json
+        t = str(t or "")
+        base = re.split(r"\s*[;(]", t)[0].strip()
+        return (mask(base) + (" (estimated)" if "estimate" in t.lower() else "")) if base else None
+
+    if routes_src:
+        RR = json.load(open(os.path.join(IN, "routes.json")))
+        node_ep = {n["id"]: n.get("ep") for n in RR.get("nodes", [])}
+        clips = {}
+        for c in RR.get("clips", []):
+            clips[c.get("segment")] = clips.get(c.get("segment"), 0) + 1
+        segs_out = [{"id": s["id"], "b": s.get("bundle"), "od": s.get("od_mm"), "par": s.get("parallel") or 1, "len": s.get("length_m"),
+                     "mar": s.get("margin_mm"), "cov": cov_of(s.get("covering")),
+                     "f": node_ep.get(s.get("from_node")) or s.get("from_node"), "t": node_ep.get(s.get("to_node")) or s.get("to_node"),
+                     "w": s.get("wires") or [], "clips": clips.get(s["id"], 0),
+                     "pts": [[round(v, 3) for v in p] for p in rdp3(s["points"])]} for s in RR.get("segments", [])]
+        json.dump({"vehicle_id": VID, "generated": today, "frame": "twin metres: +x driver, -y forward, +z up", "source": "harness-cad routes.json (%s)" % stamp.get("routes.json", ""),
+                   "segments": segs_out}, open(os.path.join(FE, "public", "wiring", "k5-routes.json"), "w"), separators=(",", ":"))
+
+    KEEP_EXTRAS = {"id", "endpoint", "route", "members", "od_mm"}   # model/status are working notes, not results
+    for zone in ("bay", "cab", "rear"):
+        src = os.path.expanduser("~/k5-harness-pull/glb/v4/k5_harness_v4_%s.glb" % zone)
+        raw = open(src, "rb").read()
+        magic, ver, _ = struct.unpack("<III", raw[:12])
+        jlen, jtype = struct.unpack("<II", raw[12:20])
+        js = json.loads(raw[20:20 + jlen])
+        tail = raw[20 + jlen:]
+        js.pop("extras", None)
+        (js.get("asset") or {}).pop("extras", None)
+        for key in ("scenes", "materials", "meshes", "textures", "images", "cameras"):
+            for obj in js.get(key) or []:
+                obj.pop("extras", None)
+        for n in js.get("nodes") or []:
+            ex = n.get("extras")
+            if isinstance(ex, dict):
+                ex = {k: v for k, v in ex.items() if k in KEEP_EXTRAS}
+                if ex:
+                    n["extras"] = ex
+                else:
+                    n.pop("extras", None)
+        jb = json.dumps(js, separators=(",", ":")).encode()
+        jb += b" " * ((4 - len(jb) % 4) % 4)
+        out = struct.pack("<III", magic, ver, 20 + len(jb) + len(tail)) + struct.pack("<II", len(jb), jtype) + jb + tail
+        bad = [x for x in (b"blendermcp", b"api_key", b"apikey", b"sketchfab") if x in out.lower()]
+        assert not bad, ("refused: %s carries %s" % (zone, bad))
+        assert len(out) <= 10_000_000, ("refused: %s is %d bytes" % (zone, len(out)))
+        open(os.path.join(FE, "public", "models", "k5-harness-v4-%s.glb" % zone), "wb").write(out)
+        print("export: %s GLB %.1f MB, %d nodes, scanned clean" % (zone, len(out) / 1e6, len(js.get("nodes") or [])))
+    print("export: k5-positions.json %d ends, k5-routes.json %d segments" % (len(ends_out), len(segs_out) if routes_src else 0))
