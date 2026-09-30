@@ -159,7 +159,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         {points.map(({ h, role }, i) => (
           <F key={i} cw={cw} k={role}>{endLink(h)} <span style={{ color: cw.inkMuted }}>{nameOf(h.code)}</span></F>
         ))}
-        {open && <F cw={cw} k={ch.length ? 'END B' : 'ENDS'}><NotOnFile cw={cw} closes={open} /></F>}
+        {open && <F cw={cw} k={ch.length ? 'OPEN END' : 'ENDS'}><NotOnFile cw={cw} closes={open} /></F>}
 
         <H cw={cw}>THE WIRE</H>
         <F cw={cw} k="GAUGE">{w.gauge != null ? <span style={mono}>{w.gauge} AWG</span> : <NotOnFile cw={cw} closes={GAP.gauge} />}</F>
