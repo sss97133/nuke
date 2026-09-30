@@ -1,5 +1,5 @@
 999
-generator fw61_adapter_plate.py blob 08171b5e018c
+generator fw61_adapter_plate.py blob 3dc76adc7f82
 999
 FB_OPENING_D=101.600 (NOT SOURCED: objectTraits.ts FB 4.0 in round, no source)
 999
@@ -9,7 +9,13 @@ THICK=3.175
 999
 PANEL_MAX=3.175
 999
+SPOTFACE_T=2.794
+999
+SPOTFACE_D=62.000
+999
 GASKET_T=1.500
+999
+GASKET_ID=107.600
 999
 SIDE=135.000
 999
@@ -517,7 +523,7 @@ $SKPOLY
   9
 $TDCREATE
  40
-2461313.867928241
+2461313.8755092593
   9
 $TDUCREATE
  40
@@ -525,7 +531,7 @@ $TDUCREATE
   9
 $TDUPDATE
  40
-2461313.867928241
+2461313.8755092593
   9
 $TDUUPDATE
  40
@@ -577,7 +583,7 @@ $SPLINESEGS
   9
 $HANDSEED
   5
-42
+52
   9
 $SURFTAB1
  70
@@ -957,11 +963,11 @@ $PSTYLEMODE
   9
 $FINGERPRINTGUID
   2
-{651E3669-8CA0-4F8F-9E00-A57FD2B6079D}
+{0B6E3437-A67E-4829-B702-0D42B454B963}
   9
 $VERSIONGUID
   2
-{376EF4FE-3F66-44CE-8799-7C9C32724E0A}
+{37663A7D-6F65-4772-BD8D-F1AA5CF47E3E}
   9
 $EXTNAMES
 290
@@ -1351,9 +1357,9 @@ ISM
   0
 CLASS
   1
-LAYOUT
+ACDBPLACEHOLDER
   2
-AcDbLayout
+AcDbPlaceHolder
   3
 ObjectDBX Classes
  90
@@ -1367,9 +1373,9 @@ ObjectDBX Classes
   0
 CLASS
   1
-ACDBPLACEHOLDER
+LAYOUT
   2
-AcDbPlaceHolder
+AcDbLayout
   3
 ObjectDBX Classes
  90
@@ -1401,7 +1407,7 @@ AcDbSymbolTable
   0
 VPORT
   5
-3E
+4E
 330
 8
 100
@@ -1597,7 +1603,7 @@ LAYER
 100
 AcDbSymbolTable
  70
-3
+5
   0
 LAYER
   5
@@ -1660,6 +1666,54 @@ AcDbSymbolTableRecord
 AcDbLayerTableRecord
   2
 CUT
+ 70
+0
+ 62
+7
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+3E
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+SPOTFACE_TO_2P79MM
+ 70
+0
+ 62
+7
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+40
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+GASKET_RING
  70
 0
  62
@@ -1773,7 +1827,7 @@ ACAD
   0
 APPID
   5
-3F
+4F
 330
 3
 100
@@ -1787,7 +1841,7 @@ HATCHBACKGROUNDCOLOR
   0
 APPID
   5
-40
+50
 330
 3
 100
@@ -2414,6 +2468,326 @@ CIRCLE
 AcDbEntity
   8
 CUT
+100
+AcDbCircle
+ 10
+54.5
+ 20
+54.5
+ 30
+0.0
+ 40
+3.3
+  0
+CIRCLE
+  5
+3F
+330
+17
+100
+AcDbEntity
+  8
+SPOTFACE_TO_2P79MM
+100
+AcDbCircle
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+31.0
+  0
+LINE
+  5
+41
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbLine
+ 10
+-67.5
+ 20
+57.5
+ 30
+0.0
+ 11
+-67.5
+ 21
+-57.5
+ 31
+0.0
+  0
+ARC
+  5
+42
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+-57.5
+ 20
+-57.5
+ 30
+0.0
+ 40
+10.0
+100
+AcDbArc
+ 50
+180.0
+ 51
+270.0
+  0
+ARC
+  5
+43
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+-57.5
+ 20
+57.5
+ 30
+0.0
+ 40
+10.0
+100
+AcDbArc
+ 50
+90.0
+ 51
+180.0
+  0
+LINE
+  5
+44
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbLine
+ 10
+-57.5
+ 20
+-67.5
+ 30
+0.0
+ 11
+57.5
+ 21
+-67.5
+ 31
+0.0
+  0
+LINE
+  5
+45
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbLine
+ 10
+57.5
+ 20
+67.5
+ 30
+0.0
+ 11
+-57.5
+ 21
+67.5
+ 31
+0.0
+  0
+ARC
+  5
+46
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+57.5
+ 20
+-57.5
+ 30
+0.0
+ 40
+10.0
+100
+AcDbArc
+ 50
+270.0
+ 51
+360.0
+  0
+ARC
+  5
+47
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+57.5
+ 20
+57.5
+ 30
+0.0
+ 40
+10.0
+100
+AcDbArc
+ 50
+0.0
+ 51
+90.0
+  0
+LINE
+  5
+48
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbLine
+ 10
+67.5
+ 20
+-57.5
+ 30
+0.0
+ 11
+67.5
+ 21
+57.5
+ 31
+0.0
+  0
+CIRCLE
+  5
+49
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+-54.5
+ 20
+-54.5
+ 30
+0.0
+ 40
+3.3
+  0
+CIRCLE
+  5
+4A
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+54.5
+ 20
+-54.5
+ 30
+0.0
+ 40
+3.3
+  0
+CIRCLE
+  5
+4B
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+-54.5
+ 20
+54.5
+ 30
+0.0
+ 40
+3.3
+  0
+CIRCLE
+  5
+4C
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
+100
+AcDbCircle
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+53.8
+  0
+CIRCLE
+  5
+4D
+330
+17
+100
+AcDbEntity
+  8
+GASKET_RING
 100
 AcDbCircle
  10
@@ -3415,7 +3789,7 @@ CREATED_BY_EZDXF
   3
 WRITTEN_BY_EZDXF
 350
-41
+51
   0
 DICTIONARYVAR
   5
@@ -3427,11 +3801,11 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-09-30T00:49:49.751377+00:00
+1.4.4 @ 2026-09-30T01:00:44.098035+00:00
   0
 DICTIONARYVAR
   5
-41
+51
 330
 2D
 100
@@ -3439,7 +3813,7 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-09-30T00:49:49.760704+00:00
+1.4.4 @ 2026-09-30T01:00:44.116971+00:00
   0
 ENDSEC
   0
