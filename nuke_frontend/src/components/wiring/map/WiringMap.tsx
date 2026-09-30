@@ -149,6 +149,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const faceCode = k === 'n' ? v : k === 'p' ? v.split('|')[0] : k === 'w' ? (ix.chain.get(v) ?? [])[0]?.code ?? null
     : k === 'd' ? map.nodes.find(n => ix.devOf(n.code) === v)?.code ?? null : null;
   const pick = (id: string) => { setSel(id); if (narrow) setTreeOpen(false); };
+  const clearSel = React.useCallback(() => setSel(null), [setSel]);
 
   // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
   const rawNode = k === 'n' ? raw.nodes.find(n => n.code === v) : undefined;
@@ -188,7 +189,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         {view === 'plan' && <PlanView cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
         {view === '3d' && (
           <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: cw.inkMuted }}>LOADING THE 3D HARNESS…</div>}>
-            <ZoneModels3D cw={cw} ix={ix} sel={sel} rel={rel} onSelect={pick} />
+            <ZoneModels3D cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} onClear={clearSel} />
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
@@ -278,7 +279,17 @@ function chipStyle(cw: Colorway, on: boolean): React.CSSProperties {
 function Summary({ cw, map, ix, site, cov, isOwner }: {
   cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; cov: ReturnType<typeof coverage>; isOwner: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  // the split opens on hover with a mouse, and on click or tap anywhere (a tap sets no hover); a tap outside closes it
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hover || pinned;
+  const wrap = React.useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!pinned) return;
+    const off = (e: PointerEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setPinned(false); };
+    document.addEventListener('pointerdown', off);
+    return () => document.removeEventListener('pointerdown', off);
+  }, [pinned]);
   const decided = map.wires.filter(w => w.designStatus === 'decided').length;
   const withEnds = map.wires.filter(w => (ix.chain.get(w.code) ?? []).length > 1).length;
   const placed = map.nodes.filter(n => site.ends[n.code]).length;
@@ -295,8 +306,9 @@ function Summary({ cw, map, ix, site, cov, isOwner }: {
       </span>
       {site.segs.length > 0 && <span style={item} title="k5-routes.json"><B>{site.segs.length}</B> LOOM SEGMENTS · <B>{lenM.toFixed(1)}</B> M</span>}
       {site.models && (
-        <span style={{ position: 'relative' }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-          <button onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
+        <span ref={wrap} style={{ position: 'relative' }}
+          onPointerEnter={e => { if (e.pointerType === 'mouse') setHover(true); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setHover(false); }}>
+          <button onClick={() => setPinned(p => !p)} aria-expanded={open} style={{ ...item, border: 'none', borderBottom: `2px solid ${cw.accent}`,
             background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: cw.fontBody }}>
             <B>{cov.modelled.length}</B> OF <B>{cov.total}</B> ENDS MODELLED IN 3D, <B>{cov.complete.length}</B> COMPLETE ▾
           </button>

@@ -5,7 +5,7 @@
 // Keyboard shortcuts: 1-5 tabs, F fit, Esc deselect, Cmd+K search
 
 import React, { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { supabase } from '../lib/supabase';
@@ -108,8 +108,19 @@ export default function WiringPlan() {
   // line, and DATA / WORKBENCH list per-part prices (live, logged out, 2026-09-30: "COST $23,590"). A visitor always
   // gets the MAP tab, whatever ?tab= says; the owner keeps every tab. Same owner check as the MAP tab.
   const { session } = useAuth();
-  const { isOwner } = useVehiclePermissions(vehicleId ?? null, session, null);
+  const { isOwner: isRowOwner } = useVehiclePermissions(vehicleId ?? null, session, null);
+  // ?asOwner=1 previews the owner's tabs on the dev server only (import.meta.env.DEV), like the MAP tab's preview;
+  // a build never honours it
+  const isOwner = isRowOwner || (import.meta.env.DEV && new URLSearchParams(window.location.search).get('asOwner') === '1');
   const shownTab: ViewTab = isOwner ? activeTab : 'map';
+  // the shown tab is in the URL, so a tab can be linked and reloaded; a visitor's ?tab=<legacy> reads back as map.
+  // Written through the router (a replace, no new history entry) so the MAP tab's own ?sel= writes keep it.
+  const [, setUrlParams] = useSearchParams();
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === shownTab) return;
+    setUrlParams(prev => { const p = new URLSearchParams(prev); p.set('tab', shownTab); return p; }, { replace: true });
+  }, [shownTab]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { window.scrollTo(0, 0); }, []);   // land at the top: the site header stays in view
   const visibleTabs = isOwner ? TABS : TABS.filter(t => t.id === 'map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
