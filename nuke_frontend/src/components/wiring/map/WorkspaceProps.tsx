@@ -7,7 +7,7 @@ import type { Colorway } from '../connector-inspector/colorways';
 import { rule } from '../connector-inspector/colorways';
 import { DevicePhoto, WhereOnTruck } from './MountsPanel';
 import { SECTIONS, type WiringMapData } from './useWiringMap';
-import { kindOf, mask, modelsOf, partNo, valOf, weakestBasis, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
+import { kindOf, mask, modelsOf, partNo, publicName, valOf, weakestBasis, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 
 const FRONT_AXLE = -1.853, IN = 0.0254;
 const secWord = (s: string | null | undefined) => SECTIONS.find(x => x.id === s)?.label ?? '—';
@@ -44,6 +44,8 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
     if (!segs.length) return null;
     return { mm: Math.round(segs.reduce((a, s) => a + (s!.len ?? 0), 0) * 1000), pm: Math.round(Math.sqrt(segs.reduce((a, s) => a + (s!.mar ?? 0) ** 2, 0))), n: segs.length };
   };
+  // a status word is the owner's; a visitor sees the result, or a dash where there is none yet
+  const pending = isOwner ? <span style={{ color: cw.warn }}>ENDS PENDING</span> : '—';
   const endLink = (h: { code: string; cav: string | null }) => <Link cw={cw} id={'p:' + h.code + '|' + (h.cav ?? '')} onSelect={onSelect}>{h.code}{h.cav ? ':' + h.cav : ''}</Link>;
   const wireTable = (wcs: string[], here?: string) => (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -59,7 +61,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{wc}</td>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{w?.gauge ?? ''}</td>
             <td style={{ padding: '2px 4px', borderBottom: rule(cw) }}>{w?.color ?? ''}</td>
-            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{far.length ? far.map((h, i) => <span key={i}>{i ? ' → ' : ''}{h!.code}{h!.cav ? ':' + h!.cav : ''}</span>) : <span style={{ color: cw.warn }}>ENDS PENDING</span>}</td>
+            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{far.length ? far.map((h, i) => <span key={i}>{i ? ' → ' : ''}{h!.code}{h!.cav ? ':' + h!.cav : ''}</span>) : pending}</td>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{L ? `${L.mm} ±${L.pm}` : ''}</td>
           </tr>
         );
@@ -88,8 +90,8 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
     return (
       <div>
         {head('CONNECTOR', n.code, n.name)}
-        <DevicePhoto cw={cw} code={n.code} />
-        <WhereOnTruck cw={cw} code={n.code} showWhy={isOwner} />
+        <DevicePhoto cw={cw} code={n.code} captionOf={publicName} />
+        <WhereOnTruck cw={cw} code={n.code} showWhy={isOwner} showStatus={isOwner} />
         <F cw={cw} k="3D MODEL">{model3d(n.code)}</F>
         <F cw={cw} k="PART NO."><span style={mono}>{partNo(n.partNumber)}</span></F>
         <F cw={cw} k="TYPE">{n.type.toUpperCase()}{n.family && n.family !== 'unknown' ? ` · ${n.family.toUpperCase()}` : ''}</F>
@@ -122,10 +124,10 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         <F cw={cw} k="SPEC"><span style={mono}>{w.spec ?? '—'}</span></F>
         <F cw={cw} k="COLOR">{w.color ?? '—'}</F>
         <F cw={cw} k="FROM">{ch[0] ? endLink(ch[0]) : '—'}</F>
-        <F cw={cw} k="TO">{ch.length > 1 ? endLink(ch[ch.length - 1]) : <span style={{ color: cw.warn }}>ENDS PENDING</span>}</F>
+        <F cw={cw} k="TO">{ch.length > 1 ? endLink(ch[ch.length - 1]) : pending}</F>
         {ch.length > 2 && <F cw={cw} k="VIA">{ch.slice(1, -1).map((h, i) => <span key={i}>{i ? ' · ' : ''}{endLink(h)}</span>)}</F>}
         <F cw={cw} k="LENGTH">{L ? <><span style={mono}>{L.mm} ± {L.pm} MM</span> ROUTED THROUGH {L.n} SEGMENTS</> : '—'}</F>
-        <F cw={cw} k="STATUS">{w.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}</F>
+        {isOwner && <F cw={cw} k="STATUS">{w.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}</F>}
         {segs.length > 0 && <>
           <H cw={cw}>ROUTE ({segs.length})</H>
           {segs.map(s => (
@@ -182,7 +184,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
     return (
       <div>
         {head('SECTION', secWord(v))}
-        <F cw={cw} k="WIRES"><span style={mono}>{wires.length}</span> ({wires.filter(w => w.designStatus === 'decided').length} DECIDED)</F>
+        <F cw={cw} k="WIRES"><span style={mono}>{wires.length}</span>{isOwner ? ` (${wires.filter(w => w.designStatus === 'decided').length} DECIDED)` : ''}</F>
         <F cw={cw} k="CONNECTORS"><span style={mono}>{nodes.length}</span></F>
       </div>
     );

@@ -5,7 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
-import { SHAPE_ORDER, mask, partNo, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
+import { SHAPE_ORDER, mask, partNo, publicName, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 
 const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1));
 
@@ -50,7 +50,7 @@ export function PartLibrary({ cw, ix, site, sel, rel, onSelect }: {
             return (
               <tr key={p.id} onClick={() => first && onSelect('n:' + first)} style={{ cursor: first ? 'pointer' : 'default', background: pri ? `${cw.accent}33` : lk ? `${cw.accent}14` : 'transparent' }}>
                 <td style={{ ...td, fontFamily: cw.fontMono, whiteSpace: 'nowrap' }}>{p.id}</td>
-                <td style={{ ...td, minWidth: 220 }}>{mask((p.what ?? '').split(' (')[0])}</td>
+                <td style={{ ...td, minWidth: 220 }}>{publicName((p.what ?? '').split(' (')[0])}</td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>{mask(p.maker)}</td>
                 <td style={{ ...td, fontFamily: cw.fontMono }}>{partNo(p.maker_pn)}</td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>{(p.shape_basis ?? 'not sourced').toUpperCase()}</td>

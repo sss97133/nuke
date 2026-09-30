@@ -94,8 +94,8 @@ function layout(section: string, map: WiringMapData, ix: WsIndex) {
   return { place, hops, width, height, cols, X };
 }
 
-export function SchematicBlock({ cw, map, ix, section, sel, rel, onSelect }: {
-  cw: Colorway; map: WiringMapData; ix: WsIndex; section: string; sel: string | null; rel: Rel; onSelect: (id: string) => void;
+export function SchematicBlock({ cw, map, ix, section, sel, rel, isOwner, onSelect }: {
+  cw: Colorway; map: WiringMapData; ix: WsIndex; section: string; sel: string | null; rel: Rel; isOwner: boolean; onSelect: (id: string) => void;
 }) {
   const L = useMemo(() => layout(section, map, ix), [section, map, ix]);
   const [z, setZ] = useState(1);
@@ -115,7 +115,7 @@ export function SchematicBlock({ cw, map, ix, section, sel, rel, onSelect }: {
           <g key={i} onClick={() => onSelect('w:' + h.wc)} style={{ cursor: 'pointer' }}>
             <path d={h.d} fill="none" stroke="transparent" strokeWidth={9} />
             <path d={h.d} fill="none" stroke={wcls(h.wc)} strokeWidth={has && (sel === 'w:' + h.wc) ? 2.4 : has && rel.wires.has(h.wc) ? 1.8 : 1}
-              strokeDasharray={map.wires.find(w => w.code === h.wc)?.designStatus === 'concept' ? '5 3' : undefined}><title>{h.wc}</title></path>
+              strokeDasharray={isOwner && map.wires.find(w => w.code === h.wc)?.designStatus === 'concept' ? '5 3' : undefined}><title>{h.wc}</title></path>
           </g>
         ))}
         {[...L.place.entries()].map(([dev, p]) => {

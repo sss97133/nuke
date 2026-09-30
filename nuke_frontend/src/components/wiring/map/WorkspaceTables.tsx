@@ -32,7 +32,7 @@ export function WorkspaceTables({ cw, map, ix, site, sel, rel, isOwner, onSelect
     const wires = {
       rows: map.wires.slice().sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
       id: (w: typeof map.wires[number]) => 'w:' + w.code, linked: (w: typeof map.wires[number]) => rel.wires.has(w.code),
-      cols: [
+      cols: ([
         { h: 'WIRE', v: w => w.code, mono: true },
         { h: 'FROM', v: w => endTxt((ix.chain.get(w.code) ?? [])[0]), mono: true },
         { h: 'TO', v: w => { const c = ix.chain.get(w.code) ?? []; return c.length > 1 ? endTxt(c[c.length - 1]) : ''; }, mono: true },
@@ -43,7 +43,7 @@ export function WorkspaceTables({ cw, map, ix, site, sel, rel, isOwner, onSelect
         { h: 'CIRCUIT', v: w => mask(w.name), w: 260 },
         { h: 'SECTION', v: w => secWord(w.section) },
         { h: 'ENDS', v: w => ((ix.chain.get(w.code) ?? []).length ? '' : 'pending'), td: w => ((ix.chain.get(w.code) ?? []).length ? '' : <span style={{ color: cw.warn }}>PENDING</span>) },
-      ] as Col<typeof map.wires[number]>[],
+      ] as Col<typeof map.wires[number]>[]).filter(c => isOwner || c.h !== 'ENDS'),   // a status word is the owner's
     };
     const pins = {
       rows: ix.pins.slice().sort((a, b) => (a.node + '|' + a.cav).localeCompare(b.node + '|' + b.cav, undefined, { numeric: true })),
@@ -66,7 +66,7 @@ export function WorkspaceTables({ cw, map, ix, site, sel, rel, isOwner, onSelect
         { h: 'DESCRIPTION', v: n => mask(n.name), w: 280 },
         { h: 'PART NO.', v: n => partNo(n.partNumber), mono: true },
         { h: 'SECTION', v: n => secWord(n.section) },
-        { h: '3D', v: n => (modelled(n.code) ? 'modelled' : 'not yet'), td: n => (modelled(n.code) ? 'MODELLED' : <span style={{ color: cw.warn }}>NOT YET</span>) },
+        { h: '3D', v: n => (modelled(n.code) ? 'MODELLED' : 'NO MODEL') },
         { h: 'PLACED', v: n => (site.ends[n.code] ? `±${site.ends[n.code].margin_mm ?? '?'} mm` : 'no'), num: true },
         { h: 'CAVITIES', v: n => (ix.pinsByNode.get(n.code) ?? []).length, num: true },
       ] as Col<typeof map.nodes[number]>[],
@@ -82,7 +82,7 @@ export function WorkspaceTables({ cw, map, ix, site, sel, rel, isOwner, onSelect
       ] as Col<typeof calls[number]>[],
     };
     return { wires, pins, conns, open };
-  }, [map, ix, site, rel, cw]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [map, ix, site, rel, cw, isOwner]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const t = T[tab === 'open' && !isOwner ? 'wires' : tab] as { rows: unknown[]; id: (r: unknown) => string; linked: (r: unknown) => boolean; cols: Col<unknown>[] };
   const ql = q.trim().toLowerCase();

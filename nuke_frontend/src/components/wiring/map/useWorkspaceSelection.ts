@@ -46,9 +46,11 @@ export function useSiteFiles(vehicleId: string | undefined): SiteFiles {
       .then(([pos, rts, pm]) => {
         if (cancelled) return;
         const mine = (f: { vehicle_id?: string } | null) => !!f && f.vehicle_id === vehicleId;
+        const ends: Record<string, SiteEnd> = mine(pos) ? (pos.ends ?? {}) : {};
+        Object.values(ends).forEach(e => { e.dev_name = publicName(e.dev_name) || e.dev; });
         setSite({
           loaded: true,
-          ends: mine(pos) ? (pos.ends ?? {}) : {},
+          ends,
           segs: mine(rts) ? (rts.segments ?? []) : [],
           models: mine(pos) && pm ? pm : null,
         });
@@ -173,15 +175,20 @@ export function mask(t: string | null | undefined): string {
 }
 
 // The buying story (where a part was lined up, what it cost, when it was ordered, through whom) is the owner's record,
-// not the result. A public name keeps what the part is: story clauses and story asides go, the first clause stays.
+// not the result, and so is a decision status ("candidate", "proposed", "not decided"). A public name keeps what the
+// part is: story and status clauses and asides go (an aside cut off by the row's length too), the first clause stays.
 const STORY = /\$|\b(?:lined up|re-?ordered|ordered|on order|backorder(?:ed)?|bought|owned|delivered|paid|invoice|receipt|seller|state row)\b/i;
+const STATUS = /\b(?:candidate|proposed|proposal|concept|decided|undecided|tbd|to be decided|pending|placeholder)\b/i;
+const HIDE = { test: (t: string) => STORY.test(t) || STATUS.test(t) };
 export function publicName(t: string | null | undefined): string {
-  const s = String(t ?? '').replace(/\s*\(([^()]*)\)/g, (m, inner: string) => (STORY.test(inner) ? '' : m));
+  const s = String(t ?? '')
+    .replace(/\s*\(([^()]*)\)/g, (m, inner: string) => (HIDE.test(inner) ? '' : m))
+    .replace(/\s*\(([^()]*)$/, (m, inner: string) => (HIDE.test(inner) ? '' : m));
   const parts = s.split(/(\s*;\s*|\s+—\s+)/);
   let out = parts[0];
   const cut = out.search(STORY);
   if (cut > 0) out = out.slice(0, cut).replace(/[\s,:—-]+$/, '');
-  for (let i = 1; i < parts.length; i += 2) if (!STORY.test(parts[i + 1] ?? '')) out += parts[i] + (parts[i + 1] ?? '');
+  for (let i = 1; i < parts.length; i += 2) if (!HIDE.test(parts[i + 1] ?? '')) out += parts[i] + (parts[i + 1] ?? '');
   return mask(out.trim());
 }
 
