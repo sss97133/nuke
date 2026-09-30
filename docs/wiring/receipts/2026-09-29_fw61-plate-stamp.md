@@ -34,7 +34,7 @@ owner_words: "the 61 pin connector should be placed at the original fuse box hol
   - The clamped thickness is then 0.381 mm under the .125 in maximum. That covers sheet tolerance and a coating.
   - The gasket is now a perimeter ring:
     - its outer edge is the plate outline, with the four fastener holes;
-    - its inner edge is the opening plus 3 mm all round (Ø107.6 on the modelled opening, parametric on FB_OPENING_D);
+    - its inner edge is the opening grown 3 mm all round (parametric on the opening's shape);
     - so the receptacle clamps bare aluminium only.
   - The jam-nut face is drawn as the face away from the gasket. That puts the plate on the firewall's cab face, the
     receptacle's flange toward the engine bay through the opening, and the jam nut in the cab. If the builder mounts
@@ -80,15 +80,33 @@ What they show:
 - The product photos show the two screw holes at diagonal corners.
 - None of them prints a dimension.
 
-**Not sourced:** the opening's shape and size, the two holes' positions, and the firewall's thickness. The drawing
-still uses objectTraits.ts FB's 4.0 in round, which cites no source.
+**The shape, from the illustration (not a measurement).** The lead rendered sheet 1 at 300 dpi, and its figure prints
+no dimension. It shows the stock hole from the cab side, and the lead read these proportions off it:
+- A trapezoid whose parallel sides are vertical, with rounded corners. The right side is the tall one: left : right is
+  0.73.
+- The width is 0.92 × the right side. The top and bottom edges slant symmetrically.
+- The corner radius is 0.08 × the right side.
+- The two "A" screw holes sit on a diagonal:
+  - A1 is 12/212 of the right side right of the right edge, and 28/212 above the top-right corner.
+  - A2 is 17/212 left of the left edge, and 30/212 below the bottom-left corner.
+  - Each is drawn about 1/15 of the right side across.
+
+The sheet is an illustration, possibly in perspective, so this is shape only. The drawing now shows that shape, with
+the right side at the trait table's 4.0 in (ASSUMED). Every other opening number follows from the ratios, and all of
+them are stamped.
+
+**Not sourced:** the opening's size (so its real scale), the two holes' true positions, and the firewall's thickness.
 
 **What was tried, and found nothing printed:**
 - The 1973, 1977, 1981 and 1987 service manuals in the library. §8 and Fig. 8-1 describe the bulkhead fuse panel
   only.
-- American Autowire's 510347 and 510351 instruction text. Its diagram has no numbers in the text layer; the figure
-  itself was not viewed.
-- Three billet bulkhead cover listings and their photos.
+- American Autowire's 510347 and 510351 instructions. The text layer has no numbers, and neither does the rendered
+  figure (the lead read it).
+- The billet bulkhead cover family on eBay: nine listings from several sellers, read as listing text on 2026-09-29.
+  None prints a size. All say "1/4-20 machine screws", and some add "remove factory screws, drill the firewall". A
+  used GM "fuse panel mount screw" listing gives no size either.
+- The 1978 C-K wiring booklet, sheet A-1 (reference_documents/wiring_diagram_booklets/pages). It names the fuse panel
+  "8917739 FUSE PANEL ASM". No listing for 8917739 gives an outline.
 - Vendor search pages:
   - LMC Truck, Classic Industries, Brothers Trucks (now at CJ Pony Parts), Speedway Motors, ICT Billet, Ron Francis
     and Dirty Dingo (404);
@@ -98,11 +116,16 @@ still uses objectTraits.ts FB's 4.0 in round, which cites no source.
 - The 67-72chevytrucks.com board. Its search needs a login.
 
 ## Unknowns
-- **The opening:** its shape, its size, the two fuse-panel screw holes' positions and size, and the firewall
-  thickness. What closes it:
-  - a tape or caliper reading at the truck (the builder);
-  - or a photo of the bare opening with a scale in it;
-  - or GM's 1977 C/K assembly manual page for the fuse panel, if it can be reached.
+- **The opening:** its size (the shape is the illustration's), the two fuse-panel screw holes' true positions and
+  size, and the firewall thickness.
+  - At the assumed scale, A2 lands on the plate's lower-left M6 hole and A1 at its top-right corner. So the real
+    positions decide the plate's own fastener pattern: reuse the stock holes, or move the corner holes clear of them.
+  - What closes it:
+    - a tape or caliper reading at the truck (the builder);
+    - or a photo of the bare opening with a scale in it;
+    - or GM's 1977 C/K assembly manual page for the fuse panel, if it can be reached;
+    - or one real dimension from any source (a block-off plate's cutout, the fuse panel's screw spacing). The ratios
+      give the rest.
 - **Which face gets the spot face.** The jam nut can go in the cab (drawn) or in the opening on the engine side. If it
   is in the opening, the opening must clear 59.0 mm across the jam nut's corners.
 
@@ -112,5 +135,7 @@ still uses objectTraits.ts FB's 4.0 in round, which cites no source.
 - **Drawing:**
   - It states the receptacle's limit and the spot face that meets it, with its reason.
   - It shows the gasket ring's inner edge.
-  - It states the opening's basis (not sourced) and the fastening (two stock screws).
+  - It draws the opening in the illustration's shape and marks it "shape from AAW 510351 sheet 1 illustration; size
+    NOT SOURCED", with A1 and A2 where the illustration puts them.
+  - `--check` also fails if the receptacle's flange or jam nut does not clear the drawn opening.
   - It says what must be opened before cutting.
