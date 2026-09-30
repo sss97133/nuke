@@ -1,0 +1,1006 @@
+{
+ "file": "k5-frame.glb",
+ "axes": "twin metres: +x driver, -y forward, +z up; glTF (X,Y,Z) = (x, z, -y)",
+ "front_axle_y": -1.896,
+ "rear_axle_y_by_this_frame": 0.809,
+ "datum_z_m": 0.213,
+ "nodes": [
+  "bumper_horn_front_L",
+  "frame_rail_L",
+  "frame_rail_boxing_front_L",
+  "bumper_horn_front_R",
+  "frame_rail_R",
+  "frame_rail_boxing_front_R",
+  "crossmember_1_front",
+  "crossmember_2_engine",
+  "crossmember_3_transmission",
+  "crossmember_4_center",
+  "crossmember_5_over_axle",
+  "crossmember_6_rear",
+  "spring_hanger_LF_front",
+  "spring_bolt_LF_front",
+  "spring_hanger_LF_rear",
+  "spring_bolt_LF_rear",
+  "shackle_LF",
+  "spring_hanger_LR_front",
+  "spring_bolt_LR_front",
+  "spring_hanger_LR_rear",
+  "spring_bolt_LR_rear",
+  "shackle_LR",
+  "body_mount_1_core_support_L",
+  "body_mount_2_cab_front_L",
+  "body_mount_3_cab_rear_L",
+  "frame_engine_mount_L",
+  "frame_engine_mount_bolt_L",
+  "spring_hanger_RF_front",
+  "spring_bolt_RF_front",
+  "spring_hanger_RF_rear",
+  "spring_bolt_RF_rear",
+  "shackle_RF",
+  "spring_hanger_RR_front",
+  "spring_bolt_RR_front",
+  "spring_hanger_RR_rear",
+  "spring_bolt_RR_rear",
+  "shackle_RR",
+  "body_mount_1_core_support_R",
+  "body_mount_2_cab_front_R",
+  "body_mount_3_cab_rear_R",
+  "frame_engine_mount_R",
+  "frame_engine_mount_bolt_R"
+ ],
+ "params": [
+  {
+   "name": "s_A",
+   "value": 0,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1: A, centre of 15 mm hole inside the front rail (origin)",
+   "basis": "maker"
+  },
+  {
+   "name": "s_B",
+   "value": 107.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582 less dimensions.yaml fr88.frame.len.B-G = 1475",
+   "basis": "maker"
+  },
+  {
+   "name": "s_C",
+   "value": 562.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582 less dimensions.yaml fr88.frame.len.C-G = 1020",
+   "basis": "maker"
+  },
+  {
+   "name": "s_D",
+   "value": 621.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582 less dimensions.yaml fr88.frame.len.D-G = 961",
+   "basis": "maker"
+  },
+  {
+   "name": "s_E",
+   "value": 791.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582 less dimensions.yaml fr88.frame.len.E-G = 791",
+   "basis": "maker"
+  },
+  {
+   "name": "s_F",
+   "value": 1296.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582 less dimensions.yaml fr88.frame.len.F-G = 286",
+   "basis": "maker"
+  },
+  {
+   "name": "s_G",
+   "value": 1582.0,
+   "source": "dimensions.yaml fr88.frame.len.A-G = 1582",
+   "basis": "maker"
+  },
+  {
+   "name": "s_H",
+   "value": 2161.0,
+   "source": "dimensions.yaml fr88.frame.len.G-H = 579 behind G",
+   "basis": "maker"
+  },
+  {
+   "name": "s_I",
+   "value": 2730.0,
+   "source": "dimensions.yaml fr88.frame.len.G-I = 1148 behind G",
+   "basis": "maker"
+  },
+  {
+   "name": "s_J",
+   "value": 2946.0,
+   "source": "dimensions.yaml fr88.frame.len.G-J = 1364 behind G",
+   "basis": "maker"
+  },
+  {
+   "name": "s_K",
+   "value": 3328.0,
+   "source": "dimensions.yaml fr88.frame.len.J-K = 382 behind J",
+   "basis": "maker"
+  },
+  {
+   "name": "s_L",
+   "value": 3756.0,
+   "source": "dimensions.yaml fr88.frame.len.J-L = 810 behind J",
+   "basis": "maker"
+  },
+  {
+   "name": "s_M",
+   "value": 4039.0,
+   "source": "dimensions.yaml fr88.frame.len.J-M = 1093 behind J",
+   "basis": "maker"
+  },
+  {
+   "name": "s_N",
+   "value": 4357.0,
+   "source": "dimensions.yaml fr88.frame.len.J-N = 1411 behind J; KLM pad B + 1861 (klm84.frame.bodymount.B-rear-end.driver) lands here too",
+   "basis": "maker"
+  },
+  {
+   "name": "s_front_tip",
+   "value": -45,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 side view: rail end drawn 12 px ahead of A at the sheet's ~3.9 mm/px",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "s_rear_tip",
+   "value": 4412,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 side view: rail end drawn 15 px behind N at ~3.9 mm/px",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "zm_A",
+   "value": 461.0,
+   "source": "dimensions.yaml fr88.frame.height.A = 461: A hole centre, read as mid-web of the horn",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_B",
+   "value": 332.0,
+   "source": "dimensions.yaml fr88.frame.height.B = 332: tip of the front hanger's eye bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_C",
+   "value": 463.0,
+   "source": "dimensions.yaml fr88.frame.height.C = 463: crossmember rivet tip on the hump's bottom flange",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_E",
+   "value": 448.0,
+   "source": "dimensions.yaml fr88.frame.height.E = 448: motor-mount bolt tip",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_F",
+   "value": 366.0,
+   "source": "dimensions.yaml fr88.frame.height.F = 366: front spring rear hanger bolt, mid-web, so a hanger-to-rail bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_G",
+   "value": 367.0,
+   "source": "dimensions.yaml fr88.frame.height.G = 367: 16 mm hole, mid-web of the level centre section",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_I",
+   "value": 305.0,
+   "source": "dimensions.yaml fr88.frame.height.I = 305: head of the rear spring front hanger's eye bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_J",
+   "value": 436.0,
+   "source": "dimensions.yaml fr88.frame.height.J = 436: 18x33 oval, mid-web on the kick-up",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_K",
+   "value": 575.0,
+   "source": "dimensions.yaml fr88.frame.height.K = 575: 17x33 oval, mid-web at the top of the kick-up",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_L",
+   "value": 489.0,
+   "source": "dimensions.yaml fr88.frame.height.L = 489: L/L' lower web",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_M",
+   "value": 367.0,
+   "source": "dimensions.yaml fr88.frame.height.M = 367: head of the rear shackle hanger bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "zm_N_frame",
+   "value": 464.0,
+   "source": "dimensions.yaml fr88.frame.height.N-frame = 464: bottom of the rear rail at N",
+   "basis": "maker"
+  },
+  {
+   "name": "rivet_head",
+   "value": 6,
+   "source": "rivet head proud of the flange, so the C/D flange sits 6 above the rivet tips",
+   "basis": "assumed",
+   "note": "+/-3"
+  },
+  {
+   "name": "web_in_front",
+   "value": 355.6,
+   "source": "dimensions.yaml gm77.frame.KA105.V = 355.6 (14 in): centreline to the inside of the web, front",
+   "basis": "maker"
+  },
+  {
+   "name": "web_in_mid_rear",
+   "value": 428.6,
+   "source": "dimensions.yaml gm77.frame.KA105.T = 428.6 = dimensions.yaml gm77.frame.KA105.U = 428.6 (16-7/8 in): inside of the web, centre and rear; FR88 G 866/2 and K 862/2 are web holes",
+   "basis": "maker"
+  },
+  {
+   "name": "taper_start",
+   "value": 366,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: rails start to spread between B and C (read at x=290 px)",
+   "basis": "scaled",
+   "note": "+/-60"
+  },
+  {
+   "name": "taper_end",
+   "value": 1212,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: spread done just ahead of F (read at x=480 px)",
+   "basis": "scaled",
+   "note": "+/-60"
+  },
+  {
+   "name": "t",
+   "value": 4.55,
+   "source": "RB: Rust Buster RB7354/RB7352 frame sections are '7 Gauge Steel' (0.179 in); the OEM gauge is not printed in any source on file",
+   "basis": "vendor",
+   "note": "+/-0.8"
+  },
+  {
+   "name": "flange",
+   "value": 57,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: rail drawn 18-20 px wide against the printed 824/866 widths",
+   "basis": "scaled",
+   "note": "+/-8"
+  },
+  {
+   "name": "d_front_horn",
+   "value": 105,
+   "source": "LTSM 1977 p2A-4 Fig 2A-3 row KA105: B(+) 15-1/4 minus A 13-3/8 = 1-7/8 in = half the inside depth",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "d_front_hump",
+   "value": 155,
+   "source": "LTSM 1977 p2A-4 Fig 2A-3 row KA105: D(+) 19-7/8 minus C 17 = 2-7/8 in = half the inside depth",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "d_center",
+   "value": 160,
+   "source": "LTSM 1977 p2A-4 Fig 2A-3 row KA105: F(+) 13 minus G 10 = 3 in = half the inside depth (161); the TurboSquid body in the twin draws 150",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "d_kickup_top",
+   "value": 140,
+   "source": "between d_center and d_rear, at K",
+   "basis": "assumed",
+   "note": "+/-15"
+  },
+  {
+   "name": "d_rear",
+   "value": 120,
+   "source": "LTSM 1977 p2A-4 Fig 2A-3 row KA105: N(+) 17-3/4 minus M 15-5/8 = 2-1/8 in = half the inside depth (117)",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "front_axle_y",
+   "value": -1.896,
+   "source": "layout builder build.py (wiring/layout-ui) FRONT_AXLE / REAR_AXLE",
+   "basis": "design",
+   "note": "twin metres"
+  },
+  {
+   "name": "wheelbase",
+   "value": 2705.0,
+   "source": "dimensions.yaml fr88.frame.wheelbase = 2705; the twin uses 2703 (rear axle 0.807), 2 mm short",
+   "basis": "maker"
+  },
+  {
+   "name": "s_front_axle",
+   "value": 690.5,
+   "source": "front axle under the front spring: midpoint of B and F (701.5) less 11, so the rear spring midpoint (I, M: 3384.5) sits 11 ahead of the rear axle at +2705",
+   "basis": "assumed",
+   "note": "+/-25"
+  },
+  {
+   "name": "z_rail_bottom_center",
+   "value": 0.5,
+   "source": "twin metres; front and rear springs reach the twin's axle centres (z 0.396) with 2-3 in of arch from the FR88 hanger heights; the TurboSquid frame in the twin sits at 0.496. Stock height: the truck has a Rough Country lift (build log, vehicle_observations aa5bff91), height not recorded, which lowers the axles and wheels against frame and body. Needs one tape: floor to the rail's bottom flange at the transmission crossmember, and tyre size",
+   "basis": "assumed",
+   "note": "+/-0.040 m"
+  },
+  {
+   "name": "cm1_s",
+   "value": 257,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: front crossmember between B and C (x 252-272 px)",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm1_w",
+   "value": 78,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: 20 px at 3.9 mm/px",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm1_h",
+   "value": 100,
+   "source": "channel depth",
+   "basis": "assumed",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm2_s_ds",
+   "value": 562,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1: C is the crossmember's driver-side rivet",
+   "basis": "maker"
+  },
+  {
+   "name": "cm2_s_ps",
+   "value": 621,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1: D is the crossmember's passenger-side rivet",
+   "basis": "maker"
+  },
+  {
+   "name": "cm2_rivet_ds",
+   "value": 331.0,
+   "source": "dimensions.yaml fr88.frame.cl.C = 331",
+   "basis": "maker"
+  },
+  {
+   "name": "cm2_rivet_ps",
+   "value": 340.0,
+   "source": "dimensions.yaml fr88.frame.cl.D = 340",
+   "basis": "maker"
+  },
+  {
+   "name": "cm2_dip",
+   "value": 125,
+   "source": "drop of the engine crossmember's middle below the rail (hoop shape from the photos, clears the oil pan)",
+   "basis": "assumed",
+   "note": "+/-40"
+  },
+  {
+   "name": "cm2_w",
+   "value": 70,
+   "source": "fore-aft width",
+   "basis": "assumed",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm2_h",
+   "value": 60,
+   "source": "section height",
+   "basis": "assumed",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm3_s0",
+   "value": 1582,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: transmission crossmember's front edge on the G line",
+   "basis": "maker"
+  },
+  {
+   "name": "cm3_s1",
+   "value": 1779,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: rear edge 54 px behind G at 3.64 mm/px",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm3_h",
+   "value": 90,
+   "source": "flange height",
+   "basis": "assumed",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm4_s",
+   "value": 3025,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: crossmember just behind J (x 955-970 px)",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm4_w",
+   "value": 60,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: 15 px at 3.94 mm/px",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm5_s",
+   "value": 3676,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: crossmember ahead of LL' (x 1100-1115 px)",
+   "basis": "scaled",
+   "note": "+/-25"
+  },
+  {
+   "name": "cm5_w",
+   "value": 77,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: 15 px at 5.16 mm/px",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm6_s",
+   "value": 4336,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: rear crossmember x 1290-1310 px, ahead of N",
+   "basis": "scaled",
+   "note": "+/-20"
+  },
+  {
+   "name": "cm6_w",
+   "value": 78,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: 20 px at 3.89 mm/px",
+   "basis": "scaled",
+   "note": "+/-15"
+  },
+  {
+   "name": "cm_h_rear",
+   "value": 100,
+   "source": "channel depth of crossmembers 4-6",
+   "basis": "assumed",
+   "note": "+/-20"
+  },
+  {
+   "name": "B_tip_x",
+   "value": 479.0,
+   "source": "dimensions.yaml fr88.frame.width.B-B = 958, /2: tip of the front hanger's eye bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "F_tip_x",
+   "value": 476.0,
+   "source": "dimensions.yaml fr88.frame.width.F-F = 952, /2: tip of the rear hanger's bolt through the web",
+   "basis": "maker"
+  },
+  {
+   "name": "I_head_x",
+   "value": 592.0,
+   "source": "dimensions.yaml fr88.frame.width.I-I = 1184, /2: head of the rear spring front hanger's eye bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "M_head_x",
+   "value": 593.0,
+   "source": "dimensions.yaml fr88.frame.width.M-M = 1186, /2: head of the rear shackle hanger's bolt",
+   "basis": "maker"
+  },
+  {
+   "name": "front_spring_x_rear",
+   "value": 403.4,
+   "source": "TX469 GM cab-chassis sheet TX000469 (K30): 31.76 in between front spring rear eyes (K30 sheet)",
+   "basis": "maker",
+   "note": "+/-35"
+  },
+  {
+   "name": "eye_w",
+   "value": 63.5,
+   "source": "2.5 in spring eye width",
+   "basis": "assumed",
+   "note": "+/-6"
+  },
+  {
+   "name": "bolt_tip_proud",
+   "value": 12,
+   "source": "bolt tip proud of the hanger plate (nut + thread)",
+   "basis": "assumed",
+   "note": "+/-5"
+  },
+  {
+   "name": "F_pivot_drop",
+   "value": 22,
+   "source": "front shackle's upper pivot below the rail's bottom flange",
+   "basis": "assumed",
+   "note": "+/-40"
+  },
+  {
+   "name": "shackle_len",
+   "value": 76,
+   "source": "shackle eye-to-eye",
+   "basis": "assumed",
+   "note": "+/-15"
+  },
+  {
+   "name": "hanger_len",
+   "value": 80,
+   "source": "fore-aft length of a hanger",
+   "basis": "assumed",
+   "note": "+/-20"
+  },
+  {
+   "name": "bm1_s",
+   "value": 60,
+   "source": "core support mount on top of the horn near the tip (photos); not in FR88/KLM84",
+   "basis": "assumed",
+   "note": "+/-40"
+  },
+  {
+   "name": "bm2_s",
+   "value": 1457.0,
+   "source": "FR88 1988 Blazer 4WD frame sheet p1 Fig 1 bottom view: front cab mount outrigger centre 46 px behind F at 3.51 mm/px",
+   "basis": "scaled",
+   "note": "+/-25"
+  },
+  {
+   "name": "bm2_x",
+   "value": 541.34,
+   "source": "dimensions.yaml klm84.frame.bodymount.A.width = 1082.68, /2 (KLM pad A = front cab mount)",
+   "basis": "maker"
+  },
+  {
+   "name": "bm3_s",
+   "value": 2496.81,
+   "source": "bm2_s + dimensions.yaml klm84.frame.bodymount.A-B.driver = 1039.81 (FR88 bottom view reads 2501)",
+   "basis": "scaled",
+   "note": "+/-25"
+  },
+  {
+   "name": "bm3_x",
+   "value": 519.905,
+   "source": "dimensions.yaml klm84.frame.bodymount.B.width = 1039.81, /2 (KLM pad B = rear cab mount)",
+   "basis": "maker"
+  },
+  {
+   "name": "E_tip_x",
+   "value": 353.0,
+   "source": "dimensions.yaml fr88.frame.width.E-E = 706, /2: motor-mount bolt tip through the bottom flange",
+   "basis": "maker"
+  },
+  {
+   "name": "J_x",
+   "value": 445.0,
+   "source": "dimensions.yaml fr88.frame.width.J-J = 890, /2: 14 mm outboard of the web (431 at G and K), so J's oval is in a plate on the web; the G-J and J-N diagonals close only with it",
+   "basis": "maker"
+  }
+ ],
+ "stations": {
+  "A": {
+   "s_mm": 0.0,
+   "twin_y_m": -2.5865
+  },
+  "B": {
+   "s_mm": 107.0,
+   "twin_y_m": -2.4795
+  },
+  "C": {
+   "s_mm": 562.0,
+   "twin_y_m": -2.0245
+  },
+  "D": {
+   "s_mm": 621.0,
+   "twin_y_m": -1.9655
+  },
+  "E": {
+   "s_mm": 791.0,
+   "twin_y_m": -1.7955
+  },
+  "F": {
+   "s_mm": 1296.0,
+   "twin_y_m": -1.2905
+  },
+  "G": {
+   "s_mm": 1582.0,
+   "twin_y_m": -1.0045
+  },
+  "H": {
+   "s_mm": 2161.0,
+   "twin_y_m": -0.4255
+  },
+  "I": {
+   "s_mm": 2730.0,
+   "twin_y_m": 0.1435
+  },
+  "J": {
+   "s_mm": 2946.0,
+   "twin_y_m": 0.3595
+  },
+  "K": {
+   "s_mm": 3328.0,
+   "twin_y_m": 0.7415
+  },
+  "L": {
+   "s_mm": 3756.0,
+   "twin_y_m": 1.1695
+  },
+  "M": {
+   "s_mm": 4039.0,
+   "twin_y_m": 1.4525
+  },
+  "N": {
+   "s_mm": 4357.0,
+   "twin_y_m": 1.7705
+  },
+  "front_tip": {
+   "s_mm": -45.0,
+   "twin_y_m": -2.6315
+  },
+  "rear_tip": {
+   "s_mm": 4412.0,
+   "twin_y_m": 1.8255
+  }
+ },
+ "rail_profile": [
+  {
+   "s_mm": -45.0,
+   "twin_y_m": -2.6315,
+   "web_x_m": 0.3602,
+   "bottom_z_m": 0.6285,
+   "top_z_m": 0.7285
+  },
+  {
+   "s_mm": 55.0,
+   "twin_y_m": -2.5315,
+   "web_x_m": 0.3602,
+   "bottom_z_m": 0.6126,
+   "top_z_m": 0.7156
+  },
+  {
+   "s_mm": 155.0,
+   "twin_y_m": -2.4315,
+   "web_x_m": 0.3602,
+   "bottom_z_m": 0.6096,
+   "top_z_m": 0.7178
+  },
+  {
+   "s_mm": 255.0,
+   "twin_y_m": -2.3315,
+   "web_x_m": 0.3602,
+   "bottom_z_m": 0.6228,
+   "top_z_m": 0.7415
+  },
+  {
+   "s_mm": 355.0,
+   "twin_y_m": -2.2315,
+   "web_x_m": 0.3602,
+   "bottom_z_m": 0.6499,
+   "top_z_m": 0.7885
+  },
+  {
+   "s_mm": 455.0,
+   "twin_y_m": -2.1315,
+   "web_x_m": 0.3621,
+   "bottom_z_m": 0.6775,
+   "top_z_m": 0.8322
+  },
+  {
+   "s_mm": 555.0,
+   "twin_y_m": -2.0315,
+   "web_x_m": 0.3688,
+   "bottom_z_m": 0.682,
+   "top_z_m": 0.837
+  },
+  {
+   "s_mm": 655.0,
+   "twin_y_m": -1.9315,
+   "web_x_m": 0.3792,
+   "bottom_z_m": 0.682,
+   "top_z_m": 0.837
+  },
+  {
+   "s_mm": 755.0,
+   "twin_y_m": -1.8315,
+   "web_x_m": 0.3921,
+   "bottom_z_m": 0.682,
+   "top_z_m": 0.837
+  },
+  {
+   "s_mm": 855.0,
+   "twin_y_m": -1.7315,
+   "web_x_m": 0.4055,
+   "bottom_z_m": 0.6749,
+   "top_z_m": 0.8299
+  },
+  {
+   "s_mm": 955.0,
+   "twin_y_m": -1.6315,
+   "web_x_m": 0.4178,
+   "bottom_z_m": 0.6433,
+   "top_z_m": 0.7986
+  },
+  {
+   "s_mm": 1055.0,
+   "twin_y_m": -1.5315,
+   "web_x_m": 0.4271,
+   "bottom_z_m": 0.5853,
+   "top_z_m": 0.7422
+  },
+  {
+   "s_mm": 1155.0,
+   "twin_y_m": -1.4315,
+   "web_x_m": 0.4323,
+   "bottom_z_m": 0.5244,
+   "top_z_m": 0.6834
+  },
+  {
+   "s_mm": 1255.0,
+   "twin_y_m": -1.3315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5001,
+   "top_z_m": 0.6601
+  },
+  {
+   "s_mm": 1355.0,
+   "twin_y_m": -1.2315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1455.0,
+   "twin_y_m": -1.1315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1555.0,
+   "twin_y_m": -1.0315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1655.0,
+   "twin_y_m": -0.9315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1755.0,
+   "twin_y_m": -0.8315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1855.0,
+   "twin_y_m": -0.7315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 1955.0,
+   "twin_y_m": -0.6315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2055.0,
+   "twin_y_m": -0.5315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2155.0,
+   "twin_y_m": -0.4315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2255.0,
+   "twin_y_m": -0.3315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2355.0,
+   "twin_y_m": -0.2315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2455.0,
+   "twin_y_m": -0.1315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2555.0,
+   "twin_y_m": -0.0315,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5,
+   "top_z_m": 0.66
+  },
+  {
+   "s_mm": 2655.0,
+   "twin_y_m": 0.0685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5003,
+   "top_z_m": 0.6603
+  },
+  {
+   "s_mm": 2755.0,
+   "twin_y_m": 0.1685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5125,
+   "top_z_m": 0.6716
+  },
+  {
+   "s_mm": 2855.0,
+   "twin_y_m": 0.2685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5364,
+   "top_z_m": 0.6936
+  },
+  {
+   "s_mm": 2955.0,
+   "twin_y_m": 0.3685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.5768,
+   "top_z_m": 0.7311
+  },
+  {
+   "s_mm": 3055.0,
+   "twin_y_m": 0.4685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.6288,
+   "top_z_m": 0.7796
+  },
+  {
+   "s_mm": 3155.0,
+   "twin_y_m": 0.5685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.6747,
+   "top_z_m": 0.8216
+  },
+  {
+   "s_mm": 3255.0,
+   "twin_y_m": 0.6685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.7074,
+   "top_z_m": 0.8502
+  },
+  {
+   "s_mm": 3355.0,
+   "twin_y_m": 0.7685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.718,
+   "top_z_m": 0.8568
+  },
+  {
+   "s_mm": 3455.0,
+   "twin_y_m": 0.8685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.718,
+   "top_z_m": 0.8505
+  },
+  {
+   "s_mm": 3555.0,
+   "twin_y_m": 0.9685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.718,
+   "top_z_m": 0.8434
+  },
+  {
+   "s_mm": 3655.0,
+   "twin_y_m": 1.0685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.6972,
+   "top_z_m": 0.8179
+  },
+  {
+   "s_mm": 3755.0,
+   "twin_y_m": 1.1685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 3855.0,
+   "twin_y_m": 1.2685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 3955.0,
+   "twin_y_m": 1.3685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 4055.0,
+   "twin_y_m": 1.4685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 4155.0,
+   "twin_y_m": 1.5685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 4255.0,
+   "twin_y_m": 1.6685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 4355.0,
+   "twin_y_m": 1.7685,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  },
+  {
+   "s_mm": 4412.0,
+   "twin_y_m": 1.8255,
+   "web_x_m": 0.4332,
+   "bottom_z_m": 0.677,
+   "top_z_m": 0.797
+  }
+ ],
+ "checks": [
+  {
+   "check": "A-G tram",
+   "model": 1586.4,
+   "FR88": 1587.0,
+   "ok": true
+  },
+  {
+   "check": "A-G diagonal",
+   "model": 1770.1,
+   "FR88": 1769.0,
+   "ok": true
+  },
+  {
+   "check": "G-J tram",
+   "model": 1365.9,
+   "FR88": 1366.0,
+   "ok": true
+  },
+  {
+   "check": "G-J diagonal",
+   "model": 1622.5,
+   "FR88": 1624.0,
+   "ok": true
+  },
+  {
+   "check": "J-N tram",
+   "model": 1411.4,
+   "FR88": 1411.0,
+   "ok": true
+  },
+  {
+   "check": "J-N diagonal",
+   "model": 1650.9,
+   "FR88": 1651.0,
+   "ok": true
+  }
+ ]
+}

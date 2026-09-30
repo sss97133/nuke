@@ -1,0 +1,241 @@
+{
+ "file": "k5-front-sheetmetal.glb",
+ "axes": "twin metres: +x driver, -y forward, +z up; glTF (X,Y,Z) = (x, z, -y)",
+ "nodes": [
+  "radiator_support",
+  "firewall_dash_panel",
+  "firewall_toe_board",
+  "inner_fender_wall_L",
+  "inner_fender_top_L",
+  "inner_fender_wheelhouse_L",
+  "inner_fender_wall_R",
+  "inner_fender_top_R",
+  "inner_fender_wheelhouse_R"
+ ],
+ "params": [
+  {
+   "name": "rs_front_y",
+   "value": -2.5265,
+   "source": "chassis_frame.py body_mount_1 core-support pads (s 60, itself assumed +/-40 mm from the owner's photos)",
+   "basis": "assumed",
+   "note": "+/-0.040 m"
+  },
+  {
+   "name": "rs_rear_y",
+   "value": -2.46,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): the radiator core's front face is at y -2.458",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "engcomp_fore_aft",
+   "value": 1097.8,
+   "source": "dimensions.yaml fr88.body.engcomp.side.driver = 1102 with dimensions.yaml fr88.body.engcomp.front-width = 1523 and dimensions.yaml fr88.body.engcomp.rear-width = 1715: fore-aft part of the point-to-point side; KLM84 prints 1108",
+   "basis": "maker"
+  },
+  {
+   "name": "rs_points_x",
+   "value": 0.7615,
+   "source": "dimensions.yaml fr88.body.engcomp.front-width = 1523, /2 (m)",
+   "basis": "maker"
+  },
+  {
+   "name": "cowl_points_x",
+   "value": 0.8575,
+   "source": "dimensions.yaml fr88.body.engcomp.rear-width = 1715, /2 (m)",
+   "basis": "maker"
+  },
+  {
+   "name": "rs_half_width",
+   "value": 0.87,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): headlights reach x +/-0.879, grille +/-0.933",
+   "basis": "design",
+   "note": "+/-0.02 m"
+  },
+  {
+   "name": "rs_bottom_z",
+   "value": 0.7,
+   "source": "lower tie bar under the radiator (core bottom z 0.734), on the frame pads (z 0.721)",
+   "basis": "assumed",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "rs_top_z",
+   "value": 1.22,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): grille top 1.199, fender top line 1.27 at the front",
+   "basis": "design",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "rs_opening_half",
+   "value": 0.42,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): radiator core x +/-0.381, plus 39 mm",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "headlight_x",
+   "value": 0.78,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): Headlights mesh x 0.68-0.879 a side",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "headlight_z",
+   "value": 1.052,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): Headlights mesh z 0.962-1.142",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "headlight_d",
+   "value": 0.18,
+   "source": "7 in round sealed beam opening (twin headlight 0.18 m tall)",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "firewall_y",
+   "value": -1.46,
+   "source": "layout builder FIREWALL constant (branch wiring/layout-ui build.py)",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "firewall_half_width",
+   "value": 0.76,
+   "source": "the old CTX-firewall-face; the TurboSquid doors' inner skins are at +/-0.717",
+   "basis": "assumed",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "cowl_z",
+   "value": 1.27,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): hood rear edge 1.32, cowl 1.366 at y -1.5",
+   "basis": "design",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "toe_bottom",
+   "value": [
+    -1.22,
+    0.66
+   ],
+   "source": "the old CTX-toe-board's lower edge (y, z)",
+   "basis": "assumed",
+   "note": "+/-0.04 m"
+  },
+  {
+   "name": "toe_top_z",
+   "value": 0.9,
+   "source": "the old CTX-toe-board's upper edge",
+   "basis": "assumed",
+   "note": "+/-0.04 m"
+  },
+  {
+   "name": "recess_half_width",
+   "value": 0.34,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): the engine's rear (heads x +/-0.329, banks +/-0.254) reaches y -1.40 to -1.45, behind the firewall station; geometry-scan's receipt flags it. A clearance recess sized to the twin's engine, not a GM shape",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "recess_z",
+   "value": [
+    0.6,
+    1.06
+   ],
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): block, rear cover and heads z 0.64-1.05, plus margin",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "recess_depth",
+   "value": 0.08,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): the block's rear cover at y -1.40, 60 mm behind -1.46, plus 20 mm",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "tunnel_half_width",
+   "value": 0.25,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): 6L90 bell x +/-0.22 plus 30 mm",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "tunnel_top_z",
+   "value": 0.98,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): 6L90 bell top 0.94 plus 40 mm",
+   "basis": "design",
+   "note": "m"
+  },
+  {
+   "name": "skirt_wall_x_front",
+   "value": 0.51,
+   "source": "FR88 Fig 2 engine compartment: skirt walls drawn from the radiator-support bar (read x 470-520 px against the 1523 pair)",
+   "basis": "scaled",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "skirt_wall_x_rear",
+   "value": 0.545,
+   "source": "FR88 Fig 2: skirt walls at the cowl bar (read x 440-490 px against the 1715 pair)",
+   "basis": "scaled",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "skirt_outer_x",
+   "value": 0.858,
+   "source": "dimensions.yaml fr88.body.engcomp.rear-width = 1715, /2: the fender-top line the skirt bolts under",
+   "basis": "maker",
+   "note": "m"
+  },
+  {
+   "name": "skirt_top_z",
+   "value": 1.0,
+   "source": "the twin's current body and parts (k5-blazer.glb TurboSquid body; harness lane's K5H_Radiator, batteries): both batteries sit at z 1.01 on the skirt tops; the old CTX wall top 1.04",
+   "basis": "design",
+   "note": "+/-0.04 m"
+  },
+  {
+   "name": "skirt_wall_bottom_z",
+   "value": 0.72,
+   "source": "the skirt's engine-side wall runs down past the frame hump (top 0.837)",
+   "basis": "assumed",
+   "note": "+/-0.05 m"
+  },
+  {
+   "name": "arch_clearance",
+   "value": 0.075,
+   "source": "wheelhouse radius over the twin's tyre (r 0.406)",
+   "basis": "assumed",
+   "note": "+/-0.03 m"
+  },
+  {
+   "name": "arch_ends_deg",
+   "value": [
+    15,
+    165
+   ],
+   "source": "arch from 15 deg behind to 165 deg ahead of the axle, per Fig 2C-14's skirt feet at the cab and the radiator support",
+   "basis": "assumed",
+   "note": "deg"
+  },
+  {
+   "name": "t_sheet",
+   "value": 0.003,
+   "source": "panel thickness drawn (real ~1 mm; drawn thicker so the viewer can see it)",
+   "basis": "design",
+   "note": "m"
+  }
+ ],
+ "cowl_points_y_by_fr88": -1.4287,
+ "replaces": [
+  "CTX-core-support-face",
+  "CTX-firewall-face",
+  "CTX-toe-board",
+  "CTX-inner-fender-wall-driver",
+  "CTX-inner-fender-wall-passenger"
+ ]
+}
