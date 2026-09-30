@@ -32127,7 +32127,7 @@ parts:
   unknowns:
   - The hanger is scaled off the vendor's side-view photo from its own 12 in (top plate to the pump housing's bottom), +-20
     %; the tubes' AN sizes (8AN / 6AN) are the listing's, their drawn OD is the photo's.
-  - 'The P367 pump is in no product photo: its body (38 x 130) is ASSUMED (red).'
+  - 'The P367 pump is in no product photo: its body (38 x 130) is ASSUMED (red). Needs: a photo or data sheet of the P367.'
   - The kit's own pigtail (black loom, a 2-pin plug and a ring lug in the photos) is not drawn; the registry routes the pairs
     to its DT and DTP connectors.
   cross_checks: []
