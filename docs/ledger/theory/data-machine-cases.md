@@ -292,3 +292,22 @@ estimate, not data.
 - The Facebook truck needs its vehicle and its two price blips.
 - The rubric needs to become a scheduled fold, reading stored full listing text rather than re-downloading it.
 - Model needs to be a key, and place needs to be an entity (C8).
+
+**Found while building (2026-10-01, measured):**
+- **The full listing text was in Postgres the whole time.**
+  - `extraction_metadata` rows with `field_name = 'raw_listing_description'` cover 97 LX450 vehicles, median 2,789 characters.
+  - `vehicles.description` is a deliberate 480-character summary (`normalizeDescriptionSummary`, `_shared/batParser.ts:747`), and nothing points from it to the full copy.
+  - 80 of 96 snapshot bodies live in a private storage bucket (`listing-snapshots`) that SQL cannot read.
+  - Result: an agent re-downloaded 72 pages that were already stored.
+- **The condition dimension exists.** `condition_taxonomy` has 202 descriptors, about 90 of them real (paint delamination, fading, respray, upholstery tear, dash cracking, service records, collision, flood, frame corrosion). The rest are fragments parsed from service manuals (`interior.gauge.terminal_no`). Only image tables key to it; text claims have no key.
+- **No model key.** `canonical_models` has no J80 row. `vehicles.series = 'FZJ80L'` is set on 96 of about 190 LX450 rows, and the rest are spelled "lx 450", "LX LX 450", "lx450Fremont, CA154K".
+- **The citation slot exists.** `ingest-observation` already accepts `citation.excerpt` and `raw_source_ref`. It gave agent-inferred rows `confidence_score` 1.0, because it scores match quality and ignores `agent_tier`.
+- **The rubric skipped discovery.** It was written before discovery, against `.claude/rules/extraction.md` ("sample 20–50 documents, enumerate all fields, aggregate, then design"). The catalog in `veins/lx450_claim_catalog.md` is that discovery.
+- **Held-out run, read-only on prod** (39 lots, 2019–2023):
+  - lockers ×1.41, t 2.38;
+  - poor paint ×0.68, t −2.06;
+  - records ×1.16, t 0.98 (did not hold);
+  - engine work ×0.73 (sign flipped);
+  - interior ×0.95;
+  - title flag n = 1.
+- **The reference was Iverson's 1979 Turing lecture, "Notation as a Tool of Thought"** (session of 2026-09-30, 19:40Z): schema = theory, data = models, query = theorem, backtest = experiment. The cost of this case is what happens when the notation is missing.
