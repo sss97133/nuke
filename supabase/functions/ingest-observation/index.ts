@@ -80,6 +80,12 @@ interface ObservationInput {
   // Wikidata-style precedence: a permanent instrument (title, build sheet) is
   // 'preferred'; a decaying assertion about the same fact is 'normal'.
   rank?: "preferred" | "normal" | "deprecated";
+  /** condition_taxonomy.canonical_key this claim is about (e.g. 'exterior.paint.delamination'). Resolved to
+   *  descriptor_id; an unknown or deprecated key is refused, never dropped. C26. */
+  descriptor_key?: string;
+  /** True when an LLM read the claim from text or images rather than a person confirming it. Caps
+   *  confidence_score at 0.6, the same convention the MCP submit_vehicle_event tool documents. C26. */
+  agent_inferred?: boolean;
 }
 
 /**
@@ -165,6 +171,24 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // A claim keyed to the condition dimension must name a live descriptor.
+    let descriptorId: string | null = null;
+    if (input.descriptor_key) {
+      const { data: descriptor } = await supabase
+        .from("condition_taxonomy")
+        .select("descriptor_id")
+        .eq("canonical_key", input.descriptor_key)
+        .is("deprecated_at", null)
+        .maybeSingle();
+      if (!descriptor) {
+        return new Response(JSON.stringify({
+          error: `Unknown or deprecated descriptor_key: ${input.descriptor_key}`,
+          hint: "Add it to condition_taxonomy through a migration first"
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      descriptorId = descriptor.descriptor_id;
+    }
+
     // Compute content hash for deduplication.
     // Hash includes vehicle_id + observed_at + observer_raw so observations on different
     // vehicles or from different source photos don't collapse onto each other.
@@ -180,7 +204,9 @@ Deno.serve(async (req) => {
       observed_at: input.observed_at,
       text: input.content_text || "",
       data: input.structured_data || {},
-      observer: input.observer_raw || {}
+      observer: input.observer_raw || {},
+      // Undefined keys drop out of JSON, so hashes of rows without a descriptor are unchanged.
+      descriptor: input.descriptor_key
     });
     const contentHash = await hashContent(contentForHash);
 
@@ -330,10 +356,15 @@ Deno.serve(async (req) => {
     // otherwise render an owner's signature as merely "medium".
     if (input.structured_data?.owner_confirmed === true) confidenceFactors.owner_confirmed = 0.30;
 
-    const confidenceScore = Math.min(1.0,
+    let confidenceScore = Math.min(1.0,
       (source.base_trust_score || 0.5) +
       Object.values(confidenceFactors).reduce((a, b) => a + b, 0)
     );
+    // An LLM reading seller text is testimony about testimony: it never outranks a person.
+    if (input.agent_inferred === true && confidenceScore > 0.6) {
+      confidenceFactors.agent_inferred_cap = 0.6 - confidenceScore;
+      confidenceScore = 0.6;
+    }
 
     // Determine confidence level from score
     let confidenceLevel = "medium";
@@ -379,6 +410,7 @@ Deno.serve(async (req) => {
         citation_secure_document_id: input.citation?.secure_document_id ?? null,
         citation_page_number: input.citation?.page_number ?? null,
         citation_excerpt: input.citation?.excerpt ?? null,
+        ...(descriptorId ? { descriptor_id: descriptorId } : {}),
         ...(input.rank ? { rank: input.rank } : {})
       })
       .select()
