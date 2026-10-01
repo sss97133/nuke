@@ -1,5 +1,9 @@
 // Serves nuke.ag/oauth/* (the MCP connector sign-in) from the oauth-server edge function.
 //
+// Lives at the repo root because Vercel builds this project from the root (root vercel.json): measured 2026-10-01 on
+// the #491 preview, /oauth/* still went straight to Supabase and /api/oauth-proxy fell to the /api/:path+ catch-all,
+// so the copy under nuke_frontend/api was never deployed.
+//
 // Why a function and not a plain rewrite: Supabase serves HTML from *.supabase.co functions as text/plain, so the
 // authorize page, the "check your email" page and the callback page reached the browser as raw source (measured
 // 2026-10-01: GET /functions/v1/oauth-server/oauth/authorize -> 200 content-type text/plain, though the function sets
@@ -14,7 +18,7 @@ async function readBody(req) {
   return chunks.length ? Buffer.concat(chunks) : undefined;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const url = new URL(req.url, 'https://nuke.ag');
   const path = (url.searchParams.get('p') || '').replace(/^\/+/, '');
   url.searchParams.delete('p');
@@ -47,3 +51,5 @@ export default async function handler(req, res) {
   res.setHeader('content-type', looksHtml ? 'text/html; charset=utf-8' : type || 'application/octet-stream');
   res.send(body);
 }
+
+module.exports = handler;
