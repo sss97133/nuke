@@ -43,7 +43,7 @@ const EXTRACTOR_VERSION = 'extract-bat-core:4.0.0';
 // source of truth means a future column addition can't silently drift and
 // produce inconsistent read-back data across the branches.
 const VEHICLE_MATCH_COLUMNS =
-  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, city, state, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
+  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, city, state, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid, platform_source";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1296,6 +1296,7 @@ Deno.serve(async (req) => {
         listing_kind: listingKind,
         discovery_url: listingUrlCanonical,
         discovery_source: "bat_core",
+        platform_source: "bringatrailer", // C7: the platform key (source_registry.slug); the live pull schedules on it
         profile_origin: "url_scraper",
         import_method: "scraper",
         is_public: true,
@@ -1379,6 +1380,7 @@ Deno.serve(async (req) => {
         discovery_url: existing?.discovery_url || listingUrlCanonical,
         listing_url: existing?.listing_url || listingUrlCanonical,
         listing_source: existing?.listing_source || "bat",
+        platform_source: existing?.platform_source || "bringatrailer", // C7: fill the platform key when missing
         // Prefer to only mark non-vehicle, never downgrade.
         ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
         updated_at: new Date().toISOString(),

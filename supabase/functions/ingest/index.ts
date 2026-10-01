@@ -491,6 +491,23 @@ interface VehicleEnrichment {
   sellerName?: string | null;
 }
 
+/**
+ * C7: vehicles.platform_source is the platform key: source_registry.slug where a row exists, else the value the
+ * column already uses for that platform. Never NULL for a detected platform; "unknown" stays NULL.
+ */
+const PLATFORM_SOURCE_SLUG: Record<string, string> = {
+  bring_a_trailer: "bringatrailer",
+  cars_and_bids: "cars-and-bids",
+  barrett_jackson: "barrett-jackson",
+  ebay_motors: "ebay-motors",
+  hagerty: "hagerty-marketplace",
+  vanguard_motors: "vanguard-motors",
+};
+function platformSourceFor(platform?: string | null): string | null {
+  if (!platform || platform === "unknown" || platform === "manual") return null;
+  return PLATFORM_SOURCE_SLUG[platform] ?? platform;
+}
+
 /** vehicle_images.source value for a given detected platform. */
 function imageSourceFor(platform?: string | null): string {
   return platform && platform !== "unknown" && platform !== "manual" ? platform : "ingest";
@@ -737,6 +754,7 @@ async function matchOrCreateVehicle(
     status: "discovered",
     primary_image_url: parsed.imageUrl || (parsed.imageUrls?.[0]) || null,
     source: platform && platform !== "unknown" ? platform : null,
+    platform_source: platformSourceFor(platform), // C7: the platform key
   };
 
   // Populate everything we have (real vehicles columns only — the table has
@@ -828,13 +846,14 @@ async function matchOrCreateVehicle(
 async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platform?: string | null) {
   const { data: existing } = await supabaseAdmin
     .from("vehicles")
-    .select("description, mileage, engine_type, transmission, color, body_style, title_status, seller_name, asking_price, primary_image_url, location, city, state, listing_url, listing_source, vin")
+    .select("description, mileage, engine_type, transmission, color, body_style, title_status, seller_name, asking_price, primary_image_url, location, city, state, listing_url, listing_source, vin, platform_source")
     .eq("id", vehicleId)
     .single();
 
   if (!existing) return;
 
   const updates: Record<string, any> = {};
+  if (!existing.platform_source && platformSourceFor(platform)) updates.platform_source = platformSourceFor(platform); // C7
 
   if (!existing.description && data.description) updates.description = data.description;
   if (!existing.mileage && data.mileage) updates.mileage = data.mileage;
