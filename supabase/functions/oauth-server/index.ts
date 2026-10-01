@@ -345,15 +345,18 @@ async function handleAuthorize(req: Request): Promise<Response> {
   <title>NUKE — Authorize</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #f5f5f5; color: #111; }
-    .card { max-width: 420px; margin: 80px auto; background: #fff; border: 2px solid #111; padding: 28px 24px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font-family: Arial, sans-serif; background: #f5f5f5; color: #111; }
+    .card { max-width: 420px; margin: 40px auto; background: #fff; border: 2px solid #111; padding: 24px 20px; }
     h1 { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px; }
     p  { font-size: 13px; line-height: 1.5; }
     label { display: block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 6px; }
-    input[type=email] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 14px; box-sizing: border-box; }
+    input[type=email] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 16px; }
     button { margin-top: 16px; width: 100%; padding: 12px; background: #111; color: #fff; border: 2px solid #111; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
     .meta { margin-top: 16px; font-size: 10px; color: #666; }
     .pill { display: inline-block; padding: 2px 6px; border: 1px solid #ccc; font-size: 10px; font-family: 'Courier New', monospace; margin-right: 4px; }
+    .scopes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .scopes code { font-size: 11px; padding: 2px 6px; background: #f0f0f0; border: 1px solid #ddd; overflow-wrap: anywhere; }
     .err  { color: #b00020; font-size: 11px; margin-top: 8px; }
   </style>
 </head>
@@ -361,8 +364,8 @@ async function handleAuthorize(req: Request): Promise<Response> {
   <div class="card">
     <h1>Connect ${escapedClientName} to NUKE</h1>
     <p><strong>${escapedClientName}</strong> wants permission to write vehicle events on your behalf.</p>
-    <div class="meta">
-      <span class="pill">scope</span> ${scope.split(" ").map((s) => `<code>${s}</code>`).join(" ")}
+    <div class="meta scopes">
+      <span class="pill">scope</span> ${scope.split(" ").filter(Boolean).map((s) => `<code>${s.replace(/[<>&"']/g, "")}</code>`).join(" ")}
     </div>
     <form method="post" action="${LOGIN_ENDPOINT}">
       <label for="email">Your NUKE email</label>
