@@ -1,9 +1,9 @@
 // Serves nuke.ag/oauth/* (the MCP connector sign-in) from the oauth-server edge function.
 //
 // Two copies exist on purpose: production is deployed by two paths that race (measured 2026-10-01). Vercel's Git
-// integration builds from the repo root (this file, CommonJS, root vercel.json), and the GitHub Action
-// deploy-vercel.yml runs `vercel deploy --prod` from nuke_frontend/ (nuke_frontend/api/oauth-proxy.js, ESM).
-// Whichever finishes last owns nuke.ag, so both must carry the proxy until one deploy path is retired.
+// integration builds from the repo root (root vercel.json, api/oauth-proxy.js, CommonJS), and the GitHub Action
+// deploy-vercel.yml runs `vercel deploy --prod` from nuke_frontend/ (this file, ESM). Whichever finishes last owns
+// nuke.ag, so both must carry the proxy until one deploy path is retired. Keep the two copies identical in behavior.
 //
 // Why a function and not a plain rewrite: Supabase serves HTML from *.supabase.co functions as text/plain, so the
 // authorize page, the "check your email" page and the callback page reached the browser as raw source (measured
@@ -19,7 +19,7 @@ async function readBody(req) {
   return chunks.length ? Buffer.concat(chunks) : undefined;
 }
 
-async function handler(req, res) {
+export default async function handler(req, res) {
   const url = new URL(req.url, 'https://nuke.ag');
   const path = (url.searchParams.get('p') || '').replace(/^\/+/, '');
   url.searchParams.delete('p');
@@ -52,5 +52,3 @@ async function handler(req, res) {
   res.setHeader('content-type', looksHtml ? 'text/html; charset=utf-8' : type || 'application/octet-stream');
   res.send(body);
 }
-
-module.exports = handler;
