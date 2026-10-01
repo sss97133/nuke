@@ -19,7 +19,9 @@ Nuke is pre-launch, and production is the test environment.
 
 For example: `scripts/data/q.sh "select * from v_schema_atlas where table_name = 'vehicles'"`.
 `docs/ledger/` is an older snapshot. Before you decide any function or table is alive or dead, check
-the atlas, then `docs/ledger/README.md`. Before you make
+the atlas, then `docs/ledger/README.md`. Before you touch the database, a monitor, a fold or a page that shows
+data, read `docs/ledger/theory/data-machine.md` and its case ledger `data-machine-cases.md` (the owner's
+vocabulary, the open cases, the compass). Before you make
 a new function, table or folder, check `docs/ledger/CAPABILITY_MAP.md`
 (`node scripts/guardrails/check-capability-before-mint.mjs "<name>"`) and extend what already exists.
 
