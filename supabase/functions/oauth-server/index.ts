@@ -449,24 +449,24 @@ async function handleLogin(req: Request): Promise<Response> {
     return errorPage("Could not start login session");
   }
 
-  // Generate Supabase magic link via admin API; redirectTo points to /oauth/callback.
+  // Send the magic link. signInWithOtp is the call that emails it; redirectTo points to /oauth/callback.
+  // shouldCreateUser: false keeps this to registered NUKE accounts (an unknown email is refused, never created).
+  // Measured 2026-10-01: the previous admin.generateLink call first minted a token without sending any email, which
+  // started Supabase's per-user cooldown, so this send was refused with 429 one second later and the error was
+  // swallowed: the page said "Check your email" and no email ever went out.
   const callbackUrl = `${CALLBACK_ENDPOINT}?session=${sessionId}`;
-  const { data, error: linkErr } = await supabase.auth.admin.generateLink({
-    type: "magiclink",
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
     email,
-    options: { redirectTo: callbackUrl },
+    options: { emailRedirectTo: callbackUrl, shouldCreateUser: false },
   });
-  if (linkErr || !data?.properties?.action_link) {
-    console.error("[oauth-server] generateLink error:", linkErr?.message ?? "no link returned");
-    return errorPage("Could not send magic link. Check that your email is registered with NUKE.");
+  if (otpErr) {
+    console.error("[oauth-server] signInWithOtp error:", otpErr.status, otpErr.message);
+    logEvent("oauth_login_magic_link_failed", { session_id: sessionId, status: otpErr.status ?? null });
+    if (otpErr.status === 429) {
+      return errorPage("A sign-in link was requested for this email moments ago. Wait one minute, then go back and try again.");
+    }
+    return errorPage("Could not send the sign-in link. Check that this email is registered with NUKE.");
   }
-
-  // Send the email by piggybacking on Supabase's standard flow:
-  // generateLink already triggers email via the configured SMTP if `should_send_email` defaults true.
-  // For some Supabase plans/configurations, we may need to call signInWithOtp instead. Try that as a
-  // fallback so the email goes out.
-  // Best-effort: also call signInWithOtp. Idempotent enough.
-  await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: callbackUrl } }).catch(() => null);
 
   logEvent("oauth_login_magic_link_sent", { session_id: sessionId });
 
