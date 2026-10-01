@@ -134,7 +134,8 @@ In addition to the card's list:
 | C22 | Five profile subpages silently empty for visitors | TablePage, LifecyclePage, VendorsPage, PartPage, VendorPage read `work_record` directly | open | yes | read `vehicle_build_log_public` for non-owners with an "owner-only" notice |
 | C23 | Band writer is a laptop cron nobody monitors | 294 of 1,347 board lots without a band; silent for 10 h | open | partly | a `v_job_health` row for the band writer; move the band into the temperature fold (model 40) |
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
-| C25 | Vein ledger, residual view, Prospector lane | none exist | open | yes | §5 |
+| C25 | Vein ledger, residual view, Prospector lane | none exist | vein ledger opened (`vein_ledger`, `vein_runs`, migration 20261001120000); residual view and lane still open | yes | §5 |
+| C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
@@ -230,3 +231,83 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
   rule reads REST latency, so it will pause itself if the smaller box is slow.
 - Deploys only through `supabase-deploy.yml`, one migration per commit. Check the workflow is idle before pushing.
 - Every change carries before and after numbers. Every monitor carries an assay. Unknown is an answer.
+
+## 10. Case C26: the buy-and-recondition decision (opened 2026-10-01)
+
+**The question.** The owner sent a Facebook Marketplace listing: a 1996 LX450, VIN JT6HJ88J8T0149733, 224k miles,
+clean Nevada title, no catalytic converters, $9,300 and then $9,000 OBO, Las Vegas. "Is it a buy?" turned into
+"to what condition must I bring it to lock in a profit?" That second question is §7's
+"value = cohort baseline + provenance residual": a plan of action priced as the residual it creates.
+
+**What answering it cost, and why.** An agent spent well over 100k tokens. Every step stood in for a missing organ:
+- **Reading the post (C16).** There was no browser with the owner's login in the loop. A crawler preview gave the
+  title, the VIN, the first part of the description and one photo. The price drop never became a blip.
+- **Missed rows.** `marketplace_listings` holds 7 LX450 rows that the agent never read, and it claimed there were
+  no private-party prices. Open world: absent from the answer is not absent from the database.
+- **The cohort was a string match.** `model ILIKE 'LX%450%'` pulled in "LX450 Project", "LX450 for Charity" and
+  duplicate rows. There is no make → model → generation key, and place is a bare `state` string (C8).
+  `get_comps` and the agent's SQL disagreed (C10).
+- **Condition was unmeasured.**
+  - `vehicles.quality_grade` was 5.5 on 14 of 33 recent lots: a default, not a measurement.
+  - `condition_rating` was set on 2 of 33.
+  - Photo condition scores existed on 2 vehicles, against 80 to 980 photos per lot (C17).
+  - The description-extraction fold (`ai-description-extraction`, 111,567 condition rows) stopped on 2026-04-13
+    and covers 1 of 61 LX450 lots.
+- **The listing text was gone.** `vehicles.description` is cut at about 481 characters, and BaT `listing`
+  observations carry 16 characters of `content_text`. The agent re-downloaded 32 BaT pages Nuke had already ingested.
+- **The condition fold was built by hand.** A subagent scored 32 listings in about 106k tokens, and the scores
+  lived in a scratchpad.
+
+**What it found (the discovery sample: 32 lots sold 2024-01 to 2026-09).** Mileage alone explains R² 0.36 of log
+price, and adding condition raises that to 0.62. Effects on the mileage residual, with Welch t:
+
+| Feature | Effect | t |
+|---|---|---|
+| Service records | ×1.39 | 2.14 |
+| Title or history flag | ×0.75 | −2.43 |
+| Poor paint | ×0.74 | −1.84 |
+| Damaged interior | ×0.78 | −1.74 |
+| Lockers | ×1.25 | 1.57 |
+| Engine major work | ×1.26 | 1.13 |
+
+For the subject truck, plan B (converters, hood and roof refinish, documented service, reupholstered interior)
+priced a median $22,068, 80% range $14.0k to $34.7k, against roughly $17.5k all-in. The costs are the agent's
+estimate, not data.
+
+**What was landed (Turing order: register, then run, then improve).**
+1. **Registered.** Migration `20261001120000_vein_ledger_lx450_condition.sql` opens the vein ledger (C25). It
+   registers V001–V006, one per feature above, each with its pass rule written before any counting run. It also
+   registers V007, the six-blank prediction for the subject truck.
+2. **The rubric.** `docs/ledger/theory/veins/lx450_condition_v0.md` is the one shared definition. Every score lands as a
+   `condition` observation through `ingest-observation`.
+3. **The runs.** `run_vein_lx450_condition(sample)` appends verdicts:
+   - `discovery` never counts, because the hypotheses were read from it;
+   - `confirmation` is 2019 to 2023, 39 held-out lots;
+   - `live` is every lot that closes after registration.
+   A better rubric is `_v1` and a better hypothesis is a new version; neither is an edit.
+
+**Still open.**
+- The condition rows must land through `ingest-observation`. The session's Nuke connector lost its sign-in before
+  writing.
+- The Facebook truck needs its vehicle and its two price blips.
+- The rubric needs to become a scheduled fold, reading stored full listing text rather than re-downloading it.
+- Model needs to be a key, and place needs to be an entity (C8).
+
+**Found while building (2026-10-01, measured):**
+- **The full listing text was in Postgres the whole time.**
+  - `extraction_metadata` rows with `field_name = 'raw_listing_description'` cover 97 LX450 vehicles, median 2,789 characters.
+  - `vehicles.description` is a deliberate 480-character summary (`normalizeDescriptionSummary`, `_shared/batParser.ts:747`), and nothing points from it to the full copy.
+  - 80 of 96 snapshot bodies live in a private storage bucket (`listing-snapshots`) that SQL cannot read.
+  - Result: an agent re-downloaded 72 pages that were already stored.
+- **The condition dimension exists.** `condition_taxonomy` has 202 descriptors, about 90 of them real (paint delamination, fading, respray, upholstery tear, dash cracking, service records, collision, flood, frame corrosion). The rest are fragments parsed from service manuals (`interior.gauge.terminal_no`). Only image tables key to it; text claims have no key.
+- **No model key.** `canonical_models` has no J80 row. `vehicles.series = 'FZJ80L'` is set on 96 of about 190 LX450 rows, and the rest are spelled "lx 450", "LX LX 450", "lx450Fremont, CA154K".
+- **The citation slot exists.** `ingest-observation` already accepts `citation.excerpt` and `raw_source_ref`. It gave agent-inferred rows `confidence_score` 1.0, because it scores match quality and ignores `agent_tier`.
+- **The rubric skipped discovery.** It was written before discovery, against `.claude/rules/extraction.md` ("sample 20–50 documents, enumerate all fields, aggregate, then design"). The catalog in `veins/lx450_claim_catalog.md` is that discovery.
+- **Held-out run, read-only on prod** (39 lots, 2019–2023):
+  - lockers ×1.41, t 2.38;
+  - poor paint ×0.68, t −2.06;
+  - records ×1.16, t 0.98 (did not hold);
+  - engine work ×0.73 (sign flipped);
+  - interior ×0.95;
+  - title flag n = 1.
+- **The reference was Iverson's 1979 Turing lecture, "Notation as a Tool of Thought"** (session of 2026-09-30, 19:40Z): schema = theory, data = models, query = theorem, backtest = experiment. The cost of this case is what happens when the notation is missing.
