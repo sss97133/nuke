@@ -26,7 +26,7 @@
     },
     {
       "source": "/oauth/:path*",
-      "destination": "/api/oauth-proxy?p=:path*"
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/oauth/:path*"
     },
     {
       "source": "/v1/events",

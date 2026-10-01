@@ -39,7 +39,7 @@
     },
     {
       "source": "/oauth/:path*",
-      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/oauth/:path*"
+      "destination": "/api/oauth-proxy?p=:path*"
     },
     {
       "source": "/api/functions/v1/:path*",
