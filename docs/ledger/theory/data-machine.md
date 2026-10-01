@@ -141,3 +141,18 @@ of every table you touch.
 
 (The elisions `[...]` drop the owner's market-strategy remarks about a named company, kept out of this public repo; the
 lead holds them.)
+
+## Additions, 2026-10-01 (from the owner's phone session of 2026-09-30)
+
+- **The case ledger.** `data-machine-cases.md` beside this card holds the open cases, the extended vocabulary
+  (market event, method, blip, chain, closer, edge, fold, dimension, bridge, join, assay, vein, fold depth), the
+  measurements of the soft close, the monitoring-by-species table, the hypotheses to test, and the compass. Read it
+  with this card; close cases there with the commit and the number.
+- **Lane 6, Prospector.** Input: the residual view (mass with no keys, no descriptions, no reader, still written).
+  Output: the vein ledger, a table. Scoreboard: veins assayed per week, veins promoted to features.
+- **Market event.** The entity is one act of bringing an asset to a room; "auction" is a value of its method
+  dimension. The soft-close chain is the first fold over it (80% of BaT lots extend; 39% of bids and a median +25%
+  of price happen inside the chain, measured on 400 lots).
+- **Not abandoning a fold:** an owner in `pipeline_registry`, a scheduled writer, an assay in `v_job_health`, a
+  described output keyed to the trunk, and a reader. A fold with no reader is dead on arrival.
+- **Anon rule:** anon may write testimony only as proposals into quarantine, never truth (P0.5, #488).
