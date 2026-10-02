@@ -65,12 +65,23 @@ Deno.serve(async (req) => {
       const vehicleId = url.searchParams.get("vehicle_id");
       const publicationId = url.searchParams.get("publication_id");
       const auctionEventId = url.searchParams.get("auction_event_id");
+      const organizationId = url.searchParams.get("organization_id");
       const vin = url.searchParams.get("vin");
       const kind = url.searchParams.get("kind");
       const page = parseInt(url.searchParams.get("page") || "1", 10);
       const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 100);
       const offset = (page - 1) * limit;
 
+      if (organizationId) {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+          return new Response(JSON.stringify({error:"organization_id must be a UUID"}),
+            {status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+        }
+        const {data,error}=await supabase.rpc("read_broadcast_entity_profile",{p_organization_id:organizationId,p_limit:limit});
+        if (error) throw error;
+        return new Response(JSON.stringify({data,profile_kind:"broadcast_evidence",historical_as_of:false}),
+          {headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
       if (!vehicleId && !vin && !publicationId && !auctionEventId) {
         return new Response(
           JSON.stringify({ error: "vehicle_id, vin, publication_id or auction_event_id parameter required" }),
@@ -99,7 +110,7 @@ Deno.serve(async (req) => {
       let query = supabase
         .from("vehicle_observations")
         .select(`
-          id, vehicle_id, source_id, kind,
+          id, vehicle_id, source_id, kind, property_id, subject_organization_id, context_bound_at,
           observed_at, ingested_at, structured_data, confidence_score,
           source_url, source_identifier, raw_source_ref, extraction_method,
           citation_publication_id, auction_event_id, media_start_ms, media_end_ms,

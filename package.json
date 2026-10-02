@@ -261,7 +261,8 @@
     "bat:lots": "deno run -A scripts/bat-lots-local.ts",
     "bat:archive": "duckdb scripts/data/bat-archive.duckdb < scripts/bat-archive.sql",
     "broadcast:evidence": "node scripts/broadcast-backfill-worker.ts",
-    "broadcast:evidence:test": "node --test scripts/lib/broadcast-evidence.test.mjs"
+    "broadcast:evidence:test": "node --test scripts/lib/broadcast-evidence.test.mjs",
+    "broadcast:profile:test": "node --test scripts/lib/broadcast-profile-fold.test.mjs scripts/lib/observation-property.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

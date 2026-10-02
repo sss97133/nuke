@@ -1,0 +1,175 @@
+{
+  "status": "review_only_not_submitted_or_applied",
+  "scope": "25 actual caption claims plus 8 display-instrument points; one presentation, one broadcast",
+  "registry_audit": {
+    "properties": 38,
+    "media_compatible": 0,
+    "raw_source_property_ids": 0,
+    "unsupported_kind": "media"
+  },
+  "reuse_proposals": [
+    {
+      "proposal_type": "modify_property",
+      "property_key": "model",
+      "property_id": "a79b528f-7d9d-46ca-96f9-96d899e81d10",
+      "current_applies_to_kinds": "{specification,listing}",
+      "requested_add_kind": "media",
+      "source_property": "model",
+      "motivating_observation_ids": [
+        "fa9dd914-9b63-492b-a92a-5a7459c433d7"
+      ],
+      "source_value": "Corvette",
+      "source_unit": null,
+      "source_claim_role": "commentator_claim",
+      "body_mutation": false,
+      "canonical_truth": "Binding identifies a property; source testimony remains a claim with its existing confidence/citation/context. No speaker or physical-fact certification is implied.",
+      "application": "Existing schema proposal review commons; live fn_schema_proposal_apply does not auto-apply modify_property, so a curator-owned change is still required."
+    },
+    {
+      "proposal_type": "modify_property",
+      "property_key": "year",
+      "property_id": "ece619f7-c49a-44f7-999f-a41acf5d4dc3",
+      "current_applies_to_kinds": "{specification,listing}",
+      "requested_add_kind": "media",
+      "source_property": "model_year",
+      "motivating_observation_ids": [
+        "cf736999-bcea-44ab-93f1-3fcd456c0e1c"
+      ],
+      "source_value": 1967,
+      "source_unit": null,
+      "source_claim_role": "commentator_claim",
+      "body_mutation": false,
+      "canonical_truth": "Binding identifies a property; source testimony remains a claim with its existing confidence/citation/context. No speaker or physical-fact certification is implied.",
+      "application": "Existing schema proposal review commons; live fn_schema_proposal_apply does not auto-apply modify_property, so a curator-owned change is still required."
+    },
+    {
+      "proposal_type": "modify_property",
+      "property_key": "exterior_color",
+      "property_id": "efcb8c61-1ff5-4790-890e-2e09118e87e3",
+      "current_applies_to_kinds": "{specification,condition}",
+      "requested_add_kind": "media",
+      "source_property": "exterior_color",
+      "motivating_observation_ids": [
+        "b824635c-d7f4-4b33-8ab8-157db09241b2"
+      ],
+      "source_value": "Silver Pearl",
+      "source_unit": null,
+      "source_claim_role": "commentator_claim",
+      "body_mutation": false,
+      "canonical_truth": "Binding identifies a property; source testimony remains a claim with its existing confidence/citation/context. No speaker or physical-fact certification is implied.",
+      "application": "Existing schema proposal review commons; live fn_schema_proposal_apply does not auto-apply modify_property, so a curator-owned change is still required."
+    },
+    {
+      "proposal_type": "modify_property",
+      "property_key": "interior_color",
+      "property_id": "514cacd3-82b4-4330-b3df-e292612ee718",
+      "current_applies_to_kinds": "{specification}",
+      "requested_add_kind": "media",
+      "source_property": "interior_color",
+      "motivating_observation_ids": [
+        "eb4965da-1209-4e47-ab16-ac13b2226b53"
+      ],
+      "source_value": "Teal Blue",
+      "source_unit": null,
+      "source_claim_role": "commentator_claim",
+      "body_mutation": false,
+      "canonical_truth": "Binding identifies a property; source testimony remains a claim with its existing confidence/citation/context. No speaker or physical-fact certification is implied.",
+      "application": "Existing schema proposal review commons; live fn_schema_proposal_apply does not auto-apply modify_property, so a curator-owned change is still required."
+    },
+    {
+      "proposal_type": "modify_property",
+      "property_key": "mileage_miles",
+      "property_id": "abdd7a7a-02c1-4b09-afc6-1a288207dd2d",
+      "current_applies_to_kinds": "{condition,listing,work_record}",
+      "requested_add_kind": "media",
+      "source_property": "odometer_reading",
+      "motivating_observation_ids": [
+        "bd90d173-dcb8-467a-8797-8d6a75fca5dc"
+      ],
+      "source_value": 62000,
+      "source_unit": "miles",
+      "source_claim_role": "reading_not_true_mileage",
+      "body_mutation": false,
+      "canonical_truth": "Binding identifies a property; source testimony remains a claim with its existing confidence/citation/context. No speaker or physical-fact certification is implied.",
+      "application": "Existing schema proposal review commons; live fn_schema_proposal_apply does not auto-apply modify_property, so a curator-owned change is still required."
+    }
+  ],
+  "new_properties": [
+    {
+      "proposal_type": "add_property",
+      "payload": {
+        "property_key": "auction_display_amount_usd",
+        "label": "Auction Display Amount (USD)",
+        "data_type": "numeric",
+        "unit": "usd",
+        "namespace_request": "pending",
+        "category": "auction_evidence",
+        "applies_to_kinds": [
+          "media"
+        ],
+        "cardinality": "multi",
+        "discriminator_key": "property",
+        "verification_scope": "instance",
+        "description": "Amount sampled from an auction broadcast display instrument. Source property distinguishes overlay from physical board; typed presentation/publication and source media clocks determine context. Not an accepted bid, asking price, hammer price or final price."
+      },
+      "motivating_observation_ids": [
+        "b56604f5-184d-487c-b518-3879d77d2b03",
+        "546341db-e32b-4862-89b2-1339b3950133",
+        "a84a6fbc-2d18-40a9-928b-cb9f138dc50d",
+        "81b01e89-aa74-49d1-9ab0-63a366755e8c",
+        "98c1380f-1d3b-4e2f-b45f-fff17c8651a6",
+        "3167a6e4-ed76-4970-96cf-b04a26b46d7b",
+        "bcbee0e4-d46d-4c56-a678-19daa8925975",
+        "14c2ff97-edc6-4b1f-b230-42b9da3f040a"
+      ],
+      "reader": "Event fold retains instruments separately. Existing vehicle_canonical latest-per-property view cannot substitute for presentation market-state replay."
+    },
+    {
+      "proposal_type": "add_property",
+      "payload": {
+        "property_key": "auction_high_bid_announced_usd",
+        "label": "Announced Auction High Bid (USD)",
+        "data_type": "numeric",
+        "unit": "usd",
+        "namespace_request": "pending",
+        "category": "auction_evidence",
+        "applies_to_kinds": [
+          "media"
+        ],
+        "cardinality": "multi",
+        "discriminator_key": "property",
+        "verification_scope": "instance",
+        "description": "Literal announced high-bid amount claimed in broadcast language. Keep no-sale/reserve/outcome distinct and provenance attached to the typed presentation. Not a sold or premium-inclusive price."
+      },
+      "motivating_observation_ids": [
+        "aacb1da7-e861-4d0d-8bae-5d0d5c047ac1"
+      ],
+      "reader": "Claim source readback by presentation; no authoritative event high_bid/winning_bid overwrite."
+    }
+  ],
+  "unit_blockers": [
+    {
+      "source_property": "engine_displacement",
+      "source_value": 427,
+      "source_unit": "cubic_inch",
+      "existing_property_key": "engine_displacement_l",
+      "existing_property_id": "66b2f1f6-b714-4ac0-85b6-60ba89529c1a",
+      "existing_unit": "liters",
+      "required": "A separately cited conversion projection or a reviewed source-unit property; never bind 427 to a liters property."
+    }
+  ],
+  "identity_path": {
+    "publisher": "Verified Mecum organization d2f587a0-5993-4d2c-9032-0fb3dd94d995 through publications.organization_id FK; source carrier remains YouTube.",
+    "observer": "NULL: source claim role label is not a verified speaker. Future platform/handle identity can reuse external_identities after audio identity evidence."
+  },
+  "review_workflow": {
+    "existing_commons": [
+      "schema_proposals",
+      "schema_proposal_reviews",
+      "pending_claims",
+      "observation_properties"
+    ],
+    "no_new_dimensions": true,
+    "automatic_replay": "No live pending-claim replay primitive found; not claimed complete."
+  }
+}

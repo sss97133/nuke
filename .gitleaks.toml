@@ -60,6 +60,13 @@ title = "Nuke Key Guardian"
   entropy = 3.5
   tags = ["key", "twilio"]
 
+  [[rules.allowlists]]
+    description = "Verified SHA256 evidence digests in the public S114 replay fixture; never credentials"
+    condition = "AND"
+    paths = ['''^scripts/fixtures/mecum-s114-fold-input\.json$''']
+    regexTarget = "line"
+    regexes = ['''^\s*"(content_hash|frame_file_sha256)": "[0-9a-f]{64}",?\s*$''']
+
 [[rules]]
   id = "modal-token"
   description = "Modal Token"

@@ -27,6 +27,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
 import { observationHashInput } from "../_shared/observationIdentity.ts";
+import { propertyBinding } from "../_shared/observationProperty.ts";
 import { mediaCitationColumns, type MediaCitation, type SourceTime } from "../_shared/mediaCitation.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
@@ -92,6 +93,8 @@ interface ObservationInput {
   /** condition_taxonomy.canonical_key this claim is about (e.g. 'exterior.paint.delamination'). Resolved to
    *  descriptor_id; an unknown or deprecated key is refused, never dropped. C26. */
   descriptor_key?: string;
+  /** Existing observation_properties.property_key; optional, exact/kind/type/unit checked. */
+  property_key?: string;
   /** True when an LLM read the claim from text or images rather than a person confirming it. Caps
    *  confidence_score at 0.6, the same convention the MCP submit_vehicle_event tool documents. C26. */
   agent_inferred?: boolean;
@@ -196,6 +199,25 @@ Deno.serve(async (req) => {
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       descriptorId = descriptor.descriptor_id;
+    }
+
+    let propertyId: string | null = null;
+    let organizationSubjectId: string | null = null;
+    if (input.property_key) {
+      const { data: property } = await supabase.from("observation_properties")
+        .select("id,property_key,data_type,unit,applies_to_kinds,deprecated_at")
+        .eq("property_key",input.property_key).maybeSingle();
+      try { propertyId = propertyBinding(input.property_key,input.kind,input.structured_data,property); }
+      catch (error) { return new Response(JSON.stringify({ error:(error as Error).message,
+        hint:"Reuse observation_properties; unknown or incompatible vocabulary follows schema_proposals/pending_claims. Raw intake remains possible without property_key." }),
+        {status:400,headers:{...corsHeaders,"Content-Type":"application/json"}}); }
+    }
+    if (input.subject?.type === "organization") {
+      const { data: organization } = await supabase.from("organizations").select("id")
+        .eq("id",input.subject.id ?? "").maybeSingle();
+      if (!organization) return new Response(JSON.stringify({error:"Unknown organization subject"}),
+        {status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      organizationSubjectId = organization.id;
     }
 
     // Compute content hash for deduplication.
@@ -418,6 +440,10 @@ Deno.serve(async (req) => {
         // (subject_type='vehicle', subject_id=NULL) applies.
         ...(input.subject?.type ? { subject_type: input.subject.type } : {}),
         ...(input.subject?.id ? { subject_id: input.subject.id } : {}),
+        ...(organizationSubjectId ? { subject_organization_id: organizationSubjectId } : {}),
+        ...((organizationSubjectId || mediaColumns.citation_publication_id || mediaColumns.auction_event_id)
+          ? { context_bound_at: new Date().toISOString() } : {}),
+        ...(propertyId ? { property_id: propertyId } : {}),
         observed_at: input.observed_at,
         source_id: source.id,
         source_url: input.source_url,
