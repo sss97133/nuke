@@ -207,6 +207,46 @@ export interface AuctionCommentRow {
   likers_count: number | null;
 }
 
+export interface BatCommentIdentityStore {
+  /** Exact platform='bat', handle lookup; no case folding or fuzzy person matching. */
+  find(handles: string[]): Promise<Array<{ id: string; handle: string }>>;
+  /** Insert only, on conflict (platform,handle) do nothing. Never reset an existing identity. */
+  insertMissing(rows: Array<{ platform: "bat"; handle: string; profile_url: string }>): Promise<void>;
+}
+
+/** Link fresh comments before INSERT, so the profile-queue trigger receives the identity too.
+ * Repeated authors cost one lookup per batch, not one request per comment. Existing identity
+ * claims/metadata/clocks are untouched. A read after insert resolves concurrent insert winners.
+ * Failures propagate: the writer can retry instead of silently inserting disconnected comments.
+ */
+export async function linkAuctionCommentIdentities(
+  rows: AuctionCommentRow[], store: BatCommentIdentityStore,
+): Promise<Array<AuctionCommentRow & { external_identity_id: string | null }>> {
+  const identifiable = (r: AuctionCommentRow) => r.author_username !== "Unknown" &&
+    r.author_username.trim() !== "" &&
+    !(r.author_username.toLowerCase() === "anonymous" && !(Number(r.bat_author_id) > 0));
+  const handles = [...new Set(rows.filter(identifiable).map((r) => r.author_username))];
+  const ids = new Map<string, string>();
+  for (let offset = 0; offset < handles.length; offset += 200) {
+    const batch = handles.slice(offset, offset + 200);
+    for (const identity of await store.find(batch)) ids.set(identity.handle, identity.id);
+    const missing = batch.filter((handle) => !ids.has(handle));
+    if (missing.length) {
+      await store.insertMissing(missing.map((handle) => ({
+        platform: "bat", handle,
+        profile_url: `https://bringatrailer.com/member/${encodeURIComponent(handle)}`,
+      })));
+      for (const identity of await store.find(missing)) ids.set(identity.handle, identity.id);
+    }
+    if (batch.some((handle) => !ids.has(handle))) {
+      throw new Error("BaT comment identity lookup incomplete after insert; retry comments");
+    }
+  }
+  return rows.map((row) => ({
+    ...row, external_identity_id: identifiable(row) ? ids.get(row.author_username)! : null,
+  }));
+}
+
 export function commentMediaUrls(c: any): string[] {
   const out: string[] = [];
   for (const img of Array.isArray(c?.images) ? c.images : []) {

@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.0.0 — rows and links only (2026-09-27)
+ * Version: 4.2.0 — comment identity links at insert (2026-10-02)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -30,12 +30,12 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, sha256Hex } from "../_shared/batAuctionRecord.ts";
+import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.0.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.0';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -500,7 +500,7 @@ function extractEssentials(html: string): {
   const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i);
   if (!sale_price && bidToMatch?.[1]) {
     const n = parseMoney(bidToMatch[1]);
-    if (Number.isFinite(n) && n > 0) high_bid = n;
+    if (n !== null && Number.isFinite(n) && n > 0) high_bid = n;
   }
 
   // SOLD signals (prefer title for low-noise extraction).
@@ -510,7 +510,7 @@ function extractEssentials(html: string): {
     : null;
   if (!sale_price && !statsHasReserveNotMet && titleSoldMatch?.[1]) {
     const n = parseMoney(titleSoldMatch[1]);
-    if (Number.isFinite(n) && n > 0) {
+    if (n !== null && Number.isFinite(n) && n > 0) {
       sale_price = n;
       high_bid = high_bid || n;
     }
@@ -534,7 +534,7 @@ function extractEssentials(html: string): {
       const m = soldSearchScope.match(p);
       if (m?.[1]) {
         const n = parseMoney(m[1]);
-        if (Number.isFinite(n) && n > 0) {
+        if (n !== null && Number.isFinite(n) && n > 0) {
           sale_price = n;
           high_bid = high_bid || n;
           break;
@@ -933,7 +933,7 @@ async function trySaveExtractionMetadata(args: {
 async function tryUpsertAuctionTimelineEvent(args: {
   supabase: any;
   vehicleId: string;
-  eventType: "auction_sold" | "auction_reserve_not_met" | "auction_ended";
+  eventType: "auction_listed" | "auction_sold" | "auction_reserve_not_met" | "auction_ended";
   eventDateYmd: string; // YYYY-MM-DD
   title: string;
   description?: string | null;
@@ -1189,6 +1189,7 @@ Deno.serve(async (req) => {
     let saleSupersession: any = null;
     let auctionEventId: string | null = null;
     let commentsWritten = 0;
+    let commentsWriteError: string | null = null;
     let bidsWritten = 0;
 
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
@@ -2430,7 +2431,7 @@ Deno.serve(async (req) => {
           const eiId = ei?.id;
 
           // Classify ownership from description (v2 — expanded patterns)
-          const desc = (essentials.description || "").toLowerCase();
+          const desc = (descriptionRaw || "").toLowerCase();
           let relType = "sold_by";
           // OWNER: selling dealer acquired/purchased/possesses the vehicle
           if (/sell(er|ing dealer).s (acquisition|purchase|possession|care|ownership|collection|inventory)|acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|bought by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased|bought|obtained)|prior to the sell(er|ing dealer)|before the sell(er|ing dealer)|(miles|kilometers) (were |have been )?(added|driven) by the sell(er|ing dealer)|sell(er|ing dealer) in \d{4}/.test(desc)) {
@@ -2554,19 +2555,32 @@ Deno.serve(async (req) => {
         // its position in today's JSON. content_hash carries the sequence number, which shifts as a thread grows:
         // a re-read of 1981-honda-civic-7 (71 rows from 2026-03-31) added 57 rows of which 45 were the same
         // comments; 65 of the 302 lots re-read on 2026-09-27 gained 1,924 such rows. Older rows stay as they are.
-        const { data: have } = await supabase
+        const { data: have, error: haveError } = await supabase
           .from("auction_comments").select("bat_comment_id").eq("vehicle_id", vehicleId).not("bat_comment_id", "is", null).limit(5000);
+        if (haveError) throw new Error(`Comment replay lookup failed: ${haveError.message}`);
         const haveIds = new Set((have ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite));
         const fresh = haveIds.size ? rows.filter((r) => r.bat_comment_id == null || !haveIds.has(r.bat_comment_id)) : rows;
-        let written = 0;
-        for (let i = 0; i < fresh.length; i += 200) {
-          const { error: cErr } = await supabase
+        const linked = await linkAuctionCommentIdentities(fresh, {
+          async find(handles) {
+            const { data, error } = await supabase.from("external_identities")
+              .select("id,handle").eq("platform", "bat").in("handle", handles);
+            if (error) throw new Error(`Comment identity lookup failed: ${error.message}`);
+            return data ?? [];
+          },
+          async insertMissing(identities) {
+            const { error } = await supabase.from("external_identities")
+              .upsert(identities, { onConflict: "platform,handle", ignoreDuplicates: true });
+            if (error) throw new Error(`Comment identity insert failed: ${error.message}`);
+          },
+        });
+        for (let i = 0; i < linked.length; i += 200) {
+          const { data: inserted, error: cErr } = await supabase
             .from("auction_comments")
-            .upsert(fresh.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true });
-          if (cErr) { console.warn(`auction_comments upsert failed (non-fatal): ${cErr.message}`); break; }
-          written += Math.min(200, fresh.length - i);
+            .upsert(linked.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true })
+            .select("id");
+          if (cErr) throw new Error(`auction_comments upsert failed: ${cErr.message}`);
+          commentsWritten += inserted?.length ?? 0;
         }
-        commentsWritten = written;
 
         // bids also into bat_bids (keyed by the lot's bat_listings row; absent for lots the catalog sync never saw)
         const bidRows = rows.filter((r) => typeof r.bid_amount === "number" && r.bid_amount > 0);
@@ -2602,6 +2616,7 @@ Deno.serve(async (req) => {
           }
         }
       } catch (e: any) {
+        commentsWriteError = e?.message || String(e);
         console.warn(`comments/bids write failed (non-fatal): ${e?.message || String(e)}`);
       }
       mark("comments_bids");
@@ -2717,6 +2732,7 @@ Deno.serve(async (req) => {
         vin_rejected: vinRejected,
         sale_supersession: saleSupersession,
         comments_written: commentsWritten,
+        comments_write_error: commentsWriteError,
         bids_written: bidsWritten,
         timestamp: new Date().toISOString(),
       }),
@@ -2731,4 +2747,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-

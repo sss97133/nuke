@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/batAuctionRecord.test.ts
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk } from "./batAuctionRecord.ts";
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
 
 // Shapes copied from real lot pages (2026-09-27): each comment carries nested channels/likers/images
 // arrays, which is what defeats a lazy "comments":[...] regex.
@@ -92,4 +92,81 @@ Deno.test("VIN check digit: valid, invalid, and pre-1981 (not judged)", () => {
   assertEquals(vinCheckDigitOk("1GCEK14L9EJ14791O"), false);  // O is not a VIN character
   assertEquals(vinCheckDigitOk("CKR147F398693"), null);       // 13-char pre-1981 GM VIN: no check digit exists
   assertEquals(vinCheckDigitOk(null), null);
+});
+
+const commentRows = (rawComments: unknown[]) => buildAuctionCommentRows({
+  rawComments, vehicleId: "vehicle", auctionEventId: "event",
+  listingUrlNorm: "https://bringatrailer.com/listing/test/", endAt: new Date("2026-01-01T00:00:00Z"),
+});
+
+Deno.test("identity links preserve testimony/hash, seller normalization, exact case, and existing keys on replay", async () => {
+  const rows = await commentRows([
+    bid("AndrewB55", 100, 1), bid("AndrewB55 (The Seller)", 200, 2), bid("andrewb55", 300, 3),
+    record("bat-bid-reserve", "Anonymous", "Reserve not met", 4), record("comment", "", "image-only", 5),
+  ]);
+  const before = structuredClone(rows);
+  const ids = new Map([["AndrewB55", "existing-id"]]);
+  const created: string[] = [];
+  const store: BatCommentIdentityStore = {
+    find: async (handles) => handles.filter((h) => ids.has(h)).map((handle) => ({ handle, id: ids.get(handle)! })),
+    insertMissing: async (identities) => {
+      for (const r of identities) {
+        assertEquals(r.platform, "bat");
+        assertEquals(r.profile_url, `https://bringatrailer.com/member/${encodeURIComponent(r.handle)}`);
+        created.push(r.handle);
+        ids.set(r.handle, "new-id");
+      }
+    },
+  };
+  const linked = await linkAuctionCommentIdentities(rows, store);
+  assertEquals(linked.map((r) => r.external_identity_id), ["existing-id", "existing-id", "new-id", null, null]);
+  assertEquals(linked.map(({ external_identity_id: _, ...testimony }) => testimony), before);
+  assertEquals(rows, before);
+  assertEquals(await linkAuctionCommentIdentities(rows, store), linked);
+  assertEquals(created, ["andrewb55"]);
+});
+
+Deno.test("identity insert races use the winner's key and public profile URLs encode punctuation", async () => {
+  const rows = await commentRows([bid('driver,+"\\ /', 100, 1)]);
+  let inserted = false;
+  const linked = await linkAuctionCommentIdentities(rows, {
+    find: async () => inserted ? [{ handle: rows[0].author_username, id: "concurrent-winner" }] : [],
+    insertMissing: async (identities) => {
+      assertEquals(identities[0].profile_url, 'https://bringatrailer.com/member/driver%2C%2B%22%5C%20%2F');
+      inserted = true;
+    },
+  });
+  assertEquals(linked[0].external_identity_id, "concurrent-winner");
+});
+
+Deno.test("501 distinct authors use bounded batches; repeated authors need no extra lookup", async () => {
+  const rows = await commentRows(Array.from({ length: 1002 }, (_, i) => bid(`user-${i % 501}`, 100, i + 1)));
+  const batches: number[] = [];
+  const linked = await linkAuctionCommentIdentities(rows, {
+    find: async (handles) => { batches.push(handles.length); return handles.map((handle) => ({ handle, id: handle })); },
+    insertMissing: async () => { throw new Error("Existing identities must not be rewritten"); },
+  });
+  assertEquals(batches, [200, 200, 101]);
+  assertEquals(linked.filter((r) => r.external_identity_id).length, 1002);
+});
+
+Deno.test("failed or incomplete identity resolution stops disconnected comment insertion", async () => {
+  const rows = await commentRows([bid("driver", 100, 1)]);
+  await assertRejects(() => linkAuctionCommentIdentities(rows, {
+    find: async () => { throw new Error("database unavailable"); }, insertMissing: async () => {},
+  }), Error, "database unavailable");
+  await assertRejects(() => linkAuctionCommentIdentities(rows, {
+    find: async () => [], insertMissing: async () => { throw new Error("insert refused"); },
+  }), Error, "insert refused");
+  await assertRejects(() => linkAuctionCommentIdentities(rows, {
+    find: async () => [], insertMissing: async () => {},
+  }), Error, "incomplete after insert");
+});
+
+Deno.test("replay with no fresh rows never touches the identity store", async () => {
+  const linked = await linkAuctionCommentIdentities([], {
+    find: async () => { throw new Error("No reads expected"); },
+    insertMissing: async () => { throw new Error("No writes expected"); },
+  });
+  assertEquals(linked, []);
 });

@@ -9,7 +9,7 @@
 // runs the integrity checks, writes nothing. --write upserts. Every lot logs one JSON line: slug, vehicle_id,
 // rows built, text-less, bids, late (post-close) comments, archive events/bids for the slug (scripts/data archive
 // export), rows in the DB after the write, ms. A REST probe every 25 lots; > 3 s pauses 120 s; 5 strikes stop the run.
-import { readCommentsJson, summarizeAuction, buildAuctionCommentRows } from "../../supabase/functions/_shared/batAuctionRecord.ts";
+import { readCommentsJson, summarizeAuction, buildAuctionCommentRows, linkAuctionCommentIdentities } from "../../supabase/functions/_shared/batAuctionRecord.ts";
 
 const [tsvPath, logPath, ...flags] = Deno.args;
 if (!tsvPath || !logPath) { console.error("usage: load_archive_comments.ts <vehicles.tsv> <log.jsonl> [--write] [--limit N] [--skip K]"); Deno.exit(2); }
@@ -99,10 +99,29 @@ for (const line of lines) {
     const fresh = have.size ? rows.filter((r) => r.bat_comment_id == null || !have.has(r.bat_comment_id)) : rows;
     if (fresh.length !== rows.length) rec.already_present = rows.length - fresh.length;
     let err: string | null = null;
-    for (let i = 0; i < fresh.length && !err; i += 200) {
-      const r = await rest("auction_comments?on_conflict=vehicle_id,content_hash", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(fresh.slice(i, i + 200)) });
-      if (!r.ok) err = `${r.status} ${(await r.text()).slice(0, 300)}`;
-    }
+    try {
+      const linked = await linkAuctionCommentIdentities(fresh, {
+        async find(handles) {
+          // PostgREST quoted IN values preserve punctuation and exact case in public handles.
+          const values = handles.map((h) => `"${h.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",");
+          const params = new URLSearchParams({ select: "id,handle", platform: "eq.bat", handle: `in.(${values})` });
+          const r = await rest(`external_identities?${params}`);
+          if (!r.ok) throw new Error(`Identity lookup: ${r.status} ${(await r.text()).slice(0, 300)}`);
+          return await r.json();
+        },
+        async insertMissing(identities) {
+          const r = await rest("external_identities?on_conflict=platform,handle", {
+            method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(identities),
+          });
+          if (!r.ok) throw new Error(`Identity insert: ${r.status} ${(await r.text()).slice(0, 300)}`);
+        },
+      });
+      rec.identities_linked = linked.filter((r) => r.external_identity_id).length;
+      for (let i = 0; i < linked.length && !err; i += 200) {
+        const r = await rest("auction_comments?on_conflict=vehicle_id,content_hash", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(linked.slice(i, i + 200)) });
+        if (!r.ok) err = `${r.status} ${(await r.text()).slice(0, 300)}`;
+      }
+    } catch (e) { err = e instanceof Error ? e.message : String(e); }
     const after = await countComments(vehicleId);
     Object.assign(rec, { db_before: before, db_after: after, write_error: err });
     if (!err && after === before + fresh.length) { rec.written_ok = true; totals.written += fresh.length; }
