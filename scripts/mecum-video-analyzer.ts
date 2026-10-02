@@ -80,7 +80,9 @@ if (options['baseline-report']) {
     current_version: report.discovery_version, baseline_yield: baseline.yield, revised_yield: report.yield,
     candidate_grain_delta: report.yield.candidate_source_grains-baseline.yield.candidate_source_grains,
     transition_candidate_delta: report.yield.presentation_transition_candidates-baseline.yield.presentation_transition_candidates,
-    change: 'Added literal next-car references even when make/year is absent; retained raw cue context and unresolved future/current scope.',
+    change: baseline.discovery_version==='mecum-caption-cues-v2'
+      ? 'Added suspension language leads and retained conditional-language qualifiers; all source claims remain unresolved.'
+      : 'Retained literal next-car references and suspension language leads, with unresolved navigation scope and conditional-language qualifiers.',
     literal_next_car_followup: source.segments.filter(c=>/\bnext\s+car\b/i.test(c.text)).map(c=>({ caption_index: c.index,
       start_seconds: c.time_seconds, detected_as_candidate: result.grains.some(g=>g.structured_data.media.caption_index===c.index &&
         g.structured_data.value.cue_labels.includes('relative_next_vehicle')), verified_auction_boundary: false,

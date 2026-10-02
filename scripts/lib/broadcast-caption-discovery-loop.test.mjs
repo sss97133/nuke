@@ -69,3 +69,29 @@ test('a dead-process lease can resume while a live-process lease refuses a secon
  const run=await runManifestDiscovery(options);assert.equal(run.new_completed_sources,1);
  await writeFile(path,JSON.stringify({pid:process.pid}));await assert.rejects(()=>runManifestDiscovery(options),/already active/);
 }));
+
+test('bounded watch reloads newly approved manifest rows and preserves completed source receipts',async()=>fixture(async({out,cache,manifest,entry,options})=>{
+ const first=await runManifestDiscovery(options);
+ const cp=JSON.parse(await readFile(join(out,'checkpoints',`${entry.video_id}.json`),'utf8'));
+ const originalBytes=await readFile(cp.grains);
+ const other={...entry,video_id:'test0000002',source_url:'https://www.youtube.com/watch?v=test0000002',approved_for_discovery:true};
+ await writeFile(join(cache,'test0000002-INTERNAL.en.json3'),JSON.stringify({events:[{tStartMs:0,segs:[{utf8:'Air ride suspension.'}]}]}));
+ const loop=runManifestDiscovery({...options,watch:true,max_sources:1,poll_seconds:0.02,max_runtime_seconds:2});
+ await new Promise(r=>setTimeout(r,80));
+ await writeFile(manifest,JSON.stringify({selection:[entry,other]}));
+ const run=await loop;
+ assert.equal(run.new_completed_sources,1);
+ assert.equal(run.manifest_source_count,2);
+ assert.equal(run.manifest_changed_count,1);
+ assert.equal(run.durable_totals.completed_sources,2);
+ assert.equal(first.durable_totals.completed_sources,1);
+ assert.deepEqual(await readFile(cp.grains),originalBytes);
+}));
+
+test('manifest mismatch and explicitly unapproved rows cannot acquire or process captions',async()=>fixture(async({out,manifest,entry,options})=>{
+ await writeFile(manifest,JSON.stringify({selection:[{...entry,approved_for_discovery:false}]}));
+ const held=await runManifestDiscovery(options);assert.equal(held.new_completed_sources,0);
+ assert.equal(held.sources[0].status,'not_approved_hold');
+ await writeFile(manifest,JSON.stringify({selection:[{...entry,source_url:'https://www.youtube.com/watch?v=test0000002'}]}));
+ await assert.rejects(()=>runManifestDiscovery(options),/source URL must match/);
+}));

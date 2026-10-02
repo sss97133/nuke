@@ -92,3 +92,14 @@ test('next-car navigation without a make or year remains a lead, including previ
   assert.ok(references.every(g=>g.structured_data.value.actual_presentation_start===null));
   assert.ok(references.every(g=>g.structured_data.value.navigation_scope==='next_or_future_reference_not_verified_auction_transition'));
 });
+
+test('conditional air-ride suspension language is retained without asserting a vehicle specification', () => {
+  const r=discoverCaptionCues(source([[55.04,'Does look like air ride suspension as well, so this can drop to the ground.']]),options);
+  const detail=r.grains.find(g=>g.structured_data.property==='vehicle_detail_cue');
+  assert.ok(detail.structured_data.value.cue_labels.includes('suspension'));
+  assert.equal(detail.structured_data.value.epistemic_language_present,true);
+  assert.equal(detail.structured_data.value.interpretation_status,'candidate_for_review');
+  assert.equal(detail.structured_data.value.vehicle_id,null);
+  assert.equal(detail.structured_data.value.speaker_role,null);
+  assert.equal(r.summary.yield.accepted_bids_verified,0);
+});

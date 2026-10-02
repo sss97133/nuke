@@ -136,3 +136,31 @@ that audiovisual evidence is absent. Both bounded workers exited when their sour
 attempt budgets settled. Reports, retained input hashes and source outcomes are
 linked in `output/mecum/audio-discovery/loop-final-receipt.json`. No candidates were
 posted to production, and no paid model API calls were made by this loop.
+
+### Cross-format scope review and version 3
+
+A further purposive review read 13 windows (63 context cues) from the 732 queued
+tasks across all five publishers, including six flagged targets and seven unhit
+targets. Three of six flagged windows had overbroad vehicle categories: exhibition
+or television years treated as vehicle references, radio-series history treated as
+equipment, and bidder familiarity treated as production rarity. Five of seven unhit
+windows contained substantive context-supported avenues; another was courtesy only
+and one exposed a music-marker caption channel without vehicle-speech coverage.
+These are inspected-window counts, not estimates of channel precision or recall.
+
+The review staged 35 source-attributed claims and separate source-keyed scope
+decisions in `output/mecum/audio-discovery/scope-review-payload.json` and
+`scope-review-report.json`. Exact cue hashes and frozen capture clocks were checked;
+vehicle, event, speaker, accepted-bid and exact-event-time assignments remain unknown.
+An air-ride suspension statement was an earned lexical miss. Version 3 retains that
+lead and its conditional wording. Comparing the same 22 source snapshots produced
+27,325 versus 27,357 candidates, with 32 new grains, none removed, and 58 suspension
+cues retained. All archived-baseline and revised replay digests matched. The full
+comparison is `scope-review-v2-v3-comparison.json`; extra cues are not verified specs.
+
+Bounded watch now reloads the curator-owned approved manifest at each poll and can
+pick up new rows without changing completed receipts. Exact public video URLs must
+match their video IDs, and explicitly unapproved rows remain held. Three new tests
+cover qualified suspension, dynamic manifest addition, and approval/identity holds;
+21 parser/runner tests pass. The prepared one-hour watch command is recorded in
+`scope-review-watch-service-receipt.json`; preparing it does not start a service.

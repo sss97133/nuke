@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 
-export const DISCOVERY_VERSION = 'mecum-caption-cues-v2';
+export const DISCOVERY_VERSION = 'mecum-caption-cues-v3';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const rule = (property, label, pattern) => ({ property, label, id: `${property}:${label}`, pattern });
 export const RULES = [
@@ -41,6 +41,7 @@ export const RULES = [
   rule('vehicle_detail_cue', 'body_configuration', /\b(?:convertible|roadster|coupe|fastback|hard\s*top|soft\s*top|two[- ]top|sedan)\b/i),
   rule('vehicle_detail_cue', 'color_trim', /\b(?:paint|interior|leather|upholstery|color\s+combination|livery|liveries|stinger)\b/i),
   rule('vehicle_detail_cue', 'equipment', /\b(?:headrest|air\s+conditioning|tinted\s+glass|radio|amfm|am\/fm|wheels?|tires?|brakes?|steering)\b/i),
+  rule('vehicle_detail_cue', 'suspension', /\b(?:air[- ]ride(?:\s+suspension)?|suspension|coil[- ]overs?)\b/i),
   rule('vehicle_detail_cue', 'mileage', /\b(?:odometer|mileage|miles?|kilometers?)\b/i),
   rule('vehicle_detail_cue', 'production_rarity', /\b(?:produced|production|built|one\s+of|only\s+\d|rare\s+color)\b/i),
   rule('evaluative_language_cue', 'quality_appearance', /\b(?:beautiful|gorgeous|stunning|fantastic|amazing|excellent|exceptional|spectacular|impressive|wonderful|pristine|that's\s+good|wow)\b/i),
@@ -138,6 +139,7 @@ export function discoverCaptionCues(source, options = {}) {
       const labels = hits.map(r => r.label);
       const value = { cue_labels: labels, rule_ids: hits.map(r => r.id), interpretation_status: 'candidate_for_review',
         speaker_id: null, speaker_role: null, vehicle_id: null,
+        epistemic_language_present: /\b(?:looks?\s+like|appears?|seems?|probably|possibly)\b/i.test(cue.text),
         historical_language_present: historical.test(cue.text),
         ...(labels.includes('relative_next_vehicle') ? { navigation_relation: 'relative_next_vehicle_language',
           navigation_scope: 'next_or_future_reference_not_verified_auction_transition', actual_presentation_start: null } : {}),

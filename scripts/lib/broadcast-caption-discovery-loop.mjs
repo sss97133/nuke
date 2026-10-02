@@ -11,6 +11,18 @@ const existsJson = async path => { try { return JSON.parse(await readFile(path,'
 const atomic = async (path,value) => { await mkdir(resolve(path,'..'),{recursive:true}); const tmp=`${path}.${process.pid}.tmp`;
   await writeFile(tmp,JSON.stringify(value,null,2)+'\n'); await rename(tmp,path); };
 
+async function approvedManifest(path) {
+  const bytes=await readFile(path),manifest=JSON.parse(bytes.toString('utf8'));
+  if(!Array.isArray(manifest?.selection)||!manifest.selection.length) throw new Error('Manifest selection required');
+  const seen=new Set();
+  for(const entry of manifest.selection) {
+    if(!/^[A-Za-z0-9_-]{11}$/.test(entry.video_id)||seen.has(entry.video_id)) throw new Error('Manifest must have unique valid video IDs');
+    if(entry.source_url!==`https://www.youtube.com/watch?v=${entry.video_id}`) throw new Error('Manifest source URL must match its public YouTube video ID');
+    seen.add(entry.video_id);
+  }
+  return {manifest,sha256:sha(bytes)};
+}
+
 export function normalizeJson3(raw,entry,capturedAt) {
   if(!Array.isArray(raw.events)) throw new Error('JSON3 events required');
   const segments=raw.events.flatMap((e,index)=>{
@@ -79,9 +91,7 @@ async function acquire(entry,cacheDir,options) {
 export async function runManifestDiscovery(options) {
   const bounds=limits(options),outputDir=resolve(options.output_dir),cacheDir=resolve(options.cache_dir),start=Date.now();
   await mkdir(outputDir,{recursive:true});await mkdir(cacheDir,{recursive:true});
-  const manifest=await existsJson(resolve(options.manifest));
-  if(!Array.isArray(manifest?.selection)||!manifest.selection.length) throw new Error('Manifest selection required');
-  const seen=new Set();for(const e of manifest.selection){if(!/^[A-Za-z0-9_-]{11}$/.test(e.video_id)||seen.has(e.video_id)) throw new Error('Manifest must have unique valid video IDs');seen.add(e.video_id);}
+  const initialManifest=await approvedManifest(resolve(options.manifest));let manifest=initialManifest.manifest;
   const lockPath=join(outputDir,'loop.lock.json');const oldLock=await existsJson(lockPath);
   if(oldLock?.pid){let live=true;try{process.kill(oldLock.pid,0);}catch(e){if(e.code==='ESRCH')live=false;else throw e;}
     if(live)throw new Error(`Discovery loop already active with PID ${oldLock.pid}`);await unlink(lockPath);}
@@ -91,8 +101,9 @@ export async function runManifestDiscovery(options) {
     limits:bounds,mode:options.watch?'bounded_watch':'bounded_batch',acquisition_enabled:!!options.acquire_captions,
     code_discovery_version:DISCOVERY_VERSION,new_completed_sources:0,new_candidate_rows:0,new_source_seconds:0,
     source_attempts:0,errors:0,resumed_completed_sources:0,paid_model_api_calls:0,production_rows_written:0,
+    manifest_revision_sha256:initialManifest.sha256,manifest_reload_count:0,manifest_changed_count:0,
     writer_enabled:false,candidate_truth_promotion_enabled:false,review_work_items:0,status:'running',sources:[],
-    improvement_evidence:'Human scope assay -> tested next-car grammar revision -> version1/version2 comparison. No autonomous code changes or releases.'};
+    improvement_evidence:'Human scope assays -> tested next-car and qualified suspension grammar revisions -> versioned same-source comparisons. No autonomous code changes or releases.'};
   const checkpoints=new Map();const cpPath=id=>join(outputDir,'checkpoints',`${id}.json`);
   const resumed=new Set(),activeSources=new Set();
   const activate=id=>{if(!activeSources.has(id)&&activeSources.size>=bounds.max_sources)return false;
@@ -108,12 +119,22 @@ export async function runManifestDiscovery(options) {
   await publish();
   try {
     do {
+      if(options.watch) {
+        // The curator-owned selection is the approval boundary. Never expand from a discovery queue.
+        const refreshed=await approvedManifest(resolve(options.manifest));run.manifest_reload_count++;
+        if(refreshed.sha256!==run.manifest_revision_sha256)run.manifest_changed_count++;
+        manifest=refreshed.manifest;run.manifest_revision_sha256=refreshed.sha256;run.manifest_source_count=manifest.selection.length;
+        for(const entry of manifest.selection) if(!checkpoints.has(entry.video_id)) {
+          checkpoints.set(entry.video_id,await existsJson(cpPath(entry.video_id))??{video_id:entry.video_id,status:'queued',attempts:[]});
+        }
+      }
       let progressed=false;
       for(const entry of manifest.selection) {
         if(stopping||Date.now()-start>=bounds.max_runtime_seconds*1000)break;
         if(run.new_completed_sources>=bounds.max_sources)break;
         let cp=checkpoints.get(entry.video_id);
         if(cp.budget_hold_run_id===run.run_id)continue;
+        if(entry.approved_for_discovery===false){cp.status='not_approved_hold';await atomic(cpPath(entry.video_id),cp);continue;}
         if(entry.status==='confirmed_upcoming'){cp.status='upcoming_not_mined';await atomic(cpPath(entry.video_id),cp);continue;}
         const files=(await readdir(cacheDir)).filter(f=>f.startsWith(`${entry.video_id}-INTERNAL.`)&&f.endsWith('.json3')).sort((a,b)=>Number(b.includes('en-orig'))-Number(a.includes('en-orig'))||a.localeCompare(b));
         let rawPath=files[0]?join(cacheDir,files[0]):entry.transcript_path?resolve(entry.transcript_path):null;

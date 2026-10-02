@@ -219,3 +219,12 @@ Final snapshot for the bounded 30-source selection: 22 completed caption passes,
 All 22 replay digests passed. Seven routes exhausted bounded retries and one source
 was upcoming. See `output/mecum/audio-discovery/loop-final-receipt.json`; these are
 caption discovery results, with zero production promotions or paid model API calls.
+
+The next bounded scope review inspected 13 windows / 63 cues across five publishers:
+3 of 6 flagged targets had overbroad vehicle categories; 5 of 7 unhit windows had
+substantive context-supported avenues. It staged 35 attributed caption claims with
+unresolved subjects and source clocks. An earned suspension grammar revision moved
+same-snapshot candidate yield from 27,325 to 27,357 (+32; 58 suspension cues retained).
+All 22 baseline/revised replay pairs and 21 parser/runner tests passed. These figures
+describe review candidates and sample scope findings, not accepted vehicle facts or
+global precision/recall. Watch commands are bounded and curator-manifest scoped.
