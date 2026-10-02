@@ -10,6 +10,16 @@ on:
     - cron: '0 7 * * *' # daily
 
 jobs:
+  agent-routing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify agent routing contract without credentials or network
+        run: node --test scripts/lib/jev-route.test.mjs scripts/nuke-spawn.test.mjs
+
   vitest:
     runs-on: ubuntu-latest
     steps:
@@ -33,4 +43,3 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
-

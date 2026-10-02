@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Nuke local CI gate — the merge/deploy check. There is NO GitHub Actions in this repo;
-# the real gate is: local typecheck + build + the ratcheted guardrails, then push → Vercel.
-# This script IS that gate. Run it before you push, or let the pre-push hook run it.
+# Nuke local CI gate: typecheck, routing contract tests and ratcheted guardrails.
+# GitHub Actions also verifies PRs and deploys. Run this before pushing.
 #
 #   scripts/ci/verify.sh                 # warn mode: reports, never blocks (default)
 #   CI_ENFORCE=1 scripts/ci/verify.sh    # enforce mode: exit 1 on any regression/secret/typefail
@@ -11,7 +10,7 @@
 # Ratchet philosophy: pre-existing violations are the baseline floor; the gate fails only when a
 # count EXCEEDS it (i.e. you ADDED a violation). Burn violations down, then lower the floor.
 set -uo pipefail
-ROOT="/Users/skylar/nuke"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GD="$ROOT/scripts/guardrails"
 BASE="$ROOT/scripts/ci/baseline.json"
 ENFORCE="${CI_ENFORCE:-0}"
@@ -55,6 +54,10 @@ ratchet(){ # name current baseline
 }
 
 echo "── Nuke CI gate ($([ "$ENFORCE" = 1 ] && echo ENFORCE || echo warn) mode) ──"
+
+echo "• agent routing contract…"
+if (cd "$ROOT" && node --test scripts/lib/jev-route.test.mjs scripts/nuke-spawn.test.mjs); then grn "  ✓ routing contract clean"
+else red "  ✗ routing contract FAILED"; fail=1; fi
 
 echo "• frontend typecheck…"
 if (cd "$ROOT/nuke_frontend" && npm run type-check >/tmp/ci_tc.out 2>&1); then grn "  ✓ typecheck clean"
