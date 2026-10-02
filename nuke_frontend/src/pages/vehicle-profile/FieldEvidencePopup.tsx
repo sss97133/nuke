@@ -1,15 +1,17 @@
 /**
  * FieldEvidencePopup — the click-through terminus for any dossier field.
  *
- * Shows: value → all evidence sources → tagged photos → "No visual evidence" honestly.
+ * Shows the value, source claims, qualified image citations and related image areas.
  * This is the reusable pattern for the computation surface's "every data point is a query" principle.
  *
  * See: docs/library/technical/design-book/09-click-through-chains.md
  */
-import React, { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import React from 'react';
+import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
+import { useFieldProvenance, citedFieldImages, evidenceRelationLabel } from './hooks/useFieldProvenance';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import './vehicle-evidence.css';
 
 interface FieldEvidencePopupProps {
   field: string;
@@ -50,74 +52,27 @@ function sourceLabel(sourceType: string): string {
   return sourceType.toUpperCase().replace(/_/g, ' ');
 }
 
-interface TaggedImage {
-  id: string;
-  url: string;
-  zone: string | null;
-  category: string | null;
-  caption: string | null;
-}
-
 const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   field, label, value, vehicleId, evidence, vinDecode,
 }) => {
-  const [images, setImages] = useState<TaggedImage[]>([]);
-  const [imagesLoading, setImagesLoading] = useState(true);
+  const inventory = useVehicleImageEvidence(vehicleId);
+  const provenance = useFieldProvenance(vehicleId, field);
+  const rows = inventory.data?.images || [];
+  const images = relatedFieldImages(rows, field);
+  const citations = citedFieldImages(provenance.data, rows);
+  const imagesLoading = inventory.isLoading || provenance.isLoading;
+  const awaiting = rows.filter(image => !hasImageAnalysis(image)).length;
+  const imageReadFailed = !!inventory.error || !!provenance.error || (!provenance.isLoading && provenance.data === null);
+  const imageObservations = provenance.data?.image_observations || [];
+  const hasRecordedImageReference = imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
 
-  // Fetch images tagged with this field's zone/category
-  useEffect(() => {
-    let cancelled = false;
-    // Zone prefixes that match actual DB values like mech_engine_bay, int_dashboard, ext_front_driver
-    const fieldToZonePrefix: Record<string, string[]> = {
-      engine_type: ['mech_engine'],
-      engine_size: ['mech_engine'],
-      fuel_system_type: ['mech_engine'],
-      vin: ['detail_badge', 'detail_vin'],
-      color: ['ext_'],
-      interior_color: ['int_'],
-      transmission: ['mech_engine', 'mech_transmission'],
-      drivetrain: ['ext_undercarriage', 'mech_'],
-      mileage: ['int_dashboard', 'detail_badge'],
-      body_style: ['ext_front', 'ext_rear', 'ext_driver', 'ext_passenger'],
-      horsepower: ['mech_engine'],
-      torque: ['mech_engine'],
-    };
-
-    const prefixes = fieldToZonePrefix[field] || [];
-    if (prefixes.length === 0) {
-      setImagesLoading(false);
-      return;
-    }
-
-    // Use ilike with OR for prefix matching
-    const orFilter = prefixes.map(p => `vehicle_zone.ilike.${p}%`).join(',');
-    supabase
-      .from('vehicle_images')
-      .select('id, image_url, thumbnail_url, vehicle_zone, category, caption')
-      .eq('vehicle_id', vehicleId)
-      .or(orFilter)
-      .order('display_order', { ascending: true })
-      .limit(12)
-      .then(({ data }) => {
-        if (!cancelled && data) {
-          setImages(data.map(d => ({
-            id: d.id,
-            url: d.image_url,
-            zone: d.vehicle_zone,
-            category: d.category,
-            caption: d.caption,
-          })));
-        }
-        if (!cancelled) setImagesLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [vehicleId, field]);
-
-  const sources = evidence?.sources || [];
+  const sources = evidence?.sources || (provenance.data?.evidence || [])
+    .filter(source => source.source !== 'field_evidence' || source.verified === true)
+    .map((source, index) => ({ id: `${source.source}-${index}`, source_type: source.source_type || source.source, field_value: source.value, created_at: source.at }));
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
 
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', lineHeight: 1.6, padding: '8px' }}>
+    <div className="field-evidence-popup" style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', lineHeight: 1.6, padding: '8px' }}>
       {/* Field value header */}
       <div style={{ marginBottom: '8px' }}>
         <div style={{
@@ -171,7 +126,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
             textTransform: 'uppercase', color: 'var(--text-secondary)',
             borderBottom: '1px solid var(--border)', paddingBottom: '2px', marginBottom: '4px',
           }}>
-            {sortedSources.length} SOURCE{sortedSources.length !== 1 ? 'S' : ''}
+            {sortedSources.length} SOURCE CLAIM{sortedSources.length !== 1 ? 'S' : ''}
           </div>
           {sortedSources.map((src, i) => (
             <div key={src.id || i} style={{
@@ -193,7 +148,43 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         </div>
       )}
 
-      {/* Tagged images */}
+      {/* Claim-specific references from the existing provenance reader. */}
+      {!imagesLoading && citations.length > 0 && (
+        <div className="field-image-citations">
+          <div className="ev-label">IMAGE-CITED OBSERVATIONS · {citations.length} IMAGE{citations.length !== 1 ? 'S' : ''}</div>
+          <p>Ordered by coded specification, visible appearance/control, then component inference. This is an inspection order, not a probability of correctness.</p>
+          <div className="ev-citation-grid">
+            {citations.map(image => (
+              <article key={image.id} className="ev-image-proof">
+                <a href={image.image_url} target="_blank" rel="noopener noreferrer">
+                  <img src={image.medium_url || optimizeImageUrl(image.image_url, 'medium') || image.image_url} alt={`Cited source for ${label.toLowerCase()}`} width={900} height={675} loading="lazy" />
+                  <span>Inspect source image {image.id.slice(0, 8)} ↗</span>
+                </a>
+                {imageObservations.filter(obs => obs.image_id === image.id).map(obs => (
+                  <div key={obs.observation_id} className="ev-image-assessment">
+                    <span className="ev-label">{evidenceRelationLabel(obs.visual_relation)}</span>
+                    <strong>{obs.value || 'Value not recorded'}</strong>
+                    {obs.image_region?.label && <p>Visible region: {obs.image_region.label}</p>}
+                    {obs.limitation && <p className="ev-proof-limitation">{obs.limitation}</p>}
+                    {obs.reference?.url && /^https:\/\//.test(obs.reference.url) && <a href={`${obs.reference.url}#page=${obs.reference.pdf_page || 1}`} target="_blank" rel="noopener noreferrer">Manufacturer reference · PDF page {obs.reference.pdf_page || 'unknown'} ↗</a>}
+                    <p className="ev-footnote">Agent review · {obs.observed_at ? new Date(obs.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'Review time unknown'} · Capture time unknown{obs.agent_model ? ` · ${obs.agent_model}` : ' · Model identifier not recorded'}</p>
+                  </div>
+                ))}
+                {imageObservations.every(obs => obs.image_id !== image.id) && <p>Legacy recorded image citation. Its observation detail is not available here.</p>}
+              </article>
+            ))}
+          </div>
+          {imageObservations.length > 1 && imageObservations.every(obs => obs.source_family && obs.source_family === imageObservations[0].source_family) && <p className="ev-footnote">These photographs come from the same source family. Multiple views are not independent source confirmations.</p>}
+        </div>
+      )}
+      {(provenance.data?.observations || []).filter(obs => obs.source_url && !imageObservations.some(imageObs => imageObs.observation_id === obs.id)).map(obs => (
+        <div key={obs.id} style={{ padding: '6px 0' }}>
+          {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
+          <span> · {obs.value || 'Value not recorded'}</span>
+          {obs.observed_at && <div style={{ color: 'var(--text-secondary)' }}>Source observation dated {new Date(obs.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</div>}
+        </div>
+      ))}
+      {/* A zone match identifies an area to inspect; it does not support a particular claim. */}
       {!imagesLoading && images.length > 0 && (
         <div>
           <div style={{
@@ -201,48 +192,50 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
             textTransform: 'uppercase', color: 'var(--text-secondary)',
             borderBottom: '1px solid var(--border)', paddingBottom: '2px', marginBottom: '4px',
           }}>
-            VISUAL EVIDENCE ({images.length})
+            RELATED IMAGES · AREA MATCH ({images.length})
           </div>
+          <p>Area matches help inspection; they do not confirm {value}.</p>
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '4px',
           }}>
             {images.map(img => (
-              <div key={img.id} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden' }}>
+              <a href={img.image_url} target="_blank" rel="noopener noreferrer" key={img.id} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden' }}>
                 <img
-                  src={optimizeImageUrl(img.url, 'thumbnail') || img.url}
-                  alt={img.caption || img.zone || field}
+                  src={img.thumbnail_url || optimizeImageUrl(img.image_url, 'thumbnail') || img.image_url}
+                  alt={img.vehicle_zone || field}
+                  width={150} height={150}
                   loading="lazy"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
-                {img.zone && (
+                {img.vehicle_zone && (
                   <span style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0,
                     fontSize: '6px', fontFamily: "'Courier New', monospace",
                     background: 'rgba(0,0,0,0.6)', color: 'var(--bg)',
                     padding: '1px 2px', textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>
-                    {img.zone.replace(/_/g, ' ')}
+                    {img.vehicle_zone.replace(/_/g, ' ')}
                   </span>
                 )}
-              </div>
+              </a>
             ))}
           </div>
         </div>
       )}
 
-      {/* No evidence state */}
-      {!imagesLoading && images.length === 0 && sortedSources.length === 0 && (
-        <div style={{ color: 'var(--text-disabled)', fontSize: '8px', fontStyle: 'italic' }}>
-          No source evidence available for this field.
+      {imagesLoading && <p aria-live="polite">Reading image evidence…</p>}
+      {imageReadFailed && <p role="alert">Image evidence could not be read. Its absence has not been established.</p>}
+      {!imagesLoading && !imageReadFailed && citations.length === 0 && (
+        <div className="field-evidence-gap">
+          <div className="ev-label">IMAGE CITATION MISSING</div>
+          <p>{hasRecordedImageReference ? 'An image reference exists but could not be validated in the visible inventory.' : `No image citation is recorded for ${label.toLowerCase()}.`}</p>
+          {awaiting > 0 && <p><strong>{awaiting}</strong> of {rows.length} visible image records are not marked complete by the image-processing pipeline. They may contain relevant evidence.</p>}
+          {images.length === 0 && awaiting === 0 && <p>No matching image area is indexed in the records read.</p>}
+          {inventory.data && !inventory.data.complete && <p>Showing {rows.length} of {inventory.data.total ?? 'an unknown number of'} visible records. This is a partial inventory.</p>}
         </div>
       )}
-
-      {!imagesLoading && images.length === 0 && sortedSources.length > 0 && (
-        <div style={{ color: 'var(--text-disabled)', fontSize: '8px' }}>
-          No visual evidence tagged for {label.toLowerCase()}.
-        </div>
-      )}
+      {!imagesLoading && !imageReadFailed && sortedSources.length === 0 && citations.length === 0 && !provenance.data?.observations.length && <p>No source claim was returned for this field. The displayed value needs a source.</p>}
     </div>
   );
 };

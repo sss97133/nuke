@@ -11,7 +11,7 @@ interface VehicleHeroImageProps {
 }
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
-  const { leadImageUrl, heroMeta, vehicleId, vehicleImages } = useVehicleProfile();
+  const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
   // Default to contain: show the full vehicle, letterbox if needed.
   // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
@@ -50,21 +50,21 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { vehicle } = useVehicleProfile();
   const v = vehicle as any;
 
-  // 404 resilience: if the lead image fails to load, walk forward through the
-  // vehicle's other photos instead of leaving a black void.
+  // The canonical reader has screened the lead image. Gallery URLs have not
+  // passed that selection and must not re-promote a rejected document on error.
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const [fullLoaded, setFullLoaded] = useState(false);
   const candidates = React.useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
-    for (const u of [leadImageUrl, ...vehicleImages]) {
+    for (const u of [leadImageUrl]) {
       const s = u ? String(u).trim() : '';
       if (!s || s === 'undefined' || s === 'null' || seen.has(s)) continue;
       seen.add(s);
       out.push(s);
     }
     return out;
-  }, [leadImageUrl, vehicleImages]);
+  }, [leadImageUrl]);
   const src = candidates.find((u) => !failedUrls.has(u)) || '';
   const handleHeroError = useCallback(() => {
     if (!src) return;
