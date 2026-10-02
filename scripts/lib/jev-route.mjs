@@ -9,12 +9,14 @@
  *
  * Needs TYPESAFE_API_KEY (run under `dotenvx run --`). Any failure falls back to
  * `fallback` (the caller's static map), so spawning never blocks on the router.
- * Env: JEV_ROUTE_MAX_TIER=haiku|sonnet|opus caps the result (default: opus).
+ * Env: JEV_ROUTE_MAX_TIER=haiku|sonnet|opus|fable caps the result (default: fable, the top tier).
  *      JEV_ROUTE_MIN_CONFIDENCE (default 0.6): below it the tier goes up one.
  */
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
-const TIERS = ['haiku', 'sonnet', 'opus'];
+const TIERS = ['haiku', 'sonnet', 'opus', 'fable'];
+// What `claude --model` gets for each tier (aliases where they exist, full id for fable).
+const MODEL_ARG = { haiku: 'haiku', sonnet: 'sonnet', opus: 'opus', fable: 'claude-fable-5-1' };
 
 const QUESTIONS = {
   tier: {
@@ -32,6 +34,9 @@ const QUESTIONS = {
       opus:
         'Hard judgment: architecture or schema design, ambiguous requirements, subtle debugging across systems, ' +
         'money or legal reasoning, planning a multi-step change to shared production state.',
+      fable:
+        'Frontier-hard work: research-grade problems, long-horizon autonomous builds, tasks where a strong ' +
+        'model is likely to fail without the very best reasoning. Use sparingly; most hard work is opus.',
       codex:
         'A bounded, self-contained coding task (one script, one function, one test suite) that needs no private ' +
         'data, no database access and no secrets.',
@@ -56,10 +61,10 @@ const clampTier = (tier, max) =>
 const up = (tier) => TIERS[Math.min(TIERS.indexOf(tier) + 1, TIERS.length - 1)];
 
 export async function routeTask({ title, description = '', fallback = 'sonnet' } = {}) {
-  const max = TIERS.includes(process.env.JEV_ROUTE_MAX_TIER) ? process.env.JEV_ROUTE_MAX_TIER : 'opus';
+  const max = TIERS.includes(process.env.JEV_ROUTE_MAX_TIER) ? process.env.JEV_ROUTE_MAX_TIER : 'fable';
   const minConf = Number(process.env.JEV_ROUTE_MIN_CONFIDENCE || 0.6);
   const fall = (reason) => ({
-    model: clampTier(fallback, max), runner: 'claude', confidence: null, source: 'fallback', reason,
+    model: clampTier(fallback, max), runner: 'claude', confidence: null, source: 'fallback', modelArg: MODEL_ARG[clampTier(fallback, max)], reason,
   });
 
   const key = process.env.TYPESAFE_API_KEY;
@@ -100,5 +105,5 @@ export async function routeTask({ title, description = '', fallback = 'sonnet' }
   const capped = clampTier(pick, max);
   if (capped !== pick) notes.push(`capped at ${max}`);
 
-  return { model: capped, runner: 'claude', confidence, source: 'jev', reason: notes.join('; ') || 'jev tier' };
+  return { model: capped, modelArg: MODEL_ARG[capped], runner: 'claude', confidence, source: 'jev', reason: notes.join('; ') || 'jev tier' };
 }

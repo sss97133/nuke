@@ -71,7 +71,7 @@ async function routeModel(task) {
   if (flag('--static')) return fallback;
   const r = await routeTask({ title: task.title, description: task.description, fallback });
   // This spawner runs `claude`; a codex pick falls back to the static model here.
-  return r.runner === 'claude' ? r.model : fallback;
+  return r.runner === 'claude' ? r.modelArg : fallback;
 }
 
 // ─── Terminal colors ─────────────────────────────────────────────────────
