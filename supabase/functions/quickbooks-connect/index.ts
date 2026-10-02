@@ -7,6 +7,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticateWriter, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { makeQboClient, runRecategorize } from './recategorize.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -130,6 +131,27 @@ Deno.serve(async (req) => {
       const dates = rows.map((r) => r.date).sort();
       return new Response(JSON.stringify({ success: true, since, transactions: counts, lines: rows.length, upserted,
         first_date: dates[0] ?? null, last_date: dates[dates.length - 1] ?? null }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Action: move posted lines to other accounts, approval-gated (2026-09-29; the gates are in recategorize.ts).
+    // A dry run unless the JSON body says dry_run: false and carries the owner's approval plus the
+    // plan_sha256 of the dry run he approved. Writes to QuickBooks only, never the database: re-run
+    // pull_transactions afterwards to refresh qb_transactions.
+    if (action === 'recategorize') {
+      if (req.method !== 'POST') throw new Error('recategorize takes a POST with a JSON body');
+      const body = await req.json().catch(() => null);
+      const { data: company, error: cErr } = await supabase
+        .from('parent_company').select('*').not('quickbooks_realm_id', 'is', null).limit(1).single();
+      if (cErr || !company) throw new Error('QuickBooks not connected');
+      let accessToken = company.quickbooks_access_token;
+      if (new Date(company.quickbooks_token_expires_at) < new Date()) accessToken = await refreshToken(supabase, company);
+      const result = await runRecategorize(makeQboClient(QB_API_BASE, company.quickbooks_realm_id, accessToken), body);
+      const s = (result.body.summary ?? {}) as Record<string, number>;
+      console.log(`[quickbooks-connect] recategorize batch=${String(body?.batch_id ?? '?')} dry_run=${body?.dry_run !== false} status=${result.status} ready=${s.ready ?? 0} applied=${s.applied ?? 0} failed=${s.failed ?? 0}`);
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
