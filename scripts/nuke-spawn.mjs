@@ -21,6 +21,7 @@ import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
+import { routeTask } from './lib/jev-route.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NUKE_DIR = join(__dirname, '..');
@@ -61,6 +62,16 @@ const MODEL_MAP = {
 
 function getModel(agentType) {
   return MODEL_MAP[agentType] || 'sonnet';
+}
+
+// Jev picks the model per task; the static map above is the fallback.
+// --static skips Jev. JEV_ROUTE_MAX_TIER=sonnet caps the pick.
+async function routeModel(task) {
+  const fallback = getModel(task.agent_type);
+  if (flag('--static')) return fallback;
+  const r = await routeTask({ title: task.title, description: task.description, fallback });
+  // This spawner runs `claude`; a codex pick falls back to the static model here.
+  return r.runner === 'claude' ? r.modelArg : fallback;
 }
 
 // ─── Terminal colors ─────────────────────────────────────────────────────
@@ -122,7 +133,7 @@ function tmuxSessionExists() {
 
 function spawnPane(task) {
   const { id, agent_type, title, description } = task;
-  const model = getModel(agent_type);
+  const model = task.model || getModel(agent_type);
 
   // Write prompt to temp file (avoids shell escaping issues)
   const promptFile = join(tmpdir(), `nuke-agent-${id}.txt`);
@@ -204,7 +215,8 @@ async function main() {
 
   console.log(`${C.bold}${tasks.length} pending tasks:${C.reset}`);
   for (const t of tasks) {
-    const model = getModel(t.agent_type);
+    t.model = await routeModel(t);
+    const model = t.model;
     const hasPersona = existsSync(join(AGENTS_DIR, t.agent_type, 'CLAUDE.md'));
     const hint = hasPersona ? '' : ` ${C.yellow}(no persona)${C.reset}`;
     console.log(`  ${C.cyan}[${t.agent_type}]${C.reset} P${t.priority} ${C.dim}[${model}]${C.reset} ${t.title}${hint}`);
