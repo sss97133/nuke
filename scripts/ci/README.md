@@ -1,7 +1,8 @@
 # Nuke CI — the local gate
 
-There is **no GitHub Actions** in this repo. The real gate has always been: verify locally, then
-push → Vercel builds/deploys. This makes that gate explicit and adds the ledger guardrails as
+Run this gate in the checkout being published; it resolves its root from the script location.
+GitHub workflows also validate changes; Supabase deploys belong to `supabase-deploy.yml`.
+The local gate adds the ledger guardrails as
 regression ratchets, so weaker models (and tired humans) can't quietly re-introduce the failure
 classes the 2026-07-12 audit found.
 
@@ -22,6 +23,7 @@ CI_WRITE_BASELINE=1 scripts/ci/verify.sh  # re-seed baseline.json from current c
 | `no-dead-asset-references` (ghost tables/fns on live paths) | **ratchet** | 18 | 12 webhooks (pending strip) + 6 guarded `vehicle_transactions` |
 | `no-committed-secrets` | **gate** | 0 (hard) | any hit blocks in any mode |
 | `no-raw-fetch` (must use `archiveFetch`) | **ratchet** | 144 | burn down opportunistically |
+| raw-fetch regression fixtures | **gate** | must pass | internal URL continuations, external pages and Firecrawl |
 | `no-raw-testimony-insert` (must use `ingest-observation`) | **ratchet** | 2 | should trend to 0 |
 | `no-schema-baked-labels` (label-as-projection) | advisory | 282 | never blocks; informational |
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Nuke local CI gate — the merge/deploy check. There is NO GitHub Actions in this repo;
-# the real gate is: local typecheck + build + the ratcheted guardrails, then push → Vercel.
+# Nuke local CI gate — typecheck + build + the ratcheted guardrails in this checkout.
+# GitHub workflows validate and deploy after the required local checks pass.
 # This script IS that gate. Run it before you push, or let the pre-push hook run it.
 #
 #   scripts/ci/verify.sh                 # warn mode: reports, never blocks (default)
@@ -11,7 +11,7 @@
 # Ratchet philosophy: pre-existing violations are the baseline floor; the gate fails only when a
 # count EXCEEDS it (i.e. you ADDED a violation). Burn violations down, then lower the floor.
 set -uo pipefail
-ROOT="/Users/skylar/nuke"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GD="$ROOT/scripts/guardrails"
 BASE="$ROOT/scripts/ci/baseline.json"
 ENFORCE="${CI_ENFORCE:-0}"
@@ -66,6 +66,8 @@ if [ "${CI_BUILD:-0}" = 1 ]; then
 fi
 
 echo "• guardrails (ratchet)…"
+if node --test "$GD/no-raw-fetch.test.mjs" >/tmp/ci_rawfetch_tests.out 2>&1; then grn "  ✓ raw-fetch regression tests"
+else red "  ✗ raw-fetch regression tests FAILED"; cat /tmp/ci_rawfetch_tests.out; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"

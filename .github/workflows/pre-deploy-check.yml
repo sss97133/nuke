@@ -24,6 +24,9 @@ jobs:
         working-directory: ./nuke_frontend
         run: npm ci
 
+      - name: Raw-fetch guard regression tests
+        run: node --test scripts/guardrails/no-raw-fetch.test.mjs
+
       - name: Type check
         working-directory: ./nuke_frontend
         run: npm run type-check || npx tsc --noEmit --skipLibCheck
@@ -77,4 +80,3 @@ jobs:
             exit 1
           fi
           echo "✅ TypeScript config valid"
-
