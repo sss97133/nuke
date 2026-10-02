@@ -31,6 +31,11 @@ const RATE_LIMIT_CONFIG = {
  *   Params: bbox, min_confidence, time_start, time_end
  *   Returns: { buckets: [{ month: "2024-01", count: 1234 }, ...] }
  *
+ * mode=recurrence&source=mecum
+ *   Source-linked catalogue presentations grouped by existing vehicle IDs.
+ *   These are identity-review candidates, not verified repeat sales or ownership.
+ *   No location is invented for a catalogue event without a location observation.
+ *
  * mode=points (default when bbox present)
  *   GeoJSON FeatureCollection from VLO joined to vehicles.
  *   zoom <= 8: server-side grid clusters
@@ -86,6 +91,68 @@ Deno.serve(async (req) => {
     }
 
     const mode = params.mode ?? (params.bbox ? "points" : "state");
+
+    // Extend the canonical map owner with a non-geographic evidence network.
+    // A bad historic vehicle link must remain inspectable rather than becoming
+    // a confident ranking. Source pages/VIN review earn same-car attribution.
+    if (mode === "recurrence") {
+      if (params.source && params.source !== "mecum") {
+        return jsonError("Recurrence source must be mecum for this assayed reader", 400);
+      }
+      const requested = Number(params.limit ?? 30);
+      if (!Number.isInteger(requested) || requested < 1 || requested > 50) {
+        return jsonError("Recurrence limit must be an integer from 1 to 50", 400);
+      }
+      const recurrencePool = new Pool(
+        (Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL"))!, 1, true,
+      );
+      const recurrenceConn = await recurrencePool.connect();
+      try {
+        await recurrenceConn.queryObject("BEGIN READ ONLY");
+        await recurrenceConn.queryObject("SET LOCAL statement_timeout = '15s'");
+        const { rows } = await recurrenceConn.queryObject({
+          text: `WITH counts AS (
+            SELECT vehicle_id, count(*)::int AS raw_rows,
+              count(DISTINCT coalesce(nullif(source_listing_id,''),nullif(source_url,'')))::int AS catalogue_keys,
+              count(DISTINCT auction_start_date::date)::int AS dated_days,
+              min(auction_start_date) AS first_date, max(auction_start_date) AS last_date
+            FROM auction_events WHERE source='mecum'
+            GROUP BY vehicle_id
+            HAVING count(DISTINCT coalesce(nullif(source_listing_id,''),nullif(source_url,'')))>1
+          ), selected AS (
+            SELECT c.*, v.year, v.make, v.model, v.vin, v.primary_image_url
+            FROM counts c JOIN vehicles v ON v.id=c.vehicle_id
+            WHERE v.deleted_at IS NULL
+            ORDER BY c.dated_days DESC, c.catalogue_keys DESC, c.vehicle_id LIMIT $1
+          ) SELECT s.*, (
+            SELECT jsonb_agg(to_jsonb(e) ORDER BY e.auction_start_date NULLS LAST,e.id)
+            FROM (
+              SELECT id, source_listing_id, source_url, lot_number, auction_start_date,
+                outcome, high_bid, winning_bid, broadcast_video_id,
+                broadcast_timestamp_start, scraped_at, created_at
+              FROM auction_events WHERE source='mecum' AND vehicle_id=s.vehicle_id
+              ORDER BY auction_start_date NULLS LAST,id LIMIT 20
+            ) e
+          ) AS presentations FROM selected s`,
+          args: [requested],
+        });
+        await recurrenceConn.queryObject("COMMIT");
+        return json({
+          vehicles: rows,
+          meta: {
+            source: "mecum", returned: rows.length,
+            attribution_status: "existing_vehicle_links_require_identity_review",
+            price_semantics: "stored_source_claims_unverified; not profit or ownership transfer",
+            catalogue_key_semantics: "listing ID preferred, source URL fallback; distinct keys are not proven sales",
+            maximum_presentations_per_vehicle: 20,
+            clock_semantics: "source dates retain original precision; capture/ingest clocks are separate",
+          },
+        }, rlHdrs);
+      } finally {
+        recurrenceConn.release();
+        await recurrencePool.end();
+      }
+    }
 
     // ── CHOROPLETH ──────────────────────────────────────────────────────────
     if (mode === "state" || mode === "county") {

@@ -44,6 +44,37 @@ export interface MapQueryParams {
   limit?: number;
 }
 
+export interface AuctionRecurrenceCandidate {
+  vehicle_id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  vin: string | null;
+  raw_rows: number;
+  catalogue_keys: number;
+  dated_days: number;
+  first_date: string | null;
+  last_date: string | null;
+  presentations: Array<{
+    id: string;
+    source_listing_id: string | null;
+    source_url: string | null;
+    lot_number: string | null;
+    auction_start_date: string | null;
+    outcome: string | null;
+    high_bid: number | null;
+    winning_bid: number | null;
+  }>;
+}
+
+/** Existing profile links are review candidates; callers must show source proof. */
+export async function fetchAuctionRecurrence(limit = 30): Promise<{
+  vehicles: AuctionRecurrenceCandidate[];
+  meta: { attribution_status: string; price_semantics: string };
+}> {
+  return mapFetch({ mode: 'recurrence', source: 'mecum', limit });
+}
+
 export async function fetchMapData(params: MapQueryParams): Promise<MapFeatureCollection> {
   return mapFetch<MapFeatureCollection>({
     bbox: params.bbox.join(','),
