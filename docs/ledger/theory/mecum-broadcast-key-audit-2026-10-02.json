@@ -1,0 +1,290 @@
+{
+  "schema_version": "1.0",
+  "audited_at_utc": "2026-10-02 12:15:18 UTC",
+  "project_id": "qkgaybvrernstplzjaam",
+  "status": "read_only_live_audit_and_undeployed_review_patch",
+  "scope": {
+    "video_id": "c9fxArnD3IY",
+    "catalogue_id": "1159827",
+    "vehicle_id": "12cde831-8981-471b-9631-588bc1251259",
+    "auction_event_id": "de832587-d233-4b83-bf76-4cefcb62ff84",
+    "source_claims": 74,
+    "profile_linked_claims": 12,
+    "unbound_claims": 62,
+    "discovery": "26 windows from one broadcast; provisional for channel-wide schema"
+  },
+  "boundaries": {
+    "production_ddl": false,
+    "deployed_code": false,
+    "source_bodies_rewritten": false,
+    "new_dimensions": false,
+    "typed_late_binding_complete": false,
+    "incremental_market_state_fold": false,
+    "durable_channel_mining_loop": false
+  },
+  "live_relationships": [
+    {
+      "edge": "vehicle_observations.source_id -> observation_sources.id",
+      "state": "enforced_fk",
+      "bound_sample": 74,
+      "sample_total": 74
+    },
+    {
+      "edge": "vehicle_observations.vehicle_id -> vehicles.id",
+      "state": "uuid_column_without_fk",
+      "bound_sample": 12,
+      "sample_total": 74,
+      "verified_targets": 12,
+      "repair": "NOT VALID FK staged; no cascading delete; NULL valid"
+    },
+    {
+      "edge": "vehicle_observations.property_id -> observation_properties.id",
+      "state": "enforced_fk_but_sample_unbound",
+      "bound_sample": 0,
+      "sample_total": 74
+    },
+    {
+      "edge": "vehicle_observations.observer_id -> external_identities.id",
+      "state": "enforced_fk_but_sample_unbound",
+      "bound_sample": 0,
+      "sample_total": 74
+    },
+    {
+      "edge": "vehicle_observations.subject_id",
+      "state": "polymorphic_uuid_without_enforced_entity_fk",
+      "bound_sample": 0,
+      "sample_total": 74
+    },
+    {
+      "edge": "vehicle_observations -> publications",
+      "state": "metadata_only_in_live_sample",
+      "publication_for_video_exists": false,
+      "repair": "Nullable citation_publication_id FK staged; canonical carrier creation and binding remain pending"
+    },
+    {
+      "edge": "vehicle_observations -> auction_events",
+      "state": "metadata_only_in_live_sample",
+      "event_id_in_source_or_resolution_context": true,
+      "repair": "Nullable auction_event_id FK and contradiction guard staged; typed binding remains pending"
+    },
+    {
+      "edge": "auction_events.vehicle_id -> vehicles.id",
+      "state": "not_valid_fk",
+      "sample_target_exists": true
+    },
+    {
+      "edge": "vehicle_metric_recompute_queue.vehicle_id -> vehicles.id",
+      "state": "enforced_fk"
+    },
+    {
+      "edge": "vehicle_live_metrics.vehicle_id -> vehicles.id",
+      "state": "primary_key_without_fk"
+    }
+  ],
+  "observed_profile_sample": {
+    "observations": 12,
+    "vehicle_ids": 12,
+    "verified_targets": 12,
+    "sampled_orphans": 0,
+    "properties": 0,
+    "observers": 0,
+    "subjects": 0,
+    "source_properties": [
+      "current_bid_displayed",
+      "room_visible",
+      "vehicle_association",
+      "vehicle_visible"
+    ]
+  },
+  "historical_orphan_assay": {
+    "query": "WITH sample AS MATERIALIZED (SELECT id,vehicle_id FROM public.vehicle_observations ORDER BY id LIMIT 200) SELECT count(*) AS sampled_rows,count(s.vehicle_id) AS nonnull_vehicle_refs,count(v.id) AS existing_targets,count(*) FILTER(WHERE s.vehicle_id IS NOT NULL AND v.id IS NULL) AS sampled_orphans FROM sample s LEFT JOIN public.vehicles v ON v.id=s.vehicle_id;",
+    "sampled_rows": 200,
+    "nonnull_vehicle_refs": 200,
+    "existing_targets": 196,
+    "sampled_orphans": 4,
+    "method": "Deterministic convenience sample by primary-key order; not random or a population estimate; no whole-log scan.",
+    "orphans": [
+      {
+        "id": "00002710-bb6c-4c75-b17a-6815ba78b363",
+        "vehicle_id": "1516ee5e-53c5-4414-8fd5-c3158021c94d",
+        "ingested_at": "2026-02-17 06:06:57.215797+00",
+        "source_id": "080fea2f-ecd1-48f5-899d-60344836d3d7"
+      },
+      {
+        "id": "000041eb-0cdd-4fbe-8faa-e2c5627e930d",
+        "vehicle_id": "70d79a2e-1f4e-46f3-8056-78c67a36e02e",
+        "ingested_at": "2026-02-16 06:14:18.916146+00",
+        "source_id": "e6bac980-a2fc-4a35-8171-ebf1ce35f854"
+      },
+      {
+        "id": "0000b94c-557f-49ed-b553-e19bc6886510",
+        "vehicle_id": "70d79a2e-1f4e-46f3-8056-78c67a36e02e",
+        "ingested_at": "2026-02-16 06:08:37.300179+00",
+        "source_id": "e6bac980-a2fc-4a35-8171-ebf1ce35f854"
+      },
+      {
+        "id": "0000e4e7-f17c-456d-bd61-8301afa1adf6",
+        "vehicle_id": "b9a1f65b-23b4-42d0-8c4e-a208953db813",
+        "ingested_at": "2026-02-17 06:13:32.132864+00",
+        "source_id": "e6bac980-a2fc-4a35-8171-ebf1ce35f854"
+      }
+    ],
+    "action": "Preserve immutable rows; no NULLing, deletion, guessed vehicle or source-body backfill. Validate the new FK only after a separately bounded historical resolution audit."
+  },
+  "property_registry": {
+    "table": "observation_properties",
+    "unique_key": "property_key",
+    "live_rows": 38,
+    "fk_exists": true,
+    "intake_exposes_property_key": false,
+    "intake_exposes_property_id": false,
+    "source_representation": "structured_data.property/value are raw source-grain labels and values, not canonical property edges.",
+    "reuse_candidates": [
+      {
+        "source": "model_year",
+        "property_key": "year",
+        "kinds": [
+          "specification",
+          "listing"
+        ],
+        "caution": "Model year only; not manufacture year. YouTube media is outside current applies_to_kinds."
+      },
+      {
+        "source": "model",
+        "property_key": "model",
+        "kinds": [
+          "specification",
+          "listing"
+        ],
+        "caution": "Class reference in speech is not automatically this chassis model."
+      },
+      {
+        "source": "odometer_reading with miles",
+        "property_key": "mileage_miles",
+        "kinds": [
+          "condition",
+          "listing",
+          "work_record"
+        ],
+        "caution": "Each reading remains a separate time/source claim; TMU and actual mileage are different qualifiers."
+      },
+      {
+        "source": "engine_displacement 427 ci",
+        "property_key": "engine_displacement_l",
+        "kinds": [
+          "specification"
+        ],
+        "caution": "Registry unit is liters; preserve raw 427 ci and perform a cited conversion at projection time, never store 427 as liters."
+      },
+      {
+        "source": "exterior_color",
+        "property_key": "exterior_color",
+        "kinds": [
+          "specification",
+          "condition"
+        ],
+        "caution": "Listing/media compatibility not currently declared."
+      },
+      {
+        "source": "interior_color",
+        "property_key": "interior_color",
+        "kinds": [
+          "specification"
+        ],
+        "caution": "Listing/media compatibility not currently declared."
+      }
+    ],
+    "non_equivalences": [
+      "current_bid_displayed is not asking_price_usd or sale_price_usd",
+      "high_bid_announced is not accepted_bid, hammer_price or sale_price_usd",
+      "vehicle_visible and room_visible are evidence relations, not canonical chassis specifications"
+    ],
+    "proposal_path": {
+      "capture": "Existing api-v1-events.captureUnknownProperties parks unknown keys in pending_claims and cites open add_property schema_proposals.",
+      "approval": "Existing fn_schema_proposal_review_handler invokes fn_schema_proposal_apply; verified auto-apply implements add_property and add_observation_kind.",
+      "gap": "modify_property requires manual curator application; promotion/replay from pending_claims was not found among live functions. Do not infer that parked claims have migrated.",
+      "decision": "Reuse and review compatible existing properties; propose genuinely new measured grains only with motivating observation IDs. No properties or proposals were inserted during this audit."
+    },
+    "next_intake_contract": "Opt-in property_key resolution by existing unique registry key; reject unknown/deprecated or kind-incompatible mappings. Keep raw claim content/hash immutable and record mapping provenance outside the source identity. Pending keys follow the existing proposal organ; automatic publication or property growth is not part of this patch."
+  },
+  "observer_registry": {
+    "table": "external_identities",
+    "unique_key": [
+      "platform",
+      "handle"
+    ],
+    "fk_exists": true,
+    "intake_exposes_observer_id": false,
+    "source_raw": "publisher=Mecum Auctions / observer=Codex visual source review, or NULL",
+    "gap": "Extraction/review agent and carrier publisher do not identify the auctioneer, ringman, phone operator or bidder.",
+    "next_intake_contract": "Optional exact external-identity reference only when a source proves the speaker/participant platform+handle. Resolve on the existing unique index; no name/fuzzy first hit. Otherwise observer_id stays NULL. Source_id supplies registered source attribution; extraction_metadata supplies model/reviewer provenance."
+  },
+  "projections_and_folds": {
+    "vehicle_canonical": {
+      "type": "ranked view",
+      "key": [
+        "vehicle_id",
+        "property_id",
+        "discriminator_value"
+      ],
+      "sample_claims_in_property_projection": 0,
+      "reason": "All 74 property_id values are NULL; this is neither an incremental fold nor an event-scoped price state."
+    },
+    "observation_count": {
+      "writer": "Existing insert/delete/relink trigger queues vehicle_metric_recompute_queue",
+      "schedule": "Existing scheduled recompute verified by parent",
+      "sample": "12 linked rows participate; unbound rows do not",
+      "gap": "vehicle_live_metrics has no vehicle FK; pipeline_registry has no observation_count/last_observation_at owner. Those fields are outside this bounded migration."
+    },
+    "market_state": {
+      "event_outcome": "live",
+      "event_prices_lot_source_listing_and_start_end": "NULL in matched live event",
+      "consumed_sample_evidence": false
+    },
+    "room_activity": {
+      "measured_points_only": true,
+      "incremental_fold_exists": false
+    },
+    "required_next_unit": {
+      "grain": "one auction presentation plus one source edition and media window",
+      "inputs": "Typed source claims with independent utterance, display, visible, active-lot and room relations; coverage, source availability, event-clock precision and ingestion clocks.",
+      "output": "Incremental per-event role-specific measurements and unresolved/conflict coverage, each attached to its existing trunk. Only observed accepted bids count as bids.",
+      "ownership": "Name the existing writer/queue, register output columns, provide the actual profile/event reader and replay assay before fleet activation.",
+      "as_of": "Exclude evidence unavailable at the evaluation cutoff; distinguish event-date precision and system knowledge time. Cohort baselines/residuals follow measured folds and exact cohort keys, not source-row counts."
+    }
+  },
+  "review_patch": {
+    "migration": "supabase/migrations/20261002050326_mecum_broadcast_evidence_links.sql",
+    "fk": "vehicle_observations_vehicle_id_fkey",
+    "validation": "NOT VALID",
+    "delete_action": "NO ACTION",
+    "null_semantics": "unbound testimony or non-chassis subject",
+    "indexes": "Reuse existing partial vehicle_id indexes; no new vehicle index.",
+    "local_pg17": {
+      "state": "passed_by_parent",
+      "fixture": "synthetic throwaway mecum_broadcast_contract_test",
+      "checks": [
+        "Historical orphan survives NOT VALID unchanged",
+        "convalidated=false",
+        "NULL accepted",
+        "New invalid non-null insert and update rejected",
+        "Referenced vehicle deletion rejected",
+        "Typed-link and clock contradictions rejected",
+        "NULL-safe relink preserves complete source row",
+        "Same-target replay writes no second audit",
+        "Later move returns preserved lineage",
+        "Ambiguous VIN stays unresolved",
+        "Existing actor/editor authorization preserved"
+      ]
+    },
+    "pending": [
+      "Owner schema review",
+      "CI migration-first deployment",
+      "Production lock/index/scale assay",
+      "Canonical publication creation",
+      "Typed relationship late binding and readback",
+      "Property and observer intake paths",
+      "Scoped fold ownership/key repairs"
+    ]
+  }
+}

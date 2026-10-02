@@ -63,15 +63,17 @@ Deno.serve(async (req) => {
     // GET /api/v1/observations?vehicle_id=xxx - List observations
     if (req.method === "GET") {
       const vehicleId = url.searchParams.get("vehicle_id");
+      const publicationId = url.searchParams.get("publication_id");
+      const auctionEventId = url.searchParams.get("auction_event_id");
       const vin = url.searchParams.get("vin");
       const kind = url.searchParams.get("kind");
       const page = parseInt(url.searchParams.get("page") || "1", 10);
       const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 100);
       const offset = (page - 1) * limit;
 
-      if (!vehicleId && !vin) {
+      if (!vehicleId && !vin && !publicationId && !auctionEventId) {
         return new Response(
-          JSON.stringify({ error: "vehicle_id or vin parameter required" }),
+          JSON.stringify({ error: "vehicle_id, vin, publication_id or auction_event_id parameter required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -98,8 +100,11 @@ Deno.serve(async (req) => {
         .from("vehicle_observations")
         .select(`
           id, vehicle_id, source_id, kind,
-          observed_at, structured_data, confidence_score,
-          created_at
+          observed_at, ingested_at, structured_data, confidence_score,
+          source_url, source_identifier, raw_source_ref, extraction_method,
+          citation_publication_id, auction_event_id, media_start_ms, media_end_ms,
+          media_relation, media_span_semantics, observed_at_basis,
+          source_event_at, source_event_date, source_event_time_precision, source_available_at
         `, { count: "estimated" });
 
       if (resolvedVehicleId) {
@@ -108,6 +113,8 @@ Deno.serve(async (req) => {
       if (kind) {
         query = query.eq("kind", kind);
       }
+      if (publicationId) query = query.eq("citation_publication_id", publicationId);
+      if (auctionEventId) query = query.eq("auction_event_id", auctionEventId);
 
       const { data, error, count } = await query
         .order("observed_at", { ascending: false })

@@ -312,3 +312,86 @@ estimate, not data.
   - interior ×0.95;
   - title flag n = 1.
 - **The reference was Iverson's 1979 Turing lecture, "Notation as a Tool of Thought"** (session of 2026-09-30, 19:40Z): schema = theory, data = models, query = theorem, backtest = experiment. The cost of this case is what happens when the notation is missing.
+# C15 field session: Mecum broadcast evidence (2026-10-02, staged; not deployed)
+
+The first source is `c9fxArnD3IY`, the Jan. 17, 2026 Kissimmee broadcast published Jan. 24.
+Twenty-six sampled content windows cover 2,271 seconds of its 22,028 seconds. Discovery is provisional:
+one broadcast is not a field catalog for the whole channel. The first audio-centered case is lot S114,
+the 1967 Corvette, primary Mecum lot 1159827, chassis 194677S101228.
+
+**What earned the contract.** The stored span 2546–2616 had been attributed to a 1970 C10 at Glendale
+2025. The actual lower third at 2546 shows S114 Corvette and $80,000 while a physical board shows
+$110,000. Caption commentary near 2600 announces a $140,000 high bid; the primary catalog reports
+no sale. Those are separate source claims, not an accepted-bid log, a hammer sale or a total price.
+Sampled frame points cannot establish first/last visible frames. A caption interval cannot establish
+an active-lot interval. Source availability Jan. 24, source event date Jan. 17, relative media time
+and Nuke's Oct. 2 capture time must remain separate.
+
+**The attached grain.** Existing `vehicle_observations` remains the source log; existing `publications`
+is the media carrier entity; existing `auction_events` is the presentation. One source claim points
+to those entities by nullable, independently verified keys. Its physical chassis key remains nullable
+until exact source listing/VIN resolution. Media relations distinguish `vehicle_discussed`,
+`vehicle_visible`, `lot_active`, `screen_display`, `room_visible`, `participant_action` and `crowd_audio`.
+Point samples, caption cues, measured intervals and candidates carry different interval semantics.
+Room/crowd claims are not forced onto a chassis or a named person. Vehicle profile provenance is a
+reader over the same cited observations, not a second provenance store.
+
+**Staged code.** The existing `broadcast-backfill-worker` now offers offline validation of the first
+25 caption-grain drafts and retires its unsafe automatic overwrite path. It does not claim to process
+the whole channel or run a durable fleet. `ingest-observation` gains explicit no-match/exact-only modes,
+canonical source-event identity independent of assignment, clock and URL rereads, typed media citation,
+and duplicate-race handling. Strict VIN lookup extends the existing indexed `find_vehicle_by_vin`
+reader: at most two live candidates, no auto-link on ambiguity; short chassis numbers need make/year.
+The existing `relink_testimony` draft supports unbound observations while preserving every source
+column in place and appending `reattribution_audit`. No clone, dropped provenance or source-hash change.
+
+**Review draft:** `20261002050326_mecum_broadcast_evidence_links.sql`; eleven added observation columns
+are described, owned by `ingest-observation` and exposed by the existing `api-v1-observations` reader.
+Two partial FK/media indexes are concurrent; no legacy rewrite or reattribution is in the migration.
+The previously missing `vehicle_observations.vehicle_id` FK is added `NOT VALID`, reusing existing
+vehicle indexes. NULL remains valid unbound testimony; new non-NULL links require an existing vehicle;
+`NO ACTION` prevents cascade deletion of permanent testimony. This does not validate historical rows.
+The database rejects known contradictory publication, sale, listing and chassis links. The first
+landed claims are still provisional capture-clock testimony until the source event clock is mapped.
+
+**Validation:** fourteen source-grain attack tests and Deno checks pass; the actual 25-caption receipt
+has 25 unique keys, zero exact source event clocks, zero accepted-bid grains. The guarded local PG17
+SQL harness **passed in a synthetic throwaway database**, run by the coordinating agent. It preserves
+a pre-migration orphan, permits unbound testimony, rejects new invalid vehicle references and tests
+link/clock contradictions, complete relink provenance, retries, lineage, VIN ambiguity and authorization.
+Owner schema review, migration-first CI deployment, production lock/index/scale assays, canonical
+publication creation, typed late binding and runtime readback remain open. No production DDL was applied.
+
+**Keys audit, measured live.** The [machine-readable audit](mecum-broadcast-key-audit-2026-10-02.json)
+distinguishes a source label or JSON UUID from an enforced edge. All 74 first-case claims have enforced
+source references; 12 have verified vehicle IDs, but production had no observation vehicle FK. The
+first 200 observations by primary-key order contain four missing vehicle targets. This convenience
+sample is not a whole-log estimate; historical testimony stays unchanged pending a bounded resolution audit.
+`auction_events.vehicle_id` has a `NOT VALID` FK. Carrier video and auction-event attribution remain
+metadata in the live observations; the canonical video publication does not yet exist.
+
+`property_id` and `observer_id` already have valid FKs, but are NULL for all 74 claims. The canonical
+property registry contains 38 rows, keyed uniquely by `property_key`; the intake does not expose that
+path. Existing `year`, `model`, `mileage_miles`, color and engine properties offer reuse, but their
+declared observation kinds exclude YouTube `media`. A displayed price is neither an asking price nor
+a sale price; 427 ci is not 427 liters. Resolve compatible keys through the existing registry, preserve
+raw source values and propose only earned vocabulary gaps through `schema_proposals` / `pending_claims`.
+The verified approval helper applies new properties; modification and parked-claim replay require
+explicit completion rather than an assumed automatic backfill.
+
+Observers resolve through the existing unique `(platform, handle)` identity commons when source
+evidence identifies a speaker/participant. "Codex visual source review" is extraction provenance;
+"Mecum Auctions" as publisher does not identify the auctioneer or bidder. Unknown observers remain NULL.
+Polymorphic `subject_id` is not an enforced entity FK. No new identity or vocabulary table was created.
+
+`vehicle_canonical` is a ranked property view and excludes these 74 NULL-property claims. The existing
+scheduled observation-count recompute reads the linked profile evidence, but its `vehicle_live_metrics`
+output has no vehicle FK or registered owner for count/last-observation columns. That repair is outside
+this bounded migration. The matched market event remains `live` with prices/lot/source-listing/time fields
+NULL: no market-state fold has consumed this evidence. Rows landed and profile readback are necessary
+steps, not proof of typed edges, incremental folds, cohort baselines or provenance residuals.
+
+**Next fold.** Audio utterances → typed price roles and per-subject discussion; frame PTS → visible
+presence intervals; room observations → camera-covered activity. Only measured accepted bids feed bid
+counts/pace, and coverage accompanies each result. Before fleet activation each incremental output
+needs its own owner, scheduled writer, trunk key, reader and assay. A read endpoint is not that fold.
