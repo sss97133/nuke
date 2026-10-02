@@ -726,6 +726,48 @@ export default function AIDataIngestionSearch() {
     }
   };
 
+  // Opening a recorded vehicle is a read, just like clicking a search result.
+  // Resolve it before the sign-in gate for creating/enriching a vehicle.
+  const openExistingVehicle = async (text: string): Promise<boolean> => {
+    const url = normalizeUrlInput(text);
+    if (!isVIN(text) && (!url || (!isLikelyVehicleListingUrl(url) && !isMecumLotUrl(url)))) return false;
+
+    let lookup = supabase.from('vehicles').select('id,deleted_at,merged_into_vehicle_id');
+    if (!url) {
+      // Keep the public preview's VIN query shape. Adding the liveness filters
+      // here caused a 15 s timeout on prod; inspect those flags on the result.
+      lookup = lookup.ilike('vin', text.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+    } else {
+      const parsed = new URL(url);
+      parsed.hash = '';
+      // BaT tracking parameters don't identify a different listing.
+      if (/^(www\.)?bringatrailer\.com$/i.test(parsed.hostname) && parsed.pathname.startsWith('/listing/')) {
+        parsed.protocol = 'https:';
+        parsed.hostname = 'bringatrailer.com';
+        parsed.search = '';
+      }
+      const canonical = parsed.href;
+      parsed.pathname = parsed.pathname.endsWith('/')
+        ? parsed.pathname.slice(0, -1) : `${parsed.pathname}/`;
+      lookup = lookup.is('deleted_at', null).is('merged_into_vehicle_id', null)
+        .in('listing_url', [...new Set([url, canonical, parsed.href])]);
+    }
+    const { data, error: lookupError } = await lookup.limit(1);
+    if (lookupError) throw new Error('Could not check for an existing vehicle. Please try again.');
+    if (!data?.[0]?.id) return false;
+    if (data[0].deleted_at || data[0].merged_into_vehicle_id) {
+      throw new Error('This vehicle record has been retired. Search for its current profile.');
+    }
+
+    setInput('');
+    setShowAutocomplete(false);
+    setShowPreview(false);
+    setExtractionPreview(null);
+    setActionsOpen(false);
+    navigate(`/vehicle/${data[0].id}`);
+    return true;
+  };
+
   const processInput = async () => {
     const rawText = input.trim();
     const normalizedUrl = normalizeUrlInput(rawText);
@@ -773,6 +815,15 @@ export default function AIDataIngestionSearch() {
     setShowWiringWorkbench(false);
 
     try {
+      if (!attachedImage) {
+        try {
+          if (await openExistingVehicle(effectiveText)) return;
+        } catch (lookupError: any) {
+          setError(lookupError.message || 'Could not check for an existing vehicle. Please try again.');
+          return;
+        }
+      }
+
       const userId = await getCurrentUserId();
       if (!userId) {
         setError('Please log in to use this feature');
@@ -1169,7 +1220,7 @@ export default function AIDataIngestionSearch() {
           const trimmedInput = input.trim();
           if (trimmedInput && !showPreview) {
             const maybeUrl = normalizeUrlInput(trimmedInput);
-            if (!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
+            if (!isVIN(trimmedInput) && !maybeUrl) {
               // Simple text search - navigate to search page
               navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
               setInput('');
@@ -1198,7 +1249,7 @@ export default function AIDataIngestionSearch() {
         const trimmedInput = input.trim();
         const maybeUrl = normalizeUrlInput(trimmedInput);
         // If it's a simple text query (not VIN, not URL), navigate directly to search
-        if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
+        if (trimmedInput && !isVIN(trimmedInput) && !maybeUrl) {
           // Simple text search - navigate immediately
           navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
           setInput('');
@@ -1426,39 +1477,8 @@ export default function AIDataIngestionSearch() {
             setShowAutocomplete(false);
             setSelectedAutocompleteIndex(-1);
 
-            // If it's an org website URL, auto-create immediately (no extra click/enter).
-            if (!attachedImage && !showPreview && isLikelyOrgWebsiteUrl(normalized)) {
-              void createOrgFromUrlAndNavigate(normalized);
-            }
-            // If it's a vehicle listing URL, auto-ingest immediately (no extra Enter).
-            // Call ingestVehicle directly since processInput() captures stale state.
-            else if (!attachedImage && !showPreview && !isLikelyOrgWebsiteUrl(normalized) && !isProbablyAssetOrDocumentUrl(normalized)) {
-              void (async () => {
-                setIsProcessing(true);
-                setError(null);
-                try {
-                  const result = await ingestVehicle({ url: normalized, enrich: true });
-                  if (result.status === 'error' || !result.vehicle_id) {
-                    // Fall through — user can press Enter to retry via legacy flow
-                    setIsProcessing(false);
-                    return;
-                  }
-                  setInput('');
-                  setShowPreview(false);
-                  setExtractionPreview(null);
-                  setActionsOpen(false);
-                  setIsProcessing(false);
-
-                  const verb = result.status === 'created' ? 'Vehicle created'
-                    : result.status === 'duplicate' ? 'Vehicle already tracked'
-                    : 'Vehicle matched';
-                  showToast(verb, result.status === 'created' ? 'success' : 'info');
-                  navigate(`/vehicle/${result.vehicle_id}`);
-                } catch {
-                  setIsProcessing(false);
-                }
-              })();
-            }
+            // Pasting prepares the input. Enter submits it through the same
+            // read-first path as typing, without starting ingestion on paste.
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
