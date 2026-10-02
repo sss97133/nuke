@@ -4,6 +4,8 @@
   "description": "We turn scattered car history into structured, tradable intelligence.",
   "private": true,
   "scripts": {
+    "mecum:transcript-discovery": "node scripts/mecum-video-analyzer.ts",
+    "mecum:transcript-discovery:test": "node --test scripts/lib/broadcast-caption-discovery.test.mjs",
     "access:firecrawl-logs": "tsx scripts/access-firecrawl-logs-api.ts",
     "dossier:build": "dotenvx run -- node scripts/daily-receipt/build-dossier.mjs",
     "ingest:session-logs:dry-run": "tsx scripts/ingest_session_logs_to_observations.ts",

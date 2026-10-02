@@ -1,275 +1,121 @@
-#!/usr/bin/env npx tsx
-/**
- * Mecum Video Analyzer
- *
- * Downloads audio from Mecum YouTube broadcasts and extracts:
- * - Bid amounts and timing
- * - Lot numbers and transitions
- * - Sold vs No Sale outcomes
- * - Auctioneer patterns and phrases
+#!/usr/bin/env node
+/** Existing Mecum analyzer owner, now an offline discovery lane.
+ * Downloads/ASR are separate evidence acquisition. This CLI never writes a database,
+ * invents auction durations, or treats transcript numbers as accepted bids.
  */
+import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { performance } from 'node:perf_hooks';
+import { createHash } from 'node:crypto';
+import { discoverCaptionCues, discoverAudioAssay } from './lib/broadcast-caption-discovery.mjs';
 
-import { execSync, spawn } from 'child_process';
-import { createClient } from '@supabase/supabase-js';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// Kissimmee 2026 broadcasts
-const BROADCASTS = [
-  { date: '2026-01-09', url: 'https://www.youtube.com/watch?v=HZRKpQvYqQc', title: 'Friday Jan 9' },
-  { date: '2026-01-10', url: 'https://www.youtube.com/watch?v=QQHb2JN1OFM', title: 'Saturday Jan 10' },
-  { date: '2026-01-14', url: 'https://www.youtube.com/watch?v=owTlZmi5LB8', title: 'Wednesday Jan 14' },
-  { date: '2026-01-15', url: 'https://www.youtube.com/watch?v=rpJ0POdkMh0', title: 'Thursday Jan 15' },
-  { date: '2026-01-16', url: 'https://www.youtube.com/watch?v=bBrM75To55A', title: 'Friday Jan 16' },
-  { date: '2026-01-17', url: 'https://www.youtube.com/watch?v=c9fxArnD3IY', title: 'Saturday Jan 17' },
-];
-
-// Block cams (raw auction floor, longer)
-const BLOCK_CAMS = [
-  { date: '2026-01-17', url: 'https://www.youtube.com/watch?v=7m_nCLrKMuU', title: 'Block Cam Sat Jan 17', duration: '11:54:57' },
-  { date: '2026-01-18', url: 'https://www.youtube.com/watch?v=mpNMsWUql2w', title: 'Block Cam Sun Jan 18', duration: '8:43:25' },
-];
-
-const DATA_DIR = '/tmp/mecum-training';
-
-interface AuctionEvent {
-  timestamp: number; // seconds into video
-  type: 'lot_start' | 'bid' | 'sold' | 'no_sale' | 'excitement';
-  lotNumber?: string;
-  amount?: number;
-  phrase?: string;
+const usage = 'node scripts/mecum-video-analyzer.ts --transcript INTERNAL.json --output-dir DIR [--event-date YYYY-MM-DD] [--auction NAME] [--duration-seconds N] [--publication-at ISO] [--sample SAMPLE.json] [--evidence-module PATH] [--audio-assay PATH --audio-source-receipt PATH] [--miss-audit PATH] [--baseline-report PATH]';
+const args = process.argv.slice(2);
+const accepted = new Set(['--transcript','--output-dir','--event-date','--auction','--duration-seconds','--publication-at','--sample','--evidence-module','--audio-assay','--audio-source-receipt','--miss-audit','--baseline-report']);
+const options = {};
+for (let i=0; i<args.length; i++) {
+  if (args[i] === '--help') { console.log(usage); process.exit(0); }
+  if (!accepted.has(args[i]) || !args[i+1] || args[i+1].startsWith('--')) throw new Error(usage);
+  options[args[i].slice(2)] = args[++i];
 }
-
-async function downloadAudio(url: string, outputName: string): Promise<string> {
-  const outputPath = path.join(DATA_DIR, `${outputName}.mp3`);
-
-  if (fs.existsSync(outputPath)) {
-    console.log(`  Audio already exists: ${outputPath}`);
-    return outputPath;
+if (!options.transcript || !options['output-dir']) throw new Error(usage);
+const started = performance.now();
+const transcriptPath = resolve(options.transcript);
+const sourceBytes = await readFile(transcriptPath);
+const source = JSON.parse(sourceBytes.toString('utf8'));
+const result = discoverCaptionCues(source, {
+  raw_source_ref: transcriptPath, event_date: options['event-date'], auction_house: 'Mecum', auction: options.auction,
+  duration_seconds: options['duration-seconds'] ? Number(options['duration-seconds']) : undefined,
+  available_at: options['publication-at'],
+});
+const report = result.summary;
+let audio=null;
+if (options['audio-assay']) {
+  if (!options['audio-source-receipt']) throw new Error('Original-audio ASR requires its acquisition receipt');
+  const assay=JSON.parse(await readFile(resolve(options['audio-assay']),'utf8'));
+  const acquisition_receipt=JSON.parse(await readFile(resolve(options['audio-source-receipt']),'utf8'));
+  if (createHash('sha256').update(await readFile(assay.source_file)).digest('hex')!==assay.source_sha256) {
+    throw new Error('Actual original-audio bytes no longer match the ASR source hash');
   }
-
-  console.log(`  Downloading audio from ${url}...`);
-
-  try {
-    execSync(
-      `yt-dlp -x --audio-format mp3 --audio-quality 5 -o "${outputPath}" "${url}"`,
-      { stdio: 'inherit', timeout: 600000 }
-    );
-    return outputPath;
-  } catch (e) {
-    console.error(`  Failed to download: ${e}`);
-    throw e;
-  }
+  audio=discoverAudioAssay(assay,source,{ raw_source_ref: resolve(options['audio-assay']),acquisition_receipt });
 }
-
-async function transcribeWithWhisper(audioPath: string): Promise<{ text: string; segments: any[] }> {
-  const outputPath = audioPath.replace('.mp3', '.json');
-
-  if (fs.existsSync(outputPath)) {
-    console.log(`  Transcription exists: ${outputPath}`);
-    return JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
-  }
-
-  console.log(`  Transcribing with Whisper...`);
-  console.log(`  (This will take a while for multi-hour videos)`);
-
-  // Use OpenAI Whisper API or local whisper
-  // For now, we'll use the local whisper if available
-  try {
-    execSync(
-      `whisper "${audioPath}" --model base --output_format json --output_dir "${DATA_DIR}"`,
-      { stdio: 'inherit', timeout: 3600000 } // 1 hour timeout
-    );
-
-    const jsonPath = audioPath.replace('.mp3', '.json');
-    return JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-  } catch (e) {
-    console.log(`  Whisper not available locally, using pattern matching instead`);
-    return { text: '', segments: [] };
-  }
+if (audio) {
+  report.original_audio = audio.summary;
+  report.coverage.audio_seconds_listened_or_asr_assayed = audio.summary.source_duration_seconds;
 }
-
-function extractAuctionEvents(transcription: { text: string; segments: any[] }): AuctionEvent[] {
-  const events: AuctionEvent[] = [];
-
-  // Patterns to detect
-  const patterns = {
-    lotStart: /lot\s*(?:number\s*)?([A-Z]?\d+)/gi,
-    bid: /(\d{1,3}(?:,\d{3})*)\s*(?:thousand|hundred|dollars?)?/gi,
-    sold: /sold|hammer\s*down|congratulations/gi,
-    noSale: /no\s*sale|reserve\s*not\s*met|pass(?:ed)?/gi,
-    excitement: /bidder\s*war|phone\s*bidders?|last\s*chance|going\s*once/gi,
-  };
-
-  for (const segment of transcription.segments || []) {
-    const text = segment.text?.toLowerCase() || '';
-    const timestamp = segment.start || 0;
-
-    // Check for lot start
-    const lotMatch = text.match(patterns.lotStart);
-    if (lotMatch) {
-      events.push({
-        timestamp,
-        type: 'lot_start',
-        lotNumber: lotMatch[1],
-      });
-    }
-
-    // Check for sold
-    if (patterns.sold.test(text)) {
-      // Try to extract final price from nearby text
-      const priceMatch = text.match(/(\d{1,3}(?:,\d{3})*)/);
-      events.push({
-        timestamp,
-        type: 'sold',
-        amount: priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : undefined,
-      });
-    }
-
-    // Check for no sale
-    if (patterns.noSale.test(text)) {
-      events.push({
-        timestamp,
-        type: 'no_sale',
-      });
-    }
-
-    // Check for excitement indicators
-    if (patterns.excitement.test(text)) {
-      events.push({
-        timestamp,
-        type: 'excitement',
-        phrase: text.trim(),
-      });
-    }
+report.generated_at = new Date().toISOString();
+report.lane = 'audio_speech_feature_discovery';
+report.owner = 'scripts/mecum-video-analyzer.ts';
+report.raw_transcript_exported = false;
+report.source_transcript_sha256 = createHash('sha256').update(sourceBytes).digest('hex');
+report.measured_scan_ms = Number((performance.now() - started).toFixed(3));
+if (options['miss-audit']) {
+  const audit = JSON.parse(await readFile(resolve(options['miss-audit']), 'utf8'));
+  if (audit.video_id !== source.video_id || audit.source_transcript_sha256 !== createHash('sha256').update(sourceBytes).digest('hex')) {
+    throw new Error('Miss audit must describe the exact cached transcript being scanned');
   }
-
-  return events;
+  report.miss_audit = { artifact: resolve(options['miss-audit']), status: audit.status,
+    applies_to_discovery_version: audit.discovery_version, selection: audit.selection,
+    denominators: audit.denominators, observed_counts: audit.observed_counts, discovered_missing_avenues: audit.discovered_missing_avenues,
+    example_misses: audit.rows.filter(r => r.assessment === 'missed_avenue').map(r => ({ caption_index: r.caption_index,
+      start_seconds: r.start_seconds, source_url: r.source_url, paraphrase: r.paraphrase })),
+    repair_proposals: audit.repair_proposals, limitation: audit.limitation };
 }
-
-function analyzePatterns(events: AuctionEvent[]) {
-  const lotDurations: number[] = [];
-  const bidIntervals: number[] = [];
-  let lastLotStart = 0;
-  let lastBid = 0;
-
-  for (const event of events) {
-    if (event.type === 'lot_start') {
-      if (lastLotStart > 0) {
-        lotDurations.push(event.timestamp - lastLotStart);
-      }
-      lastLotStart = event.timestamp;
-      lastBid = event.timestamp;
-    }
-
-    if (event.type === 'bid' || event.type === 'sold') {
-      if (lastBid > 0 && event.timestamp - lastBid < 60) {
-        bidIntervals.push(event.timestamp - lastBid);
-      }
-      lastBid = event.timestamp;
-    }
+if (options['baseline-report']) {
+  const baseline=JSON.parse(await readFile(resolve(options['baseline-report']),'utf8'));
+  if (baseline.video_id!==source.video_id || baseline.source_transcript_sha256!==report.source_transcript_sha256) {
+    throw new Error('Baseline report must describe the exact cached transcript being scanned');
   }
-
-  const avgLotDuration = lotDurations.length > 0
-    ? lotDurations.reduce((a, b) => a + b, 0) / lotDurations.length
-    : 180;
-
-  const avgBidInterval = bidIntervals.length > 0
-    ? bidIntervals.reduce((a, b) => a + b, 0) / bidIntervals.length
-    : 4;
-
-  return {
-    avgLotDurationSeconds: Math.round(avgLotDuration),
-    avgBidIntervalSeconds: Math.round(avgBidInterval * 10) / 10,
-    totalLots: lotDurations.length + 1,
-    soldCount: events.filter(e => e.type === 'sold').length,
-    noSaleCount: events.filter(e => e.type === 'no_sale').length,
-    excitementMoments: events.filter(e => e.type === 'excitement').length,
-  };
+  report.revision = { baseline_artifact: resolve(options['baseline-report']), baseline_version: baseline.discovery_version,
+    current_version: report.discovery_version, baseline_yield: baseline.yield, revised_yield: report.yield,
+    candidate_grain_delta: report.yield.candidate_source_grains-baseline.yield.candidate_source_grains,
+    transition_candidate_delta: report.yield.presentation_transition_candidates-baseline.yield.presentation_transition_candidates,
+    change: 'Added literal next-car references even when make/year is absent; retained raw cue context and unresolved future/current scope.',
+    literal_next_car_followup: source.segments.filter(c=>/\bnext\s+car\b/i.test(c.text)).map(c=>({ caption_index: c.index,
+      start_seconds: c.time_seconds, detected_as_candidate: result.grains.some(g=>g.structured_data.media.caption_index===c.index &&
+        g.structured_data.value.cue_labels.includes('relative_next_vehicle')), verified_auction_boundary: false,
+      source_url: `https://www.youtube.com/watch?v=${source.video_id}&t=${Math.floor(c.time_seconds)}s` })),
+    precision_or_recall_inference: 'None. Five previously missed lexical leads are now retained for review.' };
 }
-
-async function processVideo(broadcast: typeof BROADCASTS[0]) {
-  console.log(`\n=== Processing: ${broadcast.title} ===`);
-
-  const safeName = broadcast.date.replace(/-/g, '');
-
-  // Download audio
-  const audioPath = await downloadAudio(broadcast.url, `mecum_${safeName}`);
-
-  // Transcribe
-  const transcription = await transcribeWithWhisper(audioPath);
-
-  // Extract events
-  const events = extractAuctionEvents(transcription);
-  console.log(`  Found ${events.length} auction events`);
-
-  // Analyze patterns
-  const patterns = analyzePatterns(events);
-  console.log(`  Patterns:`, patterns);
-
-  // Store in database
-  await supabase.from('auction_training_data').upsert({
-    source: 'mecum_youtube',
-    broadcast_date: broadcast.date,
-    broadcast_url: broadcast.url,
-    events: events,
-    patterns: patterns,
-    processed_at: new Date().toISOString(),
-  }, {
-    onConflict: 'broadcast_date',
-  });
-
-  return { events, patterns };
+if (options.sample) {
+  const sample = JSON.parse(await readFile(resolve(options.sample), 'utf8'));
+  report.existing_production_sample = { artifact: resolve(options.sample), observation_count: sample.observation_count,
+    status: sample.status, proof_scope: 'previous verified source sample, separate from this discovery candidate yield' };
 }
-
-async function main() {
-  console.log('═══════════════════════════════════════════════');
-  console.log('  Mecum Video Analyzer');
-  console.log('  Training data extraction from YouTube');
-  console.log('═══════════════════════════════════════════════');
-
-  // Create data directory
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  const specificVideo = process.argv[2];
-
-  if (specificVideo) {
-    // Process single video
-    const broadcast = BROADCASTS.find(b => b.url.includes(specificVideo)) || {
-      date: new Date().toISOString().split('T')[0],
-      url: specificVideo,
-      title: 'Custom Video',
-    };
-    await processVideo(broadcast);
-  } else {
-    // List available broadcasts
-    console.log('\nAvailable Kissimmee 2026 broadcasts:');
-    BROADCASTS.forEach((b, i) => {
-      console.log(`  ${i + 1}. ${b.title} - ${b.url}`);
-    });
-
-    console.log('\nBlock cams (raw auction floor):');
-    BLOCK_CAMS.forEach((b, i) => {
-      console.log(`  ${i + 1}. ${b.title} (${b.duration}) - ${b.url}`);
-    });
-
-    console.log('\nUsage:');
-    console.log('  npx tsx scripts/mecum-video-analyzer.ts <video-id-or-url>');
-    console.log('  npx tsx scripts/mecum-video-analyzer.ts all  # Process all broadcasts');
-
-    if (process.argv[2] === 'all') {
-      for (const broadcast of BROADCASTS) {
-        await processVideo(broadcast);
-      }
-    }
-  }
+let normalized = null;
+if (options['evidence-module']) {
+  const shared = await import(pathToFileURL(resolve(options['evidence-module'])).href);
+  normalized = shared.prepareBroadcastReceipt({ observations: result.grains });
+  report.intake_compatibility = { validated_with: resolve(options['evidence-module']),
+    assay: shared.assayBroadcastReceipt(normalized), posted: false,
+    hold: 'Language discovery candidates need review and source-specific property semantics before production intake.' };
 }
-
-main().catch(console.error);
+const s114 = result.grains.filter(g => g.structured_data.media.start_seconds >= 2532 && g.structured_data.media.start_seconds < 2606);
+if (source.video_id === 'c9fxArnD3IY') report.first_review_window = { source_offset_start_seconds: 2532, source_offset_end_seconds: 2606,
+  scope: 'S114 source window established by separate catalogue/frame sample; parser makes no vehicle assignment',
+  candidate_grains: s114.length,
+  category_counts: Object.fromEntries(report.categories.map(c => [c.property,s114.filter(g => g.structured_data.property === c.property).length])),
+  example_claims: [
+    { start_seconds: 2541, property: 'evaluative_language_cue', paraphrase: 'Investment-quality praise of the Corvette.', claim_status: 'caption-derived opinion cue', speaker_role: null },
+    { start_seconds: 2542, property: 'vehicle_detail_cue', paraphrase: 'Engine and transmission originality plus documentation are discussed.', claim_status: 'unverified vehicle fact claim', speaker_role: null },
+    { start_seconds: 2550, property: 'vehicle_history_cue', paraphrase: 'Three-owner history is stated alongside an odometer reading.', claim_status: 'unverified vehicle fact claim', speaker_role: null },
+    { start_seconds: 2574, property: 'vehicle_detail_cue', paraphrase: 'A model-year production quantity is stated; compare the catalogue and audio.', claim_status: 'unverified numeric fact claim', speaker_role: null },
+    { start_seconds: 2600, property: 'price_language_cue', paraphrase: 'A high bid of 140,000 dollars is announced in the caption.', claim_status: 'announced high bid, not a completed sale or accepted-bid count', speaker_role: null },
+  ].filter(e => s114.some(g => g.structured_data.property === e.property && g.structured_data.media.start_seconds === e.start_seconds)),
+  original_audio_review_pending: true, accepted_bid_velocity: null, bid_acceleration: null, crowd_emotion: null };
+const outputDir = resolve(options['output-dir']);
+await mkdir(outputDir, { recursive: true });
+const save = async (name, value) => {
+  const target = join(outputDir, name); const temporary = `${target}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify(value, null, 2) + '\n'); await rename(temporary, target);
+};
+await save('candidate-grains.json', { status: 'review_only_not_posted', observations: result.grains });
+await save('review-windows.json', { windows: result.review_windows });
+if (audio) await save('original-audio-candidate-grains.json', { status: 'review_only_clip_offsets_not_intake_ready', grains: audio.grains });
+if (normalized) await save('validated-candidate-payload.json', { options: { stop_on_error: true, gap_fill: false, write_evidence: false }, observations: normalized, review_only: true });
+// Write latest last, atomically, so dashboards only see a complete pass.
+await save(`${report.discovery_version}.json`, report);
+await save('latest.json', report);
+console.log(JSON.stringify({ status: report.status, coverage: report.coverage, yield: report.yield,
+  measured_scan_ms: report.measured_scan_ms, output: join(outputDir,'latest.json') },null,2));

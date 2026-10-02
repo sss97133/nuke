@@ -46,3 +46,53 @@ The quantitative methods used across these studies are the standard primitives o
 7. **[ramos2003tfidf]** Juan Ramos (2003). *Using TF-IDF to Determine Word Relevance in Document Queries*. First **Instructional** Conf. on Machine Learning (iCML — a Rutgers tutorial venue, **not** ICML).
 
 *Verification note: all seven confirmed real. ⚠️ [ramos2003tfidf] is the* Instructional *Conference (iCML), NOT the International Conference on Machine Learning (ICML) — do not conflate.*
+
+---
+
+## Mecum caption and original-audio discovery assay — 2026-10-02
+
+The first cached [Kissimmee broadcast](https://www.youtube.com/watch?v=c9fxArnD3IY)
+contains 2,964 timed automatic-caption cues and 49,114 word tokens in a 22,028-second
+video. An offline pass through the existing `scripts/mecum-video-analyzer.ts` owner
+discovers caption/category grains for references, history, details, evaluative language,
+prices, outcomes, cadence and verbal room descriptions. These are review candidates,
+with caption indexes, source links, method, frozen capture clock and text hashes. Raw
+captions stay in the INTERNAL cache. No database writer runs in this lane.
+
+Version 1 produced 2,540 candidate grains, 223 bounded review groups and 18 transition
+leads. A deterministic scope audit inspected 60 distinct cues: first/middle/last hits in
+eight categories, five year-keyword hits, eight unhit captions, all 18 transition leads,
+all five literal next-car expressions and two numeric ambiguity probes. Six of 24
+category draws were overbroad; two of five year draws referred to the event or racing
+history. Six of eight unhit captions contained recoverable avenues: platform and
+presenter context, weather, ordered-together/color relationships, less formulaic opinion
+and broadcast closing. These small, overlapping samples do not estimate global
+precision or recall. A manufacturer excitement slogan is evidence of branding, rather
+than a measurement of crowd emotion; keeping its context allows a later property fold.
+
+The audit found all five literal next-car expressions missing from the transition grammar.
+Version 2 retains them even without a make/year keyword: four add a grain and one
+enriches an existing grain. Revised yield is 2,544 grains and 23 transition leads, with
+223 review groups. Future previews and rhetorical references remain unresolved leads;
+no group has a measured auction boundary or resolved chassis. Ten parser assays cover
+technical numbers, historic sale scope, duplicate caption onsets, replay identity,
+bounded intervals, unknown roles and next-car navigation.
+
+A separate acquired WAV measured 99.9735 seconds despite a requested 92-second cut.
+Local CPU/int8 `faster-whisper` base.en yielded 18 segments and 210 timestamped words in
+3.559 seconds, with no paid model API calls. Twenty-three language candidates were
+assayed. Six distinctive text anchors suggest a clip origin near 2509.72 seconds,
+but the verified origin remains unknown: approximate caption/ASR onsets cannot prove
+the sample mapping. File-relative timestamps are preserved. Foreground ASR does not
+prove absence of background chant or crowd reaction. Speaker identities, accepted
+bids, bid velocity and crowd emotion remain unverified.
+
+Reproduce with `npm run mecum:transcript-discovery -- --transcript <INTERNAL-cache.json>
+--output-dir <artifact-directory>`; optional `--audio-assay` with `--audio-source-receipt`, `--miss-audit` and
+`--baseline-report` consume source receipts. `--evidence-module` validates review
+payloads with the existing broadcast receipt contract without posting them. Artifacts
+for this assay live under `output/mecum/audio-discovery/`: `latest.json`, versioned
+reports, source-keyed candidates, review windows and `bounded-miss-audit.json`. The
+baseline audit references the exact transcript SHA-256. Further assays should expand
+platform/relationship vocabulary, review numeric speech and annotate accepted bids
+and overlapping speaker turns from aligned original audio/video.

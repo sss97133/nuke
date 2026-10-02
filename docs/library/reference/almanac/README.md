@@ -180,3 +180,30 @@ Facts, figures, and reference data. Updated when the numbers change.
 | 2026-03-20 | NUKE ENCYCLOPEDIA written. Library structure established. Art + publishing verticals specced. |
 
 **Total as of 2026-03-20**: 541+ sessions, 13,758+ prompts, 2,045+ commits, 142 calendar days.
+
+## Mecum broadcast discovery assay — 2026-10-02
+
+Source: cached timed captions for YouTube `c9fxArnD3IY`; source-backed scope assay in
+`output/mecum/audio-discovery/bounded-miss-audit.json`. Counts describe offline
+language review leads, not verified vehicle facts or database intake.
+
+| Metric | Measured value | Scope |
+|---|---:|---|
+| Video duration | 22,028 seconds | Source metadata supplied to pass |
+| Caption cues / word tokens | 2,964 / 49,114 | Entire cached transcript scanned |
+| Simultaneous adjacent onset pairs | 5 | Preserved by caption index |
+| Version 1 / version 2 candidate grains | 2,540 / 2,544 | One category hit per caption |
+| Version 1 / version 2 transition leads | 18 / 23 | Unverified navigation language |
+| Bounded review groups | 223 | Gap <=20 seconds, onset span <=180 seconds; not lots |
+| Distinct cues in manual scope audit | 60 | Deterministic overlapping strata |
+| Overbroad category draws | 6 of 24 | Inspected sample only |
+| Non-model years | 2 of 5 | Event/racing context in inspected sample |
+| Recoverable avenues among unhit sample | 6 of 8 | Inspected sample only |
+| Recovered literal next-car leads | 5 of 5 | Lexical follow-up assay, not recall estimate |
+| Original WAV / local ASR runtime | 99.9735 / 3.559 seconds | One CPU/int8 base.en clip |
+| ASR segments / timestamped words | 18 / 210 | Source seek and speaker roles unresolved |
+| New production observations from discovery | 0 | Review-only artifacts |
+
+See the [caption discovery study](../../intellectual/studies/README.md#mecum-caption-and-original-audio-discovery-assay--2026-10-02)
+for methodology, limits and reproducibility. No accepted-bid count, auction duration,
+crowd emotion or global precision/recall was established by this assay.
