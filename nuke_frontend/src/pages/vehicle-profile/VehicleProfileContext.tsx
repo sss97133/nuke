@@ -122,8 +122,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Hero ──
   const [leadImageUrl, setLeadImageUrl] = useState<string | null>(null);
   const [heroMeta, setHeroMeta] = useState<HeroImageMeta | null>(null);
-  // Once selectBestHeroImage picks a hero, don't let stale closures override it
+  // A completed selector (including no eligible image) owns the hero decision.
   const heroResolvedRef = React.useRef(false);
+  const heroSelectionRequestRef = React.useRef(0);
+  const activeVehicleIdRef = React.useRef(vehicleId);
+  activeVehicleIdRef.current = vehicleId;
+  const vehicleLoadedForRouteRef = React.useRef<string | undefined>(undefined);
 
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
@@ -187,6 +191,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadVehicle = useCallback(async () => {
     if (!vehicleId) return;
+    const heroRequest = ++heroSelectionRequestRef.current;
+    heroResolvedRef.current = false;
     rpcLoadedRef.current = { images: false, timeline: false, commentCount: null, observationCount: null };
     const rpcResult = await loadVehicleImpl({
       vehicleId,
@@ -196,13 +202,22 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       navigate,
       ranBatSyncRef,
       setLoading,
-      setVehicle,
+      setVehicle: (row) => {
+        if (activeVehicleIdRef.current !== vehicleId) return;
+        vehicleLoadedForRouteRef.current = vehicleId;
+        setVehicle(row);
+      },
       setIsPublic,
-      setLeadImageUrl,
-      setVehicleImages,
+      setLeadImageUrl: (url) => {
+        if (activeVehicleIdRef.current === vehicleId && !heroResolvedRef.current) setLeadImageUrl(url);
+      },
+      setVehicleImages: (urls) => {
+        if (activeVehicleIdRef.current === vehicleId) setVehicleImages(urls);
+      },
       setTimelineEvents,
       setAuctionPulse: setAuctionPulse as any,
     });
+    if (activeVehicleIdRef.current !== vehicleId) return;
     rpcLoadedRef.current = rpcResult;
     // Use RPC stats for counts if available
     if (rpcResult.commentCount !== null) setTotalCommentCount(rpcResult.commentCount);
@@ -211,43 +226,48 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     if (!rpcResult.timeline) {
       loadTimelineEvents();
     }
-    heroResolvedRef.current = false;
     // Hero selection runs in exactly one place per load: here when the RPC
     // delivered the complete image set, otherwise inside loadVehicleImages
     // (which runs whenever rpcResult.images is false). Running it in both
     // paths duplicated the 60-row candidate query on every profile load.
     if (rpcResult.images) {
       selectBestHeroImage(vehicleId, supabase).then((result) => {
-        if (result?.url) {
-          setLeadImageUrl(result.url);
-          setHeroMeta(result.meta);
-          heroResolvedRef.current = true;
-        }
-      }).catch(() => {});
+        if (activeVehicleIdRef.current !== vehicleId || heroSelectionRequestRef.current !== heroRequest) return;
+        setLeadImageUrl(result?.url || null);
+        setHeroMeta(result?.meta || null);
+        heroResolvedRef.current = true;
+      }).catch(() => {
+        if (activeVehicleIdRef.current !== vehicleId || heroSelectionRequestRef.current !== heroRequest) return;
+        setLeadImageUrl(null);
+        setHeroMeta(null);
+        heroResolvedRef.current = true;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, session, navigate]);
 
   const loadVehicleImages = useCallback(async () => {
-    if (!vehicle?.id) return;
+    if (!vehicle?.id || activeVehicleIdRef.current !== vehicleId ||
+      vehicleLoadedForRouteRef.current !== vehicleId) return;
+    const heroRequest = ++heroSelectionRequestRef.current;
+    const isCurrent = () => activeVehicleIdRef.current === vehicleId &&
+      heroSelectionRequestRef.current === heroRequest;
     const result = await resolveVehicleImages(vehicle.id);
+    if (!isCurrent()) return;
     setVehicleImages(result.urls);
     try {
       const heroResult = await selectBestHeroImage(vehicle.id, supabase, result.leadUrl);
-      if (heroResult?.url) {
-        setLeadImageUrl(heroResult.url);
-        setHeroMeta(heroResult.meta);
-        heroResolvedRef.current = true;
-        return;
-      }
+      if (!isCurrent()) return;
+      setLeadImageUrl(heroResult?.url || null);
+      setHeroMeta(heroResult?.meta || null);
+      heroResolvedRef.current = true;
     } catch {
-      // Ignore and fall back to the resolver lead below.
-    }
-    if (result.leadUrl && !heroResolvedRef.current) {
-      setLeadImageUrl(result.leadUrl);
+      if (!isCurrent()) return;
+      setLeadImageUrl(null);
       setHeroMeta(null);
+      heroResolvedRef.current = true;
     }
-  }, [vehicle?.id]);
+  }, [vehicle?.id, vehicleId]);
 
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;

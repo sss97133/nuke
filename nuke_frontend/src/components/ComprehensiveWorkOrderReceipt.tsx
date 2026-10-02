@@ -718,7 +718,6 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               <div style={{ 
                 fontSize: '11px', 
                 color: 'var(--text-muted)', 
-,
                 marginBottom: '16px',
                 padding: '8px',
                 background: 'var(--grey-50)'}}>

@@ -94,11 +94,11 @@ const inflightProfileRpc = new Map<string, Promise<any>>();
  * Select the best hero image for a vehicle based on zone, quality, confidence,
  * and banner fit.
  *
- * Priority:
- *  1. Front-facing exterior zones with completed AI processing, ranked by a
- *     weighted hero score
- *  2. Fallback: best "money shot" candidate from any analyzed zone
- *  3. Fallback: existing primary_image_url from the vehicle record
+ * Priority: latest eligible owner photo, explicit primary, analyzed exterior,
+ * then other eligible candidates. A primary is fetched independently of the
+ * recent window so newer imports cannot erase an older explicit choice.
+ * The legacy URL argument remains positional for callers, but unchecked URLs
+ * cannot bypass row-level exclusions or viewer access.
  *
  * Returns the best image URL (large > medium > image_url) and metadata
  * extracted from exif_data and taken_at.
@@ -106,64 +106,63 @@ const inflightProfileRpc = new Map<string, Promise<any>>();
 export async function selectBestHeroImage(
   vehicleId: string,
   supabase: any,
-  primaryImageUrl?: string | null,
+  _primaryImageUrl?: string | null,
   prefetchedImages?: any[],
 ): Promise<HeroImageResult | null> {
   try {
-    // Coalesce the prior 4 sequential queries into one round-trip.
-    // Strategy: pull a generous candidate window ordered by (is_primary, quality, ai recency),
-    // then apply the same priority logic client-side. If the caller already has the image list,
-    // skip the network call entirely.
+    // Coalesce concurrent loads. Keep the recent window for owner-upload recency,
+    // but read explicit primaries separately: recency alone can omit the primary.
+    const projection = 'id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type';
+    const readRows = async (query: any): Promise<any[]> => {
+      const { data, error } = await query;
+      if (error) console.warn('[selectBestHeroImage] query error:', error);
+      return data || [];
+    };
     let candidates: any[] | null = null;
 
     if (prefetchedImages && prefetchedImages.length > 0) {
-      candidates = prefetchedImages;
+      const primaryRows = prefetchedImages.some((img) => img?.is_primary === true)
+        ? []
+        : await readRows(supabase.from('vehicle_images').select(projection)
+          .eq('vehicle_id', vehicleId).eq('is_primary', true)
+          .order('created_at', { ascending: false }).limit(10));
+      candidates = [...prefetchedImages, ...primaryRows];
     } else {
       let pending = inflightHeroCandidates.get(vehicleId);
       if (!pending) {
-        const query: Promise<any[] | null> = supabase
-          .from('vehicle_images')
-          .select(
-            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type'
-          )
-          .eq('vehicle_id', vehicleId)
-          // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
-          // is_primary remains a tiebreaker fallback further down.
-          .order('taken_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false, nullsFirst: false })
-          .order('is_primary', { ascending: false, nullsFirst: false })
-          .order('photo_quality_score', { ascending: false, nullsFirst: false })
-          .limit(60)
-          .then(({ data, error }: { data: any[] | null; error: any }) => {
-            if (error) {
-              console.warn('[selectBestHeroImage] query error:', error);
-            }
-            return data || null;
-          });
+        const query = Promise.all([
+          readRows(supabase.from('vehicle_images').select(projection)
+            .eq('vehicle_id', vehicleId)
+            .order('taken_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false, nullsFirst: false })
+            .order('is_primary', { ascending: false, nullsFirst: false })
+            .order('photo_quality_score', { ascending: false, nullsFirst: false })
+            .limit(60)),
+          readRows(supabase.from('vehicle_images').select(projection)
+            .eq('vehicle_id', vehicleId).eq('is_primary', true)
+            .order('created_at', { ascending: false }).limit(10)),
+        ]).then(([recent, primary]) => [...recent, ...primary]);
         pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));
         inflightHeroCandidates.set(vehicleId, pending);
       }
       candidates = await pending;
     }
 
-    if (!candidates || candidates.length === 0) {
-      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
-      return null;
-    }
+    if (!candidates || candidates.length === 0) return null;
 
     // Filter out documents/duplicates, mismatch-flagged rows, and vision-gate rejections.
     const usable = candidates.filter((img: any) => {
       if (img?.is_document === true) return false;
-      if (img?.is_duplicate === true) return false;
+      if (img?.is_duplicate === true || img?.is_superseded === true || img?.is_sensitive === true) return false;
+      if (!getHeroCandidateUrl(img)) return false;
       const mvms = img?.image_vehicle_match_status;
       if (mvms === 'mismatch' || mvms === 'unrelated') return false;
       const vgs = img?.vision_gate_status;
-      if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
+      if (typeof vgs === 'string' && vgs.startsWith('rejected')) return false;
       return true;
     });
 
     if (usable.length === 0) {
-      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
       return null;
     }
 
@@ -185,11 +184,12 @@ export async function selectBestHeroImage(
     // closeup, engine bay, undercarriage, interior, document, or transport/delivery
     // shot. Skylar 2026-05-30: "engine bay isn't a primary, post-delivery isn't a
     // primary — there should be flags that inhibit that image from being the hero."
-    const NON_HERO_ZONE = /^(detail_|int_|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
+    const NON_HERO_ZONE = /^(detail_|int_|mech_|panel_|wheel_|ext_undercarriage|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
     const EXT_ZONE = /(^ext_)|profile|three.?quarter|(^3q)/i;
     const NON_HERO_CAT = new Set([
       'engine_bay', 'engine', 'undercarriage', 'interior', 'vehicle_interior',
-      'documentation', 'receipt_document', 'data_plate', 'trunk_storage', 'transport', 'delivery',
+      'documentation', 'document', 'receipt_document', 'receipt', 'invoice', 'screenshot',
+      'data_plate', 'trunk_storage', 'transport', 'delivery', 'detail', 'detail_shot', 'parts',
     ]);
     const isHeroEligible = (img: any): boolean => {
       if (img?.is_document === true) return false;
@@ -198,6 +198,9 @@ export async function selectBestHeroImage(
       const t = (img?.image_type || '').toLowerCase();
       if (NON_HERO_ZONE.test(z)) return false;
       if (NON_HERO_CAT.has(c) || NON_HERO_CAT.has(t)) return false;
+      const angles = [img?.angle, img?.ai_detected_angle];
+      if (angles.some((angle) => typeof angle === 'string' &&
+        /interior|engine|under.?hood|undercarriage|detail|document|receipt|data.?plate|transport|delivery|trunk|wheel|sticker/i.test(angle))) return false;
       return true;
     };
     const isExterior = (img: any): boolean => {
@@ -206,9 +209,15 @@ export async function selectBestHeroImage(
       return EXT_ZONE.test(z) || c === 'exterior' || c === 'exterior_body' || c === 'vehicle_exterior';
     };
 
-    const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
+    // Apply the same exclusions to primary, scored and last-resort branches.
+    // Unknown classification stays unknown, and remains eligible as a fallback.
+    const eligible = usable.filter(isHeroEligible);
+    if (eligible.length === 0) return null;
+    const ownerOwned = eligible.filter((img: any) => isOwnerTrustSource(img?.source));
+    ownerOwned.sort((a, b) =>
+      (Date.parse(b.taken_at || b.created_at) || 0) - (Date.parse(a.taken_at || a.created_at) || 0));
     if (ownerOwned.length > 0) {
-      // Candidates are ordered taken_at DESC. Latest owner EXTERIOR shot wins;
+      // Owner rows are ordered by capture time (ingest time if unknown). Latest EXTERIOR wins;
       // else latest owner hero-eligible shot (not a detail/engine/interior/transport).
       // Only if NEITHER exists do we fall through to the exterior/quality priorities below
       // — better to fall through than pin a closeup or shipping photo as the face of the truck.
@@ -219,14 +228,14 @@ export async function selectBestHeroImage(
     }
 
     // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).
-    const primary = usable.find((img: any) => img?.is_primary === true);
+    const primary = eligible.find((img: any) => img?.is_primary === true);
     if (primary) return buildHeroResult(primary);
 
     const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
     const frontZones = new Set(['ext_front', 'ext_front_driver', 'ext_front_passenger']);
 
     // Priority 1: front-facing exterior, AI completed
-    const fronts = usable.filter(
+    const fronts = eligible.filter(
       (img: any) => img?.ai_processing_status === 'completed' && frontZones.has(img?.vehicle_zone)
     );
     if (fronts.length > 0) {
@@ -240,7 +249,7 @@ export async function selectBestHeroImage(
     }
 
     // Priority 2: any zone with a quality score
-    const scored2 = usable
+    const scored2 = eligible
       .filter((img: any) => img?.photo_quality_score != null)
       .map((img: any) => {
         const base = scoreHeroCandidate(img);
@@ -252,11 +261,10 @@ export async function selectBestHeroImage(
       return buildHeroResult(scored2[0].img);
     }
 
-    // Priority 3: any usable image (candidates are already ordered by is_primary, quality, created_at)
-    return buildHeroResult(usable[0]);
+    // Priority 3: an eligible image whose classification may still be unknown.
+    return buildHeroResult(eligible[0]);
   } catch (err) {
     console.warn('[selectBestHeroImage] error:', err);
-    if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
     return null;
   }
 }

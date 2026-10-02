@@ -22,6 +22,7 @@ const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
+const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -193,6 +194,9 @@ const VehicleProfileInner: React.FC = () => {
           </div>
         </div>
     );
+  }
+  if (new URLSearchParams(location.search).get('view') === 'evidence') {
+    return <React.Suspense fallback={null}><VehicleEvidenceView /></React.Suspense>;
   }
   return (
       <div className="vehicle-profile-page">
