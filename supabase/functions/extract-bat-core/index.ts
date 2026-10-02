@@ -1044,7 +1044,9 @@ Deno.serve(async (req) => {
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { "X-Nuke-Writer": "extract-bat-core" } },
+    });
 
     const body = await req.json().catch(() => ({}));
     const inputUrl = String(body?.url || body?.auction_url || "").trim();
