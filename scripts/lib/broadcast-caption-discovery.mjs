@@ -267,7 +267,7 @@ export function discoverAudioAssay(assay, source, options = {}) {
     throw new Error('Acquired audio receipt must bind this video to the exact ASR source file/hash');
   }
   const grains = []; const anchors = [];
-  const requestedStart = assay.requested_offset_seconds;
+  const requestedStart = assay.requested_offset_seconds ?? receipt.requested_start_seconds;
   const target = source.segments.filter(c => !Number.isFinite(requestedStart) ||
     (c.time_seconds >= requestedStart - 120 && c.time_seconds <= requestedStart + assay.source_duration_seconds + 120));
   assay.segments.forEach((s,index) => {

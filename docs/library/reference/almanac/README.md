@@ -207,3 +207,9 @@ language review leads, not verified vehicle facts or database intake.
 See the [caption discovery study](../../intellectual/studies/README.md#mecum-caption-and-original-audio-discovery-assay--2026-10-02)
 for methodology, limits and reproducibility. No accepted-bid count, auction duration,
 crowd emotion or global precision/recall was established by this assay.
+
+The subsequent durable six-source cached-caption batch produced 8,850 candidate
+grains and 184 pending scope-review items. Sources span RM Sotheby's, Barrett-Jackson,
+Broad Arrow and Bonhams. A second process resumed six completed checkpoints with
+zero new rows. These figures are distinct from the 2,544-grain Mecum benchmark and
+from previously verified production observations; the discovery writer stays disabled.

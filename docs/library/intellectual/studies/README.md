@@ -96,3 +96,32 @@ reports, source-keyed candidates, review windows and `bounded-miss-audit.json`. 
 baseline audit references the exact transcript SHA-256. Further assays should expand
 platform/relationship vocabulary, review numeric speech and annotate accepted bids
 and overlapping speaker turns from aligned original audio/video.
+
+### Durable source-loop follow-up
+
+The same analyzer now accepts `--manifest`, `--cache-dir` and `--output-dir`, with
+optional bounded `--watch` and anonymous `--acquire-captions --yt-dlp-bin <existing-tool>`.
+Limits constrain distinct new sources attempted (including failures), source-media
+hours, candidate rows, retry attempts and runtime. One source/hash/discovery-version
+checkpoint records normalized INTERNAL evidence, immutable report/grain files, replay
+digest, pending review work and error/retry receipts. Signals stop after the current
+source; a dead-process lease is recoverable. Source dates remain unknown unless
+explicitly supplied; the frozen cache-read timestamp is separate from cache mtime,
+publication and event time. Completed artifact hashes are checked on resume.
+
+The initial six-cache batch yielded 8,850 candidates and 184 review work items across
+RM Sotheby's, Barrett-Jackson, Broad Arrow and Bonhams. A separate process resumed all
+six checkpoints and added zero rows. Six loop assays exercise original JSON3 indexes,
+frozen-clock restart, new-byte revisions, complete-source row-budget holds, finite retry
+exhaustion and unhit review sampling; two additional assays check source limits and
+dead/live leases. A process generates candidates and review tasks; it does not modify
+or release its own code, post production rows, or promote keywords to verified facts.
+The demonstrated improvement remains the source-scope audit followed by the tested
+next-car revision and its versioned comparison.
+
+An additional Broad Arrow WAV/ASR assay contains price/closing language rather than
+the selected Mecum commentary/specification foreground. Eight review avenues include
+stated bid acknowledgement versus asks, bidder participation and representation,
+increment rejection, closing calls, gesture cautions and a numeric ASR inconsistency.
+Clip-origin estimates remain unverified. These observations motivate new property
+semantics and targeted listening; they do not establish accepted-bid velocity.

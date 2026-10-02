@@ -9,15 +9,24 @@ import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { createHash } from 'node:crypto';
 import { discoverCaptionCues, discoverAudioAssay } from './lib/broadcast-caption-discovery.mjs';
+import { runManifestDiscovery } from './lib/broadcast-caption-discovery-loop.mjs';
 
 const usage = 'node scripts/mecum-video-analyzer.ts --transcript INTERNAL.json --output-dir DIR [--event-date YYYY-MM-DD] [--auction NAME] [--duration-seconds N] [--publication-at ISO] [--sample SAMPLE.json] [--evidence-module PATH] [--audio-assay PATH --audio-source-receipt PATH] [--miss-audit PATH] [--baseline-report PATH]';
+const batchUsage='Manifest: --manifest selection.json --cache-dir INTERNAL_DIR --output-dir DIR [--watch] [--acquire-captions --yt-dlp-bin PATH] [--max-sources 6 --max-hours 24 --max-new-rows 50000 --max-runtime-seconds 3600]';
 const args = process.argv.slice(2);
-const accepted = new Set(['--transcript','--output-dir','--event-date','--auction','--duration-seconds','--publication-at','--sample','--evidence-module','--audio-assay','--audio-source-receipt','--miss-audit','--baseline-report']);
+const accepted = new Set(['--transcript','--output-dir','--event-date','--auction','--duration-seconds','--publication-at','--sample','--evidence-module','--audio-assay','--audio-source-receipt','--miss-audit','--baseline-report','--manifest','--cache-dir','--max-sources','--max-hours','--max-new-rows','--max-attempts','--max-runtime-seconds','--poll-seconds','--yt-dlp-bin']);
 const options = {};
 for (let i=0; i<args.length; i++) {
-  if (args[i] === '--help') { console.log(usage); process.exit(0); }
+  if (args[i] === '--help') { console.log(usage+'\n'+batchUsage); process.exit(0); }
+  if (['--watch','--acquire-captions'].includes(args[i])) { options[args[i].slice(2)]=true;continue; }
   if (!accepted.has(args[i]) || !args[i+1] || args[i+1].startsWith('--')) throw new Error(usage);
   options[args[i].slice(2)] = args[++i];
+}
+if(options.manifest) {
+  if(!options['output-dir']||!options['cache-dir'])throw new Error('Manifest mode requires output/cache directories');
+  const loop=await runManifestDiscovery(Object.fromEntries(Object.entries(options).map(([k,v])=>[k.replaceAll('-','_'),v])));
+  console.log(JSON.stringify({status:loop.status,new_completed_sources:loop.new_completed_sources,durable_totals:loop.durable_totals,
+    loop_status:join(resolve(options['output-dir']),'loop-status.json')},null,2));process.exit(0);
 }
 if (!options.transcript || !options['output-dir']) throw new Error(usage);
 const started = performance.now();
