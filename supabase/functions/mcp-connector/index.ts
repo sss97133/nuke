@@ -41,7 +41,7 @@ function getSupabase() {
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-api-key, x-client-info, content-type, mcp-session-id, mcp-protocol-version",
+    "authorization, x-api-key, x-client-info, content-type, mcp-session-id, mcp-protocol-version, x-nuke-surface",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Expose-Headers": "mcp-session-id",
 };
@@ -438,18 +438,26 @@ interface ToolDef {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    openWorldHint: boolean;
+    title: string;
+  };
 }
 
 const TOOLS: ToolDef[] = [
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Describe Nuke Platform" },
     description:
       "Get a high-level overview of the Nuke vehicle data platform: total vehicles, images, observations, sources, organizations, and a description of the 6 architecture layers. Call this first to understand what's available.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "describe_schema",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Describe Database Schema" },
     description:
       "Describe database tables. Pass a table_name to get columns, types, and pipeline ownership. Pass a layer name (identity, factory_spec, vehicle_state, market, observations, actors) to get all tables in that architecture layer.",
     inputSchema: {
@@ -466,6 +474,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_pipeline_registry",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Pipeline Registry" },
     description:
       "Show which edge functions own which database fields. Returns pipeline_registry entries showing field ownership, whether direct writes are prohibited, and what function to use instead. Query by table name or get all entries.",
     inputSchema: {
@@ -479,6 +488,7 @@ const TOOLS: ToolDef[] = [
   // ── Search ────────────────────────────────────────────────────────────
   {
     name: "search_vehicles",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Vehicles" },
     description:
       "Quick search across 1.25M+ vehicles. Accepts VIN (17 chars), listing URL, year, make/model text, or free-text query. Returns matching vehicles with thumbnails. " +
       "Results contain only confirmed data. Never fabricate missing fields — null means 'not recorded'. For location/price/body_style filtering, use browse_inventory instead.",
@@ -493,6 +503,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "search_vehicles_advanced",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Advanced Vehicle Search" },
     description:
       "Full-text search with filters, pagination, and inline valuations. Filter by make, model, year range. Results include VIN, price, mileage, Nuke Estimate when available. " +
       "Returns paginated results — tell the user the total count and whether more exist. For location/body_style filtering, use browse_inventory instead.",
@@ -514,6 +525,7 @@ const TOOLS: ToolDef[] = [
 
   {
     name: "decode_vin",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, title: "Decode VIN" },
     description:
       "Decode a VIN to factory specifications via NHTSA VPIC database. Returns year, make, model, trim, engine, " +
       "transmission, drivetrain, body style, plant of manufacture, and more. Works for all US-market vehicles 1981+. " +
@@ -529,6 +541,7 @@ const TOOLS: ToolDef[] = [
 
   {
     name: "browse_inventory",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Browse Vehicle Inventory" },
     description:
       "Browse vehicles with location, body style, status, and price filters. Use this for queries like 'find me a truck in Las Vegas' or 'show Porsches under $80K in California'. " +
       "Queries the database directly with WHERE clauses. Results contain only confirmed data — never fabricate missing fields. Null values mean 'not recorded'.",
@@ -553,6 +566,7 @@ const TOOLS: ToolDef[] = [
   // ── Vehicle Deep Graph ────────────────────────────────────────────────
   {
     name: "vehicle",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Full Vehicle Record" },
     description:
       "Get all populated fields for a vehicle by ID. Returns every non-null field on the record: " +
       "year, make, model, VIN, mileage, colors, engine, transmission, drivetrain, price, " +
@@ -568,6 +582,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_vehicle",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Detail" },
     description:
       "Get a vehicle profile by ID. Returns identity (year/make/model/VIN), pricing, location, images, and summary counts for observations, events, and images.",
     inputSchema: {
@@ -580,6 +595,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_vehicle_deep",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Digital Twin" },
     description:
       "Full-resolution digital twin for one vehicle. Returns the complete entity across all 6 architecture layers: identity, market events, observations with sources, image summary, analysis signals, and valuations. " +
       "Also returns description, highlights, equipment, modifications, known_flaws, comment/description discoveries, and a _data_guidance section showing completeness. " +
@@ -598,6 +614,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_field_evidence",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Field Evidence" },
     description:
       "Get the provenance chain for a specific field on a vehicle. Shows every source that contributed to the field's value, with confidence scores, timestamps, and source material references. This is how you answer 'how do you know that?'",
     inputSchema: {
@@ -613,6 +630,7 @@ const TOOLS: ToolDef[] = [
   // ── Observations ──────────────────────────────────────────────────────
   {
     name: "query_observations",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Observations" },
     description:
       "Get observations for a vehicle with full provenance. Each observation includes source name, trust score, confidence, timestamp, and content. Filter by source or observation kind. " +
       "Observations are verified data from registered sources — present them faithfully with source attribution.",
@@ -633,6 +651,7 @@ const TOOLS: ToolDef[] = [
   // ── Market Intelligence ───────────────────────────────────────────────
   {
     name: "get_valuation",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Cached Vehicle Valuation" },
     description:
       "Look up a cached Nuke Estimate (valuation) by vehicle_id or VIN. Returns estimated value, confidence, range, deal score, heat score, and price tier. " +
       "Quote all price figures exactly as returned. Do not round or approximate.",
@@ -646,6 +665,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "compute_valuation",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Recompute Vehicle Valuation" },
     description:
       "Force-recompute 'The Nuke Estimate' — a confidence-weighted 8-signal valuation. More expensive than get_valuation but always fresh. Returns value, confidence, deal score, heat score, price tier.",
     inputSchema: {
@@ -659,6 +679,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_comps",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Comparable Sales" },
     description:
       "Find comparable vehicle sales. Query by make/model, vehicle_id, or VIN. Returns actual auction results from BaT, Mecum, Barrett-Jackson, RM Sotheby's, Cars & Bids, and more. Includes price statistics.",
     inputSchema: {
@@ -676,6 +697,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_make_model_terminal",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Make and Model Market Terminal" },
     description:
       "Return the cohort terminal for a year-make-model: the full market-intelligence envelope for a model line, not a single VIN. Includes population count, price distribution (min/median/max, percentiles), market flow (listing/sale velocity over time), sentiment, dealer flow, comparable sales, production/survival estimates, and the cited consensus fields that summarize the cohort. Backed by the get_make_model_terminal RPC. Pass grain='generation' to widen the cohort to a full generation; default 'year'.",
     inputSchema: {
@@ -691,6 +713,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_market_history",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Market History" },
     description:
       "Get all auction and listing events for a vehicle or model cohort. Returns chronological event history including final prices, bid counts, platforms, and outcomes.",
     inputSchema: {
@@ -709,6 +732,7 @@ const TOOLS: ToolDef[] = [
   // ── Reference Library ─────────────────────────────────────────────────
   {
     name: "query_library",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Reference Library" },
     description:
       "Search the vehicle reference library. Types: paint_codes (76 GM colors), condition_knowledge (1,084 entries from service manuals), condition_taxonomy (descriptors), vehicle_nomenclature (naming standards). Returns factory reference data.",
     inputSchema: {
@@ -729,6 +753,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "search_service_manuals",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Service Manuals" },
     description:
       "Search ingested GM service manuals (1,111 chunks). Find torque specs, procedures, part numbers, service intervals. Returns matching text chunks with page references.",
     inputSchema: {
@@ -744,6 +769,7 @@ const TOOLS: ToolDef[] = [
   // ── Vision ────────────────────────────────────────────────────────────
   {
     name: "analyze_image",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true, title: "Analyze or Requeue Vehicle Image" },
     description:
       "YONO vision analysis: make classification, condition (1-5), zone (41 zones), damage flags, modification flags, photo quality. $0/image — local inference, zero cloud API calls.",
     inputSchema: {
@@ -757,6 +783,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "identify_vehicle_image",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, title: "Identify Vehicle from Image" },
     description:
       "AI identification of year/make/model/trim from a vehicle photo. Tiered approach: Gemini Flash → GPT-4o-mini → GPT-4o. Returns identification with confidence score and reasoning.",
     inputSchema: {
@@ -777,6 +804,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_vehicle_images",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Images" },
     description:
       "Get images for a vehicle with zone classification, condition scores, and AI analysis metadata. Filter by zone (ext_front, ext_rear, interior, engine_bay, etc.).",
     inputSchema: {
@@ -791,6 +819,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_vehicle_wiki",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Wiki" },
     description:
       "The finite-asset wiki for one VIN: a readable, fully-sourced page where every field is the weighted consensus of evidence-cited claims (evidence_class × contributor reputation × confidence × recency). Each cited field carries its value, citation, confidence, contributors, and any conflict (surfaced inline, never silently resolved). The canonical header is the denormalized cache; cited_fields are the live projection — the truth. This is the read-side product surface of the agent-write loop: a Wikipedia for one physical object, every line cited.",
     inputSchema: {
@@ -803,6 +832,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_attribute_checklist",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Attribute Checklist" },
     description:
       "Return the checklist of attributes a caller agent can answer about a subject (image, vehicle, person, cluster). Each entry includes the prompt to run, the expected_shape of the answer, the L1–L5 layer, modality hints, and depends_on so callers can iterate in dependency order. " +
       "Use this as the laser-tag harness: Nuke supplies the checklist + (later) the substrate landing zone; the caller's own model runs the vision/text inference. Surface-level extractions (bbox, viewpoint, year/make/model) are L1–L2; deeper attributes (condition cues, modifications, era-correctness) are L3+ and are where caller agents add the most value. " +
@@ -830,6 +860,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_attribute_value",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Attribute Claim" },
     description:
       "Submit a caller-extracted answer for a single attribute from get_attribute_checklist. The caller's model ran the inference; this tool records the result in projection_event with full audit envelope per cockpit-unified-interface.md. " +
       "The caller's model is auto-registered in model_registry on first submission (caller_kind='walkin', base_trust=0.30 — accumulates reputation over time). The prompt is auto-registered in prompt_template_registry on first submission. " +
@@ -863,6 +894,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "confirm_work_session",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Confirm, Amend or Reject Work Session" },
     description:
       "Owner-confirmation gate for the labor ledger. Turns an inferred work_session (status auto_inferred/completed — produced by the photo→labor pipeline or the dT cluster.work_transition operator, base_trust ~0.30) into an owner-confirmed FACT. Per the value-accrual rule, labor value reaches the ledger ONLY on confirm/amend, never from inference alone. " +
       "decision='confirm' accepts the existing inferred numbers; 'amend' applies owner-supplied labor_hours/labor_rate/parts (recomputes total_job_cost); 'reject' records that no billable labor happened (no value; the row is NOT deleted). Sets work_sessions.status + finalized_at + metadata.owner_confirmation, and logs the decision as a high-trust projection_event atom (attribute cluster.work_transition_confirmed) for the audit trail.",
@@ -885,6 +917,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_invoice",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Invoice Projection" },
     description:
       "Project a customer invoice as a deterministic SQL composition over substrate atoms. Wraps `resolve_work_order_status(query)` and writes the result to projection_event with audit envelope per cockpit-unified-interface.md. Same engine the tax-meld pipeline (per project_tax_filing_as_first_meld_mvp.md) is built on. " +
       "subject = vehicle/work_order; attribute = 'invoice_artifact'; audience selects field set ('client' = customer-facing, 'irs' = audit-defensible with full provenance, 'internal' = unredacted). Re-projects on substrate change; the audit row in projection_event is the durable record.",
@@ -903,6 +936,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_work_log",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Work Log Projection" },
     description:
       "Project a shop work-log for a given date as a deterministic SQL composition over substrate atoms (photos + work_order labor + work_order parts + payments + receipts). Same engine as project_invoice, time-bounded subject. " +
       "Audience tiers: public = customer-facing journal post (atom-attributed but redacted), owner = full shop diary, counterparty = customer-facing per-vehicle. Pass vehicle_id to scope to one build; omit to compose across all activity that day. " +
@@ -923,6 +957,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_money_flow",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Money Flow Projection" },
     description:
       "Project a money-flow artifact for a date range — composes (1) accounts receivable: open invoices / work-orders less collected payments, (2) expenses out grouped by scope (NUKE LTD / Viva / Personal / Per-Vehicle), (3) monthly income vs expense over the trailing window. Same projection_event audit pattern as project_work_log. Powers nuke.ag/me/money. " +
       "Audience: owner = unredacted full ledger (default); counterparty = scoped to caller's own AR/AP only.",
@@ -942,6 +977,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_subject_atoms",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Subject Claims" },
     description:
       "Read-side companion to submit_attribute_value. Returns every projection_event atom recorded for a subject, grouped by attribute with all observer submissions visible (no top-K curation per feedback_authentic_data_no_topk_curation.md). Each atom carries caller model + caller's base_trust + confidence + recorded_at. " +
       "Consumers synthesize: corroborated atoms from multiple callers raise effective confidence; contradicting atoms surface dialectic. Use this to query what the laser-tag harness has accumulated for any image / vehicle / shop_day before composing a projection (work_log, invoice, profile, journal post).",
@@ -958,6 +994,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "find_subjects_needing_atoms",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Find Subjects Needing Claims" },
     description:
       "Discovery surface for walk-in callers: given a subject_kind (image / vehicle / user), return subjects with thin atom coverage (fewer than min_atoms in projection_event). Activates the laser-tag harness at scale — any caller can hit this, get a worklist, run get_attribute_checklist for each subject, submit answers via submit_attribute_value. " +
       "Without this, callers don't know where to start. With it, the entire third-party-LLM compute base can attack thin substrate spots in priority order. Defaults: subject_kind=image, min_atoms=3, limit=20, recent_only=true (last 90 days). 'user' was added 2026-05-24 per Skylar directive — surfaces auth.users rows whose user-profile attributes (display_identity / contact_surface / role_set / possession_set / etc.) need filling.",
@@ -975,6 +1012,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "synthesize_attribute",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Synthesize Attribute Consensus" },
     description:
       "Dialectic synthesis (L4 of project_signal-substrate-five-layer.md). Given a subject + attribute, returns a single consensus value computed from all non-retracted atoms, weighted by each caller's base_trust × confidence. " +
       "Output: { consensus: { label, weighted_confidence, support, contradiction_score, distinct_callers }, contributing_atoms[] }. Consumers (vehicle profile, work_log render, invoice composer) use this when they want ONE answer per attribute instead of the raw atom stream from query_subject_atoms. " +
@@ -990,6 +1028,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_attribute",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Attribute Consensus Projection" },
     description:
       "Canonical weighted-consensus projection. Calls the SQL function project_attribute(p_subject_id, p_attribute) — the SAME engine that powers vehicle_wiki_view — so the answer you get here is byte-for-byte the answer the vehicle profile renders. " +
       "Prefer this over synthesize_attribute when you want the system's authoritative single value for a (subject, attribute): synthesize_attribute is a separate TS reimplementation of the same idea and can drift from the SQL truth. This tool has no drift — it IS the canonical engine. " +
@@ -1005,6 +1044,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "propose_attribute",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Propose New Attribute" },
     description:
       "Propose a NOVEL attribute the registry LACKS (e.g. 'image.weld_pattern_type', 'image.media_blast_profile', 'image.period_correct_finish') so a real discovery isn't lost when get_attribute_checklist has no slot for it. " +
       "This is the ONLY tool that can grow the attribute vocabulary — without it, anything the checklist doesn't already name is dropped. Records a schema_proposals row (proposal_type='add_image_attribute', status='open') with full source DNA. A human curator reviews and promotes accepted proposals into attribute-registry.ts; promotion stays HUMAN by design (laser-tag doctrine — the agent grows the vocabulary, the human signs it). " +
@@ -1030,6 +1070,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_attribute_values",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Batch Attribute Claims" },
     description:
       "Batch version of submit_attribute_value. Caller submits an array of {attribute, value, confidence, basis_signals?, candidates?} for the same subject + model_slug in a single call. Returns array of projection_event_ids in submission order, with per-row error if validation/insert failed. " +
       "Drastically reduces round-trips when iterating a checklist (17 atoms in 1 call instead of 17). Same auto-registration semantics as submit_attribute_value (caller_kind=walkin, base_trust=0.30 on first call).",
@@ -1073,6 +1114,7 @@ const TOOLS: ToolDef[] = [
   // ── Actors & Organizations ────────────────────────────────────────────
   {
     name: "search_organizations",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Organizations" },
     description:
       "Search 4,975 organizations — dealers, auction houses, restoration shops, builders, collectors. " +
       "Filter by business type and/or location. Results contain only confirmed data. Null values mean 'not recorded'.",
@@ -1093,6 +1135,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_organization",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Organization Record" },
     description:
       "Get full organization profile by ID. Includes inventory summary, reputation, location, and linked vehicles.",
     inputSchema: {
@@ -1107,6 +1150,7 @@ const TOOLS: ToolDef[] = [
   // ── Ingestion ─────────────────────────────────────────────────────────
   {
     name: "extract_listing",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true, title: "Extract and Ingest Vehicle Listing" },
     description:
       "Extract structured vehicle data from any listing URL. Works on BaT, Cars & Bids, Craigslist, eBay Motors, FB Marketplace, Hagerty, and thousands more. Returns year, make, model, VIN, price, images.",
     inputSchema: {
@@ -1120,6 +1164,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_observation",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Vehicle Observation" },
     description:
       "Submit an observation about a vehicle through the governed pipeline. All writes go through ingest-observation, respecting pipeline_registry. Returns observation_id and dedup status.",
     inputSchema: {
@@ -1141,6 +1186,7 @@ const TOOLS: ToolDef[] = [
   // ── External Agent Write API (v1/events) ──────────────────────────────
   {
     name: "submit_vehicle_event",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Vehicle Event" },
     description:
       "Submit a vehicle event via the public /v1/events envelope, keyed by VIN. Use this when a user describes work performed, observations made, or notes about a specific vehicle they own. event_type='service' for shop work / inspections / modifications, 'note' for general comments. Returns event_id (= observation_id) on success. The vehicle must already exist in NUKE — call create_profile or vehicle ingestion first if it doesn't.",
     inputSchema: {
@@ -1169,6 +1215,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_event_schema",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Event Schema" },
     description:
       "Return the JSON Schema for a given event_type so an agent can self-validate its payload before calling submit_vehicle_event. Currently supports 'service' and 'note'. Use this to discover what fields are expected.",
     inputSchema: {
@@ -1181,6 +1228,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_event_checklist",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Event Checklist" },
     description:
       "Return a Claude-actionable per-field checklist for a given event_type. Each field includes type, required flag, plain-language description, why_it_matters, and three booleans — vision_fillable, context_fillable, tool_fillable — that tell the agent how to source the value. Use this BEFORE submit_vehicle_event so the agent fills the structured form instead of dumping a free-form blob. Supported event_types: service, note, inspection, modification, condition_assessment.",
     inputSchema: {
@@ -1197,6 +1245,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "verify_vehicle_access",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Check Vehicle Access" },
     description:
       "Given the caller's API key, return whether it has read or write access to events for a specific VIN. Use this BEFORE attempting submit_vehicle_event so you can surface a 'connect Nuke and grant scope' message instead of triggering a 403. Returns { can_write, can_read, scopes_matched, vehicle_in_nuke }.",
     inputSchema: {
@@ -1211,6 +1260,7 @@ const TOOLS: ToolDef[] = [
   // ── Auction Readiness ───────────────────────────────────────────────
   {
     name: "get_auction_readiness",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Get or Recompute Auction Readiness" },
     description:
       "Get the Auction Readiness Score for a vehicle. Returns a 6-dimension score (0-100) indicating how ready the vehicle is for auction submission, with specific coaching prompts for closing gaps.",
     inputSchema: {
@@ -1223,6 +1273,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_coaching_plan",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Get Coaching Plan and Persist Readiness" },
     description:
       "Get a prioritized coaching plan for improving a vehicle's auction readiness. Returns ordered actions (photo uploads, data entry, narrative writing) with specific prompts and point values.",
     inputSchema: {
@@ -1235,6 +1286,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "prepare_listing",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Prepare Listing Preview and Persist Readiness" },
     description:
       "Generate a listing package preview for a vehicle. Pulls identity, ordered photos, structured fields, and valuation data into a submission-ready bundle. Vehicle should be TIER 1 or TIER 2.",
     inputSchema: {
@@ -1250,6 +1302,7 @@ const TOOLS: ToolDef[] = [
   // ── User Onboarding & Account Linking ────────────────────────────
   {
     name: "create_profile",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Create User Profile and API Key" },
     description:
       "Create a new Nuke user profile via email. Zero-friction onboarding — call this when a user wants to join Nuke. " +
       "If the email already exists, returns the existing profile (idempotent). " +
@@ -1267,6 +1320,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_profile",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get User Profile" },
     description:
       "Look up an existing Nuke user profile by email or user_id. Returns profile details, linked accounts, and vehicle count.",
     inputSchema: {
@@ -1279,6 +1333,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "link_account",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Link External Account" },
     description:
       "Request to link an external platform account (BaT, Cars & Bids, Hemmings, Instagram, etc.) to a Nuke user. " +
       "Creates a pending claim that must be verified. Returns a preview of what data would be linked (comments, bids, vehicles).",
@@ -1299,6 +1354,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "verify_account_link",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Verify External Account Link" },
     description:
       "Complete verification of a pending account link claim. Methods: email_match (compare emails), profile_url_proof (user provides proof URL), manual_review (submit for admin review).",
     inputSchema: {
@@ -1317,6 +1373,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "list_linked_accounts",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "List Linked Accounts" },
     description:
       "Show all external platform accounts linked to a Nuke user, with verification status and data counts.",
     inputSchema: {
@@ -1331,6 +1388,7 @@ const TOOLS: ToolDef[] = [
   // ── Photo Ingest ────────────────────────────────────────────────────
   {
     name: "ingest_photos",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Upload and Ingest Vehicle Photos" },
     description:
       "Ingest vehicle photos into Nuke. Accepts base64-encoded images or URLs. " +
       "Use this when a user wants to upload, catalog, or document their vehicle with photos. " +
@@ -1378,6 +1436,8 @@ const TOOLS: ToolDef[] = [
   // ── SQL Query ──────────────────────────────────────────────────────
   {
     name: "execute_sql",
+    // SELECT expressions may invoke mutating RPCs; the keyword guard cannot guarantee read-only.
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Execute SQL Query" },
     description:
       "Execute raw SQL against the Nuke Postgres database. Use this for ad-hoc queries, " +
       "data exploration, and analytics that aren't covered by other tools. Returns rows " +
@@ -1399,6 +1459,7 @@ const TOOLS: ToolDef[] = [
   // ── Composite Auction Briefing ───────────────────────────────────────
   {
     name: "get_auction_briefing",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Auction Briefing" },
     description:
       "Get a complete auction briefing for a vehicle in one call. Returns identity, live auction data (bids/views/watchers), " +
       "Nuke Estimate valuation, seller profile and analytics, comparable sales, market history, comment sentiment, " +
@@ -6180,14 +6241,39 @@ function handleInitialize(req: JsonRpcRequest): JsonRpcResponse {
   });
 }
 
-function handleToolsList(req: JsonRpcRequest): JsonRpcResponse {
-  return rpcResult(req.id, { tools: TOOLS });
+// Explicit allowlist: adding a tool to the full connector never exposes it to ChatGPT.
+// Keep broad record/observation reads, private projections, SQL and all writes out.
+const CHATGPT_TOOL_NAMES = new Set([
+  "describe_platform",
+  "search_vehicles",
+  "search_vehicles_advanced",
+  "browse_inventory",
+  "decode_vin",
+  "get_vehicle",
+  "get_valuation",
+  "get_comps",
+  "query_market_history",
+  "search_organizations",
+]);
+
+function isChatGptSurface(req: Request): boolean {
+  return req.headers.get("x-nuke-surface") === "chatgpt" ||
+    new URL(req.url).searchParams.get("surface") === "chatgpt";
 }
 
-async function handleToolsCall(req: JsonRpcRequest): Promise<JsonRpcResponse> {
+function handleToolsList(req: JsonRpcRequest, chatgptSurface = false): JsonRpcResponse {
+  const tools = chatgptSurface ? TOOLS.filter((tool) => CHATGPT_TOOL_NAMES.has(tool.name)) : TOOLS;
+  return rpcResult(req.id, { tools });
+}
+
+async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse> {
   const params = req.params as { name: string; arguments?: Record<string, unknown> } | undefined;
   if (!params?.name) {
     return rpcError(req.id, -32602, "Missing tool name");
+  }
+
+  if (chatgptSurface && !CHATGPT_TOOL_NAMES.has(params.name)) {
+    return rpcError(req.id, -32602, `Tool not available on ChatGPT surface: ${params.name}`);
   }
 
   const handler = TOOL_HANDLERS[params.name];
@@ -6208,7 +6294,7 @@ function handlePing(req: JsonRpcRequest): JsonRpcResponse {
   return rpcResult(req.id, {});
 }
 
-async function handleJsonRpc(body: JsonRpcRequest): Promise<JsonRpcResponse | null> {
+async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse | null> {
   // Notifications (no id) — return null to signal 202
   if (body.id === undefined || body.id === null) {
     if (body.method === "notifications/initialized") {
@@ -6224,9 +6310,9 @@ async function handleJsonRpc(body: JsonRpcRequest): Promise<JsonRpcResponse | nu
     case "initialize":
       return handleInitialize(body);
     case "tools/list":
-      return handleToolsList(body);
+      return handleToolsList(body, chatgptSurface);
     case "tools/call":
-      return await handleToolsCall(body);
+      return await handleToolsCall(body, chatgptSurface);
     case "ping":
       return handlePing(body);
     default:
@@ -6372,7 +6458,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Route to MCP handler
-  const response = await handleJsonRpc(body);
+  const response = await handleJsonRpc(body, isChatGptSurface(req));
 
   // Notifications get 202 (no body)
   if (response === null) {
