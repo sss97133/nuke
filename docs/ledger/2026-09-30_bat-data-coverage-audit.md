@@ -224,6 +224,81 @@ overlap with §4.2 and §4.5.
     read as 09-30 00:00, already past. Two others showed an end of 10-01 00:00. The 15-minute sync restores
     the timestamp, and the next read truncates it again, adding one more correction record each time.
 
+### 4.6 Running lots written as ended: the 15 rows
+
+15 `auction_events` rows read `bid_to` on lots that haven't ended. They are the SL500 (read 22:28Z) and my 14
+sample lots (23:47–23:49Z):
+
+  - `683145ab-e951-45fd-b186-63c8bbc3a1c3` 1999-mercedes-benz-sl500-347, ends 2026-09-30 17:31Z
+  - `07e67aa8-fdfa-4b91-9371-d2e5e4237b64` 2006-toyota-tundra-77, ends 2026-09-30 18:23Z
+  - `dceb73dd-764f-4278-b5ca-980487f8e9d9` 2008-bmw-328i-convertible-34, ends 2026-09-30 19:40Z
+  - `95b589d8-5c5d-40c0-8dd1-ecf0168f0670` 2001-suzuki-carry-pickup-4wd-5-speed-3, ends 2026-09-30 20:59Z
+  - `0551d335-1f35-4a46-918c-05d4207c335c` 2015-ferrari-458-speciale-40, ends 2026-10-01 17:10Z
+  - `8751a4c0-3a1c-4c13-a1b2-714def5e6072` 1969-lincoln-continental-mark-iii-19, ends 2026-10-01 19:16Z
+  - `4fce884c-6103-4673-8ce9-975608bd94a9` 1997-toyota-rav4-22, ends 2026-10-01 20:11Z
+  - `8d0c13c4-6306-4d21-99f7-7f59f97d7c55` 2003-chevrolet-s-10-37, ends 2026-10-01 20:51Z
+  - `0f5f6148-37d7-470e-89f9-206265d87c2f` 2008-lamborghini-murcielago-lp640-roadster-16, ends 2026-10-02 17:00Z
+  - `b86a17e5-fd37-44d7-a39e-5e5c9bc37944` 2001-plymouth-prowler-57, ends 2026-10-03 18:11Z
+  - `7ae36754-1753-449b-abac-85d99024cb9a` 1975-honda-cb200t-13, ends 2026-10-03 19:09Z
+  - `82c21964-98f8-426e-b5be-c0b4aa771a0c` 1961-scootacar-mk1, ends 2026-10-04 17:44Z
+  - `3007b540-d023-4488-b599-9509aaf2057f` 2001-toyota-tundra-31, ends 2026-10-05 18:45Z
+  - `6300566d-df29-4012-bb89-3ae8f9742a4b` 2009-smart-fortwo-cabrio-6, ends 2026-10-05 18:58Z
+  - `734bb780-ef7c-4352-a012-7507203bf3ce` 2005-jeep-wrangler-310, ends 2026-10-06 17:47Z
+
+**1. Do they fix themselves? Yes, 14 of 15, when each lot is settled.**
+- The reader upserts `auction_events` with `onConflict: "vehicle_id,source_url"`, the unique index
+  `idx_auction_events_vehicle_source_url`.
+- `source_url` is `canonicalUrl(input)`: no trailing slash, no query. The drain passes the catalog URL
+  with a trailing slash, which canonicalises to the same key.
+- So the settlement read rewrites the same row (same id) with the closed page's outcome, high bid and
+  winning bid.
+- None of the 15 has an `import_queue` row, so bat-closed-lots-sync can queue each after its close (the
+  sync runs at 06:50Z and covers the previous day's closes).
+
+Caveats:
+- **Not yet shown through the drain.** No lot read mid-auction has been settled through the drain yet.
+  - The first will be the 2000 Cobra R: event `cff75f24-33e5-43ea-ae20-058962d47db6`, read 09-29 11:23Z,
+    closed 18:53Z. It still reads `bid_to` $85,000, and it has no queue row yet.
+  - The 09-30 06:50Z sync should queue it. Check after about 07:15Z:
+    `select outcome, winning_bid, updated_at from auction_events where id = 'cff75f24-33e5-43ea-ae20-058962d47db6'`.
+- **History.** Of 3,521 BaT event rows created before their lot closed, 1,947 were rewritten after the
+  close (the same row: created < end < updated). 1,559 never were, and 1,106 of those still read `bid_to`:
+  lots nobody read after the close.
+- **The exception.** The 2009 Smart fortwo (`6300566d`) won't heal. `validate_import_url` will auto-skip
+  its settlement queue row ("smart" contains "art", §4.1 item 4), so the drain never reads it. It heals only
+  if P4 lands before the 10-06 06:50Z sync, or if it is re-read through `extract-bat-core` after 10-05
+  18:58Z.
+- **The motorcycle** (1975 Honda CB200T, `7ae36754`) heals if the reader's quality gate accepts it at
+  settlement; untested.
+
+**2. Who reads `auction_events.outcome`, and does any of them take future-dated rows?** Nobody counts these
+rows as results. No DB reader filters on the end date, but none counts `bid_to` either.
+- **DB functions:**
+  - `get_auction_comps` and `get_comps_scored` take `outcome = 'sold' AND winning_bid > 0` only.
+  - `backfill_transfers_for_sold_auctions` takes `outcome = 'sold'` only.
+  - `queue_bat_backfill_vehicles` is unscheduled. It flags a `sale_price` whose event isn't `sold`, and
+    live rows have no `sale_price`.
+  - `get_user_reconciliation` reads the owner's own lots, and only their counts and end dates.
+  - `mark_active_auctions` reads `ae.ends_at`, a column `auction_events` doesn't have; it's dead.
+- **Not readers at all:** the market board (`market_pulse_live`: vehicles and hammer_predictions), the
+  cohort terminal (`get_make_model_terminal`: vehicle_events) and the band backtests (the local archive).
+- **The vehicle page's auction band** (`auctionSequence.ts`) joins the outcome with
+  `vehicle_events.event_status`. All 15 have an `active` vehicle_events row, so "bid_to active" classifies
+  as `live`, which is correct.
+  - Its regex tests `reserve_not_met` before `live`, though. A reserve lot read mid-auction would show
+    "reserve not met". That's P0a.
+- **`ValueProvenancePopup`** lists the raw outcome ("bid to"). It opens from the VehicleHeader price, whose
+  row has been display:none since 2026-03-21. I didn't check the live page for another way in.
+- **Counts over outcomes** (this audit's §2 and any coverage probe) treat the 15 as unsold until they close.
+
+**3. No SQL write proposed.**
+- No sanctioned writer covers `auction_events`. `retire_rows` allows only `auction_comments`, and
+  `correct_vehicle_event_link` covers `vehicle_events`. The reader is this table's writer, and it rewrites
+  these rows at settlement.
+- To correct them before they close: ship P0a (outcome `live` for a running lot), then re-read the 15 URLs
+  through `extract-bat-core`. Each upsert rewrites its own row to `live`.
+- For the Smart, P4 as well.
+
 ## 5. The temperature
 
 **What "cold" is today.** The homepage board (`nuke_frontend/src/pages/market/MarketPulse.tsx`) computes
