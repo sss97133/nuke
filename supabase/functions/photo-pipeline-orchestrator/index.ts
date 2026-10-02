@@ -18,6 +18,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { classifyImage, type ClassificationResult } from "./classifier.ts";
+import { persistPipelineState, type PipelineReceipt } from "./persistence.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
@@ -25,44 +27,26 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-// Image type classification categories
-type ImageType =
-  | "vehicle_exterior"
-  | "vehicle_interior"
-  | "engine_bay"
-  | "undercarriage"
-  | "detail_closeup"
-  | "vin_plate"
-  | "part_closeup"
-  | "receipt_document"
-  | "progress_shot"
-  | "other";
-
-type ImageMedium = 'photograph' | 'render' | 'drawing' | 'screenshot';
-
-interface ClassificationResult {
-  image_type: ImageType;
-  confidence: number;
-  is_automotive: boolean;
-  description: string;
-  detected_text?: string[];
-  vin_detected?: string;
-  image_medium?: ImageMedium;
-  medium_context?: string;
-  vehicle_hints?: {
-    make?: string;
-    model?: string;
-    year_range?: string;
-    color?: string;
-  };
-  /**
-   * false = this is NOT a real Gemini verdict — it's a stand-in produced because
-   * the classifier was rate-limited, errored, or unconfigured. Root-cause fix
-   * (2026-07-06, the 429/hollow-completion incident): this flag is what lets
-   * Step 7 stop lying with ai_processing_status='completed'. Absent/true = a
-   * real classification (or no classifier condition applies).
-   */
-  classifier_ok?: boolean;
+async function persistImageState(
+  imageId: string, receipt: PipelineReceipt, state: Record<string, unknown>,
+  metadata: Record<string, unknown> = {},
+  source?: { image_url: string; vehicle_id: string | null },
+): Promise<void> {
+  await persistPipelineState({
+    async read() {
+      const { data, error } = await supabase.from("vehicle_images")
+        .select("ai_scan_metadata, updated_at, image_url, vehicle_id").eq("id", imageId).single();
+      if (error || !data?.updated_at) throw new Error("photo_pipeline_metadata_read_failed");
+      return { metadata: data.ai_scan_metadata ?? {}, updated_at: data.updated_at,
+        image_url: data.image_url, vehicle_id: data.vehicle_id };
+    },
+    async compareAndSwap(snapshot, patch) {
+      const { data, error } = await supabase.from("vehicle_images")
+        .update(patch).eq("id", imageId).eq("updated_at", snapshot.updated_at).select("id");
+      if (error) throw new Error("photo_pipeline_metadata_write_failed");
+      return data?.length === 1;
+    },
+  }, receipt, state, metadata, source);
 }
 
 interface PipelineInput {
@@ -85,6 +69,16 @@ Deno.serve(async (req) => {
   }
 
   const startedAt = Date.now();
+  const attemptId = crypto.randomUUID();
+  let processingImageId: string | null = null;
+  let processingSource: { image_url: string; vehicle_id: string | null } | undefined;
+  const receipt = (imageId: string, outcome: PipelineReceipt["outcome"]): PipelineReceipt => ({
+    receipt_id: `${attemptId}:${imageId}:${outcome}`,
+    attempt_id: attemptId,
+    image_id: imageId, method: "photo-pipeline-orchestrator", pipeline_version: "v2", receipt_version: 1,
+    outcome, processing_started_at: new Date(startedAt).toISOString(),
+    processing_finished_at: outcome === "processing" ? null : new Date().toISOString(),
+  });
 
   try {
     const input = await req.json();
@@ -115,7 +109,7 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(limit);
       if (ownerErr) {
-        console.error(`[photo-pipeline] process_pending owner-query error: ${ownerErr.message}`);
+        throw new Error("photo_pipeline_owner_queue_read_failed");
       }
 
       let pendingImages = ownerPending ?? [];
@@ -138,7 +132,7 @@ Deno.serve(async (req) => {
           .limit(limit);
 
         if (backlogErr) {
-          console.error(`[photo-pipeline] process_pending backlog-query error: ${backlogErr.message}`);
+          throw new Error("photo_pipeline_backlog_queue_read_failed");
         }
 
         for (const row of backlogPending ?? []) {
@@ -194,27 +188,38 @@ Deno.serve(async (req) => {
             },
           );
           const result = await resp.json();
-          results.push({ image_id: img.id, success: true, classification: result.classification });
+          results.push({ image_id: img.id, success: resp.ok && result.success === true,
+            classification: result.classification, classifier_ok: result.classifier_ok });
         } catch (err: any) {
           results.push({ image_id: img.id, success: false, error: err.message });
         }
       }
 
-      // Bulk update junk URLs in one query
-      if (junkIds.length > 0) {
-        await supabase.from("vehicle_images").update({
-          ai_processing_status: "completed",
-          ai_scan_metadata: { pipeline_version: "v2", skipped: "junk_url_batch" },
-        }).in("id", junkIds);
+      // Policy skips preserve concurrent producers' metadata too.
+      for (const imageId of junkIds) {
+        try {
+          const image = pendingImages.find(r => r.id === imageId)!;
+          const source = { image_url: image.image_url, vehicle_id: image.vehicle_id };
+          await persistImageState(imageId, receipt(imageId, "processing"),
+            { ai_processing_status: "processing" }, {}, source);
+          await persistImageState(imageId, receipt(imageId, "policy_skip"),
+            { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url_batch" }, source);
+        } catch {
+          const result = results.find(r => r.image_id === imageId);
+          if (result) result.success = false;
+        }
       }
 
       return new Response(
-        JSON.stringify({ success: true, processed: results.length, results }),
+        JSON.stringify({ success: results.every(r => r.success),
+          processed: results.filter(r => r.success).length, attempted: results.length, results }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const { image_id, image_url, vehicle_id, user_id } = input as PipelineInput;
+    const { image_id, image_url } = input as PipelineInput;
+    const vehicle_id = input.vehicle_id ?? null;
+    const user_id = input.user_id ?? null;
 
     if (!image_id || !image_url) {
       return new Response(
@@ -223,6 +228,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    const { data: imageRow, error: imageError } = await supabase.from("vehicle_images")
+      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at, is_external, image_url, vehicle_id")
+      .eq("id", image_id).single();
+    if (imageError || !imageRow) throw new Error("photo_pipeline_image_read_failed");
+    if (imageRow.image_url !== image_url || imageRow.vehicle_id !== vehicle_id) {
+      throw new Error("photo_pipeline_source_changed");
+    }
+    processingSource = { image_url: imageRow.image_url, vehicle_id: imageRow.vehicle_id };
+    processingImageId = image_id;
+    await persistImageState(image_id, receipt(image_id, "processing"),
+      { ai_processing_status: "processing", ai_processing_started_at: new Date(startedAt).toISOString() }, {}, processingSource);
+
     // Skip garbage URLs (tracking pixels, ads, non-image URLs)
     const JUNK_PATTERNS = [
       /facebook\.com\/tr/i, /googleads/i, /doubleclick/i,
@@ -230,10 +247,8 @@ Deno.serve(async (req) => {
       /\.gif\?/, /pixel\./, /beacon\./,
     ];
     if (JUNK_PATTERNS.some(p => p.test(image_url))) {
-      await supabase.from("vehicle_images").update({
-        ai_processing_status: "completed",
-        ai_scan_metadata: { pipeline_version: "v2", skipped: "junk_url", url_pattern: image_url.substring(0, 80) },
-      }).eq("id", image_id);
+      await persistImageState(image_id, receipt(image_id, "policy_skip"),
+        { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url" }, processingSource);
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "junk_url", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -243,17 +258,6 @@ Deno.serve(async (req) => {
     console.log(`[photo-pipeline] Processing image ${image_id}`);
 
     // Step 1: Mark as processing + read pre-computed Apple ML data
-    const { data: imageRow } = await supabase
-      .from("vehicle_images")
-      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at, is_external")
-      .eq("id", image_id)
-      .maybeSingle();
-
-    await supabase
-      .from("vehicle_images")
-      .update({ ai_processing_status: "processing" })
-      .eq("id", image_id);
-
     // Step 1.5: Cross-sweep moment dedup. A library re-sweep (iphoto /
     // hd_archive / ssd_blast-style bulk ingest) re-lands an already-ingested
     // capture moment as a new export — different file_hash (invisible to
@@ -276,14 +280,9 @@ Deno.serve(async (req) => {
         if (self?.is_duplicate) {
           // Merge, never replace: the detector just wrote its
           // duplicate_collapse breadcrumb into ai_scan_metadata.
-          await supabase.from("vehicle_images").update({
-            ai_processing_status: "completed",
-            ai_scan_metadata: {
-              ...(self.ai_scan_metadata || {}),
-              pipeline_version: "v2",
-              skipped: "cross_sweep_duplicate",
-            },
-          }).eq("id", image_id);
+          await persistImageState(image_id, receipt(image_id, "policy_skip"),
+            { ai_processing_status: "completed" },
+            { pipeline_version: "v2", skipped: "cross_sweep_duplicate" }, processingSource);
           return new Response(
             JSON.stringify({ success: true, image_id, classification: "cross_sweep_duplicate", skipped: true, duration_ms: Date.now() - startedAt }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -298,15 +297,13 @@ Deno.serve(async (req) => {
     // Fast-path: if Apple ML pre-scored this as non-automotive (score 0), skip Gemini
     if (vehicleScore !== null && vehicleScore === 0 && appleLabels.length > 0) {
       console.log(`[photo-pipeline] Apple ML score=0, skipping Gemini (labels: ${appleLabels.join(', ')})`);
-      await supabase.from("vehicle_images").update({
-        ai_processing_status: "completed",
-        ai_scan_metadata: {
+      await persistImageState(image_id, receipt(image_id, "policy_skip"),
+        { ai_processing_status: "completed" }, {
           pipeline_version: "v2",
           skipped: "apple_ml_non_automotive",
           apple_ml_labels: appleLabels,
           vehicle_score: vehicleScore,
-        },
-      }).eq("id", image_id);
+        }, processingSource);
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "non_automotive_apple_ml", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -314,7 +311,23 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Classify image type (Gemini Flash)
-    const classification = await classifyImage(image_url);
+    const classification = await classifyImage(image_url,
+      Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
+      Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key"));
+    // A missing classifier is operational failure, not visual testimony. No
+    // second paid model or deep queue is automatically invoked to rescue it.
+    if (classification.classifier_ok === false) {
+      const detail = classification.classifier_receipt;
+      await persistImageState(image_id, {
+        ...receipt(image_id, "failed"), classifier_model: detail?.model ?? null,
+        classifier_attempts: detail?.attempts ?? 0, failure_phase: detail?.failure_phase,
+        error_class: detail?.error_class, http_status: detail?.http_status,
+      }, { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
+      { pipeline_version: "v2", classifier_failed: true, classification }, processingSource);
+      return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false,
+        state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     // Merge Apple ML hints into classification if Gemini didn't detect vehicle hints
     if (appleLabels.length > 0 && !classification.vehicle_hints?.make) {
       classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
@@ -337,8 +350,9 @@ Deno.serve(async (req) => {
     );
 
     // Step 5: Create observation
+    let observation: { id: string; status: "created" | "existing" } | null = null;
     if (resolvedVehicleId) {
-      await createObservation(
+      observation = await createObservation(
         classification,
         image_id,
         image_url,
@@ -357,32 +371,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 7: Mark as completed — UNLESS the classifier itself never actually ran
-    // (rate-limited / errored / unconfigured). Root-cause fix for the 429/hollow-
-    // completion incident (2026-07-06): 13,718 rows were hitting Gemini 429s and
-    // 7,138 of those settled as ai_processing_status='completed' with nothing but
-    // a failure string in ai_scan_metadata — the flag was lying about what
-    // happened. classifier_ok===false means classifyImage() never got a real
-    // verdict; the honest terminal state is 'failed', NOT 'completed'. The rest
-    // of the pipeline (resolveVehicle/routeByType/enqueueDeepByok/createObservation)
-    // still ran above — this only changes the status label, so the BYOK deep-tier
-    // rescue path is untouched.
-    //
-    // Why 'failed' and not a new 'needs_retry' status: reset_stuck_photo_pipeline_images()
-    // (15-min cron) ALREADY sweeps 'failed' with exactly the retry-budgeted semantics
-    // this needs (ai_retry_count < 3 -> reset to 'pending' for a fresh whole-pipeline
-    // pass with new jittered backoff; >= 3 -> stays 'failed', an honest terminal state)
-    // — verified live against the deployed function. The 2026-06-18 comment this
-    // replaces believed re-throwing here caused an infinite failed->pending loop; that
-    // is not what the live cron does (it's retry-count-gated), so the workaround
-    // (silently faking 'completed') is no longer needed. A distinct 'needs_retry'
-    // status was tried first but would need its own partial index — CONCURRENTLY
-    // build on this table's 39M rows exceeds the 120s statement_timeout ceiling even
-    // for a narrow predicate (confirmed empirically, twice, cleanly rolled back) — so
-    // reusing 'failed' (zero new indexes, zero schema risk, already the flag frontend
-    // code already renders) is the correct-not-just-easier choice.
+    // Step 7: Persist processing state and the classifier receipt. Failures
+    // returned above before claim/handler creation. The existing hourly reset
+    // owns the finite retry budget; no schedule is changed by this writer patch.
     const durationMs = Date.now() - startedAt;
-    const classifierFailed = classification.classifier_ok === false;
+    const classifierFailed = false; // failed classifiers returned before claim creation
     const scanMeta: Record<string, any> = {
       pipeline_version: "v2",
       classification,
@@ -391,8 +384,7 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString(),
       classifier_failed: classifierFailed, // queryable top-level flag, not buried in nested JSON
     };
-    // P3.2: stamp the observable deep-queue marker here (step 7 rewrites
-    // ai_scan_metadata, so enqueueDeepByok deliberately doesn't write it itself —
+    // P3.2: stamp the observable deep-queue marker in the owned patch here —
     // it only flips the gate column, the real prepare() selection key). NOT
     // byok_deep_analysis, which would make prepare() think the deep work is done.
     if (routeResult.deep_enqueued) {
@@ -404,7 +396,7 @@ Deno.serve(async (req) => {
     }
     const updatePayload: Record<string, any> = {
       ai_processing_status: classifierFailed ? "failed" : "completed",
-      ai_scan_metadata: scanMeta,
+      ai_processing_completed_at: new Date().toISOString(),
     };
     if (resolvedVehicleId && !vehicle_id) {
       updatePayload.vehicle_id = resolvedVehicleId;
@@ -413,10 +405,13 @@ Deno.serve(async (req) => {
     if (classification.image_medium) {
       updatePayload.image_medium = classification.image_medium;
     }
-    await supabase
-      .from("vehicle_images")
-      .update(updatePayload)
-      .eq("id", image_id);
+    await persistImageState(image_id, {
+      ...receipt(image_id, "completed"),
+      classifier_model: classification.classifier_receipt?.model ?? null,
+      classifier_attempts: classification.classifier_receipt?.attempts ?? 0,
+      observation_id: observation?.id,
+      observation_status: observation?.status ?? "no_vehicle",
+    }, updatePayload, scanMeta, processingSource);
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
@@ -436,6 +431,8 @@ Deno.serve(async (req) => {
         image_id,
         classification: classification.image_type,
         classifier_ok: !classifierFailed,
+        state_persisted: true,
+        observation_id: observation?.id ?? null,
         vehicle_id: resolvedVehicleId,
         vehicle_resolved: !!resolvedVehicleId,
         route: routeResult.summary,
@@ -444,27 +441,20 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
-    console.error("[photo-pipeline] Error:", error);
+    console.error("[photo-pipeline] Operation failed");
 
     // Try to mark as failed
     try {
-      const { image_id } = await req.clone().json().catch(() => ({ image_id: null }));
-      if (image_id) {
-        await supabase
-          .from("vehicle_images")
-          .update({
-            ai_processing_status: "failed",
-            ai_scan_metadata: {
-              pipeline_error: error.message,
-              failed_at: new Date().toISOString(),
-            },
-          })
-          .eq("id", image_id);
+      if (processingImageId && processingSource && !["photo_pipeline_source_changed", "photo_pipeline_stale_attempt"].includes(error?.message)) {
+        await persistImageState(processingImageId, {
+          ...receipt(processingImageId, "failed"), failure_phase: "pipeline",
+          error_class: "pipeline_operation_failed",
+        }, { ai_processing_status: "failed" }, { pipeline_error: "pipeline_operation_failed" }, processingSource);
       }
     } catch (_) { /* best-effort */ }
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: "photo_pipeline_operation_failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
@@ -508,171 +498,6 @@ async function flagCrossSweepDuplicates(vehicleId: string, takenAt: string): Pro
 }
 
 // ============================================================
-// CLASSIFY IMAGE (Gemini Flash — cheap and fast)
-// ============================================================
-
-// Terminal "unclassified" result — used whenever the classifier is absent,
-// rate-limited, or errors. Sets classifier_ok:false, which Step 7 reads to
-// write ai_processing_status='failed' (not a fake 'completed') — the
-// reset_stuck_photo_pipeline_images() cron (15-min, retry-count-gated) is
-// what actually re-churns it, not this function. BYOK deep analysis / owner
-// confirmation is the real classifier downstream once retries exhaust.
-function UNCLASSIFIED_FALLBACK(reason: string): ClassificationResult {
-  return {
-    image_type: "other",
-    confidence: 0.2,
-    is_automotive: true,
-    description: `Unclassified (classifier unavailable: ${String(reason).slice(0, 120)}) — left for BYOK/owner review`,
-    classifier_ok: false,
-  };
-}
-
-async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
-  // Prefer paid keys over free tier to avoid 429s
-  const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY") ??
-    Deno.env.get("GEMINI_API_KEY") ??
-    Deno.env.get("GOOGLE_API_KEY") ??
-    Deno.env.get("free_api_key");
-
-  if (!geminiKey) {
-    console.warn("[photo-pipeline] No Gemini key, falling back to basic classification");
-    return {
-      image_type: "other",
-      confidence: 0.3,
-      is_automotive: true,
-      description: "No AI classification available",
-      classifier_ok: false,
-    };
-  }
-
-  // Fetch image as base64 (once, before retry loop)
-  const imageResponse = await fetch(imageUrl);
-  const imageBuffer = await imageResponse.arrayBuffer();
-  const base64Image = btoa(
-    new Uint8Array(imageBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
-  );
-  const mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
-
-  // Root-cause note (2026-07-06 429/hollow-completion incident): this per-invocation
-  // backoff can't fix a THUNDERING HERD — the orchestrator is a per-row pg_net trigger
-  // (AFTER INSERT ... FOR EACH ROW), so a single bulk photo sync (hundreds of rows in
-  // one INSERT batch) fires hundreds of concurrent invocations that each independently
-  // hit the same Gemini key's RPM quota at once. Fixed exponential delays (1s/2s/4s in
-  // lockstep across every concurrent invocation) synchronize the retries right back
-  // into the same collision. MAX_RETRIES 3->5 + a delay cap + +/-30% jitter de-syncs
-  // the herd (textbook thundering-herd mitigation) — it reduces, but cannot alone
-  // eliminate, collisions under a large burst. The real backstop is Step 7 below no
-  // longer lying about 'completed' when this budget is exhausted.
-  const MAX_RETRIES = 5;
-  const BASE_DELAY_MS = 1000;
-  const MAX_DELAY_MS = 8000;
-  const jitteredDelay = (attempt: number) => {
-    const capped = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
-    return Math.round(capped * (0.7 + Math.random() * 0.6)); // +/-30% jitter
-  };
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  text: `Classify this automotive image. Respond in JSON only:
-{
-  "image_type": one of ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"],
-  "image_medium": one of ["photograph", "render", "drawing", "screenshot"],
-  "medium_context": "brief explanation (e.g. '3D render of planned build', 'pencil sketch', 'screenshot from parts catalog', 'real photograph')",
-  "confidence": 0.0-1.0,
-  "is_automotive": true/false,
-  "description": "brief description",
-  "detected_text": ["any visible text/numbers"],
-  "vin_detected": "17-char VIN if visible or null",
-  "vehicle_hints": {"make": "...", "model": "...", "year_range": "...", "color": "..."}
-}
-
-image_medium definitions:
-- "photograph": real camera photo of a physical vehicle
-- "render": 3D render, CGI, digital mockup, or AI-generated image of a vehicle
-- "drawing": hand-drawn sketch, pencil drawing, technical illustration, blueprint
-- "screenshot": screenshot from a website, app, parts catalog, or software`,
-                },
-                {
-                  inlineData: { mimeType, data: base64Image },
-                },
-              ],
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 1024,
-              responseMimeType: "application/json",
-              // Disable thinking for classification — it's unnecessary and consumes output tokens
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          }),
-        },
-      );
-
-      // Rate limited — retry with capped exponential backoff + jitter (de-syncs
-      // concurrent invocations from the same bulk-insert burst; see note above)
-      if (response.status === 429) {
-        const delay = jitteredDelay(attempt);
-        console.warn(`[photo-pipeline] Gemini 429 (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      // Gemini 2.5+ may include thinking parts before the actual response
-      // Find the last text part (thinking parts come first, JSON response last)
-      const parts = result.candidates?.[0]?.content?.parts || [];
-      const text = parts.filter((p: any) => p.text && !p.thought).pop()?.text
-        || parts[parts.length - 1]?.text;
-
-      if (!text) throw new Error("No classification response");
-
-      const parsed = JSON.parse(text);
-      return {
-        image_type: parsed.image_type || "other",
-        confidence: parsed.confidence || 0.5,
-        is_automotive: parsed.is_automotive !== false,
-        description: parsed.description || "",
-        detected_text: parsed.detected_text,
-        vin_detected: parsed.vin_detected,
-        image_medium: parsed.image_medium || "photograph",
-        medium_context: parsed.medium_context,
-        vehicle_hints: parsed.vehicle_hints,
-        classifier_ok: true,
-      };
-    } catch (error: any) {
-      // Classifier failure must NOT churn the row itself (this function still never
-      // throws — the caller always gets a usable ClassificationResult so downstream
-      // resolveVehicle/routeByType/enqueueDeepByok/createObservation keep running).
-      // What changed 2026-07-06: churn is no longer avoided by mislabeling the row
-      // 'completed'. classifier_ok:false tells Step 7 to write 'failed' instead, and
-      // reset_stuck_photo_pipeline_images() (15-min cron) already sweeps 'failed' with
-      // a retry budget (ai_retry_count < 3 -> reset to 'pending' for a fresh pass with
-      // new jittered backoff; >= 3 -> stays 'failed', honest terminal) — verified live
-      // against the deployed function, so this does not reopen an infinite-loop.
-      console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
-      return UNCLASSIFIED_FALLBACK(error.message);
-    }
-  }
-
-  // All retries exhausted on 429 — classifier_ok:false routes this to 'failed'
-  // (Step 7's honest terminal state), not a silent fake 'completed'.
-  return UNCLASSIFIED_FALLBACK("Gemini rate limited (429) after retries");
-}
-
-// ============================================================
 // RESOLVE VEHICLE (GPS, metadata, recent work)
 // ============================================================
 
@@ -703,7 +528,7 @@ async function resolveVehicle(
     .maybeSingle();
 
   if (image?.latitude && image?.longitude) {
-    const { data: nearbyMatch } = await supabase
+    const { data: nearbyResult } = await supabase
       .rpc("auto_match_image_to_vehicles", {
         p_image_id: imageId,
         p_latitude: image.latitude,
@@ -712,8 +537,8 @@ async function resolveVehicle(
         p_user_id: userId,
       })
       .maybeSingle();
-
-    if (nearbyMatch?.vehicle_id && nearbyMatch?.confidence > 0.7) {
+    const nearbyMatch = nearbyResult as { vehicle_id?: string; confidence?: number } | null;
+    if (nearbyMatch?.vehicle_id && Number(nearbyMatch.confidence) > 0.7) {
       console.log(`[photo-pipeline] Vehicle resolved via GPS (confidence: ${nearbyMatch.confidence})`);
       return nearbyMatch.vehicle_id;
     }
@@ -1107,7 +932,7 @@ async function createObservation(
   imageUrl: string,
   vehicleId: string,
   routeResult: RouteResult,
-): Promise<void> {
+): Promise<{ id: string; status: "created" | "existing" }> {
   try {
     const sourceSlug = classification.image_type === "receipt_document"
       ? "receipt_ocr"
@@ -1133,16 +958,19 @@ async function createObservation(
     // every retry instead of being recognized as the same testimony.
     // sourceIdentifier is stable across retries (keyed on imageId, not
     // time), so check for an existing row on it first.
-    const { data: existingObs } = await supabase
+    const { data: existingObs, error: existingError } = await supabase
       .from("vehicle_observations")
       .select("id")
       .eq("source_identifier", sourceIdentifier)
       .eq("kind", kind)
+      .eq("vehicle_id", vehicleId)
+      .eq("source_url", imageUrl)
       .limit(1)
       .maybeSingle();
-    if (existingObs) return;
+    if (existingError) throw new Error("photo_pipeline_observation_read_failed");
+    if (existingObs) return { id: existingObs.id, status: "existing" };
 
-    await callEdgeFunction("ingest-observation", {
+    const result = await callEdgeFunction("ingest-observation", {
       source_slug: sourceSlug,
       kind,
       observed_at: new Date().toISOString(),
@@ -1158,10 +986,20 @@ async function createObservation(
         extracted_fields: routeResult.extracted_fields,
       },
       vehicle_id: vehicleId,
+      agent_model: routeResult.extracted_fields ? null : classification.classifier_receipt?.model ?? null,
+      agent_inferred: true,
+      extraction_method: "image_analysis",
+      extraction_metadata: { pipeline: "photo-pipeline-orchestrator", pipeline_version: "v2",
+        observed_at_semantics: "analysis_review_time", capture_at: null,
+        classifier_model_configured: classification.classifier_receipt?.model ?? null,
+        downstream_handler: routeResult.handler, downstream_model: null },
     });
+    if (!result?.success || !result?.observation_id) throw new Error("photo_pipeline_observation_write_failed");
+    return { id: result.observation_id, status: result.duplicate ? "existing" : "created" };
   } catch (error: any) {
-    // Non-blocking: observation creation failure shouldn't fail the pipeline
-    console.warn(`[photo-pipeline] Observation creation failed: ${error.message}`);
+    // Classification alone does not establish that testimony landed.
+    console.warn("[photo-pipeline] Observation persistence failed");
+    throw error;
   }
 }
 
@@ -1208,11 +1046,12 @@ async function updateFieldEvidence(
       });
 
     if (error) {
-      console.warn(`[photo-pipeline] Field evidence upsert error: ${error.message}`);
+      throw new Error("photo_pipeline_field_evidence_write_failed");
     } else {
       console.log(`[photo-pipeline] Updated ${entries.length} field evidence entries`);
     }
   } catch (error: any) {
-    console.warn(`[photo-pipeline] Field evidence failed: ${error.message}`);
+    console.warn("[photo-pipeline] Field evidence persistence failed");
+    throw error;
   }
 }
