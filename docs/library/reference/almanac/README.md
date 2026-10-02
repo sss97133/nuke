@@ -213,3 +213,9 @@ grains and 184 pending scope-review items. Sources span RM Sotheby's, Barrett-Ja
 Broad Arrow and Bonhams. A second process resumed six completed checkpoints with
 zero new rows. These figures are distinct from the 2,544-grain Mecum benchmark and
 from previously verified production observations; the discovery writer stays disabled.
+
+Final snapshot for the bounded 30-source selection: 22 completed caption passes,
+76,662 cues, 512,662 word tokens, 27,325 candidates and 732 pending review items.
+All 22 replay digests passed. Seven routes exhausted bounded retries and one source
+was upcoming. See `output/mecum/audio-discovery/loop-final-receipt.json`; these are
+caption discovery results, with zero production promotions or paid model API calls.

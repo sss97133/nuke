@@ -125,3 +125,14 @@ stated bid acknowledgement versus asks, bidder participation and representation,
 increment rejection, closing calls, gesture cautions and a numeric ASR inconsistency.
 Clip-origin estimates remain unverified. These observations motivate new property
 semantics and targeted listening; they do not establish accepted-bid velocity.
+
+The selected 30-source caption pass subsequently settled at 22 completed sources
+across five publishers: 76,662 cached caption cues, 512,662 word tokens, 27,325 review
+candidates and 732 pending source-scope work items. All 22 replay digests passed.
+Seven acquisition routes exhausted three bounded attempts: three caption-route
+failures and four sources returned no selected English captions. One source was
+upcoming. These outcomes are explicit adapter/access holds; they do not establish
+that audiovisual evidence is absent. Both bounded workers exited when their source
+attempt budgets settled. Reports, retained input hashes and source outcomes are
+linked in `output/mecum/audio-discovery/loop-final-receipt.json`. No candidates were
+posted to production, and no paid model API calls were made by this loop.
