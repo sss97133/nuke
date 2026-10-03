@@ -22,7 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
-import { derivePublicComment } from "./deriveComment.ts";
+import { COMMENT_MODEL, classifyCommentModelFailure, derivePublicComment } from "./deriveComment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -108,10 +108,20 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const mode = body.mode || "discover"; // "discover", "extract_claims", or "question_classify_llm"
 
-    if (mode === "derive_comment") {
+    if (mode === "derive_comment" || mode === "comment_provider_health") {
       const writer = await authenticateWriter(req);
       if (!writer.ok || writer.caller.kind !== "service_role") {
         return jsonResponse({ error: "service_role required" }, 403);
+      }
+      if (mode === "comment_provider_health") {
+        if (!anthropicKey) return jsonResponse({ healthy: false, error: "configured_comment_model_unavailable", model_calls: 0 }, 503);
+        const response = await fetch(`https://api.anthropic.com/v1/models/${COMMENT_MODEL}`, {
+          headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+          signal: AbortSignal.timeout(10000),
+        });
+        const data = await response.json().catch(() => null);
+        return jsonResponse({ healthy: response.ok, model: COMMENT_MODEL, model_calls: 0,
+          ...(response.ok ? {} : classifyCommentModelFailure(response.status, data)) }, response.ok ? 200 : 503);
       }
       const result = await derivePublicComment(supabase, body, { apiKey: anthropicKey });
       return jsonResponse(result.body, result.status);

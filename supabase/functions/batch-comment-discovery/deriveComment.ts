@@ -10,6 +10,35 @@ const fail = (error: string, status = 500, retryable = false) => reply(status, {
   success: false, derivation_complete: false, error, retryable, derived: [],
 });
 
+const PROVIDER_ERROR_TYPES = new Set(['invalid_request_error', 'authentication_error', 'permission_error',
+  'not_found_error', 'request_too_large', 'request_too_large_error', 'rate_limit_error', 'api_error',
+  'overloaded_error', 'billing_error']);
+
+/** Return only static diagnostics. Provider messages may contain source text or credentials. */
+export function classifyCommentModelFailure(status: number, output: unknown) {
+  const providerStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : 0;
+  const envelope = output && typeof output === 'object' && !Array.isArray(output)
+    ? output as Record<string, unknown> : null;
+  const detail = envelope?.error && typeof envelope.error === 'object' && !Array.isArray(envelope.error)
+    ? envelope.error as Record<string, unknown> : null;
+  const type = typeof detail?.type === 'string' && PROVIDER_ERROR_TYPES.has(detail.type) ? detail.type : 'unknown';
+  const message = typeof detail?.message === 'string' ? detail.message.slice(0, 4096) : '';
+  let kind = 'provider_error';
+  if (/\bcredit balance\b.{0,80}\b(?:too low|insufficient|exhausted)\b/i.test(message) ||
+      /\binsufficient\s+(?:credits?|credit balance)\b/i.test(message)) kind = 'credit_balance';
+  else if (providerStatus === 401 || type === 'authentication_error') kind = 'authentication';
+  else if (providerStatus === 429 || type === 'rate_limit_error') kind = 'rate_limit';
+  else if (providerStatus === 404 || type === 'not_found_error' ||
+      /\bmodel\b.{0,100}\b(?:not found|not available|unavailable|does not exist|do not have access)\b/i.test(message)) kind = 'model_unavailable';
+  else if (providerStatus === 403 || type === 'permission_error') kind = 'permission_denied';
+  else if (type === 'billing_error') kind = 'billing';
+  else if (providerStatus === 529 || type === 'overloaded_error') kind = 'overloaded';
+  else if (providerStatus === 413 || type === 'request_too_large' || type === 'request_too_large_error') kind = 'request_too_large';
+  else if (type === 'invalid_request_error') kind = 'invalid_request';
+  return { error: `comment_model_http_${providerStatus}_${kind}`, provider_http_status: providerStatus,
+    provider_error_type: type, provider_failure_class: kind };
+}
+
 /** Existing dispatcher entrypoint for system-owned public comments. No private-owner billing. */
 // deno-lint-ignore no-explicit-any
 export async function derivePublicComment(sb: any, body: any, deps: { apiKey: string; fetch?: typeof fetch; land?: typeof landCommentClaims }) {
@@ -95,7 +124,12 @@ export async function derivePublicComment(sb: any, body: any, deps: { apiKey: st
           messages: [{ role: "user", content: prompt }] }),
       });
     } catch { return fail("comment_model_transport_failed"); }
-    if (!response.ok) return fail(`comment_model_http_${response.status}`);
+    if (!response.ok) {
+      const diagnosed = classifyCommentModelFailure(response.status, await response.json().catch(() => null));
+      // A provider rejection consumed its reservation. It is not a queue budget
+      // deferral and must not silently purchase another attempt.
+      return reply(500, { ...fail(diagnosed.error).body, ...diagnosed, model_calls: modelCalls });
+    }
     const output = await response.json().catch(() => null);
     if (!output || output.stop_reason !== "end_turn" || !Array.isArray(output.content)) return fail("comment_model_output_incomplete");
     const content = output.content.filter((part: { type?: string; text?: unknown } | null) => part?.type === "text" && typeof part.text === "string")

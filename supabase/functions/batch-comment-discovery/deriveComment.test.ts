@@ -1,4 +1,4 @@
-import { COMMENT_EXTRACTOR, COMMENT_MODEL, COMMENT_VERSION, derivePublicComment } from './deriveComment.ts';
+import { COMMENT_EXTRACTOR, COMMENT_MODEL, COMMENT_VERSION, derivePublicComment, classifyCommentModelFailure } from './deriveComment.ts';
 
 function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message);
@@ -330,4 +330,44 @@ Deno.test('an explicitly examined empty comment can complete with no invented at
   equal(result.status, 200); equal(result.body.empty_source_result, true);
   equal(h.state.landingInputs[0].claims, []);
   equal(h.state.landingInputs[0].processedCommentIds, [COMMENT_ID]);
+});
+
+Deno.test('provider rejections expose only static status, recognized type and failure classification', async () => {
+  const cases = [
+    [400, 'invalid_request_error', 'Your credit balance is too low to access the API. PRIVATE_SOURCE', 'credit_balance'],
+    [401, 'authentication_error', 'Invalid API key PRIVATE_KEY', 'authentication'],
+    [429, 'rate_limit_error', 'Rate limit exceeded PRIVATE_SOURCE', 'rate_limit'],
+    [404, 'not_found_error', 'model: missing PRIVATE_SOURCE', 'model_unavailable'],
+    [400, 'invalid_request_error', 'The model is not available PRIVATE_SOURCE', 'model_unavailable'],
+    [403, 'permission_error', 'Permission denied PRIVATE_SOURCE', 'permission_denied'],
+    [529, 'overloaded_error', 'Overloaded PRIVATE_SOURCE', 'overloaded'],
+    [413, 'request_too_large', 'Request body PRIVATE_SOURCE', 'request_too_large'],
+    [400, 'invalid_request_error', 'Invalid request PRIVATE_SOURCE', 'invalid_request'],
+  ] as const;
+  for (const [status, type, message, kind] of cases) {
+    const h = harness(); h.state.providerStatus = status;
+    h.state.providerOutput = { type: 'error', error: { type, message }, request_id: 'PRIVATE_REQUEST_ID' };
+    const result = await h.run(); incomplete(result);
+    equal(result.status, 500); equal(result.body.retryable, false);
+    equal(result.body.provider_http_status, status);
+    equal(result.body.provider_error_type, type);
+    equal(result.body.provider_failure_class, kind);
+    equal(result.body.error, `comment_model_http_${status}_${kind}`);
+    equal(result.body.model_calls, 1);
+    assert(!JSON.stringify(result.body).includes('PRIVATE'));
+    equal(h.state.progress, null); equal(h.state.landingCalls, 0);
+    incomplete(await h.run()); equal(h.state.providerCalls, 1);
+  }
+});
+
+Deno.test('unrecognized provider error types and malformed envelopes never echo source details', () => {
+  for (const output of [null, 'PRIVATE_BODY', [], { error: 'PRIVATE_BODY' },
+    { error: { type: 'PRIVATE_TYPE', message: 'PRIVATE_BODY' } },
+    { error: { type: { secret: 'private' }, message: 42 } }]) {
+    const result = classifyCommentModelFailure(500, output);
+    equal(result.provider_error_type, 'unknown');
+    equal(result.error, 'comment_model_http_500_provider_error');
+    assert(!JSON.stringify(result).includes('PRIVATE'));
+  }
+  equal(classifyCommentModelFailure(NaN, null).provider_http_status, 0);
 });

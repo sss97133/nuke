@@ -163,7 +163,10 @@ Deno.serve(async (req) => {
             await requeue(admin, item.id, 60, "comment persistence retry from cached extraction");
             results.push({ id: item.id, status: "requeued", reason: "persistence_incomplete" });
           } else {
-            await finish(admin, item.id, "failed", { error: `reader_${res.status}_or_incomplete_receipt` });
+            const readerError = publicComment && typeof out?.error === "string" &&
+              /^[a-z][a-z0-9_]{0,100}$/.test(out.error) ? out.error : `reader_${res.status}_or_incomplete_receipt`;
+            await finish(admin, item.id, "failed", { error: readerError,
+              ...(publicComment ? { credential_source: "system_api_key" } : {}) });
             results.push({ id: item.id, status: "failed" });
           }
           continue;
