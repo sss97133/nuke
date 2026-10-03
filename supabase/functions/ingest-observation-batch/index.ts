@@ -1,10 +1,11 @@
 /**
  * INGEST OBSERVATION BATCH
  *
- * Bulk observation ingestion endpoint. Accepts an array of observations
- * and processes them sequentially through `ingest-observation` via internal
- * HTTP call. This preserves all vehicle resolution, source validation,
- * dedup, and confidence scoring from the single-observation endpoint.
+ * Canonical batch intake. Explicit cached_image_property_projection_v1 mode
+ * admits up to 3,000 service-authenticated projections in one atomic database
+ * transaction, with immutable-parent validation and stored witness receipts.
+ * Other observations retain the existing sequential ingest-observation path
+ * for vehicle resolution, source validation, dedup and confidence scoring.
  *
  * POST /functions/v1/ingest-observation-batch
  * {
@@ -21,7 +22,7 @@
  *
  * Returns:
  * {
- *   "success": true,
+ *   "success": false,
  *   "total": 50,
  *   "ingested": 45,
  *   "duplicates": 3,
@@ -33,7 +34,8 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
+import { BatchAdmissionError, CACHED_PROPERTY_MODE, readBatchBody, ingestCachedProperties } from "./cachedProperties.ts";
 
 const MAX_BATCH_SIZE = 200;
 
@@ -98,7 +100,20 @@ Deno.serve(async (req) => {
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
-    const body: BatchRequest = await req.json();
+    const body = await readBatchBody(req);
+
+    if (body.mode !== undefined) {
+      if (body.mode !== CACHED_PROPERTY_MODE || Object.keys(body).some(k => !["mode", "observations"].includes(k))) {
+        throw new BatchAdmissionError("unsupported_batch_mode_or_options");
+      }
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ success: false, error: "cached_batch_requires_service_role" }), { status: 403, headers });
+      }
+      const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false, autoRefreshToken: false } });
+      return new Response(JSON.stringify(await ingestCachedProperties(db, body.observations)), { headers });
+    }
 
     if (!body.observations || !Array.isArray(body.observations)) {
       return new Response(JSON.stringify({
@@ -148,7 +163,7 @@ Deno.serve(async (req) => {
 
         const data = await resp.json();
 
-        if (!resp.ok) {
+        if (!resp.ok || data.success !== true || typeof data.observation_id !== "string") {
           failed++;
           results.push({
             index: i,
@@ -222,7 +237,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      success: true,
+      success: failed === 0 && results.length === body.observations.length,
       total: body.observations.length,
       ingested,
       duplicates,
@@ -231,9 +246,12 @@ Deno.serve(async (req) => {
     }), { headers });
 
   } catch (e: any) {
-    console.error("[ingest-observation-batch] Error:", e);
+    if (e instanceof BatchAdmissionError) {
+      return new Response(JSON.stringify({ success: false, error: e.code }), { status: e.status, headers });
+    }
+    console.error("[ingest-observation-batch] Request failed");
     return new Response(JSON.stringify({
-      error: e.message || "Internal error",
+      success: false, error: "batch_request_failed",
     }), { status: 500, headers });
   }
 });

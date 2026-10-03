@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyImagePropertyClaims, projectImageProperties, PROJECTION_VERSION } from './image-property-projection.mjs';
+import { createHash } from 'node:crypto';
+import { applyImagePropertyClaims as applyBatchClaims, projectImageProperties, PROJECTION_VERSION } from './image-property-projection.mjs';
+
+const applyImagePropertyClaims = (sb, claims, options = {}) => applyBatchClaims(sb, claims, { ...options, mode: 'legacy' });
 
 const IDS = {
   source: '11111111-1111-4111-8111-111111111111',
@@ -58,6 +61,20 @@ test('exact replay and differently ordered source fields produce identical bytes
   reordered.structured_data.state_observations = { completeness: 'partial', paint_state: 'primer', rust_severity: 'surface' };
   assert.deepEqual(projectImageProperties(reordered, image), first);
   assert.deepEqual(projectImageProperties(observation, image), first);
+});
+
+test('transport source proof preserves the existing v1 identity and includes only the immutable hash inputs', () => {
+  const { observation, image } = fixtures();
+  const { claims } = projectImageProperties(observation, image);
+  const expectedHash = ['b94f4925ade0599a', '65510972c1e6f7a0', 'b775b6cfaca3f6d2', 'cf992c11485f20a1'].join('');
+  for (const claim of claims) {
+    assert.equal(claim.structured_data.source_result_hash, expectedHash);
+    assert.equal(createHash('sha256').update(claim.source_result_json).digest('hex'), expectedHash);
+    assert.equal(claim.source_identifier, `${PROJECTION_VERSION}:${observation.id}:${expectedHash}:${claim.property_key}`);
+    assert.equal(Object.hasOwn(claim.structured_data, 'source_result_json'), false);
+    assert.deepEqual(Object.keys(JSON.parse(claim.source_result_json)),
+      ['observation_id', 'image_id', 'vehicle_id', 'model', 'method', 'recorded_at', 'state_observations']);
+  }
 });
 
 test('a new source result keeps the old claim identity and creates a distinct new one', () => {
@@ -249,4 +266,126 @@ test('invalid or exhausted run budgets stop before any write attempt', async () 
   assert.equal(result.reason, 'run_budget_exhausted');
   assert.equal(result.failed, 1);
   assert.equal(calls.length, 0);
+});
+
+function batchFixture(options = {}) {
+  const { observation, image } = fixtures();
+  const claims = projectImageProperties(observation, image).claims;
+  const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const registry = claims.map((claim, index) => ({ property_key: claim.property_key, id: uuid(10 + index) }));
+  const calls = [];
+  const sb = {
+    from(table) {
+      calls.push({ table });
+      assert.equal(table, 'observation_properties');
+      const q = { select() { return q; }, in() { return q; },
+        async abortSignal() { return { data: registry, error: null }; } };
+      return q;
+    },
+    functions: { async invoke(name, args) {
+      calls.push({ name, args });
+      assert.equal(name, 'ingest-observation-batch');
+      if (options.reject) throw Error('private failed request');
+      const results = claims.map((claim, index) => ({ index, success: true,
+        observation_id: uuid(100 + index), duplicate: !!options.duplicate,
+        vehicle_id: claim.vehicle_id, image_id: claim.structured_data.image_id,
+        property_id: registry[index].id, property_key: claim.property_key,
+        value: claim.structured_data[claim.property_key],
+        source_observation_id: claim.structured_data.source_observation_id,
+        source_result_hash: claim.structured_data.source_result_hash,
+        source_recorded_at: claim.structured_data.source_recorded_at,
+        confidence_score: 0.6, witness_id: uuid(200 + index) }));
+      const data = { success: true, source_id: IDS.source, total: claims.length, ingested: options.duplicate ? 0 : claims.length,
+        duplicates: options.duplicate ? claims.length : 0, failed: 0, results };
+      options.change?.(data);
+      return { data, error: options.error ?? null };
+    } },
+  };
+  return { sb, claims, registry, calls };
+}
+
+test('default batch mode lands all claims with one canonical request and transaction proof', async () => {
+  const f = batchFixture(); let requests = 0;
+  const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry, onRequest: () => requests++ });
+  assert.equal(result.verified, 3); assert.equal(result.inserted, 3); assert.equal(result.failed, 0);
+  assert.equal(result.requests, 1); assert.equal(requests, 1); assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].args.body.mode, 'cached_image_property_projection_v1');
+  assert.deepEqual(f.calls[0].args.body.observations, f.claims);
+  assert.ok(f.calls[0].args.timeout > 10000 && f.calls[0].args.timeout <= 45000);
+});
+
+test('batch exact replay counts existing verified claims without new insertions', async () => {
+  const f = batchFixture({ duplicate: true });
+  const result = await applyBatchClaims(f.sb, f.claims);
+  assert.equal(result.inserted, 0); assert.equal(result.duplicates, 3); assert.equal(result.verified, 3);
+  assert.equal(result.requests, 2); assert.equal(f.calls.length, 2);
+});
+
+for (const [name, change] of [
+  ['false success', d => { d.success = false; }],
+  ['omitted success', d => { delete d.success; }],
+  ['missing result', d => { d.results.pop(); }],
+  ['duplicate index', d => { d.results[1].index = 0; }],
+  ['string index', d => { d.results[0].index = '0'; }],
+  ['negative index', d => { d.results[0].index = -1; }],
+  ['out of range index', d => { d.results[0].index = 3; }],
+  ['missing observation ID', d => { delete d.results[0].observation_id; }],
+  ['same observation twice', d => { d.results[1].observation_id = d.results[0].observation_id; }],
+  ['same witness twice', d => { d.results[1].witness_id = d.results[0].witness_id; }],
+  ['missing witness', d => { delete d.results[0].witness_id; }],
+  ['wrong property', d => { d.results[0].property_id = IDS.output; }],
+  ['wrong key', d => { d.results[0].property_key = 'wrong'; }],
+  ['wrong vehicle', d => { d.results[0].vehicle_id = IDS.output; }],
+  ['wrong image', d => { d.results[0].image_id = IDS.output; }],
+  ['wrong source', d => { d.results[0].source_observation_id = IDS.output; }],
+  ['wrong source hash', d => { d.results[0].source_result_hash = 'wrong'; }],
+  ['wrong source clock', d => { d.results[0].source_recorded_at = '2026-10-03T00:00:00Z'; }],
+  ['missing source registry identity', d => { delete d.source_id; }],
+  ['wrong value', d => { d.results[0].value = 'perforation'; }],
+  ['truth confidence', d => { d.results[0].confidence_score = 1; }],
+  ['unknown confidence', d => { d.results[0].confidence_score = null; }],
+  ['missing duplicate classification', d => { delete d.results[0].duplicate; }],
+  ['failed item', d => { d.results[0].success = false; }],
+  ['failed aggregate', d => { d.failed = 1; }],
+  ['wrong submitted total', d => { d.total = 4; }],
+  ['wrong inserted aggregate', d => { d.ingested = 2; d.duplicates = 1; }],
+]) test(`batch ${name} rejects all unproven completion and never falls back`, async () => {
+  const f = batchFixture({ change });
+  const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry });
+  assert.equal(result.failed, 1); assert.equal(result.verified, 0); assert.equal(result.inserted, 0);
+  assert.equal(f.calls.length, 1); assert.equal(result.reason, 'batch_receipt_invalid');
+});
+
+test('batch request rejection or error does not retry, fallback, or expose raw errors', async () => {
+  for (const options of [{ reject: true }, { error: { message: 'private failed request' } }]) {
+    const f = batchFixture(options);
+    const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry });
+    assert.equal(result.failed, 1); assert.equal(f.calls.length, 1);
+    assert.equal(JSON.stringify(result).includes('private'), false);
+  }
+});
+
+test('batch bounds reject duplicate identities, missing registry and oversized payload before invocation', async () => {
+  for (const mutation of [
+    f => { f.claims[1].source_identifier = f.claims[0].source_identifier; },
+    f => { f.registry.pop(); },
+    f => { f.claims[0].structured_data.unexpected = 'x'.repeat(8 * 1024 * 1024); },
+  ]) {
+    const f = batchFixture(); mutation(f);
+    const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry });
+    assert.equal(result.failed, 1); assert.equal(result.verified, 0); assert.equal(f.calls.length, 0);
+  }
+});
+
+test('batch accepts shuffled complete receipts by explicit index and retains remaining time cap', async () => {
+  const f = batchFixture({ change: d => d.results.reverse() });
+  const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry, runMs: 500 });
+  assert.equal(result.verified, 3); assert.equal(result.failed, 0);
+  assert.ok(f.calls[0].args.timeout <= 500);
+});
+
+test('batch source registry mismatch fails even when the returned source ID is a valid UUID', async () => {
+  const f = batchFixture();
+  const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry, sourceId: IDS.output });
+  assert.equal(result.failed, 1); assert.equal(result.verified, 0); assert.equal(f.calls.length, 1);
 });

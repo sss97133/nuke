@@ -29,6 +29,7 @@ import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.t
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
+import { observationContentHash } from "../_shared/observationContentHash.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,14 +121,6 @@ async function allowShareVerdict(supabase: any, req: Request, input: Observation
     namespace: "ingest-observation-share-verdict", windowSeconds: 3600, maxRequests: SHARE_VERDICTS_PER_HOUR,
   });
   return rl.allowed;
-}
-
-async function hashContent(content: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(content);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async (req) => {
@@ -244,22 +237,7 @@ Deno.serve(async (req) => {
     // Bug fix 2026-05-24: previously two observations with same source/kind but different
     // vehicle_id collapsed into one row; cross-vehicle reuse of an observation_id was
     // returned to callers. See ISSUES.md "[MEDIUM] ingest-observation dedup ignores vehicle_id".
-    const contentForHash = JSON.stringify({
-      source: input.source_slug,
-      kind: input.kind,
-      vehicle_id: input.vehicle_id || "",
-      source_url: input.source_url || "",
-      source_identifier: input.source_identifier || "",
-      observed_at: input.observed_at,
-      text: input.content_text || "",
-      data: input.structured_data || {},
-      observer: input.observer_raw || {},
-      // Undefined keys drop out of JSON, so hashes of rows without a descriptor are unchanged.
-      descriptor: input.descriptor_key,
-      property: input.property_key,
-      source_comment: input.source_comment_id
-    });
-    const contentHash = await hashContent(contentForHash);
+    const contentHash = await observationContentHash(input);
 
     // Check for duplicate
     const { data: existing } = await supabase

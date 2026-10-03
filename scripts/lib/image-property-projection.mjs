@@ -43,7 +43,8 @@ export function projectImageProperties(observation, image) {
     state_observations: Object.fromEntries(Object.keys(IMAGE_PROPERTIES)
       .map(key => [key, data.state_observations?.[key] ?? null])),
   };
-  const sourceHash = createHash('sha256').update(JSON.stringify(sourceResult)).digest('hex');
+  const sourceResultJson = JSON.stringify(sourceResult);
+  const sourceHash = createHash('sha256').update(sourceResultJson).digest('hex');
   for (const [sourceKey, [propertyKey, values]] of Object.entries(IMAGE_PROPERTIES)) {
     const value = data.state_observations?.[sourceKey];
     if (!values.includes(value)) continue;
@@ -54,6 +55,9 @@ export function projectImageProperties(observation, image) {
       // mixes capture/review/ingest clocks, so never relabel it as photo capture.
       observed_at: observation.ingested_at,
       source_identifier: `${PROJECTION_VERSION}:${observation.id}:${sourceHash}:${propertyKey}`,
+      // Transport proof only. The canonical hash enumerates its existing fields;
+      // this envelope never becomes a second copy of testimony in structured_data.
+      source_result_json: sourceResultJson,
       raw_source_ref: `vehicle_observations:${observation.id}`,
       agent_model: observation.agent_model,
       agent_tier: observation.agent_tier || undefined,
@@ -77,8 +81,84 @@ export function projectImageProperties(observation, image) {
   return { claims, deferred: claims.length ? null : 'no_known_scalar_values' };
 }
 
-/** One finite pass; successful HTTP alone is insufficient. Read back its typed links. */
-export async function applyImagePropertyClaims(sb, claims, { runMs = 60000 } = {}) {
+export const IMAGE_PROPERTY_BATCH_MODE = 'cached_image_property_projection_v1';
+export const IMAGE_PROPERTY_BATCH_LIMIT = 3000;
+
+/** The batch front door verifies row and witness persistence in one transaction.
+ * Legacy calls require an explicit option; a failed batch never reroutes. */
+export async function applyImagePropertyClaims(sb, claims, { runMs = 60000, mode = 'batch',
+  registry: suppliedRegistry, sourceId, onRequest = () => {} } = {}) {
+  if (mode === 'legacy') return applyImagePropertyClaimsLegacy(sb, claims, { runMs });
+  const receipt = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: Array.isArray(claims) ? claims.length : 0,
+    requests: 0, observations: [] };
+  if (mode !== 'batch' || !Number.isInteger(runMs) || runMs < 1 || runMs > 60000 ||
+      !Array.isArray(claims) || claims.length > IMAGE_PROPERTY_BATCH_LIMIT) {
+    return { ...receipt, failed: 1, reason: 'invalid_budget' };
+  }
+  if (claims.length === 0) return receipt;
+  const deadline = Date.now() + runMs;
+  const request = (maximumMs = 10000) => {
+    if (Date.now() >= deadline) throw new Error('run_budget_exhausted');
+    onRequest(); receipt.requests++;
+    return Math.max(1, Math.min(maximumMs, deadline - Date.now()));
+  };
+  let registry = suppliedRegistry;
+  try {
+    if (registry === undefined) {
+      const response = await sb.from('observation_properties').select('id,property_key')
+        .in('property_key', [...new Set(claims.map(claim => claim.property_key))])
+        .abortSignal(AbortSignal.timeout(request()));
+      if (response?.error || !Array.isArray(response?.data)) throw new Error('registry_unavailable');
+      registry = response.data;
+    }
+    if (!Array.isArray(registry)) throw new Error('registry_incomplete');
+    const propertyIds = new Map(registry.map(row => [row.property_key, row.id]));
+    if (propertyIds.size !== registry.length || claims.some(claim => !UUID.test(propertyIds.get(claim.property_key) ?? ''))) {
+      throw new Error('registry_incomplete');
+    }
+    const body = { mode: IMAGE_PROPERTY_BATCH_MODE, observations: claims };
+    if (Buffer.byteLength(JSON.stringify(body), 'utf8') > 8 * 1024 * 1024 ||
+        new Set(claims.map(claim => claim.source_identifier)).size !== claims.length) throw new Error('invalid_budget');
+    const timeout = request(45000);
+    receipt.unattempted = 0;
+    const response = await sb.functions.invoke('ingest-observation-batch', { body, timeout });
+    const data = response?.data;
+    if (response?.error || data?.success !== true || !UUID.test(data.source_id ?? '') ||
+        (sourceId !== undefined && data.source_id !== sourceId) || data.total !== claims.length || data.failed !== 0 ||
+        !Number.isSafeInteger(data.ingested) || data.ingested < 0 ||
+        !Number.isSafeInteger(data.duplicates) || data.duplicates < 0 ||
+        data.ingested + data.duplicates !== claims.length || !Array.isArray(data.results) ||
+        data.results.length !== claims.length) throw new Error('batch_receipt_invalid');
+    const indices = new Set(), ids = new Set(), witnesses = new Set();
+    let inserted = 0, duplicates = 0;
+    for (const row of data.results) {
+      const index = row?.index;
+      if (!Number.isSafeInteger(index) || index < 0 || index >= claims.length || indices.has(index)) throw new Error('batch_receipt_invalid');
+      const claim = claims[index];
+      if (row.success !== true || typeof row.duplicate !== 'boolean' || !UUID.test(row.observation_id ?? '') ||
+          !UUID.test(row.witness_id ?? '') || ids.has(row.observation_id) || witnesses.has(row.witness_id) ||
+          row.vehicle_id !== claim.vehicle_id || row.image_id !== claim.structured_data.image_id ||
+          row.property_id !== propertyIds.get(claim.property_key) || row.property_key !== claim.property_key ||
+          row.value !== claim.structured_data[claim.property_key] ||
+          row.source_observation_id !== claim.structured_data.source_observation_id ||
+          row.source_result_hash !== claim.structured_data.source_result_hash ||
+          row.source_recorded_at !== claim.structured_data.source_recorded_at ||
+          !Number.isFinite(row.confidence_score) || row.confidence_score < 0 || row.confidence_score > 0.6) {
+        throw new Error('batch_receipt_invalid');
+      }
+      indices.add(index); ids.add(row.observation_id); witnesses.add(row.witness_id);
+      row.duplicate ? duplicates++ : inserted++;
+    }
+    if (inserted !== data.ingested || duplicates !== data.duplicates) throw new Error('batch_receipt_invalid');
+    return { ...receipt, inserted, duplicates, verified: claims.length, observations: data.results };
+  } catch (error) {
+    const safe = ['invalid_budget', 'registry_unavailable', 'registry_incomplete', 'run_budget_exhausted', 'batch_receipt_invalid'];
+    return { ...receipt, failed: 1, reason: safe.includes(error?.message) ? error.message : 'batch_request_failed' };
+  }
+}
+
+/** Explicit compatibility mode; never selected after a failed batch. */
+async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}) {
   const receipt = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: claims.length };
   if (!Number.isInteger(runMs) || runMs < 1 || runMs > 60000 || claims.length > 1500) {
     return { ...receipt, failed: 1, reason: 'invalid_budget' };
