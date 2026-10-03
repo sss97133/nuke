@@ -20,6 +20,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, type PipelineReceipt } from "./persistence.ts";
+import { runClassifierAssay } from "./classifierAssay.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
@@ -82,6 +83,8 @@ Deno.serve(async (req) => {
 
   try {
     const input = await req.json();
+
+    if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
 
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
@@ -992,6 +995,7 @@ async function createObservation(
       extraction_metadata: { pipeline: "photo-pipeline-orchestrator", pipeline_version: "v2",
         observed_at_semantics: "analysis_review_time", capture_at: null,
         classifier_model_configured: classification.classifier_receipt?.model ?? null,
+        classifier_receipt: classification.classifier_receipt ?? null,
         downstream_handler: routeResult.handler, downstream_model: null },
     });
     if (!result?.success || !result?.observation_id) throw new Error("photo_pipeline_observation_write_failed");

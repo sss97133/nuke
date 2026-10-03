@@ -26,11 +26,12 @@ globalThis.fetch = (async (input, init) => {
   calls.push(`${options?.method ?? "GET"} ${url.pathname}`);
   if (Deno.env.get("GEMINI_API_KEY") === "synthetic-model-key") {
     if (url.origin === "https://generativelanguage.googleapis.com") {
-      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({
-        image_type: classificationType, is_automotive: true, description: "Synthetic image classification", confidence: 0.8,
+      if (url.pathname.endsWith(":countTokens")) return Response.json({ totalTokens: 1024 });
+      return Response.json({ usageMetadata: { promptTokenCount: 1024, candidatesTokenCount: 100, totalTokenCount: 1124 }, candidates: [{ content: { parts: [{ text: JSON.stringify({
+        image_type: classificationType, image_medium: "photograph", is_automotive: true, description: "Synthetic image classification", confidence: 0.8,
       }) }] } }] });
     }
-    if (url.origin === project && url.pathname === "/image.jpg") return new Response(new Uint8Array([1, 2, 3]));
+    if (url.origin === project && url.pathname === "/image.jpg") return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } });
     if (url.origin === project && url.pathname === "/rest/v1/vehicle_observations") return Response.json([]);
     if (url.origin === project && url.pathname === "/functions/v1/ingest-observation") {
       intakeBody = JSON.parse(String(options?.body));
@@ -125,6 +126,13 @@ Deno.test("field evidence rejection fails completion and composite model remains
   const extraction = intakeBody?.extraction_metadata as Record<string, unknown>;
   assert(extraction.classifier_model_configured === "gemini-2.5-flash" && extraction.downstream_model === null);
   assert(calls.includes("POST /rest/v1/vehicle_field_evidence"));
+});
+
+Deno.test("classifier assay dispatches before processing and refuses ordinary pipeline fields without writes", async () => {
+  reset(); const response = await handler(request({ action: "classifier_assay" }));
+  const result = await response.json();
+  assert(response.status === 400 && result.error === "classifier_assay_input_invalid");
+  assert(patches === 0 && calls.length === 0 && row.ai_processing_status === "pending");
 });
 
 Deno.test("restore handler-test fetch fixture", () => { globalThis.fetch = originalFetch; });
