@@ -86,6 +86,8 @@ interface ObservationInput {
   descriptor_key?: string;
   /** Registered property represented by structured_data[property_key]. */
   property_key?: string;
+  /** Typed source-comment lineage; PostgreSQL checks quote and same-vehicle identity. */
+  source_comment_id?: string;
   /** Deterministic service-side projection may explicitly avoid downstream inference. */
   defer_analysis?: boolean;
   /** True when an LLM read the claim from text or images rather than a person confirming it. Caps
@@ -154,6 +156,14 @@ Deno.serve(async (req) => {
       allowAnonymous: () => allowShareVerdict(supabase, req, input),
     });
     if (denied) return denied;
+
+    if (input.source_comment_id !== undefined &&
+        (typeof input.source_comment_id !== "string" ||
+         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.source_comment_id) ||
+         input.kind !== "comment" || input.agent_inferred !== true || input.structured_data?.is_inferred !== true)) {
+      return new Response(JSON.stringify({ error: "Comment atoms require a source UUID, comment kind and inferred qualification" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (input.defer_analysis !== undefined && typeof input.defer_analysis !== "boolean") {
       return new Response(JSON.stringify({ error: "defer_analysis must be boolean" }),
@@ -246,7 +256,8 @@ Deno.serve(async (req) => {
       observer: input.observer_raw || {},
       // Undefined keys drop out of JSON, so hashes of rows without a descriptor are unchanged.
       descriptor: input.descriptor_key,
-      property: input.property_key
+      property: input.property_key,
+      source_comment: input.source_comment_id
     });
     const contentHash = await hashContent(contentForHash);
 
@@ -452,6 +463,7 @@ Deno.serve(async (req) => {
         citation_excerpt: input.citation?.excerpt ?? null,
         ...(descriptorId ? { descriptor_id: descriptorId } : {}),
         ...(property.propertyId ? { property_id: property.propertyId } : {}),
+        ...(input.source_comment_id ? { source_comment_id: input.source_comment_id } : {}),
         ...(input.rank ? { rank: input.rank } : {})
       })
       .select()

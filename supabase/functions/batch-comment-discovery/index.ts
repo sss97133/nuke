@@ -21,7 +21,8 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
+import { derivePublicComment } from "./deriveComment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,10 +103,19 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
     const body = await req.json().catch(() => ({}));
     const mode = body.mode || "discover"; // "discover", "extract_claims", or "question_classify_llm"
+
+    if (mode === "derive_comment") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return jsonResponse({ error: "service_role required" }, 403);
+      }
+      const result = await derivePublicComment(supabase, body, { apiKey: anthropicKey });
+      return jsonResponse(result.body, result.status);
+    }
 
     // Anthropic key required for discover and extract_claims modes, not question_classify_llm
     if (mode !== "question_classify_llm" && !anthropicKey) {
@@ -371,7 +381,8 @@ async function processVehicle(
 async function extractClaims(
   supabase: any, supabaseUrl: string, serviceKey: string, anthropicKey: string, body: any
 ) {
-  const { buildClaimExtractionPrompt, parseClaimResponse, computeClaimConfidence } = await import("../_shared/commentRefinery.ts");
+  const { buildClaimExtractionPrompt, parseClaimResponse } = await import("../_shared/commentRefinery.ts");
+  const { landCommentClaims } = await import("./claimLanding.ts");
 
   const batchSize = Math.min(body.batch_size || 10, 30); // vehicles per invocation
   const commentsPerCall = body.comments_per_call || 10;   // comments per LLM call
@@ -394,16 +405,16 @@ async function extractClaims(
   if (pendErr) return { error: pendErr.message, processed: 0 };
 
   // Group by vehicle
-  const vehicleIds = [...new Set((pendingRows || []).map((r: any) => r.vehicle_id))].slice(0, batchSize);
+  const vehicleIds = [...new Set<string>((pendingRows || []).map((r: any) => String(r.vehicle_id)))].slice(0, batchSize);
   if (vehicleIds.length === 0) return { processed: 0, claims_total: 0, vehicles: 0, note: "No pending claims above threshold" };
 
   // Get vehicle context
   const { data: vehicles } = await supabase
     .from("vehicles")
-    .select("id, year, make, model, vin, sale_price")
+    .select("id, year, make, model, vin, sale_price, is_public")
     .in("id", vehicleIds);
 
-  const vehicleMap = new Map((vehicles || []).map((v: any) => [v.id, v]));
+  const vehicleMap = new Map<string, any>((vehicles || []).map((v: any) => [v.id, v]));
 
   let totalClaims = 0;
   let totalProcessed = 0;
@@ -415,15 +426,7 @@ async function extractClaims(
     if (Date.now() - startTime > 45000) break; // time budget
 
     const vehicle = vehicleMap.get(vId);
-    if (!vehicle) continue;
-
-    // Detect source platform for this vehicle
-    const { data: veRows } = await supabase
-      .from("vehicle_events")
-      .select("source_platform")
-      .eq("vehicle_id", vId)
-      .limit(1);
-    const sourcePlatform = veRows?.[0]?.source_platform || "bat";
+    if (!vehicle || vehicle.is_public !== true) continue;
 
     // Get pending comments for this vehicle (above threshold, not yet processed)
     const { data: pendingComments } = await supabase
@@ -439,32 +442,23 @@ async function extractClaims(
 
     const commentIds = pendingComments.map((p: any) => p.comment_id);
 
-    // Fetch full comment text — try auction_comments first, then vehicle_observations
+    // Admit only sources this typed landing contract can cite, before spending.
+    // Other source families need their own canonical source relation first.
     let fullComments: any[] | null = null;
     const { data: acComments } = await supabase
       .from("auction_comments")
-      .select("id, comment_text, author_username, is_seller, posted_at, bid_amount")
+      .select("id, vehicle_id, comment_text, author_username, is_seller, posted_at, bid_amount, source_url")
       .in("id", commentIds);
 
     if (acComments && acComments.length > 0) {
-      fullComments = acComments;
-    } else {
-      // Fallback: Hagerty comments stored as vehicle_observations (kind='comment')
-      const { data: obsComments } = await supabase
-        .from("vehicle_observations")
-        .select("id, content_text, structured_data, observed_at")
-        .in("id", commentIds);
-
-      if (obsComments && obsComments.length > 0) {
-        fullComments = obsComments.map((o: any) => ({
-          id: o.id,
-          comment_text: o.content_text || "",
-          author_username: o.structured_data?.author || o.structured_data?.author_username || "anon",
-          is_seller: o.structured_data?.is_seller || false,
-          posted_at: o.observed_at,
-          bid_amount: o.structured_data?.bid_amount || null,
-        }));
-      }
+      fullComments = acComments.filter((comment: any) => {
+        if (comment.vehicle_id !== vId || comment.bid_amount != null || !comment.posted_at) return false;
+        try {
+          const url = new URL(comment.source_url);
+          return url.protocol === "https:" && ["bringatrailer.com", "www.bringatrailer.com"].includes(url.hostname)
+            && !url.username && !url.password;
+        } catch { return false; }
+      });
     }
 
     if (!fullComments || fullComments.length === 0) continue;
@@ -475,7 +469,7 @@ async function extractClaims(
       .select("field_name")
       .eq("vehicle_id", vId)
       .limit(50);
-    const existingFieldNames = [...new Set((existingEvidence || []).map((e: any) => e.field_name))];
+    const existingFieldNames = [...new Set<string>((existingEvidence || []).map((e: any) => String(e.field_name)))];
 
     // Process in batches of commentsPerCall
     for (let i = 0; i < fullComments.length; i += commentsPerCall) {
@@ -602,124 +596,17 @@ async function extractClaims(
         continue;
       }
 
-      // Parse claims
-      const { claims, parseErrors } = parseClaimResponse(content, batch);
-      if (parseErrors.length > 0) {
-        errors.push(...parseErrors.slice(0, 3).map((e: string) => `${vId}: ${e}`));
-      }
-
-      // Write Category A/B claims to field_evidence
-      const fieldClaims = claims.filter(c => c.category === 'A' || c.category === 'B');
-      const fieldEvidenceRows = fieldClaims.map(c => {
-        const anchor = c.temporal_anchor && c.temporal_anchor !== 'null' && c.temporal_anchor !== 'current'
-          ? new Date(c.temporal_anchor) : null;
-        const conf = computeClaimConfidence(c.confidence, null, c.claim_type, anchor);
-        return {
-          vehicle_id: vId,
-          field_name: c.field_name || c.claim_type,
-          proposed_value: c.proposed_value,
-          source_type: 'auction_comment_claim',
-          source_confidence: Math.round((isNaN(conf) ? c.confidence : conf) * 100),
-          extraction_context: batch.find((b: any) => b.id === c.comment_id)?.comment_text?.substring(0, 500) || '',
-          supporting_signals: [{  // JSONB — pass object, not string
-            quote: c.quote,
-            author: batch.find((b: any) => b.id === c.comment_id)?.author_username || 'unknown',
-            temporal_anchor: c.temporal_anchor,
-            claim_type: c.claim_type,
-            category: c.category,
-            model: modelUsed,
-          }],
-          status: 'pending',
-          raw_extraction_data: { reasoning: c.reasoning, contradicts_existing: c.contradicts_existing },
-        };
+      // Parsing is not completion. Every covered comment must have all its
+      // source-linked atoms persisted and read back before progress advances.
+      const parsed = parseClaimResponse(content, batch);
+      const landed = await landCommentClaims(supabase, {
+        vehicleId: vId, comments: batch, claims: parsed.claims,
+        processedCommentIds: parsed.processedCommentIds, commentErrors: parsed.commentErrors,
+        modelUsed, costCents, promptVersion: "public_comment_atoms_v1",
       });
-
-      if (fieldEvidenceRows.length > 0) {
-        const { error: feErr } = await supabase
-          .from("field_evidence")
-          .upsert(fieldEvidenceRows, { onConflict: "vehicle_id,field_name,source_type,proposed_value" });
-        if (feErr) errors.push(`field_evidence write: ${feErr.message}`);
-      }
-
-      // Write Category B claims as condition observations via ingest-observation
-      const conditionClaims = claims.filter(c => c.category === 'B');
-      for (const c of conditionClaims) {
-        try {
-          await supabase.functions.invoke("ingest-observation", {
-            body: {
-              source_slug: sourcePlatform,
-              kind: "condition",
-              observed_at: c.temporal_anchor && c.temporal_anchor !== 'null'
-                ? c.temporal_anchor
-                : batch.find((b: any) => b.id === c.comment_id)?.posted_at || new Date().toISOString(),
-              content_text: c.quote,
-              structured_data: {
-                claim_type: c.claim_type,
-                proposed_value: c.proposed_value,
-                confidence: c.confidence,
-                author: batch.find((b: any) => b.id === c.comment_id)?.author_username || 'unknown',
-                category: 'B',
-              },
-              vehicle_id: vId,
-              extraction_method: "comment_refinery_condition_v1",
-              agent_model: modelUsed,
-            },
-          });
-        } catch (condErr: any) {
-          errors.push(`condition-obs: ${condErr.message?.slice(0, 100)}`);
-        }
-      }
-
-      // Write Category C claims as vehicle_observations via ingest-observation
-      const provClaims = claims.filter(c => c.category === 'C');
-      for (const c of provClaims) {
-        try {
-          await supabase.functions.invoke("ingest-observation", {
-            body: {
-              source_slug: sourcePlatform,
-              kind: c.observation_kind || "expert_opinion",
-              observed_at: c.temporal_anchor && c.temporal_anchor !== 'null'
-                ? c.temporal_anchor
-                : batch.find((b: any) => b.id === c.comment_id)?.posted_at || new Date().toISOString(),
-              content_text: c.quote,
-              structured_data: {
-                claim_type: c.claim_type,
-                proposed_value: c.proposed_value,
-                reasoning: c.reasoning,
-                author: batch.find((b: any) => b.id === c.comment_id)?.author_username || 'unknown',
-              },
-              vehicle_id: vId,
-              extraction_method: "comment_refinery_v1",
-              agent_model: modelUsed,
-            },
-          });
-        } catch (obsErr: any) {
-          errors.push(`ingest-obs: ${obsErr.message?.slice(0, 100)}`);
-        }
-      }
-
-      // Update comment_claims_progress for processed comments
-      const batchCommentIds = batch.map((b: any) => b.id);
-      const claimCountByComment = new Map<string, number>();
-      for (const c of claims) {
-        claimCountByComment.set(c.comment_id, (claimCountByComment.get(c.comment_id) || 0) + 1);
-      }
-
-      for (const cId of batchCommentIds) {
-        await supabase
-          .from("comment_claims_progress")
-          .update({
-            llm_processed: true,
-            llm_model: modelUsed,
-            llm_cost_cents: Math.round(costCents / batch.length * 10000) / 10000,
-            claims_extracted: claimCountByComment.get(cId) || 0,
-            processed_at: new Date().toISOString(),
-          })
-          .eq("comment_id", cId);
-      }
-
-      totalClaims += claims.length;
-      totalProcessed += batch.length;
+      errors.push(...parsed.parseErrors.slice(0, 3), ...landed.errors.slice(0, 3));
+      totalClaims += landed.claims_total;
+      totalProcessed += landed.comments_processed;
       totalCostCents += costCents;
     }
 
@@ -727,7 +614,7 @@ async function extractClaims(
   }
 
   // Self-chain if requested
-  if (shouldContinue && vehiclesProcessed > 0) {
+  if (shouldContinue && totalProcessed > 0 && errors.length === 0 && Number(body._batch_num || 1) < 3) {
     const { count: remaining } = await supabase
       .from("comment_claims_progress")
       .select("id", { count: "exact", head: true })
@@ -738,7 +625,8 @@ async function extractClaims(
       fetch(`${supabaseUrl}/functions/v1/batch-comment-discovery`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "extract_claims", batch_size: body.batch_size, continue: true }),
+        body: JSON.stringify({ mode: "extract_claims", batch_size: body.batch_size, vehicle_id: vehicleId,
+          comments_per_call: Math.min(commentsPerCall, 10), _batch_num: Number(body._batch_num || 1) + 1, continue: true }),
       }).catch(e => console.error("[extract_claims] Chain failed:", e));
     }
   }

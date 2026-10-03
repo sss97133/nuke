@@ -32,7 +32,8 @@ async function run(body: unknown, scenario: string, token = "test-key") {
     const response = (data: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(data), {
       status, headers: { "Content-Type": "application/json" },
     }));
-    if (url.pathname.endsWith("observation_sources")) return response([{ id: UUID, base_trust_score: .85, supported_observations: ["condition"] }]);
+    if (url.pathname.endsWith("observation_sources")) return response([{ id: UUID, base_trust_score: .85,
+      supported_observations: url.searchParams.get("slug") === "eq.bat" ? ["comment"] : ["condition"] }]);
     if (url.pathname.endsWith("observation_properties")) {
       if (scenario === "registry_error") return response({ message: "unavailable" }, 503);
       return response(scenario === "unknown_property" ? [] : [{ id: UUID, namespace: "core", deprecated_at: null, applies_to_kinds: ["condition"] }]);
@@ -41,6 +42,7 @@ async function run(body: unknown, scenario: string, token = "test-key") {
       if (method === "POST") {
         if (scenario === "race") return response({ code: "23505", message: "duplicate" }, 409);
         if (scenario === "witness_failed") return response({ code: "23514", message: "image mismatch" }, 400);
+        if (scenario === "comment_source_failed") return response({ code: "23503", message: "source comment missing" }, 400);
         return response([{ id: UUID }], 201);
       }
       observationReads++;
@@ -112,6 +114,90 @@ Deno.test("signed-in user cannot select the service-only deferred mode", async (
     assert(r.status === 403 && r.calls.length === 0);
   } finally {
     if (old === undefined) Deno.env.delete("JWT_SIGNING_SECRET"); else Deno.env.set("JWT_SIGNING_SECRET", old);
+  }
+});
+
+const COMMENT_ID = "20000000-0000-4000-8000-000000000001";
+const OTHER_COMMENT_ID = "20000000-0000-4000-8000-000000000002";
+const commentInput = {
+  source_slug: "bat", kind: "comment", vehicle_id: UUID,
+  observed_at: "2026-01-02T03:04:05Z",
+  source_comment_id: COMMENT_ID,
+  source_url: "https://bringatrailer.com/listing/synthetic-vehicle/",
+  source_identifier: "synthetic-comment-atom",
+  content_text: "The engine runs well.",
+  agent_inferred: true, defer_analysis: true,
+  extraction_method: "comment_refinery_atom", agent_cost_cents: 0,
+  structured_data: { analysis_kind: "comment_atom", is_inferred: true,
+    statement_kind: "assertion", subject_scope: "vehicle", qualification: "candidate",
+    claim_type: "mechanical_condition", proposed_value: "runs well", confidence: .4 },
+};
+
+Deno.test("inferred comment insert retains its typed source link, qualification and source clock", async () => {
+  const r = await run(commentInput, "success");
+  assert(r.status === 200 && r.data.success === true);
+  const insert = r.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+  assert(insert?.body?.source_comment_id === COMMENT_ID);
+  assert(insert?.body?.vehicle_id === UUID && insert?.body?.kind === "comment");
+  assert(insert?.body?.observed_at === commentInput.observed_at);
+  assert(insert?.body?.source_url === commentInput.source_url);
+  assert(insert?.body?.content_text === commentInput.content_text);
+  assert(insert?.body?.confidence_score === .6);
+  const data = insert?.body?.structured_data as Record<string, unknown>;
+  assert(data?.is_inferred === true && data?.qualification === "candidate");
+  assert(data?.confidence === .4);
+  assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
+});
+
+Deno.test("identical comment atoms from different source comments retain distinct content hashes", async () => {
+  const inserted: Record<string, unknown>[] = [];
+  for (const source_comment_id of [COMMENT_ID, OTHER_COMMENT_ID, COMMENT_ID]) {
+    const r = await run({ ...commentInput, source_comment_id }, "success");
+    assert(r.status === 200 && r.data.success === true);
+    const insert = r.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+    assert(insert?.body?.source_comment_id === source_comment_id);
+    inserted.push(insert!.body!);
+  }
+  assert(typeof inserted[0].content_hash === "string" && /^[0-9a-f]{64}$/.test(inserted[0].content_hash));
+  assert(inserted[0].content_hash !== inserted[1].content_hash,
+    "separate source comments must not collapse into one observation");
+  assert(inserted[0].content_hash === inserted[2].content_hash,
+    "replaying the same source comment must retain deterministic identity");
+});
+
+Deno.test("invalid source comment UUIDs fail before any database mutation", async () => {
+  for (const source_comment_id of ["not-a-uuid", "", null, 42, {}, "20000000-0000-4000-8000-00000000000Z"]) {
+    const r = await run({ ...commentInput, source_comment_id }, "success");
+    assert(r.status === 400 && r.data.success !== true);
+    assert(r.calls.length === 0);
+  }
+});
+
+Deno.test("source-linked atoms require comment kind and explicit inference qualification", async () => {
+  for (const patch of [
+    { kind: "condition" }, { kind: "ownership" },
+    { agent_inferred: false }, { agent_inferred: undefined }, { agent_inferred: "true" },
+    { structured_data: undefined }, { structured_data: null }, { structured_data: {} },
+    { structured_data: { is_inferred: false } }, { structured_data: { is_inferred: "true" } },
+  ]) {
+    const r = await run({ ...commentInput, ...patch }, "success");
+    assert(r.status === 400 && r.data.success !== true);
+    assert(r.calls.length === 0);
+  }
+});
+
+Deno.test("comment source constraint failure cannot report successful intake or trigger analysis", async () => {
+  const r = await run(commentInput, "comment_source_failed");
+  assert(r.status === 500 && r.data.success !== true);
+  assert(r.calls.some(call => call.method === "POST" && call.path.endsWith("vehicle_observations")));
+  assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
+});
+
+Deno.test("replayed deferred comment uses the existing observation without downstream work", async () => {
+  for (const scenario of ["duplicate", "race"]) {
+    const r = await run(commentInput, scenario);
+    assert(r.status === 200 && r.data.duplicate === true && r.data.observation_id === UUID);
+    assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
   }
 });
 
