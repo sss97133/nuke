@@ -153,6 +153,10 @@ function applyFixture(options = {}) {
     id: IDS.output, vehicle_id: first.vehicle_id, property_id: IDS.property,
     property_key: first.property_key, observation_properties: { property_key: first.property_key },
     structured_data: first.structured_data, confidence_score: 0.6, observed_at: first.observed_at,
+    ingested_at: '2026-05-03T09:00:01.123456Z', source_identifier: first.source_identifier,
+    extraction_method: first.extraction_method, agent_model: first.agent_model,
+    raw_source_ref: first.raw_source_ref, kind: first.kind, is_superseded: false,
+    source: { slug: first.source_slug },
     ...options.row,
   };
   const sb = {
@@ -216,6 +220,18 @@ for (const [name, options] of [
   ['null stored confidence', { row: { confidence_score: null } }],
   ['negative stored confidence', { row: { confidence_score: -0.1 } }],
   ['unqualified stored confidence', { row: { confidence_score: 0.8 } }],
+  ['wrong event clock', { row: { observed_at: '2026-05-03T09:00:01Z' } }],
+  ['microsecond event drift', { row: { observed_at: '2026-05-03T09:00:00.000001Z' } }],
+  ['missing ingest clock', { row: { ingested_at: null } }],
+  ['invalid ingest clock', { row: { ingested_at: 'unknown' } }],
+  ['ingest before source record', { row: { ingested_at: '2026-05-03T08:59:59.999999Z' } }],
+  ['wrong source identity', { row: { source_identifier: 'different-result' } }],
+  ['wrong canonical source', { row: { source: { slug: 'other-source' } } }],
+  ['wrong method', { row: { extraction_method: 'new-visual-inference' } }],
+  ['wrong model', { row: { agent_model: 'unrecorded-model' } }],
+  ['wrong source reference', { row: { raw_source_ref: 'different-parent' } }],
+  ['wrong kind', { row: { kind: 'specification' } }],
+  ['superseded output', { row: { is_superseded: true } }],
 ]) {
   test(`${name} stops the bounded pass with failed persistence`, async () => {
     const { sb, claims, calls } = applyFixture(options);
@@ -224,6 +240,36 @@ for (const [name, options] of [
     assert.equal(result.verified, 0);
     assert.equal(result.inserted, 0);
     assert.equal(calls.length, 1);
+  });
+}
+
+test('equivalent timezone clocks and an old first-ingest receipt remain valid on replay', async () => {
+  const { sb, claims } = applyFixture({ duplicate: true, row: {
+    observed_at: '2026-05-03T02:00:00.000000-07:00',
+    ingested_at: '2026-05-03T09:00:00.000001+00:00',
+  } });
+  const result = await applyImagePropertyClaims(sb, claims.slice(0, 1));
+  assert.equal(result.failed, 0);
+  assert.equal(result.duplicates, 1);
+  assert.equal(result.verified, 1);
+});
+
+for (const [field, value] of [
+  ['projection_version', 'different-version'], ['analysis_kind', 'new-analysis'],
+  ['property_key', 'different-property'], ['source_extraction_method', 'different-source-method'],
+  ['source_model_confidence', 0.99], ['source_observed_at', '2026-05-02T08:00:00Z'],
+  ['observed_at_basis', 'photo_capture'], ['capture_at', '2026-05-01T08:00:00Z'],
+  ['analyzed_at', '2026-05-01T08:00:00Z'],
+]) {
+  test(`altered ${field} cannot count as verified output`, async () => {
+    const { observation, image } = fixtures();
+    const first = projectImageProperties(observation, image).claims[0];
+    const { sb, claims } = applyFixture({ row: {
+      structured_data: { ...first.structured_data, [field]: value },
+    } });
+    const result = await applyImagePropertyClaims(sb, claims.slice(0, 1));
+    assert.equal(result.failed, 1);
+    assert.equal(result.verified, 0);
   });
 }
 

@@ -81,6 +81,15 @@ export function projectImageProperties(observation, image) {
   return { claims, deferred: claims.length ? null : 'no_known_scalar_values' };
 }
 
+// PostgreSQL retains microseconds; Date.parse alone would accept sub-ms drift.
+// Normalize only for comparison: never change source payloads or replay hashes.
+function instantMicros(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return null;
+  return BigInt(Date.parse(value)) * 1000n + BigInt((match[1] ?? '').padEnd(6, '0').slice(3));
+}
+
 export const IMAGE_PROPERTY_BATCH_MODE = 'cached_image_property_projection_v1';
 export const IMAGE_PROPERTY_BATCH_LIMIT = 3000;
 
@@ -187,22 +196,29 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
       }
       const id = result.data.observation_id;
       const row = await sb.from('vehicle_observations')
-        .select('id,vehicle_id,property_id,structured_data,confidence_score')
+        .select('id,vehicle_id,property_id,structured_data,confidence_score,observed_at,ingested_at,source_identifier,extraction_method,agent_model,raw_source_ref,kind,is_superseded,source:observation_sources!source_id(slug)')
         .eq('id', id).maybeSingle().abortSignal(AbortSignal.timeout(timeout()));
       const witness = await sb.from('observation_witnesses').select('id')
         .eq('observation_id', id).eq('image_id', claim.structured_data.image_id)
         .eq('witness_role', 'derived').limit(2).abortSignal(AbortSignal.timeout(timeout()));
+      const eventTime = instantMicros(row.data?.observed_at);
+      const ingestTime = instantMicros(row.data?.ingested_at);
+      const expectedEventTime = instantMicros(claim.observed_at);
       if (row.error || witness.error || !propertyIds.get(claim.property_key) ||
           row.data?.property_id !== propertyIds.get(claim.property_key) ||
+          row.data.id !== id || row.data.is_superseded !== false || row.data.kind !== claim.kind ||
+          row.data.source?.slug !== claim.source_slug || row.data.source_identifier !== claim.source_identifier ||
+          row.data.extraction_method !== claim.extraction_method || row.data.agent_model !== claim.agent_model ||
+          row.data.raw_source_ref !== claim.raw_source_ref ||
+          eventTime === null || ingestTime === null || expectedEventTime === null ||
+          eventTime !== expectedEventTime || ingestTime < eventTime ||
           row.data.vehicle_id !== claim.vehicle_id ||
-          row.data.structured_data?.[claim.property_key] !== claim.structured_data[claim.property_key] ||
-          row.data.structured_data?.source_observation_id !== claim.structured_data.source_observation_id ||
-          row.data.structured_data?.image_id !== claim.structured_data.image_id ||
-          row.data.structured_data?.source_result_hash !== claim.structured_data.source_result_hash ||
-          row.data.structured_data?.source_recorded_at !== claim.structured_data.source_recorded_at ||
+          // This projection emits allowlisted scalar fields only; include all its
+          // retained provenance/unknown clocks, not just the result digest.
+          Object.entries(claim.structured_data).some(([key, value]) => row.data.structured_data?.[key] !== value) ||
           !Number.isFinite(row.data.confidence_score) || row.data.confidence_score < 0 ||
           row.data.confidence_score > 0.6 || witness.data?.length !== 1) {
-        receipt.failed++; break;
+        receipt.failed++; receipt.reason = 'persistence_readback_mismatch'; break;
       }
       result.data.duplicate === true ? receipt.duplicates++ : receipt.inserted++;
       receipt.verified++;
