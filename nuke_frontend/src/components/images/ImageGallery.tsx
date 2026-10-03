@@ -1111,9 +1111,11 @@ const ImageGallery = ({
   // Cap how many images we render at once to avoid 1000+ broken/slow grids (infinite scroll loads more).
   const MAX_INITIAL_DISPLAY = 200;
 
-  // When vehicle meta arrives, re-filter any already-loaded images so the UI doesn't briefly show
-  // unrelated BaT homepage / other-lot images for bat_import vehicles.
+  // Legacy URL fallbacks still need scrape-noise heuristics. Real image rows
+  // already passed vehicle_image_gallery_eligible in fetchGalleryImages; a
+  // filename or date bucket must not override that database admission.
   useEffect(() => {
+    if (!usingFallback) return;
     if (!vehicleMeta) return;
     if (!allImages || allImages.length === 0) return;
     const nextAll = applyBatCanonicalOverlay(filterBatNoiseRows(allImages), vehicleMeta);
@@ -1123,7 +1125,7 @@ const ImageGallery = ({
     setDisplayedImages(sorted.slice(0, MAX_INITIAL_DISPLAY));
     setAutoLoad(true);
     // Do not toggle usingFallback here; we only filter the current view.
-  }, [vehicleMeta, applySourceFilter]); // intentionally not depending on allImages to avoid loops
+  }, [vehicleMeta, applySourceFilter, usingFallback]); // intentionally not depending on allImages to avoid loops
 
   const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   const normalizeFallbackUrls = (urls: string[]) => {
@@ -1199,7 +1201,7 @@ const ImageGallery = ({
       // Refresh DB-backed gallery view immediately
       const refreshed = await fetchGalleryImages(vehicleId);
 
-      const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
+      const images = dedupeFetchedImages(refreshed || []);
       setUsingFallback(false);
       setAllImages(images);
       const sorted = sortRows(applySourceFilter(images), sortBy);
@@ -1844,7 +1846,7 @@ const ImageGallery = ({
         setDuplicateCount(dupCountResult.count || 0);
         const deduped = dedupeFetchedImages(rawImages || []);
         const cleaned = applyQuarantinePolicy(deduped);
-        const images = applyBatCanonicalOverlay(filterBatNoiseRows(cleaned, meta), meta);
+        const images = cleaned;
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -1919,7 +1921,7 @@ const ImageGallery = ({
             if (refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
               const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-              const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
+              const refreshedFiltered = refreshedCleaned;
               // Check if the specific image was updated
               const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
@@ -2131,7 +2133,7 @@ const ImageGallery = ({
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
       const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-      const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
+      const refreshedFiltered = refreshedCleaned;
       setAllImages(refreshedFiltered);
       
       // Always show images after upload and refresh the display
