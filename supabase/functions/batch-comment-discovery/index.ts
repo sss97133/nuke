@@ -22,7 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
-import { COMMENT_MODEL, classifyCommentModelFailure, derivePublicComment } from "./deriveComment.ts";
+import { COMMENT_MODEL, OPENAI_COMMENT_MODEL, classifyCommentModelFailure, derivePublicComment } from "./deriveComment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
     const body = await req.json().catch(() => ({}));
@@ -114,16 +115,17 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "service_role required" }, 403);
       }
       if (mode === "comment_provider_health") {
-        if (!anthropicKey) return jsonResponse({ healthy: false, error: "configured_comment_model_unavailable", model_calls: 0 }, 503);
-        const response = await fetch(`https://api.anthropic.com/v1/models/${COMMENT_MODEL}`, {
-          headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+        if (!openaiKey && !anthropicKey) return jsonResponse({ healthy: false, error: "configured_comment_model_unavailable", model_calls: 0 }, 503);
+        const model = openaiKey ? OPENAI_COMMENT_MODEL : COMMENT_MODEL;
+        const response = await fetch(openaiKey ? `https://api.openai.com/v1/models/${model}` : `https://api.anthropic.com/v1/models/${model}`, {
+          headers: openaiKey ? { Authorization: `Bearer ${openaiKey}` } : { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
           signal: AbortSignal.timeout(10000),
         });
         const data = await response.json().catch(() => null);
-        return jsonResponse({ healthy: response.ok, model: COMMENT_MODEL, model_calls: 0,
+        return jsonResponse({ healthy: response.ok, model, model_calls: 0,
           ...(response.ok ? {} : classifyCommentModelFailure(response.status, data)) }, response.ok ? 200 : 503);
       }
-      const result = await derivePublicComment(supabase, body, { apiKey: anthropicKey });
+      const result = await derivePublicComment(supabase, body, { apiKey: anthropicKey, openaiKey });
       return jsonResponse(result.body, result.status);
     }
 
