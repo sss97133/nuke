@@ -60,6 +60,18 @@ title = "Nuke Key Guardian"
   entropy = 3.5
   tags = ["key", "twilio"]
 
+  # Immutable public questionnaire/model SHA-256 digests, not credentials.
+  # Restrict exceptions to these exact declarations in these two assay files.
+  # Gitleaks 8.30's finding.Line includes the preceding newline; admit only that prefix.
+  [[rules.allowlists]]
+    condition = "AND"
+    paths = ['''(^|/)yono/scripts/local_scene_(assay\.py|questionnaire_v2\.json)$''']
+    regexTarget = "line"
+    regexes = [
+      '''^\n?\+?(QUESTIONNAIRE_HASH = |  "questionnaire_hash": )"(410c4289c01963b3)(df68b59b1f611da5)(8fb33525b1c443c0)(f9ff6b31e7b1f826)",?$''',
+      '''^\n?\+?MODEL_DIGEST = "(5ced39dfa4bac325)(dc183dd1e4febaa1)(c46b3ea28bce4889)(6c8e69c1e79611cc)"$''',
+    ]
+
 [[rules]]
   id = "modal-token"
   description = "Modal Token"
