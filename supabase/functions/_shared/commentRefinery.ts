@@ -20,6 +20,7 @@ export interface ExtractedClaim {
   statement_kind?: 'assertion' | 'question';
   subject_scope?: 'vehicle' | 'model' | 'comment';
   epistemic_status?: 'asserted' | 'uncertain' | 'unknown' | 'refused';
+  action_status?: 'planned' | 'completed' | 'unknown' | 'not_applicable';
   qualification?: 'candidate';
   field_name: string | null;       // null for Category C/D/E
   proposed_value: string;
@@ -203,6 +204,7 @@ For each comment, extract ALL supported atoms. Return a JSON array where each el
         "quote": "matching numbers 427",
         "contradicts_existing": false,
         "epistemic_status": "asserted|uncertain|unknown|refused",
+        "action_status": "planned|completed|unknown|not_applicable",
         "observation_kind": "sighting|ownership|work_record|null"
       }
     ]
@@ -220,6 +222,7 @@ RULES:
 8. Buyer questions use claim_type=buyer_question, category Q; a question is not evidence of a defect. Seller responses use seller_response only for a comment marked SELLER. No answer-link, answered/resolved verdict or independence claim is inferred here. Skip bid amounts, congratulations, jokes and price opinions.
 9. General model knowledge uses general_spec/category E and never establishes a fact about this particular vehicle. Return an explicit empty claims array only for comments with none of the supported atoms.
 10. Do NOT invent claims — only extract what is explicitly stated
+11. Include action_status for every atom: planned for future/scheduled work, completed only for explicitly completed work, unknown when completion is unclear, and not_applicable for statements unrelated to an action. An appointment, intention, scheduled service, or promise is never proof of completed work. Preserve seller plans as seller_response with action_status=planned, never work_performed. If a source mixes plans and past work, avoid a completed verdict unless independently reviewed; do not paraphrase a plan as a repair already done. Buyer questions cannot establish action completion.
 
 Return ONLY the JSON array, no other text.`;
 }
@@ -320,6 +323,19 @@ function validDate(value: string): boolean {
   return month >= 1 && month <= 12 && day >= 1 && day <= lastDay && Number.isFinite(Date.parse(value));
 }
 
+// Conservative admission guard, not a general semantic verifier. Check the full
+// comment so a model cannot omit "will" or "scheduled" from its selected quote.
+const PLANNED_ACTION = /\b(?:schedul(?:e|ed|ing)|appointments?|will|shall|going\s+to|go(?:es|ing)?\s+in|plans?|planned|planning|intend(?:s|ed)?|book(?:ed|ing)|set\s+for)\b/i;
+const COMPLETED_ACTION = /\b(?:completed|repaired|replaced|serviced|fixed|resolved|performed|done|carried\s+out)\b/i;
+function assertsCompletedAction(value: string): boolean {
+  // Explicit negative or future statements retain their meaning. Other mixed
+  // or ambiguous completion wording is held rather than silently rewritten.
+  const qualified = value
+    .replace(/\b(?:not|never)(?:\s+(?:yet|been|already|fully))?\s+(?:completed|repaired|replaced|serviced|fixed|resolved|performed|done|carried\s+out)\b/gi, '')
+    .replace(/\b(?:will|would|should|could|may|might)\s+(?:be|get|have\s+been)\s+(?:completed|repaired|replaced|serviced|fixed|resolved|performed|done|carried\s+out)\b/gi, '');
+  return COMPLETED_ACTION.test(qualified);
+}
+
 function validateClaim(value: unknown, comment: CommentRow): ExtractedClaim | string {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'claim_must_be_object';
   const c = value as Record<string, unknown>;
@@ -343,6 +359,13 @@ function validateClaim(value: unknown, comment: CommentRow): ExtractedClaim | st
   const epistemicStatus = c.epistemic_status ?? (category === 'Q' ? 'unknown' : 'asserted');
   if (!['asserted', 'uncertain', 'unknown', 'refused'].includes(epistemicStatus as string)) return 'invalid_epistemic_status';
   if (category === 'Q' && (epistemicStatus !== 'unknown' || c.contradicts_existing === true)) return 'question_cannot_assert_fact';
+  const actionStatus = c.action_status === undefined ? 'unknown' : c.action_status;
+  if (!['planned', 'completed', 'unknown', 'not_applicable'].includes(actionStatus as string)) return 'invalid_action_status';
+  if (category === 'Q' && actionStatus === 'completed') return 'question_cannot_establish_completion';
+  if (c.claim_type === 'work_performed' && actionStatus === 'planned') return 'planned_action_is_not_work_performed';
+  if (PLANNED_ACTION.test(comment.comment_text) &&
+      (c.claim_type === 'work_performed' || actionStatus === 'completed' ||
+       (category !== 'Q' && assertsCompletedAction(c.proposed_value)))) return 'planned_source_cannot_establish_completion';
   const kinds: Record<string, string> = { sighting: 'sighting', ownership_claim: 'ownership', previous_sale: 'provenance', work_performed: 'work_record', buyer_question: 'comment', seller_response: 'comment' };
   const observationKind = kinds[c.claim_type];
   if (c.observation_kind != null && c.observation_kind !== observationKind) return 'claim_kind_mismatch';
@@ -360,6 +383,7 @@ function validateClaim(value: unknown, comment: CommentRow): ExtractedClaim | st
   return {
     claim_type: c.claim_type, category, statement_kind: statementKind, subject_scope: subjectScope,
     epistemic_status: epistemicStatus as ExtractedClaim['epistemic_status'], qualification: 'candidate',
+    action_status: actionStatus as ExtractedClaim['action_status'],
     field_name: typeof c.field_name === 'string' ? c.field_name : null,
     proposed_value: c.proposed_value.trim(), confidence: Math.min(0.6, c.confidence), model_confidence: c.confidence,
     temporal_anchor: anchor, temporal_anchor_basis: anchorBasis, reasoning: typeof c.reasoning === 'string' ? c.reasoning : '',

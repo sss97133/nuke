@@ -50,6 +50,74 @@ Deno.test('zero confidence is retained rather than defaulted to a positive score
   equal(parsed.claims[0].model_confidence, 0);
 });
 
+Deno.test('planned service cannot be admitted as completed work even with an exact quote', () => {
+  const comment = { ...source('plan', 'We scheduled the service; it goes in on October 7.'), is_seller: true };
+  const atom = claim({ claim_type: 'work_performed', category: 'C',
+    proposed_value: 'Airbag repair completed', quote: comment.comment_text, confidence: 0.5 });
+  for (const patch of [{}, { action_status: 'completed' }, { action_status: 'unknown' }, { action_status: 'planned' }]) {
+    const parsed = parseClaimResponse(response([{ ...atom, ...patch }]), [comment]);
+    equal(parsed.claims, []); equal(parsed.processedCommentIds, []);
+    assert(parsed.commentErrors.plan.length > 0);
+  }
+});
+
+Deno.test('seller appointment remains a planned response with the actual source clock', () => {
+  const comment = { ...source('plan', 'We scheduled the service on Monday, but it goes in at 7am Oct 7th. Something to do with an airbag sensor.'), is_seller: true };
+  const atom = claim({ claim_type: 'seller_response', category: 'C', quote: comment.comment_text,
+    proposed_value: 'Seller reports a service appointment for Oct 7 concerning an airbag sensor.',
+    action_status: 'planned', epistemic_status: 'uncertain' });
+  const parsed = parseClaimResponse(response([atom]), [comment]);
+  equal(parsed.processedCommentIds, ['plan']);
+  equal(parsed.claims[0].action_status, 'planned');
+  equal(parsed.claims[0].subject_scope, 'comment');
+  equal(parsed.claims[0].temporal_anchor, comment.posted_at);
+  equal(parsed.claims[0].source_quote_actual, comment.comment_text);
+});
+
+Deno.test('future wording cannot be omitted from the quote to fabricate completed work', () => {
+  for (const text of ['The airbag sensor will be replaced.', 'We have an appointment for the airbag sensor.',
+    'We are going to replace the airbag sensor.', 'We plan to replace the airbag sensor.']) {
+    const comment = { ...source('plan', text), is_seller: true };
+    for (const patch of [
+      { claim_type: 'work_performed', category: 'C', action_status: 'unknown' },
+      { claim_type: 'seller_response', category: 'C', action_status: 'completed' },
+      { claim_type: 'seller_response', category: 'C', action_status: 'unknown' },
+    ]) {
+      const parsed = parseClaimResponse(response([claim({ ...patch, quote: 'airbag sensor',
+        proposed_value: 'The airbag sensor was replaced.' })]), [comment]);
+      equal(parsed.processedCommentIds, []);
+      equal(parsed.commentErrors.plan, ['planned_source_cannot_establish_completion']);
+    }
+  }
+});
+
+Deno.test('action qualification defaults to unknown and rejects malformed values', () => {
+  equal(parseClaimResponse(response(), [source()]).claims[0].action_status, 'unknown');
+  for (const action_status of [null, true, 1, {}, 'done', 'COMPLETED']) {
+    const result = parseClaimResponse(response([claim({ action_status })]), [source()]);
+    equal(result.processedCommentIds, []);
+    equal(result.commentErrors['source-1'], ['invalid_action_status']);
+  }
+  equal(parseClaimResponse(response([claim({ action_status: 'not_applicable' })]), [source()]).claims[0].action_status, 'not_applicable');
+});
+
+Deno.test('explicit past work retains completed qualification without a future plan', () => {
+  const comment = source('work', 'The tires were replaced on 2025-01-02.');
+  const parsed = parseClaimResponse(response([claim({ claim_type: 'work_performed', category: 'C',
+    proposed_value: 'The tires were replaced.', quote: comment.comment_text,
+    action_status: 'completed', temporal_anchor: '2025-01-02' })]), [comment]);
+  equal(parsed.processedCommentIds, ['work']);
+  equal(parsed.claims[0].action_status, 'completed');
+});
+
+Deno.test('questions about completed appointments do not assert completion', () => {
+  const comment = source('question', 'You scheduled an appointment. Was the repair completed?');
+  const atom = claim({ claim_type: 'buyer_question', category: 'Q', quote: comment.comment_text,
+    proposed_value: 'Was the repair completed?', action_status: 'unknown' });
+  equal(parseClaimResponse(response([atom]), [comment]).processedCommentIds, ['question']);
+  equal(parseClaimResponse(response([{ ...atom, action_status: 'completed' }]), [comment]).processedCommentIds, []);
+});
+
 Deno.test('empty whole response processes nobody; explicit empty comment processes only that comment', () => {
   const comments = [source('a'), source('b')];
   const empty = parseClaimResponse('[]', comments);

@@ -28,7 +28,7 @@ function item(number = 1, patch: Record<string, unknown> = {}) {
 }
 function receipt(patch: Record<string, unknown> = {}) {
   return { success: true, derivation_complete: true, source_comment_id: SOURCE_ID,
-    source_hash: 'a'.repeat(64), empty_source_result: false,
+    source_hash: 'a'.repeat(64), empty_source_result: false, cost_cents: .25,
     derived: [{ observation_id: OBSERVATION_ID, comment_id: SOURCE_ID, credential: 'system_api_key' }], ...patch };
 }
 type Call = { path: string; method: string; body: any; headers: Headers; signal?: AbortSignal | null; url: URL };
@@ -104,6 +104,7 @@ Deno.test('public comment routes its source and queue IDs with system identity',
   assert(invokes[0].signal instanceof AbortSignal);
   equal(queueWrites(r, 'done')[0].body.observation_ids, [OBSERVATION_ID]);
   equal(queueWrites(r, 'done')[0].body.credential_source, 'system_api_key');
+  equal(queueWrites(r, 'done')[0].body.cost_cents, .25);
 });
 
 Deno.test('two public invocations cap each tick and unstarted work restores attempts', async () => {
@@ -144,6 +145,7 @@ Deno.test('false or incomplete 2xx public receipts cannot mark work done', async
 Deno.test('only explicitly examined empty source results may complete with zero observations', async () => {
   const r = await run({ output: receipt({ derived: [], empty_source_result: true }) });
   equal(r.data.done, 1); equal(queueWrites(r, 'done')[0].body.observation_ids, []);
+  equal(queueWrites(r, 'done')[0].body.credential_source, 'system_api_key');
   for (const patch of [{ success: false }, { derivation_complete: false }, { source_comment_id: OWNER_ID }]) {
     const failed = await run({ output: receipt({ derived: [], empty_source_result: true, ...patch }) });
     equal(failed.data.done, 0); equal(queueWrites(failed, 'done').length, 0);
@@ -152,6 +154,7 @@ Deno.test('only explicitly examined empty source results may complete with zero 
 
 Deno.test('receipt must identify the requested source and every derived observation', async () => {
   for (const patch of [
+    { cost_cents: undefined }, { cost_cents: null }, { cost_cents: -1 }, { cost_cents: 6 },
     { source_comment_id: null }, { source_comment_id: OWNER_ID },
     { derived: [{ observation_id: OBSERVATION_ID }] },
     { derived: [{ observation_id: OBSERVATION_ID, comment_id: OWNER_ID }] },

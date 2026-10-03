@@ -151,6 +151,7 @@ Deno.serve(async (req) => {
 
         const derived = out?.derived ?? [];
         const invalidPublicReceipt = publicComment && (out?.success !== true || out?.derivation_complete !== true ||
+          !Number.isFinite(out?.cost_cents) || out.cost_cents < 0 || out.cost_cents > 5 ||
           out?.source_comment_id !== item.evidence_id || !Array.isArray(out?.derived) || derived.length > 16 ||
           (derived.length === 0 && out?.empty_source_result !== true) ||
           derived.some((d: any) => !d || typeof d.observation_id !== "string" ||
@@ -171,6 +172,7 @@ Deno.serve(async (req) => {
         await finish(admin, item.id, "done", {
           observation_ids: derived.map((d: any) => d.observation_id).filter(Boolean),
           credential_source: publicComment ? "system_api_key" : derived[0]?.credential ?? null,
+          ...(publicComment ? { cost_cents: out.cost_cents } : {}),
         });
         done++;
         results.push({
@@ -213,6 +215,7 @@ async function finish(admin: any, id: string, status: string, extra: Record<stri
     error_message: (extra.error as string) ?? null,
     observation_ids: (extra.observation_ids as string[]) ?? null,
     credential_source: (extra.credential_source as string) ?? null,
+    ...(extra.cost_cents !== undefined ? { cost_cents: extra.cost_cents } : {}),
     ...(extra.attempts != null ? { attempts: extra.attempts } : {}),
   }).eq("id", id).select("id,status").maybeSingle();
   if (error || data?.id !== id || data?.status !== status) throw new Error("derivation completion was not persisted");

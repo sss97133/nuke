@@ -71,6 +71,7 @@ export async function landCommentClaims(supabase: any, input: ClaimLandingInput)
               statement_kind: claim.statement_kind,
               subject_scope: scope,
               epistemic_status: claim.epistemic_status,
+              action_status: claim.action_status ?? "unknown",
               qualification: claim.qualification,
               field_name: claim.field_name,
               proposed_value: claim.proposed_value,
