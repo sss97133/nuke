@@ -35,16 +35,24 @@ const badAtoms = observations.filter(o => {
   return !c || c.vehicle_id !== o.vehicle_id || !c.auction_event_id ||
     !o.content_text || !c.comment_text.includes(o.content_text) ||
     Date.parse(o.observed_at) !== Date.parse(c.posted_at) ||
-    o.confidence_score < 0 || o.confidence_score > .6 ||
+    !Number.isFinite(o.confidence_score) || o.confidence_score < 0 || o.confidence_score > .6 ||
     o.structured_data?.is_inferred !== true;
 });
 const complete = progress.filter(p => p.llm_processed && p.extraction_version === 'public_comment_atoms_v1');
 const badCompletions = complete.filter(p => !Array.isArray(p.observation_ids) ||
   p.claims_extracted !== p.observation_ids.length ||
   p.observation_ids.some(id => observationById.get(id)?.source_comment_id !== p.comment_id));
-const badDone = queue.filter(q => q.status === 'done' &&
-  (!complete.some(p => p.comment_id === q.evidence_id) || !Array.isArray(q.observation_ids) ||
-   q.observation_ids.some(id => observationById.get(id)?.source_comment_id !== q.evidence_id)));
+const badDone = queue.filter(q => {
+  if (q.status !== 'done') return false;
+  const p = complete.find(p => p.comment_id === q.evidence_id);
+  return !p || !Array.isArray(q.observation_ids) || !Array.isArray(p.observation_ids) ||
+    q.observation_ids.length !== p.observation_ids.length ||
+    new Set(q.observation_ids).size !== q.observation_ids.length ||
+    p.observation_ids.some(id => !q.observation_ids.includes(id)) ||
+    q.observation_ids.some(id => observationById.get(id)?.source_comment_id !== q.evidence_id);
+});
+const readerAtoms = reader?.comment_evidence?.atoms ?? [];
+const badReaderAtoms = readerAtoms.filter(a => observationById.get(a.observation_id)?.source_comment_id !== a.source_comment_id);
 const countBy = (rows, field) => rows.reduce((counts, row) => {
   const key = String(field(row)); counts[key] = (counts[key] ?? 0) + 1; return counts;
 }, {});
@@ -60,9 +68,11 @@ const summary = {
   reader_atoms: reader?.comment_evidence?.atoms_returned ?? null,
   statement_kinds: countBy(observations, o => o.structured_data?.statement_kind),
   epistemic_status: countBy(observations, o => o.structured_data?.epistemic_status),
+  action_status: countBy(observations, o => o.structured_data?.action_status),
   broken_atom_links_or_qualification: badAtoms.length,
   false_progress_completions: badCompletions.length,
   false_queue_completions: badDone.length,
+  broken_reader_links: badReaderAtoms.length,
   duplicate_atom_identities: observations.length - new Set(observations.map(o => o.source_identifier)).size,
 };
 const receipt = { checked_at: new Date().toISOString(), vehicle_id: vehicleId, summary,
@@ -72,4 +82,4 @@ const receipt = { checked_at: new Date().toISOString(), vehicle_id: vehicleId, s
   observations, reader_evidence: reader?.comment_evidence ?? null };
 writeFileSync(destination, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
 console.log(JSON.stringify({ checked_at: receipt.checked_at, ...summary }, null, 2));
-if (badAtoms.length || badCompletions.length || badDone.length) process.exitCode = 1;
+if (badAtoms.length || badCompletions.length || badDone.length || badReaderAtoms.length) process.exitCode = 1;
