@@ -27,6 +27,10 @@ MINUTES="${3:-45}"
 ONLY_VEHICLE="${4:-}"
 SHARD_COUNT="${5:-1}"   # parallel drain: split the fleet across N runners
 SHARD_INDEX="${6:-0}"   # which slice THIS runner owns (0..N-1)
+MAX_FAILURES="${BYOK_MAX_FAILURES:-3}"
+if ! [[ "$MAX_FAILURES" =~ ^([1-9]|10)$ ]]; then
+  echo 'cloud-drain | invalid failure budget (expected 1..10)' >&2; exit 1
+fi
 DEADLINE=$(( $(date +%s) + MINUTES * 60 ))
 log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 
@@ -35,6 +39,9 @@ log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 # in the UI instead of us hardcoding one GitHub secret. The resolver decrypts via a
 # service-role-only RPC; we eval its output but never echo the secret.
 RESOLVED="$(dotenvx run -- node scripts/deep-image-analysis-byok.mjs resolve --user-id "$USER_ID" 2>/dev/null)"
+if [ "$?" -ne 0 ]; then
+  log "credential resolution failed — abort (no fallback)"; exit 1
+fi
 if [ -n "$RESOLVED" ]; then
   # Export ONLY well-formed KEY=VALUE lines. dotenvx prints a human banner
   # ("⟐ injected env (N)") to stdout; exporting that line trips
@@ -77,13 +84,17 @@ if [[ "$ONLY_VEHICLE" =~ ^[0-9a-f-]{36}$ ]]; then
   VEH=("$ONLY_VEHICLE")
   log "targeted run: single vehicle ${ONLY_VEHICLE:0:8}"
 else
+  QUEUE="$(dotenvx run -- node scripts/deep-image-analysis-byok.mjs queue --user-id "$USER_ID" 2>/dev/null)"
+  if [ "$?" -ne 0 ]; then
+    log "vehicle queue query failed — abort (remaining unknown)"; exit 1
+  fi
   while IFS= read -r line; do
     [[ "$line" =~ ^[0-9a-f-]{36}$ ]] && VEH+=("$line")
-  done < <(dotenvx run -- node scripts/deep-image-analysis-byok.mjs queue --user-id "$USER_ID" 2>&1)
+  done <<< "$QUEUE"
 fi
 
 if [ "${#VEH[@]}" -eq 0 ]; then
-  log "vehicle queue empty or query failed — abort (NOT a drain)"; exit 1
+  log "vehicle queue query succeeded with no eligible vehicles"; exit 0
 fi
 
 # Vehicle-level sharding for a PARALLEL drain. A single serial run only reaches the head
@@ -113,17 +124,28 @@ log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model 
 # before the next) starved breadth — one big vehicle hogged whole runs while 100+ stayed
 # at 0% and showed empty when browsed. Rotating one batch each spreads coverage fast.
 did=0
-declare -A DRAINED=()
+failures=0
+attempts=0
+# Space-delimited UUID set; works in both runner Bash and the Mac's Bash 3.
+DRAINED=" "
+is_drained(){ [[ "$DRAINED" == *" $1 "* ]]; }
 while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   progressed=0
   for vid in "${VEH[@]}"; do
     [ "$(date +%s)" -ge "$DEADLINE" ] && break
-    [ -n "${DRAINED[$vid]:-}" ] && continue
+    is_drained "$vid" && continue
+    attempts=$((attempts + 1))
     bash "$HERE/byok-image-batch.sh" "$vid" "$BATCH"; rc=$?
     case "$rc" in
-      3) DRAINED[$vid]=1 ;;                              # vehicle drained → drop from rotation
-      1) log "transient on ${vid:0:8} — backoff 10s, retry next pass"; sleep 10 ;;
-      *) did=$((did + 1)); progressed=1 ;;              # did real work; rotate to next vehicle
+      3) DRAINED="$DRAINED$vid " ;;                      # vehicle drained → drop from rotation
+      0) did=$((did + 1)); progressed=1 ;;              # verified batch receipt
+      *)
+        failures=$((failures + 1))
+        log "batch failed: exit=$rc failures=$failures limit=$MAX_FAILURES"
+        if [ "$failures" -ge "$MAX_FAILURES" ]; then
+          log "failure budget exhausted — stopping"; break 2
+        fi
+        sleep 10 ;;
     esac
   done
   if [ "$(date +%s)" -ge "$DEADLINE" ]; then
@@ -132,8 +154,16 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   # Stop early only when every vehicle is drained (no undrained left).
   if [ "$progressed" -eq 0 ]; then
     remaining=0
-    for vid in "${VEH[@]}"; do [ -z "${DRAINED[$vid]:-}" ] && remaining=$((remaining + 1)); done
+    for vid in "${VEH[@]}"; do is_drained "$vid" || remaining=$((remaining + 1)); done
     [ "$remaining" -eq 0 ] && { log "all vehicles drained this run"; break; }
   fi
 done
 log "done: $did batches analyzed this run (round-robin, breadth-first)"
+remaining=0
+for vid in "${VEH[@]}"; do is_drained "$vid" || remaining=$((remaining + 1)); done
+outcome=complete
+[ "$remaining" -gt 0 ] && outcome=incomplete
+[ "$failures" -gt 0 ] && outcome=failed
+log "drain receipt: outcome=$outcome batches=$did failures=$failures attempts=$attempts remaining=$remaining"
+[ "$failures" -eq 0 ] || exit 1
+[ "$remaining" -eq 0 ] || exit 2

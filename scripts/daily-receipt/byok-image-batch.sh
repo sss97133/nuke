@@ -39,7 +39,7 @@ log(){ echo "$(date '+%F %T') | $*" | tee -a "$LOG"; }
 # One batch at a time across all invocations (cron + manual)
 if [ -f "$LOCK" ]; then
   pid=$(cat "$LOCK" 2>/dev/null)
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then log "already running (PID $pid) — skip"; exit 0; fi
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then log "already running (PID $pid) — incomplete"; exit 75; fi
 fi
 echo $$ > "$LOCK"; trap 'rm -f "$LOCK"; rm -rf "$DIR"' EXIT
 
@@ -165,24 +165,59 @@ log "invoking claude for vision on $N images"
 # the model that actually ran — numbers carry source DNA.
 MODEL="${BYOK_MODEL:-claude-opus-4-8}"
 RESULT_JSON="$DIR/claude_result.json"
+RESULT_ERR="$DIR/claude_error.txt"
 T_VISION_START=$(date +%s)
 env -u CLAUDE_EFFORT timeout $(( N * 150 + 60 )) \
   claude --print --output-format json --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
-  < "$PROMPT_FILE" >"$RESULT_JSON" 2>>"$LOG" || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
+  < "$PROMPT_FILE" >"$RESULT_JSON" 2>"$RESULT_ERR"
+VISION_RC=$?
 BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
 
 # Capture REAL token usage + cost for the batch. --output-format json makes the CLI emit
 # total_cost_usd + usage even on the subscription (it computes the API-equivalent cost
 # from actual tokens), so every run finally records what an image costs — the per-image
 # unit-economics signal the pipeline never had (provenance was hard-coded $0 before).
-read COST_USD IN_TOK OUT_TOK CACHE_TOK < <(node -e '
-  try{const j=require(process.argv[1]); const u=j.usage||{};
-    process.stdout.write([j.total_cost_usd||0, u.input_tokens||0, u.output_tokens||0, (u.cache_creation_input_tokens||0)+(u.cache_read_input_tokens||0)].join(" "));
-  }catch(e){process.stdout.write("0 0 0 0");}' "$RESULT_JSON" 2>/dev/null || echo "0 0 0 0")
+node - "$RESULT_JSON" "$RESULT_ERR" "$VISION_RC" > "$DIR/vision-receipt.txt" <<'JS'
+const fs = require('node:fs');
+const [resultPath, errorPath, exitCode] = process.argv.slice(2);
+let result = {}, category = 'none', text = '';
+try {
+  result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error();
+} catch { result = {}; category = 'malformed_result'; }
+const failed = Number(exitCode) !== 0 || result.is_error === true || result.type === 'error' ||
+  String(result.subtype || '').startsWith('error');
+if (failed) {
+  category = 'execution_failed';
+  // Inspect privately; emit fixed categories/numeric codes, never result/error bodies.
+  text = JSON.stringify([result.error, result.errors, result.result]);
+  try { text += fs.readFileSync(errorPath, 'utf8'); } catch {}
+  if (/authentication_error|oauth.{0,80}expir|invalid.{0,30}(?:token|api key)|not logged in|unauthorized|API Error: 401/i.test(text)) category = 'authentication';
+  else if (/rate_limit|rate limit|usage limit|hit your limit|API Error: 429/i.test(text)) category = 'rate_limit';
+  else if (/permission|not allowed|forbidden|API Error: 403/i.test(text)) category = 'permission';
+  else if (/model.{0,80}(?:unavailable|not found|not available)|invalid model/i.test(text)) category = 'model_unavailable';
+  else if (/unknown (?:option|argument)|unrecognized (?:option|argument)|command not found/i.test(text)) category = 'cli_configuration';
+  else if (/ECONN|ENOTFOUND|ETIMEDOUT|connection error/i.test(text)) category = 'network';
+  if (Number(exitCode) === 124) category = 'timeout';
+  if (Number(exitCode) === 137) category = 'terminated';
+}
+const candidate = result.error?.status || result.error?.status_code || result.status_code ||
+  text.match(/(?:API Error:|HTTP|status["': ]+)\s*(401|403|408|429|500|502|503|504)\b/i)?.[1];
+const code = [401,403,408,429,500,502,503,504].includes(Number(candidate)) ? Number(candidate) : 0;
+const number = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0;
+const u = result.usage || {};
+console.log([number(result.total_cost_usd), Math.floor(number(u.input_tokens)),
+  Math.floor(number(u.output_tokens)), Math.floor(number(u.cache_creation_input_tokens) + number(u.cache_read_input_tokens)), category, code].join(' '));
+JS
+read COST_USD IN_TOK OUT_TOK CACHE_TOK RESULT_CATEGORY RESULT_CODE < "$DIR/vision-receipt.txt"
+if [ -z "${RESULT_CATEGORY:-}" ]; then
+  log "vision receipt parser failed — abort ingest"; exit 1
+fi
 log "vision cost: \$$COST_USD for $N imgs | tokens in=$IN_TOK out=$OUT_TOK cache=$CACHE_TOK | model=$MODEL"
 
 V=$( [ -f "$SINK" ] && wc -l < "$SINK" | tr -d ' ' || echo 0 )
 log "claude wrote $V verdict lines"
+log "vision receipt: exit=$VISION_RC category=$RESULT_CATEGORY code=$RESULT_CODE verdicts=$V expected=$N"
 if [ "$V" -eq 0 ]; then log "no verdicts produced — abort ingest"; exit 1; fi
 
 # SANITIZE — repair the two things the model gets wrong without discarding good work:
@@ -257,11 +292,26 @@ for i,l in enumerate(raw):
 open(sink,"w").write("\n".join(out)+"\n")
 print(f"sanitize: kept {len(out)} verdicts, forced vehicle_id+taken_at, fixed {fixed_ids} ids, coerced {coerced} enums/phrases, dropped {dropped} un-boxed elements")
 PY
+if [ "$?" -ne 0 ]; then log "verdict sanitization failed — abort ingest"; exit 1; fi
 
 # 4) INGEST (network) — schema-validate + write cascade to remote DB
-dotenvx run -- node scripts/deep-image-analysis-byok.mjs ingest --sink "$SINK" >>"$LOG" 2>&1
-WROTE=$(tail -5 "$LOG" | grep -oE "ingest: wrote [0-9]+" | grep -oE "[0-9]+" | tail -1 || echo "?")
+INGEST_LOG="$DIR/ingest.log"
+dotenvx run -- node scripts/deep-image-analysis-byok.mjs ingest --sink "$SINK" >"$INGEST_LOG" 2>&1
+INGEST_RC=$?
+node - "$INGEST_LOG" > "$DIR/ingest-receipt.txt" <<'JS'
+const fs = require('node:fs');
+const receipts = [...fs.readFileSync(process.argv[2], 'utf8').matchAll(/^ingest: wrote (\d+), failed (\d+) from /gm)];
+console.log(receipts.length === 1 ? `${receipts[0][1]} ${receipts[0][2]}` : '-1 -1');
+JS
+read WROTE FAILED < "$DIR/ingest-receipt.txt"
+WROTE="${WROTE:--1}"; FAILED="${FAILED:--1}"
+log "ingest receipt: exit=$INGEST_RC wrote=$WROTE failed=$FAILED expected=$N"
 log "ingest wrote $WROTE / $N for day ${DAY:-unknown}"
+BATCH_FAILED=0
+if [ "$INGEST_RC" -ne 0 ] || [ "$WROTE" -ne "$N" ] || [ "$FAILED" -ne 0 ] || [ "$RESULT_CATEGORY" != none ]; then
+  BATCH_FAILED=1
+fi
+if [ "$WROTE" -le 0 ]; then log "no verified ingest progress — batch failed"; exit 1; fi
 
 # 5) ROLL UP THE DAY (network) — refresh the work_session / daily receipt for this
 # date. Idempotent: safe to run after every chunk of a big multi-pass day.
@@ -336,3 +386,4 @@ const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);
 ' "$VEHICLE_ID" >>"$LOG" 2>&1 || log "dedup/session/promote rpc returned non-zero (non-fatal)"
 
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="
+exit "$BATCH_FAILED"

@@ -26,8 +26,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
+import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,6 +84,10 @@ interface ObservationInput {
   /** condition_taxonomy.canonical_key this claim is about (e.g. 'exterior.paint.delamination'). Resolved to
    *  descriptor_id; an unknown or deprecated key is refused, never dropped. C26. */
   descriptor_key?: string;
+  /** Registered property represented by structured_data[property_key]. */
+  property_key?: string;
+  /** Deterministic service-side projection may explicitly avoid downstream inference. */
+  defer_analysis?: boolean;
   /** True when an LLM read the claim from text or images rather than a person confirming it. Caps
    *  confidence_score at 0.6, the same convention the MCP submit_vehicle_event tool documents. C26. */
   agent_inferred?: boolean;
@@ -130,7 +135,8 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
   try {
@@ -148,6 +154,18 @@ Deno.serve(async (req) => {
       allowAnonymous: () => allowShareVerdict(supabase, req, input),
     });
     if (denied) return denied;
+
+    if (input.defer_analysis !== undefined && typeof input.defer_analysis !== "boolean") {
+      return new Response(JSON.stringify({ error: "defer_analysis must be boolean" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (input.defer_analysis === true) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Deferred analysis requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     // Look up source
     const { data: source, error: sourceError } = await supabase
@@ -189,6 +207,27 @@ Deno.serve(async (req) => {
       descriptorId = descriptor.descriptor_id;
     }
 
+    let propertyRow = null;
+    if (input.property_key !== undefined) {
+      if (!isSupportedImagePropertyKey(input.property_key)) {
+        return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const lookup = await supabase.from("observation_properties")
+        .select("id, property_key, applies_to_kinds, namespace, deprecated_at")
+        .eq("property_key", input.property_key).maybeSingle();
+      if (lookup.error) {
+        return new Response(JSON.stringify({ error: "Property registry unavailable" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      propertyRow = lookup.data;
+    }
+    const property = validateObservationProperty(input, propertyRow);
+    if (!property.ok) {
+      return new Response(JSON.stringify({ error: property.error }),
+        { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Compute content hash for deduplication.
     // Hash includes vehicle_id + observed_at + observer_raw so observations on different
     // vehicles or from different source photos don't collapse onto each other.
@@ -206,7 +245,8 @@ Deno.serve(async (req) => {
       data: input.structured_data || {},
       observer: input.observer_raw || {},
       // Undefined keys drop out of JSON, so hashes of rows without a descriptor are unchanged.
-      descriptor: input.descriptor_key
+      descriptor: input.descriptor_key,
+      property: input.property_key
     });
     const contentHash = await hashContent(contentForHash);
 
@@ -335,7 +375,7 @@ Deno.serve(async (req) => {
           vehicleId = fuzzyMatches[0].id;
           vehicleMatchConfidence = 0.60;
           vehicleMatchSignals = { fuzzy_match: true, year: hints.year, make: hints.make };
-        } else if (fuzzyMatches?.length > 1) {
+        } else if (fuzzyMatches && fuzzyMatches.length > 1) {
           // Multiple matches - leave unresolved for manual review
           vehicleMatchSignals = {
             multiple_candidates: true,
@@ -401,8 +441,8 @@ Deno.serve(async (req) => {
         // LLM provenance fields
         agent_tier: input.agent_tier || null,
         agent_model: input.agent_model || null,
-        agent_cost_cents: input.agent_cost_cents || null,
-        agent_duration_ms: input.agent_duration_ms || null,
+        agent_cost_cents: input.agent_cost_cents ?? null,
+        agent_duration_ms: input.agent_duration_ms ?? null,
         extraction_method: input.extraction_method || null,
         raw_source_ref: input.raw_source_ref || null,
         // Provenance of the claim itself: which document, which page, which words.
@@ -411,12 +451,22 @@ Deno.serve(async (req) => {
         citation_page_number: input.citation?.page_number ?? null,
         citation_excerpt: input.citation?.excerpt ?? null,
         ...(descriptorId ? { descriptor_id: descriptorId } : {}),
+        ...(property.propertyId ? { property_id: property.propertyId } : {}),
         ...(input.rank ? { rank: input.rank } : {})
       })
       .select()
       .maybeSingle();
 
     if (insertError) {
+      // Two identical workers may pass the pre-read simultaneously. Only the
+      // unique content-hash winner is a replay; other constraint failures fail.
+      if (insertError.code === "23505") {
+        const { data: winner } = await supabase.from("vehicle_observations")
+          .select("id").eq("content_hash", contentHash).maybeSingle();
+        if (winner) return new Response(JSON.stringify({ success: true, duplicate: true,
+          observation_id: winner.id }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       console.error("Insert error:", insertError);
       return new Response(JSON.stringify({
         error: "Failed to insert observation",
@@ -425,7 +475,7 @@ Deno.serve(async (req) => {
     }
 
     // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
-    if (vehicleId && input.kind) {
+    if (vehicleId && input.kind && input.defer_analysis !== true) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
       fetch(`${supabaseUrl}/functions/v1/analysis-engine-coordinator`, {
