@@ -70,9 +70,10 @@ export function useVehicleImageEvidence(vehicleId: string | undefined) {
       try {
         const { data, count, error } = await supabase.from('vehicle_images')
           .select(SELECT, { count: 'exact' }).eq('vehicle_id', vehicleId!)
+          .eq('vehicle_image_gallery_eligible', true)
           .not('is_sensitive', 'is', true).not('is_duplicate', 'is', true)
           .not('is_superseded', 'is', true).not('image_url', 'is', null)
-          .or('and(or(vision_gate_status.is.null,vision_gate_status.eq.approved),or(image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")))')
+          .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
           .order('is_primary', { ascending: false }).order('created_at', { ascending: true })
           .limit(CAP).abortSignal(controller.signal);
         if (error) throw error;

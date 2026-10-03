@@ -63,41 +63,29 @@ async function fetchVehicleImagesUncached<T = any>(
   const { maxRows, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
 
-  // Gate + mismatch filters run server-side as ONE or=(and(or(),or())) group.
-  // Two chained .or() calls emit duplicate or= params (PostgREST 500s on those);
-  // a single combined group is accepted (probed against prod 2026-06-11).
-  // Server-side filtering also stops rejected rows from being downloaded just
-  // to be discarded (20% of rows for heavy vehicles), and applies the vision
-  // gate even when the caller's select omits vision_gate_status — the old
-  // client-side filter silently no-opped in that case.
-  //
-  // The gallery uses a WHITELIST (vision_gate_status null or approved): the full
-  // gallery is the conservative surface and shows only confirmed-good images.
-  // Peripheral discovery surfaces (DiscoveryFeed, VehicleThumbnail, ProImageViewer)
-  // use a BLACKLIST that only hides the explicit rejects — see those components.
-  // Note: 'rejected' is NOT a vision_gate_status enum value (the enum is pending,
-  // approved, rejected_personal, rejected_misattributed, review_needed); a PostgREST
-  // not.in() containing it 400s with "invalid input value for enum", so it must
-  // never appear in a filter literal.
-  const gateFilter = options.includeMismatchFilter
-    ? 'and(or(vision_gate_status.is.null,vision_gate_status.eq.approved),or(image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")))'
-    : 'vision_gate_status.is.null,vision_gate_status.eq.approved';
-
-  const fetchPage = (from: number, withCount: boolean) =>
-    supabase
+  // The shared database predicate admits pending public listing photos only
+  // with approved publication provenance tied to this vehicle's auction event.
+  // It preserves the gate for private intake and excludes rejected/unsafe rows;
+  // display eligibility does not claim that vision analysis has completed.
+  const fetchPage = (from: number, withCount: boolean) => {
+    const query = supabase
       .from('vehicle_images')
       .select(selectClause, withCount ? { count: 'exact' } : undefined)
       .eq('vehicle_id', vehicleId)
+      .eq('vehicle_image_gallery_eligible', true)
       .not('is_document', 'is', true)
       .not('is_duplicate', 'is', true)
       // Superseded rows are prior versions of reattributed images — never display them.
       .not('is_superseded', 'is', true)
       .not('image_url', 'is', null)
-      .or(gateFilter)
       .order('is_primary', { ascending: false })
       .order('position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
+    return options.includeMismatchFilter
+      ? query.or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+      : query;
+  };
 
   // Race each page against the remaining overall budget so one hung request
   // (saturated pool) can't block past the deadline — callers get partial results.
