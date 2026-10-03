@@ -60,16 +60,8 @@ const MODEL_MAP = {
   cwtfo: 'opus',
 };
 
-// Cost control (usage audit 2026-10-03: Opus subagents were ~27% of all Claude usage).
-// Agents run at most Sonnet unless --allow-opus is passed or the task has priority 1.
-// Every claude -p run also gets a spend ceiling (--max-budget-usd), override with
-// NUKE_SPAWN_BUDGET_USD.
+// Every claude -p run gets a spend ceiling (--max-budget-usd); override with NUKE_SPAWN_BUDGET_USD.
 const BUDGET_USD = process.env.NUKE_SPAWN_BUDGET_USD || '5';
-
-function capTier(model, task) {
-  if (flag('--allow-opus') || Number(task?.priority) === 1) return model;
-  return /opus|fable/.test(model) ? 'sonnet' : model;
-}
 
 function getModel(agentType) {
   return MODEL_MAP[agentType] || 'sonnet';
@@ -79,7 +71,7 @@ function getModel(agentType) {
 // --static skips Jev. JEV_ROUTE_MAX_TIER=sonnet caps the pick.
 async function routeModel(task) {
   const fallback = getModel(task.agent_type);
-  if (flag('--static')) return { runner: 'claude', model: capTier(fallback, task) };
+  if (flag('--static')) return { runner: 'claude', model: fallback };
   const r = await routeTask({ title: task.title, description: task.description, fallback });
   // routeTask in lib/jev-route.mjs blocks codex for flagged or unknown private data.
   if (r.runner === 'codex') {
@@ -87,7 +79,7 @@ async function routeModel(task) {
     const model = Number(task.priority) === 1 || (task.description || '').length > 2000 ? 'deep' : 'fast';
     return { runner: 'codex', model };
   }
-  return { runner: 'claude', model: capTier(r.modelArg || fallback, task) };
+  return { runner: 'claude', model: r.modelArg || fallback };
 }
 
 // ─── Terminal colors ─────────────────────────────────────────────────────
@@ -149,7 +141,7 @@ function tmuxSessionExists() {
 
 function spawnPane(task) {
   const { id, agent_type, title, description } = task;
-  const model = capTier(task.model || getModel(agent_type), task);
+  const model = task.model || getModel(agent_type);
 
   // Write prompt to temp file (avoids shell escaping issues)
   const promptFile = join(tmpdir(), `nuke-agent-${id}.txt`);
