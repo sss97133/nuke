@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: [] as any[], fetch: vi.fn(), requests: [] as any[] }));
+const fixture = vi.hoisted(() => ({ rows: [] as any[], fetch: vi.fn(), queueStats: vi.fn(), requests: [] as any[] }));
 vi.mock('../../lib/fetchVehicleImages', () => ({ fetchVehicleImages: (...args: any[]) => fixture.fetch(...args) }));
 vi.mock('../../lib/supabase', () => {
   const meta = { id: 'vehicle-fixture', year: 2006, make: 'Pontiac', model: 'Solstice',
@@ -23,10 +23,13 @@ vi.mock('../../lib/supabase', () => {
 });
 vi.mock('../../services/imageUploadService', () => ({ ImageUploadService: {} }));
 vi.mock('../../services/globalUploadStatusService', () => ({ globalUploadStatusService: {} }));
-vi.mock('../../services/uploadQueueService', () => ({ uploadQueueService: { getQueueStats: async () => ({ pending: 0, failed: 0 }) } }));
+vi.mock('../../services/uploadQueueService', () => ({ uploadQueueService: { getQueueStats: (...args: any[]) => fixture.queueStats(...args) } }));
 vi.mock('../../services/imageDisplayPriority', () => ({ sortImagesByPriority: (rows: any[]) => rows }));
 vi.mock('../../services/imageSetService', () => ({ ImageSetService: {} }));
-vi.mock('../image/ImageLightbox', () => ({ default: ({ imageId }: any) => <div data-testid="lightbox">{imageId}</div> }));
+vi.mock('../image/ImageLightbox', () => ({ default: ({ imageId, title, onNext, onPrev }: any) => <>
+  <div data-testid="lightbox">{imageId}</div><span data-testid="lightbox-title">{title}</span>
+  <button data-testid="lightbox-next" onClick={onNext}>Next</button><button data-testid="lightbox-prev" onClick={onPrev}>Previous</button>
+</> }));
 vi.mock('./SensitiveImageOverlay', () => ({ SensitiveImageOverlay: () => null }));
 vi.mock('../onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
 
@@ -47,6 +50,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   fixture.rows = photos();
   fixture.fetch.mockReset().mockImplementation(async () => fixture.rows);
+  fixture.queueStats.mockReset().mockResolvedValue({ pending: 0, failed: 0 });
   fixture.requests = [];
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('IntersectionObserver', class {
@@ -76,6 +80,84 @@ async function mount(props: Record<string, any> = {}) {
 }
 
 describe('ImageGallery canonical database rows', () => {
+  it.each([false, true])('navigates the full filtered collection before thumbnail paging (filtered=%s)', async (filtered) => {
+    vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
+    fixture.rows.forEach((row, index) => { row.category = index % 2 === 0 ? 'detail' : 'general'; });
+    const galleryFilter = filtered ? { category: 'detail' } : undefined;
+    const eligible = fixture.rows.filter(row => !filtered || row.category === 'detail');
+    await mount({ galleryFilter });
+    expect(galleryPhotos()).toHaveLength(50);
+    await act(async () => { galleryPhotos()[0].dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[data-testid="lightbox-title"]')?.textContent).toBe(`1 of ${eligible.length}`);
+    await act(async () => { container.querySelector('[data-testid="lightbox-prev"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(eligible.at(-1)!.id);
+    expect(container.querySelector('[data-testid="lightbox-title"]')?.textContent).toBe(`${eligible.length} of ${eligible.length}`);
+    await act(async () => { galleryPhotos()[49].dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    await act(async () => { container.querySelector('[data-testid="lightbox-next"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(eligible[50].id);
+    expect(container.querySelector('[data-testid="lightbox-title"]')?.textContent).toBe(`51 of ${eligible.length}`);
+    expect(galleryPhotos()).toHaveLength(50);
+    // Changing layout cannot replace the selected image with the same thumbnail index.
+    await act(async () => { root.render(<ImageGallery vehicleId="vehicle-fixture" showUpload={false} galleryView="INFO" galleryFilter={galleryFilter} />); });
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(eligible[50].id);
+  });
+
+  it.each(['FULL', 'INFO'])('pages all399 in %s when its nested column scrolls, with the sentinel after the photos', async (galleryView) => {
+    let finishQueueRead!: (value: unknown) => void;
+    fixture.queueStats.mockReturnValue(new Promise(resolve => { finishQueueRead = resolve; }));
+    container.style.overflowY = 'auto';
+    container.style.height = '300px';
+    const roots: (Element | Document | null)[] = [];
+    // Unlike the old always-intersecting stub, this models the two conditions
+    // required at the column bottom: the correct scroll root and a final sentinel.
+    vi.stubGlobal('IntersectionObserver', class {
+      target: Element | null = null;
+      root: Element | Document | null;
+      callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        this.callback = callback;
+        this.root = options?.root ?? null;
+        roots.push(this.root);
+      }
+      onScroll = () => {
+        if (!this.target || this.root !== container || container.scrollTop <= 0) return;
+        const lastPhoto = galleryPhotos().at(-1);
+        const afterImages = !!lastPhoto && !!(lastPhoto.compareDocumentPosition(this.target) & Node.DOCUMENT_POSITION_FOLLOWING);
+        this.callback([{ target: this.target, isIntersecting: afterImages } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      };
+      observe(target: Element) { this.target = target; (this.root ?? window).addEventListener('scroll', this.onScroll); }
+      disconnect() { (this.root ?? window).removeEventListener('scroll', this.onScroll); }
+      unobserve() { this.disconnect(); }
+    });
+    await mount({ galleryView });
+    // In production the queue read finishes after image state is populated.
+    // The observer must attach when loading finally removes the placeholder.
+    expect(galleryPhotos()).toHaveLength(0);
+    await act(async () => { finishQueueRead({ pending: 0, failed: 0 }); });
+    const firstCount = galleryPhotos().length;
+    expect(firstCount).toBeGreaterThan(0);
+    expect(firstCount).toBeLessThan(399);
+    expect(roots.length).toBeGreaterThan(0);
+    expect(roots.every(scrollRoot => scrollRoot === container)).toBe(true);
+    expect(container.querySelectorAll('[data-gallery-load-more]')).toHaveLength(1);
+    await act(async () => { window.dispatchEvent(new Event('scroll')); await vi.advanceTimersByTimeAsync(500); });
+    expect(galleryPhotos()).toHaveLength(firstCount);
+    for (let i = 0; i < 20 && galleryPhotos().length < 399; i++) {
+      const before = galleryPhotos().length;
+      await act(async () => {
+        container.scrollTop = before * 100;
+        container.dispatchEvent(new Event('scroll'));
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(galleryPhotos().length).toBeGreaterThan(before);
+    }
+    expect(galleryPhotos()).toHaveLength(399);
+    expect(container.querySelectorAll('[data-gallery-load-more]')).toHaveLength(0);
+    const last = galleryPhotos().at(-1)!;
+    await act(async () => { last.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(fixture.rows.at(-1)!.id);
+  });
+
   it('keeps all399 admitted photos through filename/date heuristics and progressive navigation', async () => {
     await mount();
     expect(fixture.fetch).toHaveBeenCalledWith('vehicle-fixture', expect.any(String), { includeMismatchFilter: true });

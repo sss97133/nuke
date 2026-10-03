@@ -365,7 +365,7 @@ const ImageGallery = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageId, setCurrentImageId] = useState<string | null>(null);
   const [viewModeInternal, setViewModeInternal] = useState<'zones' | 'grid' | 'masonry' | 'list' | 'bundles'>('zones');
   // When parent passes galleryView, derive viewMode; otherwise use internal state
   const viewMode = galleryView != null ? galleryViewToViewMode(galleryView) : viewModeInternal;
@@ -446,6 +446,8 @@ const ImageGallery = ({
     setAllImages([]);
     setDisplayedImages([]);
     setShowImages(false);
+    setLightboxOpen(false);
+    setCurrentImageId(null);
     setUsingFallback(false);
     setError(null);
     setLoading(true);
@@ -498,7 +500,7 @@ const ImageGallery = ({
     setDisplayedImages(sorted.slice(0, Math.max(imagesPerPage, 50)));
     if (sorted.length > 0) setShowImages(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryFilter]);
+  }, [galleryFilter, allImages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1709,8 +1711,17 @@ const ImageGallery = ({
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
+    if (loading || !infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
     if (displayedImages.length >= galleryFilteredImages.length) return; // All images already loaded
+
+    // Vehicle profiles scroll inside a column. Watching the window can leave
+    // its sentinel clipped even when that column has reached its bottom.
+    let scrollRoot: HTMLElement | null = sentinelRef.current.parentElement;
+    while (scrollRoot && scrollRoot !== document.body && scrollRoot !== document.documentElement) {
+      if (/(auto|scroll|overlay)/.test(window.getComputedStyle(scrollRoot).overflowY)) break;
+      scrollRoot = scrollRoot.parentElement;
+    }
+    if (scrollRoot === document.body || scrollRoot === document.documentElement) scrollRoot = null;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1719,12 +1730,12 @@ const ImageGallery = ({
           loadMoreImages();
         }
       },
-      { threshold: 0.1, rootMargin: '100px' }
+      { root: scrollRoot, threshold: 0.1, rootMargin: '100px' }
     );
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, galleryFilteredImages.length, showImages, loadMoreImages]);
+  }, [loading, infiniteScrollEnabled, loadingMore, displayedImages.length, galleryFilteredImages.length, showImages, viewMode, loadMoreImages]);
 
   // Check authentication and permissions
   useEffect(() => {
@@ -2183,37 +2194,31 @@ const ImageGallery = ({
     }
   };
 
-  const openLightbox = (index: number) => {
-    setCurrentImageIndex(index);
+  // Thumbnail paging must not limit the viewer's navigation. Keep selection by
+  // identity so appending or sorting thumbnails cannot change the open photo.
+  const lightboxImages = getSortedImages();
+  const currentImageIndex = lightboxImages.findIndex(image => String(image.id) === currentImageId);
+  const openLightboxById = (imageId: string) => {
+    if (!lightboxImages.some(image => String(image.id) === imageId)) return;
+    setCurrentImageId(imageId);
     setLightboxOpen(true);
-
-    // Load tags for the current image
-    const image = displayedImages[index];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    loadImageTags(imageId);
+  };
+  const openLightbox = (index: number) => {
+    const imageId = displayedImages[index]?.id;
+    if (imageId) openLightboxById(String(imageId));
   };
 
   const nextImage = () => {
-    const newIndex = (currentImageIndex + 1) % displayedImages.length;
-    setCurrentImageIndex(newIndex);
-
-    // Load tags for the new image
-    const image = displayedImages[newIndex];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    if (!lightboxImages.length) return;
+    const image = lightboxImages[(currentImageIndex + 1) % lightboxImages.length];
+    openLightboxById(String(image.id));
   };
 
   const previousImage = () => {
-    const newIndex = (currentImageIndex - 1 + displayedImages.length) % displayedImages.length;
-    setCurrentImageIndex(newIndex);
-
-    // Load tags for the new image
-    const image = displayedImages[newIndex];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    if (!lightboxImages.length) return;
+    const image = lightboxImages[(currentImageIndex - 1 + lightboxImages.length) % lightboxImages.length];
+    openLightboxById(String(image.id));
   };
 
   const getDisplayDate = (image: any) => {
@@ -2641,7 +2646,7 @@ const ImageGallery = ({
     );
   }
 
-  const currentImage = displayedImages[currentImageIndex];
+  const currentImage = lightboxImages[currentImageIndex];
   const lightboxImageId = currentImage && String((currentImage as any).__external) === 'true' ? undefined : (isUuid(String(currentImage?.id || '')) ? String(currentImage.id) : undefined);
 
   return (
@@ -3351,14 +3356,6 @@ const ImageGallery = ({
               </>
             );
           })()}
-          {/* Infinite scroll sentinel */}
-          {displayedImages.length < allImages.length && (
-            <div ref={sentinelRef} style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {loadingMore && (
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading more...</span>
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -3956,19 +3953,6 @@ const ImageGallery = ({
         </div>
       )}
 
-      {/* Load More - Infinite Scroll */}
-      {showImages && displayedImages.length < allImages.length && (
-        <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-          {loadingMore && (
-            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>
-              Loading more images...
-            </div>
-          )}
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} style={{ height: '1px' }} />
-        </div>
-      )}
-
       {/* Full View - Single column, full width images */}
       {viewMode === 'masonry' && showImages && (
         <div>
@@ -4298,10 +4282,7 @@ const ImageGallery = ({
                           key={imgId}
                           src={getOptimalImageUrl(img, 'thumbnail')}
                           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => {
-                            const globalIdx = allImages.findIndex(i => i.id === imgId);
-                            if (globalIdx >= 0) openLightbox(globalIdx);
-                          }}
+                          onClick={() => openLightboxById(String(imgId))}
                           loading="lazy"
                         />
                       );
@@ -4359,7 +4340,7 @@ const ImageGallery = ({
                       return (
                         <img key={imgId} src={getOptimalImageUrl(img, 'thumbnail')}
                           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => { const gi = allImages.findIndex(i => i.id === imgId); if (gi >= 0) openLightbox(gi); }}
+                          onClick={() => openLightboxById(String(imgId))}
                           loading="lazy" />
                       );
                     })}
@@ -4371,6 +4352,18 @@ const ImageGallery = ({
         </div>
       )}
 
+      {/* One sentinel after every gallery view, including FULL and INFO. */}
+      {showImages && displayedImages.length < galleryFilteredImages.length && (
+        <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
+          {loadingMore && (
+            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>
+              Loading more images...
+            </div>
+          )}
+          <div ref={sentinelRef} data-gallery-load-more="true" style={{ height: '1px' }} />
+        </div>
+      )}
+
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
@@ -4379,10 +4372,10 @@ const ImageGallery = ({
           vehicleId={vehicleId}
           isOpen={lightboxOpen}
           onClose={() => setLightboxOpen(false)}
-          onNext={displayedImages.length > 1 ? nextImage : undefined}
-          onPrev={displayedImages.length > 1 ? previousImage : undefined}
+          onNext={lightboxImages.length > 1 ? nextImage : undefined}
+          onPrev={lightboxImages.length > 1 ? previousImage : undefined}
           canEdit={canCreateTags && !usingFallback}
-          title={`${currentImageIndex + 1} of ${displayedImages.length}`}
+          title={`${currentImageIndex + 1} of ${lightboxImages.length}`}
           description={getDisplayDate(currentImage)}
           imageDisplayName={getImageDisplayName(currentImage)}
           imageRecord={currentImage}
