@@ -141,6 +141,10 @@ test('actual CLI returns nonzero and writes the useful summary with offline SDK 
     const script = join(directory, 'worker.mjs');
     const summary = join(directory, 'summary.md');
     await copyFile(new URL('./process-all-3000-images.js', import.meta.url), script);
+    await mkdir(join(directory, 'lib'), { recursive: true });
+    for (const name of ['cached-image-worker.mjs', 'image-property-projection.mjs']) {
+      await copyFile(new URL(`./lib/${name}`, import.meta.url), join(directory, 'lib', name));
+    }
     for (const name of ['dotenv', '@supabase/supabase-js']) {
       const moduleDirectory = join(directory, 'node_modules', name);
       await mkdir(moduleDirectory, { recursive: true });
@@ -170,6 +174,7 @@ test('actual CLI returns nonzero and writes the useful summary with offline SDK 
           SUPABASE_SERVICE_ROLE_KEY: fixture === 'missing_configuration' ? '' : 'offline-fixture-key',
           GITHUB_STEP_SUMMARY: summary,
           FIXTURE: fixture,
+          IMAGE_PROCESSING_MODE: 'preflight',
         },
       });
       assert.equal(run.error, undefined);

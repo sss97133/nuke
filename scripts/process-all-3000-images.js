@@ -1,11 +1,13 @@
-import { appendFile } from 'node:fs/promises';
+import { appendFile, readFile, mkdir, open, rename, unlink } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCachedImageProjection, initialCheckpoint, validateCheckpoint, cachedWorkerExitCode,
+  CACHE_WORKER_VERSION, CACHE_BUDGET } from './lib/cached-image-worker.mjs';
 
-// The former batch-analyze-all-images consumer has no verified deployment or
-// persistence contract. This scheduled entrypoint therefore only reads a bounded
-// pending-state sample. It must not redirect work to a paid or paused pipeline.
+// The hourly owner now projects qualified immutable cached readings through
+// canonical intake. The legacy pending-state preflight remains explicitly
+// selectable; it never redirects to a paid or paused pipeline.
 export const BUDGET = Object.freeze({
   candidate_rows: 50,
   candidate_queries: 1,
@@ -48,6 +50,7 @@ function receipt() {
 }
 
 export function exitCode(result) {
+  if (result.consumer === CACHE_WORKER_VERSION) return cachedWorkerExitCode(result);
   // No processing-success path exists until a reviewed consumer, bounded claims,
   // durable persistence verification and reader assay are wired into this owner.
   return result.status === 'blocked' ? 2 : 1;
@@ -116,6 +119,16 @@ export async function runImagePreflight(supabase, { queryMs = BUDGET.query_ms } 
 }
 
 export function stepSummary(result) {
+  if (result.consumer === CACHE_WORKER_VERSION) return [
+    '## Cached image property processing', '',
+    `- Outcome: ${result.status} (${result.reason}); mode: ${result.mode}.`,
+    `- Vehicles inspected: ${result.inspected_vehicles}; public-source image candidates inspected: ${result.inspected_images}.`,
+    `- Eligible stored readings: ${result.eligible_source_images}; eligible claims: ${result.eligible_claims}.`,
+    `- Existing / newly persisted / reader-verified claims: ${result.existing_claims} / ${result.newly_persisted_claims} / ${result.confirmed_reader_visible_claims}.`,
+    `- Verified source images: ${result.verified_sources}; deferred: ${JSON.stringify(result.deferred)}.`,
+    `- Model calls: ${result.model_calls}; incremental hosted inference cost: $0; checkpoint saved: ${result.checkpoint_saved}.`,
+    '- Scope: immutable cached readings from public vehicles and approved public auction images; fleet completion remains unknown.', '',
+  ].join('\n');
   return [
     '## Image processing preflight',
     '',
@@ -143,7 +156,32 @@ async function main() {
       const supabase = createClient(url, key, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
-      result = await runImagePreflight(supabase);
+      const mode = process.env.IMAGE_PROCESSING_MODE || 'cached';
+      if (mode === 'preflight') result = await runImagePreflight(supabase);
+      else if (mode === 'cached') {
+        const checkpointPath = process.env.IMAGE_CACHE_CHECKPOINT || join(process.cwd(), '.image-worker/checkpoint.json');
+        let checkpoint = initialCheckpoint();
+        try { checkpoint = validateCheckpoint(JSON.parse(await readFile(checkpointPath, 'utf8'))); }
+        catch (error) { if (error?.code !== 'ENOENT') throw new Error('checkpoint_invalid'); }
+        const apply = process.env.IMAGE_CACHE_APPLY === '1';
+        result = await runCachedImageProjection(supabase, { checkpoint, apply,
+          sourceLimit: Number(process.env.IMAGE_CACHE_SOURCE_LIMIT || CACHE_BUDGET.default_sources),
+          async saveCheckpoint(next) {
+            await mkdir(dirname(checkpointPath), { recursive: true, mode: 0o700 });
+            const temporary = `${checkpointPath}.${process.pid}.tmp`;
+            const file = await open(temporary, 'wx', 0o600);
+            try {
+              await file.writeFile(JSON.stringify(validateCheckpoint(next)) + '\n');
+              await file.sync();
+            } finally { await file.close(); }
+            try { await rename(temporary, checkpointPath); }
+            catch (error) { await unlink(temporary).catch(() => {}); throw error; }
+          },
+        });
+        // Operational IDs stay in the private checkpoint, never in workflow logs.
+        const { checkpoint: _checkpoint, ...summary } = result;
+        result = summary;
+      } else result.reason = 'unsupported_processing_mode';
     }
   } catch {
     // Never print SDK exceptions: they can include URLs, payloads or credentials.

@@ -1,5 +1,12 @@
 name: Process All Images
 
+permissions:
+  contents: read
+
+concurrency:
+  group: public-cached-image-properties
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:  # Manual trigger
   schedule:
@@ -28,6 +35,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Restore cached image progress
+        uses: actions/cache/restore@v4
+        with:
+          path: .image-worker/checkpoint.json
+          key: public-cached-image-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            public-cached-image-v1-
+
       - name: Process all images
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -35,12 +50,21 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          IMAGE_PROCESSING_MODE: cached
+          IMAGE_CACHE_APPLY: '1'
+          IMAGE_CACHE_CHECKPOINT: .image-worker/checkpoint.json
         run: |
           node scripts/process-all-3000-images.js
+
+      - name: Save cached image progress
+        if: always() && hashFiles('.image-worker/checkpoint.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .image-worker/checkpoint.json
+          key: public-cached-image-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Report results
         if: always()
         run: |
           echo "## Image Processing Results" >> $GITHUB_STEP_SUMMARY
           echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
-
