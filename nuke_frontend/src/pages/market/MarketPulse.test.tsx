@@ -1,0 +1,107 @@
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const fixture = vi.hoisted(() => ({ pulse: {} as any, retry: vi.fn() }));
+vi.mock('./useMarketPulse', async importOriginal => ({
+  ...await importOriginal<typeof import('./useMarketPulse')>(),
+  useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }),
+}));
+vi.mock('./useLotMovement', async importOriginal => ({
+  ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => ({ data: [] }),
+}));
+vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
+vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
+vi.mock('@tanstack/react-virtual', () => ({ useWindowVirtualizer: ({ count, estimateSize }: any) => ({
+  getTotalSize: () => count * estimateSize(),
+  getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ index, start: index * estimateSize() })),
+}) }));
+
+import MarketPulse from './MarketPulse';
+import { currentBidDistribution, type LiveAuction } from './useMarketPulse';
+
+let root: Root, container: HTMLDivElement;
+const HOUR = 3_600_000;
+function lot(id: string, make: string, bid: number | null, hours: number): LiveAuction {
+  return { id, make, currentBid: bid, endsAt: Date.now() + hours * HOUR, year: 2000, model: 'Local fixture',
+    updatedAt: Date.now(), listedAt: Date.now() - 2 * HOUR, imageUrl: null, noReserve: false,
+    listingUrl: `https://bringatrailer.com/listing/local-fixture-${id}/`, title: id, band: null };
+}
+async function render(query = '') {
+  window.history.replaceState({}, '', '/?' + query);
+  await act(async () => root.render(<BrowserRouter><MarketPulse onUnavailable={<div>Existing feed fallback</div>} /></BrowserRouter>));
+}
+function button(prefix: string) {
+  const b = [...container.querySelectorAll('button')].find(b => (b.getAttribute('aria-label') || b.textContent || '').startsWith(prefix));
+  expect(b).toBeTruthy(); return b!;
+}
+async function click(prefix: string) { await act(async () => button(prefix).click()); }
+function boardTitles() { return [...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.textContent); }
+
+beforeEach(() => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  fixture.retry.mockReset();
+  fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
+    lot('unknown', 'PORSCHE', null, 10), lot('other-make', 'FORD', 100_000, 1)], syncedAt: Date.now(), curve: null },
+    isLoading: false, isError: false, risenIds: new Set(), refetch: fixture.retry, dataUpdatedAt: Date.now() };
+  container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+});
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+describe('market answer -> supporting lots', () => {
+  it('keeps unknown separate from zero and assigns each boundary exactly once', () => {
+    const bids = [null, 0, 9_999, 10_000, 24_999, 25_000, 49_999, 50_000, 99_999, 100_000, NaN, -1];
+    const d = currentBidDistribution(bids.map((bid, i) => lot(String(i), 'PORSCHE', bid, 1)));
+    expect(d.counts).toEqual({ under10k: 2, '10k25k': 2, '25k50k': 2, '50k100k': 2, '100kplus': 1, unknown: 3 });
+    expect(d.recorded).toBe(9); expect(d.median).toBe(25_000);
+    expect(Object.values(d.counts).reduce((a, b) => a + b, 0)).toBe(bids.length);
+    expect(currentBidDistribution([lot('missing', 'PORSCHE', null, 1)]).median).toBeNull();
+  });
+  it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
+    await render('make=PORSCHE');
+    expect(button('Current bids').textContent).toContain('$25K');
+    expect(button('Live lots').textContent).toContain('3');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
+    await click('Live lots');
+    expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+    expect(window.location.search).toContain('board=1');
+  });
+  it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
+    await render('make=PORSCHE'); await click('$25,000–49,999:');
+    expect(window.location.search).toContain('make=PORSCHE');
+    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/later', '/vehicle/later']);
+    expect(button('$25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
+    await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+  });
+  it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
+    await render('make=PORSCHE'); await click('Unrecorded:');
+    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/unknown', '/vehicle/unknown']);
+    await click('Ending < 24 h');
+    expect(window.location.search).not.toContain('bidRange');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('1 of 2 lots');
+    expect(container.querySelector('a[title="The listing on Bring a Trailer"]')?.getAttribute('href')).toContain('local-fixture-first');
+    expect(container.textContent).toContain('Source read time and bid event time are unavailable');
+  });
+  it('makes an empty scope recoverable and does not display a zero median', async () => {
+    await render('make=MISSING');
+    expect(container.textContent).toContain('No open lots match these filters');
+    expect(container.textContent).toContain('Median current bid —');
+    await click('Clear market filters'); expect(button('Live lots').textContent).toContain('4');
+  });
+  it('distinguishes loading, failure, and a failed refresh with previously fetched data', async () => {
+    fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
+    await render(); expect(button('Current bids').textContent).toContain('…');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeNull();
+    fixture.pulse.isLoading = false; fixture.pulse.isError = true;
+    await render(); expect(container.textContent).toContain('could not be loaded');
+    await click('Retry live board'); expect(fixture.retry).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain('Existing feed fallback');
+    fixture.pulse.data = { auctions: [lot('cached', 'PORSCHE', 10_000, 2)] };
+    await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
+    expect(container.textContent).toContain('Median current bid $10,000');
+  });
+});

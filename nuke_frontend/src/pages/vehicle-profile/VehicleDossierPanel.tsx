@@ -435,6 +435,9 @@ const FieldRow: React.FC<{
 
         {/* Value */}
         <span
+          role={onValueClick ? 'button' : undefined}
+          tabIndex={onValueClick ? 0 : undefined}
+          aria-label={onValueClick ? `${label}: ${displayValue}. Inspect evidence` : undefined}
           style={{
             fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, sans-serif',
             fontSize: '10px',
@@ -445,6 +448,9 @@ const FieldRow: React.FC<{
             textDecoration: onValueClick ? 'underline dotted' : undefined,
           }}
           onClick={onValueClick ? (e) => { e.stopPropagation(); onValueClick(); } : undefined}
+          onKeyDown={onValueClick ? e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onValueClick(); }
+          } : undefined}
         >
           {displayValue || '\u2014'}
         </span>
@@ -723,6 +729,7 @@ const VehicleDossierPanel: React.FC = () => {
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            if (field === 'vin') return true; // Unknown canonical identity still has a useful source drill.
             if (field === 'sale_price') return !!priceKind;
             let pv = v[field];
             if ((pv == null || pv === '') && evidence[field]?.sources?.length > 0) {
@@ -768,10 +775,11 @@ const VehicleDossierPanel: React.FC = () => {
                 const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
                 const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
                 let pv = v[field];
-                if ((pv == null || pv === '') && group && group.sources.length > 0) {
+                if (field !== 'vin' && (pv == null || pv === '') && group && group.sources.length > 0) {
                   pv = group.primary.field_value;
                 }
                 let displayValue = fmtVal(field, pv);
+                if (field === 'vin' && !displayValue) displayValue = 'Unknown';
                 let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 if (field === 'sale_price') {
                   const on = priceFacts?.price_as_of
@@ -803,7 +811,7 @@ const VehicleDossierPanel: React.FC = () => {
                       />
                     </React.Suspense>,
                     `${fieldLabel} — ${displayValue}`,
-                    480,
+                    Math.min(480, window.innerWidth - 24),
                     false,
                   );
                 };
@@ -891,7 +899,7 @@ const VehicleDossierPanel: React.FC = () => {
                         />
                       </React.Suspense>,
                       `${label} — ${displayValue}`,
-                      480,
+                      Math.min(480, window.innerWidth - 24),
                       false,
                     )}
                   />
