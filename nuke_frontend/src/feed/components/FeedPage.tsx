@@ -27,7 +27,9 @@ import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import { useInterests } from '../../hooks/useInterests';
 import { useViewHistory } from '../../hooks/useViewHistory';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { FeedVehicle } from '../types/feed';
+import './FeedPage.css';
 
 export default function FeedPage() {
   const {
@@ -116,7 +118,9 @@ export default function FeedPage() {
 
   // Local display settings (not URL-persisted)
   const [fontSize, setFontSize] = useState(10);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [filterOverride, setFilterOverride] = useState<boolean | null>(null);
+  const filtersCollapsed = filterOverride ?? isMobile;
   const [showScores, setShowScores] = useState(false);
   const [activeMetric, setActiveMetric] = useState<string | null>(null);
   const [activeHeroPanel, setActiveHeroPanel] = useState<HeroDimension | null>(null);
@@ -408,7 +412,7 @@ export default function FeedPage() {
             onResetAll={resetAll}
             hasActiveFilters={hasActiveFilters}
             collapsed={filtersCollapsed}
-            onToggleCollapsed={() => setFiltersCollapsed(!filtersCollapsed)}
+            onToggleCollapsed={() => setFilterOverride(!filtersCollapsed)}
           />
 
           {/* Main content */}
