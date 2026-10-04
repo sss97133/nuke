@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: ${{ fromJSON(github.event.inputs.minutes == '0' && '[0]' || '[0,1,2,3]') }}
     steps:
       - uses: actions/checkout@v4
 

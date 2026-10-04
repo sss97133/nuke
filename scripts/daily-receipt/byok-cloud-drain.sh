@@ -24,6 +24,10 @@ HERE="$(dirname "$0")"
 USER_ID="${1:?usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes] [vehicle_id] [shard_count] [shard_index]}"
 BATCH="${2:-12}"
 MINUTES="${3:-45}"
+if [ "$MINUTES" = "0" ]; then
+  python3 scripts/daily-receipt/byok-startup-diagnostic.py
+  exit "$?"
+fi
 ONLY_VEHICLE="${4:-}"
 SHARD_COUNT="${5:-1}"   # parallel drain: split the fleet across N runners
 SHARD_INDEX="${6:-0}"   # which slice THIS runner owns (0..N-1)
