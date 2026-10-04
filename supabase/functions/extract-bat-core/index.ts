@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.5 — pinned protected description preview and bounded native intake (2026-10-04)
+ * Version: 4.2.6 — declare source-link-only photo admission (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -38,7 +38,7 @@ import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.5';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.6';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -2275,6 +2275,16 @@ Deno.serve(async (req) => {
               // photo-pipeline-orchestrator → a Gemini call per image (78–140 per lot; 66K lots = ~7M calls).
               // Vision on external links is a deliberate, paid pass (BYOK), never a side effect of indexing.
               ai_processing_status: "skipped",
+              // Admission policy, not an analysis receipt. Only new links get this declaration.
+              ai_scan_metadata: {
+                image_intake: {
+                  version: 1,
+                  producer: "extract-bat-core",
+                  mode: "source_link_only",
+                  analysis_requested: false,
+                  reason: "external_link_analysis_requires_explicit_request",
+                },
+              },
               approval_status: "auto_approved",
               is_approved: true,
               redaction_level: "none",

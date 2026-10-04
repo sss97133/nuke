@@ -4,9 +4,54 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { assess, options, query, run, SAMPLE_LIMIT, cachedAssayOptions } from './check-image-observation-health.mjs';
+import { assess, options, query, run, SAMPLE_LIMIT, cachedAssayOptions, assessFreshImages, runFreshImages } from './check-image-observation-health.mjs';
 
 const scope = { vehicle: '10000000-0000-0000-0000-000000000001', since: '2026-10-04T05:00:00Z', field: 'interior_color' };
+
+function admission() {
+  return { assay: 'fresh_image_admission_v1', sample_limit: 20, candidate_vehicle_limit: 5,
+    window_hours: 24, vehicle_selected: true, sample_truncated: false, output_coverage: 'not_measured',
+    metrics: { sampled: 1, gallery_eligible: 1, source_policy_deferred: 1, unexplained_skips: 0,
+      pending: 0, processing: 0, completed: 0, failed: 0, other_status: 0, pipeline_receipts: 0 } };
+}
+test('admission, gallery arrival and completed receipts never certify analysis output', () => {
+  const a = admission();
+  assert.equal(assessFreshImages(a).status, 'incomplete');
+  assert(assessFreshImages(a).reasons.includes('external_link_analysis_requires_explicit_request'));
+  a.metrics.source_policy_deferred = 0; a.metrics.completed = 1; a.metrics.pipeline_receipts = 1;
+  assert.equal(assessFreshImages(a).status, 'incomplete');
+  a.metrics.completed = 0; a.metrics.failed = 1;
+  assert.equal(assessFreshImages(a).status, 'failed');
+});
+test('unknown skips, empty arrivals and caps remain explicit incomplete evidence', () => {
+  const a = admission(); a.metrics.source_policy_deferred = 0; a.metrics.unexplained_skips = 1;
+  assert(assessFreshImages(a).reasons.includes('skip_reason_unknown'));
+  for (const k of Object.keys(a.metrics)) a.metrics[k] = 0;
+  a.vehicle_selected = false;
+  assert(assessFreshImages(a).reasons.includes('no_sampled_arrivals'));
+  a.vehicle_selected = true; a.sample_truncated = true;
+  a.metrics.sampled = a.metrics.source_policy_deferred = 20;
+  assert(assessFreshImages(a).reasons.includes('sample_truncated'));
+});
+test('admission query failures and malformed counts cannot become zero or healthy', () => {
+  for (const execute of [() => { throw Error('private credential-bearing error'); }, () => 'null',
+    () => '[]', () => JSON.stringify([{ assay: null }])]) {
+    const r = runFreshImages(execute);
+    assert.equal(r.status, 'failed'); assert.equal(r.coverage, 'unknown');
+    assert(!JSON.stringify(r).includes('private'));
+  }
+  for (const value of [null, -1, '1', 21]) {
+    const a = admission(); a.metrics.sampled = value;
+    assert.throws(() => assessFreshImages(a));
+  }
+  const a = admission(); a.metrics.processing = 1;
+  assert.throws(() => assessFreshImages(a));
+  a.metrics.processing = 0; a.output_coverage = 'passed';
+  assert.throws(() => assessFreshImages(a));
+  let sql;
+  assert.equal(runFreshImages(q => { sql = q; return JSON.stringify([{ assay: admission() }]); }).status, 'incomplete');
+  assert.equal(sql, "SELECT public.get_pipeline_pulse_24h()->'fresh_image_flow' AS assay;");
+});
 
 test('cached coverage requires an explicit bounded vehicle scope and always selects read-only mode', () => {
   const args = ['--cached-coverage', '--vehicle', scope.vehicle];
