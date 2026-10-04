@@ -57,6 +57,10 @@ jobs:
         run: createdb dm_fold_assay_ci
       - name: Verify actual fold-health migration and operational failure contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_assay_ci -f supabase/sql/test_vehicle_metric_fold_health_assay.sql
+      - name: Create disposable value-queue retry database
+        run: createdb dm_refinement_value_retry_ci
+      - name: Verify retained failures, bounded drain and concurrent row locking
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_value_retry_ci -f supabase/sql/test_vehicle_value_queue_retry_retention.sql
 
   image-projection:
     runs-on: ubuntu-latest
