@@ -5,7 +5,7 @@ import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
-import { useLotMovement, weigh, type ActivityReceipt, type LotMovement, type MovementItem } from './useLotMovement';
+import AuctionEvidence from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
 
@@ -629,117 +629,6 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   );
 }
 
-// ---- Movement -----------------------------------------------------------------------------------
-// Captured interactions on the current listing, qualified by the reader's as-of, bounds and source clock.
-// Bid-step weight compares only the observed increments in view; no assumed listing-duration rate is shown.
-
-function ago(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-const KIND: Record<MovementItem['kind'], string> = { bid: 'Bid', comment: 'Comment', question: 'Question', seller: 'Seller' };
-
-// Weight as a bar: 1x the observed median step fills a quarter; 4x or more fills it.
-function WeightBar({ w, title: t }: { w: number; title: string }) {
-  return (
-    <span title={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-      <span style={{ position: 'relative', width: 32, height: 6, background: 'var(--border)' }}>
-        <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(1, w / 4) * 100}%`, background: w >= 1.5 ? 'var(--success)' : 'var(--text-secondary)' }} />
-      </span>
-      <span style={{ ...mono, fontWeight: w >= 1.5 ? 700 : 400 }}>{w.toFixed(1)}×</span>
-    </span>
-  );
-}
-
-const MOVEMENT_ITEMS = 3;
-
-function Movement({ m, receipt, readAsOf, rowCap, limit = MOVEMENT_ITEMS }: {
-  m: LotMovement | undefined; receipt: ActivityReceipt['lots'][number] | undefined;
-  readAsOf: string | undefined; rowCap: number | undefined;
-  limit?: number;
-}) {
-  const now = useSecondClock();
-  if (!m && !receipt) return null;
-  const items = (m?.items ?? []).slice(0, limit);
-  const asOf = readAsOf ? Date.parse(readAsOf) : m?.readAsOf;
-  const sourceAt = receipt ? Date.parse(receipt.source_read_at ?? '') : m?.sourceReadAt;
-  const sourceBasis = receipt?.source_read_basis ?? m?.sourceReadBasis ?? 'unknown';
-  const knownSource = sourceBasis !== 'unknown' && sourceAt != null && Number.isFinite(sourceAt);
-  const captured = receipt?.activity_rows ?? m?.items.length ?? 0;
-  const truncated = receipt?.has_more ?? m?.lastHourFloor ?? false;
-  return (
-    <div aria-label="Captured lot activity" style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, fontSize: 10, color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
-      <div style={{ fontSize: 9, lineHeight: 1.4 }}>
-        Captured activity as of {asOf != null && Number.isFinite(asOf)
-          ? <time dateTime={new Date(asOf).toISOString()}>{clock(asOf)}</time> : 'unknown time'}.
-        {' '}{knownSource
-          ? <span>Source read <time dateTime={new Date(sourceAt!).toISOString()}>{ago(now - sourceAt!)}</time> · {sourceBasis === 'cached_snapshot' ? 'Cached snapshot' : 'Direct fetch'}.</span>
-          : <span>Source read time unknown.</span>}
-      </div>
-      <div style={{ fontSize: 9, lineHeight: 1.4 }}>
-        Showing {items.length} of {captured} captured interactions{rowCap != null ? ` · read limit ${rowCap}` : ''}.
-        {truncated && ' Window truncated; earlier interactions are omitted.'}
-      </div>
-      {items.map((it, i) => (
-        <div key={`${it.at}-${i}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', minWidth: 0, whiteSpace: 'nowrap' }}>
-          <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0, color: it.kind === 'bid' ? 'var(--text)' : 'var(--text-secondary)' }}>{KIND[it.kind]}</span>
-          {it.amount != null && <span style={{ ...mono, color: 'var(--text)' }}>{bidNumber(it.amount, true)}</span>}
-          {it.step != null && <span style={mono}>+{bidNumber(it.step, true)}</span>}
-          {it.weight != null && m?.medianStep != null && (
-            <WeightBar w={it.weight} title={`A +${bidNumber(it.step)} step against a median step of ${bidNumber(m.medianStep)} over this lot's ${m.steps} bid steps in view`} />
-          )}
-          <span style={{ ...mono, marginLeft: 'auto', flexShrink: 0 }}>{ago(now - it.at)}</span>
-        </div>
-      ))}
-      {m != null && m.lastHour > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
-          <span style={{ ...label, fontSize: 8, flexShrink: 0 }}>Captured hour before read</span>
-          <span style={mono}>{m.lastHourFloor ? '≥' : ''}{m.lastHour} posted</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ActivityDrill({ auction, onClose }: { auction: LiveAuction; onClose: () => void }) {
-  const ids = useMemo(() => [auction.id], [auction.id]);
-  const query = useLotMovement(ids);
-  const movement = useMemo(() => query.data
-    ? weigh(query.data, new Map([[auction.id, auction.endsAt]]), query.dataUpdatedAt || Date.now()) : null,
-    [query.data, query.dataUpdatedAt, auction.id, auction.endsAt]);
-  const receipt = query.coverage?.lots.find(l => l.vehicle_id === auction.id);
-  const ref = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    ref.current?.focus({ preventScroll: true });
-    ref.current?.scrollIntoView?.({ block: 'nearest' });
-    return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
-  }, [auction.id]);
-  return <section ref={ref} tabIndex={-1} aria-label="Listing activity evidence" onKeyDown={e => { if (e.key === 'Escape') onClose(); }} style={{ border: '2px solid var(--border)', padding: 10, marginBottom: 12 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-      <h3 style={{ fontSize: 13, margin: 0 }}>{title(auction)} · captured activity</h3>
-      <button onClick={onClose} style={{ ...label, background: 'var(--bg)', color: 'var(--text)', border: '2px solid var(--border)', padding: 6 }}>Close activity</button>
-    </div>
-    <div style={{ fontSize: 11, marginTop: 6 }}>
-      <Link to={`/vehicle/${auction.id}`}>Vehicle evidence</Link>{' · '}
-      {auction.listingUrl && <a href={auction.listingUrl} target="_blank" rel="noopener noreferrer">BaT source listing ↗</a>}
-    </div>
-    {query.isFetching && <div role="status">Reading current listing interactions…</div>}
-    {query.isError && <div role="status">Activity could not be refreshed. <button onClick={() => void query.refetch()}>Retry activity</button></div>}
-    {!query.isFetching && !query.isError && query.coverage && !receipt && <div role="status">No eligible current-listing receipt at this read. The listing may have ended or become unavailable.</div>}
-    <Movement m={movement?.get(auction.id)} receipt={receipt} readAsOf={query.coverage?.as_of} rowCap={query.coverage?.per_lot_limit} limit={40} />
-    {receipt?.source_bid_amount != null && <div style={{ fontSize: 11, marginTop: 6 }}>
-      Source bid number {bidNumber(receipt.source_bid_amount)} · recorded at capture {bidNumber(receipt.current_bid_at_capture)} · currency unverified.
-      {' '}{receipt.source_bid_match === 'matched' ? 'Numbers match at capture.' : receipt.source_bid_match === 'mismatched' ? 'Numbers differ at capture.' : 'Comparison unknown.'}
-    </div>}
-    <p style={{ fontSize: 11, margin: '8px 0 0', color: 'var(--text-secondary)' }}>Captured current-listing interactions, limited to 40. Missing earlier events and unscored opinions do not establish mood or a historical bidding rate.</p>
-  </section>;
-}
-
 // Fixed row heights so the board can render only the rows on screen.
 const ROW_H = 52;
 const ROW_H_NARROW = 50;
@@ -840,7 +729,14 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const make = makeParam === 'ALL' ? null : makeParam ?? null;
   const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
   const model = make ? params.get('model') : null;
-  const [activityLot, setActivityLot] = useState<LiveAuction | null>(null);
+  const lotParam = params.get('lot');
+  const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
+  const openActivity = (auction: LiveAuction) => {
+    const next = new URLSearchParams(params); next.set('lot', auction.id); setParams(next);
+  };
+  const closeActivity = () => {
+    const next = new URLSearchParams(params); next.delete('lot'); setParams(next);
+  };
   const salesDay = params.get('day');
   const salesLens: MarketSalesLens = {
     scopeKey: params.get('salesScope'), days: params.get('days') === '2' ? 2 : 7,
@@ -862,7 +758,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     if (key === 'make' || key === 'view') next.delete('model');
     if (key === 'view') next.delete('bidRange');
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
-    setActivityLot(null);
+    next.delete('lot');
     setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort' });
   };
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
@@ -870,7 +766,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     next.set('make', nextMake ?? 'all');
     ['model', 'bidRange', 'day', 'series', 'salesScope'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
-    setActivityLot(null);
+    next.delete('lot');
     setParams(next);
   };
   const setSalesLens = (change: Partial<MarketSalesLens>) => {
@@ -922,7 +818,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     return rows;
   }, [scoped, selectedBid, sort, heat, model]);
 
-  if (!data && isError && view === 'inventory') return <>
+  if (!data && isError && view === 'inventory' && !activityId) return <>
     <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
     <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
     {onUnavailable}
@@ -944,6 +840,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </div>
 
       {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
+
+      {activityId && <AuctionEvidence vehicleId={activityId} onClose={closeActivity} />}
 
       <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
 
@@ -991,7 +889,6 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         </section>
       </div>
 
-      {activityLot && <ActivityDrill auction={activityLot} onClose={() => setActivityLot(null)} />}
 
       <div ref={boardRef} tabIndex={-1} aria-label="Supporting live lots">
       <section style={{ border: '2px solid var(--border)' }}>
@@ -1030,7 +927,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}>Clear market filters</button></div>}
-        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={setActivityLot} />}
+        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={openActivity} />}
       </section>
       </div>
       </>}
