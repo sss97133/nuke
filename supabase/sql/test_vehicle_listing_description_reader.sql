@@ -1,11 +1,11 @@
 -- Synthetic actual PG17 contract only; reuse the installed listing reader fixture.
 \set ON_ERROR_STOP on
+\set description_reader_contract true
 \ir test_listing_observation_consensus.sql
 ALTER TYPE public.observation_kind ADD VALUE 'sale_result';
 ALTER TYPE public.observation_kind ADD VALUE 'condition';
 ALTER TYPE public.observation_kind ADD VALUE 'bid';
 ALTER TYPE public.observation_kind ADD VALUE 'splice';
-ALTER TABLE public.vehicles ADD COLUMN description text, ADD COLUMN description_source text;
 CREATE OR REPLACE FUNCTION public.observation_is_public(p_kind public.observation_kind, p_data jsonb)
 RETURNS boolean
 LANGUAGE sql
@@ -23,7 +23,6 @@ AS $$
 $$;
 
 
-\ir ../migrations/20261004074612_vehicle_listing_description_reader.sql
 SET TIME ZONE 'UTC';
 BEGIN;
 INSERT INTO public.vehicles(id,is_public,description,description_source,owner_id,color) VALUES
