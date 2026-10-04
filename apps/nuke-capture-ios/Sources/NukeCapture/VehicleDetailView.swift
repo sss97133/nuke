@@ -827,10 +827,11 @@ struct VehicleDetailView: View {
     @ViewBuilder private func specRow(_ s: VehicleSpec) -> some View {
         RootedValueView(
             label: s.label,
-            value: s.value ?? "",
-            status: s.rooted ? .attributed : .facade,
-            onDrill: s.rooted
-                ? { provenanceDrill = SpecDrill(label: s.label, value: s.value ?? "", field: s.field) }
+            value: s.value ?? s.reported_value ?? (s.reported_conflict == true ? "Conflicting reports" : "Unknown"),
+            status: s.reported_conflict == true ? .conflicting : (s.rooted || s.reported_value != nil ? .attributed : .facade),
+            decay: s.reported_conflict == true ? "reports disagree · not resolved" : (s.reported_value != nil ? "reported · not verified" : nil),
+            onDrill: s.rooted || s.reported_value != nil || s.reported_conflict == true
+                ? { provenanceDrill = SpecDrill(label: s.label, value: s.value ?? s.reported_value ?? "Unknown", field: s.field) }
                 : nil
         )
         Divider()
@@ -2582,6 +2583,8 @@ struct VehicleSpec: Decodable, Identifiable {
     let rooted: Bool
     let inline_source: String?
     let evidence_count: Int?
+    let reported_value: String?
+    let reported_conflict: Bool?
     var id: String { field }
 }
 
@@ -2771,6 +2774,8 @@ struct FieldProvenance: Decodable {
         let value: String?
         let confidence: Double?
         let observed_at: String?
+        let ingested_at: String?
+        let extraction_method: String?
         let kind: String?
         let source_slug: String?
         let trust: Double?
@@ -2901,6 +2906,9 @@ struct FieldProvenanceSheet: View {
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
             ForEach(obs) { o in
                 VStack(alignment: .leading, spacing: 5) {
+                    if let value = o.value, !value.isEmpty {
+                        Text("Reported: \(value)").font(.system(.footnote, design: .monospaced))
+                    }
                     if let c = o.content, !c.isEmpty {
                         Text(c).font(.footnote).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -2917,6 +2925,12 @@ struct FieldProvenanceSheet: View {
                     }
                     if let u = o.source_url, let link = URL(string: u) {
                         Link("View source ↗", destination: link).font(.caption2)
+                    }
+                    if let learned = whenLabel(o.ingested_at) {
+                        Text("Learned \(learned)").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let method = o.extraction_method, !method.isEmpty {
+                        Text(method).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
