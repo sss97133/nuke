@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
 
 interface ObservationRow {
   id: string;
@@ -101,8 +102,8 @@ const ObservationPage: React.FC = () => {
         supabase
           .from('vehicle_observations')
           .select(`
-            id, vehicle_id, kind, observed_at, ingested_at, source_url, source_id,
-            confidence, confidence_score, content_text, structured_data, property_id,
+            id, vehicle_id, kind, observed_at, ingested_at, source_id,
+            confidence, confidence_score, structured_data, property_id,
             is_superseded, superseded_by,
             observation_sources!left(display_name, slug)
           `)
@@ -133,8 +134,8 @@ const ObservationPage: React.FC = () => {
         lineageQueries.push(
           supabase
             .from('vehicle_observations')
-            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_url, source_id,
-              confidence, confidence_score, content_text, structured_data, property_id,
+            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
+              confidence, confidence_score, structured_data, property_id,
               is_superseded, superseded_by`)
             .eq('id', observation.superseded_by)
             .maybeSingle()
@@ -148,39 +149,13 @@ const ObservationPage: React.FC = () => {
         lineageQueries.push(
           supabase
             .from('vehicle_observations')
-            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_url, source_id,
-              confidence, confidence_score, content_text, structured_data, property_id,
+            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
+              confidence, confidence_score, structured_data, property_id,
               is_superseded, superseded_by`)
             .eq('id', originalId)
             .maybeSingle()
             .then(({ data }) => {
               if (!cancelled && data) setSupersedes(data as ObservationRow);
-            }) as unknown as Promise<void>,
-        );
-      }
-
-      // Witness image lookup — if structured_data references a witness image,
-      // fetch its public URL so AnnotatedImage can render the artifact + bboxes.
-      const sd = observation.structured_data as Record<string, unknown> | null;
-      const witnessImageId =
-        sd && typeof sd.witness_image_id === 'string'
-          ? (sd.witness_image_id as string)
-          : sd && typeof sd.install_witness_image_id === 'string'
-          ? (sd.install_witness_image_id as string)
-          : sd && typeof sd.image_id === 'string'
-          ? (sd.image_id as string)
-          : null;
-      if (witnessImageId) {
-        lineageQueries.push(
-          supabase
-            .from('vehicle_images')
-            .select('image_url')
-            .eq('id', witnessImageId)
-            .maybeSingle()
-            .then(({ data }) => {
-              if (!cancelled && data && (data as any).image_url) {
-                setWitnessImageUrl((data as any).image_url as string);
-              }
             }) as unknown as Promise<void>,
         );
       }
@@ -191,7 +166,7 @@ const ObservationPage: React.FC = () => {
         lineageQueries.push(
           supabase
             .from('vehicle_observations')
-            .select('id, kind, observed_at, content_text, structured_data')
+            .select('id, kind, observed_at')
             .eq('vehicle_id', vehicleId)
             .eq('is_superseded', false)
             .neq('id', obsId)
@@ -223,17 +198,9 @@ const ObservationPage: React.FC = () => {
     };
   }, [vehicleId, obsId]);
 
-  const sourceArtifact = useMemo(() => {
-    if (!obs) return null;
-    const sd = obs.structured_data as Record<string, unknown> | null;
-    const candidate =
-      obs.source_url ||
-      (sd && typeof sd.file_url === 'string' ? (sd.file_url as string) : '') ||
-      (sd && typeof sd.image_url === 'string' ? (sd.image_url as string) : '') ||
-      witnessImageUrl ||
-      '';
-    return candidate || null;
-  }, [obs, witnessImageUrl]);
+  // Original documents and OCR labels have no verified name-publication consent.
+  const sourceArtifact = publicObservationArtifact();
+  const visibleData = useMemo(() => publicObservationData(obs?.structured_data ?? null), [obs]);
 
   const vehLabel = vehicle
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -242,14 +209,7 @@ const ObservationPage: React.FC = () => {
   const observedDate = obs?.observed_at?.slice(0, 10) || '';
   const obsTitle = useMemo(() => {
     if (!obs) return '';
-    const sd = obs.structured_data as Record<string, unknown> | null;
-    if (obs.content_text) return obs.content_text;
-    if (sd) {
-      const sval =
-        sd.label || sd.value || sd.title || sd.summary || sd.merchant || sd.wire_id || sd.property_key;
-      if (sval) return String(sval);
-    }
-    return `(${obs.kind})`;
+    return `${labelCase(obs.kind)} observation`;
   }, [obs]);
 
   return (
@@ -367,6 +327,8 @@ const ObservationPage: React.FC = () => {
             {obsTitle}
           </h1>
 
+          <p style={{ fontSize: 10, color: 'var(--text-secondary, #666)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
+
           <div
             style={{
               fontSize: 9,
@@ -447,7 +409,7 @@ const ObservationPage: React.FC = () => {
           })()}
 
           {/* Structured data */}
-          {obs.structured_data && Object.keys(obs.structured_data).length > 0 && (
+          {Object.keys(visibleData).length > 0 && (
             <section style={{ marginBottom: 24 }}>
               <h2
                 style={{
@@ -463,7 +425,7 @@ const ObservationPage: React.FC = () => {
               >
                 Structured Data
               </h2>
-              <StructuredDataTable data={obs.structured_data} />
+              <StructuredDataTable data={visibleData} />
             </section>
           )}
 
@@ -554,7 +516,7 @@ const ObservationPage: React.FC = () => {
                       {r.kind}
                     </span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.content_text || '—'}
+                      {labelCase(r.kind)} observation
                     </span>
                   </Link>
                 ))}

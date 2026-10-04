@@ -27,6 +27,8 @@ final class WorkDaySignEngine: ObservableObject {
 
     @Published private(set) var days: [WorkDay] = []
     @Published private(set) var loaded = false
+    @Published private(set) var isLoading = false
+    @Published private(set) var loadError: String?
     @Published private(set) var signedCount = 0
     @Published var note: String?
 
@@ -47,29 +49,41 @@ final class WorkDaySignEngine: ObservableObject {
 
     /// Owner's unconfirmed work-days, newest first. Owner-scoped by construction.
     func load() async {
-        guard let userId = SupabaseService.currentUserId else { loaded = true; return }
-        let vehicles: [VehicleRow] = (try? await SupabaseService.client.from("vehicles")
-            .select("id, year, make, model")
-            .eq("user_id", value: userId)
-            .execute().value) ?? []
-        guard !vehicles.isEmpty else { days = []; loaded = true; return }
-        let byId = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
-
-        let rows: [SessionRow] = (try? await SupabaseService.client.from("work_sessions")
-            .select("id, vehicle_id, session_date, duration_minutes")
-            .in("vehicle_id", values: vehicles.map(\.id))
-            .is("owner_confirmed_at", value: nil)
-            .gt("duration_minutes", value: 0)
-            .order("session_date", ascending: false)
-            .limit(80)
-            .execute().value) ?? []
-
-        days = rows.map { r in
-            WorkDay(id: r.id, vehicleId: r.vehicle_id, sessionDate: r.session_date,
-                    durationMinutes: r.duration_minutes ?? 0,
-                    vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE")
+        guard !isLoading else { return }
+        guard let userId = SupabaseService.currentUserId else {
+            loadError = "Sign in to load your work days."
+            return
         }
-        loaded = true
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            let vehicles: [VehicleRow] = try await SupabaseService.client.from("vehicles")
+                .select("id, year, make, model")
+                .eq("user_id", value: userId)
+                .execute().value
+            guard !vehicles.isEmpty else { days = []; loaded = true; return }
+            let byId = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
+
+            let rows: [SessionRow] = try await SupabaseService.client.from("work_sessions")
+                .select("id, vehicle_id, session_date, duration_minutes")
+                .in("vehicle_id", values: vehicles.map(\.id))
+                .is("owner_confirmed_at", value: nil)
+                .gt("duration_minutes", value: 0)
+                .order("session_date", ascending: false)
+                .limit(80)
+                .execute().value
+
+            days = rows.map { r in
+                WorkDay(id: r.id, vehicleId: r.vehicle_id, sessionDate: r.session_date,
+                        durationMinutes: r.duration_minutes ?? 0,
+                        vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE")
+            }
+            loaded = true
+        } catch {
+            loadError = "Couldn't load your work days. Check your connection and try again."
+            NSLog("NukeCapture work days load failed: %@", String(describing: error))
+        }
     }
 
     /// The day's actual photos — the proof you confirm on (that vehicle, that day).
@@ -128,7 +142,16 @@ struct WorkDaySignView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if !engine.loaded {
+            if let error = engine.loadError {
+                VStack(spacing: 12) {
+                    Text(error).font(.callout).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { Task { await engine.load() } }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(engine.isLoading)
+                }
+                .padding()
+            } else if !engine.loaded || engine.isLoading {
                 ProgressView().tint(.white)
             } else if engine.days.isEmpty {
                 doneState
@@ -164,7 +187,7 @@ struct WorkDaySignView: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 1) {
                     Text("YOUR DAYS").font(.caption.weight(.bold)).kerning(1).foregroundStyle(.white)
-                    if engine.loaded {
+                    if engine.loaded && !engine.isLoading && engine.loadError == nil {
                         Text(engine.signedCount > 0
                              ? "\(engine.signedCount) signed · \(engine.days.count) left"
                              : "\(engine.days.count) to confirm")
@@ -176,7 +199,7 @@ struct WorkDaySignView: View {
         .toolbarBackground(.black, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .preferredColorScheme(.dark)
-        .task { if !engine.loaded { await engine.load() } }
+        .task { await engine.load() }
     }
 
     private var doneState: some View {

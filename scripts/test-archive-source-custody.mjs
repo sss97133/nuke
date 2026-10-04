@@ -2,7 +2,7 @@
 // NODE_PATH=nuke_frontend/node_modules node --test scripts/test-archive-source-custody.mjs
 import assert from 'node:assert/strict';
 import { createHash, createHmac, webcrypto } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -23,6 +23,12 @@ const snapshot = { id: snapshotId, platform: 'bat', listing_url: sourceUrl, succ
   html: null, html_storage_path: 'bat/synthetic-one.html', html_sha256: digest(html),
   fetched_at: '2025-06-16T00:00:00Z', created_at: '2025-06-16T06:00:00Z',
   metadata: { vehicle_id: vehicleId, vehicle_matched: true, parsed_at: '2025-06-16T12:00:00Z' } };
+const eventId='00000000-0000-4000-8000-000000000005';
+const episode={id:eventId,vehicle_id:vehicleId,source_platform:'bat',source_url:sourceUrl,source_listing_id:'opaque-lot-123',
+  event_type:'auction',event_status:'sold',final_price:12345,sold_at:'2025-06-15T00:00:00.000000+00:00',ended_at:null,
+  created_at:'2025-06-16T00:00:00.123456Z',updated_at:'2025-06-16T00:00:00.234567Z',extracted_at:'2025-06-16T00:00:00.345678Z'};
+const jsonb = value => Array.isArray(value) ? value.map(jsonb)
+  : value!==null&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,jsonb(value[k])])):value;
 
 function compile(path) {
   const { outputText, diagnostics } = ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'), {
@@ -47,6 +53,7 @@ function fixture(options = {}) {
   const requests = [], writes = [], observations = [];
   const actualSnapshot = { ...snapshot, ...(options.snapshot ?? {}) };
   const actualParent = { ...parent, ...(options.parent ?? {}) };
+  const actualEpisode = {...episode,...options.episode};
   const bytes = options.bytes ?? Buffer.from(html);
   async function http(raw,init) {
     const request = raw instanceof Request ? raw : new Request(raw,init);
@@ -60,22 +67,35 @@ function fixture(options = {}) {
     }
     if(u.pathname==='/rest/v1/vehicle_observations') {
       if(request.method==='GET') {
-        const hash=u.searchParams.get('content_hash')?.slice(3);return Response.json(observations.find(o=>o.content_hash===hash)??null);
+        if(options.typedReplayReadError&&u.searchParams.get('select')?.includes('source_vehicle_event_id'))return Response.json({code:'42703',message:'typed column unavailable'},{status:400});
+        return Response.json(observations.find(o=>['content_hash','source_id','source_identifier','kind'].every(key=>
+          !u.searchParams.has(key)||u.searchParams.get(key)==='eq.'+o[key]))??null);
       }
       assert.equal(request.method,'POST');assert(options.allowObservationWrite,'Explicit productive observation fixture only');
       const row=await request.json();assert(!('ingested_at'in row),'Database owns ingestion time');
       assert(row.extractor_id == null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.extractor_id),
         'Production extractor_id is nullable UUID, not a method string');
       assert.equal(row.kind,'sale_result');
-      if(options.allowGenericWrite)assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed key');
+      if(options.allowGenericWrite){
+        assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed capture key');
+        assert(!('source_vehicle_event_id'in row),'Generic intake ignores caller typed episode key');
+      }
       else{assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
-      if(observations.some(o=>o.content_hash===row.content_hash))return Response.json({code:'23505',message:'unique_observation'},{status:409});
-      const saved={is_superseded:false,extractor_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
+      if(row.source_vehicle_event_id&&options.guardRefusal)return Response.json({code:'23514',message:'pinned source headers changed'},{status:409});
+      const keys=['source_id','source_identifier','kind','content_hash'];
+      if(keys.every(k=>row[k]!=null)&&observations.some(o=>keys.every(k=>o[k]===row[k])))return Response.json({code:'23505',message:'unique_observation'},{status:409});
+      const saved={is_superseded:false,extractor_id:null,source_vehicle_event_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
+      if(options.jsonbOrder)saved.extraction_metadata=jsonb(saved.extraction_metadata);
       observations.push(saved);writes.push(row);return Response.json(saved);
     }
     if(u.pathname==='/rest/v1/rpc/vehicle_price_facts') {
       assert.deepEqual(await request.json(),{p_vehicle_ids:[vehicleId]});
       return Response.json([{...fact,...(options.fact??{})}]);
+    }
+    if(u.pathname==='/rest/v1/vehicle_events') {
+      assert.equal(request.method,'GET');assert(!u.searchParams.has('order'),'Explicit source event PK only');
+      if(options.episodeReadError)return Response.json({code:'57014',message:'native read unavailable'},{status:500});
+      return Response.json(options.episodeMissing||u.searchParams.get('id')!=='eq.'+actualEpisode.id?null:actualEpisode);
     }
     if(u.pathname==='/rest/v1/vehicles') {
       assert.equal(request.method,'GET');
@@ -141,7 +161,7 @@ function fixture(options = {}) {
       }});
     return exports;
   }
-  return {requests,writes,observations,snapshot:actualSnapshot,parser:load('parser'),
+  return {requests,writes,observations,snapshot:actualSnapshot,episode:actualEpisode,parser:load('parser'),
     read:(extra={})=>load('archive').readPinnedArchivedPage({snapshotId,vehicleId,sourceUrl,...extra},{supabase,now:()=>new Date('2026-01-03T00:00:00Z')}),
     attach:(capture,receipt)=>load('archive').attachPinnedArchivedSaleQualification(capture,receipt,{supabase}),
     intake:async(body={},token='svc-test')=>{
@@ -332,11 +352,20 @@ test('superseded or differently attributed duplicate is refused without restorin
     assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
   }
 });
-test('generic intake ignores a caller-provided typed source key',async()=>{
+test('actual generic intake ignores caller-provided typed capture and episode keys',async()=>{
   const f=fixture({allowObservationWrite:true,allowGenericWrite:true});
   const r=await f.intake({mode:undefined,source_slug:'bat',kind:'sale_result',observed_at:'2025-06-15T00:00:00Z',
-    vehicle_id:vehicleId,source_snapshot_id:snapshotId,defer_analysis:true});
-  assert.equal(r.status,200);assert.equal(f.observations.length,1);assert(!('source_snapshot_id'in f.observations[0]));
+    vehicle_id:vehicleId,source_snapshot_id:snapshotId,source_vehicle_event_id:'00000000-0000-4000-8000-000000000099',defer_analysis:true});
+  assert.equal(r.status,200);assert.equal(f.observations.length,1);
+  assert(!('source_snapshot_id'in f.writes[0]));assert(!('source_vehicle_event_id'in f.writes[0]));
+  assert.equal(f.observations[0].source_vehicle_event_id,null,'Database default carries no caller ancestry');
+});
+test('actual current v1 protected intake refuses an unestablished caller episode key',async()=>{
+  const f=fixture({allowObservationWrite:true});
+  const r=await f.intake({mode:'source_sale_qualification',vehicle_id:vehicleId,snapshot_id:snapshotId,
+    source_vehicle_event_id:'00000000-0000-4000-8000-000000000099',dry_run:false});
+  assert.equal(r.status,422);assert.equal(f.observations.length,0);assert.equal(f.writes.length,0);
+  assert(!f.requests.some(q=>q.path.endsWith('/vehicle_observations')&&q.method==='POST'));
 });
 test('generic batch cannot elevate a signed-in or service caller into protected mode',async()=>{
   const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
@@ -346,4 +375,138 @@ test('generic batch cannot elevate a signed-in or service caller into protected 
     const f=fixture(),r=await f.proxy({observations:[{mode:'source_sale_qualification',vehicle_id:vehicleId,dry_run:false}]},token);
     assert.equal(r.status,403);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
   }
+});
+
+test('optional current-v1 event selector derives exact server-owned headers, never caller metadata',async()=>{
+  const f=fixture(),r=await f.intake({source_vehicle_event_id:eventId.toUpperCase(),amount:1,
+    extraction_metadata:{source_episode_context:{id:snapshotId},source_snapshot_context:{id:eventId}},ingested_at:'1900-01-01'});
+  assert.equal(r.status,200);assert.equal(r.body.proposed_source_vehicle_event_id,eventId);
+  assert.deepEqual(r.body.source_episode_context,episode);
+  assert.deepEqual(r.body.source_snapshot_context,{id:snapshotId,platform:'bat',listing_url:sourceUrl,success:true,http_status:200,
+    html_sha256:snapshot.html_sha256,fetched_at:snapshot.fetched_at,created_at:snapshot.created_at,html_storage_path:snapshot.html_storage_path,
+    inline_body_present:false,metadata:{vehicle_id:vehicleId,vehicle_matched:true,parsed_at:snapshot.metadata.parsed_at}});
+  assert.equal(r.body.source_episode_context.created_at,episode.created_at);assert.equal(r.body.derived_ingested_at,null);
+  assert.equal(r.body.availability_known_at,null);assert.equal(r.body.source_public_visibility,'unestablished');
+  assert.equal(r.body.recorded_clock_basis,'database_transaction_start_not_commit_availability');assert.equal(f.writes.length,0);
+});
+test('optional current-v1 persists event/capture edges and replays JSONB-reordered contexts with original database clock',async()=>{
+  const f=fixture({allowObservationWrite:true,jsonbOrder:true});
+  const plain=fixture({allowObservationWrite:true});await plain.intake({dry_run:false});
+  const first=await f.intake({dry_run:false,source_vehicle_event_id:eventId});assert.equal(first.status,200,JSON.stringify(first.body));
+  const saved=f.observations[0];assert.equal(saved.source_vehicle_event_id,eventId);assert.equal(saved.source_snapshot_id,snapshotId);
+  assert.equal(saved.content_hash,plain.observations[0].content_hash,'Typed context is outside frozen captured claim hash');
+  assert(!('source_vehicle_event_id' in plain.writes[0]));assert(!('ingested_at' in f.writes[0]));
+  assert.equal(first.body.source_vehicle_event_id,eventId);assert.equal(first.body.availability_known_at,null);
+  const replay=await f.intake({dry_run:false,source_vehicle_event_id:eventId});assert.equal(replay.status,200);
+  assert.equal(replay.body.duplicate,true);assert.equal(replay.body.observation_id,first.body.observation_id);
+  assert.equal(replay.body.derived_ingested_at,first.body.derived_ingested_at);assert.equal(f.writes.length,1);
+  for(const request of f.requests.filter(q=>q.path.endsWith('/vehicle_observations')&&q.method==='GET')){
+    assert.equal(request.query.source_id,'eq.00000000-0000-4000-8000-000000000004');
+    assert.equal(request.query.kind,'eq.sale_result');assert.equal(request.query.source_identifier,'eq.'+saved.source_identifier);
+  }
+});
+test('concurrent optional current-v1 submissions converge on one native edge and original recording clock',async()=>{
+  const f=fixture({allowObservationWrite:true}),body={dry_run:false,source_vehicle_event_id:eventId};
+  const [a,b]=await Promise.all([f.intake(body),f.intake(body)]);
+  assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(f.observations.length,1);assert.equal(f.writes.length,1);
+  assert.equal(a.body.observation_id,b.body.observation_id);assert.equal(a.body.derived_ingested_at,b.body.derived_ingested_at);
+  assert.equal(Number(a.body.duplicate)+Number(b.body.duplicate),1);assert.equal(f.observations[0].source_vehicle_event_id,eventId);
+});
+test('legacy NULL episode ancestry collision is retained and refused without promotion or a second claim',async()=>{
+  const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false});const original=JSON.stringify(f.observations[0]);
+  const r=await f.intake({dry_run:false,source_vehicle_event_id:eventId});assert.equal(r.status,503);
+  assert.equal(f.writes.length,1);assert.equal(f.observations.length,1);assert.equal(JSON.stringify(f.observations[0]),original);
+});
+for(const [label,patch] of [
+  ['different event',{source_vehicle_event_id:snapshotId}],['missing event',{source_vehicle_event_id:null}],
+  ['missing context',{extraction_metadata:{}}],['different pinned headers',{extraction_metadata:{source_episode_context:{...episode,updated_at:'2025-07-01T00:00:00Z'}}}],
+  ['superseded',{is_superseded:true}],
+  ['unknown DB clock',{ingested_at:null}],['unzoned DB clock',{ingested_at:'2026-01-02 00:00:00'}],
+  ['submillisecond event mismatch',{observed_at:'2025-06-15T00:00:00.000001Z'}],
+])test(`optional current-v1 persisted replay refuses ${label} without rewriting testimony`,async()=>{
+  const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false,source_vehicle_event_id:eventId});
+  Object.assign(f.observations[0],patch);const original=JSON.stringify(f.observations[0]);
+  assert.equal((await f.intake({dry_run:false,source_vehicle_event_id:eventId})).status,503);
+  assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
+});
+test('later native header mutation refuses replay with original immutable claim retained',async()=>{
+  const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false,source_vehicle_event_id:eventId});
+  const original=JSON.stringify(f.observations[0]);f.episode.updated_at='2025-07-01T00:00:00.654321Z';
+  const r=await f.intake({dry_run:false,source_vehicle_event_id:eventId});assert.equal(r.status,503);
+  assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
+});
+for(const [label,options,reason] of [
+  ['missing',{episodeMissing:true},'source_episode_attribution_conflict'],['unavailable',{episodeReadError:true},'source_episode_read_failed'],
+  ['another parent',{episode:{vehicle_id:snapshotId}},'source_episode_attribution_conflict'],
+  ['another platform',{episode:{source_platform:'other'}},'source_episode_attribution_conflict'],
+  ['another source',{episode:{source_url:'https://bringatrailer.com/listing/another/'}},'source_episode_identity_conflict'],
+  ['URL-shaped contradictory listing ID',{episode:{source_listing_id:'bringatrailer.com/listing/another/'}},'source_episode_identity_conflict'],
+  ['unknown status',{episode:{event_status:'ended'}},'source_episode_current_sale_conflict'],
+  ['not sold',{episode:{event_status:'reserve_not_met'}},'source_episode_current_sale_conflict'],
+  ['unknown amount',{episode:{final_price:null}},'source_episode_current_sale_conflict'],
+  ['price disagreement',{episode:{final_price:12346}},'source_episode_current_sale_conflict'],
+  ['earlier date',{episode:{sold_at:'2025-06-14T00:00:00Z'}},'source_episode_current_sale_conflict'],
+  ['nonmidnight instant',{episode:{sold_at:'2025-06-15T01:00:00.123456Z'}},'source_episode_civil_day_unestablished'],
+  ['unknown date',{episode:{sold_at:null}},'source_episode_civil_day_unestablished'],
+  ['unzoned secondary clock',{episode:{ended_at:'2025-06-15 00:00:00'}},'source_episode_clock_unknown'],
+  ['invalid recorded clock',{episode:{created_at:'2025-02-30T00:00:00Z'}},'source_episode_clock_unknown'],
+])test(`optional current-v1 refuses ${label} native event before any insert`,async()=>{
+  const f=fixture(options),r=await f.intake({dry_run:false,source_vehicle_event_id:eventId});
+  assert.equal(r.status,422,JSON.stringify(r.body));assert.equal(r.body.reason,reason);assert.equal(f.writes.length,0);
+  assert(!f.requests.some(q=>q.method==='POST'&&q.path.endsWith('/vehicle_observations')));
+});
+test('optional current-v1 preserves opaque IDs/NULL recording clocks and supported URL aliases without inferred units',async()=>{
+  for(const source_listing_id of ['opaque-lot-123','https://www.bringatrailer.com/listing/synthetic-one/?x=1']){
+    const f=fixture({episode:{source_listing_id,created_at:null,updated_at:null,extracted_at:null}});
+    const r=await f.intake({source_vehicle_event_id:eventId});assert.equal(r.status,200);
+    assert.equal(r.body.source_episode_context.source_listing_id,source_listing_id);assert.equal(r.body.source_episode_context.created_at,null);
+    assert(!('currency' in r.body.source_episode_context));assert.equal(r.body.availability_known_at,null);
+  }
+});
+test('optional event cannot bypass existing current-sale, private parent, raw bytes or parser eligibility',async()=>{
+  for(const options of [{fact:{sold_amount:20000}},{fact:{sold_on:'2025-07-01'}},{parent:{is_public:false}},
+    {bytes:Buffer.from('corrupt')},{bytes:Buffer.from('bid to USD $12,345 on 6/15/25'),snapshot:{html_sha256:digest('bid to USD $12,345 on 6/15/25')}}]){
+    const f=fixture(options);assert.equal((await f.intake({dry_run:false,source_vehicle_event_id:eventId})).status,422);assert.equal(f.writes.length,0);
+    assert(!f.requests.some(q=>q.path.endsWith('/vehicle_events')),'Source episode cannot replace current-v1 proof');
+  }
+});
+for(const source_vehicle_event_id of [null,'invalid',[eventId]])test(`optional event requires one UUID: ${JSON.stringify(source_vehicle_event_id)}`,async()=>{
+  const f=fixture(),r=await f.intake({source_vehicle_event_id});assert.equal(r.status,422);assert.equal(r.body.reason,'invalid_source_episode_locator');
+  assert.equal(f.requests.length,1);assert.equal(f.writes.length,0);
+});
+test('optional current-v1 fails closed when typed schema or atomic source guard refuses, with no fallback insert',async()=>{
+  const missing=fixture({typedReplayReadError:true}),r=await missing.intake({dry_run:false,source_vehicle_event_id:eventId});
+  assert.equal(r.status,503);assert.equal(missing.writes.length,0);assert(!missing.requests.some(q=>q.path.endsWith('/vehicle_observations')&&q.method==='POST'));
+  const changed=fixture({allowObservationWrite:true,guardRefusal:true}),refusal=await changed.intake({dry_run:false,source_vehicle_event_id:eventId});
+  assert.equal(refusal.status,500);assert.equal(changed.writes.length,0);assert.equal(changed.observations.length,0);
+  assert.equal(changed.requests.filter(q=>q.path.endsWith('/vehicle_observations')&&q.method==='POST').length,1);
+});
+test('generic caller event/capture keys cannot assign ancestry',async()=>{
+  const f=fixture({allowObservationWrite:true,allowGenericWrite:true}),r=await f.intake({mode:undefined,source_slug:'bat',kind:'sale_result',
+    observed_at:'2025-06-15T00:00:00Z',source_vehicle_event_id:eventId,source_snapshot_id:snapshotId,defer_analysis:true});
+  assert.equal(r.status,200);assert(!('source_vehicle_event_id' in f.writes[0]));assert(!('source_snapshot_id' in f.writes[0]));
+  assert(!f.requests.some(q=>q.path.endsWith('/vehicle_events')));
+});
+test('episode-v2/unknown version and reserved preview marker never fall through to v1 admission',async()=>{
+  for(const qualification_version of ['episode_v2','unknown'])for(const dry_run of [true,false]){
+    const f=fixture({allowObservationWrite:true}),r=await f.intake({qualification_version,dry_run,source_vehicle_event_id:eventId});
+    assert.equal(r.status,409);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+  }
+  for(const input of [{extraction_method:'protected_archived_sale_episode_preview_v2'},
+    {structured_data:{source_sale_receipt:{method:'protected_archived_sale_episode_preview_v2'}}}]){
+    const f=fixture();assert.equal((await f.intake({mode:undefined,...input})).status,403);assert.equal(f.requests.length,0);
+  }
+});
+test('actual optional-v1 producer payloads cover inline and protected-storage custody at the canonical boundary',async()=>{
+  const cases=[];
+  for(const inline of [true,false]){
+    const f=fixture({allowObservationWrite:true,snapshot:inline?{html}:{}});
+    const r=await f.intake({dry_run:false,source_vehicle_event_id:eventId});assert.equal(r.status,200);
+    assert.equal(f.writes[0].extraction_metadata.source_snapshot_context.inline_body_present,inline);
+    assert.equal(f.writes[0].structured_data.source_sale_receipt.body_source,inline?'inline':'protected_storage');
+    cases.push({input:f.writes[0],episode:f.episode,snapshot:f.snapshot,synthetic_html:html});
+  }
+  // Optional private artifact for the disposable PG17 guard cross-check. Never
+  // captures live rows or performs a production connection.
+  if(process.env.CURRENT_SALE_WRITER_FIXTURE_OUTPUT)writeFileSync(process.env.CURRENT_SALE_WRITER_FIXTURE_OUTPUT,JSON.stringify(cases,null,2));
 });

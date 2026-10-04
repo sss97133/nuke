@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase';
 import type { DailyReceipt, DaySessionInfo } from './hooks/useBuildLog';
 import DayCard from './DayCard';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
 
 interface DayPageVehicle {
   id: string;
@@ -86,8 +87,8 @@ const DayPage: React.FC = () => {
         supabase
           .from('vehicle_observations')
           .select(`
-            id, kind, observed_at, ingested_at, source_url,
-            confidence, confidence_score, content_text, structured_data,
+            id, kind, observed_at, ingested_at,
+            confidence, confidence_score, structured_data,
             observation_sources!left(display_name, slug)
           `)
           .eq('vehicle_id', vehicleId)
@@ -284,6 +285,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
   return (
     <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
       {observations.map((obs, idx) => {
+        const visibleData = publicObservationData(obs.structured_data);
         const isOpen = !!expanded[obs.id];
         const time = obs.observed_at
           ? new Date(obs.observed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -297,7 +299,8 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
         const sd = (obs.structured_data || {}) as Record<string, unknown>;
         const dateLowConf =
           sd.observed_at_confidence === 'low' || sd.observed_at_source === 'file_upload_timestamp_ms';
-        const scannedAt = typeof sd.observed_at_original === 'string' ? (sd.observed_at_original as string) : null;
+        const scannedAt = typeof sd.observed_at_original === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(sd.observed_at_original)
+          ? sd.observed_at_original : null;
 
         return (
           <div
@@ -362,14 +365,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                   whiteSpace: isOpen ? 'normal' : 'nowrap',
                 }}
               >
-                {obs.content_text || (() => {
-                  const sd = obs.structured_data;
-                  if (sd && typeof sd === 'object') {
-                    const summary = sd.label || sd.value || sd.title || sd.summary || sd.wire_id || sd.property_key;
-                    if (summary) return String(summary);
-                  }
-                  return '(no content_text)';
-                })()}
+                {obs.kind.replace(/_/g, ' ')} observation
               </span>
               <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary, #666)' }}>
                 {obs.source_slug || obs.source_name || '—'}
@@ -388,6 +384,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
 
             {isOpen && (
               <div style={{ padding: '6px 12px 10px', fontSize: 10, fontFamily: 'Arial, sans-serif' }}>
+                <p>{OBSERVATION_PRIVACY_NOTICE}</p>
                 {(scannedAt || dateLowConf) && (
                   <div
                     style={{
@@ -413,10 +410,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                   // a file (receipt scan, photo, document image). Falls back to a
                   // clickable URL for non-image sources (web pages, archives).
                   const sd = obs.structured_data as Record<string, unknown> | null;
-                  const candidate =
-                    obs.source_url ||
-                    (sd && typeof sd.file_url === 'string' ? (sd.file_url as string) : '') ||
-                    (sd && typeof sd.image_url === 'string' ? (sd.image_url as string) : '');
+                  const candidate = publicObservationArtifact();
                   if (!candidate) return null;
                   const isImage = /\.(jpe?g|png|webp|gif|heic|tiff?)(\?.*)?$/i.test(candidate);
                   if (isImage) {
@@ -491,7 +485,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                     </div>
                   );
                 })()}
-                {obs.structured_data && Object.keys(obs.structured_data).length > 0 && (
+                {Object.keys(visibleData).length > 0 && (
                   <div>
                     <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
                       Structured Data
@@ -511,7 +505,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                         overflow: 'auto',
                       }}
                     >
-                      {JSON.stringify(obs.structured_data, null, 2)}
+                      {JSON.stringify(visibleData, null, 2)}
                     </pre>
                   </div>
                 )}

@@ -88,6 +88,7 @@ Updated: 2026-03-27
 ### Valuation / Nuke Estimate
 - **Dated source-sale calculators**: `nuke_frontend/src/lib/dealRead/batComps.ts` — existing `comparePriceToSourceSales`; additive `selectSourceSalePopulation` retains episode candidates, qualified captures, explicit relevance and repeat-sale observations. V2 is not yet wired to `/valuation`.
 - **Contracts**: `nuke_frontend/src/lib/dealRead/batComps.test.ts`; ENCYCLOPEDIA Section 5, "Vehicle sale-event population and explicit relevance".
+- **Qualified source evidence view**: `nuke_frontend/src/pages/Valuation.tsx` and its DOM tests — full v1 source-lot receipt with display paging, sanitized ancestry, exact-source/vehicle navigation and explicit optional-year membership scope; no earlier-resale reader or v2 population promotion.
 - **Private population assay**: `scripts/discovery/sale-event-candidates.sql` retains explicitly supplied parents' native episode candidates and bounded protected headers; `scripts/assay-sale-population.mjs` audits saved inputs offline. Neither qualifies native prices, admits historical evidence, installs a DB reader or changes `/valuation`.
 - **Column**: `vehicles.nuke_estimate`
 - **Compute**: `supabase/functions/compute-vehicle-valuation/index.ts`

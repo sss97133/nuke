@@ -223,6 +223,12 @@ jobs:
         run: createdb dm_refinement_sale_event_candidates_ci
       - name: Verify earlier resales, episode identity and candidate boundaries
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_event_candidates_ci -f scripts/discovery/sale-event-candidates-test.sql
+      - name: Setup Node.js for source-episode concurrency controls
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify nullable episode ancestry, source custody and two-session races
+        run: node scripts/discovery/sale-episode-source-integrity-test.mjs
 
   vitest:
     runs-on: ubuntu-latest
