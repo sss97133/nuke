@@ -30,6 +30,8 @@ import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
 import { observationContentHash } from "../_shared/observationContentHash.ts";
+import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
+import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +39,9 @@ const corsHeaders = {
 };
 
 interface ObservationInput {
+  mode?: string;
+  snapshot_id?: string;
+  dry_run?: boolean;
   source_slug: string;
   kind: string;
   observed_at: string;
@@ -106,6 +111,59 @@ interface ObservationInput {
  * Every other write here needs the service key or a signed-in user (see _shared/writeGuard.ts).
  */
 const SHARE_VERDICTS_PER_HOUR = 20;
+const ARCHIVED_SALE_METHOD = "protected_archived_sale_observation_v1";
+
+/** Derive protected sale testimony here, never from caller-supplied values.
+ * This is the canonical intake; database ingested_at is deliberately omitted.
+ */
+async function deriveArchivedSale(supabase: any, selectors: ObservationInput) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof selectors.vehicle_id !== "string" || !uuid.test(selectors.vehicle_id)) return { ok: false as const, reason: "invalid_vehicle_locator" };
+  const vehicleId = selectors.vehicle_id.toLowerCase();
+  const { data: parent, error: parentError } = await supabase.from("vehicles")
+    .select("id,is_public,deleted_at,listing_kind,origin_metadata").eq("id",vehicleId).maybeSingle();
+  if (parentError) return { ok: false as const, reason: "parent_read_failed" };
+  if (!parent || parent.is_public !== true || parent.deleted_at !== null || parent.listing_kind === "non_vehicle_item") {
+    return { ok: false as const, reason: "parent_not_public_real_vehicle" };
+  }
+  const { data: facts, error } = await supabase.rpc("vehicle_price_facts", { p_vehicle_ids: [vehicleId] });
+  if (error) return { ok: false as const, reason: "current_sale_read_failed" };
+  const fact = facts?.find((f: any) => f.vehicle_id === vehicleId);
+  if (!fact || fact.price_kind !== "sold" || !fact.sold_basis || fact.outcome !== "sold"
+    || !Number.isFinite(Number(fact.sold_amount)) || Number(fact.sold_amount) <= 0 || !fact.sold_on || !fact.source_url) {
+    return { ok: false as const, reason: "current_sourced_sale_unknown" };
+  }
+  const locator = selectors.snapshot_id ?? parent.origin_metadata?.bat_snapshot_parsed?.snapshot_id;
+  if (typeof locator !== "string" || !uuid.test(locator)) return { ok: false as const, reason: "capture_locator_unknown" };
+  const capture = await readPinnedArchivedPage({ snapshotId: locator.toLowerCase(), vehicleId, sourceUrl: fact.source_url }, { supabase });
+  if (!capture.ok) return capture;
+  const sale = parseQualifiedBaTSale(capture.html);
+  if (!sale.ok) return sale;
+  if (sale.amount !== Number(fact.sold_amount) || sale.eventDay !== fact.sold_on) return { ok: false as const, reason: "source_sale_conflict" };
+  if (Date.parse(capture.snapshot.fetchedAt) < Date.parse(sale.eventDay + "T00:00:00Z")) return { ok: false as const, reason: "capture_precedes_sale" };
+  const receipt = {
+    method: ARCHIVED_SALE_METHOD, verification_basis: "producer_attested_archived_hash_parser",
+    snapshot_id: capture.snapshot.id, vehicle_id: vehicleId, source_url: capture.snapshot.sourceUrl,
+    source_sha256: capture.snapshot.sourceSha256, body_source: capture.snapshot.bodySource, byte_length: capture.snapshot.byteLength,
+    parser: sale.parser, amount: sale.amount, currency: sale.currency, outcome: "sold", event_day: sale.eventDay, event_grain: "date",
+    price_basis: "published_bid_excluding_fees", price_basis_rule: "bat_published_result_fee_separate_v1",
+    price_basis_source: "https://bringatrailer.com/policies/", captured_at: capture.snapshot.fetchedAt,
+    source_ingested_at: capture.snapshot.ingestedAt, original_parsed_at: capture.snapshot.parsedAt, source_known_at: capture.snapshot.sourceKnownAt,
+  };
+  const input: ObservationInput = {
+    source_slug: "bat", kind: "sale_result", vehicle_id: vehicleId,
+    // Date grain is explicit; midnight is not an asserted exact closing time.
+    observed_at: sale.eventDay + "T00:00:00.000Z", source_url: capture.snapshot.sourceUrl,
+    source_identifier: `archived-sale:${capture.snapshot.id}:${sale.parser}`,
+    content_text: `Published sold result: ${sale.currency} ${sale.amount} on ${sale.eventDay} (date grain; fees excluded).`,
+    // No registered extractor UUID is established for this deterministic method.
+    structured_data: { source_sale_receipt: receipt },
+    extraction_method: ARCHIVED_SALE_METHOD, raw_source_ref: `listing_page_snapshots:${capture.snapshot.id}`,
+    extraction_metadata: { producer_qualified_at: new Date().toISOString(), clock_basis: "producer_verification_attempt" },
+    defer_analysis: true,
+  };
+  return { ok: true as const, input, receipt };
+}
 
 // deno-lint-ignore no-explicit-any
 async function allowShareVerdict(supabase: any, req: Request, input: ObservationInput): Promise<boolean> {
@@ -139,7 +197,47 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const input: ObservationInput = await req.json();
+    let input: ObservationInput = await req.json();
+    let archivedSale: Awaited<ReturnType<typeof deriveArchivedSale>> | undefined;
+    if (input.mode === "source_sale_qualification") {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Protected sale qualification requires a service writer" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const dryRun = input.dry_run !== false;
+      archivedSale = await deriveArchivedSale(supabase,input);
+      if (!archivedSale.ok) return new Response(JSON.stringify({ success: false, reason: archivedSale.reason }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (dryRun) return new Response(JSON.stringify({ success: true, dry_run: true, status: "qualified_preview",
+        vehicle_id: archivedSale.input.vehicle_id, receipt: archivedSale.receipt, derived_ingested_at: null,
+        availability_known_at: null, model_calls: 0, writes: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      input = archivedSale.input;
+    } else if (input.extraction_method === ARCHIVED_SALE_METHOD || input.extractor_id === ARCHIVED_SALE_METHOD
+      || (input.structured_data?.source_sale_receipt as Record<string,unknown> | undefined)?.method === ARCHIVED_SALE_METHOD) {
+      return new Response(JSON.stringify({ error: "Protected sale receipts must be derived through source_sale_qualification" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const protectedReply = (row: any, duplicate: boolean) => {
+      if (!archivedSale?.ok) return null;
+      const saved = row?.structured_data?.source_sale_receipt;
+      const exactTuple = saved && Object.entries(archivedSale.receipt).every(([key,value]) => saved[key] === value);
+      if (!row?.id || row.vehicle_id !== input.vehicle_id || row.source_snapshot_id !== archivedSale.receipt.snapshot_id || !Number.isFinite(Date.parse(row.ingested_at)) || !exactTuple
+        || row.kind !== "sale_result" || row.is_superseded !== false || row.source_id !== source.id
+        || row.extraction_method !== ARCHIVED_SALE_METHOD || row.extractor_id !== null
+        || row.raw_source_ref !== input.raw_source_ref || row.source_identifier !== input.source_identifier
+        || row.source_url !== input.source_url || Date.parse(row.observed_at) !== Date.parse(input.observed_at)) {
+        return new Response(JSON.stringify({ error: "Persisted protected sale receipt unavailable" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ success: true, dry_run: false, duplicate, observation_id: row.id,
+        vehicle_id: input.vehicle_id, receipt: saved, derived_ingested_at: row.ingested_at,
+        availability_known_at: row.ingested_at, model_calls: 0, writes: duplicate ? 0 : 1 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
 
     // Validate required fields
     if (!input.source_slug || !input.kind || !input.observed_at) {
@@ -246,11 +344,13 @@ Deno.serve(async (req) => {
     // Check for duplicate
     const { data: existing } = await supabase
       .from("vehicle_observations")
-      .select("id")
+      .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id")
       .eq("content_hash", contentHash)
       .maybeSingle();
 
     if (existing) {
+      const protectedResponse = protectedReply(existing,true);
+      if (protectedResponse) return protectedResponse;
       return new Response(JSON.stringify({
         success: true,
         duplicate: true,
@@ -410,6 +510,9 @@ Deno.serve(async (req) => {
       .from("vehicle_observations")
       .insert({
         vehicle_id: vehicleId,
+        // Only freshly verified protected admission sets the typed source key.
+        // Generic input, including caller-provided source_snapshot_id, is ignored.
+        ...(archivedSale?.ok ? { source_snapshot_id: archivedSale.receipt.snapshot_id } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,
         vehicle_match_signals: Object.keys(vehicleMatchSignals).length > 0 ? vehicleMatchSignals : null,
         // Polymorphic subject (engineering-manual/20). Conditional spread: with no
@@ -456,10 +559,14 @@ Deno.serve(async (req) => {
       // unique content-hash winner is a replay; other constraint failures fail.
       if (insertError.code === "23505") {
         const { data: winner } = await supabase.from("vehicle_observations")
-          .select("id").eq("content_hash", contentHash).maybeSingle();
-        if (winner) return new Response(JSON.stringify({ success: true, duplicate: true,
+            .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id").eq("content_hash", contentHash).maybeSingle();
+        if (winner) {
+          const protectedResponse = protectedReply(winner,true);
+          if (protectedResponse) return protectedResponse;
+          return new Response(JSON.stringify({ success: true, duplicate: true,
           observation_id: winner.id }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
       }
       console.error("Insert error:", insertError);
       return new Response(JSON.stringify({
@@ -467,6 +574,9 @@ Deno.serve(async (req) => {
         details: insertError.message
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    const protectedResponse = protectedReply(observation,false);
+    if (protectedResponse) return protectedResponse;
 
     // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
     if (vehicleId && input.kind && input.defer_analysis !== true) {

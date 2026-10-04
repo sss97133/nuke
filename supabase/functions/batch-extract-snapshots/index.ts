@@ -19,8 +19,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
-import { attachPinnedArchivedSaleQualification, readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
-import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -530,9 +528,8 @@ Deno.serve(async (req) => {
   }
 });
 
-/** Extend the registered archived extractor with a bounded, hash-verified
- * derived receipt. This does not attest currency/date from vehicle metadata.
- * The current price reader must agree; disagreements are held for source review.
+/** Explicit bounded selection only. The canonical intake derives the raw sale
+ * tuple and DB ingestion clock; this producer never writes snapshot metadata.
  */
 async function qualifySourceSales(supabase: any, body: any): Promise<Response> {
   const ids = Array.isArray(body.vehicle_ids)
@@ -545,60 +542,28 @@ async function qualifySourceSales(supabase: any, body: any): Promise<Response> {
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   const dryRun = body.dry_run !== false;
-  const { data: parents, error: parentError } = await supabase.from("vehicles")
-    .select("id,origin_metadata").in("id",ids).eq("is_public",true).is("deleted_at",null)
-    .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item");
-  if (parentError) throw new Error("Public source parents unavailable");
-  const publicIds = (parents ?? []).map((p: any) => p.id);
-  const { data: facts, error: factError } = publicIds.length
-    ? await supabase.rpc("vehicle_price_facts", { p_vehicle_ids: publicIds }) : { data: [], error: null };
-  if (factError) throw new Error("Canonical price facts unavailable");
-  const parentMap = new Map((parents ?? []).map((p: any) => [p.id,p]));
-  const factMap = new Map((facts ?? []).map((p: any) => [p.vehicle_id,p]));
   const results: Record<string, unknown>[] = [];
   for (const id of ids) {
-    const parent: any = parentMap.get(id), fact: any = factMap.get(id);
-    const refuse = (reason: string, snapshotId?: string) => results.push({ vehicle_id: id, snapshot_id: snapshotId ?? null, status: "refused", reason });
-    if (!parent) { refuse("parent_not_public_real_vehicle"); continue; }
-    if (!fact || fact.price_kind !== "sold" || !fact.sold_basis || fact.outcome !== "sold"
-      || !Number.isFinite(Number(fact.sold_amount)) || Number(fact.sold_amount) <= 0 || !fact.sold_on || !fact.source_url) {
-      refuse("current_sourced_sale_unknown"); continue;
+    const { data, error } = await supabase.functions.invoke("ingest-observation", {
+      body: { mode: "source_sale_qualification", vehicle_id: id, dry_run: dryRun },
+    });
+    if (error || data?.success !== true) {
+      let reason = data?.reason ?? "canonical_intake_failed";
+      if (error?.context instanceof Response) {
+        try { reason = (await error.context.clone().json())?.reason ?? reason; } catch { /* explicit intake failure */ }
+      }
+      results.push({ vehicle_id: id, status: "refused", reason });
+      continue;
     }
-    const snapshotId = parent.origin_metadata?.bat_snapshot_parsed?.snapshot_id;
-    if (typeof snapshotId !== "string" || !uuid.test(snapshotId)) { refuse("capture_locator_unknown"); continue; }
-    const input = await readPinnedArchivedPage({ snapshotId, vehicleId: id, sourceUrl: fact.source_url }, { supabase });
-    if (!input.ok) { refuse(input.reason,snapshotId); continue; }
-    if (Object.prototype.hasOwnProperty.call(input.protectedMetadata,"source_sale_qualification_v1")) {
-      refuse("existing_qualification_preserved",snapshotId); continue;
-    }
-    const sale = parseQualifiedBaTSale(input.html);
-    if (!sale.ok) { refuse(sale.reason,snapshotId); continue; }
-    if (sale.amount !== Number(fact.sold_amount) || sale.eventDay !== fact.sold_on) {
-      refuse("source_sale_conflict",snapshotId); continue;
-    }
-    if (Date.parse(input.snapshot.fetchedAt) < Date.parse(sale.eventDay + "T00:00:00Z")) {
-      refuse("capture_precedes_sale",snapshotId); continue;
-    }
-    const qualifiedAt = new Date().toISOString();
-    const receipt = {
-      method: "protected_archived_sale_qualification_v1", verification_basis: "producer_attested_archived_hash_parser",
-      snapshot_id: snapshotId, vehicle_id: id, source_url: input.snapshot.sourceUrl,
-      source_sha256: input.snapshot.sourceSha256, body_source: input.snapshot.bodySource, byte_length: input.snapshot.byteLength,
-      parser: sale.parser, amount: sale.amount, currency: sale.currency, outcome: sale.outcome,
-      event_day: sale.eventDay, event_grain: "date", price_basis: "published_bid_excluding_fees",
-      price_basis_rule: "bat_published_result_fee_separate_v1", price_basis_source: "https://bringatrailer.com/policies/",
-      captured_at: input.snapshot.fetchedAt, source_ingested_at: input.snapshot.ingestedAt,
-      original_parsed_at: input.snapshot.parsedAt, source_known_at: input.snapshot.sourceKnownAt,
-      qualified_at: qualifiedAt, knowledge_at: new Date(Math.max(Date.parse(qualifiedAt),Date.parse(input.snapshot.knownAt))).toISOString(),
-    };
-    if (dryRun) { results.push({ vehicle_id: id, snapshot_id: snapshotId, status: "qualified_preview", receipt }); continue; }
-    const saved = await attachPinnedArchivedSaleQualification(input,receipt,{ supabase });
-    if (!saved.ok) { refuse(saved.reason,snapshotId); continue; }
-    results.push({ vehicle_id: id, snapshot_id: snapshotId, status: "stored", receipt });
+    results.push({ vehicle_id: id, snapshot_id: data.receipt?.snapshot_id,
+      status: dryRun ? "qualified_preview" : "stored", receipt: data.receipt,
+      observation_id: data.observation_id ?? null, derived_ingested_at: data.derived_ingested_at ?? null,
+      duplicate: data.duplicate ?? false, writes: data.writes });
   }
   return new Response(JSON.stringify({ success: true, mode: "source_sale_qualification", dry_run: dryRun, requested: ids.length,
     qualified: results.filter(r => r.status === "qualified_preview" || r.status === "stored").length,
-    refused: results.filter(r => r.status === "refused").length, results }),
+    refused: results.filter(r => r.status === "refused").length,
+    writes: results.reduce((total,r) => total + Number(r.writes ?? 0),0), model_calls: 0, results }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

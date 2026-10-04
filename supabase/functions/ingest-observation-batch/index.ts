@@ -133,6 +133,13 @@ Deno.serve(async (req) => {
       }), { status: 400, headers });
     }
 
+    // Generic batches forward using a service key. Never let a signed-in
+    // caller enter protected sale admission through that delegated credential.
+    if (body.observations.some((obs: ObservationInput & { mode?: unknown }) => obs?.mode === "source_sale_qualification")) {
+      return new Response(JSON.stringify({ error: "Protected sale qualification requires direct service-only intake" }),
+        { status: 403, headers });
+    }
+
     const opts = body.options || {};
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
