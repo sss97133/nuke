@@ -1,4 +1,5 @@
 import { extractDescription } from "../_shared/batParser.ts";
+import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 
 // Input resolution for the existing description miner. Never reconstruct missing
 // text from a vehicle summary or silently replace a newer source with older prose.
@@ -122,8 +123,17 @@ export async function loadDescriptionInput(
     const [textField, text] = candidates[0] || [];
     // Old BaT rows contain only a title/marker (often 16 chars); that is not prose.
     if (typeof text === "string" && text.trim().length >= 100) {
+      const captureBased = data.observation_time_basis === "source_capture";
+      const captureClock = observationClockMicroseconds(data.source_captured_at);
+      if (captureBased && (data.source_event_time_status !== "unknown" ||
+          captureClock === null || captureClock !== observationClockMicroseconds(source.observed_at))) {
+        throw new Error("Listing capture clock inconsistent; mining refused");
+      }
       return requireCompleteInput({ text, sourceRef: `vehicle_observations:${source.id}`,
-        sourceUrl: source.source_url, observedAt: source.observed_at, ingestedAt: source.ingested_at,
+        sourceUrl: source.source_url, observedAt: captureBased ? null : source.observed_at,
+        ...(captureBased ? { capturedAt: data.source_captured_at,
+          ...(/^[0-9a-f]{64}$/i.test(data.source_capture_sha256 || '')
+            ? { captureSha256: data.source_capture_sha256 } : {}) } : {}), ingestedAt: source.ingested_at,
         textField, custody: "sanctioned_observation" });
     }
   }

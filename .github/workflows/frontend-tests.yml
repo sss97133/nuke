@@ -223,7 +223,7 @@ jobs:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
       - name: Verify preserved description input and sanctioned intake
-        run: node --test scripts/test-description-source-input.mjs
+        run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
@@ -262,3 +262,7 @@ jobs:
         run: createdb dm_fold_listing
       - name: Verify event queue fold and public evidence reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listing -f supabase/sql/test_listing_observation_consensus.sql
+      - name: Create disposable full-description reader database
+        run: createdb dm_fold_description
+      - name: Verify full native listing prose and qualified public reader
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_description -f supabase/sql/test_vehicle_listing_description_reader.sql

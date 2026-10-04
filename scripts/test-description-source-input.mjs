@@ -172,6 +172,7 @@ function fixture(options = {}) {
         };
         if (specifier === './descriptionInput.ts') return load('input');
         if (specifier === '../_shared/batParser.ts') return load('bat');
+        if (specifier === '../_shared/observationContentHash.ts') return load('hash');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path is used') };
         assert.fail(`Unexpected import ${specifier}`);
@@ -508,4 +509,35 @@ test('an all-refused batch reports failure without indefinite self-continuation'
   const { result } = await f.run({ batch_size: 1, continue: true });
   assert.equal(result.errors, 1);
   assert.equal(result.continued, false);
+});
+
+test('native forward capture retains unknown original event clock for later inferred reports', async () => {
+  const f=fixture({observations:[{...observation,observed_at:captureTime,structured_data:{
+    observation_time_basis:'source_capture',source_event_time_status:'unknown',source_captured_at:captureTime}}]});
+  const {result}=await f.run({vehicle_id:vehicleId});assert.equal(result.success,true);
+  const report=f.intake.find(row=>row.kind==='specification');
+  assert.equal(report.extraction_metadata.source_observed_at,null);
+  assert.equal(report.extraction_metadata.source_captured_at,captureTime);
+  assert.equal(report.extraction_metadata.source_event_time_status,'unknown');
+  assert.equal(report.extraction_metadata.observation_time_basis,'source_capture');
+});
+test('inconsistent native capture clocks cannot silently become inferred source-event testimony',async()=>{
+  const f=fixture({observations:[{...observation,structured_data:{observation_time_basis:'source_capture',
+    source_event_time_status:'unknown',source_captured_at:captureTime}}]});
+  const {result}=await f.run({vehicle_id:vehicleId});assert.match(result.error_details[0],/capture clock inconsistent/);
+  assert.equal(f.intake.length,0);assert.equal(f.modelPrompts.length,0);
+});
+
+test('sub-millisecond drift in a native capture cannot pass source ancestry',async()=>{
+ const f=fixture({observations:[{...observation,observed_at:'2020-01-01T00:00:00.123456Z',structured_data:{
+ observation_time_basis:'source_capture',source_event_time_status:'unknown',source_captured_at:'2020-01-01T00:00:00.123457Z'}}]});
+ const {result}=await f.run({vehicle_id:vehicleId});assert.match(result.error_details[0],/capture clock inconsistent/);assert.equal(f.intake.length,0);
+});
+test('native capture comparison accepts equivalent explicit zones without changing microsecond bytes',async()=>{
+ const capturedAt='2020-01-01 00:00:00.123456+00';
+ const f=fixture({observations:[{...observation,observed_at:'2020-01-01T01:00:00.123456+01:00',structured_data:{
+ observation_time_basis:'source_capture',source_event_time_status:'unknown',source_captured_at:capturedAt,source_capture_sha256:'a'.repeat(64)}}]});
+ const {result}=await f.run({vehicle_id:vehicleId});assert.equal(result.success,true);
+ const report=f.intake.find(row=>row.kind==='specification');assert.equal(report.extraction_metadata.source_captured_at,capturedAt);
+ assert.equal(report.extraction_metadata.source_capture_sha256,'a'.repeat(64));
 });

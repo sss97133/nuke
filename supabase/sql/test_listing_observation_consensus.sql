@@ -89,6 +89,12 @@ CREATE TRIGGER test_count_enqueue AFTER INSERT OR UPDATE OF vehicle_id OR DELETE
 ON public.vehicle_observations FOR EACH ROW EXECUTE FUNCTION public.test_count_enqueue();
 
 \ir ../migrations/20261004031800_listing_observation_consensus_reader.sql
+-- The description contract runs every existing report/role/queue assertion
+-- against the replacement reader too, rather than only its prior definition.
+\if :{?description_reader_contract}
+ALTER TABLE public.vehicles ADD COLUMN description text, ADD COLUMN description_source text;
+\ir ../migrations/20261004074612_vehicle_listing_description_reader.sql
+\endif
 BEGIN;
 
 INSERT INTO public.vehicles(id,is_public,color,owner_id) VALUES
