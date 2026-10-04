@@ -752,14 +752,25 @@ struct ZIPActivityFold {
         linkedVehicleCount = Set(matched.map(\.vehicle_id)).count
         let episodes = Dictionary(grouping: matched, by: { ZIPListingRow.sourceKey($0.bat_listing_url)! })
         listingCount = episodes.count
+        var identitiesByHandle: [String: Set<UUID>] = [:]
+        for row in matched {
+            if let handle = row.seller_username?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+               !handle.isEmpty, let identity = row.seller_external_identity_id {
+                identitiesByHandle[handle, default: []].insert(identity)
+            }
+        }
         var bySeller: [String: [ZIPListingRow]] = [:]
         var names: [String: String] = [:]; var ambiguous = 0
         for rows in episodes.values {
             let handles = Set(rows.compactMap { $0.seller_username?.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }.map { $0.lowercased() })
             let identities = Set(rows.compactMap(\.seller_external_identity_id))
-            guard handles.count == 1, identities.count <= 1, let handle = handles.first else { ambiguous += 1; continue }
-            let sellerKey = identities.first.map { "bat:\($0.uuidString.lowercased())" } ?? "bat:\(handle)"
+            guard handles.count == 1, identities.count <= 1, Set(rows.map(\.vehicle_id)).count == 1,
+                  let handle = handles.first else { ambiguous += 1; continue }
+            let knownIdentities = identitiesByHandle[handle] ?? []
+            guard !identities.isEmpty || knownIdentities.count <= 1 else { ambiguous += 1; continue }
+            let identity = identities.first ?? knownIdentities.first
+            let sellerKey = identity.map { "bat:\($0.uuidString.lowercased())" } ?? "bat:\(handle)"
             // Stable representative of the episode; conflicting outcomes are not
             // silently upgraded into a completed sale or a revenue measurement.
             let row = rows.sorted { $0.id.uuidString < $1.id.uuidString }[0]
@@ -795,7 +806,7 @@ struct ZIPActivityView: View {
                 if !complete { Text("The area is still loading; these counts are provisional.").font(.caption).foregroundStyle(.secondary) }
             }
             if let fold {
-                Section("Seller activity") {
+                Section("Bring a Trailer sellers") {
                     if fold.sellers.isEmpty {
                         Text(loading ? "Reading seller relationships…" : "No source-matched sellers recorded for this cohort.")
                             .foregroundStyle(.secondary)
@@ -814,7 +825,7 @@ struct ZIPActivityView: View {
                             LabeledContent(seller.name, value: "\(seller.listings.count) source listings")
                         }
                     }
-                    Text("Source-matched sellers for \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Ranked by represented listings.")
+                    Text("Source-matched BaT records for \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Ranked by represented listings.")
                         .font(.caption).foregroundStyle(.secondary)
                     if fold.ambiguousSellerCount > 0 {
                         Text("\(fold.ambiguousSellerCount) source episodes have missing or conflicting seller identity.")
@@ -893,12 +904,16 @@ struct ZIPActivityView: View {
         guard !Task.isCancelled else { return }
         fold = initial
         do {
-            async let listingRead: [ZIPListingRow] = readListings()
+            async let listingRead: [ZIPListingRow] = readListings(table: "bat_listings",
+                selection: "id,vehicle_id,bat_listing_url,seller_username,seller_external_identity_id")
+            async let auctionRead: [ZIPListingRow] = readListings(table: "auction_events",
+                selection: "id,vehicle_id,bat_listing_url:source_url,seller_username:seller_name")
             async let businessRead: [ZIPBusinessRow] = readBusinesses()
-            let result = try await (listingRead, businessRead)
-            let calculated = await Task.detached { ZIPActivityFold(group: group, listings: result.0) }.value
+            let result = try await (listingRead, auctionRead, businessRead)
+            let sourceListings = result.0 + result.1
+            let calculated = await Task.detached { ZIPActivityFold(group: group, listings: sourceListings) }.value
             try Task.checkCancellation()
-            listings = result.0; businesses = result.1; fold = calculated
+            listings = sourceListings; businesses = result.2; fold = calculated
             NSLog("NukeCapture ZIP %@: %d source listings, %d seller groups, %d public business links",
                   group.id, calculated.listingCount, calculated.sellers.count, publicBusinessLinks.count)
             #if DEBUG
@@ -914,15 +929,15 @@ struct ZIPActivityView: View {
         loading = false
     }
 
-    private func readListings() async throws -> [ZIPListingRow] {
+    private func readListings(table: String, selection: String) async throws -> [ZIPListingRow] {
         var result: [ZIPListingRow] = []
         let ids = group.vehicles.map { $0.id.uuidString.lowercased() }.sorted()
         for offset in stride(from: 0, to: ids.count, by: 80) {
             var cursor: String?
             while true {
                 try Task.checkCancellation()
-                var request = SupabaseService.client.from("bat_listings")
-                    .select("id,vehicle_id,bat_listing_url,seller_username,seller_external_identity_id")
+                var request = SupabaseService.client.from(table)
+                    .select(selection)
                     .in("vehicle_id", values: Array(ids[offset..<min(offset + 80, ids.count)]))
                 if let cursor { request = request.gt("id", value: cursor) }
                 let page: [ZIPListingRow] = try await request.order("id", ascending: true).limit(500).execute().value
