@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { comparePriceToSourceSales, type DatedSourceSale } from '../lib/dealRead/batComps';
 import '../styles/unified-design-system.css';
+import SourceSaleDistribution from '../components/market/SourceSaleDistribution';
 
 // Top 25 BaT makes by sold_count from mv_treemap_by_brand on 2026-05-26.
 // Powers the <datalist> autocomplete + benchmark hints.
@@ -97,6 +98,7 @@ export default function Valuation() {
   const [error, setError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
   const latestRequest = useRef(0);
+  const filters = useRef<HTMLDetailsElement>(null);
   const result = lookup?.result ?? null;
   const subjectVehicleId = params.get('vehicle_id') || null;
   const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventBefore,currency,subjectVehicleId]);
@@ -169,7 +171,7 @@ export default function Valuation() {
       const parts = [q.year, q.make, q.model].filter(Boolean).join(' ');
       document.title = `${parts} sale-price evidence – Nuke`;
     } else {
-      document.title = 'Vehicle Valuation – Nuke';
+      document.title = 'Recorded sale prices – Nuke';
     }
   }, [result]);
 
@@ -180,6 +182,9 @@ export default function Valuation() {
 
   const stats = result?.stats;
   const receipt = result?.receipt;
+  const recordedLabels = useMemo(() => Object.fromEntries((result?.comparables ?? []).map(c => [
+    c.bat_listing_url, c.bat_listing_title || [c.year, c.make, c.model].filter(Boolean).join(' '),
+  ])), [result]);
   const outputCurrency = receipt?.currency || currency;
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
@@ -196,7 +201,7 @@ export default function Valuation() {
     : '';
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '20px 12px 60px', color: 'var(--text)' }}>
+    <div className="sale-price-page" style={{ maxWidth: 960, margin: '0 auto', padding: '20px 12px 60px', color: 'var(--text)' }}>
       {/* HEADER */}
       <div style={{ marginBottom: 16 }}>
         <div style={{
@@ -205,7 +210,7 @@ export default function Valuation() {
           letterSpacing: '1.5px',
           textTransform: 'uppercase',
         }}>
-          Vehicle Valuation
+          Recorded sale prices
         </div>
         <div style={{
           fontSize: FS.label,
@@ -215,8 +220,26 @@ export default function Valuation() {
         }}>
           Dated BaT sale prices · cohort evidence · candidate bid percentile
         </div>
+        {receipt && <button type="button" style={{ border: 0, background: 'transparent', color: 'var(--text)', padding: '6px 0', fontSize: FS.body, textDecoration: 'underline', cursor: 'pointer' }} onClick={() => {
+          if (!filters.current) return;
+          filters.current.open = true;
+          filters.current.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          filters.current.querySelector('input')?.focus({ preventScroll: true });
+        }}>Change cohort / sales window ↓</button>}
       </div>
 
+      {receipt && stats && !changedFilters && <SourceSaleDistribution
+        sales={receipt.eligible} currency={receipt.currency} label={receipt.cohort.label}
+        basis={receipt.cohort.basis} memberRows={receipt.coverage.member_rows} minimumSales={receipt.minimum_sales}
+        yearRestricted={result?.query.year != null} modelRestricted={result?.query.model != null}
+        eventFrom={receipt.event_from} eventBefore={receipt.event_before}
+        evidenceAsOf={receipt.evidence_as_of} knowledgeMode={receipt.knowledge_mode}
+        recordedLabels={recordedLabels}
+        summary={{ median: stats.median, p10: stats.p10, p90: stats.p90 }} comparison={comparison}
+        candidateInput={<Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />} />}
+
+      <details ref={filters} open={!receipt || changedFilters} style={{ marginBottom: 12, scrollMarginTop: 90 }}>
+      <summary style={{ fontSize: FS.body, cursor: 'pointer', marginBottom: 6 }}>Change cohort, currency or sales window</summary>
       {/* SEARCH FORM */}
       <form onSubmit={onSubmit} style={{
         border: '2px solid var(--text)',
@@ -234,7 +257,7 @@ export default function Valuation() {
         <Field label="Year" value={year} onChange={setYear} placeholder="1989" inputMode="numeric" minWidth={80} />
         <Field label="Make *" value={make} onChange={setMake} placeholder="Ferrari" required minWidth={150} list="valuation-makes" />
         <Field label="Model" value={model} onChange={setModel} placeholder="328" minWidth={150} />
-        <Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />
+        {(!receipt || changedFilters) && <Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />}
         <Field label="Sales before (UTC date)" value={eventBefore} onChange={setEventBefore} placeholder="YYYY-MM-DD" minWidth={120} />
         <label style={{ fontSize: FS.label }}>CURRENCY
           <select aria-label="Currency" value={currency} onChange={e => setCurrency(e.target.value)} style={{ display: 'block', border: '2px solid var(--text)', padding: 6 }}>
@@ -262,8 +285,10 @@ export default function Valuation() {
           {loadingThisContext ? 'Looking' : result ? 'Refresh evidence' : 'Compare'}
         </button>
       </form>
-
-      {receipt && <section aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
+      </details>
+      {changedFilters && <p role="status" style={{ fontSize: FS.body }}>Filters changed. Compare again to load matching evidence; the previous receipt remains available below.</p>}
+      {receipt && <details aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
+        <summary>Scope, exclusions and source receipt</summary>
         <strong>{comparison?.percentile == null ? 'Price percentile unavailable' : `${comparison.percentile.toFixed(1)} percentile in recorded sales`}</strong>
         {changedFilters && <div>Compare again to apply the changed cohort, currency, date or vehicle.</div>}
         <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence to include newly admitted source evidence. Save this receipt to keep this calculation.'}</div>
@@ -286,7 +311,7 @@ export default function Valuation() {
             const a = document.createElement('a'); a.href=url; a.download='sale-comparison-receipt.json'; a.click(); URL.revokeObjectURL(url);
           }}>Save this evidence receipt</button>
         </details>
-      </section>}
+      </details>}
 
       {/* ERROR */}
       {error && (
@@ -357,7 +382,8 @@ export default function Valuation() {
       {/* RESULT */}
       {result && stats && stats.sold_count > 0 && (
         <>
-          {/* Subject + hero stats card */}
+          {/* Secondary numeric summary; the graph is the primary analytical surface. */}
+          <details><summary style={{ fontSize: FS.body, marginBottom: 8, cursor: 'pointer' }}>Numerical summary</summary>
           <div style={{
             border: '2px solid var(--text)',
             background: 'var(--surface)',
@@ -411,8 +437,8 @@ export default function Valuation() {
               <StatCell label="Min" value={fmtUsd(stats.min)} mono />
               <StatCell label="Max" value={fmtUsd(stats.max)} mono divider />
               <StatCell label="Avg" value={fmtUsd(stats.avg)} mono divider />
-              <StatCell label="Avg Bids" value={stats.avg_bid_count != null ? String(stats.avg_bid_count) : '—'} divider />
-              <StatCell label="Avg Comments" value={stats.avg_comment_count != null ? String(stats.avg_comment_count) : '—'} divider />
+              {stats.avg_bid_count != null && <StatCell label="Avg Bids" value={String(stats.avg_bid_count)} divider />}
+              {stats.avg_comment_count != null && <StatCell label="Avg Comments" value={String(stats.avg_comment_count)} divider />}
             </div>
 
             {/* Outlier inline note */}
@@ -426,17 +452,21 @@ export default function Valuation() {
                 letterSpacing: '0.3px',
               }}>
                 <span style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.5px' }}>Outlier flagged</span>
-                {' · '}max {fmtUsd(stats.max)} is &gt;5× median. Likely bad data. Trust the median, not the average.
+                {' · '}max {fmtUsd(stats.max)} is &gt;5× median. Inspect the source evidence and vehicle differences behind this amount dispersion; no data error or condition adjustment is established.
               </div>
             )}
           </div>
 
+          </details>
+
           {/* COMPARABLES */}
           {result.comparables.length > 0 && (
+            <details><summary style={{ fontSize: FS.body, margin: '8px 0', cursor: 'pointer' }}>Recent sale summaries · {result.comparables.length}</summary>
             <div style={{
               border: '2px solid var(--text)',
               background: 'var(--surface)',
               marginBottom: 12,
+              overflowX: 'auto',
             }}>
               <div style={{
                 padding: '6px 10px',
@@ -487,6 +517,7 @@ export default function Valuation() {
                 </tbody>
               </table>
             </div>
+            </details>
           )}
 
           {/* Footer note */}
