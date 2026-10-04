@@ -45,6 +45,19 @@ describe('existing minute-refresh activity reader receipt', () => {
 });
 
 describe('actual extraction source clock', () => {
+  it('binds a positive live source bid to its direct or cached page read without changing legacy clocks', () => {
+    expect(sourceReadClock('direct', AS_OF, 1100).source_read).toMatchObject({
+      at: '2026-10-04T12:00:00.000Z', basis: 'direct_fetch', bid_amount_version: 1, bid_amount: 1100, bid_currency: null,
+    });
+    expect(sourceReadClock('snapshot', '2024-01-02T15:14:13Z', 1000).source_read).toMatchObject({
+      at: '2024-01-02T15:14:13.000Z', basis: 'cached_snapshot', bid_amount: 1000,
+    });
+    expect(sourceReadClock('direct', AS_OF).source_read).not.toHaveProperty('bid_amount');
+  });
+  it('leaves missing, zero, invalid amounts and unknown read clocks unproved', () => {
+    for (const bid of [null, 0, -1, Infinity, NaN]) expect(sourceReadClock('direct', AS_OF, bid).source_read.bid_amount).toBeNull();
+    expect(sourceReadClock('snapshot', null, 1100).source_read).toMatchObject({ at: null, basis: 'unknown', bid_amount: null });
+  });
   it('advances repeated direct reads with response clocks', () => {
     expect(sourceReadClock('direct', AS_OF).source_read).toMatchObject({ at: '2026-10-04T12:00:00.000Z', basis: 'direct_fetch' });
     expect(sourceReadClock('direct', '2026-10-04T12:01:00Z').scraped_at).toBe('2026-10-04T12:01:00.000Z');
