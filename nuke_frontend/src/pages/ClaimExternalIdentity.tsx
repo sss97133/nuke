@@ -1,5 +1,6 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import '../styles/unified-design-system.css';
 
 interface IdentityResult {
@@ -32,13 +33,18 @@ const PLATFORMS = [
 const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(PLATFORMS.map(p => [p.key, p.label]));
 
 const ClaimExternalIdentity: React.FC = () => {
+  const { user } = useAuth();
+  const [accountRead, setAccountRead] = React.useState<{
+    userId: string; identities: Array<{ id: string; platform: string; handle: string; profile_url: string | null }>;
+    claims: Array<{ id: string; platform: string; handle: string; external_identity_id: string | null; status: string }>;
+    identityError: boolean; claimError: boolean;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchPlatform, setSearchPlatform] = React.useState<string>('bat');
   const [searchResults, setSearchResults] = React.useState<IdentityResult[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [selectedIdentity, setSelectedIdentity] = React.useState<IdentityResult | null>(null);
   const [claimId, setClaimId] = React.useState<string | null>(null);
-  const [verificationCode, setVerificationCode] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [message, setMessage] = React.useState<string>('');
   const [importStep, setImportStep] = React.useState<'idle' | 'input' | 'submitting' | 'polling' | 'done'>('idle');
@@ -52,6 +58,27 @@ const ClaimExternalIdentity: React.FC = () => {
   const [platformCounts, setPlatformCounts] = React.useState<Record<string, number>>({});
   const logRef = React.useRef<HTMLDivElement>(null);
   const hasLoggedProcessing = React.useRef(false);
+
+  // Use the authenticated account and canonical UUIDs, never a matching handle,
+  // to show existing links. Claim status is separate from a populated link.
+  React.useEffect(() => {
+    if (!user?.id) { setAccountRead(null); return; }
+    let cancelled = false;
+    const userId = user.id;
+    (async () => {
+      const [identities, claims] = await Promise.all([
+        supabase.from('external_identities').select('id, platform, handle, profile_url')
+          .eq('claimed_by_user_id', userId).order('platform').order('handle').limit(100),
+        supabase.from('account_link_claims').select('id, platform, handle, external_identity_id, status')
+          .eq('user_id', userId).order('created_at', { ascending: false }).limit(100),
+      ]);
+      if (!cancelled) setAccountRead({ userId, identities: identities.data || [], claims: claims.data || [],
+        identityError: !!identities.error, claimError: !!claims.error });
+    })().catch(() => {
+      if (!cancelled) setAccountRead({ userId, identities: [], claims: [], identityError: true, claimError: true });
+    });
+    return () => { cancelled = true; };
+  }, [user?.id, claimId]);
 
   const addLog = React.useCallback((text: string, type: 'info' | 'success' | 'dim' = 'info') => {
     setImportLog(prev => [...prev, { time: new Date(), text, type }]);
@@ -222,7 +249,6 @@ const ClaimExternalIdentity: React.FC = () => {
   const selectIdentity = (identity: IdentityResult) => {
     setSelectedIdentity(identity);
     setClaimId(null);
-    setVerificationCode(null);
     setMessage('');
   };
 
@@ -252,8 +278,7 @@ const ClaimExternalIdentity: React.FC = () => {
 
       const claimIdStr = String(data);
       setClaimId(claimIdStr);
-      setVerificationCode(`NUKE-${claimIdStr.slice(0, 8).toUpperCase()}`);
-      setMessage('Claim started. Add the code below to your profile to verify.');
+      setMessage('Claim request saved. Approval is required before this source account is linked.');
     } catch (e: any) {
       console.error('Claim failed:', e);
       setMessage(e?.message || 'Failed to start claim.');
@@ -323,6 +348,37 @@ const ClaimExternalIdentity: React.FC = () => {
           Find your account. Inherit your reputation.
         </div>
       </div>
+
+      {user && accountRead?.userId === user.id && (
+        <div style={{ marginBottom: 'var(--space-4)', fontSize: '12px' }}>
+          {(accountRead.identityError || accountRead.claimError) && (
+            <div role="alert">{accountRead.identityError ? 'Linked accounts could not be loaded.' : 'Claim status could not be loaded.'}</div>
+          )}
+          {accountRead.identities.length > 0 && (
+            <section aria-label="Your linked source accounts" style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>YOUR LINKED SOURCE ACCOUNTS</div>
+              <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>Linked to this signed-in Nuke account. Comments, questions and seller responses can connect through the same source account as bids.</div>
+              {accountRead.identities.map(identity => {
+                const claim = accountRead.claims.find(c => c.external_identity_id === identity.id);
+                const sourceUrl = identity.profile_url && /^https?:\/\//i.test(identity.profile_url) ? identity.profile_url : null;
+                return <div key={identity.id} style={{ marginTop: 'var(--space-2)' }}>
+                  <strong>{PLATFORM_LABELS[identity.platform] || identity.platform}: {identity.handle}</strong>
+                  {sourceUrl && <> · <a href={sourceUrl} target="_blank" rel="noopener noreferrer">Source profile</a></>}
+                  <div style={{ color: 'var(--text-muted)' }}>{accountRead.claimError ? 'Claim status unavailable.' : claim ? `Stored claim status: ${claim.status}.` : 'Source-control proof record unavailable for this existing link.'}</div>
+                </div>;
+              })}
+              {accountRead.identities.length === 100 && <div>Showing the first 100 linked accounts.</div>}
+            </section>
+          )}
+          {accountRead.claims.length > 0 && (
+            <section aria-label="Your source account claim requests" style={{ marginTop: 'var(--space-3)' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700 }}>YOUR CLAIM REQUESTS</div>
+              {accountRead.claims.map(claim => <div key={claim.id}>{PLATFORM_LABELS[claim.platform] || claim.platform}: {claim.handle} · {claim.status}</div>)}
+              {accountRead.claims.length === 100 && <div>Showing the latest 100 requests.</div>}
+            </section>
+          )}
+        </div>
+      )}
 
       {/* Platform cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
@@ -647,7 +703,7 @@ const ClaimExternalIdentity: React.FC = () => {
           {!claimId && (
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-                Start your claim, then verify by adding a code to your profile.
+                Request a link to this source account. The request needs approval before the account is linked.
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <button className="button button-secondary" onClick={() => setSelectedIdentity(null)}>
@@ -660,69 +716,18 @@ const ClaimExternalIdentity: React.FC = () => {
             </div>
           )}
 
-          {/* After claim started - show verification options */}
-          {claimId && verificationCode && (
+          {/* The existing RPC stores a request; it does not verify profile control. */}
+          {claimId && (
             <div>
               <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-                Verify your claim
+                Claim request saved
               </div>
-
-              <div style={{
-                padding: 'var(--space-4)',
-                backgroundColor: 'var(--grey-50)',
-                marginBottom: 'var(--space-3)'
-              }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Option 1: Add this code to your {PLATFORM_LABELS[selectedIdentity.platform] || selectedIdentity.platform} bio
-                </div>
-                <div style={{
-                  padding: 'var(--space-3)',
-                  backgroundColor: 'var(--white)',
-                  border: '2px dashed var(--border-light)',
-                  fontFamily: "'Courier New', monospace",
-                  fontSize: '19px',
-                  textAlign: 'center',
-                  userSelect: 'all',
-                  letterSpacing: '2px'
-                }}>
-                  {verificationCode}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-                  We'll check your profile automatically. Once found, your claim is verified instantly.
-                </div>
-              </div>
-
-              <div style={{
-                padding: 'var(--space-4)',
-                border: '1px solid var(--border-light)',
-                marginBottom: 'var(--space-3)'
-              }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Option 2: Text us a screenshot
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Text a screenshot of your logged-in {PLATFORM_LABELS[selectedIdentity.platform] || selectedIdentity.platform} profile to <strong>(555) 123-4567</strong>
-                </div>
-              </div>
-
-              <div style={{
-                padding: 'var(--space-4)',
-                border: '1px solid var(--border-light)',
-              }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Option 3: Full verification (ID + face scan)
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Text a photo of your ID to <strong>(555) 123-4567</strong> for the highest confidence level.
-                  This unlocks all features including proxy bidding.
-                </div>
-              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Submitting a request does not establish control of the source profile or grant access to private source data. Its stored status appears under your claim requests above.</div>
 
               <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button className="button button-secondary" onClick={() => {
                   setSelectedIdentity(null);
                   setClaimId(null);
-                  setVerificationCode(null);
                 }}>
                   Done
                 </button>
