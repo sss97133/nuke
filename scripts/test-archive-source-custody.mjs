@@ -35,17 +35,42 @@ const sources = new Map([
   ['archive',compile('../supabase/functions/_shared/archiveFetch.ts')],
   ['parser',compile('../supabase/functions/_shared/batParser.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
+  ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
+  ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
+  ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
+  ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
   ['guard',compile('../supabase/functions/_shared/writeGuard.ts')],
 ]);
 
 function fixture(options = {}) {
-  const requests = [], writes = [];
+  const requests = [], writes = [], observations = [];
   const actualSnapshot = { ...snapshot, ...(options.snapshot ?? {}) };
   const actualParent = { ...parent, ...(options.parent ?? {}) };
   const bytes = options.bytes ?? Buffer.from(html);
   async function http(raw,init) {
     const request = raw instanceof Request ? raw : new Request(raw,init);
     const u = new URL(request.url);requests.push({method:request.method,path:u.pathname,query:Object.fromEntries(u.searchParams)});
+    if(u.pathname==='/functions/v1/ingest-observation') {
+      load('intake');return handlers.get('intake')(request);
+    }
+    if(u.pathname==='/rest/v1/observation_sources') {
+      assert.equal(request.method,'GET');assert.equal(u.searchParams.get('slug'),'eq.bat');
+      return Response.json({id:'00000000-0000-4000-8000-000000000004',base_trust_score:0.85,supported_observations:['sale_result']});
+    }
+    if(u.pathname==='/rest/v1/vehicle_observations') {
+      if(request.method==='GET') {
+        const hash=u.searchParams.get('content_hash')?.slice(3);return Response.json(observations.find(o=>o.content_hash===hash)??null);
+      }
+      assert.equal(request.method,'POST');assert(options.allowObservationWrite,'Explicit productive observation fixture only');
+      const row=await request.json();assert(!('ingested_at'in row),'Database owns ingestion time');
+      assert.equal(row.kind,'sale_result');
+      if(options.allowGenericWrite)assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed key');
+      else{assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
+      if(observations.some(o=>o.content_hash===row.content_hash))return Response.json({code:'23505',message:'unique_observation'},{status:409});
+      const saved={is_superseded:false,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
+      observations.push(saved);writes.push(row);return Response.json(saved);
+    }
     if(u.pathname==='/rest/v1/rpc/vehicle_price_facts') {
       assert.deepEqual(await request.json(),{p_vehicle_ids:[vehicleId]});
       return Response.json([{...fact,...(options.fact??{})}]);
@@ -84,13 +109,13 @@ function fixture(options = {}) {
   }
   const supabase=createClient('https://fixture.invalid','svc-test',{global:{fetch:http},auth:{persistSession:false,autoRefreshToken:false}});
   const modules=new Map();
-  let handler;
+  const handlers=new Map();
   const env={SUPABASE_URL:'https://fixture.invalid',SUPABASE_SERVICE_ROLE_KEY:'svc-test',SUPABASE_JWT_SECRET:'test-jwt'};
   function load(name) {
     if(modules.has(name))return modules.get(name);
     const exports={};modules.set(name,exports);
     runInNewContext(sources.get(name),{exports,URL,Request,Response,Headers,TextEncoder,TextDecoder,Uint8Array,Date,crypto:webcrypto,AbortSignal,atob,btoa,fetch:http,
-      console:{log(){},warn(){},error(){}},Deno:{env:{get:key=>env[key]},serve:callback=>{handler=callback;}},
+      console:{log(){},warn(){},error(){}},Deno:{env:{get:key=>env[key]},serve:callback=>{handlers.set(name,callback);}},
       require:specifier=>{
         if(specifier.startsWith('https://esm.sh/@supabase/supabase-js@'))return {createClient:()=>supabase};
         if(specifier==='./batFetcher.ts')return {fetchBatPage:()=>assert.fail('No crawl'),logFetchCost:()=>assert.fail('No paid fetch'),isLoginPage:()=>false};
@@ -103,15 +128,33 @@ function fixture(options = {}) {
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
         if(specifier==='../_shared/observationWriter.ts')return {writeObservation:()=>assert.fail('No testimony write')};
+        if(specifier==='../_shared/urlNormalization.ts')return {normalizeListingUrl:value=>value,normalizeVin:value=>value};
+        if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
+        if(specifier==='./imageProperties.ts')return load('property');
+        if(specifier==='../_shared/observationContentHash.ts')return load('hash');
+        if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
+        if(specifier==='./cachedProperties.ts')return load('cached');
+        if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;
   }
-  return {requests,writes,snapshot:actualSnapshot,parser:load('parser'),
+  return {requests,writes,observations,snapshot:actualSnapshot,parser:load('parser'),
     read:(extra={})=>load('archive').readPinnedArchivedPage({snapshotId,vehicleId,sourceUrl,...extra},{supabase,now:()=>new Date('2026-01-03T00:00:00Z')}),
     attach:(capture,receipt)=>load('archive').attachPinnedArchivedSaleQualification(capture,receipt,{supabase}),
+    intake:async(body={},token='svc-test')=>{
+      load('intake');const response=await handlers.get('intake')(new Request('https://fixture.invalid/ingest-observation',{method:'POST',
+        headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
+        body:JSON.stringify({mode:'source_sale_qualification',vehicle_id:vehicleId,...body})}));
+      return {status:response.status,body:await response.json()};
+    },
+    proxy:async(body,token='svc-test')=>{
+      load('proxy');const response=await handlers.get('proxy')(new Request('https://fixture.invalid/ingest-observation-batch',{method:'POST',
+        headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}));
+      return {status:response.status,body:await response.json()};
+    },
     run:async(body={},token='svc-test')=>{
-      load('handler');const response=await handler(new Request('https://fixture.invalid/batch-extract-snapshots',{method:'POST',
+      load('handler');const response=await handlers.get('handler')(new Request('https://fixture.invalid/batch-extract-snapshots',{method:'POST',
         headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
         body:JSON.stringify({mode:'source_sale_qualification',vehicle_ids:[vehicleId],...body})}));
       return {status:response.status,body:await response.json()};
@@ -182,7 +225,8 @@ test('canonical service preview defaults to no writes or inference and ignores f
   assert.equal(r.status,200);assert.equal(r.body.dry_run,true);assert.equal(r.body.qualified,1);assert.equal(f.writes.length,0);
   const receipt=r.body.results[0].receipt;assert.equal(receipt.amount,12345);assert.equal(receipt.currency,'USD');
   assert.equal(receipt.verification_basis,'producer_attested_archived_hash_parser');assert.equal(receipt.source_ingested_at,snapshot.created_at);
-  assert(Date.parse(receipt.knowledge_at)>=Date.parse(receipt.qualified_at));assert.equal(receipt.original_parsed_at,snapshot.metadata.parsed_at);
+  assert.equal(receipt.method,'protected_archived_sale_observation_v1');assert.equal(receipt.original_parsed_at,snapshot.metadata.parsed_at);
+  assert(!('qualified_at'in receipt));assert.equal(r.body.results[0].derived_ingested_at,null);
   assert(!JSON.stringify(r.body).includes('html_storage_path'));assert(!JSON.stringify(r.body).includes(html));
 });
 test('anonymous and signed-in user cannot become protected qualification writers',async()=>{
@@ -197,24 +241,27 @@ test('qualification source disagreement, private parents and invalid batch bound
     const f=fixture({fact:patch}),r=await f.run({dry_run:false});assert.equal(r.body.results[0].reason,'source_sale_conflict');assert.equal(f.writes.length,0);
   }
   const privateParent=fixture({parent:{is_public:false}});const privateResult=await privateParent.run({dry_run:false});
-  assert.equal(privateResult.body.results[0].reason,'parent_not_public_real_vehicle');assert.equal(privateParent.requests.length,1);
+  assert.equal(privateResult.body.results[0].reason,'parent_not_public_real_vehicle');assert.equal(privateParent.requests.length,2);
   for(const body of [{vehicle_ids:[]},{vehicle_ids:Array(21).fill(vehicleId)},{force:true},{use_queue:true},{platform:'other'}])assert.equal((await fixture().run(body)).status,400);
 });
-test('productive qualification only adds protected receipt with atomic metadata/hash/clock custody guards',async()=>{
-  const f=fixture({allowQualificationWrite:true});const first=await f.run({dry_run:false});
+test('canonical productive qualification appends once and replay preserves first database ingestion',async()=>{
+  const f=fixture({allowObservationWrite:true});const original=JSON.stringify(f.snapshot),first=await f.run({dry_run:false});
   assert.equal(first.body.results[0].status,'stored');assert.equal(f.writes.length,1);
-  assert.equal(f.snapshot.metadata.parsed_at,snapshot.metadata.parsed_at);assert.equal(f.snapshot.metadata.vehicle_id,vehicleId);
-  const receipt=f.snapshot.metadata.source_sale_qualification_v1;
-  const duplicate=await f.run({dry_run:false});assert.equal(duplicate.body.results[0].reason,'existing_qualification_preserved');
-  assert.equal(f.writes.length,1);assert.equal(f.snapshot.metadata.source_sale_qualification_v1,receipt);
+  const result=first.body.results[0],saved=f.observations[0];assert.equal(saved.ingested_at,result.derived_ingested_at);
+  assert.equal(saved.observed_at,'2025-06-15T00:00:00.000Z');assert.equal(saved.structured_data.source_sale_receipt.event_grain,'date');
+  assert(!('producer_qualified_at'in saved.structured_data.source_sale_receipt));assert(saved.extraction_metadata.producer_qualified_at);
+  const duplicate=await f.run({dry_run:false});assert.equal(duplicate.body.results[0].duplicate,true);
+  assert.equal(duplicate.body.results[0].observation_id,result.observation_id);assert.equal(duplicate.body.results[0].derived_ingested_at,result.derived_ingested_at);
+  assert.equal(f.writes.length,1);assert.equal(JSON.stringify(f.snapshot),original);
 });
 test('concurrent protected metadata change refuses rather than overwriting the winning update',async()=>{
-  const f=fixture({allowQualificationWrite:true,concurrentMetadata:true});const r=await f.run({dry_run:false});
-  assert.equal(r.body.results[0].reason,'capture_changed_or_already_qualified');assert.equal(f.writes.length,0);
+  const f=fixture({allowQualificationWrite:true,concurrentMetadata:true}),capture=await f.read();
+  const r=await f.attach(capture,legacyReceipt(capture));
+  assert.equal(r.reason,'capture_changed_or_already_qualified');assert.equal(f.writes.length,0);
   assert.equal(f.snapshot.metadata.concurrent_note,'preserve');assert(!f.snapshot.metadata.source_sale_qualification_v1);
 });
 test('registered archive owner refuses a forged tuple or backdated/future qualification clock',async()=>{
-  const f=fixture(),capture=await f.read(),preview=await f.run(),receipt=preview.body.results[0].receipt;
+  const f=fixture(),capture=await f.read(),receipt=legacyReceipt(capture);
   assert.equal((await f.attach(capture,{...receipt,currency:'GBP'})).reason,'qualification_attribution_conflict');
   assert.equal((await f.attach(capture,{...receipt,qualified_at:'2025-06-15T00:00:00.000Z'})).reason,'qualification_clock_conflict');
   assert.equal((await f.attach(capture,{...receipt,qualified_at:'2999-01-01T00:00:00.000Z'})).reason,'qualification_clock_conflict');
@@ -222,8 +269,77 @@ test('registered archive owner refuses a forged tuple or backdated/future qualif
 });
 test('qualification cannot precede source knowledge within the same millisecond',async()=>{
   const f=fixture({snapshot:{created_at:'2025-06-16T12:00:00.000001Z'}});
-  const capture=await f.read(),preview=await f.run(),receipt=preview.body.results[0].receipt;
+  const capture=await f.read(),receipt=legacyReceipt(capture);
   const earlier='2025-06-16T12:00:00.000Z';
   assert.equal((await f.attach(capture,{...receipt,qualified_at:earlier,knowledge_at:earlier})).reason,'qualification_clock_conflict');
   assert.equal(f.writes.length,0);assert(!f.requests.some(r=>r.method==='PATCH'));
+});
+
+function legacyReceipt(capture) {
+  const sale=fixture().parser.parseQualifiedBaTSale(capture.html),qualifiedAt=new Date().toISOString(),s=capture.snapshot;
+  return {method:'protected_archived_sale_qualification_v1',verification_basis:'producer_attested_archived_hash_parser',
+    snapshot_id:s.id,vehicle_id:s.vehicleId,source_url:s.sourceUrl,source_sha256:s.sourceSha256,
+    parser:sale.parser,amount:sale.amount,currency:sale.currency,event_day:sale.eventDay,outcome:'sold',event_grain:'date',
+    body_source:s.bodySource,byte_length:s.byteLength,price_basis:'published_bid_excluding_fees',
+    price_basis_rule:'bat_published_result_fee_separate_v1',price_basis_source:'https://bringatrailer.com/policies/',
+    captured_at:s.fetchedAt,source_ingested_at:s.ingestedAt,original_parsed_at:s.parsedAt,source_known_at:s.sourceKnownAt,
+    qualified_at:qualifiedAt,knowledge_at:qualifiedAt};
+}
+
+test('concurrent identical canonical submissions converge on one row and original ingestion clock',async()=>{
+  const f=fixture({allowObservationWrite:true});const [a,b]=await Promise.all([f.intake({dry_run:false}),f.intake({dry_run:false})]);
+  assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(f.observations.length,1);
+  assert.equal(a.body.observation_id,b.body.observation_id);assert.equal(a.body.derived_ingested_at,b.body.derived_ingested_at);
+  assert.equal(Number(a.body.duplicate)+Number(b.body.duplicate),1);
+});
+test('canonical intake derives preview from raw source and refuses generic protected-marker forgery',async()=>{
+  const f=fixture(),r=await f.intake({amount:1,currency:'GBP',observed_at:'1900-01-01',ingested_at:'1900-01-01',structured_data:{fake:true}});
+  assert.equal(r.body.receipt.amount,12345);assert.equal(r.body.receipt.currency,'USD');assert.equal(r.body.derived_ingested_at,null);
+  assert.equal(r.body.availability_known_at,null);assert.equal(r.body.writes,0);assert.equal(f.writes.length,0);
+  for(const forged of [{extraction_method:'protected_archived_sale_observation_v1'},
+    {extractor_id:'protected_archived_sale_observation_v1'},
+    {structured_data:{source_sale_receipt:{method:'protected_archived_sale_observation_v1'}}}]){
+    assert.equal((await f.intake({mode:undefined,source_slug:'bat',kind:'sale_result',observed_at:'2025-01-01',...forged})).status,403);
+  }
+});
+test('canonical protected mode refuses anonymous and signed-in callers before reading source evidence',async()=>{
+  const anon=fixture();assert.equal((await anon.intake({},null)).status,401);assert.equal(anon.requests.length,0);
+  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
+  const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  const user=fixture();assert.equal((await user.intake({},token)).status,403);assert.equal(user.requests.length,0);
+});
+test('canonical intake holds corrupt raw, incompatible current facts and unknown outcomes without writing',async()=>{
+  for(const options of [{bytes:Buffer.from('corrupt')},{fact:{sold_amount:12000}},
+    {fact:{sold_on:'2025-06-14'}},{fact:{outcome:'unknown'}},{snapshot:{metadata:{...snapshot.metadata,vehicle_id: snapshotId}}}]){
+    const f=fixture(options),r=await f.intake({dry_run:false});assert.equal(r.status,422);assert.equal(f.writes.length,0);
+  }
+});
+test('legacy badge-only duplicate sharing the exact hash is refused and never promoted',async()=>{
+  const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false});
+  f.observations[0].source_snapshot_id=null;const legacy=JSON.stringify(f.observations[0]);
+  const replay=await f.intake({dry_run:false});assert.equal(replay.status,503);
+  assert.equal(JSON.stringify(f.observations[0]),legacy);assert.equal(f.observations.length,1);assert.equal(f.writes.length,1);
+});
+test('superseded or differently attributed duplicate is refused without restoring its claim',async()=>{
+  for(const patch of [{is_superseded:true},{extractor_id:'legacy'},{raw_source_ref:'unknown'}]){
+    const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false});Object.assign(f.observations[0],patch);
+    const original=JSON.stringify(f.observations[0]);assert.equal((await f.intake({dry_run:false})).status,503);
+    assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
+  }
+});
+test('generic intake ignores a caller-provided typed source key',async()=>{
+  const f=fixture({allowObservationWrite:true,allowGenericWrite:true});
+  const r=await f.intake({mode:undefined,source_slug:'bat',kind:'sale_result',observed_at:'2025-06-15T00:00:00Z',
+    vehicle_id:vehicleId,source_snapshot_id:snapshotId,defer_analysis:true});
+  assert.equal(r.status,200);assert.equal(f.observations.length,1);assert(!('source_snapshot_id'in f.observations[0]));
+});
+test('generic batch cannot elevate a signed-in or service caller into protected mode',async()=>{
+  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
+  const signing=`${header}.${payload}`,user=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  for(const token of ['svc-test',user]){
+    const f=fixture(),r=await f.proxy({observations:[{mode:'source_sale_qualification',vehicle_id:vehicleId,dry_run:false}]},token);
+    assert.equal(r.status,403);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+  }
 });
