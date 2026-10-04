@@ -33,9 +33,10 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { sourceReadClock } from "./sourceReadClock.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.1';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -145,6 +146,7 @@ async function trySaveHtmlSnapshot(args: {
   success: boolean;
   errorMessage: string | null;
   html: string | null;
+  fetchedAt?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   const { supabase, listingUrl, httpStatus, success, errorMessage, html, metadata } = args;
@@ -159,6 +161,7 @@ async function trySaveHtmlSnapshot(args: {
       fetch_method: "direct",
       http_status: httpStatus,
       success,
+      fetched_at: args.fetchedAt ?? new Date().toISOString(),
       error_message: errorMessage,
       // v4: a receipt, not a copy. The hash + length prove what was read; the page lives at BaT.
       html: null,
@@ -1079,6 +1082,7 @@ Deno.serve(async (req) => {
     let httpStatus: number | null = null;
     let userAgent = "";
     let htmlSource: "snapshot" | "direct" = "direct";
+    let sourceFetchedAt: string | null = null;
 
     // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
     const preferSnapshot = body?.prefer_snapshot === false ? false : true;
@@ -1101,6 +1105,7 @@ Deno.serve(async (req) => {
           httpStatus = typeof (snap as any)?.http_status === "number" ? (snap as any).http_status : 200;
           userAgent = `snapshot:${String((snap as any)?.id || "")}`;
           htmlSource = "snapshot";
+          sourceFetchedAt = typeof snap.fetched_at === "string" ? snap.fetched_at : null;
           console.log(`extract-bat-core: using snapshot for ${listingUrlCanonical}`);
         }
       } catch (e: any) {
@@ -1111,6 +1116,7 @@ Deno.serve(async (req) => {
       console.log(`extract-bat-core: fetching ${listingUrlNorm}`);
       try {
         const fetched = await fetchHtmlDirect(listingUrlNorm);
+        sourceFetchedAt = new Date().toISOString();
         html = fetched.html;
         httpStatus = fetched.status;
         userAgent = fetched.userAgent;
@@ -1133,6 +1139,7 @@ Deno.serve(async (req) => {
         listingUrl: listingUrlNorm,
         httpStatus,
         success: true,
+        fetchedAt: sourceFetchedAt,
         errorMessage: null,
         html,
         metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
@@ -2499,6 +2506,7 @@ Deno.serve(async (req) => {
 
       const endAt = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
+      const readClock = sourceReadClock(htmlSource, sourceFetchedAt);
 
       const { data, error } = await supabase
         .from("auction_events")
@@ -2519,9 +2527,11 @@ Deno.serve(async (req) => {
           comments_count: essentials.comment_count || null,
           page_views: essentials.view_count || null,
           watchers: essentials.watcher_count || null,
+          scraped_at: readClock.scraped_at,
           updated_at: new Date().toISOString(),
           raw_data: {
             extractor: "extract-bat-core",
+            source_read: readClock.source_read,
             listing_url: listingUrlCanonical,
             listing_details: {
               vin: essentials.vin,
