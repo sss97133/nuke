@@ -65,6 +65,7 @@ final class SyncEngine: ObservableObject {
     /// Ignition backfill queue depth — TodayView shows this as a ledger row
     /// while the queue drains. 0 = no backfill in flight.
     @Published private(set) var backfillRemaining = 0
+    @Published private(set) var backfillError: String?
     /// The pause toggle (Today tab) — the consent surface now that backfill
     /// starts automatically after site confirm. Paused = nothing uploads:
     /// sync() refuses to run and the backfill loop stops between assets
@@ -177,9 +178,13 @@ final class SyncEngine: ObservableObject {
 
     /// Request Photos read-write access (write: future phases mark synced
     /// assets), register the change observer, run the first sync. Safe to
-    /// call repeatedly (foreground transitions) — only the sync re-runs.
+    /// call repeatedly (foreground transitions) — sync and queued history resume.
     func start() async {
-        if started { await sync(); return }
+        if started {
+            await sync()
+            await resumeBackfillIfNeeded()
+            return
+        }
 
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         guard status == .authorized || status == .limited else {
@@ -539,8 +544,11 @@ final class SyncEngine: ObservableObject {
 
     func backfill(assetIdentifiers: [String]) async {
         guard !assetIdentifiers.isEmpty else { return }
-        defaults.set(assetIdentifiers, forKey: Key.backfillQueue)
-        backfillRemaining = assetIdentifiers.count
+        var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+        var known = Set(queue)
+        queue.append(contentsOf: assetIdentifiers.filter { known.insert($0).inserted })
+        defaults.set(queue, forKey: Key.backfillQueue)
+        backfillRemaining = queue.count
         await drainBackfill()
     }
 
@@ -561,23 +569,42 @@ final class SyncEngine: ObservableObject {
         }
         isSyncing = true
         lastError = nil
+        backfillError = nil
+        var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+        var heldPrivate = 0   // contributor-mode firewall holds
+        var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (alibi metadata only)
         defer {
             isSyncing = false
             lastSyncDate = Date()
             defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
+            recordHeldPrivate(heldPrivate)
+            NSLog("NukeCapture backfill: %d uploaded (%d metadata-only), %d off-site skipped, %d held(private), %d deduped, %d failed",
+                  uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
         }
 
-        var uploaded = 0, skipped = 0, deduped = 0, failed = 0
-        var heldPrivate = 0   // contributor-mode firewall holds
-        var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (alibi metadata only)
         let drainStart = Date()
+        var attempted = Set<String>()
+        let recoveryMessage = "Some photos couldn't be read or uploaded. They remain queued for retry."
 
         while true {
-            var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+            let queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
             guard !queue.isEmpty else { break }
             if Task.isCancelled || isPaused { return }   // queue stays persisted
 
-            let slice = Array(queue.prefix(Config.backfillBatchSize))
+            // A failed item stays queued, but gets only one attempt in this pass.
+            let slice = Array(queue.lazy.filter { !attempted.contains($0) }
+                .prefix(Config.backfillBatchSize))
+            guard !slice.isEmpty else { break }
+            attempted.formUnion(slice)
+            var settled = Set<String>()
+            defer {
+                // Checkpoint successes and definitive exclusions even on pause
+                // or cancellation; preserve failures and newly queued assets.
+                let pending = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+                let remaining = pending.filter { !settled.contains($0) }
+                defaults.set(remaining, forKey: Key.backfillQueue)
+                backfillRemaining = remaining.count
+            }
 
             let fetch = PHAsset.fetchAssets(withLocalIdentifiers: slice, options: nil)
             var assets: [PHAsset] = []
@@ -585,6 +612,11 @@ final class SyncEngine: ObservableObject {
             // fetchAssets(withLocalIdentifiers:) does not guarantee order —
             // restore oldest-first inside the batch.
             assets.sort { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+            let unresolved = Set(slice).subtracting(assets.map(\.localIdentifier))
+            if !unresolved.isEmpty {
+                failed += unresolved.count
+                backfillError = recoveryMessage
+            }
 
             for asset in assets {
                 if Task.isCancelled || isPaused { return }
@@ -598,6 +630,7 @@ final class SyncEngine: ObservableObject {
                       asset.sourceType == .typeUserLibrary,
                       !asset.mediaSubtypes.contains(.photoScreenshot) else {
                     skipped += 1
+                    settled.insert(asset.localIdentifier)
                     continue
                 }
 
@@ -605,20 +638,27 @@ final class SyncEngine: ObservableObject {
                 // photo joins the pool — same gate as the live sync pass.
                 if contributorMode, await contributorGateHolds(assetID: asset.localIdentifier) {
                     heldPrivate += 1
+                    settled.insert(asset.localIdentifier)
                     continue
                 }
 
                 let filename = Self.originalFilename(for: asset)
                 do {
                     let data = try await Self.requestOriginalData(for: asset)
+                    if Task.isCancelled || isPaused { return }
 
                     // Gate 2: require Apple camera EXIF (same as sync pass).
                     let (cameraMake, cameraModel) = CameraEXIF.cameraInfo(from: data)
-                    guard cameraMake == "Apple" else { skipped += 1; continue }
+                    guard cameraMake == "Apple" else {
+                        skipped += 1
+                        settled.insert(asset.localIdentifier)
+                        continue
+                    }
 
                     let key = "\(filename)|\(data.count)"
                     if seenSet.contains(key) {
                         deduped += 1
+                        settled.insert(asset.localIdentifier)
                         continue
                     }
 
@@ -631,7 +671,6 @@ final class SyncEngine: ObservableObject {
                         mlLabels = t.labels
                         pixelsEligible = t.pixelsEligible
                     }
-                    if !pixelsEligible { metadataOnly += 1 }
 
                     let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
                     let meta = PhotoMeta(
@@ -651,21 +690,18 @@ final class SyncEngine: ObservableObject {
                     )
                     markSeen(key)
                     recordUpload(assetIdentifier: asset.localIdentifier)
+                    settled.insert(asset.localIdentifier)
                     uploaded += 1
+                    if !pixelsEligible { metadataOnly += 1 }
                     totalSynced += 1
                     defaults.set(totalSynced, forKey: Key.totalSynced)
                 } catch {
                     failed += 1
                     lastError = "\(filename): \(error.localizedDescription)"
+                    backfillError = recoveryMessage
                 }
             }
 
-            // The whole slice is settled (uploaded / skipped / deduped /
-            // failed-and-reported) — drop it from the persisted queue.
-            // Identifiers that no longer resolve to assets fall out here too.
-            queue.removeFirst(min(slice.count, queue.count))
-            defaults.set(queue, forKey: Key.backfillQueue)
-            backfillRemaining = queue.count
             // Honest ETA fuel: the observed rate of THIS drain (uploads ÷
             // elapsed minutes), never an assumed constant (C4).
             let mins = Date().timeIntervalSince(drainStart) / 60.0
@@ -673,9 +709,6 @@ final class SyncEngine: ObservableObject {
             await Task.yield()
         }
 
-        recordHeldPrivate(heldPrivate)
-        NSLog("NukeCapture backfill: %d uploaded (%d metadata-only), %d off-site skipped, %d held(private), %d deduped, %d failed",
-              uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
     }
 
     // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
@@ -739,6 +772,9 @@ final class SyncEngine: ObservableObject {
                 // alongside it was also clean (no failed uploads to retry).
                 return syncClean
             }
+            // A later scheduled/user pass retries failures. Do not repeatedly
+            // retry them now just because other photos made progress.
+            if backfillError != nil { return false }
 
             // Re-loop only if the backfill queue actually shrank — otherwise we
             // are wedged (failing/unresolvable assets) and looping won't help.
