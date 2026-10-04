@@ -95,6 +95,10 @@ jobs:
         env:
           IMAGE_ANCESTRY_DATABASE: dm_refinement_image_ancestry
         run: node --test scripts/check-image-observation-health.test.mjs
+      - name: Create disposable fresh-image admission database
+        run: createdb dm_refinement_fresh_image_admission
+      - name: Verify actual pulse migration, admission policy, scope caps and retained grants
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
 
   market-lot-activity-contract:
     runs-on: ubuntu-latest

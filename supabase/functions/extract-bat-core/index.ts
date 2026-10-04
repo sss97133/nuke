@@ -2275,6 +2275,16 @@ Deno.serve(async (req) => {
               // photo-pipeline-orchestrator → a Gemini call per image (78–140 per lot; 66K lots = ~7M calls).
               // Vision on external links is a deliberate, paid pass (BYOK), never a side effect of indexing.
               ai_processing_status: "skipped",
+              // Admission policy, not an analysis receipt. Only new links get this declaration.
+              ai_scan_metadata: {
+                image_intake: {
+                  version: 1,
+                  producer: "extract-bat-core",
+                  mode: "source_link_only",
+                  analysis_requested: false,
+                  reason: "external_link_analysis_requires_explicit_request",
+                },
+              },
               approval_status: "auto_approved",
               is_approved: true,
               redaction_level: "none",

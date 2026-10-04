@@ -222,9 +222,43 @@ export function assess(assay) {
     scope_note: 'Bounded vehicle/ingest-window sample. Receipt presence is table-level, not per-observation proof. Cached claims require current full-source ancestry; hidden ineligible sources are excluded, visible ineligible-source children fail. Capture/analysis clocks remain unverified. No corpus, cadence, image-processing UPDATE, independent-source or calibrated-correctness claim.' };
 }
 
-export function run(scope, execute = sql => execFileSync('/bin/bash', [fileURLToPath(new URL('./data/q.sh', import.meta.url)),
+const executeReadonly = sql => execFileSync('/bin/bash', [fileURLToPath(new URL('./data/q.sh', import.meta.url)),
   `BEGIN READ ONLY; SET LOCAL statement_timeout = '15s'; ${sql} COMMIT;`],
-  { encoding: 'utf8', timeout: 25000, stdio: ['ignore', 'pipe', 'pipe'] })) {
+  { encoding: 'utf8', timeout: 25000, stdio: ['ignore', 'pipe', 'pipe'] });
+
+export function assessFreshImages(assay) {
+  const states = ['source_policy_deferred', 'unexplained_skips', 'pending', 'processing', 'completed', 'failed', 'other_status'];
+  const counts = ['sampled', 'gallery_eligible', 'pipeline_receipts', ...states];
+  const m = assay?.metrics;
+  if (assay?.assay !== 'fresh_image_admission_v1' || assay.sample_limit !== 20
+      || assay.candidate_vehicle_limit !== 5 || assay.window_hours !== 24
+      || typeof assay.vehicle_selected !== 'boolean' || typeof assay.sample_truncated !== 'boolean'
+      || assay.output_coverage !== 'not_measured'
+      || !counts.every(k => Number.isSafeInteger(m?.[k]) && m[k] >= 0)
+      || m.sampled > 20 || counts.slice(1).some(k => m[k] > m.sampled)
+      || states.reduce((sum, k) => sum + m[k], 0) !== m.sampled
+      || (!assay.vehicle_selected && m.sampled !== 0)
+      || (assay.sample_truncated && m.sampled !== 20)) throw new Error('invalid admission assay');
+  const reasons = ['analysis_output_not_measured'];
+  if (m.failed) reasons.push('processing_failed');
+  if (m.source_policy_deferred) reasons.push('external_link_analysis_requires_explicit_request');
+  if (m.unexplained_skips) reasons.push('skip_reason_unknown');
+  if (!m.sampled) reasons.push('no_sampled_arrivals');
+  if (assay.sample_truncated) reasons.push('sample_truncated');
+  // Even completed statuses/receipts cannot certify durable testimony or reader output.
+  return { ...assay, status: m.failed ? 'failed' : 'incomplete', reasons };
+}
+
+export function runFreshImages(execute = executeReadonly) {
+  try {
+    const rows = JSON.parse(execute("SELECT public.get_pipeline_pulse_24h()->'fresh_image_flow' AS assay;"));
+    return assessFreshImages(Array.isArray(rows) ? rows[0]?.assay : null);
+  } catch {
+    return { assay: 'fresh_image_admission_v1', status: 'failed', reasons: ['query_or_assay_failed'], coverage: 'unknown' };
+  }
+}
+
+export function run(scope, execute = executeReadonly) {
   try {
     const rows = JSON.parse(execute(query(scope)));
     return assess(Array.isArray(rows) ? rows[0]?.assay : null);
@@ -236,12 +270,14 @@ export function run(scope, execute = sql => execFileSync('/bin/bash', [fileURLTo
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
     const args = process.argv.slice(2);
-    const result = args[0] === '--cached-coverage' ? await runCachedCoverage(args) : run(options(args));
+    if (args[0] === '--fresh-images' && args.length !== 1) throw new Error('invalid admission arguments');
+    const result = args[0] === '--fresh-images' ? runFreshImages() :
+      args[0] === '--cached-coverage' ? await runCachedCoverage(args) : run(options(args));
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.mode === 'cached_assay' ? cachedWorkerExitCode(result) :
       result.status === 'passed_in_scope' ? 0 : result.status === 'incomplete' ? 2 : 1;
   } catch {
-    console.error('usage: node scripts/check-image-observation-health.mjs --vehicle <uuid> --since <ISO timestamp> [--field interior_color]; or --cached-coverage --vehicle <uuid> [--sources 1..100]');
+    console.error('usage: node scripts/check-image-observation-health.mjs --vehicle <uuid> --since <ISO timestamp> [--field interior_color]; or --cached-coverage --vehicle <uuid> [--sources 1..100]; or --fresh-images');
     process.exitCode = 2;
   }
 }

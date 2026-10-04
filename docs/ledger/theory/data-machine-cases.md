@@ -199,6 +199,28 @@ claims or a work cap. This measures cached output coverage, not new photo throug
 source independence, fleet completion or recurring execution. The scheduled processing entry point and its
 push/apply trigger are unchanged. Both detector suites run in the existing image-projection CI job.
 
+**C17 fresh image admission.** The October 4 read-only trace found 20 new BaT links marked
+`skipped`, gallery eligible, with no processing receipt or linked observations. The public vehicle
+page loaded its BaT gallery images. This is the extractor's deliberate cost boundary: indexing
+external links does not request paid analysis. New links declare that policy under
+`ai_scan_metadata.image_intake`; existing rows are not rewritten. The declaration is operational
+metadata, not testimony, a model result or permission to resume processing.
+
+```bash
+bash scripts/check-ingestion-health.sh --image-observations --fresh-images
+```
+
+This reads `get_pipeline_pulse_24h().fresh_image_flow`, also included in the existing heartbeat's
+pulse snapshot. It selects the newest public BaT vehicle among at most five public feed arrivals
+in 24 hours, then at most 20 recent BaT links plus one truncation sentinel. It reports gallery
+eligibility, explicitly deferred links, unexplained skips, processing states and receipt presence.
+Old skips retain an unknown reason; a later processing receipt or processing clock prevents an
+initial admission declaration from hiding later work. Empty/capped samples stay incomplete.
+Exit 1 means a sampled failed processing status or query/contract failure; otherwise exit 2:
+claims, witnesses and reader output are not measured here, even for completed statuses.
+No new alert rule, schedule, inference, re-drive or paid processing authorization is implied.
+Use the arrival/cached assays above for testimony and reader evidence. C17 remains open.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
