@@ -62,6 +62,7 @@ RETURNS text LANGUAGE sql AS $$ SELECT CASE WHEN $1 IN ('not_sold','unsold','bid
   WHEN $1='sold' OR $2='sold' THEN 'status' END $$;
 -- Execute the actual current price reader, rather than a hand-built price return fixture.
 \ir ../../supabase/migrations/20260928224500_vehicle_price_facts_live_outcome.sql
+\ir ../../supabase/migrations/20261004212806_vehicle_price_facts_materialized_basis.sql
 CREATE FUNCTION public.valuation_by_ymm(integer DEFAULT NULL,text DEFAULT NULL,text DEFAULT NULL) RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
 \ir ../../supabase/migrations/20261004073000_valuation_source_sale_receipt.sql
 \ir ../../supabase/migrations/20261004093000_valuation_source_sale_pruning.sql
