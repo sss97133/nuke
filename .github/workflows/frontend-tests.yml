@@ -10,6 +10,14 @@ on:
     - cron: '0 7 * * *' # daily
 
 jobs:
+  discovery-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify discovery failure and evidence contracts
+        run: python3 scripts/discovery/inclusion_pass_test.py
+
   vitest:
     runs-on: ubuntu-latest
     steps:
@@ -33,4 +41,3 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
-
