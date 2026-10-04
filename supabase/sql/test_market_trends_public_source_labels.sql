@@ -38,6 +38,18 @@ RESET ROLE;
 -- Mirror live default grants on newly created views; migration must explicitly remove DML.
 ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon,authenticated,service_role;
 \ir ../migrations/20261004085000_market_trends_public_source_labels.sql
+-- CI can replay a successful SQL file after a later edge deployment fails.
+CREATE TEMP TABLE repaired_count_contract AS SELECT oid,pg_get_functiondef(oid) AS definition,
+ proacl,proowner,proconfig FROM pg_proc WHERE oid='public.get_market_trends(jsonb)'::regprocedure;
+CREATE TEMP TABLE repaired_projection_contract AS SELECT oid,relacl,relowner,reloptions,
+ pg_get_viewdef(oid) AS definition FROM pg_class WHERE oid='public.v_market_trend_source_labels'::regclass;
+\ir ../migrations/20261004085000_market_trends_public_source_labels.sql
+SELECT assert_count((SELECT old.definition=pg_get_functiondef(p.oid) AND old.proacl IS NOT DISTINCT FROM p.proacl
+ AND old.proowner=p.proowner AND old.proconfig=p.proconfig FROM repaired_count_contract old
+ JOIN pg_proc p USING(oid)),'actual twice-apply retains exact repaired count body, owner, ACL and config');
+SELECT assert_count((SELECT old.definition=pg_get_viewdef(c.oid) AND old.relacl IS NOT DISTINCT FROM c.relacl
+ AND old.relowner=c.relowner AND old.reloptions=c.reloptions FROM repaired_projection_contract old
+ JOIN pg_class c USING(oid)),'actual twice-apply retains exact three-field barrier view, owner and ACL');
 
 SELECT assert_count((SELECT c.relacl IS NOT DISTINCT FROM old.relacl AND c.relrowsecurity=old.relrowsecurity
  AND c.relforcerowsecurity=old.relforcerowsecurity FROM pg_class c CROSS JOIN protected_source_contract old
