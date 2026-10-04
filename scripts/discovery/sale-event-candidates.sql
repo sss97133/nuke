@@ -30,7 +30,7 @@ WITH request AS MATERIALIZED (
     e.created_at,e.updated_at,e.extracted_at AS source_read_at,
     'vehicle_events.extracted_at'::text AS read_clock_basis
   FROM parents p JOIN public.vehicle_events e ON e.vehicle_id=p.id
-  ORDER BY e.id LIMIT (SELECT coalesce(native_limit,0)+1 FROM request)
+  ORDER BY e.id LIMIT (SELECT CASE WHEN valid THEN native_limit+1 ELSE 0 END FROM request)
 ), native_listings AS MATERIALIZED (
   SELECT 'bat_listings'::text AS source_table,l.id,l.vehicle_id,'bat'::text AS platform,
     l.bat_listing_url AS source_url,nullif(btrim(l.bat_lot_number),'') AS listing_id,
@@ -41,7 +41,7 @@ WITH request AS MATERIALIZED (
     l.created_at,l.updated_at,l.scraped_at AS source_read_at,
     'bat_listings.scraped_at'::text AS read_clock_basis
   FROM parents p JOIN public.bat_listings l ON l.vehicle_id=p.id
-  ORDER BY l.id LIMIT (SELECT coalesce(native_limit,0)+1 FROM request)
+  ORDER BY l.id LIMIT (SELECT CASE WHEN valid THEN native_limit+1 ELSE 0 END FROM request)
 ), boundary AS MATERIALIZED (
   SELECT r.*,
     coalesce(r.valid,false) AND (SELECT count(*) FROM native_events)<=r.native_limit
@@ -51,12 +51,19 @@ WITH request AS MATERIALIZED (
   SELECT * FROM native_events UNION ALL SELECT * FROM native_listings
 ), normalized AS MATERIALIZED (
   SELECT n.*,
-    CASE WHEN n.source_url ~* '^https?://[^/@[:space:]]+/[^[:space:]]+'
-      THEN lower(regexp_replace(regexp_replace(regexp_replace(n.source_url,
-        '^https?://(www\.)?','','i'),'[?#].*$',''),'/+$','')) END AS url_key,
-    CASE WHEN n.source_table='vehicle_events' AND n.listing_id ~* '^(https?://)?(www\.)?[^/@[:space:]]+\.[^/@[:space:]]+/[^[:space:]]+'
+    -- Only the established BaT listing aliases share a normalized key. Other
+    -- sources retain exact URL path/query/case: these may identify distinct lots.
+    CASE WHEN n.platform='bat' AND btrim(n.source_url) ~* '^https?://(www\.)?bringatrailer\.com/listing/[a-z0-9-]+/?([?#].*)?$'
+      THEN lower(regexp_replace(regexp_replace(regexp_replace(btrim(n.source_url),
+        '^https?://(www\.)?','','i'),'[?#].*$',''),'/+$',''))
+      WHEN btrim(n.source_url) ~* '^https?://[^/@[:space:]]+/[^[:space:]]+'
+        THEN btrim(n.source_url) END AS url_key,
+    CASE WHEN n.source_table='vehicle_events' AND n.platform='bat'
+      AND n.listing_id ~* '^(https?://)?(www\.)?bringatrailer\.com/listing/[a-z0-9-]+/?([?#].*)?$'
       THEN lower(regexp_replace(regexp_replace(regexp_replace(n.listing_id,
-        '^(https?://)?(www\.)?','','i'),'[?#].*$',''),'/+$','')) END AS listing_url_key,
+        '^(https?://)?(www\.)?','','i'),'[?#].*$',''),'/+$',''))
+      WHEN n.source_table='vehicle_events' AND n.listing_id ~* '^https?://[^/@[:space:]]+/[^[:space:]]+'
+        THEN n.listing_id END AS listing_url_key,
     CASE lower(btrim(n.recorded_outcome)) WHEN 'sold' THEN 'sold'
       WHEN 'no_sale' THEN 'not_sold' WHEN 'unsold' THEN 'not_sold'
       WHEN 'reserve_not_met' THEN 'not_sold' WHEN 'cancelled' THEN 'not_sold'
@@ -92,13 +99,14 @@ WITH request AS MATERIALIZED (
       WHEN pg_input_is_valid(s.metadata->>'vehicle_id','uuid') THEN (s.metadata->>'vehicle_id')::uuid END=e.vehicle_id AS parent_attested,
     CASE WHEN s.metadata->>'parsed_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$'
       AND pg_input_is_valid(s.metadata->>'parsed_at','timestamptz') THEN (s.metadata->>'parsed_at')::timestamptz END AS parsed_at
-  FROM episodes e JOIN public.listing_page_snapshots s ON s.platform=e.platform AND s.listing_url=ANY(coalesce(e.recorded_urls,'{}'::text[])||ARRAY[
+  FROM episodes e JOIN public.listing_page_snapshots s ON s.platform=e.platform AND s.listing_url=ANY(coalesce(e.recorded_urls,'{}'::text[])||
+    CASE WHEN e.platform='bat' AND e.url_key ~ '^bringatrailer\.com/listing/[a-z0-9-]+$' THEN ARRAY[
     'https://'||e.url_key,'https://'||e.url_key||'/',
     'http://'||e.url_key,'http://'||e.url_key||'/',
     'https://www.'||e.url_key,'https://www.'||e.url_key||'/',
     'http://www.'||e.url_key,'http://www.'||e.url_key||'/'
-  ])
-  ORDER BY s.id,e.vehicle_id LIMIT (SELECT coalesce(capture_limit,0)+1 FROM request)
+    ] ELSE ARRAY[e.url_key] END)
+  ORDER BY s.id,e.vehicle_id LIMIT (SELECT CASE WHEN valid THEN capture_limit+1 ELSE 0 END FROM request)
 )
 SELECT jsonb_build_object(
   'contract','sale_event_candidates_v1','stage','private_candidate_assay_not_price_comps',
@@ -118,12 +126,14 @@ SELECT jsonb_build_object(
     'vehicleId',p.vehicle_id,'sourcePlatform',p.platform,'sourceEpisodeKey',p.episode_key,
     'sourceUrl',p.source_url,'sourceListingId',p.listing_id,
     'eventAt',p.formatted_event,'eventDay',p.event_day,'eventGrain',p.event_grain,'eventTimeBasis',p.event_basis,
-    'recordedOutcome',p.recorded_outcome,'outcome',p.outcome,'amount',p.amount,
-    'currency',NULL,'priceBasis',NULL,'knownAt',NULL,'knownAtEvidence',NULL,
+    'recordedOutcome',p.recorded_outcome,'outcome',p.outcome,
+    'amount',CASE WHEN p.amount::text IN ('NaN','Infinity','-Infinity') THEN NULL ELSE p.amount END,
+    'currency',NULL,'priceBasis',NULL,'unitSource',NULL,'conditionEvidence','unknown',
+    'knownAt',NULL,'knownAtEvidence',NULL,
     'qualification',jsonb_build_object('status','candidate','basis','native_recorded_claim_units_source_clock_unverified',
       'evidenceRefs',jsonb_build_array(jsonb_build_object('table',p.source_table,'id',p.id))),
     'publicSourceStatus','unestablished','relevance','[]'::jsonb,
-    'nativeRow',jsonb_build_object('createdAt',p.created_at,'updatedAt',p.updated_at,
+    'nativeRow',jsonb_build_object('recordedAmount',p.amount::text,'createdAt',p.created_at,'updatedAt',p.updated_at,
       'sourceReadAt',p.source_read_at,'readClockBasis',p.read_clock_basis,
       'clockMeaning','mutable_row_headers_not_immutable_claim_knownAt'),
     'flags',jsonb_build_object('identityConflict',p.identity_conflict,
@@ -131,7 +141,7 @@ SELECT jsonb_build_object(
       'eventBeforeCutoff',CASE WHEN b.event_before IS NULL THEN NULL
         WHEN p.event_grain='day' AND p.event_day::date<>(b.event_before AT TIME ZONE 'UTC')::date
           THEN p.event_day::date<(b.event_before AT TIME ZONE 'UTC')::date
-        WHEN p.event_grain='instant' THEN p.event_at<=b.event_before END)
+        WHEN p.event_grain='instant' THEN p.event_at<b.event_before END)
   ) ORDER BY p.source_table,p.id) FROM presentations p),'[]'::jsonb),
   'sourceCaptureHeaders',CASE WHEN (SELECT count(*) FROM capture_headers)>b.capture_limit THEN '[]'::jsonb ELSE
     coalesce((SELECT jsonb_agg(jsonb_build_object('capture',jsonb_build_object('table','listing_page_snapshots','id',h.id),
