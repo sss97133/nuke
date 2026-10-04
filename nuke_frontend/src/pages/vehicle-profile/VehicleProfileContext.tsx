@@ -7,13 +7,14 @@
  * Pattern modeled after AuthContext.tsx.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
-import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { auctionReaderRevision, buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { withTimeout } from '../../lib/withTimeout';
@@ -108,6 +109,7 @@ export function useVehicleProfile(): VehicleProfileContextValue {
 // ---------------------------------------------------------------------------
 
 export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
 
@@ -566,6 +568,24 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     if (!vehicle?.id) return;
     const vehicleIdForFilter = vehicle.id;
 
+    let lastRevision: string | null = null;
+    let readerRefresh: ReturnType<typeof setTimeout> | null = null;
+    const refreshReaders = (row: any) => {
+      const revision = auctionReaderRevision(row);
+      if (revision === lastRevision) return;
+      lastRevision = revision;
+      // A recovery batch can publish many rows. Flush once per second without
+      // postponing forever while bids/comments keep arriving.
+      if (readerRefresh) return;
+      readerRefresh = setTimeout(() => {
+        readerRefresh = null;
+        for (const key of ['vehicle-price-facts', 'auction-sequence', 'vehicle-comments-unified',
+          'auction-comments', 'auction-comment-stats', 'auction-episode-evidence']) {
+          void queryClient.invalidateQueries({ queryKey: [key, vehicleIdForFilter] });
+        }
+      }, 1000);
+    };
+
     const channel = supabase
       .channel(`auction-pulse:${vehicleIdForFilter}`)
       .on(
@@ -581,6 +601,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
             return { ...(prev || {}), ...merged };
           });
+          if (merged) refreshReaders(row);
         },
       )
       .on(
@@ -604,11 +625,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       .subscribe();
 
     return () => {
+      if (readerRefresh) clearTimeout(readerRefresh);
       try { supabase.removeChannel(channel); } catch {
         try { channel.unsubscribe(); } catch { /* ignore */ }
       }
     };
-  }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform]);
+  }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform, queryClient]);
 
   // ── Auction pulse polling (60s) ──
 
