@@ -1,15 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
 import { useLotMovement, weigh, type LotMovement, type MovementItem } from './useLotMovement';
-import { NO_MAKE, useMarketPulse, useSameHourReadings, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useSameHourReadings, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
-// Every figure is computed from the rows market_pulse_live() returns, and every
-// row opens the vehicle's own record. Nothing here is estimated or smoothed.
+// Activity figures count the rows market_pulse_live() returns; rows open their
+// canonical records. Model-based hot/cold context is explained separately below.
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -18,7 +19,7 @@ type Window = 'all' | '1h' | '24h' | 'new' | 'nr' | 'hot' | 'cold';
 type Sort = 'ending' | 'bid' | 'newest' | 'hottest' | 'coldest';
 
 const WINDOWS: { id: Window; label: string }[] = [
-  { id: 'all', label: 'Live auctions' },
+  { id: 'all', label: 'Live lots' },
   { id: '1h', label: 'Ending < 1 h' },
   { id: '24h', label: 'Ending < 24 h' },
   { id: 'new', label: 'First seen < 24 h' },
@@ -27,7 +28,7 @@ const WINDOWS: { id: Window; label: string }[] = [
   { id: 'cold', label: 'Running cold' },
 ];
 
-// The board opens on the money; the soonest endings have their own panel beside the map.
+// Current auctions appear in close order unless the viewer chooses another sort.
 const SORTS: { id: Sort; label: string }[] = [
   { id: 'bid', label: 'Highest bid' },
   { id: 'ending', label: 'Ending first' },
@@ -578,15 +579,14 @@ function Thumb({ src, size }: { src: string | null; size: number }) {
   );
 }
 
-// The sync writes a row only when its bid changes, so a row's own time is when its bid last
-// changed, not when it was last read. Freshness is the sync's: if nothing has been written for
-// 45 minutes (three missed syncs), every bid on the page is shown grey as possibly behind.
+// This is a row-write-age warning only. vehicles.updated_at can change for any
+// writer; it cannot verify source freshness or tell when a bid happened.
 const STALE_MS = 45 * 60_000;
 
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
     <span
-      title={`${stale ? 'The live sync is behind; this is the last bid Nuke read. ' : ''}Bid last changed ${clock(auction.updatedAt)}`}
+      title={`Recorded current bid. Vehicle record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       style={{
         ...mono,
         fontWeight: 700,
@@ -724,7 +724,7 @@ function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: bo
       <div style={{ width: narrow ? 76 : 104, textAlign: 'right', flexShrink: 0 }}>
         <BidCell auction={a} risen={risen} stale={stale} />
       </div>
-      {!narrow && a.listingUrl && (
+      {a.listingUrl && (
         <a
           href={a.listingUrl}
           target="_blank"
@@ -782,7 +782,7 @@ function inWindow(a: LiveAuction, w: Window, now: number, heat?: Heat | null): b
 
 export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.ReactNode }) {
   usePageTitle('Market');
-  const { data, isLoading, isError, risenIds } = useMarketPulse();
+  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt } = useMarketPulse();
   const [params, setParams] = useSearchParams();
   const [boardRef, boardWidth] = useWidth<HTMLDivElement>();
   const narrow = boardWidth > 0 && boardWidth < 640;
@@ -792,13 +792,20 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
   const make = params.get('make')?.toUpperCase() ?? null;
   const win = (WINDOWS.some((w) => w.id === params.get('live')) ? params.get('live') : 'all') as Window;
-  const sort = (SORTS.some((s) => s.id === params.get('sort')) ? params.get('sort') : 'bid') as Sort;
+  const sort = (SORTS.some((s) => s.id === params.get('sort')) ? params.get('sort') : 'ending') as Sort;
+  const selectedBid = BID_BUCKETS.find(b => b.id === params.get('bidRange'))?.id ?? null;
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
     if (value == null) next.delete(key);
     else next.set(key, value);
+    if (key === 'live' || (key === 'make' && value != null) || key === 'bidRange') next.set('board', '1');
+    if (key === 'live' || key === 'make') next.delete('bidRange');
     setParams(next, { replace: true });
+    if (key === 'live' || key === 'bidRange') window.requestAnimationFrame(() => {
+      boardRef.current?.scrollIntoView?.({ block: 'start' });
+      boardRef.current?.focus({ preventScroll: true });
+    });
   };
 
   // Figures and filters are evaluated against the clock once a minute; the countdowns tick on their own.
@@ -809,14 +816,15 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
+  const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
   const heat = useMemo(() => new Map(live.map((a) => [a.id, heatOf(a, data?.curve ?? null, now)])), [live, data, now]);
 
   const figures = useMemo(() => {
     const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
-    for (const a of live) for (const w of WINDOWS) if (inWindow(a, w.id, now, heat.get(a.id))) f[w.id] += 1;
+    for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now, heat.get(a.id))) f[w.id] += 1;
     return f;
-  }, [live, now, heat]);
-  const openBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
+  }, [cohort, now, heat]);
+  const openBids = useMemo(() => currentBidDistribution(cohort).total, [cohort]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
   // Every series placed against its own readings at this UTC weekday and hour; only the ones at an edge are drawn.
@@ -830,21 +838,26 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   );
   const series = useMemo(() => (live.length && readings.length ? edgeSeries(live, readings) : []), [live, readings]);
   const archiveDays = useMemo(() => new Set(readings.filter((r) => r.source === 'archive').map((r) => r.day)), [readings]);
-  // The full board is a long list of cars: it opens below the strips on request, or when a figure filters it.
-  const showBoard = params.get('board') === '1' || win !== 'all';
+
+  const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now, heat.get(a.id))), [cohort, win, now, heat]);
+  const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
 
   const board = useMemo(() => {
-    const rows = live.filter((a) => (make == null || a.make === make) && inWindow(a, win, now, heat.get(a.id)));
+    const rows = scoped.filter(a => selectedBid == null || bidBucket(a.currentBid) === selectedBid);
     const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
     else if (sort === 'hottest') rows.sort((a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1));
     else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
+    else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [live, make, win, sort, now, heat]);
-  const boardBids = useMemo(() => board.reduce((s, a) => s + (a.currentBid ?? 0), 0), [board]);
+  }, [scoped, selectedBid, sort, heat]);
+  const boardBids = useMemo(() => currentBidDistribution(board).total, [board]);
 
-  if (isError || (!isLoading && live.length === 0)) return <>{onUnavailable ?? null}</>;
+  if (!data && isError) return <>
+    <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
+    {onUnavailable}
+  </>;
 
   return (
     <ExplainContext.Provider value={openExplain}>
@@ -852,20 +865,28 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.14em' }}>MARKET</span>
-          <span style={label}>Live auctions · Bring a Trailer</span>
+          <span style={label}>Live lots · Bring a Trailer{make ? ` · ${make}` : ''}</span>
         </div>
         {data?.syncedAt != null && (
           <span style={label} title={data.source}>
-            Last change seen {clock(data.syncedAt)} · {syncBehind ? 'live sync is behind' : 'board read every 15 min'}
+            Latest record write {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}
           </span>
         )}
       </div>
 
-      {!isLoading && <EdgeStrips series={series} hourUtc={hourUtc} weekdayUtc={weekdayUtc} archiveDays={archiveDays} />}
+      {isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
+
+      <label style={{ ...label, display: 'block', marginBottom: 8 }}>
+        Make{' '}
+        <select aria-label="Live lot make" value={make ?? ''} onChange={e => setParam('make', e.target.value || null)} style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 4 }}>
+          <option value="">All makes</option>
+          {[...new Set([...live.map(a => a.make), ...(make ? [make] : [])])].sort().map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </label>
 
       {/* Figures. Each one is a filter on the board below. */}
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
-        <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of the current high bid on every live auction" compact={narrow} />
+        <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of recorded current bids for the selected make across all open lots" compact={narrow} />
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}
@@ -882,40 +903,38 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         ))}
       </div>
 
-      {!isLoading && data?.weekAgo && <Relativity value={openBids} weekAgo={data.weekAgo} />}
+      {!isLoading && <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />}
+
+      {!isLoading && !make && <EdgeStrips series={series} hourUtc={hourUtc} weekdayUtc={weekdayUtc} archiveDays={archiveDays} />}
+      {!isLoading && !make && data?.weekAgo && <Relativity value={openBids} weekAgo={data.weekAgo} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
           <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} weekAgo={data?.weekAgo ?? null} heat={heat} />
         </section>
-        <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
+        {board.length > 0 && <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
           <div style={{ fontSize: 9, color: 'var(--text-secondary)', padding: '4px 8px', borderBottom: '2px solid var(--border)' }}>
             Latest bids and comments. × = against the lot's own usual: a bid's step vs its median step in view; the last hour vs its average hour since it opened.
           </div>
-          <EndingNext auctions={live.filter((a) => make == null || a.make === make)} risenIds={risenIds} stale={syncBehind} heat={heat} />
-        </section>
+          <EndingNext auctions={[...board].sort((a, b) => a.endsAt - b.endsAt)} risenIds={risenIds} stale={syncBehind} heat={heat} />
+        </section>}
       </div>
 
-      <div ref={boardRef}>
-      {!showBoard && (
-        <button onClick={() => setParam('board', '1')} style={{ ...label, color: 'var(--text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>
-          All {board.length.toLocaleString('en-US')} live auctions{make ? ` · ${make}` : ''}, as a list ↓
-        </button>
-      )}
-
-      {showBoard && <section style={{ border: '2px solid var(--border)' }}>
+      <div ref={boardRef} tabIndex={-1} aria-label="Supporting live lots">
+      <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
-            {board.length.toLocaleString('en-US')} auctions · {usd(boardBids, true)} bid
+            {board.length.toLocaleString('en-US')} lots · {usd(boardBids, true)} recorded bid
             {make ? ` · ${make}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
+            {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {SORTS.map((s) => (
               <button
                 key={s.id}
-                onClick={() => setParam('sort', s.id === 'bid' ? null : s.id)}
+                onClick={() => setParam('sort', s.id === 'ending' ? null : s.id)}
                 aria-pressed={sort === s.id}
                 style={{
                   ...label,
@@ -931,8 +950,13 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
             ))}
           </div>
         </div>
+        {!isLoading && board.length === 0 && <div role="status" style={{ padding: 12 }}>No open lots match these filters. <button onClick={() => {
+          const next = new URLSearchParams(params);
+          ['make', 'live', 'bidRange'].forEach(k => next.delete(k));
+          setParams(next, { replace: true });
+        }}>Clear market filters</button></div>}
         {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} />}
-      </section>}
+      </section>
       </div>
 
       {data?.source && (
@@ -943,6 +967,52 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <ExplainSheet item={explaining} onClose={closeExplain} narrow={narrow} />
     </div>
     </ExplainContext.Provider>
+  );
+}
+
+function BidDistribution({ distribution, lots, scope, selected, onSelect, fetchedAt }: {
+  distribution: ReturnType<typeof currentBidDistribution>; lots: number; scope: string;
+  selected: BidBucket | null; onSelect: (b: BidBucket) => void; fetchedAt: number;
+}) {
+  return (
+    <section aria-label="Current bid distribution" style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', marginBottom: 6 }}>
+        <span style={{ ...label, color: 'var(--text)' }}>{scope}</span>
+        <span style={{ fontSize: 12 }}>
+          Median current bid <strong style={mono}>{usd(distribution.median)}</strong>
+          {' '}· {distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid
+        </span>
+      </div>
+      {lots === 0 && <div role="status" style={{ fontSize: 12 }}>No open lots in this scope.</div>}
+      <div style={{ display: 'grid', gap: 2 }}>
+        {BID_BUCKETS.map(b => {
+          const n = distribution.counts[b.id];
+          const pct = lots > 0 ? n / lots * 100 : 0;
+          return (
+            <button key={b.id} disabled={n === 0 && selected !== b.id} aria-pressed={selected === b.id}
+              aria-label={`${b.label}: ${n} of ${lots} lots. Show supporting lots`}
+              onClick={() => onSelect(b.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 24, padding: '2px 4px', border: '2px solid transparent', textAlign: 'left', fontFamily: 'Arial, sans-serif', fontSize: 11,
+                color: selected === b.id ? 'var(--bg)' : 'var(--text)', background: selected === b.id ? 'var(--text)' : 'var(--bg)', cursor: n > 0 || selected === b.id ? 'pointer' : 'default' }}>
+              <span style={{ width: 100, flexShrink: 0 }}>{b.label}</span>
+              <span aria-hidden="true" style={{ flex: 1, height: 8, background: 'var(--surface)' }}>
+                <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: selected === b.id ? 'var(--bg)' : 'var(--text-secondary)' }} />
+              </span>
+              <span style={{ ...mono, width: 76, textAlign: 'right', flexShrink: 0 }}>{n} · {pct.toFixed(1)}%</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
+        Recorded current bids in USD · open BaT lots visible to you · choose a range to see its lots.
+      </div>
+      <details style={{ fontSize: 11, marginTop: 6 }}>
+        <summary style={{ cursor: 'pointer' }}>Scope, source and timing</summary>
+        <p style={{ margin: '6px 0' }}>One lot per Nuke record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. The median excludes unrecorded bids. A recorded zero stays zero.</p>
+        <p style={{ margin: '6px 0' }}>These are current listing bids, not sold prices or a valuation. Condition, restoration and build class are not matched. The board can include parts and other nonvehicle lots. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
+        <p style={{ margin: '6px 0' }}>Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in this reader; freshness is unverified. BaT's board is scheduled to be read every 15 minutes.</p>
+      </details>
+    </section>
   );
 }
 

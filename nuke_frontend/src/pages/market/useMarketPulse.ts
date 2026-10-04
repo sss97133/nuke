@@ -56,6 +56,42 @@ export interface MarketPulse {
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
+// Disjoint ranges of the recorded current bid, in USD. Missing is not a zero bid.
+export const BID_BUCKETS = [
+  { id: 'under10k', label: 'Under $10,000' },
+  { id: '10k25k', label: '$10,000–24,999' },
+  { id: '25k50k', label: '$25,000–49,999' },
+  { id: '50k100k', label: '$50,000–99,999' },
+  { id: '100kplus', label: '$100,000+' },
+  { id: 'unknown', label: 'Unrecorded' },
+] as const;
+export type BidBucket = typeof BID_BUCKETS[number]['id'];
+
+export function bidBucket(bid: number | null): BidBucket {
+  if (bid == null || !Number.isFinite(bid) || bid < 0) return 'unknown';
+  if (bid < 10_000) return 'under10k';
+  if (bid < 25_000) return '10k25k';
+  if (bid < 50_000) return '25k50k';
+  if (bid < 100_000) return '50k100k';
+  return '100kplus';
+}
+
+export function currentBidDistribution(auctions: LiveAuction[]) {
+  const counts = Object.fromEntries(BID_BUCKETS.map(b => [b.id, 0])) as Record<BidBucket, number>;
+  const bids: number[] = [];
+  for (const a of auctions) {
+    const bucket = bidBucket(a.currentBid);
+    counts[bucket] += 1;
+    if (bucket !== 'unknown') bids.push(a.currentBid as number);
+  }
+  bids.sort((a, b) => a - b);
+  const mid = Math.floor(bids.length / 2);
+  return {
+    counts, recorded: bids.length, total: bids.reduce((sum, bid) => sum + bid, 0),
+    median: bids.length === 0 ? null : bids.length % 2 ? bids[mid] : (bids[mid - 1] + bids[mid]) / 2,
+  };
+}
+
 type Row = [
   string, number | null, string | null, string | null, number | null, string, string, string, string | null, boolean,
   string | null, (string | null)?, (number | null)?, (number | null)?, (number | null)?, (string | null)?, (number | null)?,

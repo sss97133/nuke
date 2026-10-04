@@ -37,7 +37,12 @@ export interface FieldProvenance {
   source_image_url: string | null;
   evidence: ProvenanceCitation[];
   image_observations?: ImageObservation[];
-  observations: { id: string; value: string | null; source_slug: string | null; source_url: string | null; observed_at: string | null }[];
+  observations: {
+    id: string; value: string | null; source_slug: string | null; source_url: string | null; observed_at: string | null;
+    // Optional until the extended reader deployment has been verified.
+    ingested_at?: string | null; extraction_method?: string | null; confidence?: number | null;
+    kind?: string | null;
+  }[];
 }
 
 export function citedFieldImages(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {

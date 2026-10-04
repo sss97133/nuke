@@ -7,6 +7,8 @@
  * See: docs/library/technical/design-book/09-click-through-chains.md
  */
 import React from 'react';
+import PrefetchLink from '../../components/PrefetchLink';
+import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, evidenceRelationLabel } from './hooks/useFieldProvenance';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
@@ -55,6 +57,7 @@ function sourceLabel(sourceType: string): string {
 const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   field, label, value, vehicleId, evidence, vinDecode,
 }) => {
+  const { closeTop } = usePopup();
   const inventory = useVehicleImageEvidence(vehicleId);
   const provenance = useFieldProvenance(vehicleId, field);
   const rows = inventory.data?.images || [];
@@ -70,6 +73,10 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     .filter(source => source.source !== 'field_evidence' || source.verified === true)
     .map((source, index) => ({ id: `${source.source}-${index}`, source_type: source.source_type || source.source, field_value: source.value, created_at: source.at }));
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
+
+  if (!provenance.isLoading && provenance.data === null && !provenance.error) {
+    return <p role="status">Field evidence is unavailable or this record is private.</p>;
+  }
 
   return (
     <div className="field-evidence-popup" style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', lineHeight: 1.6, padding: '8px' }}>
@@ -90,6 +97,13 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           {value}
         </div>
       </div>
+
+      {provenance.data && <div style={{ marginBottom: 8 }}>
+        <span className="ev-label">CANONICAL VALUE</span>{' '}
+        <strong>{provenance.data.value || 'Unknown'}</strong>
+        {!provenance.data.value && <p>The canonical value is unknown. Source reports below remain attributed claims.</p>}
+        {evidence?.hasConflict && evidence.conflictType === 'genuine' && <p role="status">Source claims differ. No resolution is established by this display.</p>}
+      </div>}
 
       {/* VIN decode section */}
       {field === 'vin' && vinDecode && Object.keys(vinDecode).length > 0 && (
@@ -178,10 +192,12 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         </div>
       )}
       {(provenance.data?.observations || []).filter(obs => obs.source_url && !imageObservations.some(imageObs => imageObs.observation_id === obs.id)).map(obs => (
-        <div key={obs.id} style={{ padding: '6px 0' }}>
+        <div key={obs.id} style={{ padding: '6px 0', overflowWrap: 'anywhere' }}>
+          <div className="ev-label">SOURCE REPORT · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.id}`} onClick={closeTop}>Inspect observation {obs.id}</PrefetchLink></div>
           {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
           <span> · {obs.value || 'Value not recorded'}</span>
-          {obs.observed_at && <div style={{ color: 'var(--text-secondary)' }}>Source observation dated {new Date(obs.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</div>}
+          <div style={{ color: 'var(--text-secondary)' }}>Observation time: {obs.observed_at ? new Date(obs.observed_at).toLocaleString() : 'Unknown'} · Ingest time: {obs.ingested_at ? new Date(obs.ingested_at).toLocaleString() : 'Unavailable'}</div>
+          <div style={{ color: 'var(--text-secondary)' }}>Method: {obs.extraction_method || 'Unavailable'} · Stored confidence: {obs.confidence == null ? 'Unavailable' : obs.confidence}</div>
         </div>
       ))}
       {/* A zone match identifies an area to inspect; it does not support a particular claim. */}
