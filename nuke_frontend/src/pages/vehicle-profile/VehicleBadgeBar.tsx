@@ -14,9 +14,9 @@ function formatPrice(n: number | null | undefined): string {
 /**
  * Supplementary badge bar -- shows engagement metrics that VehicleHeader doesn't display.
  * VehicleHeader already renders: SOLD, source, price, seller, buyer, location, mileage, time.
- * This bar adds: BIDS, COMMENTS, WATCHERS, DQ score.
+ * This bar adds: BIDS, COMMENTS, WATCHERS, stored coverage score.
  *
- * Every badge is clickable and opens a popup with full data.
+ * Engagement badges open full-data popups; coverage describes the stored heuristic.
  */
 const VehicleBadgeBar: React.FC = () => {
   const { vehicle, auctionPulse } = useVehicleProfile();
@@ -28,7 +28,8 @@ const VehicleBadgeBar: React.FC = () => {
   const { data: commentStats } = useAuctionCommentStats(v?.id);
   const commentCount = commentStats?.commentCount || auctionPulse?.comment_count || v.comment_count;
   const watcherCount = auctionPulse?.watcher_count || v.bat_watchers;
-  const dqScore = v.data_quality_score;
+  const dqScore = typeof v.data_quality_score === 'number' && Number.isFinite(v.data_quality_score) &&
+    v.data_quality_score >= 0 && v.data_quality_score <= 100 ? v.data_quality_score : null;
   const highBid = v.high_bid || auctionPulse?.current_bid;
   const listingUrl = (auctionPulse as any)?.listing_url || v.bat_auction_url || v.discovery_url || null;
 
@@ -136,14 +137,14 @@ const VehicleBadgeBar: React.FC = () => {
         </span>
       )}
 
-      {/* DQ SCORE */}
+      {/* Stored coverage heuristic; verification remains unknown. */}
       {dqScore != null && (
-        <span className={`badge badge--dq ${dqScore >= 70 ? 'badge--dq-green' : 'badge--dq-orange'}`}>
-          DQ {dqScore}
+        <span data-testid="data-coverage-score" className="badge badge--dq">
+          COVERAGE {dqScore}/100 · VERIFICATION UNKNOWN
           <span className="badge__tooltip">
-            Data Quality: {dqScore}/100<br />
-            {v.confidence_score != null && <>Confidence: {v.confidence_score}/100<br /></>}
-            <span className="tt-db">vehicles.data_quality_score</span>
+            Stored coverage heuristic: {dqScore}/100<br />
+            Inputs: images, identity fields, observations, price and VIN length.<br />
+            Assessment time unknown.
           </span>
         </span>
       )}

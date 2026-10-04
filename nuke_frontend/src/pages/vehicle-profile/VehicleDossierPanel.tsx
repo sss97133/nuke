@@ -611,6 +611,9 @@ const VehicleDossierPanel: React.FC = () => {
   if (!vehicle) return null;
 
   const v = vehicle as any;
+  const coverageScore = typeof v.data_quality_score === 'number' &&
+    Number.isFinite(v.data_quality_score) && v.data_quality_score >= 0 && v.data_quality_score <= 100
+    ? v.data_quality_score : null;
   const ymm = [v.year, v.make, v.model].filter(Boolean).join(' ').toUpperCase().trim();
 
   return (
@@ -998,11 +1001,11 @@ const VehicleDossierPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Data Quality Score */}
-      {typeof (v as any).data_quality_score === 'number' && (
-        <div style={{
+      {/* Stored coverage heuristic; does not assess fact verification. */}
+      {coverageScore !== null && (
+        <div data-testid="data-coverage-score" title="Inputs: images, identity fields, observations, price and VIN length." style={{
           background: 'var(--surface-elevated)',
-          border: '2px solid var(--accent)',
+          border: '2px solid var(--border)',
           padding: '8px 10px',
           marginBottom: '8px',
         }}>
@@ -1014,16 +1017,16 @@ const VehicleDossierPanel: React.FC = () => {
             textTransform: 'uppercase',
             marginBottom: '4px',
           }}>
-            DATA QUALITY
+            DATA COVERAGE
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{
               fontFamily: "'Courier New', Courier, monospace",
               fontSize: '12px',
               fontWeight: 700,
-              color: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
+              color: 'var(--text-secondary)',
             }}>
-              {Math.round((v as any).data_quality_score)}/100
+              {Math.round(coverageScore)}/100
             </span>
             <div style={{
               flex: 1,
@@ -1032,11 +1035,15 @@ const VehicleDossierPanel: React.FC = () => {
             }}>
               <div style={{
                 height: '100%',
-                width: `${Math.min(100, Math.max(0, (v as any).data_quality_score))}%`,
-                background: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
+                width: `${coverageScore}%`,
+                background: 'var(--text-secondary)',
                 transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }} />
             </div>
+          </div>
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Stored coverage heuristic · verification unknown.<br />
+            Assessment time unknown.
           </div>
         </div>
       )}

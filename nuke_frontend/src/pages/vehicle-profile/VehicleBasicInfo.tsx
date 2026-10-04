@@ -78,6 +78,10 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   onEditClick,
   onOpenVINProofImages,
 }) => {
+  const coverageScore = typeof (vehicle as any).data_quality_score === 'number' &&
+    Number.isFinite((vehicle as any).data_quality_score) &&
+    (vehicle as any).data_quality_score >= 0 && (vehicle as any).data_quality_score <= 100
+    ? (vehicle as any).data_quality_score : null;
   // Ensure onDataPointClick is always a function - defensive wrapper
   const safeOnDataPointClick = React.useMemo(() => {
     if (onDataPointClick && typeof onDataPointClick === 'function') {
@@ -937,19 +941,18 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           {/* Additional details */}
           {renderVehicleDetails()}
 
-          {/* Data Quality Score */}
-          {typeof (vehicle as any).data_quality_score === 'number' && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid transparent' }}>
-              <span>Data Quality</span>
+          {/* Stored coverage heuristic; does not assess fact verification. */}
+          {coverageScore !== null && (
+            <div data-testid="data-coverage-score" title="Inputs: images, identity fields, observations, price and VIN length." className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid transparent', flexWrap: 'wrap' }}>
+              <span>Data Coverage</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{
                   fontWeight: 700,
-                  color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                         (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
+                  color: 'var(--text-secondary)',
                   fontSize: '12px',
                   fontFamily: "'Courier New', monospace"
                 }}>
-                  {(vehicle as any).data_quality_score}/100
+                  {coverageScore}/100
                 </span>
                 <span style={{
                   display: 'inline-block',
@@ -960,10 +963,12 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   <span style={{
                     display: 'block',
                     height: '100%',
-                    width: `${Math.min(100, Math.max(0, (vehicle as any).data_quality_score))}%`,
-                    background: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                                (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)'}} />
+                    width: `${coverageScore}%`,
+                    background: 'var(--text-secondary)'}} />
                 </span>
+              </span>
+              <span style={{ width: '100%', fontSize: '9px', color: 'var(--text-secondary)' }}>
+                Stored coverage heuristic · verification unknown. Assessment time unknown.
               </span>
             </div>
           )}
