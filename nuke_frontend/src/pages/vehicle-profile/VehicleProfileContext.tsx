@@ -133,6 +133,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
+  const currentAuctionUrlRef = useRef<string | null>(null);
+  useEffect(() => { currentAuctionUrlRef.current = auctionPulse?.listing_url ?? null; }, [auctionPulse?.listing_url]);
   const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
 
   // ── Header data ──
@@ -562,7 +564,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
-  // ── Auction pulse realtime: vehicle_events + auction_comments ──
+  // ── Auction pulse realtime: published current cache ──
 
   useEffect(() => {
     if (!vehicle?.id) return;
@@ -594,7 +596,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         (payload) => {
           const row = (payload as any)?.new as any;
           if (!row) return;
-          if (auctionPulse?.listing_url && row.source_url && row.source_url !== auctionPulse.listing_url) return;
+          const currentUrl = currentAuctionUrlRef.current;
+          if (currentUrl && row.source_url && row.source_url.replace(/\/$/, '') !== currentUrl.replace(/\/$/, '')) return;
 
           const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
           if (merged) setAuctionPulse((prev: any) => {
@@ -602,24 +605,6 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             return { ...(prev || {}), ...merged };
           });
           if (merged) refreshReaders(row);
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'auction_comments', filter: `vehicle_id=eq.${vehicleIdForFilter}` },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          const postedAt = row?.posted_at ? String(row.posted_at) : null;
-          const isBid = row?.bid_amount !== null && row?.bid_amount !== undefined;
-          setAuctionPulse((prev: any) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              comment_count: typeof prev.comment_count === 'number' ? prev.comment_count + 1 : 1,
-              last_comment_at: postedAt || prev.last_comment_at || null,
-              last_bid_at: isBid ? (postedAt || prev.last_bid_at || null) : (prev.last_bid_at || null),
-            };
-          });
         },
       )
       .subscribe();
@@ -630,7 +615,9 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try { channel.unsubscribe(); } catch { /* ignore */ }
       }
     };
-  }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform, queryClient]);
+  // Keep this channel stable while initial pulse data arrives. Removing and
+  // immediately reusing its topic can leave a joined channel without delivery.
+  }, [vehicle?.id, queryClient]);
 
   // ── Auction pulse polling (60s) ──
 
