@@ -46,6 +46,28 @@ constraint, permission, test or gate that implements it, or record the missing m
 Documentation changes should preserve owner intent while correcting stale navigation and status
 claims. See `docs/ledger/README.md` for the distinction between active guidance and audit outputs.
 
+## Answering vehicle and opportunity questions
+
+Read the existing database and reader contracts first. Reuse stored source captures and extraction
+results before fetching the same evidence again. Report the retrieval boundary and the specific
+missing relation or field; do not turn an incomplete reader into a claim that the data does not exist.
+
+A listing first establishes a **blip**, with attributed text, photos, source identity and clocks.
+Retain unresolved vehicle matches. A badge is evidence of a badge; a seller's specification is an
+attributed claim. Ask for the next evidence needed for the current decision, at its current stage.
+
+Keep the wider market available as supporting evidence. A thin configuration slice sits inside
+model, generation and broader purpose-specific cohorts. Market volume, movement, liquidity, price
+and configuration rank have different eligibility rules. Incomplete price evidence can still support
+an observed presentation count; it cannot become a confirmed sale. Return coverage, unresolved
+members and exclusion reasons alongside each measure. A candidate's asking-price percentile does
+not establish its vehicle's expected value or rank.
+
+The owner made this an all-vehicle repair requirement on 2026-10-04. Before changing an appraisal,
+comparable, market or opportunity reader, read **C27 / §11** in
+[`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md#11-whole-market-evidence-and-immediate-vehicle-questions)
+and the existing [`market reader contract`](docs/market/MARKET_MEASUREMENT_UI_CONTRACT.md).
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.

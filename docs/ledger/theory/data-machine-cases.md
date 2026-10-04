@@ -136,6 +136,7 @@ In addition to the card's list:
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
+| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | open — repair contracts recorded; no repairs delivered by this entry | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
 
 **C22 table connection — 2026-10-04 UTC.** Useful question: what work was recorded on this vehicle,
 by which permitted supplier, and at what build stage? Existing `work_record` testimony is read through
@@ -512,3 +513,169 @@ cost to source evidence; demonstrate one charge counted once across multiple doc
 dates, holder/vehicle allocations, unit conflicts and uncovered categories; and retain prior as-of results when a
 new receipt changes the outcome. Carefully documented cases can validate these mechanisms before any population
 claim about improvement returns. This refinement is a design contract; it installs no relation, ROI reader or fold.
+
+## 11. Whole market evidence and immediate vehicle questions
+
+**Owner direction, 2026-10-04.** A red 1963 split-window Corvette lead exposed failures in retrieval,
+source mapping, event reconciliation, media binding, cohort construction and the public reader. The
+owner asks for repairs that make the existing evidence better and immediately queryable for **all
+vehicles**. More individual appraisals do not close this case. Extend C9, C10, C14, C15, C17 and C26
+through their existing owners; this case connects their consequences to one useful answer.
+
+The owner's latest correction is central: other Corvettes support market volume and movement even
+when they are not close price comparables. A 1963/427 configuration is a thin slice inside the
+Corvette cohort. Its proposed high position within that market is a hypothesis to measure, with
+supporting and contrary evidence. The reader must preserve that hierarchy. A restrictive price
+admission policy must not erase evidence usable for another measure.
+
+### What the conversation requires
+
+The initial listing is a blip and raw material. Preserve the source listing identity, capture,
+description, images, observed clues and clocks without forcing an identified vehicle profile.
+Unbound evidence remains available for a later supported match. A photo can establish a visible
+split window, hood shape, side-exhaust layout or emblem with its method and uncertainty; an emblem
+does not establish the installed engine. Keep seller claims separately attributed. The initial
+answer can provide broad market context and a supported benchmark with a wide uncertainty range.
+Unknown build details should narrow that answer's claims and identify the next useful evidence.
+
+Start with the existing DB and captures, then reconcile the missing pieces to their sources. The
+agent should not require the owner to search every venue manually, nor repeat source extraction
+already performed. Acquisition, capital, operator skill, seller cooperation and an eventual buyer
+are separate relationships. Someone who found and can market a vehicle may lack purchase capital;
+that missing role can create a matching opportunity. Price spread alone does not establish profit.
+Keep the seller's willingness, costs, time, consignment terms and role attribution explicit when
+evidenced. This conversation authorizes recording the repairs, not contacting sellers, looking up
+private identities, financing an acquisition or activating an automated opportunity exchange.
+
+### Dated evidence and its limits
+
+Read-only DB snapshot at **2026-10-04 22:10 UTC**: `vehicles.year = 1963`,
+`model ILIKE 'corvette%'`, nondeleted, at most 2,000 parent rows; 1,537 returned. Prices were read
+through the existing `vehicle_price_facts(uuid[])` / `vehicle_sale_basis()` contract. Source labels
+used the returned platform, with recognized URL host or discovery source as fallback. These are
+recorded parent rows in a broad diagnostic slice, not unique chassis, unique sales, total market
+coverage or a production cohort membership rule.
+
+| Source label | Recorded parent rows | Positive sold amount admitted by that reader | Positive stored sale_price without admitted sold amount |
+|---|---:|---:|---:|
+| Mecum | 572 | 42 | 479 |
+| Bring a Trailer | 433 | 324 | 1 |
+| Barrett-Jackson | 290 | 244 | 10 |
+| Gooding | 29 | 24 | 1 |
+
+The columns have different meanings. A stored number is not automatically a sale. An unresolved
+price still leaves source, presentation and specification evidence worth reconciling and querying.
+The raw slice mixes coupes, convertibles, original cars, modified cars and incomplete descriptions.
+Its aggregate median cannot appraise this lead.
+
+The ordinary public `/valuation?year=1963&make=Chevrolet&model=Corvette` reader at
+**22:21:24 UTC** displayed 21 qualified cached BaT source lots out of 1,249 current public cohort
+parents. Its window was 2023-10-04 through 2026-10-04. Condition, build, body, trim, engine, mileage
+and equipment remained unmatched. The private prefix query and public exact-model/windowed reader
+are different populations; their difference is not a measured exclusion count. The deployed graph
+and source drill exist, but this read did not deliver Mecum/Barrett-Jackson market context or prove
+the target's rank. An entered asking-price percentile describes that amount against the displayed
+prices, not the vehicle's expected sale amount.
+
+Specific reproducible source repair: vehicle `b2414fd1-33eb-4911-bf14-2832ccc432f7`,
+Mecum [lot 173892](https://www.mecum.com/lots/173892/1963-chevrolet-corvette-resto-mod/).
+The source page identifies **Kissimmee 2014, F208, Friday January 24, 2014**, with a published
+$100,000 result and an aluminum 454/510 HP engine. The stored row had no sale date, a legacy
+`available` status and `engine_size = '327 V-8'` alongside its 454 description. This source check
+recovered evidence; it did not write a correction. An auction run day must retain its source and
+day precision; it does not establish settlement time or an unstated fee basis. A 2014 result belongs
+in the history and needs an explicit time treatment before supporting a current-price comparison.
+Do not silently apply inflation, fees or today's build state to it.
+
+A diagnostic URL grouping found 163 repeated locator groups / 164 excess parent rows. It normalized
+scheme, `www`, trailing slash and discarded query/fragment solely to find candidates. This is not a
+verified duplicate-sale count or an acceptable universal merge rule. Some exact source lots occur
+on multiple parent rows; different source episodes on the same VIN are valid separate history.
+Other sampled rows pointed to non-Corvette listings or carried inconsistent platform/build fields.
+Reconcile source identity and membership before counting them.
+
+The recently cited Mecum video example was **1967** Corvette S114, vehicle
+`12cde831-8981-471b-9631-588bc1251259`, not evidence that the 1963 slice was processed. Its bounded
+probe found 11 YouTube media observations among 22 vehicle observations. All 11 lacked typed
+`source_vehicle_event_id` and `property_id`; bid displays and room context lived in payloads. A
+displayed current bid cannot become a final sale result. Discovered videos, extracted grains,
+landed testimony, bound events and reader-qualified measurements are different coverage stages.
+
+### The shared market answer
+
+Use one declared as-of/cutoff and expose each measure's own supported population. Every view can
+drill through the same retained source evidence, including unresolved candidates where permitted.
+
+1. **Recorded market activity.** Show observed presentations, active supply, changes, outcomes and
+   time coverage across relevant venues. Count market events once across duplicate captures. An
+   unknown outcome contributes to presentation coverage, not confirmed sale volume. Sell-through
+   needs a defensible denominator; liquidity needs covered time/exposure. Report source gaps and
+   ingestion changes so an expanding scraper is not narrated as an expanding market.
+2. **Market movement and price history.** Return dated distributions within compatible currency,
+   fee basis, source/method and supported comparison strata. Preserve old events. Compare periods
+   with the same eligibility and coverage treatment; disclose changed vehicle mix. A raw median
+   change is not a constant-quality index, and a highest bid is not a sold price. Partially qualified
+   source amounts remain inspectable with their limits instead of disappearing from the evidence.
+3. **Nested configuration context.** Resolve the vehicle's evidenced memberships through the
+   existing cohort/dimension owners: broader market, Corvette, generation, year, body and supported
+   build/condition/equipment slices. Retain match, mismatch, unknown and conflict per dimension.
+   Wider cohorts inform volume, movement and market position even when unsuitable as direct price
+   peers. Sparse slices retain their sample size and uncertainty; any pooling or shrinkage must
+   name and validate its method. Cross-platform cohorts must disclose venue composition.
+4. **Vehicle position and opportunity.** Name what is ranked: a known historical sale, asking
+   amount, expected realized value, demand or another supported measure. Provide cohort, dates,
+   units, eligible/observed denominator, method/version, contributors, counterexamples and
+   uncertainty. Test the 1963/427 high-position hypothesis using configuration evidence and matched
+   historical results; a badge or entered ask cannot prove it. If projecting a sale amount, fill the
+   theory card's six prediction blanks and backtest. Keep ranking evidence separate from the
+   acquisition/capital/operator/seller path and its actual costs.
+
+This extends the existing [market measurement contract](../../market/MARKET_MEASUREMENT_UI_CONTRACT.md).
+There is no separate Corvette-only valuation algorithm or new dashboard required by this case.
+
+### Repair assignments and acceptance
+
+**Order:** restore access to retained evidence and repair source/event mappings first; build the
+shared market/cohort answer next; measure and deliver its speed and public usefulness. Each lane
+starts by verifying current atlas ownership and relevant handoffs. The existing canonical writer
+for testimony is `ingest-observation`; correction and supersession use sanctioned paths. Names
+below identify capabilities to extend, not permission to bypass a held writer or start a new service.
+
+| Priority | Repair | Existing capability or lane | Evidence that closes the repair |
+|---|---|---|---|
+| P0 | DB-first retrieval and lead-stage contract | Existing ingest/extractors, source captures, `api-v1-comps`, `valuation_by_ymm`; agent guidance above | A listing-only case returns retained evidence, unresolved identity, broad context and decision-critical next gaps without inventing a profile or repeating a stored capture fetch. Agent and public results declare their differing access scopes. |
+| P0 | Source field reconciliation | `extract-mecum`, other venue extractors, `archiveFetch`, sanctioned provenance correction/supersession | Replay pinned source fixtures, including 173892: supported event/run day, amount/outcome, platform, installed-vs-factory claims, currency/fee knowledge and unknowns survive intake and reach the reader. Test conflicting/no-sale and missing-unit cases. Historical repair is separately authorized and measured. |
+| P0 | Vehicle, source episode and capture identity | Existing vehicle/event/observation and source identity owners; sale-event selection lane | Same episode/two captures counts once; same chassis/two auction appearances counts twice; uncertain alias remains unresolved. Contradictions and original testimony survive. Non-Corvette pointers cannot pollute a resolved Corvette cohort. Counts conserve candidates, aliases, unresolved and admitted episodes. |
+| P0 | Media evidence reaches market events | Existing Mecum broadcast-evidence lane and `ingest-observation`; existing source-event/property owners | One known clip drills media timestamp → retained observation → source lot/event → permitted vehicle/cohort reader. Intermediate bid, hammer indication, no-sale and uncertain lot attribution remain distinct. Per-event manifest accounts for discovered, captured, extracted, landed, bound and usable grains. No 1967 example claims 1963 coverage. |
+| P1 | Whole-market and nested cohort reader | `valuation_by_ymm`, existing market readers/cohort owners, `vehicle_price_facts`; C9/C10 and sale-event selection contract | One response retains broad presentation/outcome context and separately qualified price/build slices across captured venues. The 1963 case exposes Mecum/BJ/BaT contributions or exact unresolved reasons. A second non-Corvette case proves the mechanism is general. No narrow-price gate removes valid volume evidence. |
+| P1 | Configuration and position measures | Existing specification, image witness, component/build and cohort folds; C17/C26 | Episode-scoped body/engine/build/condition claims retain evidence and knowledge time. Broad and narrow counts, ranking basis, sample/coverage and uncertainty are reproducible. Badge-only engine stays uncertain; contradictory build claims are visible. Held-out/replay evidence supports any estimated rank or price claim. |
+| P1 | Immediate, bounded query path | Existing shared SQL/API readers and fold/queue owners | Profile the same declared requests cold and warm, fix the measured bottleneck, then record p50/p95, payload and row scope after deploy. Use indexed/replayable maintained state; source qualification and historical replay do not repeat on every page load. Establish and assay an explicit arrival budget; increasing the timeout does not establish an instant answer. |
+| P1 | Useful answer and evidence drill | Existing `/valuation` graph, market views, agent/API and iOS consumers | A user sees wider context, dated movement, supported position and missing evidence before manually assembling comps. Drill to exact source episode/capture/media and field support; historical and recent prices remain distinguishable. Shared measures agree for the same scope/cutoff. Low-confidence or excluded evidence is explainable, not a silent empty chart. |
+| P2 | Opportunity roles and next evidence | Existing relationship/identity, ownership/transfer and market capabilities; verify live owners before design | A declared opportunity distinguishes discoverer/operator, available capital, seller cooperation and buyer fit, with attributed work/terms and missing roles. Negotiation and inspection advance only the current decision. Product design and any automated contacts/transactions require their own scope and authorization. |
+
+**Reuse current work.** The existing public sale graph/source drill was delivered through PRs
+[#574](https://github.com/sss97133/nuke/pull/574) and
+[#578](https://github.com/sss97133/nuke/pull/578); analytical coverage and broad-reader performance
+remain open. An existing October 4 Mecum source helper (`parseMecumSourceResultCandidate`, local
+commit `20209e9d11cf`) had focused local tests and a cached-source
+fixture, but was not pushed, merged or deployed at inspection. Its conservative unit/outcome gates
+are useful inputs to reconcile; its local success is not production admission or a solved reader.
+Consult its current handoff before duplicating it. A prior bounded Mustang UI receipt reported a
+9,711 ms initial request and a 10,088 ms all-years failure; those are dated observations of that
+request, not Corvette latency or a measured fleet percentile. Current performance needs its own probe.
+
+### Release and closure receipt
+
+Each repair records **entity/grain, canonical keys and unresolved links, event clock, ingest/knowledge
+clock, source/custody, owner, writer, reader, executable assay, replay policy and authorization**.
+For a fold, declare refresh cadence and the health check that detects stale or disconnected output.
+Check live `v_schema_atlas`; check `v_job_health` when scheduled work matters. Coverage reports
+distinguish not observed, capture inaccessible, extraction missing, binding missing, fold stale and
+reader exclusion. Each state must lead to an owned repair or an explicit source limitation.
+
+Closure uses the same retained acceptance cases before and after, including unbound identity,
+old run date, conflicting outcome/unit/build, duplicate capture, repeat sale, thin slice, unsupported
+media result and changed source coverage. Retain as-of behavior when later evidence arrives. Record
+**implemented, tested, merged, deployed and runtime-verified** separately, with a checked commit and
+bounded query receipt. This entry documents the requirements and probes; it changes no production
+data/schema, installs no writer or measure, and proves no arbitrage or high-ranking target vehicle.
