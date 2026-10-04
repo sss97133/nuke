@@ -155,6 +155,12 @@ jobs:
         run: createdb dm_refinement_bat_profile
       - name: Verify the actual profile migration and replay contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+      - name: Setup Deno for native auction fixtures
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify daily close reconciliation through canonical native intake
+        run: node --test scripts/check-auction-reconciliation.test.mjs
 
   sold-context-contract:
     runs-on: ubuntu-latest
