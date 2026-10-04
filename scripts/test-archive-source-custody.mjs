@@ -67,7 +67,10 @@ function fixture(options = {}) {
       assert(row.extractor_id == null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.extractor_id),
         'Production extractor_id is nullable UUID, not a method string');
       assert.equal(row.kind,'sale_result');
-      if(options.allowGenericWrite)assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed key');
+      if(options.allowGenericWrite){
+        assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed capture key');
+        assert(!('source_vehicle_event_id'in row),'Generic intake ignores caller typed episode key');
+      }
       else{assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
       if(observations.some(o=>o.content_hash===row.content_hash))return Response.json({code:'23505',message:'unique_observation'},{status:409});
       const saved={is_superseded:false,extractor_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
@@ -332,11 +335,19 @@ test('superseded or differently attributed duplicate is refused without restorin
     assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
   }
 });
-test('generic intake ignores a caller-provided typed source key',async()=>{
+test('actual generic intake ignores caller-provided typed capture and episode keys',async()=>{
   const f=fixture({allowObservationWrite:true,allowGenericWrite:true});
   const r=await f.intake({mode:undefined,source_slug:'bat',kind:'sale_result',observed_at:'2025-06-15T00:00:00Z',
-    vehicle_id:vehicleId,source_snapshot_id:snapshotId,defer_analysis:true});
-  assert.equal(r.status,200);assert.equal(f.observations.length,1);assert(!('source_snapshot_id'in f.observations[0]));
+    vehicle_id:vehicleId,source_snapshot_id:snapshotId,source_vehicle_event_id:'00000000-0000-4000-8000-000000000099',defer_analysis:true});
+  assert.equal(r.status,200);assert.equal(f.observations.length,1);
+  assert(!('source_snapshot_id'in f.observations[0]));assert(!('source_vehicle_event_id'in f.observations[0]));
+});
+test('actual current v1 protected intake ignores caller-provided typed episode key',async()=>{
+  const f=fixture({allowObservationWrite:true});
+  const r=await f.intake({mode:'source_sale_qualification',vehicle_id:vehicleId,snapshot_id:snapshotId,
+    source_vehicle_event_id:'00000000-0000-4000-8000-000000000099',dry_run:false});
+  assert.equal(r.status,200);assert.equal(f.observations.length,1);
+  assert(!('source_vehicle_event_id'in f.observations[0]),'No episode ancestry is installed by current v1 writer');
 });
 test('generic batch cannot elevate a signed-in or service caller into protected mode',async()=>{
   const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
