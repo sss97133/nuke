@@ -15,7 +15,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { conditionExtractionArtifact, conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
-  loadDescriptionInput, requireCompleteInput, reusableConditionExtraction, type DescriptionInput } from "./descriptionInput.ts";
+  loadDescriptionInput, loadReusableConditionExtraction, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -306,6 +306,13 @@ async function extractConditionsWithLLM(
   throw new Error("Condition extraction returned no JSON array");
 }
 
+async function requirePublicParent(supabase: any, vehicleId: string) {
+  const { data, error } = await supabase.from("vehicles").select("id")
+    .eq("id", vehicleId).eq("is_public", true).is("deleted_at", null)
+    .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item").maybeSingle();
+  if (error || !data) throw new Error("Public vehicle unavailable; mining/cache refused");
+}
+
 async function ingestConditionObservations(
   vehicleId: string,
   conditions: any[],
@@ -313,6 +320,7 @@ async function ingestConditionObservations(
   serviceKey: string,
   modelUsed: string,
   input: DescriptionInput,
+  supabase: any,
 ): Promise<{ ingested: number; duplicates: number; errors: number }> {
   let ingested = 0;
   let duplicates = 0;
@@ -320,6 +328,7 @@ async function ingestConditionObservations(
 
   for (const condition of conditions) {
     try {
+      await requirePublicParent(supabase, vehicleId);
       const resp = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
         method: "POST",
         headers: {
@@ -381,7 +390,7 @@ Deno.serve(async (req) => {
         throw new Error("Description preview requires one vehicle_id");
       }
       const { data: vehicle, error } = await supabase.from("vehicles")
-        .select("id,listing_url,discovery_url").eq("id", vehicleId)
+        .select("id,listing_url,discovery_url,origin_metadata").eq("id", vehicleId)
         .is("deleted_at", null).or("listing_kind.is.null,listing_kind.neq.non_vehicle_item").single();
       if (error || !vehicle) throw new Error("Preview vehicle unavailable");
       const input = await loadDescriptionInput(supabase, vehicle);
@@ -389,6 +398,11 @@ Deno.serve(async (req) => {
         ...descriptionPreview(input), model_calls: 0, writes: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    // This function uses service credentials while its legacy discovery cache is
+    // publicly readable. Reject private/deleted/nonvehicle parents before any
+    // cache response or model request. The service-only preview stays private.
+    if (vehicleId) await requirePublicParent(supabase, vehicleId);
 
     // Existing discovery is retained. A repeat request never overwrites it or
     // spends inference again just because a newer full text is now readable.
@@ -411,15 +425,16 @@ Deno.serve(async (req) => {
       const backfillBatch = Math.max(1, Math.min(body.batch_size || 20, 50));
       // Summary length only admits candidates; the preserved input must be >=500.
       const { data: rows, error } = vehicleId
-        ? await supabase.from("vehicles").select("id,year,make,model,listing_url,discovery_url")
-          .eq("id", vehicleId).is("deleted_at", null)
+        ? await supabase.from("vehicles").select("id,year,make,model,listing_url,discovery_url,origin_metadata")
+          .eq("id", vehicleId).eq("is_public", true).is("deleted_at", null)
           .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
         : await supabase.rpc("execute_sql", {
-        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url
+        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url, v.origin_metadata
                 FROM vehicles v
                 WHERE v.description IS NOT NULL
                   AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND v.is_public = true
                   AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
@@ -454,12 +469,10 @@ Deno.serve(async (req) => {
       for (const vehicle of backfillVehicles) {
         if (Date.now() - startTime > 50000) break;
         try {
+          await requirePublicParent(supabase, vehicle.id);
           const input = await loadDescriptionInput(supabase, vehicle);
           if (input.text.length < 500) throw new Error("Preserved source too short for condition backfill");
-          const { data: cache, error: cacheError } = await supabase.from("description_discoveries")
-            .select("raw_extraction").eq("vehicle_id", vehicle.id).maybeSingle();
-          if (cacheError) throw new Error("Condition cache lookup failed; inference refused");
-          const cached = await reusableConditionExtraction(cache?.raw_extraction, input);
+          const cached = await loadReusableConditionExtraction(supabase, vehicle.id, input);
           if (!cached && body.cached_conditions_only === true) {
             throw new Error("Cached condition output missing or changed; retry refused without inference");
           }
@@ -468,7 +481,7 @@ Deno.serve(async (req) => {
           if (cached) cachedPasses++;
           console.log(`[discover-desc] ${vehicle.id}: LLM=${condModel}, ${conditions.length} conditions, input=${input.text.length} chars`);
           const { ingested, duplicates, errors: errs } = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey, condModel, input
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel, input, supabase
           );
           totalIngested += ingested;
           totalDuplicates += duplicates;
@@ -487,6 +500,7 @@ Deno.serve(async (req) => {
                   SELECT 1 FROM vehicles v
                   WHERE v.description IS NOT NULL AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND v.is_public = true
                   AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
@@ -532,8 +546,9 @@ Deno.serve(async (req) => {
     if (vehicleId) {
       const { data, error } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, description, sale_price, listing_url, discovery_url")
+        .select("id, year, make, model, description, sale_price, listing_url, discovery_url, origin_metadata")
         .eq("id", vehicleId)
+        .eq("is_public", true)
         .is("deleted_at", null).or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
         .single();
       if (error) throw error;
@@ -542,12 +557,13 @@ Deno.serve(async (req) => {
       // Anti-join: get vehicles with descriptions NOT yet discovered
       // Uses primary key ordering (fast) instead of sale_price sort (slow full scan)
       const { data: rows, error } = await supabase.rpc("execute_sql", {
-        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url,
+        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url, v.origin_metadata,
                   COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
                 FROM vehicles v
                 WHERE v.description IS NOT NULL
                   AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND v.is_public = true
                   AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)
                 LIMIT ${batchSize}`
@@ -592,6 +608,7 @@ Deno.serve(async (req) => {
 
       const chunk = vehicles.slice(i, i + PARALLEL);
       const promises = chunk.map(async (vehicle: any) => {
+        await requirePublicParent(supabase, vehicle.id);
         const input = await loadDescriptionInput(supabase, vehicle);
         if (input.text.length < 100) throw new Error("Preserved listing text too short");
 
@@ -607,7 +624,7 @@ Deno.serve(async (req) => {
           const { conditions, model: condModel2 } = await extractConditionsWithLLM(input.text, vehicle);
           conditionArtifact = await conditionExtractionArtifact(input, conditions, condModel2);
           conditionResult = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey, condModel2, input
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel2, input, supabase
           );
           console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${conditionResult.ingested} conditions extracted`);
         } catch (condErr: any) {
@@ -618,12 +635,14 @@ Deno.serve(async (req) => {
 
         // Await the sanctioned observation writer. The old bridge independently
         // gap-filled canonical vehicle fields; mining only produces cited reports.
+        await requirePublicParent(supabase, vehicle.id);
         const { error: observationError, data: observationResult } = await supabase.functions.invoke("ingest-observation", {
           body: { vehicle_id: vehicle.id, source_slug: "ai-description-extraction", kind: "specification",
             source_url: input.sourceUrl, raw_source_ref: input.sourceRef,
-            observed_at: input.observedAt || input.ingestedAt,
+            observed_at: input.observedAt || input.capturedAt || input.ingestedAt,
             structured_data: { ...discovered, is_inferred: true, ...descriptionSourceMetadata(input) },
-            extraction_metadata: { inference_at: new Date().toISOString(), ...descriptionSourceMetadata(input) },
+            extraction_metadata: { inference_at: new Date().toISOString(), ...descriptionSourceMetadata(input),
+              ...(conditionArtifact ? { __description_condition_extraction: conditionArtifact } : {}) },
             citation: { excerpt: input.text }, extraction_method: "description_discovery_v2_full_source",
             agent_model: discModel, agent_inferred: true, defer_analysis: true },
         });
@@ -631,13 +650,13 @@ Deno.serve(async (req) => {
           throw new Error("Sanctioned discovery observation intake failed");
         }
 
+        await requirePublicParent(supabase, vehicle.id);
         const { error: insertError } = await supabase
           .from("description_discoveries")
           .insert({
             vehicle_id: vehicle.id,
             discovered_at: new Date().toISOString(),
-            raw_extraction: { ...discovered,
-              ...(conditionArtifact ? { __description_condition_extraction: conditionArtifact } : {}) },
+            raw_extraction: discovered,
             keys_found: keysFound,
             total_fields: totalFields,
             description_length: input.text.length,
@@ -697,6 +716,7 @@ Deno.serve(async (req) => {
                 SELECT 1 FROM vehicles v
                 WHERE v.description IS NOT NULL AND length(v.description) >= 100
                 AND v.deleted_at IS NULL
+                AND v.is_public = true
                 AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                 AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)
               ) AS has_more`

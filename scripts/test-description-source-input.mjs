@@ -17,12 +17,19 @@ const quote = 'The trunk floor needs replacement.';
 const fullText = `${'Preserved seller prose. '.repeat(420)}Literal $& costs. ${quote} Choice of two rear axles, both needing rebuild.`;
 const vehicle = { id: vehicleId, year: 1970, make: 'Fixture', model: 'Coupe',
   description: fullText.slice(0, 480), listing_url: listingUrl, discovery_url: null,
-  deleted_at: null, listing_kind: null, sale_price: null };
+  deleted_at: null, listing_kind: null, sale_price: null, is_public: true };
 const observation = { id: 'original-capture', vehicle_id: vehicleId, kind: 'listing', subject_type: 'vehicle',
   source_url: listingUrl, content_text: fullText, structured_data: {}, is_superseded: false,
   observed_at: eventTime, ingested_at: captureTime };
 const rawMetadata = { id: 'raw-capture', vehicle_id: vehicleId, field_name: 'raw_listing_description',
   field_value: fullText, source_url: listingUrl, extracted_at: captureTime };
+const snapshotId = '00000000-0000-4000-8000-000000000002';
+const snapshotIngestion = '2020-01-03T00:00:00.000Z';
+const snapshot = { id: snapshotId, platform: 'bat', listing_url: listingUrl, fetched_at: captureTime,
+  created_at: snapshotIngestion, success: true, http_status: 200,
+  html: `<div class="post-content"><p>${fullText}</p></div>`,
+  metadata: { vehicle_id: vehicleId, vehicle_matched: true } };
+const snapshotVehicle = { ...vehicle, origin_metadata: { bat_snapshot_parsed: { snapshot_id: snapshotId } } };
 
 function compile(path) {
   const { outputText, diagnostics } = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
@@ -36,6 +43,7 @@ const sources = new Map([
   ['input', compile('../supabase/functions/discover-description-data/descriptionInput.ts')],
   ['guard', compile('../supabase/functions/_shared/writeGuard.ts')],
   ['hash', compile('../supabase/functions/_shared/observationContentHash.ts')],
+  ['bat', compile('../supabase/functions/_shared/batParser.ts')],
 ]);
 
 function fixture(options = {}) {
@@ -43,8 +51,14 @@ function fixture(options = {}) {
   const successfulIntake = new Map();
   const rows = {
     vehicles: [options.vehicle ?? vehicle],
-    vehicle_observations: options.observations ?? [observation],
+    vehicle_observations: [...(options.observations ?? [observation]), ...(options.cacheArtifact ? [{
+      ...observation, id: 'retained-specification', kind: 'specification',
+      raw_source_ref: options.cacheArtifact.source_ref, source_url: options.cacheArtifact.source_url,
+      extraction_method: 'description_discovery_v2_full_source',
+      extraction_metadata: { __description_condition_extraction: options.cacheArtifact },
+    }] : [])],
     extraction_metadata: options.metadata ?? [],
+    listing_page_snapshots: options.snapshots ?? [],
     description_discoveries: options.cached ? [{ id: 'existing-cache', vehicle_id: vehicleId, keys_found: 4,
       raw_extraction: options.cacheArtifact ? { __description_condition_extraction: options.cacheArtifact } : {} }] : [],
   };
@@ -80,18 +94,22 @@ function fixture(options = {}) {
       if (existing) return Response.json({ success: true, observation_id: existing, duplicate: true });
       const id = `inferred-${successfulIntake.size + 1}`;
       successfulIntake.set(hash, id);
+      rows.vehicle_observations.push({ ...body, id, ingested_at: new Date().toISOString(), subject_type: 'vehicle',
+        is_superseded: false });
       return Response.json({ success: true, observation_id: id, duplicate: false });
     }
     if (url.pathname.endsWith('/functions/v1/discover-description-data')) {
       assert.fail('A single-vehicle or refused batch must not start continuation');
     }
     if (url.pathname.endsWith('/rpc/observation_is_public')) {
-      assert.equal(body.p_kind, 'listing');
+      assert.ok(['listing', 'specification'].includes(body.p_kind));
       return Response.json(options.visibilityError ? { message: 'Synthetic visibility failure' } :
         options.restricted !== true, { status: options.visibilityError ? 500 : 200 });
     }
     if (url.pathname.endsWith('/rpc/execute_sql')) {
-      return Response.json(body.query.includes('SELECT EXISTS') ? [{ has_more: true }] : rows.vehicles);
+      assert.match(body.query, /v\.is_public = true/, 'Every batch/remaining query gates public parents');
+      return Response.json(body.query.includes('SELECT EXISTS') ? [{ has_more: true }] : rows.vehicles
+        .filter(row => row.is_public === true && row.deleted_at == null && row.listing_kind !== 'non_vehicle_item'));
     }
     if (url.pathname.endsWith('/rpc/persist_realization_plan')) return Response.json({});
     const table = url.pathname.split('/').at(-1);
@@ -105,14 +123,19 @@ function fixture(options = {}) {
       return new Response(null, { status: 201 });
     }
     assert.equal(method, 'GET');
-    if (table === 'vehicle_observations' || table === 'extraction_metadata') {
+    assert.notEqual(table, 'extraction_metadata', 'Publicly writable raw metadata has no source custody');
+    if (table === 'vehicle_observations') {
       assert.equal(url.searchParams.get('vehicle_id'), `eq.${vehicleId}`);
       assert.equal(url.searchParams.get('limit'), '5', 'Source selection is bounded per vehicle');
     }
-    if (options.lookupFailure && table === 'extraction_metadata') {
+    if ((options.lookupFailure && table === 'vehicle_observations') ||
+        (options.snapshotFailure && table === 'listing_page_snapshots')) {
       return Response.json({ message: 'Synthetic lookup failure' }, { status: 500 });
     }
     let result = [...rows[table]];
+    if (table === 'vehicles' && options.privateAfterModel && modelPrompts.length) {
+      result = result.map(row => ({ ...row, is_public: false }));
+    }
     for (const [key, value] of url.searchParams) {
       if (value.startsWith('eq.')) result = result.filter(row => String(row[key]) === value.slice(3));
       if (value === 'is.null') result = result.filter(row => row[key] == null);
@@ -146,6 +169,7 @@ function fixture(options = {}) {
             auth: { persistSession: false, autoRefreshToken: false } }),
         };
         if (specifier === './descriptionInput.ts') return load('input');
+        if (specifier === '../_shared/batParser.ts') return load('bat');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path is used') };
         assert.fail(`Unexpected import ${specifier}`);
@@ -192,26 +216,29 @@ test('normal miner sends the entire preserved source to both passes, then awaits
   assert.equal(f.intake.find(row => row.kind === 'specification').citation.excerpt, fullText);
 });
 
-test('480-char summary resolves full metadata without inventing a listing event clock; replay is stable', async () => {
-  const f = fixture({ observations: [], metadata: [rawMetadata] });
+test('480-char summary resolves protected same-source snapshot text; source, capture and ingestion clocks remain separate', async () => {
+  const f = fixture({ observations: [], metadata: [rawMetadata], vehicle: snapshotVehicle, snapshots: [snapshot] });
   const { result } = await f.run({ vehicle_id: vehicleId });
   assert.equal(result.discovered, 1);
   for (const claim of f.intake) {
-    assert.equal(claim.raw_source_ref, 'extraction_metadata:raw-capture');
+    assert.equal(claim.raw_source_ref, `listing_page_snapshots:${snapshotId}`);
     assert.equal(claim.structured_data.source_observed_at, null);
     assert.equal(claim.structured_data.source_event_time_status, 'unknown');
     assert.equal(claim.structured_data.observation_time_basis, 'source_capture');
+    assert.equal(claim.structured_data.source_captured_at, captureTime);
+    assert.equal(claim.structured_data.source_ingested_at, snapshotIngestion);
+    assert.equal(claim.structured_data.source_custody, 'protected_snapshot');
     assert.equal(claim.observed_at, captureTime);
   }
-  const input = { text: fullText, sourceRef: 'extraction_metadata:raw-capture', sourceUrl: listingUrl,
-    observedAt: null, ingestedAt: captureTime };
+  const input = { text: fullText, sourceRef: `listing_page_snapshots:${snapshotId}`, sourceUrl: listingUrl,
+    observedAt: null, capturedAt: captureTime, ingestedAt: snapshotIngestion };
   const first = f.input.conditionObservationInput(vehicleId, { quote }, input, 'fixture', '2021-01-01T00:00:00Z');
   const replay = f.input.conditionObservationInput(vehicleId, { quote }, input, 'fixture', '2022-01-01T00:00:00Z');
   assert.equal(await f.hash.observationContentHash(first), await f.hash.observationContentHash(replay));
 });
 
 test('condition-only point request is scoped and uses full input despite the short summary', async () => {
-  const f = fixture({ observations: [], metadata: [rawMetadata] });
+  const f = fixture({ observations: [], vehicle: snapshotVehicle, snapshots: [snapshot] });
   const { result } = await f.run({ mode: 'condition_backfill', vehicle_id: vehicleId, continue: true });
   assert.equal(result.processed, 1);
   assert.equal(result.conditions_ingested, 1);
@@ -245,10 +272,88 @@ test('operator preview needs service role and performs no writes or model calls'
   assert.equal((await f.run({ mode: 'preview', vehicle_id: vehicleId }, userToken)).status, 403);
 });
 
+test('private, deleted and nonvehicle parents cannot read a cache, mine or write through point or batch modes', async () => {
+  for (const changed of [{ is_public: false }, { deleted_at: captureTime }, { listing_kind: 'non_vehicle_item' }]) {
+    for (const mode of [undefined, 'condition_backfill']) {
+      const f = fixture({ vehicle: { ...vehicle, ...changed }, cached: true });
+      const point = await f.run({ vehicle_id: vehicleId, mode });
+      assert.equal(point.status, 500);
+      assert.match(point.result.error, /Public vehicle unavailable/);
+      assert.equal(f.requests.filter(r => /description_discoveries|vehicle_observations|listing_page_snapshots/
+        .test(r.url.pathname)).length, 0, 'Refusal precedes cache/source access');
+      const batch = await f.run({ batch_size: 1, mode });
+      assert.equal(batch.result.discovered ?? batch.result.processed, 0);
+      assert.equal(f.modelPrompts.length + f.intake.length + f.cacheWrites.length, 0);
+    }
+  }
+});
+
+test('a visibility change during inference is rechecked before intake and public cache writes', async () => {
+  const f = fixture({ privateAfterModel: true });
+  const { result } = await f.run({ vehicle_id: vehicleId });
+  assert.equal(result.discovered, 0);
+  assert.match(result.error_details[0], /Public vehicle unavailable/);
+  assert.equal(f.intake.length + f.cacheWrites.length, 0);
+});
+
+test('the service-only no-write preview may inspect a private parent without creating public cache artifacts', async () => {
+  const f = fixture({ vehicle: { ...vehicle, is_public: false }, noModelKey: true });
+  const { result } = await f.run({ mode: 'preview', vehicle_id: vehicleId });
+  assert.equal(result.success, true);
+  assert.equal(result.source_custody, 'sanctioned_observation');
+  assert.equal(f.modelPrompts.length + f.intake.length + f.cacheWrites.length, 0);
+});
+
+test('publicly writable raw metadata is never advertised as original captured text or model input', async () => {
+  const f = fixture({ observations: [], metadata: [rawMetadata] });
+  const { result } = await f.run({ vehicle_id: vehicleId });
+  assert.equal(result.discovered, 0);
+  assert.match(result.error_details[0], /metadata custody unknown/);
+  assert.equal(f.modelPrompts.length + f.intake.length + f.cacheWrites.length, 0);
+});
+
+for (const [name, changed, extra] of [
+  ['wrong source', { listing_url: 'https://other.invalid/two' }],
+  ['relinked vehicle', { metadata: { vehicle_matched: true, vehicle_id: 'other-vehicle' } }],
+  ['unmatched vehicle', { metadata: { vehicle_matched: false, vehicle_id: vehicleId } }],
+  ['failed capture', { success: false }],
+  ['wrong platform', { platform: 'unknown' }],
+  ['HTTP failure', { http_status: 500 }],
+  ['unknown HTTP status', { http_status: null }],
+  ['unknown capture time', { fetched_at: null }],
+  ['unknown ingestion time', { created_at: null }],
+  ['future capture', { fetched_at: '2999-01-01T00:00:00Z' }],
+  ['future ingestion', { created_at: '2999-01-01T00:00:00Z' }],
+  ['receipt-only source', { html: null, html_storage_path: 'protected/path.html' }],
+  ['oversized archive', { html: 'x'.repeat(5_000_001) }],
+  ['missing preserved prose', { html: '<html>Only a listing title</html>' }],
+  ['unavailable snapshot', {}, { snapshots: [] }],
+  ['snapshot lookup failure', {}, { snapshotFailure: true }],
+]) {
+  test(`${name} cannot be rescued by mutable metadata or a summary`, async () => {
+    const f = fixture({ vehicle: snapshotVehicle, observations: [], metadata: [rawMetadata],
+      snapshots: [{ ...snapshot, ...changed }], ...extra });
+    const { result } = await f.run({ vehicle_id: vehicleId });
+    assert.equal(result.discovered, 0);
+    assert.equal(result.errors, 1);
+    assert.match(result.error_details[0], /snapshot/);
+    assert.equal(f.modelPrompts.length + f.intake.length + f.cacheWrites.length, 0);
+  });
+}
+
+test('a protected but older capture cannot repair a newer missing read', async () => {
+  const f = fixture({ vehicle: snapshotVehicle, snapshots: [snapshot],
+    observations: [{ ...observation, content_text: null, ingested_at: '2020-02-01T00:00:00Z' }] });
+  const { result } = await f.run({ vehicle_id: vehicleId });
+  assert.match(result.error_details[0], /unavailable/);
+  assert.equal(f.modelPrompts.length + f.intake.length + f.cacheWrites.length, 0);
+});
+
 for (const [name, options, error] of [
   ['missing capture', { observations: [] }, /unavailable/],
   ['unknown listing URL', { observations: [], metadata: [], vehicle: { ...vehicle, listing_url: null } }, /unknown or ambiguous/],
-  ['ambiguous source', { vehicle: { ...vehicle, listing_url: null }, metadata: [{ ...rawMetadata, source_url: 'https://other.invalid/two' }] }, /ambiguous/],
+  ['ambiguous source', { vehicle: { ...vehicle, listing_url: null }, observations: [observation,
+    { ...observation, source_url: 'https://other.invalid/two' }] }, /ambiguous/],
   ['mismatched URL', { observations: [{ ...observation, source_url: 'https://other.invalid/two' }] }, /unavailable/],
   ['oversized latest capture', { observations: [{ ...observation, content_text: 'x'.repeat(32_001) }],
     metadata: [{ ...rawMetadata, extracted_at: eventTime }] }, /not truncated/],
@@ -280,13 +385,14 @@ test('latest event wins, NULL supersession is eligible, tracking does not change
   assert.ok(f.intake.every(row => row.raw_source_ref === 'vehicle_observations:new'));
 });
 
-test('newer explicit full metadata is used instead of an observation summary', async () => {
+test('newer protected snapshot prose is used instead of an observation summary', async () => {
   const f = fixture({ observations: [{ ...observation, content_text: fullText.slice(0, 480) }],
-    metadata: [{ ...rawMetadata, extracted_at: '2020-02-01T00:00:00Z' }] });
+    vehicle: snapshotVehicle, snapshots: [{ ...snapshot, fetched_at: '2020-02-01T00:00:00Z',
+      created_at: '2020-02-01T00:00:01Z' }] });
   const { result } = await f.run({ vehicle_id: vehicleId });
   assert.equal(result.discovered, 1);
   assert.ok(f.modelPrompts.every(prompt => prompt.includes(fullText)));
-  assert.ok(f.intake.every(row => row.raw_source_ref === 'extraction_metadata:raw-capture'));
+  assert.ok(f.intake.every(row => row.raw_source_ref === `listing_page_snapshots:${snapshotId}`));
 });
 
 test('a 480-char structured summary cannot hide fuller content from the same capture', async () => {
@@ -343,7 +449,10 @@ test('partial condition intake retries from the retained artifact without model 
   assert.equal(f.successfulIntake.size, 1);
   assert.equal(f.cacheWrites.length, 1);
   const retainedCache = JSON.stringify(f.cacheWrites[0]);
-  assert.ok(f.cacheWrites[0].raw_extraction.__description_condition_extraction.conditions.length > 0);
+  assert.equal(f.cacheWrites[0].raw_extraction.__description_condition_extraction, undefined,
+    'Condition quotes are never retained in the public learning cache');
+  assert.ok(f.intake.find(row => row.kind === 'specification').extraction_metadata
+    .__description_condition_extraction.conditions.length > 0, 'Original output stays under observation parent RLS');
   options.conditionFailure = false;
   const retry = await f.run(first.result.condition_retries[0]);
   assert.equal(retry.result.cached_condition_passes, 1);
