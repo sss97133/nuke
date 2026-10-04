@@ -37,6 +37,9 @@ CREATE TABLE public.make_model_profiles(subject_id uuid PRIMARY KEY,grain text,y
 CREATE TABLE public.observation_sources(id uuid PRIMARY KEY,slug text UNIQUE);
 CREATE TABLE public.pipeline_registry(table_name text,column_name text,owned_by text,description text,do_not_write_directly boolean,write_via text,UNIQUE(table_name,column_name));
 INSERT INTO public.observation_sources VALUES ('22222222-2222-2222-2222-222222222222','bat');
+CREATE TABLE public.vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,
+  source_platform text,source_url text,source_listing_id text,event_type text,event_status text,final_price numeric,
+  sold_at timestamptz,ended_at timestamptz,created_at timestamptz,updated_at timestamptz,extracted_at timestamptz);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,source_id uuid REFERENCES public.observation_sources,
   kind text,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,
   source_url text,source_identifier text,raw_source_ref text,extraction_method text,extractor_id uuid,structured_data jsonb,content_hash text,
@@ -60,6 +63,9 @@ CREATE FUNCTION public.valuation_by_ymm(integer DEFAULT NULL,text DEFAULT NULL,t
 \ir ../../supabase/migrations/20261004093000_valuation_source_sale_pruning.sql
 \ir ../../supabase/migrations/20261004101500_valuation_archived_sale_observations.sql
 \ir ../../supabase/migrations/20261004104500_valuation_source_capture_durability.sql
+ALTER TABLE public.vehicle_observations ADD COLUMN source_vehicle_event_id uuid REFERENCES public.vehicle_events;
+ALTER TABLE public.vehicle_observations ADD COLUMN extraction_metadata jsonb;
+\ir ../../supabase/migrations/20261004190312_valuation_typed_sale_episode_ancestry.sql
 
 CREATE FUNCTION pg_temp.seed(n integer,d jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE vid uuid:=md5('vehicle-'||n)::uuid; sid uuid:=md5('snapshot-'||n)::uuid;
@@ -83,7 +89,7 @@ BEGIN
       'sale_date',coalesce(d->>'parsed_date',to_char(sale_day,'FMMM/FMDD/YY')))));
 END $$;
 CREATE FUNCTION pg_temp.base() RETURNS void LANGUAGE plpgsql AS $$ BEGIN
-  TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations;
+  TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events;
   FOR n IN 1..10 LOOP PERFORM pg_temp.seed(n); END LOOP;
 END $$;
 CREATE FUNCTION pg_temp.read(d jsonb DEFAULT '{}'::jsonb) RETURNS jsonb LANGUAGE sql AS $$
@@ -160,11 +166,11 @@ SELECT pg_temp.ok('public route returns sanitized evidence but cannot read raw s
 RESET ROLE;
 SELECT pg_temp.ok('only one RPC signature remains',(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='valuation_by_ymm')=1);
 
-TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations;
+TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events;
 INSERT INTO public.vehicles(id,year,make,model,is_public)
 SELECT md5('cap-'||n)::uuid,1970,'Synthetic','Coupe',true FROM generate_series(1,10001) n;
 SELECT pg_temp.ok('10001-member cap refuses rather than returning a sampled statistic',pg_temp.read() ? 'error' AND pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>'{stats}'='null'::jsonb);
-TRUNCATE public.vehicles,public.vehicle_observations;
+TRUNCATE public.vehicles,public.vehicle_observations,public.vehicle_events;
 SELECT pg_temp.ok('zero eligible means unknown aggregates, not zero prices',pg_temp.read()#>>'{stats,sold_count}'='0' AND pg_temp.read()#>'{stats,median}'='null'::jsonb AND pg_temp.read()#>'{receipt,percentile}'='null'::jsonb);
 
 -- The same fixtures execute against parseBaTHTML in batComps.test.ts. This reader
@@ -218,7 +224,7 @@ DECLARE s public.listing_page_snapshots;v public.vehicles;r jsonb;BEGIN
     coalesce(row_patch->>'kind','sale_result'),v.sale_date::timestamp AT TIME ZONE 'UTC',
     CASE WHEN row_patch ? 'ingested_at' THEN (row_patch->>'ingested_at')::timestamptz ELSE '2026-01-02T00:00:00.000123Z'::timestamptz END,
     coalesce((row_patch->>'superseded')::boolean,false),coalesce(row_patch->>'source_url',s.listing_url),
-    'archived-sale:'||s.id||':batParser:1.0.0_sale_grammar_with_ambiguity_refusal',
+    'archived-sale:'||s.id||':'||(r->>'parser'),
     coalesce(row_patch->>'raw_source_ref','listing_page_snapshots:'||s.id),coalesce(row_patch->>'extraction_method','protected_archived_sale_observation_v1'),
     (row_patch->>'extractor_id')::uuid,jsonb_build_object('source_sale_receipt',r),md5(r::text),
     CASE WHEN row_patch ? 'source_snapshot_id' THEN (row_patch->>'source_snapshot_id')::uuid ELSE s.id END)
@@ -255,7 +261,9 @@ END $$;
 -- exact receipt after reusing stored byte length, then conflict rather than replace.
 DO $$ DECLARE first_id uuid;first_ingest timestamptz;BEGIN
   SELECT id,ingested_at INTO first_id,first_ingest FROM public.vehicle_observations;
-  INSERT INTO public.vehicle_observations SELECT gen_random_uuid(),vehicle_id,source_id,kind,observed_at,'2026-01-03T00:00:00Z',is_superseded,
+  INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,kind,observed_at,ingested_at,is_superseded,
+    source_url,source_identifier,raw_source_ref,extraction_method,extractor_id,structured_data,content_hash,source_snapshot_id)
+  SELECT gen_random_uuid(),vehicle_id,source_id,kind,observed_at,'2026-01-03T00:00:00Z',is_superseded,
     source_url,source_identifier,raw_source_ref,extraction_method,extractor_id,structured_data,content_hash,source_snapshot_id FROM public.vehicle_observations
   ON CONFLICT(source_id,source_identifier,kind,content_hash) DO NOTHING;
   PERFORM pg_temp.ok('actual uniqueness preserves first observation ID and ingestion on replay',
@@ -426,3 +434,82 @@ SELECT pg_temp.ok('future current locator cannot turn exactly 10000 earlier sour
 SELECT pg_temp.ok('the same new locator counts once known and makes the 10001 capture refusal explicit',
   pg_temp.read()->>'error' LIKE '%10000-source-capture%' AND pg_temp.read()->'stats'='null'::jsonb
   AND pg_temp.read()#>>'{coverage,capture_refs_at_least}'='10001');
+
+-- Producer-shaped synthetic consumer fixtures. Actual handler→guard coupling
+-- is exercised separately; this executes the real reader on its admitted tuple.
+CREATE FUNCTION pg_temp.typed_admit(n integer,inline_body boolean DEFAULT false) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE raw text;BEGIN
+  SELECT html INTO raw FROM public.listing_page_snapshots WHERE id=md5('snapshot-'||n)::uuid;
+  PERFORM pg_temp.admit(n,'{"parser":"batParser:1.0.0:strict_sale_tuple_v1"}');
+  INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,source_listing_id,event_type,event_status,
+    final_price,sold_at,ended_at,created_at,updated_at,extracted_at)
+  SELECT md5('episode-'||n)::uuid,v.id,'bat',v.listing_url,v.listing_url,'auction','sold',v.sale_price,
+    v.sale_date::timestamptz,v.sale_date::timestamptz,'2025-06-16T00:00:00.123456Z',NULL,'2025-06-16T12:00:00Z'
+  FROM public.vehicles v WHERE v.id=md5('vehicle-'||n)::uuid;
+  UPDATE public.vehicle_observations o SET source_vehicle_event_id=e.id,
+    extraction_metadata=jsonb_build_object('source_episode_context',to_jsonb(e),
+      'private_diagnostic','Morgan Example PRIVATE SOURCE HEADER')
+  FROM public.vehicle_events e WHERE e.vehicle_id=o.vehicle_id AND o.vehicle_id=md5('vehicle-'||n)::uuid;
+  IF inline_body THEN
+    UPDATE public.listing_page_snapshots SET html=raw WHERE id=md5('snapshot-'||n)::uuid;
+    UPDATE public.vehicle_observations SET structured_data=jsonb_set(structured_data,'{source_sale_receipt,body_source}','"inline"')
+    WHERE vehicle_id=md5('vehicle-'||n)::uuid;
+  END IF;
+END $$;
+
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11);
+DO $$ DECLARE r jsonb;e jsonb;BEGIN
+  r:=pg_temp.read(); SELECT x INTO e FROM jsonb_array_elements(r#>'{receipt,eligible}') x WHERE x->>'vehicleId'=md5('vehicle-11')::uuid::text;
+  PERFORM pg_temp.ok('actual canonical parser identity qualifies without relabelling',r#>>'{stats,sold_count}'='11'
+    AND r#>>'{receipt,coverage,typed_sale_episode_links}'='1' AND e->>'sourceVehicleEventId'=md5('episode-11')::uuid::text
+    AND e->>'sourceParser'='batParser:1.0.0:strict_sale_tuple_v1' AND e->>'admissionParser'=e->>'sourceParser');
+  PERFORM pg_temp.ok('public episode ancestry withholds private source context and diagnostic names',
+    r::text NOT LIKE '%Morgan Example%' AND r::text NOT LIKE '%source_episode_context%' AND r::text NOT LIKE '%private_diagnostic%');
+END $$;
+UPDATE public.vehicle_observations SET source_identifier=replace(source_identifier,'strict_sale_tuple_v1','unsupported_parser');
+SELECT pg_temp.ok('parser replay identity cannot be forged independently of receipt',pg_temp.read()#>>'{stats,sold_count}'='10');
+
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11,true);
+DO $$ DECLARE r jsonb;e jsonb;BEGIN
+  r:=pg_temp.read(); SELECT x INTO e FROM jsonb_array_elements(r#>'{receipt,eligible}') x WHERE x->>'vehicleId'=md5('vehicle-11')::uuid::text;
+  PERFORM pg_temp.ok('typed inline ancestry retains independent raw verification and separate producer parser',
+    r#>>'{stats,sold_count}'='11' AND r#>>'{receipt,coverage,inline_raw_verified}'='11' AND r#>>'{receipt,coverage,archived_admitted}'='0'
+    AND e->>'sourceVehicleEventId'=md5('episode-11')::uuid::text AND e->>'sourceVerification'='per_read_inline_hash_parser'
+    AND e->>'admissionParser'='batParser:1.0.0:strict_sale_tuple_v1'
+    AND (e->>'derivedIngestedAt')::timestamptz=(e->>'knownAt')::timestamptz);
+  r:=pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}');
+  SELECT x INTO e FROM jsonb_array_elements(r#>'{receipt,eligible}') x WHERE x->>'vehicleId'=md5('vehicle-11')::uuid::text;
+  PERFORM pg_temp.ok('later ancestry cannot leak into earlier raw evidence receipt',r#>>'{stats,sold_count}'='11'
+    AND r#>>'{receipt,coverage,typed_sale_episode_links}'='0' AND e->'sourceVehicleEventId'='null'::jsonb
+    AND e->'derivedObservationId'='null'::jsonb AND e->'admissionParser'='null'::jsonb);
+END $$;
+UPDATE public.listing_page_snapshots SET html='corrupted available body' WHERE id=md5('snapshot-11')::uuid;
+SELECT pg_temp.ok('typed ancestry cannot substitute for bad available inline bytes',pg_temp.read()#>>'{stats,sold_count}'='10');
+
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11);
+DO $$ DECLARE changes jsonb;original public.vehicle_events;BEGIN
+  SELECT * INTO original FROM public.vehicle_events WHERE id=md5('episode-11')::uuid;
+  FOR changes IN SELECT value FROM jsonb_array_elements('[{"source_url":"https://bringatrailer.com/listing/different/"},
+    {"vehicle_id":"99b5202f-f181-c828-d461-3571f0f67f94"},{"source_platform":"other"},{"event_status":"unsold"},
+    {"final_price":22000},{"updated_at":"2026-01-03T00:00:00Z"},{"source_listing_id":"different"}]'::jsonb) LOOP
+    UPDATE public.vehicle_events e SET source_url=x.source_url,vehicle_id=x.vehicle_id,source_platform=x.source_platform,
+      event_status=x.event_status,final_price=x.final_price,updated_at=x.updated_at,source_listing_id=x.source_listing_id
+    FROM jsonb_populate_record(original,changes) x WHERE e.id=original.id;
+    PERFORM pg_temp.ok('mutable native context refuses current presentation '||changes::text,
+      pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,exclusions,source_episode_context_changed}'='1');
+  END LOOP;
+END $$;
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11);
+UPDATE public.vehicle_observations SET extraction_metadata='{}';
+SELECT pg_temp.ok('missing pinned context is unknown and never positively linked',pg_temp.read()#>>'{stats,sold_count}'='10');
+UPDATE public.vehicle_observations SET extraction_metadata=jsonb_build_object('source_episode_context',to_jsonb(e))
+FROM public.vehicle_events e WHERE e.id=source_vehicle_event_id;
+UPDATE public.vehicle_observations SET extraction_metadata=jsonb_set(extraction_metadata,'{source_episode_context,created_at}','"invalid clock"');
+SELECT pg_temp.ok('malformed producer clock refuses without a reader cast error',pg_temp.read()#>>'{stats,sold_count}'='10');
+
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11);
+UPDATE public.vehicle_observations SET extraction_metadata=jsonb_set(extraction_metadata,'{source_episode_context,created_at}','"2025-06-15T17:00:00.123456-07:00"');
+SELECT pg_temp.ok('equivalent explicitly zoned microsecond native context agrees',pg_temp.read()#>>'{stats,sold_count}'='11');
+UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-11')::uuid;
+SELECT pg_temp.ok('typed ancestry never publishes a private parent or its aggregate contribution',
+  pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,typed_sale_episode_links}'='0');
