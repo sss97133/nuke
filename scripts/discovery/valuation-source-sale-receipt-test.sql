@@ -386,6 +386,11 @@ DO $$ DECLARE k integer;sid uuid;raw text:='Sold for <strong>USD $11,000</strong
     PERFORM pg_temp.admit(11,'{}','{"ingested_at":"2026-01-02T12:00:00Z"}',sid);
   END LOOP;
 END $$;
+-- Populate planner statistics after the synthetic growth, as the existing
+-- production intake tables already are. Do not rely on autovacuum timing or
+-- carry the earlier empty-table plan into the dense capture boundary.
+ANALYZE public.vehicle_observations;
+ANALYZE public.listing_page_snapshots;
 SELECT pg_temp.ok('future derived captures cannot consume the earlier knowledge capture cap',
   pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{stats,sold_count}'='11'
   AND pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{receipt,coverage,capture_presentations}'='11');
@@ -402,6 +407,8 @@ DELETE FROM public.listing_page_snapshots WHERE id IN
   (SELECT md5('extra-capture-'||k)::uuid FROM generate_series(1,11) k);
 UPDATE public.vehicle_observations SET ingested_at='2026-01-02T03:00:00Z'
   WHERE source_snapshot_id<>md5('snapshot-11')::uuid;
+-- The bulk clock change reverses the cutoff selectivity; refresh its statistics.
+ANALYZE public.vehicle_observations;
 SELECT pg_temp.ok('exact 10000 capture boundary resolves complete source evidence at distinct vehicle grain',
   pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{stats,sold_count}'='11'
   AND pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{receipt,coverage,capture_presentations}'='10000'
