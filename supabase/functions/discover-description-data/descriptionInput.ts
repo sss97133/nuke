@@ -12,6 +12,7 @@ export interface DescriptionInput {
   ingestedAt: string;
   textField?: string;
   capturedAt?: string;
+  captureSha256?: string;
   custody?: "sanctioned_observation" | "protected_snapshot";
 }
 
@@ -79,7 +80,7 @@ export async function loadDescriptionInput(
       throw new Error("Snapshot locator invalid; source custody unknown, mining refused");
     }
     const { data: snapshot, error } = await supabase.from("listing_page_snapshots")
-      .select("id,platform,listing_url,fetched_at,created_at,success,http_status,html,metadata")
+      .select("id,platform,listing_url,fetched_at,created_at,success,http_status,html,html_sha256,metadata")
       .eq("id", snapshotId).maybeSingle();
     const capture = Date.parse(snapshot?.fetched_at);
     const ingestion = Date.parse(snapshot?.created_at);
@@ -97,12 +98,16 @@ export async function loadDescriptionInput(
       if (typeof snapshot.html !== "string" || !snapshot.html || snapshot.html.length > 5_000_000) {
         throw new Error("Protected snapshot text unavailable or oversized; mining refused");
       }
+      if (typeof snapshot.html_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(snapshot.html_sha256) ||
+          snapshot.html_sha256.toLowerCase() !== await descriptionInputFingerprint({ text: snapshot.html } as DescriptionInput)) {
+        throw new Error("Protected snapshot capture hash missing or mismatched; mining refused");
+      }
       const text = extractDescription(snapshot.html);
       if (!text || text.length < 100) throw new Error("Protected snapshot prose unavailable; mining refused");
       return requireCompleteInput({ text, sourceRef: `listing_page_snapshots:${snapshot.id}`,
         sourceUrl: snapshot.listing_url, observedAt: null, capturedAt: snapshot.fetched_at,
         ingestedAt: snapshot.created_at, textField: "listing_page_snapshots.html:batParser.extractDescription",
-        custody: "protected_snapshot" });
+        custody: "protected_snapshot", captureSha256: snapshot.html_sha256.toLowerCase() });
     }
   }
   if (source) {
@@ -129,6 +134,7 @@ export function descriptionSourceMetadata(input: DescriptionInput) {
   return { source_ref: input.sourceRef, source_url: input.sourceUrl,
     source_observed_at: input.observedAt, source_ingested_at: input.ingestedAt,
     source_captured_at: input.capturedAt || null,
+    source_capture_sha256: input.captureSha256 || null,
     source_custody: input.custody || "unknown",
     source_event_time_status: input.observedAt ? "known" : "unknown",
     observation_time_basis: input.observedAt ? "source_event" : "source_capture",
@@ -154,6 +160,7 @@ export async function reusableConditionExtraction(rawExtraction: any, input: Des
   if (!cached || cached.source_ref !== input.sourceRef || cached.source_url !== input.sourceUrl ||
       cached.source_observed_at !== input.observedAt || cached.source_ingested_at !== input.ingestedAt ||
       cached.source_captured_at !== (input.capturedAt || null) ||
+      cached.source_capture_sha256 !== (input.captureSha256 || null) ||
       cached.input_sha256 !== await descriptionInputFingerprint(input)) return null;
   if (!Array.isArray(cached.conditions) || typeof cached.model !== "string" || !cached.model) {
     throw new Error("Cached condition artifact malformed; retry refused");

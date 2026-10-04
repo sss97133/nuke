@@ -1,6 +1,7 @@
 // Actual Edge handler + installed Supabase SDK, synthetic HTTP adapter only.
 // NODE_PATH=nuke_frontend/node_modules node --test scripts/test-description-source-input.mjs
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
@@ -30,6 +31,7 @@ const snapshot = { id: snapshotId, platform: 'bat', listing_url: listingUrl, fet
   html: `<div class="post-content"><p>${fullText}</p></div>`,
   metadata: { vehicle_id: vehicleId, vehicle_matched: true } };
 const snapshotVehicle = { ...vehicle, origin_metadata: { bat_snapshot_parsed: { snapshot_id: snapshotId } } };
+snapshot.html_sha256 = createHash('sha256').update(snapshot.html).digest('hex');
 
 function compile(path) {
   const { outputText, diagnostics } = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
@@ -228,6 +230,7 @@ test('480-char summary resolves protected same-source snapshot text; source, cap
     assert.equal(claim.structured_data.source_captured_at, captureTime);
     assert.equal(claim.structured_data.source_ingested_at, snapshotIngestion);
     assert.equal(claim.structured_data.source_custody, 'protected_snapshot');
+    assert.equal(claim.structured_data.source_capture_sha256, snapshot.html_sha256);
     assert.equal(claim.observed_at, captureTime);
   }
   const input = { text: fullText, sourceRef: `listing_page_snapshots:${snapshotId}`, sourceUrl: listingUrl,
@@ -327,6 +330,9 @@ for (const [name, changed, extra] of [
   ['receipt-only source', { html: null, html_storage_path: 'protected/path.html' }],
   ['oversized archive', { html: 'x'.repeat(5_000_001) }],
   ['missing preserved prose', { html: '<html>Only a listing title</html>' }],
+  ['missing capture hash', { html_sha256: null }],
+  ['malformed capture hash', { html_sha256: 'unknown' }],
+  ['mismatched capture hash', { html_sha256: '0'.repeat(64) }],
   ['unavailable snapshot', {}, { snapshots: [] }],
   ['snapshot lookup failure', {}, { snapshotFailure: true }],
 ]) {
