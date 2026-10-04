@@ -2,6 +2,21 @@
 \set ON_ERROR_STOP on
 \set description_reader_contract true
 \ir test_listing_observation_consensus.sql
+-- Live canonical intake's optional extractor reference is UUID, not a producer label.
+-- Keep that real PG boundary in the fixture; the SDK test traverses the actual handler.
+ALTER TABLE public.vehicle_observations ADD COLUMN extractor_id uuid;
+DO $$ BEGIN
+  ASSERT (SELECT atttypid = 'uuid'::regtype AND NOT attnotnull FROM pg_attribute
+    WHERE attrelid = 'public.vehicle_observations'::regclass AND attname = 'extractor_id');
+  ASSERT (jsonb_populate_record(NULL::public.vehicle_observations,
+    '{"extraction_method":"html_description_capture"}')).extractor_id IS NULL;
+  BEGIN
+    PERFORM jsonb_populate_record(NULL::public.vehicle_observations,
+      '{"extractor_id":"extract-bat-core"}');
+    RAISE EXCEPTION 'Producer slug unexpectedly admitted as extractor UUID';
+  EXCEPTION WHEN invalid_text_representation THEN NULL;
+  END;
+END $$;
 ALTER TYPE public.observation_kind ADD VALUE 'sale_result';
 ALTER TYPE public.observation_kind ADD VALUE 'condition';
 ALTER TYPE public.observation_kind ADD VALUE 'bid';

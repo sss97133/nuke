@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.3 — preserve full description through canonical listing intake (2026-10-04)
+ * Version: 4.2.4 — retain producer attribution without an invented extractor UUID (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -37,7 +37,7 @@ import { sourceReadClock } from "./sourceReadClock.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.3';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.4';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -2648,7 +2648,7 @@ Deno.serve(async (req) => {
     // Await the existing sanctioned intake. Capture time is not the seller's event time;
     // preserve full parsed prose independently of manual text and the 480-character summary.
     const descriptionReceipt = vehicleId ? await recordListingDescription(supabase, {
-      vehicleId, sourceUrl: listingUrlCanonical, text: descriptionRaw || "",
+      vehicleId, sourceUrl: listingUrlCanonical, text: descriptionRaw || "", extractorVersion: EXTRACTOR_VERSION,
       capturedAt: sourceFetchedAt, captureBasis: htmlSource,
       captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
       snapshotCustody: descriptionSnapshotCustody,
