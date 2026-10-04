@@ -1,0 +1,5 @@
+.feed-filter-toggle:focus-visible {
+  /* Override the shared reset so keyboard users can find the filter control. */
+  outline: 2px solid var(--text) !important;
+  outline-offset: -2px;
+}

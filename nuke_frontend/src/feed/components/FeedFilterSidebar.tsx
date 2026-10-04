@@ -199,15 +199,20 @@ export function FeedFilterSidebar({
 
   if (collapsed) {
     return (
-      <div
+      <button
+        type="button"
+        className="feed-filter-toggle"
+        aria-label="Show filters"
+        aria-expanded={false}
         style={{
           width: '32px',
           flexShrink: 0,
+          border: 'none',
           borderRight: '2px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          paddingTop: '8px',
+          padding: '8px 0 0',
           cursor: 'pointer',
           background: 'var(--surface)',
           position: 'sticky',
@@ -229,7 +234,7 @@ export function FeedFilterSidebar({
         }}>
           FILTERS {filterCount > 0 ? `(${filterCount})` : ''}
         </span>
-      </div>
+      </button>
     );
   }
 
@@ -279,13 +284,17 @@ export function FeedFilterSidebar({
             </button>
           )}
           {onToggleCollapsed && (
-            <span
+            <button
+              type="button"
+              className="feed-filter-toggle"
+              aria-label="Hide filters"
+              aria-expanded={true}
               onClick={onToggleCollapsed}
-              style={{ cursor: 'pointer', fontSize: '10px', color: 'var(--text-disabled)' }}
+              style={{ cursor: 'pointer', fontSize: '10px', color: 'var(--text-disabled)', background: 'transparent', border: 'none', padding: '4px' }}
               title="Collapse filters"
             >
               ◂
-            </span>
+            </button>
           )}
         </div>
       </div>

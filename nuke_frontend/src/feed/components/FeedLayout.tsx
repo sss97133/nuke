@@ -339,7 +339,7 @@ export function FeedLayout({
             ) : viewMode === 'grid' ? (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                 gap: '4px',
               }}>
                 {Array.from({ length: cols }, (_, colIdx) => {

@@ -17,11 +17,11 @@ interface AppHeaderProps {
 }
 
 const NAV_LINKS = [
+  { label: 'MARKET', to: '/?tab=market' },
   { label: 'FEED', to: '/?tab=feed' },
   { label: 'SEARCH', to: '/search' },
   { label: 'GARAGE', to: '/?tab=garage' },
   { label: 'JOURNAL', to: '/journal' },
-  { label: 'MARKET', to: '/market/trends' },
 ];
 
 /**
@@ -59,7 +59,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const isActive = (to: string) => {
     if (to.includes('?tab=')) {
       const tab = new URLSearchParams(to.split('?')[1]).get('tab');
-      const currentTab = new URLSearchParams(location.search).get('tab');
+      const requestedTab = new URLSearchParams(location.search).get('tab');
+      const currentTab = requestedTab === 'feed' || requestedTab === 'garage' ? requestedTab : 'market';
       return location.pathname === '/' && currentTab === tab;
     }
     return location.pathname.startsWith(to);
@@ -86,6 +87,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               key={to}
               to={to}
               className={`header-nav-link${isActive(to) ? ' active' : ''}`}
+              aria-current={isActive(to) ? 'page' : undefined}
             >
               {label}
             </PrefetchLink>

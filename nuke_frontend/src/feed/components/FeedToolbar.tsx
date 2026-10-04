@@ -136,7 +136,7 @@ export function FeedToolbar({
     >
       {/* Sort chips — hidden in table view (columns are clickable) */}
       {!isTableView && (
-        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', alignItems: 'center' }}>
           <span style={{
             fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
             textTransform: 'uppercase', color: 'var(--text-disabled)', marginRight: '4px',

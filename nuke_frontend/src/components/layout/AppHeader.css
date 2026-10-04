@@ -89,6 +89,12 @@
   color: var(--text);
 }
 
+.header-nav-link:focus-visible {
+  /* The shared reset suppresses all outlines with !important. */
+  outline: 2px solid var(--text) !important;
+  outline-offset: 2px;
+}
+
 .header-nav-link.active {
   color: var(--text);
   font-weight: 700;
@@ -282,7 +288,25 @@
    RESPONSIVE — MOBILE
    ============================================================================ */
 
+.home-mobile-nav {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  .home-mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 2px solid var(--border);
+    background: var(--surface);
+  }
+
+  .home-mobile-nav .header-nav-link {
+    padding: 8px;
+    font-size: 11px;
+  }
+
   .header {
     grid-template-columns: max-content 1fr max-content;
     gap: 6px;
