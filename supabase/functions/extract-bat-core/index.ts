@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.6 — declare source-link-only photo admission (2026-10-04)
+ * Version: 4.2.5 — pinned protected description preview and bounded native intake (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -38,7 +38,7 @@ import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.6';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.5';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
