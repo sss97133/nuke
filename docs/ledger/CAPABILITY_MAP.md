@@ -52,7 +52,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | VIN decode | `batch-vin-decode` | decode-vin-and-update (0 callers), extract-vin-from-vehicle (undeployed), vin_decode_cache (empty), vin_decoded_data (never written) |
 | Profile completeness | `calculate_vehicle_completion_algorithmic` via drain cron | calculate-profile-completeness (undeployed edge fn) |
 | Live auction sync | `sync-live-auctions` (cron */15) | sync-live-auction (singular; undeployed) |
-| Market trends (public API) | `api-v1-market-trends` + get_market_trends | calculate-market-trends (0 callers), calculate-market-indexes (undeployed, empty tables), market-spread-calculator / price-analytics (ghosts) |
+| Market trends (public API) | `api-v1-market-trends` + get_market_trends; `v_market_trend_source_labels` projects only the registered source ID/slug/display name for its bounded count reader | calculate-market-trends (0 callers), calculate-market-indexes (undeployed, empty tables), market-spread-calculator / price-analytics (ghosts); protected source registry operator fields are not a public catalog |
 | Auction trend aggregates (admin) | `auction-trends-stats` + `get_auction_trends_v2` (/trends) | auction-intelligence (deleted) |
 | Market aggregate substrate | `mv_market_pulse` + `marketplace_metro_pulse` + `marketplace_velocity` (actively refreshed) | market_indexes, market_segment_stats_cache (0 rows) |
 | Treemap market-share data | `treemap_*` SQL routines via direct supabase.rpc(); refresh = reactivate `treemap-refresh` cron → treemap_refresh_all() † | treemap-vehicles wrapper †, treemap-data (deleted); do NOT build a new refresh path |
