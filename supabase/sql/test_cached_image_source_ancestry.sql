@@ -58,10 +58,11 @@ CREATE TABLE public.pipeline_registry(id uuid PRIMARY KEY DEFAULT gen_random_uui
  table_name text,column_name text,owned_by text,description text,do_not_write_directly boolean,write_via text,
  UNIQUE(table_name,column_name));
 CREATE TABLE public.vehicle_field_provenance(vehicle_id uuid,field_name text,primary_source text,total_confidence numeric);
-CREATE TABLE public.vehicle_field_sources(vehicle_id uuid,field_name text,field_value text,source_type text,
+CREATE TABLE public.vehicle_field_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid,field_name text,field_value text,source_type text,
  confidence_score integer,is_verified boolean,ai_reasoning text,source_image_id uuid,created_at timestamptz);
-CREATE TABLE public.field_evidence(vehicle_id uuid,field_name text,proposed_value text,source_type text,
- source_confidence integer,status text,extraction_context text,raw_extraction_data jsonb,created_at timestamptz);
+CREATE TABLE public.field_evidence(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid,field_name text,proposed_value text,source_type text,
+ source_confidence integer,status text,extraction_context text,raw_extraction_data jsonb,created_at timestamptz,
+ extracted_at timestamptz,assigned_at timestamptz,assigned_by text);
 \ir ../migrations/20260928233000_observation_privacy_marking.sql
 \ir ../migrations/20261002213353_enforce_atomic_image_witnesses.sql
 \ir ../migrations/20261003023500_bulk_cached_image_projection.sql
@@ -69,6 +70,17 @@ CREATE TABLE public.field_evidence(vehicle_id uuid,field_name text,proposed_valu
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.get_field_provenance(uuid,text) TO anon,authenticated,service_role;
 \ir ../migrations/20261004064216_cached_image_source_ancestry.sql
+CREATE TEMP TABLE fixture_field_reader_contract_before AS
+ SELECT proacl,prosecdef,provolatile,proconfig FROM pg_proc
+ WHERE oid='public.get_field_provenance(uuid,text)'::regprocedure;
+\ir ../migrations/20261004110000_field_provenance_evidence_identity.sql
+DO $$ BEGIN
+ ASSERT (SELECT ROW(p.proacl,p.prosecdef,p.provolatile,p.proconfig)
+   IS NOT DISTINCT FROM ROW(b.proacl,b.prosecdef,b.provolatile,b.proconfig)
+   FROM pg_proc p CROSS JOIN fixture_field_reader_contract_before b
+   WHERE p.oid='public.get_field_provenance(uuid,text)'::regprocedure),
+  'Evidence metadata must preserve reader permissions, owner execution and search path';
+END $$;
 \ir ../migrations/20261004052152_observe_image_observation_writes.sql
 SET request.headers='{"x-nuke-writer":"ingest-observation-batch"}';
 INSERT INTO public.vehicles(id,is_public,color) VALUES
@@ -468,3 +480,83 @@ DO $$ DECLARE p jsonb; before_count bigint; flag text; BEGIN
 END $$;
 ROLLBACK;
 SELECT 'PASS: actual canonical admission/replay, source privacy/supersession/relink, safe clocks/IDs, late cached cutoff, anon/auth/service and legacy reader' AS result;
+-- Native evidence identity/lifecycle metadata, without changing the eligible
+-- union, confidence ordering, public/owner gate or the legacy response keys.
+BEGIN;
+INSERT INTO public.field_evidence(id,vehicle_id,field_name,proposed_value,source_type,source_confidence,status,
+ created_at,extracted_at,assigned_at,assigned_by) VALUES
+ ('88888888-8888-8888-8888-000000000001','11111111-1111-1111-1111-111111111111','color','reported-other','bat',85,'pending',
+  '2026-02-01T01:02:03.000001Z','2026-03-02T03:04:05.123456Z',NULL,'PRIVATE ACTOR NOT IN DTO'),
+ ('88888888-8888-8888-8888-000000000002','11111111-1111-1111-1111-111111111111','color','fixture','bat_listing',80,'accepted',
+  '2026-02-02T01:02:03.000002Z','2026-03-03T03:04:05.234567Z','2026-04-04T05:06:07.345678Z','PRIVATE ACTOR NOT IN DTO'),
+ ('88888888-8888-8888-8888-000000000003','11111111-1111-1111-1111-111111111111','color','legacy-clock-unknown','legacy',60,'pending',
+  '2026-02-03T01:02:03Z',NULL,NULL,NULL),
+ ('88888888-8888-8888-8888-000000000004','11111111-1111-1111-1111-111111111111','color','superseded-hidden','bat',99,'superseded',
+  now(),now(),now(),NULL),
+ ('88888888-8888-8888-8888-000000000005','11111111-1111-1111-1111-111111111111','color','rejected-hidden','bat',98,'rejected_source',
+  now(),now(),now(),NULL),
+ ('88888888-8888-8888-8888-000000000006','11111111-1111-1111-1111-111111111111','color','null-status-hidden','legacy',97,NULL,
+  now(),NULL,NULL,NULL),
+ ('88888888-8888-8888-8888-000000000007','22222222-2222-2222-2222-222222222222','color','other-vehicle-hidden','bat',96,'pending',
+  now(),now(),NULL,NULL),
+ ('88888888-8888-8888-8888-000000000008','99999999-9999-9999-9999-999999999999','color','private-owner-evidence','owner',95,'accepted',
+  now(),'2026-03-04T03:04:05.123456Z','2026-04-05T05:06:07.345678Z',NULL);
+INSERT INTO public.vehicle_field_sources(id,vehicle_id,field_name,field_value,source_type,confidence_score,is_verified,created_at)
+VALUES ('77777777-7777-7777-7777-000000000099','11111111-1111-1111-1111-111111111111','color','field-source-alternative','reference',82,false,'2026-02-06T00:00Z');
+
+SET LOCAL ROLE anon;
+DO $$ DECLARE p jsonb; e jsonb; old_entry jsonb; BEGIN
+ p:=public.get_field_provenance('11111111-1111-1111-1111-111111111111','color');
+ ASSERT p->>'value'='fixture', 'Native alternatives must not promote a canonical value';
+ ASSERT jsonb_array_length(p->'evidence')=4, 'Preserve eligible union; no null-status, retired or other-parent rows';
+ ASSERT (SELECT array_agg(x->>'value' ORDER BY ord) FROM jsonb_array_elements(p->'evidence') WITH ORDINALITY t(x,ord))
+   =ARRAY['reported-other','field-source-alternative','fixture','legacy-clock-unknown'], 'Preserve existing confidence order';
+ e:=p->'evidence'->0;
+ ASSERT e->>'source'='field_evidence' AND e->>'id'='88888888-8888-8888-8888-000000000001';
+ ASSERT e->>'status'='pending' AND e->'verified'='false'::jsonb;
+ ASSERT (e->>'extracted_at')::timestamptz='2026-03-02T03:04:05.123456Z'::timestamptz AND e->'assigned_at'='null'::jsonb;
+ ASSERT (e->>'at')::timestamptz='2026-02-01T01:02:03.000001Z'::timestamptz, 'Preserve old creation clock separately';
+ old_entry:=e-ARRAY['id','status','extracted_at','assigned_at'];
+ ASSERT old_entry=jsonb_build_object('source','field_evidence','value','reported-other','source_type','bat',
+  'confidence',85,'verified',false,'reasoning',NULL,'image_id',NULL,'at','2026-02-01T01:02:03.000001Z'::timestamptz),
+  'Legacy DTO is unchanged after removing four additive metadata keys';
+ e:=p->'evidence'->1;
+ ASSERT e->>'source'='vehicle_field_sources' AND e->>'id'='77777777-7777-7777-7777-000000000099';
+ ASSERT e->'status'='null'::jsonb AND e->'extracted_at'='null'::jsonb AND e->'assigned_at'='null'::jsonb,
+  'A field source has no lifecycle/extraction/assignment columns; do not infer them';
+ e:=p->'evidence'->2;
+ ASSERT e->>'status'='accepted' AND e->'verified'='true'::jsonb;
+ ASSERT (e->>'extracted_at')::timestamptz='2026-03-03T03:04:05.234567Z'::timestamptz;
+ ASSERT (e->>'assigned_at')::timestamptz='2026-04-04T05:06:07.345678Z'::timestamptz, 'Retain native sub-ms assignment clock';
+ e:=p->'evidence'->3;
+ ASSERT e->>'status'='pending' AND e->'extracted_at'='null'::jsonb AND e->'assigned_at'='null'::jsonb,
+  'Unknown legacy clocks stay unknown instead of borrowing created_at';
+ ASSERT NOT EXISTS(SELECT 1 FROM jsonb_array_elements(p->'evidence') x
+  WHERE x ?| ARRAY['assigned_by','user_id','raw_extraction_data','actor_id']), 'No actor/raw/private metadata is added';
+ ASSERT public.get_field_provenance('99999999-9999-9999-9999-999999999999','color') IS NULL,
+  'Anonymous caller still cannot get private-parent evidence IDs/clocks';
+END $$;
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SET LOCAL test.auth_uid='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+DO $$ DECLARE p jsonb; BEGIN
+ p:=public.get_field_provenance('99999999-9999-9999-9999-999999999999','color');
+ ASSERT p->'evidence'->0->>'id'='88888888-8888-8888-8888-000000000008', 'Existing private owner can still see own evidence';
+ ASSERT p->'evidence'->0->>'status'='accepted';
+END $$;
+SET LOCAL test.auth_uid='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+DO $$ BEGIN
+ ASSERT public.get_field_provenance('99999999-9999-9999-9999-999999999999','color') IS NULL,
+  'Unrelated authenticated reader still denied private evidence metadata';
+END $$;
+RESET ROLE;
+SET LOCAL test.auth_uid='';
+SET LOCAL ROLE service_role;
+DO $$ BEGIN
+ ASSERT jsonb_array_length(public.get_field_provenance('11111111-1111-1111-1111-111111111111','color')->'evidence')=4;
+ ASSERT public.get_field_provenance('99999999-9999-9999-9999-999999999999','color') IS NULL,
+  'Service role does not gain a private reader bypass';
+END $$;
+RESET ROLE;
+ROLLBACK;
+SELECT 'PASS: native evidence ID/status, exact separate/unknown clocks, unchanged union/order/legacy DTO, anon/auth/service gates and ACL' AS evidence_metadata_result;
