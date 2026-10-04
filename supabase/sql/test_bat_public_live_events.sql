@@ -64,6 +64,7 @@ CREATE TABLE cron.job_run_details(jobid bigint,status text,start_time timestampt
 INSERT INTO cron.job VALUES(510,'bat-live-pull','* * * * *',true,'SELECT bat_live_pull_run(3)');
 INSERT INTO cron.job_run_details VALUES(510,'succeeded',now(),'ok');
 \ir ../migrations/20261004182500_bat_public_live_event_intake.sql
+\ir ../migrations/20261004205500_bat_clock_retired_recovery.sql
 GRANT USAGE ON SCHEMA public,net,cron TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public,net,cron TO service_role;
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public,net TO service_role;
@@ -140,11 +141,18 @@ DO $$ BEGIN ASSERT (get_live_auction_health()#>>'{closing_stream,status}')='fail
 
 -- Every eligible closing lot goes to one multiplexed stream; HTML cap stays 3.
 UPDATE monitored_auctions SET stream_state='{}',next_poll_at=now()+interval '1 hour';
+-- Match the production incident: the board clock already changed sale_status
+-- to not_sold and retired the monitor, without any native terminal result.
+UPDATE vehicles SET sale_status='not_sold';
+UPDATE monitored_auctions SET is_live=false,auction_end_time=now()-interval '1 minute',last_synced_at=now();
 INSERT INTO monitored_auctions(source_id,vehicle_id,external_auction_id,external_auction_url,auction_end_time,is_live,next_poll_at)
 SELECT '00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000002','synthetic-'||i,
   'https://bringatrailer.com/listing/synthetic-'||i,now()+interval '4 minutes',true,now()+interval '1 hour' FROM generate_series(1,19)i;
 DO $$ DECLARE r jsonb; BEGIN
   r:=bat_live_pull_run(3,false);
+  ASSERT (SELECT is_live FROM monitored_auctions WHERE id='00000000-0000-0000-0000-000000000001'),
+    'clock-retired not_sold parent resumes capture until a sourced final result';
+  ASSERT r->>'skipped'='previous pass in flight','HTML in-flight gate cannot block native recovery';
   ASSERT (r->>'stream_lots')::integer=20,'three HTML slots cannot truncate 20 live subscriptions';
   ASSERT (SELECT count(*)=1 FROM net.calls WHERE body->>'mode'='live_stream'),'one source connection request multiplexes every closing';
   ASSERT (r->>'dispatched')::integer<=3,'HTML fallback capacity remains bounded';
