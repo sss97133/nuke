@@ -2756,6 +2756,65 @@ struct FieldProvenance: Decodable {
     let source_image_url: String?
     let evidence: [Evidence]
     let observations: [Observation]
+    // Optional for older reader payloads. These are claim-specific citations,
+    // already filtered by the RPC's vehicle and image visibility gates.
+    let image_observations: [ImageObservation]?
+
+    var imageObservations: [ImageObservation] { image_observations ?? [] }
+
+    var hasSharedImageSource: Bool {
+        let citations = imageObservations
+        guard Set(citations.map(\.image_id)).count > 1,
+              let family = citations.first?.source_family, !family.isEmpty else { return false }
+        return citations.allSatisfy { $0.source_family == family }
+    }
+
+    // The legacy verified flag includes accepted field evidence. Its record
+    // time never establishes when a value was independently verified.
+    func acceptedSourceRecordedAt(for value: String) -> String? {
+        evidence.filter { $0.verified == true && $0.value == value }.compactMap { $0.at }.max()
+    }
+
+    struct ImageObservation: Decodable, Identifiable {
+        let observation_id: UUID
+        let image_id: UUID
+        let image_url: String?
+        let value: String?
+        let source_url: String?
+        let source_family: String?
+        let extraction_method: String?
+        let agent_model: String?
+        let observed_at: String?
+        let ingested_at: String?
+        let confidence: Double?
+        let visual_relation: String?
+        let limitation: String?
+        let is_inferred: Bool?
+        let image_region: Region?
+        let reference: Reference?
+        var id: String { "\(observation_id)|\(image_id)" }
+        var inspectionOrder: Int {
+            switch visual_relation {
+            case "direct_code": return 0
+            case "direct_visual": return 1
+            case "component_inference": return 2
+            default: return 3
+            }
+        }
+        var relationLabel: String {
+            switch visual_relation {
+            case "direct_code": return "Coded specification"
+            case "direct_visual": return "Visible appearance"
+            case "component_inference": return "Component inference"
+            default: return "Recorded image citation"
+            }
+        }
+        struct Region: Decodable { let label: String? }
+        struct Reference: Decodable {
+            let url: String?
+            let pdf_page: Int?
+        }
+    }
 
     struct Evidence: Decodable, Identifiable {
         let source: String?
@@ -2793,6 +2852,7 @@ struct FieldProvenanceSheet: View {
     @State private var loadFailed = false   // a failed trace ≠ "no source exists"
     @State private var zoomURL: String?
     @State private var zoomOpen = false
+    @State private var sheetDetent: PresentationDetent = .medium
 
     var body: some View {
         NavigationStack {
@@ -2803,7 +2863,10 @@ struct FieldProvenanceSheet: View {
                     if let p = prov {
                         sourceLine(p)
                         if let img = p.source_image_url, !img.isEmpty { sourceImage(img) }
-                        if !p.observations.isEmpty { observationsSection(p.observations) }
+                        if !p.imageObservations.isEmpty { imageObservationsSection(p) }
+                        let cited = Set(p.imageObservations.map(\.observation_id))
+                        let reports = p.observations.filter { !cited.contains($0.id) }
+                        if !reports.isEmpty { observationsSection(reports) }
                         if !p.evidence.isEmpty { evidenceSection(p.evidence) }
                         if hasNothing(p) { emptyState }
                     } else if loadFailed {
@@ -2824,13 +2887,14 @@ struct FieldProvenanceSheet: View {
                     }
                 }
             }
+            .refreshable { await load() }
             .navigationTitle(drill.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $sheetDetent)
         .task { await load() }
         .fullScreenCover(isPresented: $zoomOpen) {
             FullScreenGalleryView(images: zoomURL.map { [$0] } ?? [])
@@ -2854,15 +2918,99 @@ struct FieldProvenanceSheet: View {
                     Label("Copy", systemImage: "doc.on.doc").font(.caption)
                 }
             }
-            // The value is true AS OF its latest verification — show the WHEN, and warn if aging.
-            if let v = latestVerified {
-                Label(v.aging ? "Last verified \(v.label) · may be out of date" : "Verified \(v.label)",
-                      systemImage: v.aging ? "clock.badge.exclamationmark" : "checkmark.circle")
+            // Source acceptance and record time are not independent verification.
+            if let v = acceptedSource {
+                Label(v.aging ? "Accepted source recorded \(v.label) · may be out of date" : "Accepted source recorded \(v.label)",
+                      systemImage: v.aging ? "clock.badge.exclamationmark" : "doc.text")
                     .font(.caption2)
                     .foregroundStyle(v.aging ? Color.orange : Color.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+    }
+
+    @ViewBuilder private func imageObservationsSection(_ p: FieldProvenance) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("INTERPRETATIONS FROM PHOTOGRAPHS")
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+            Text("Inspect the photographs behind each report. A citation does not verify the vehicle's recorded value.")
+                .font(.footnote).foregroundStyle(.secondary)
+            if p.hasSharedImageSource {
+                Text("These photographs share a source family. Multiple views are not independent confirmations.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            // Match the web's inspection order, preserving RPC order within each
+            // class. This is not a confidence or correctness ranking.
+            ForEach(p.imageObservations.enumerated().sorted {
+                $0.element.inspectionOrder == $1.element.inspectionOrder
+                    ? $0.offset < $1.offset
+                    : $0.element.inspectionOrder < $1.element.inspectionOrder
+            }.map(\.element)) { o in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(o.relationLabel).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    if let value = o.value, !value.isEmpty {
+                        Text(value).font(.footnote.weight(.medium)).textSelection(.enabled)
+                    }
+                    if let url = webURL(o.image_url) {
+                        Button { zoomURL = url.absoluteString; zoomOpen = true } label: {
+                            CachedAsyncImage(url: NukeImage.thumb(url.absoluteString, width: 700)) { image in
+                                image.resizable().scaledToFit()
+                            } placeholder: {
+                                Label("Photo unavailable · tap to open", systemImage: "photo")
+                                    .font(.caption).frame(maxWidth: .infinity, minHeight: 100)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Inspect cited photograph: \(o.value ?? drill.label)")
+                    }
+                    if let report = p.observations.first(where: { $0.id == o.observation_id })?.content,
+                       !report.isEmpty {
+                        Text(report).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if let region = o.image_region?.label, !region.isEmpty {
+                        Text("Visible region: \(region)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if o.is_inferred == true {
+                        Label("Interpretation · not independently verified", systemImage: "eye")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let limitation = o.limitation, !limitation.isEmpty {
+                        Text(limitation).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let confidence = pct(o.confidence) {
+                        Text("Stored confidence: \(confidence) · not calibrated")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Text("Reviewed: \(reviewClock(o.observed_at) ?? "time not recorded")")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    if let learned = reviewClock(o.ingested_at) {
+                        Text("Learned: \(learned)").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Text("Photo capture time not recorded")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Text(o.agent_model.map { "Model: \($0)" } ?? "Model identifier not recorded")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    if let method = o.extraction_method, !method.isEmpty {
+                        Text("Method: \(method)").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let url = webURL(o.source_url) { Link("View source", destination: url).font(.caption) }
+                    if let reference = o.reference, let url = webURL(reference.url) {
+                        let target = reference.pdf_page.flatMap { page -> URL? in
+                            guard page > 0, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+                            parts.fragment = "page=\(page)"
+                            return parts.url
+                        } ?? url
+                        Link("Manufacturer reference", destination: target).font(.caption)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
         .padding(16)
     }
 
@@ -2993,11 +3141,31 @@ struct FieldProvenanceSheet: View {
     // ─── helpers ─────────────────────────────────────────────────────────────
     private func hasNothing(_ p: FieldProvenance) -> Bool {
         (p.inline_source?.isEmpty != false) && p.source_image_url == nil
-            && p.observations.isEmpty && p.evidence.isEmpty
+            && p.observations.isEmpty && p.evidence.isEmpty && p.imageObservations.isEmpty
     }
 
-    // ─── Temporal: a spec is true AS OF a date. Surface the WHEN so a value reads as
-    // "current · verified DATE" with older readings as a timeline — not as timeless fact.
+    private func webURL(_ raw: String?) -> URL? {
+        guard let raw, let url = URL(string: raw),
+              ["https", "http"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
+        return url
+    }
+
+    private func reviewClock(_ iso: String?) -> String? {
+        guard let iso else { return nil }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = parser.date(from: iso)
+        if date == nil {
+            parser.formatOptions = [.withInternetDateTime]
+            date = parser.date(from: iso)
+        }
+        guard let date else { return nil }
+        let output = DateFormatter()
+        output.dateStyle = .medium
+        output.timeStyle = .short
+        return output.string(from: date) + " " + (output.timeZone.abbreviation(for: date) ?? "")
+    }
+
     private func whenLabel(_ iso: String?) -> String? {
         guard let iso, !iso.isEmpty else { return nil }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
@@ -3011,11 +3179,8 @@ struct FieldProvenanceSheet: View {
         guard let d = f.date(from: String(iso.prefix(10))) else { return nil }
         return Calendar.current.dateComponents([.month], from: d, to: Date()).month
     }
-    // Newest reading across all evidence + observations (ISO strings sort chronologically).
-    private var latestVerified: (label: String, aging: Bool)? {
-        guard let p = prov else { return nil }
-        let dates = p.evidence.compactMap { $0.at } + p.observations.compactMap { $0.observed_at }
-        guard let newest = dates.max(), let lbl = whenLabel(newest) else { return nil }
+    private var acceptedSource: (label: String, aging: Bool)? {
+        guard let newest = prov?.acceptedSourceRecordedAt(for: drill.value), let lbl = whenLabel(newest) else { return nil }
         return (lbl, (monthsAgo(newest) ?? 0) > 14)   // a build-state value >~14mo old is likely stale
     }
 
@@ -3048,6 +3213,7 @@ struct FieldProvenanceSheet: View {
                      params: ["p_vehicle_id": vehicleId, "p_field": drill.field])
                 .execute()
                 .value
+            if !loaded, prov?.imageObservations.isEmpty == false { sheetDetent = .large }
         } catch {
             loadFailed = true
             NSLog("NukeCapture field provenance failed: %@", String(describing: error))
