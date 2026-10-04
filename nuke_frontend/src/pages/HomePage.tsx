@@ -1245,9 +1245,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'garage', label: 'Garage' },
 ];
 
-// v2 (2026-09-27): the market pulse became the homepage; a stored v1 choice is not carried over.
-const LS_KEY = 'nuke_hub_tab_v2';
-
 function TabSkeleton() {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'Arial, sans-serif' }}>
@@ -1261,38 +1258,12 @@ function TabSkeleton() {
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const [showFeed, setShowFeed] = useState(false);
-  const defaultTab = useMemo(() => {
-    const fromUrl = searchParams.get('tab') as TabId | null;
-    if (fromUrl && TABS.some((t) => t.id === fromUrl)) return fromUrl;
-    const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
-    if (fromStorage && TABS.some((t) => t.id === fromStorage)) return fromStorage;
-    return 'market';
-  }, []);
-
-  const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+  // The URL is the shared source of truth for header links, mobile links and
+  // browser back/forward. A saved tab must not replace the market on arrival.
+  const requestedTab = searchParams.get('tab');
+  const activeTab: TabId = TABS.find(tab => tab.id === requestedTab)?.id || 'market';
 
   const garage = useVehiclesDashboard(user?.id);
-
-  useEffect(() => {
-    if (authLoading) return;
-    const fromUrl = searchParams.get('tab') as TabId | null;
-    const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
-    if (!fromUrl && !fromStorage) {
-      setActiveTab('market');
-    }
-    // Show feed for logged-out users when tab=feed is in URL
-    // (includes treemap drill-through navigation with filters)
-    if (!user && fromUrl) {
-      setShowFeed(true);
-    }
-  }, [authLoading, user, searchParams]);
-
-  const switchTab = (tab: TabId) => {
-    setActiveTab(tab);
-    localStorage.setItem(LS_KEY, tab);
-    setSearchParams(tab === 'garage' && user ? {} : { tab }, { replace: true });
-  };
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   useEffect(() => {
@@ -1306,73 +1277,38 @@ export default function HomePage() {
     localStorage.setItem('nuke_onboarding_seen', '1');
   };
 
-  // Logged-out users see the live market (the intake form stays at /intake and is
-  // the fallback if the market can't load).
-  // Treemap is preserved at /explore (or ?force_treemap=1 on this route).
-  // Onboarding slideshow only fires for signed-in users, so it's safe to
-  // fork before the showOnboarding effect mounts.
-  if (!authLoading && !user && !showFeed) {
-    const forceTreemap = searchParams.get('force_treemap') === '1';
-    if (forceTreemap) {
-      return <TreemapHomePage onBrowse={() => setShowFeed(true)} />;
-    }
-    return (
-      <Suspense fallback={<TabSkeleton />}>
-        <MarketPulse onUnavailable={<IntakePage variant="homepage" />} />
-      </Suspense>
-    );
+  // Preserve the existing explicit treemap entry and its filtered feed drill.
+  if (!authLoading && !user && searchParams.get('force_treemap') === '1') {
+    return <TreemapHomePage onBrowse={() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('force_treemap');
+      next.set('tab', 'feed');
+      setSearchParams(next);
+    }} />;
   }
+
+  if (authLoading) return <TabSkeleton />;
 
   return (
     <div>
       {showOnboarding && (
         <OnboardingSlideshow isOpen={showOnboarding} onClose={handleOnboardingClose} />
       )}
-      {activeTab !== 'feed' && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'var(--surface)',
-            flexShrink: 0,
-            borderBottom: '2px solid var(--border)',
-            height: 30,
-          }}
-        >
-          {TABS.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => switchTab(tab.id)}
-                aria-selected={active}
-                style={{
-                  padding: '0 16px',
-                  height: 30,
-                  fontSize: 9,
-                  fontFamily: 'Arial, sans-serif',
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  border: 'none',
-                  borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
-                  background: active ? 'var(--bg)' : 'transparent',
-                  color: active ? 'var(--text)' : 'var(--text-disabled)',
-                  cursor: 'pointer',
-                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <nav className="home-mobile-nav" aria-label="Browse">
+        {TABS.map((tab) => (
+          <Link
+            key={tab.id}
+            to={`/?tab=${tab.id}`}
+            aria-current={activeTab === tab.id ? 'page' : undefined}
+            className={`header-nav-link${activeTab === tab.id ? ' active' : ''}`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
 
       <Suspense fallback={<TabSkeleton />}>
-        {activeTab === 'market' && <MarketPulse onUnavailable={<FeedPage />} />}
+        {activeTab === 'market' && <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
         {activeTab === 'feed' && <FeedPage />}
       </Suspense>
