@@ -77,6 +77,22 @@ UPDATE public.bat_user_profiles SET expertise_score=42,metadata='{"preserved":"y
   first_seen='1990-01-01T00:00:00Z',last_seen='2090-01-01T00:00:00Z',total_comments=999,total_bids=999
 WHERE username='winner';
 
+-- A captured NULL status is unknown evidence, even beside a known outcome.
+-- An unmatched LEFT JOIN row is different: it is not a captured listing.
+INSERT INTO public.bat_listings(vehicle_id,bat_listing_url,listing_status,buyer_username)
+VALUES
+ ('10000000-0000-0000-0000-000000000010','https://bringatrailer.com/listing/sold-null/','sold','sold_null'),
+ ('10000000-0000-0000-0000-000000000010','https://bringatrailer.com/listing/sold-null',NULL,'sold_null'),
+ ('10000000-0000-0000-0000-000000000011','https://bringatrailer.com/listing/no-sale-null/','no_sale',NULL),
+ ('10000000-0000-0000-0000-000000000011','https://bringatrailer.com/listing/no-sale-null',NULL,NULL);
+INSERT INTO public.auction_comments
+ (source_key,platform,author_username,comment_type,source_url,vehicle_id,bid_amount,posted_at)
+VALUES
+ ('sold-null','bat','sold_null','bid','https://bringatrailer.com/listing/sold-null/',
+  '10000000-0000-0000-0000-000000000010',100,'2026-10-01T12:00:00Z'),
+ ('no-sale-null','bat','no_sale_null','bid','https://bringatrailer.com/listing/no-sale-null/',
+  '10000000-0000-0000-0000-000000000011',100,'2026-10-01T12:00:00Z');
+
 \ir ../migrations/20261004040743_published_buyer_profile_record.sql
 
 DO $$ BEGIN
@@ -90,6 +106,16 @@ SELECT public.refresh_bat_user_profile('loser');
 SELECT public.refresh_bat_user_profile('unknown_only');
 SELECT public.refresh_bat_user_profile('observer');
 SELECT public.refresh_bat_user_profile('case');
+SELECT public.refresh_bat_user_profile('sold_null');
+SELECT public.refresh_bat_user_profile('no_sale_null');
+DO $$ BEGIN
+  IF (SELECT count(*) FROM public.bat_user_profiles
+      WHERE username IN ('sold_null','no_sale_null') AND total_wins IS NULL AND win_rate IS NULL
+        AND metadata#>>'{bat_bidder_record,eligible_closed_presentations}' = '0'
+        AND metadata#>>'{bat_bidder_record,unknown_outcome_presentations}' = '1') <> 2 THEN
+    RAISE EXCEPTION 'Captured NULL duplicate outcomes became a published win or a loss';
+  END IF;
+END $$;
 DO $$ DECLARE r public.bat_user_profiles%ROWTYPE; BEGIN
   SELECT * INTO r FROM public.bat_user_profiles WHERE username='winner';
   IF r.total_comments <> 11 OR r.total_bids <> 10 OR r.total_wins <> 2 OR r.win_rate <> 0.6667

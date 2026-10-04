@@ -76,10 +76,10 @@ BEGIN
       min(l.buyer_handle) AS buyer,
       CASE
         WHEN count(l.id) = 0 THEN 'unlinked'
-        WHEN bool_and(l.listing_status = 'sold')
+        WHEN bool_and(l.listing_status IS NOT DISTINCT FROM 'sold') FILTER (WHERE l.id IS NOT NULL)
           AND count(DISTINCT l.buyer_handle) = 1
           THEN 'sold_with_buyer'
-        WHEN bool_and(l.listing_status = 'no_sale')
+        WHEN bool_and(l.listing_status IS NOT DISTINCT FROM 'no_sale') FILTER (WHERE l.id IS NOT NULL)
           AND count(DISTINCT l.buyer_handle) = 0
           THEN 'no_sale'
         ELSE 'outcome_or_buyer_unknown'
