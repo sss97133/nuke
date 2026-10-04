@@ -485,6 +485,164 @@ export function shareBelow(prices: number[], ask: number): number | null {
   return prices.filter(p => p < ask).length / prices.length;
 }
 
+/** A published sale presentation, separate from a vehicle's mutable current price. */
+export interface DatedSourceSale {
+  vehicleId: string | null;
+  sourceUrl: string | null;
+  amount: number | null;
+  outcome: 'sold' | 'not_sold' | 'unknown';
+  /** Source event timestamp or ISO date; a date is an interval, never midnight testimony. */
+  eventAt: string | null;
+  /** When this specific sourced amount/outcome became available, not entity created_at. */
+  knownAt: string | null;
+  currency: string | null;
+  priceBasis: 'published_bid_excluding_fees' | 'buyer_total' | null;
+  /** Source attribution for currency and price basis; no platform-wide USD default. */
+  unitSource: string | null;
+  conditionEvidence: 'listing_claim' | 'structured' | 'visual' | 'unknown';
+}
+
+export interface SaleComparisonOptions {
+  cohort: { key: string; label: string; basis: string; complete: boolean };
+  subject: { amount: number | null; currency: string | null; priceBasis: DatedSourceSale['priceBasis']; sourceUrl?: string | null; vehicleId?: string | null };
+  eventFrom: string;
+  /** Exclusive source-event cutoff; do not include subject or later sales. */
+  eventBefore: string;
+  evidenceAsOf: string;
+  computedAt: string;
+  knowledgeMode: 'retrospective' | 'known_at';
+  minimumSales?: number;
+}
+
+type SaleExclusion = 'subject' | 'source_unknown' | 'duplicate_conflict' | 'not_sold' | 'price_unknown'
+  | 'event_unknown' | 'outside_event_window' | 'unknown_units' | 'different_units' | 'knowledge_unknown' | 'knowledge_conflicting' | 'learned_later';
+
+/** Canonical source presentation key; aliases and fragments must not count twice. */
+function saleSourceKey(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (!['http:', 'https:'].includes(u.protocol)) return null;
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const rawPath = u.pathname.replace(/\/+$/, '');
+    const path = host === 'bringatrailer.com' ? rawPath.toLowerCase() : rawPath;
+    return host && path ? `${host}${path}` : null;
+  } catch { return null; }
+}
+
+function sourceEventInterval(raw: string | null): [number, number] | null {
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const start = Date.parse(`${raw}T00:00:00Z`);
+    if (!Number.isFinite(start) || new Date(start).toISOString().slice(0, 10) !== raw) return null;
+    return [start, start + 86_400_000];
+  }
+  // A source timestamp needs an explicit zone; browser-local time is not evidence.
+  if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(raw)) return null;
+  const day = raw.slice(0, 10);
+  const calendar = Date.parse(`${day}T00:00:00Z`);
+  if (!Number.isFinite(calendar) || new Date(calendar).toISOString().slice(0, 10) !== day) return null;
+  const time = Date.parse(raw);
+  return Number.isFinite(time) ? [time, time] : null;
+}
+
+/**
+ * General cohort calculator; independent of the 914-specific buildCompSet recipe.
+ * Returns the exact evidence rows and refusals behind an empirical mid-rank.
+ * Nominal original currency, with no inflation/FX/fee or condition adjustment.
+ * This is a price position in recorded sales, not a value estimate or bid advice.
+ */
+export function comparePriceToSourceSales(rows: readonly DatedSourceSale[], opts: SaleComparisonOptions) {
+  const from = sourceEventInterval(opts.eventFrom)?.[0];
+  const before = sourceEventInterval(opts.eventBefore)?.[0];
+  const knownBefore = sourceEventInterval(opts.evidenceAsOf)?.[0];
+  const computed = sourceEventInterval(opts.computedAt)?.[0];
+  const reasons: string[] = [];
+  if (!opts.cohort.complete) reasons.push('cohort_incomplete');
+  if (from == null || before == null || knownBefore == null || computed == null || from >= before || knownBefore > computed || before > computed) reasons.push('invalid_cutoffs');
+  if (opts.knowledgeMode === 'known_at' && before != null && knownBefore != null && knownBefore > before) reasons.push('knowledge_after_comparison');
+  const subject = opts.subject;
+  if (subject.amount == null || !Number.isFinite(subject.amount) || subject.amount <= 0 || !subject.currency || !subject.priceBasis) reasons.push('subject_price_or_units_unknown');
+  const groups = new Map<string, DatedSourceSale[]>();
+  const excluded: Array<{ sourceKey: string | null; vehicleIds: Array<string | null>; reason: SaleExclusion }> = [];
+  const eligible: Array<DatedSourceSale & { sourceKey: string }> = [];
+  const subjectKey = saleSourceKey(subject.sourceUrl);
+  for (const row of rows) {
+    const key = saleSourceKey(row.sourceUrl);
+    if (!key) { excluded.push({ sourceKey: null, vehicleIds: [row.vehicleId], reason: 'source_unknown' }); continue; }
+    const group = groups.get(key) || []; group.push(row); groups.set(key, group);
+  }
+  for (const [sourceKey, group] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
+    const exclude = (reason: SaleExclusion) => excluded.push({ sourceKey, vehicleIds: group.map(r => r.vehicleId), reason });
+    if (sourceKey === subjectKey || (subject.vehicleId && group.some(r => r.vehicleId === subject.vehicleId))) { exclude('subject'); continue; }
+    const boundaryClaims = group.filter(r => {
+      const event = sourceEventInterval(r.eventAt), clock = sourceEventInterval(r.knownAt)?.[0];
+      return event && from != null && before != null && event[0] >= from && event[0] < before && event[1] <= before
+        && clock != null && clock >= event[0] && knownBefore != null && clock <= knownBefore
+        && r.currency && r.priceBasis && saleSourceKey(r.unitSource) === sourceKey;
+    });
+    // Later evidence cannot change a historical receipt by introducing an alias conflict.
+    const claims = boundaryClaims.length ? boundaryClaims : group;
+    // A duplicate never wins by row ordering; different known price/date/unit/outcome evidence is unresolved.
+    const values = <K extends keyof DatedSourceSale>(key: K) => new Set(claims.map(r => r[key]).filter(v => v != null));
+    if (['amount', 'eventAt', 'currency', 'priceBasis', 'outcome'].some(k => values(k as keyof DatedSourceSale).size > 1)) { exclude('duplicate_conflict'); continue; }
+    const preferred = [...claims].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    const row = { ...(preferred.find(r => r.amount != null && r.eventAt) || preferred[0]) };
+    if (row.outcome !== 'sold') { exclude('not_sold'); continue; }
+    if (row.amount == null || !Number.isFinite(row.amount) || row.amount <= 0) { exclude('price_unknown'); continue; }
+    const interval = sourceEventInterval(row.eventAt);
+    if (!interval) { exclude('event_unknown'); continue; }
+    if (from == null || before == null || interval[0] < from || interval[0] >= before || interval[1] > before) { exclude('outside_event_window'); continue; }
+    // Use a complete, attributed unit record; never combine partial unit guesses across rows.
+    const attributedRows = preferred.filter(r => r.amount === row.amount && r.eventAt === row.eventAt && r.currency && r.priceBasis && saleSourceKey(r.unitSource) === sourceKey);
+    const attributed = attributedRows[0];
+    if (!attributed) { exclude('unknown_units'); continue; }
+    Object.assign(row, { currency: attributed.currency, priceBasis: attributed.priceBasis, unitSource: attributed.unitSource });
+    if (row.currency !== subject.currency || row.priceBasis !== subject.priceBasis) { exclude('different_units'); continue; }
+    const knownTimes = attributedRows.map(r => sourceEventInterval(r.knownAt)?.[0]).filter((t): t is number => t != null);
+    if (knownTimes.some(t => t < interval[0])) { exclude('knowledge_conflicting'); continue; }
+    if (!knownTimes.length) { exclude('knowledge_unknown'); continue; }
+    // Even retrospective reports cannot use evidence learned after their declared knowledge cutoff.
+    if (knownTimes.length && (knownBefore == null || Math.min(...knownTimes) > knownBefore)) { exclude('learned_later'); continue; }
+    row.knownAt = knownTimes.length ? new Date(Math.min(...knownTimes)).toISOString() : null;
+    eligible.push({ ...row, sourceKey });
+  }
+  const minimum = opts.minimumSales ?? 10;
+  if (!Number.isInteger(minimum) || minimum < 2) reasons.push('invalid_minimum');
+  if (eligible.length < minimum) reasons.push('insufficient_sales');
+  const prices = eligible.map(r => r.amount!);
+  const below = prices.filter(p => p < (subject.amount ?? NaN)).length;
+  const equal = prices.filter(p => p === subject.amount).length;
+  const ordered = [...prices].sort((a,b) => a-b);
+  const continuous = (p: number) => {
+    if (!ordered.length) return null;
+    const rank = (ordered.length-1)*p, lower = Math.floor(rank), upper = Math.ceil(rank);
+    return ordered[lower]+(ordered[upper]-ordered[lower])*(rank-lower);
+  };
+  const summary: Summary = { n: prices.length, min: ordered[0] ?? null, max: ordered[ordered.length-1] ?? null,
+    p10: continuous(.1), p25: continuous(.25), p50: continuous(.5), p75: continuous(.75), p90: continuous(.9) };
+  return {
+    method: 'source_sale_price_midrank_v1' as const,
+    quantileMethod: 'continuous_linear_interpolation' as const,
+    cohort: { ...opts.cohort },
+    subject: { ...subject },
+    eventFrom: opts.eventFrom, eventBefore: opts.eventBefore, evidenceAsOf: opts.evidenceAsOf, computedAt: opts.computedAt,
+    knowledgeMode: opts.knowledgeMode,
+    priceAdjustment: 'nominal_original_currency_no_fees_fx_or_inflation' as const,
+    conditionAdjustedAssessment: 'unmeasured' as const,
+    reasons,
+    counts: { inputRows: rows.length, sourceLots: groups.size, eligibleSales: eligible.length, below, equal, above: eligible.length - below - equal,
+      knowledgeUnknown: eligible.filter(r => !r.knownAt).length,
+      conditionListingClaims: eligible.filter(r => r.conditionEvidence === 'listing_claim').length,
+      conditionStructured: eligible.filter(r => r.conditionEvidence === 'structured').length,
+      conditionVisual: eligible.filter(r => r.conditionEvidence === 'visual').length,
+      conditionUnknown: eligible.filter(r => r.conditionEvidence === 'unknown').length },
+    percentile: reasons.length ? null : 100 * (below + equal / 2) / eligible.length,
+    distribution: reasons.length ? null : summary,
+    eligible, excluded,
+  };
+}
+
 export function fmtMoney(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return 'n/a';
   return `$${Math.round(n).toLocaleString('en-US')}`;

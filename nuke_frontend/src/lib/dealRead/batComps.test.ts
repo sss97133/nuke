@@ -1,11 +1,129 @@
 import { describe, it, expect } from 'vitest';
+import { parseBaTHTML } from '../../../../supabase/functions/_shared/batParser';
+import saleParserFixtures from '../../../../scripts/discovery/bat-sale-parser-fixtures.json';
 import {
   batSlug, yearFromSlug, classifyEngine, textFeatures, buildCompSet, quantile, median,
   summarize, shareBelow, windowComps, MIN_READABLE_DESCRIPTION,
+  comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions,
   type VehicleCompRow, type BatListingRow,
 } from './batComps';
 
 const NOW = new Date('2026-09-27T12:00:00Z');
+
+describe('valuation raw-source grammar parity with the existing BaT parser', () => {
+  for (const fixture of saleParserFixtures) it(fixture.name, () => {
+    const parsed = parseBaTHTML(fixture.html);
+    expect({ currency: parsed.sale_currency, price: parsed.sale_price, date: parsed.sale_date, status: parsed.sale_status }).toEqual(fixture.canonical);
+  });
+});
+
+function sourceSale(n: number, over: Partial<DatedSourceSale> = {}): DatedSourceSale {
+  const sourceUrl = `https://bringatrailer.com/listing/synthetic-cohort-${n}/`;
+  return { vehicleId: `synthetic-${n}`, sourceUrl, amount: n * 1000, outcome: 'sold',
+    eventAt: '2025-06-15', knownAt: '2025-06-16T12:00:00Z', currency: 'USD',
+    priceBasis: 'published_bid_excluding_fees', unitSource: sourceUrl, conditionEvidence: 'unknown', ...over };
+}
+const saleOptions = (over: Partial<SaleComparisonOptions> = {}): SaleComparisonOptions => ({
+  cohort: { key: 'synthetic-cohort', label: 'Synthetic same-year model', basis: 'recorded_model_context', complete: true },
+  subject: { amount: 5000, currency: 'USD', priceBasis: 'published_bid_excluding_fees' },
+  eventFrom: '2024-01-01T00:00:00Z', eventBefore: '2026-01-01T00:00:00Z',
+  evidenceAsOf: '2026-01-02T00:00:00Z', computedAt: '2026-01-03T00:00:00Z',
+  knowledgeMode: 'retrospective', ...over,
+});
+
+describe('dated source sale percentile contract', () => {
+  const ten = () => Array.from({ length: 10 }, (_, i) => sourceSale(i + 1));
+
+  it('uses every eligible lot, gives ties half weight and leaves condition-adjusted value unmeasured', () => {
+    const result = comparePriceToSourceSales(ten(), saleOptions());
+    expect(result.percentile).toBe(45);
+    expect(result.distribution).toMatchObject({ p10: 1900,p50: 5500,p90: 9100 });
+    expect(result.counts).toMatchObject({ eligibleSales: 10, below: 4, equal: 1, above: 5, conditionUnknown: 10 });
+    expect(result.conditionAdjustedAssessment).toBe('unmeasured');
+    expect(result.priceAdjustment).toBe('nominal_original_currency_no_fees_fx_or_inflation');
+  });
+
+  it('deduplicates source URL aliases deterministically and excludes the subject across vehicle aliases', () => {
+    const rows = [...ten(), sourceSale(1, { vehicleId: 'alias', sourceUrl: 'http://www.bringatrailer.com/listing/SYNTHETIC-COHORT-1?ref=alias#bid' })];
+    const options = saleOptions({ subject: { ...saleOptions().subject, sourceUrl: 'https://bringatrailer.com/listing/synthetic-cohort-10' }, minimumSales: 2 });
+    const first = comparePriceToSourceSales(rows, options);
+    expect(first.counts.eligibleSales).toBe(9);
+    expect(first.excluded).toContainEqual(expect.objectContaining({ reason: 'subject' }));
+    expect(comparePriceToSourceSales([...rows].reverse(), options)).toEqual(first);
+  });
+
+  it('withholds a conflicted source lot rather than choosing a duplicate price by row order', () => {
+    const result = comparePriceToSourceSales([...ten(), sourceSale(1, { amount: 8000 })], saleOptions());
+    expect(result.counts.eligibleSales).toBe(9);
+    expect(result.excluded).toContainEqual(expect.objectContaining({ reason: 'duplicate_conflict' }));
+    expect(result.percentile).toBeNull();
+  });
+
+  it('excludes bids, unknown outcomes, junk amounts and invalid source dates', () => {
+    const rows = [sourceSale(1, { outcome: 'not_sold' }), sourceSale(2, { outcome: 'unknown' }),
+      sourceSale(3, { amount: Infinity }), sourceSale(4, { eventAt: '2025-02-30' }),
+      sourceSale(5, { eventAt: '2025-02-30T12:00:00Z' }), sourceSale(6, { eventAt: '2025-06-15T12:00:00' })];
+    const result = comparePriceToSourceSales(rows, saleOptions());
+    expect(result.counts.eligibleSales).toBe(0);
+    expect(result.excluded.map(e => e.reason)).toEqual(['not_sold','not_sold','price_unknown','event_unknown','event_unknown','event_unknown']);
+    expect(result.distribution).toBeNull();
+  });
+
+  it('does not assume a BaT currency or combine buyer totals with published bids', () => {
+    const rows = [sourceSale(1, { currency: null }), sourceSale(2, { currency: 'EUR' }),
+      sourceSale(3, { priceBasis: 'buyer_total' }), sourceSale(4, { unitSource: null })];
+    const result = comparePriceToSourceSales(rows, saleOptions());
+    expect(result.counts.eligibleSales).toBe(0);
+    expect(result.excluded.map(e => e.reason)).toEqual(['unknown_units','different_units','different_units','unknown_units']);
+    expect(comparePriceToSourceSales(ten().map(r => ({ ...r, currency: 'EUR' })), saleOptions({ subject: { ...saleOptions().subject, currency: 'EUR' } })).percentile).toBe(45);
+  });
+
+  it('requires per-lot unit attribution, without borrowing an early clock from an unknown-unit alias', () => {
+    const row = sourceSale(1, { knownAt: '2026-01-02T00:00:00Z' });
+    const earlyUnknown = sourceSale(1, { currency: null, knownAt: '2025-06-16T00:00:00Z' });
+    const result = comparePriceToSourceSales([row, earlyUnknown], saleOptions({ evidenceAsOf: '2026-01-01T00:00:00Z' }));
+    expect(result.excluded[0].reason).toBe('learned_later');
+    expect(comparePriceToSourceSales([sourceSale(1, { unitSource: 'https://bringatrailer.com/listing/another-lot/' })], saleOptions()).excluded[0].reason).toBe('unknown_units');
+  });
+
+  it('keeps source-event cutoff separate from knowledge cutoff and refuses future knowledge', () => {
+    const row = sourceSale(1, { knownAt: '2026-01-02T00:00:00Z' });
+    expect(comparePriceToSourceSales([row], saleOptions()).counts.eligibleSales).toBe(1);
+    const historical = saleOptions({ knowledgeMode: 'known_at', evidenceAsOf: '2026-01-01T00:00:00Z' });
+    expect(comparePriceToSourceSales([row], historical).excluded[0].reason).toBe('learned_later');
+    expect(comparePriceToSourceSales(ten(), saleOptions({ knowledgeMode: 'known_at' })).reasons).toContain('knowledge_after_comparison');
+    expect(comparePriceToSourceSales(ten(), saleOptions({ evidenceAsOf: '2026-01-04T00:00:00Z' })).reasons).toContain('invalid_cutoffs');
+    const laterAlias = sourceSale(1, { amount: 9000, knownAt: '2026-01-02T12:00:00Z' });
+    expect(comparePriceToSourceSales([...ten(), laterAlias], historical).percentile).toBe(45);
+  });
+
+  it('excludes unknown and impossible source knowledge clocks even in a retrospective receipt', () => {
+    expect(comparePriceToSourceSales([sourceSale(1, { knownAt: null })], saleOptions()).excluded[0].reason).toBe('knowledge_unknown');
+    expect(comparePriceToSourceSales([sourceSale(1, { knownAt: '2025-06-14T23:59:59Z' })], saleOptions()).excluded[0].reason).toBe('knowledge_conflicting');
+  });
+
+  it('requires a date-grain sale to fit wholly before the comparison, without inventing intraday order', () => {
+    const options = saleOptions({ eventBefore: '2025-06-15T18:00:00Z', evidenceAsOf: '2025-06-17T00:00:00Z' });
+    expect(comparePriceToSourceSales([sourceSale(1)], options).excluded[0].reason).toBe('outside_event_window');
+    expect(comparePriceToSourceSales([sourceSale(1, { eventAt: '2025-06-15T17:00:00Z' })], options).counts.eligibleSales).toBe(1);
+  });
+
+  it('refuses incomplete cohorts, small denominators and unknown candidate units', () => {
+    expect(comparePriceToSourceSales(ten(), saleOptions({ cohort: { ...saleOptions().cohort, complete: false } })).percentile).toBeNull();
+    const small = comparePriceToSourceSales(ten().slice(0, 9), saleOptions());
+    expect(small.reasons).toContain('insufficient_sales'); expect(small.distribution).toBeNull();
+    expect(comparePriceToSourceSales(ten(), saleOptions({ subject: { ...saleOptions().subject, amount: null } })).reasons).toContain('subject_price_or_units_unknown');
+  });
+
+  it('creates a new evidence receipt without mutating the prior calculation or historic condition', () => {
+    const rows = ten(), original = structuredClone(rows), options = saleOptions();
+    const prior = comparePriceToSourceSales(rows, options), frozen = structuredClone(prior);
+    const next = comparePriceToSourceSales([...rows, sourceSale(11)], { ...options, evidenceAsOf: '2026-01-03T00:00:00Z' });
+    expect(rows).toEqual(original); expect(prior).toEqual(frozen);
+    expect(next.counts.eligibleSales).toBe(11); expect(prior.counts.eligibleSales).toBe(10);
+    expect(next.conditionAdjustedAssessment).toBe('unmeasured');
+  });
+});
 
 function vehicle(over: Partial<VehicleCompRow> & { id: string; listing_url: string }): VehicleCompRow {
   return {
