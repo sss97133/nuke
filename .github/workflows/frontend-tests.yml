@@ -10,6 +10,18 @@ on:
     - cron: '0 7 * * *' # daily
 
 jobs:
+  image-projection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify cached image projection receipts (offline)
+        run: node --test scripts/lib/image-property-projection.test.mjs
+
   market-lot-activity-contract:
     runs-on: ubuntu-latest
     services:
