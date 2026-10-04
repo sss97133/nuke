@@ -106,11 +106,12 @@ describe('source-qualified sale graph', () => {
     expect(host.querySelector('.source-sales-candidate')).toBeNull();
     expect(host.textContent).toContain('Median recorded sale $40,650');
   });
-  it.each(['currency', 'date', 'source', 'unit source', 'knowledge'])('refuses an inconsistent %s receipt instead of silently dropping its members', async field => {
+  it.each(['currency', 'date', 'source', 'source user info', 'unit source', 'knowledge'])('refuses an inconsistent %s receipt instead of silently dropping its members', async field => {
     const sales = props.sales.map(r => ({ ...r }));
     if (field === 'currency') sales[0].currency = 'EUR';
     if (field === 'date') sales[0].eventAt = '2026-02-31';
     if (field === 'source') sales[0].sourceUrl = 'javascript:alert(1)';
+    if (field === 'source user info') { sales[0].sourceUrl = 'https://untrusted@bringatrailer.com/listing/invalid-source/'; sales[0].unitSource = sales[0].sourceUrl; }
     if (field === 'unit source') sales[0].unitSource = props.sales[1].sourceUrl;
     if (field === 'knowledge') sales[0].knownAt = '2027-01-01T00:00:00Z';
     await render({ sales });

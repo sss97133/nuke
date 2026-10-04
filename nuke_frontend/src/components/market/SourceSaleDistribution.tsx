@@ -27,7 +27,7 @@ export interface SourceSaleGraphProps {
 }
 
 function sourceUrl(raw: string | null) {
-  try { const u = new URL(raw ?? ''); return u.protocol === 'https:' && u.hostname === 'bringatrailer.com' && /^\/listing\/[^/?#]+\/$/.test(u.pathname) && !u.search && !u.hash ? u.href : null; } catch { return null; }
+  try { const u = new URL(raw ?? ''); return u.protocol === 'https:' && u.hostname === 'bringatrailer.com' && !u.username && !u.password && !u.port && /^\/listing\/[^/?#]+\/$/.test(u.pathname) && !u.search && !u.hash ? u.href : null; } catch { return null; }
 }
 function day(raw: string | null) {
   if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
