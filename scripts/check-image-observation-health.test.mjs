@@ -60,7 +60,7 @@ function fixture() {
   return {
     assay: 'image_observation_health_v1', sample_limit: SAMPLE_LIMIT,
     metrics: { sampled: 1, image_claims: 1, excluded_share: 0, invalid_image_refs: 0, missing_images: 0,
-      mismatched_vehicles: 0, eligible: 1, missing_witnesses: 0, fresh_witnesses: 1, fresh_images: 1,
+      mismatched_vehicles: 0, cached_projections: 0, cached_source_ineligible: 0, cached_bad_reader_visible: 0, eligible: 1, missing_witnesses: 0, fresh_witnesses: 1, fresh_images: 1,
       reader_eligible: 1, reader_missing: 0 },
     sensors: ['vehicle_observations', 'observation_witnesses', 'vehicle_images'].map(tbl => ({
       tbl, enabled: true, last_receipt_at: '2026-10-04T05:01:00Z', writer_declared: true,
@@ -162,9 +162,92 @@ test('actual SQL detects broken links, missing receipts and visibility exclusion
   check('UPDATE public.vehicle_observations SET is_superseded=true;', 'incomplete');
   check("UPDATE public.vehicle_observations SET kind='comment',source_id='20000000-0000-0000-0000-000000000002', structured_data=structured_data || '{\"kind_detail\":\"professional_review\"}';", 'incomplete');
   check('', 'incomplete', { ...scope, since: '2099-01-01T00:00:00Z' });
-  check(`INSERT INTO public.vehicle_observations
+  check(`INSERT INTO public.vehicle_observations (id,vehicle_id,source_id,kind,structured_data,is_superseded,ingested_at)
     SELECT ('60000000-0000-0000-0000-' || lpad(i::text,12,'0'))::uuid,
       '${scope.vehicle}'::uuid,'20000000-0000-0000-0000-000000000001'::uuid,
       'specification','{}'::jsonb,false,'2026-10-04T05:02:00Z'::timestamptz
     FROM generate_series(1,1000) i;`, 'incomplete');
+});
+
+
+test('ineligible cached source is a deferral; leaked child is an actual health failure', () => {
+  const hidden = fixture();
+  Object.assign(hidden.metrics, { cached_projections: 1, cached_source_ineligible: 1,
+    eligible: 0, reader_eligible: 0, fresh_witnesses: 0, fresh_images: 0 });
+  assert.equal(assess(hidden).status, 'incomplete');
+  hidden.metrics.cached_bad_reader_visible = 1;
+  assert.equal(assess(hidden).status, 'failed');
+  assert(assess(hidden).reasons.includes('cached_bad_reader_visible'));
+});
+
+test('actual PG17 cached ancestry excludes restricted originals and forbids reader leakage', {
+  skip: !process.env.IMAGE_ANCESTRY_DATABASE,
+}, () => {
+  const database = process.env.IMAGE_ANCESTRY_DATABASE;
+  assert.equal(database, 'dm_refinement_image_ancestry', 'disposable fixture only');
+  const sample = { vehicle: '11111111-1111-1111-1111-111111111111',
+    since: '2026-10-04T00:00:00Z', field: 'image_visible_rust_severity' };
+  const sql = mutation => execFileSync(process.env.IMAGE_ANCESTRY_PSQL ?? 'psql',
+    ['-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-d', database,
+      '-c', `BEGIN; ${mutation} ${query(sample)} ROLLBACK;`], { encoding: 'utf8' });
+  const check = mutation => assess(JSON.parse(sql(mutation)));
+  const baseline = check('');
+  assert.equal(baseline.status, 'passed_in_scope');
+  assert.equal(baseline.metrics.sampled, 6, 'Only late cached children arrive in this ingest window');
+  assert.equal(baseline.metrics.cached_projections, 6);
+  assert.equal(baseline.metrics.cached_source_ineligible, 3);
+  assert.equal(baseline.metrics.cached_bad_reader_visible, 0);
+  assert.equal(baseline.metrics.eligible, 3, 'Other valid scalar properties retain arrival eligibility');
+  assert.equal(baseline.metrics.reader_eligible, 1, 'Selected-field reader coverage is separate');
+  for (const mutation of [
+    "UPDATE public.vehicles SET deleted_at=now() WHERE id='11111111-1111-1111-1111-111111111111';",
+    "UPDATE public.vehicles SET listing_kind='non_vehicle_item' WHERE id='11111111-1111-1111-1111-111111111111';",
+    "UPDATE public.vehicle_observations SET is_superseded=true WHERE id='55555555-5555-5555-5555-000000000001';",
+    "UPDATE public.vehicle_observations SET vehicle_id='22222222-2222-2222-2222-222222222222' WHERE id='55555555-5555-5555-5555-000000000001';",
+    "UPDATE public.vehicle_observations SET structured_data=structured_data||'{\"receipt_id\":\"new-restriction\"}' WHERE id='55555555-5555-5555-5555-000000000001';",
+    "UPDATE public.vehicle_observations SET structured_data=jsonb_set(structured_data,'{source_recorded_at}','\"invalid\"') WHERE extraction_method='cached_byok_property_projection_v1';",
+  ]) {
+    const result = check(mutation);
+    assert.equal(result.status, 'incomplete');
+    assert.equal(result.metrics.cached_source_ineligible, 6);
+    assert.equal(result.metrics.cached_bad_reader_visible, 0);
+    assert.equal(result.metrics.eligible, 0);
+  }
+  // Reproduce the old leaked output, using the same stored child/witness rows.
+  const leaked = check(`CREATE OR REPLACE FUNCTION public.get_field_provenance(p_vehicle_id uuid,p_field text)
+    RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+    SELECT jsonb_build_object('image_observations',jsonb_agg(jsonb_build_object(
+      'observation_id',o.id,'image_id',w.image_id,'witness_id',w.id)))
+    FROM public.vehicle_observations o JOIN public.observation_witnesses w ON w.observation_id=o.id
+    WHERE o.vehicle_id=$1 AND o.structured_data ? $2 $$;`);
+  assert.equal(leaked.status, 'failed');
+  assert.equal(leaked.metrics.cached_bad_reader_visible, 1);
+  assert(leaked.reasons.includes('cached_bad_reader_visible'));
+  const wrongWitness = `UPDATE public.observation_witnesses w
+    SET image_id='44444444-4444-4444-4444-000000000002'
+    FROM public.vehicle_observations o WHERE o.id=w.observation_id
+      AND o.extraction_method='cached_byok_property_projection_v1'
+      AND o.structured_data->>'source_observation_id'='55555555-5555-5555-5555-000000000001';`;
+  const withheld = check(wrongWitness);
+  assert.equal(withheld.status, 'failed', 'Broken typed receipt still needs repair even when reader withholds it');
+  assert.equal(withheld.metrics.cached_bad_reader_visible, 0);
+  assert.equal(withheld.metrics.missing_witnesses, 3);
+  const wrongCitation = check(`${wrongWitness}
+    CREATE OR REPLACE FUNCTION public.get_field_provenance(p_vehicle_id uuid,p_field text)
+    RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+    SELECT jsonb_build_object('image_observations',jsonb_agg(jsonb_build_object(
+      'observation_id',o.id,'image_id',w.image_id,'witness_id',w.id)))
+    FROM public.vehicle_observations o JOIN public.observation_witnesses w ON w.observation_id=o.id
+    WHERE o.vehicle_id=$1 AND o.structured_data ? $2
+      AND o.structured_data->>'source_observation_id'='55555555-5555-5555-5555-000000000001' $$;`);
+  assert.equal(wrongCitation.status, 'failed');
+  assert.equal(wrongCitation.metrics.cached_source_ineligible, 3);
+  assert.equal(wrongCitation.metrics.cached_bad_reader_visible, 1, 'Eligible ancestor cannot justify a different cited image');
+  const capped = check(`SET LOCAL app.writer='fixture-sample-bound';
+    INSERT INTO public.vehicle_observations(vehicle_id,kind,structured_data,ingested_at)
+    SELECT '${sample.vehicle}'::uuid,'specification','{}'::jsonb,'2026-10-04T06:01Z'
+    FROM generate_series(1,1000);`);
+  assert.equal(capped.metrics.sampled, SAMPLE_LIMIT + 1);
+  assert.equal(capped.status, 'incomplete');
+  assert(capped.reasons.includes('sample_truncated'));
 });

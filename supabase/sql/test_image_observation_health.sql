@@ -45,3 +45,12 @@ INSERT INTO public.test_reader VALUES ('{"image_observations":[{
   "observation_id":"40000000-0000-0000-0000-000000000001",
   "image_id":"30000000-0000-0000-0000-000000000001",
   "witness_id":"50000000-0000-0000-0000-000000000001"}]}');
+
+-- Cached ancestry is checked by the assay even when this legacy fixture only
+-- exercises ordinary image arrivals. Keep its older INSERT shape explicit.
+ALTER TABLE public.vehicle_observations ADD COLUMN observed_at timestamptz,
+  ADD COLUMN extraction_method text, ADD COLUMN agent_model text,
+  ADD COLUMN raw_source_ref text, ADD COLUMN source_identifier text,
+  ADD COLUMN confidence text, ADD COLUMN confidence_score numeric;
+
+ALTER TABLE public.vehicles ADD COLUMN deleted_at timestamptz, ADD COLUMN listing_kind text;

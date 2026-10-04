@@ -12,7 +12,7 @@ function fixture(count = 1) {
     observation_properties: properties.map((property_key, index) => ({ id: id(10 + index), property_key })),
     observation_sources: [{ id: source, slug: 'photo_pipeline' }],
     image_coverage_by_vehicle: [{ vehicle_id: vehicle, seen_t1: count }],
-    vehicles: [{ id: vehicle, is_public: true }],
+    vehicles: [{ id: vehicle, is_public: true, deleted_at: null, listing_kind: null }],
     vehicle_images: Array.from({ length: count }, (_, index) => ({ id: id(100 + index), vehicle_id: vehicle,
       image_url: `https://bringatrailer.com/wp-content/uploads/synthetic-${index}.jpg`, source: 'bat_import',
       vision_gate_status: 'approved', is_sensitive: false, is_duplicate: false, is_superseded: false,
@@ -20,7 +20,7 @@ function fixture(count = 1) {
     vehicle_observations: [],
   };
   for (const image of rows.vehicle_images) rows.vehicle_observations.push({
-    id: id(1000 + Number(image.id.slice(-12))), vehicle_id: vehicle, kind: 'condition', is_superseded: false,
+    id: id(1000 + Number(image.id.slice(-12))), vehicle_id: vehicle, kind: 'condition', is_superseded: false, source_is_public: true,
     observed_at: '2026-10-01T01:00:00Z', ingested_at: '2026-10-01T02:00:00Z', agent_model: 'recorded-vision-v1',
     extraction_method: 'recorded-image-method-v1', confidence: 'medium', confidence_score: 0.8,
     structured_data: { image_id: image.id, analysis_kind: 'image_deep_byok',
@@ -160,6 +160,8 @@ test('dry run neither persists evidence nor saves operational progress', async (
 
 for (const [name, change, reason] of [
   ['missing source', f => { f.rows.vehicle_observations = []; }, 'immutable_testimony_missing'],
+  ['restricted source', f => { f.rows.vehicle_observations[0].source_is_public = false; }, 'source_not_public'],
+  ['unknown source visibility', f => { delete f.rows.vehicle_observations[0].source_is_public; }, 'source_visibility_unknown'],
   ['low confidence', f => { f.rows.vehicle_observations[0].confidence_score = 0.2; }, 'source_confidence_ineligible'],
   ['source mismatch', f => { f.rows.vehicle_observations[0].vehicle_id = id(99); }, 'immutable_testimony_missing'],
   ['missing model', f => { f.rows.vehicle_observations[0].agent_model = null; }, 'source_provenance_incomplete'],
@@ -194,6 +196,17 @@ test('private vehicle never admits public-hosted photos', async () => {
   const f = fixture(); f.rows.vehicles[0].is_public = false;
   const result = await runCachedImageProjection(f.sb, f.options);
   assert.equal(result.deferred.vehicle_not_public, 1); assert.equal(f.writes.length, 0);
+  assert.equal(f.calls.some(call => call.table === 'vehicle_images'), false);
+});
+
+for (const [name, patch, reason] of [
+  ['deleted public parent', { deleted_at: '2026-10-02T00:00:00Z' }, 'vehicle_deleted'],
+  ['non-vehicle public parent', { listing_kind: 'non_vehicle_item' }, 'vehicle_non_vehicle_item'],
+]) test(`${name} defers before cached source access or writes`, async () => {
+  const f = fixture(); Object.assign(f.rows.vehicles[0], patch);
+  const result = await runCachedImageProjection(f.sb, f.options);
+  assert.equal(result.deferred[reason], 1);
+  assert.equal(f.writes.length, 0);
   assert.equal(f.calls.some(call => call.table === 'vehicle_images'), false);
 });
 
@@ -319,6 +332,17 @@ test('newest low confidence testimony is deferred instead of selecting an older 
   f.rows.vehicle_observations.push(newer);
   const result = await runCachedImageProjection(f.sb, f.options);
   assert.equal(result.deferred.source_confidence_ineligible, 1);
+  assert.equal(f.writes.length, 0);
+});
+
+test('newest restricted source never falls back to an older public reading', async () => {
+  const f = fixture();
+  const newer = structuredClone(f.rows.vehicle_observations[0]);
+  newer.id = id(9000); newer.ingested_at = '2026-10-02T00:00:00Z'; newer.source_is_public = false;
+  f.rows.vehicle_observations.push(newer);
+  const result = await runCachedImageProjection(f.sb, f.options);
+  assert.equal(result.deferred.source_not_public, 1);
+  assert.equal(result.eligible_claims, 0);
   assert.equal(f.writes.length, 0);
 });
 

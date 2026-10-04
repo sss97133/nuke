@@ -68,7 +68,8 @@ export function options(args) {
 export function query(scope) {
   const { vehicle, since, field } = options(['--vehicle', scope.vehicle, '--since', scope.since, '--field', scope.field ?? 'interior_color']);
   return `WITH arrivals AS MATERIALIZED (
-  SELECT id, vehicle_id, source_id, kind, structured_data, is_superseded, ingested_at
+  SELECT id, vehicle_id, source_id, kind, structured_data, is_superseded, ingested_at,
+    observed_at, extraction_method, agent_model, raw_source_ref, source_identifier, confidence_score
   FROM public.vehicle_observations
   WHERE vehicle_id = '${vehicle}'::uuid AND ingested_at >= '${since}'::timestamptz
   ORDER BY ingested_at DESC, id DESC LIMIT ${SAMPLE_LIMIT + 1}
@@ -81,19 +82,66 @@ export function query(scope) {
     CASE WHEN a.structured_data->>'image_id' ~* '${UUID.source}'
       THEN (a.structured_data->>'image_id')::uuid END AS image_key
   FROM arrivals a LEFT JOIN public.observation_sources s ON s.id = a.source_id
+), ancestry AS MATERIALIZED (
+  SELECT r.*, coalesce(r.extraction_method='cached_byok_property_projection_v1'
+    OR r.structured_data->>'analysis_kind'='image_property_projection'
+    OR r.structured_data->>'projection_version'='byok_image_properties_v1',false) AS cached_projection,
+    coalesce(EXISTS(SELECT 1 FROM public.vehicles v WHERE v.id=r.vehicle_id AND v.is_public IS TRUE
+          AND v.deleted_at IS NULL AND coalesce(v.listing_kind,'')<>'non_vehicle_item')
+        AND a.id IS NOT NULL AND a.vehicle_id=r.vehicle_id AND a.kind::text='condition'
+        AND a.is_superseded IS NOT TRUE AND public.observation_is_public(a.kind,a.structured_data)
+        AND a.structured_data->>'analysis_kind'='image_deep_byok'
+        AND a.structured_data->>'image_id'=r.structured_data->>'image_id'
+        AND a.structured_data->>'scene_type' IS DISTINCT FROM 'receipt_document'
+        AND a.structured_data->'needs_review' IS DISTINCT FROM 'true'::jsonb
+        AND a.structured_data->'needs_clarification' IS DISTINCT FROM 'true'::jsonb
+        AND (NOT a.structured_data ? 'attribution_doubt' OR a.structured_data->'attribution_doubt' IN ('null'::jsonb,'false'::jsonb,'0'::jsonb,'""'::jsonb))
+        AND a.confidence::text IS DISTINCT FROM 'low' AND a.confidence_score BETWEEN 0.6 AND 1
+        AND nullif(btrim(a.agent_model),'') IS NOT NULL AND nullif(btrim(a.extraction_method),'') IS NOT NULL
+        AND isfinite(a.ingested_at) AND r.kind::text='condition'
+        AND r.extraction_method='cached_byok_property_projection_v1'
+        AND r.structured_data->>'analysis_kind'='image_property_projection'
+        AND r.structured_data->>'projection_version'='byok_image_properties_v1'
+        AND (r.structured_data->>'property_key') IN ('image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state')
+        AND r.structured_data->(r.structured_data->>'property_key')=a.structured_data->'state_observations'->
+          CASE (r.structured_data->>'property_key') WHEN 'image_visible_rust_severity' THEN 'rust_severity'
+            WHEN 'image_visible_paint_stage' THEN 'paint_state' ELSE 'completeness' END
+        AND r.confidence_score BETWEEN 0 AND 0.6
+        AND r.structured_data->>'claim_role'='inferred'
+        AND r.structured_data->>'source_family'='image:'||(r.structured_data->>'image_id')
+        AND r.structured_data->'source_model_confidence'=to_jsonb(a.confidence_score)
+        AND r.agent_model=a.agent_model
+        AND r.structured_data->>'source_extraction_method'=a.extraction_method
+        AND r.raw_source_ref='vehicle_observations:'||a.id::text
+        AND r.structured_data->>'source_result_hash' ~ '^[0-9a-f]{64}$'
+        AND r.source_identifier='byok_image_properties_v1:'||a.id::text||':'||
+          (r.structured_data->>'source_result_hash')||':'||(r.structured_data->>'property_key')
+        AND r.structured_data->>'observed_at_basis'='source_testimony_recorded_at'
+        AND r.structured_data->'capture_at'='null'::jsonb AND r.structured_data->'analyzed_at'='null'::jsonb
+        AND r.observed_at=a.ingested_at
+        AND CASE WHEN pg_catalog.pg_input_is_valid(r.structured_data->>'source_recorded_at','timestamptz')
+          AND (r.structured_data->>'source_observed_at' IS NULL OR
+            pg_catalog.pg_input_is_valid(r.structured_data->>'source_observed_at','timestamptz'))
+          THEN (r.structured_data->>'source_recorded_at')::timestamptz=a.ingested_at
+            AND (r.structured_data->>'source_observed_at')::timestamptz IS NOT DISTINCT FROM a.observed_at
+          ELSE false END, false) AS source_eligible
+  FROM refs r LEFT JOIN public.vehicle_observations a ON a.id=CASE
+    WHEN r.structured_data->>'source_observation_id' ~* '${UUID.source}'
+    THEN (r.structured_data->>'source_observation_id')::uuid END
 ), links AS MATERIALIZED (
   SELECT r.*, i.id AS existing_image, i.vehicle_id AS image_vehicle, i.created_at AS image_created_at,
     w.id AS witness_id, w.added_at AS witness_added_at,
     r.image_claim AND NOT r.excluded_share AND i.id IS NOT NULL
-      AND i.vehicle_id = r.vehicle_id AS eligible,
+      AND i.vehicle_id = r.vehicle_id AND (NOT r.cached_projection OR r.source_eligible) AS eligible,
     r.structured_data ? '${field}' AND r.is_superseded IS NOT TRUE
       AND public.observation_is_public(r.kind, r.structured_data)
+      AND (NOT r.cached_projection OR r.source_eligible)
       AND i.is_sensitive IS NOT TRUE AND i.is_superseded IS NOT TRUE AND i.is_duplicate IS NOT TRUE
       AND (i.vision_gate_status IS NULL OR i.vision_gate_status::text = 'approved')
       AND coalesce(i.image_vehicle_match_status, '') NOT IN ('mismatch', 'unrelated')
       AND nullif(btrim(i.image_url), '') IS NOT NULL
       AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = r.vehicle_id AND v.is_public = true) AS reader_visible
-  FROM refs r LEFT JOIN public.vehicle_images i ON i.id = r.image_key
+  FROM ancestry r LEFT JOIN public.vehicle_images i ON i.id = r.image_key
   LEFT JOIN public.observation_witnesses w
     ON w.observation_id = r.id AND w.image_id = r.image_key AND w.witness_role = 'derived'
 ), reader AS MATERIALIZED (
@@ -106,6 +154,13 @@ export function query(scope) {
     count(*) FILTER (WHERE image_claim AND NOT excluded_share AND image_key IS NULL) AS invalid_image_refs,
     count(*) FILTER (WHERE image_key IS NOT NULL AND NOT excluded_share AND existing_image IS NULL) AS missing_images,
     count(*) FILTER (WHERE existing_image IS NOT NULL AND NOT excluded_share AND image_vehicle IS DISTINCT FROM vehicle_id) AS mismatched_vehicles,
+    count(*) FILTER (WHERE cached_projection) AS cached_projections,
+    count(*) FILTER (WHERE cached_projection AND NOT source_eligible) AS cached_source_ineligible,
+    count(*) FILTER (WHERE cached_projection AND EXISTS (
+      SELECT 1 FROM reader, jsonb_array_elements(CASE WHEN jsonb_typeof(result->'image_observations') = 'array'
+        THEN result->'image_observations' ELSE '[]'::jsonb END) c
+      WHERE c->>'observation_id'=links.id::text
+        AND (NOT source_eligible OR c->>'image_id' IS DISTINCT FROM links.image_key::text))) AS cached_bad_reader_visible,
     count(*) FILTER (WHERE eligible) AS eligible,
     count(*) FILTER (WHERE eligible AND witness_id IS NULL) AS missing_witnesses,
     count(*) FILTER (WHERE eligible AND witness_added_at >= '${since}'::timestamptz) AS fresh_witnesses,
@@ -137,7 +192,7 @@ SELECT jsonb_build_object('assay', 'image_observation_health_v1', 'measured_at',
 
 export function assess(assay) {
   const counts = ['sampled', 'image_claims', 'excluded_share', 'invalid_image_refs', 'missing_images',
-    'mismatched_vehicles', 'eligible', 'missing_witnesses', 'fresh_witnesses', 'fresh_images', 'reader_eligible', 'reader_missing'];
+    'mismatched_vehicles', 'cached_projections', 'cached_source_ineligible', 'cached_bad_reader_visible', 'eligible', 'missing_witnesses', 'fresh_witnesses', 'fresh_images', 'reader_eligible', 'reader_missing'];
   if (assay?.assay !== 'image_observation_health_v1' || assay.sample_limit !== SAMPLE_LIMIT
       || !counts.every(k => Number.isSafeInteger(assay.metrics?.[k]) && assay.metrics[k] >= 0)
       || !Array.isArray(assay.sensors) || assay.sensors.length !== TABLES.length
@@ -149,8 +204,9 @@ export function assess(assay) {
   const m = assay.metrics;
   if (m.sampled > SAMPLE_LIMIT + 1 || counts.slice(1).some(k => m[k] > m.sampled)
       || m.reader_eligible > m.eligible || m.reader_missing > m.reader_eligible
-      || m.missing_witnesses > m.eligible) throw new Error('inconsistent assay; coverage unknown');
-  const failures = ['invalid_image_refs', 'missing_images', 'mismatched_vehicles', 'missing_witnesses', 'reader_missing'].filter(k => m[k] > 0);
+      || m.missing_witnesses > m.eligible || m.cached_source_ineligible > m.cached_projections
+      || m.cached_bad_reader_visible > m.cached_projections) throw new Error('inconsistent assay; coverage unknown');
+  const failures = ['invalid_image_refs', 'missing_images', 'mismatched_vehicles', 'missing_witnesses', 'reader_missing', 'cached_bad_reader_visible'].filter(k => m[k] > 0);
   const incomplete = [];
   for (const s of assay.sensors) {
     if (!s.enabled) failures.push(`${s.tbl}:sensor_missing`);
@@ -163,7 +219,7 @@ export function assess(assay) {
   if (m.reader_eligible === 0) incomplete.push('reader_not_measured');
   const status = failures.length ? 'failed' : incomplete.length ? 'incomplete' : 'passed_in_scope';
   return { ...assay, status, reasons: [...failures, ...incomplete],
-    scope_note: 'Bounded vehicle/ingest-window sample. Receipt presence is table-level, not per-observation proof. No corpus, cadence, image-processing UPDATE, independent-source or calibrated-correctness claim.' };
+    scope_note: 'Bounded vehicle/ingest-window sample. Receipt presence is table-level, not per-observation proof. Cached claims require current full-source ancestry; hidden ineligible sources are excluded, visible ineligible-source children fail. Capture/analysis clocks remain unverified. No corpus, cadence, image-processing UPDATE, independent-source or calibrated-correctness claim.' };
 }
 
 export function run(scope, execute = sql => execFileSync('/bin/bash', [fileURLToPath(new URL('./data/q.sh', import.meta.url)),
