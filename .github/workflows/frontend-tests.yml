@@ -179,6 +179,10 @@ jobs:
         run: createdb dm_refinement_market_counts
       - name: Verify recorded episodes, bounded membership, privacy and cap contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_counts -f supabase/sql/test_market_trends_recorded_sale_counts.sql
+      - name: Create disposable market-value delta database
+        run: createdb dm_refinement_market_delta_ci
+      - name: Verify unknown estimates, genuine zero and existing reader access
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_delta_ci -f supabase/sql/test_market_value_delta_unknown.sql
 
   valuation-source-sale-contract:
     runs-on: ubuntu-latest
