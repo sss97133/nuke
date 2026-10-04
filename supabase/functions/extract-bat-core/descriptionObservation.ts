@@ -23,6 +23,10 @@ export async function recordListingDescription(supabase: any, input: {
       input.snapshotCustody?.sha256?.toLowerCase() !== input.captureSha256.toLowerCase())) {
     return { status: "refused", reason: "Protected same-source snapshot custody is unverified" };
   }
+  if (input.strictReceipt && (input.captureBasis !== "snapshot" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.snapshotId || ""))) {
+    return { status: "refused", reason: "Strict native receipt requires a pinned protected snapshot" };
+  }
   if (input.sourceArchiveIngestedAt !== undefined) {
     const archiveClock = observationClockMicroseconds(input.sourceArchiveIngestedAt);
     if (archiveClock === null || archiveClock < captureClock || archiveClock > BigInt(Date.now())*1000n) {
@@ -42,14 +46,35 @@ export async function recordListingDescription(supabase: any, input: {
     // extractor_id names an optional registry UUID. A producer label is not that identity.
     extraction_method: "html_description_capture",
     raw_source_ref: input.snapshotId ? `listing_page_snapshots:${input.snapshotId}` : input.sourceUrl,
+    // The live unique key includes source_identifier. NULL identifiers do not
+    // arbitrate concurrent inserts; reuse this capture's existing source ref.
+    ...(input.strictReceipt ? { source_identifier: `listing_page_snapshots:${input.snapshotId}` } : {}),
     defer_analysis: true,
   };
   // A pinned historical operation must not mistake a superseded/relinked hash
-  // winner for successful replay. This uses the existing unique hash/PK indexes.
+  // winner for successful replay. This uses the existing composite source key,
+  // content-hash lookup index and observation PK; the hash alone is not unique.
   const payloadHash = input.strictReceipt || input.dryRun ? await observationContentHash(body) : null;
-  const receiptColumns = "id,vehicle_id,kind,subject_type,is_superseded,observed_at,source_url,raw_source_ref,extraction_method,content_text,structured_data,content_hash";
+  const receiptColumns = "id,vehicle_id,source_id,source_identifier,kind,subject_type,is_superseded,observed_at,ingested_at,source_url,raw_source_ref,extraction_method,content_text,structured_data,content_hash";
+  let registeredSourceId: string | null = null;
+  if (input.strictReceipt) {
+    const source = await supabase.from("observation_sources").select("id")
+      .eq("slug", body.source_slug).maybeSingle();
+    if (source.error || !source.data?.id) return { status: "refused", reason: "Registered BaT source unavailable" };
+    registeredSourceId = source.data.id;
+  }
+  const validIngestClock = (row: any) => {
+    const clock = observationClockMicroseconds(row?.ingested_at);
+    const minimum = input.sourceArchiveIngestedAt
+      ? observationClockMicroseconds(input.sourceArchiveIngestedAt) : captureClock;
+    return clock !== null && minimum !== null && clock >= minimum && clock <= BigInt(Date.now())*1000n;
+  };
   const matches = (row: any) => row && row.vehicle_id === input.vehicleId && row.kind === "listing" &&
-    row.subject_type === "vehicle" && row.is_superseded !== true && row.source_url === input.sourceUrl &&
+    row.subject_type === "vehicle" && row.is_superseded === false &&
+    (!input.strictReceipt || (row.source_id === registeredSourceId &&
+      row.source_identifier === body.source_identifier)) &&
+    validIngestClock(row) &&
+    row.source_url === input.sourceUrl &&
     row.raw_source_ref === body.raw_source_ref && row.extraction_method === body.extraction_method &&
     row.content_hash === payloadHash && row.content_text === input.text &&
     observationClockMicroseconds(row.observed_at) === captureClock &&
@@ -57,8 +82,10 @@ export async function recordListingDescription(supabase: any, input: {
     Object.entries(body.structured_data).every(([key,value]) => row.structured_data[key] === value);
   let existing: any = null;
   if (payloadHash) {
-    const lookup = await supabase.from("vehicle_observations").select(receiptColumns)
-      .eq("content_hash", payloadHash).maybeSingle();
+    let query = supabase.from("vehicle_observations").select(receiptColumns).eq("content_hash", payloadHash);
+    if (input.strictReceipt) query = query.eq("source_id", registeredSourceId)
+      .eq("source_identifier", body.source_identifier).eq("kind", body.kind);
+    const lookup = await query.maybeSingle();
     if (lookup.error || (lookup.data && !matches(lookup.data))) {
       return { status: "refused", reason: "Native receipt unavailable or superseded/relinked/changed; replay refused" };
     }

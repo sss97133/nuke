@@ -95,7 +95,7 @@ function canonicalIntake(options = {}) {
       intakes.push(admitted);
       return handlers.get('intake')(new Request(url, { ...init, body: JSON.stringify(admitted) }));
     }
-    if (url.pathname === '/rest/v1/observation_sources') return Response.json([{
+    if (url.pathname === '/rest/v1/observation_sources') return Response.json(options.sourceUnavailable ? [] : [{
       id: '00000000-0000-4000-8000-000000000003', base_trust_score: .85, supported_observations: ['listing'],
     }]);
     if (url.pathname === '/rest/v1/rpc/observation_is_public') return Response.json(options.restricted !== true);
@@ -104,7 +104,9 @@ function canonicalIntake(options = {}) {
         if (url.searchParams.has('content_hash')) {
           const existing = committed.get(url.searchParams.get('content_hash').replace(/^eq\./, ''));
           options.onHashRead?.(existing, committed);
-          return Response.json(existing ? [existing] : []);
+          const sameKey = existing && ['source_id','source_identifier','kind'].every(key =>
+            !url.searchParams.has(key) || `eq.${existing[key]}` === url.searchParams.get(key));
+          return Response.json(sameKey ? [existing] : []);
         }
         if (url.searchParams.has('id')) {
           const existing = [...committed.values()].find(row => `eq.${row.id}` === url.searchParams.get('id'));
@@ -116,7 +118,12 @@ function canonicalIntake(options = {}) {
         if (body.extractor_id != null && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.extractor_id)) {
           return Response.json({ code: '22P02', message: `invalid input syntax for type uuid: "${body.extractor_id}"` }, { status: 400 });
         }
-        if (committed.has(body.content_hash)) return Response.json({ code: '23505', message: 'Duplicate content hash' }, { status: 409 });
+        const current = committed.get(body.content_hash);
+        // PostgreSQL's actual unique key permits duplicate NULL identifiers.
+        // Only the same fully non-NULL source/identifier/kind/hash conflicts.
+        if (current && body.source_identifier != null && current.source_identifier != null &&
+          current.source_id === body.source_id && current.source_identifier === body.source_identifier &&
+          current.kind === body.kind) return Response.json({ code: '23505', message: 'Duplicate composite receipt' }, { status: 409 });
         const receipt = { ...body, id: '00000000-0000-4000-8000-000000000002',
           subject_type: 'vehicle', is_superseded: false, ingested_at: new Date().toISOString() };
         committed.set(body.content_hash, receipt);
@@ -275,6 +282,8 @@ test('explicit historical append crosses actual canonical intake with exact arch
   assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.2.5');
   assert.equal(row.structured_data.source_event_time_status, 'unknown');
   assert.equal(row.raw_source_ref, `listing_page_snapshots:${f.snapshot.id}`);
+  assert.equal(row.source_identifier, row.raw_source_ref);
+  assert.equal(row.source_id, '00000000-0000-4000-8000-000000000003');
   assert.equal(row.extractor_id, undefined);
   assert.equal(row.source_snapshot_id, undefined, 'Sale-only typed snapshot key is not used for prose');
   assert.equal(row.content_hash, preview.body.description_receipt.observation_payload_sha256);
@@ -291,13 +300,23 @@ test('explicit historical append crosses actual canonical intake with exact arch
     !r.path.includes('/rpc/')).length, 1, 'Only one native testimony INSERT, via actual canonical owner');
 });
 
-test('concurrent exact historical requests share the canonical unique hash receipt', async () => {
+test('concurrent exact historical requests share the real non-NULL composite source receipt', async () => {
   const f = canonicalIntake({ core: true });
   const results = await Promise.all([f.call({ dry_run: false }), f.call({ dry_run: false })]);
   assert.ok(results.every(r => r.status === 200), errorText(f));
   assert.equal(f.committed.size, 1);
   assert.equal(new Set(results.map(r => r.body.description_receipt.observation_id)).size, 1);
   assert.deepEqual(results.map(r => r.body.writes).sort(), [0,1]);
+  assert.ok(f.requests.filter(r => r.path.endsWith('/vehicle_observations') && r.params.has('source_id'))
+    .every(r => r.params.get('source_identifier') === `eq.listing_page_snapshots:${f.snapshot.id}` &&
+      r.params.get('kind') === 'eq.listing'), 'Strict lookup uses the actual complete composite owner');
+});
+test('registered BaT source unavailable cannot advertise a preview or invoke intake', async () => {
+  const f = canonicalIntake({core:true,sourceUnavailable:true});
+  const result = await f.call();
+  assert.equal(result.status, 500);
+  assert.match(result.body.error, /Registered BaT source unavailable/);
+  assert.equal(f.intakes.length, 0);
 });
 
 function userToken(role) {
@@ -386,7 +405,11 @@ for (const [name, mutate] of [ ['parent becomes private',(table,n,{vehicle}) => 
   });
 }
 
-for (const [name, change] of [ ['superseded',{is_superseded:true}], ['relinked',{vehicle_id:'other'}],
+for (const [name, change] of [ ['superseded',{is_superseded:true}], ['unknown supersession',{is_superseded:null}],
+  ['relinked',{vehicle_id:'other'}], ['unknown native ingest clock',{ingested_at:null}],
+  ['invalid native ingest clock',{ingested_at:'not-a-date'}], ['future native ingest clock',{ingested_at:'2099-01-01T00:00:00Z'}],
+  ['native ingest before capture',{ingested_at:'2019-01-01T00:00:00Z'}],
+  ['native ingest before archive',{ingested_at:'2020-01-01T00:00:00.123457Z'}],
   ['changed text',{content_text:'Changed testimony'}], ['changed qualification',{structured_data:{description_capture:true}}] ]) {
   test(`${name} hash winner cannot count as replay`, async () => {
     const f = canonicalIntake({ core:true });
@@ -395,6 +418,19 @@ for (const [name, change] of [ ['superseded',{is_superseded:true}], ['relinked',
     const before = f.intakes.length;
     assert.equal((await f.call({dry_run:false})).status, 500);
     assert.equal(f.intakes.length, before, 'Refusal does not manufacture a replacement or supersession');
+  });
+}
+for (const [name,change] of [ ['foreign registry source',{source_id:'00000000-0000-4000-8000-000000000099'}],
+  ['unknown registry source',{source_id:null}], ['changed source identity',{source_identifier:'other-capture'}],
+  ['NULL source identity',{source_identifier:null}] ]) {
+  test(`${name} generic hash winner fails exact historical receipt verification`, async () => {
+    const f = canonicalIntake({core:true});
+    assert.equal((await f.call({dry_run:false})).status, 200, errorText(f));
+    Object.assign([...f.committed.values()][0], change);
+    const result = await f.call({dry_run:false});
+    assert.equal(result.status, 500);
+    assert.match(result.body.error, /changed or unrelated native receipt/);
+    assert.equal(f.requests.filter(r => r.method === 'POST' && r.path === '/rest/v1/vehicle_observations').length, 1);
   });
 }
 test('canonical returned receipt changes are visible failures after the bounded append', async () => {
