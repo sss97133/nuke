@@ -13,7 +13,13 @@ vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
-vi.mock('./RecordedSalesComparison', () => ({ default: () => <section aria-label="Recorded sales comparison" /> }));
+vi.mock('./RecordedSalesComparison', () => ({ default: ({ make, onMakeChange, onViewChange }: any) => <section aria-label="Recorded sales comparison">
+  <span>Comparison scope {make ?? 'all'}</span>
+  <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
+  <button onClick={() => onViewChange('inventory')}>Use inventory view</button>
+  <button onClick={() => onMakeChange('FORD')}>Choose Ford cohort</button>
+  <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
+</section> }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 vi.mock('@tanstack/react-virtual', () => ({ useWindowVirtualizer: ({ count, estimateSize }: any) => ({
   getTotalSize: () => count * estimateSize(),
@@ -78,18 +84,18 @@ beforeEach(() => {
 describe('captured lot activity clocks and bounds', () => {
   it('labels unknown source time and captured as-of without an assumed usual rate', async () => {
     setMovement(movementReceipt('unknown', '2026-10-03T11:59:00Z'));
-    await render('make=PORSCHE');
+    await render('make=PORSCHE'); await click('Inspect activity for first');
     const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
     expect(activity.textContent).toContain('Source read time unknown');
     expect(activity.querySelector('time')?.dateTime).toBe('2026-10-03T11:58:00.000Z');
     expect(activity.textContent).toContain('Showing 3 of 3 captured interactions · read limit 40');
     expect(activity.textContent).toContain('Captured hour before read3 posted');
     expect(container.textContent).not.toMatch(/usual|since it opened|7-day run/);
-    expect(activity.closest('a')?.getAttribute('href')).toBe('/vehicle/first');
+    expect(activity.closest('section')?.querySelector('a')?.getAttribute('href')).toBe('/vehicle/first');
   });
   it('preserves old cached source age separately from a recent captured read', async () => {
     setMovement(movementReceipt('cached_snapshot', '2026-10-02T11:00:00Z'));
-    await render('make=PORSCHE');
+    await render('make=PORSCHE'); await click('Inspect activity for first');
     const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
     expect(activity.textContent).toContain('Source read 1d ago · Cached snapshot');
     expect([...activity.querySelectorAll('time')].map(t => t.dateTime)).toEqual([
@@ -100,20 +106,20 @@ describe('captured lot activity clocks and bounds', () => {
   it('labels direct reads and truncated per-lot windows on the phone layout', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     setMovement(movementReceipt('direct_fetch', '2026-10-03T11:55:00Z', true));
-    await render('make=PORSCHE');
+    await render('make=PORSCHE'); await click('Inspect activity for first');
     const activity = container.querySelector('[aria-label="Captured lot activity"]') as HTMLElement;
     expect(activity.textContent).toContain('Source read 5m ago · Direct fetch');
-    expect(activity.textContent).toContain('Showing 3 of 40 captured interactions · read limit 40');
+    expect(activity.textContent).toContain('Showing 40 of 40 captured interactions · read limit 40');
     expect(activity.textContent).toContain('Window truncated; earlier interactions are omitted');
     expect(activity.textContent).toContain('≥40 posted');
     expect(activity.style.overflowWrap).toBe('anywhere');
-    expect([...container.querySelectorAll('div')].some(d => d.style.gridTemplateColumns === 'repeat(4, 1fr)')).toBe(true);
+    expect(container.querySelector('[aria-label="Open inventory filters"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
-    expect(container.querySelector('a[title="The listing on Bring a Trailer"]')?.getAttribute('href')).toContain('local-fixture-first');
+    expect(container.querySelector('a[href="https://bringatrailer.com/listing/local-fixture-first/"]')).toBeTruthy();
   });
   it('shows a captured zero without inventing activity when a source receipt exists', async () => {
     const receipt = movementReceipt('unknown', null); receipt.lots[0].activity = []; receipt.lots[0].activity_rows = 0;
-    setMovement(receipt); await render('make=PORSCHE');
+    setMovement(receipt); await render('make=PORSCHE'); await click('Inspect activity for first'); await click('Inspect activity for first');
     const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
     expect(activity.textContent).toContain('Showing 0 of 0 captured interactions');
     expect(activity.textContent).toContain('Source read time unknown');
@@ -123,6 +129,41 @@ describe('captured lot activity clocks and bounds', () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('market answer -> supporting lots', () => {
+  it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
+    fixture.pulse.data.auctions[0].model = 'Recorded model A';
+    fixture.pulse.data.auctions[1].model = 'Recorded model B';
+    fixture.pulse.data.auctions[2].model = 'Recorded model B';
+    await render('make=PORSCHE');
+    await click('Recorded model B: 2 captured lots');
+    expect(window.location.search).toContain('model=Recorded+model+B');
+    expect(boardTitles()).toEqual(['first', 'unknown']);
+    expect(container.querySelector('[aria-label="Inventory drill path"]')?.textContent).toContain('Recorded model: Recorded model B');
+    await click('Use recorded sales view');
+    expect(window.location.search).toContain('view=sales');
+    expect(window.location.search).not.toContain('model=');
+    expect(container.querySelector('[aria-label="Supporting live lots"]')).toBeNull();
+    await click('Use inventory view');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+  });
+  it('attaches its map observer when an initially loading population becomes available', async () => {
+    const data = fixture.pulse.data; fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
+    await render('make=all');
+    expect(container.querySelector('button[aria-label="PORSCHE: 3 captured live lots"]')).toBeNull();
+    fixture.pulse.data = data; fixture.pulse.isLoading = false; await render();
+    expect(container.querySelector('button[aria-label="PORSCHE: 3 captured live lots"]')).toBeTruthy();
+  });
+  it('uses one comparison make for the live board and keeps the optional bid ranges collapsed', async () => {
+    await render();
+    expect(container.textContent).toContain('Comparison scope all');
+    expect(container.querySelector('[aria-label="Live lot make"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.closest('details')?.open).toBe(false);
+    await click('Choose Ford cohort');
+    expect(window.location.search).toContain('make=FORD');
+    expect(boardTitles().slice(-1)).toEqual(['other-make']);
+    await click('Choose all live makes');
+    expect(window.location.search).toContain('make=all');
+    expect(button('Live lots').textContent).toContain('4');
+  });
   it('keeps unknown separate from zero and assigns each boundary exactly once', () => {
     const bids = [null, 0, 9_999, 10_000, 24_999, 25_000, 49_999, 50_000, 99_999, 100_000, NaN, -1];
     const d = currentBidDistribution(bids.map((bid, i) => lot(String(i), 'PORSCHE', bid, 1)));
@@ -133,11 +174,12 @@ describe('market answer -> supporting lots', () => {
   });
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
-    expect(button('Lots with bid data').textContent).toContain('2');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
     expect(container.textContent).toContain('source currency unknown');
     expect(container.textContent).not.toContain('USD');
     expect(container.textContent).not.toContain('$');
     expect(button('Live lots').textContent).toContain('3');
+    expect(container.textContent).toContain('3 of 4 captured BaT vehicle lots');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
     await click('Live lots');
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
@@ -146,16 +188,17 @@ describe('market answer -> supporting lots', () => {
   it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
     await render('make=PORSCHE'); await click('25,000–49,999:');
     expect(window.location.search).toContain('make=PORSCHE');
-    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/later', '/vehicle/later']);
+    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/later']);
     expect(button('25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
     await click('25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
     await render('make=PORSCHE'); await click('Unrecorded:');
-    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/unknown', '/vehicle/unknown']);
+    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/unknown']);
     await click('Ending < 24 h');
     expect(window.location.search).not.toContain('bidRange');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('1 of 2 lots');
+    expect(container.querySelector('button[aria-label="Local fixture: 2 captured lots. Filter this recorded model"]')).toBeTruthy();
     expect(container.querySelector('a[title="The listing on Bring a Trailer"]')?.getAttribute('href')).toContain('local-fixture-first');
     expect(container.textContent).toContain('Source read time and bid event time are unavailable');
   });
@@ -168,7 +211,7 @@ describe('market answer -> supporting lots', () => {
   });
   it('distinguishes loading, failure, and a failed refresh with previously fetched data', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
-    await render(); expect(button('Lots with bid data').textContent).toContain('…');
+    await render(); expect(button('Live lots').textContent).toContain('…');
     expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeNull();
     fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render(); expect(container.textContent).toContain('could not be loaded');
@@ -185,7 +228,7 @@ describe('market answer -> supporting lots', () => {
     await render('make=PORSCHE&live=hot&sort=hottest');
     expect(container.textContent).not.toMatch(/Running hot|Running cold|vs last week|Current bid per auction|Median current bid/);
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
-    await click('PORSCHE ✕');
+    await click('All captured makes');
     expect(container.textContent).toContain('area = captured lot count');
   });
 });

@@ -52,15 +52,41 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
 
 describe('recorded sales evidence comparison', () => {
+  it('keeps the shared context in inventory mode without requesting ended outcomes', async () => {
+    await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" view="inventory" />));
+    expect(fixture.request).toBeNull();
+    expect(container.querySelector('[aria-label="Recorded sales event window"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
+  });
+  it('preserves an unregistered stored make in the shared control without inventing a sales scope', async () => {
+    const onMakeChange = vi.fn();
+    await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="inventory" onMakeChange={onMakeChange} />));
+    const scope = container.querySelector('select[aria-label="Recorded sales scope"]') as HTMLSelectElement;
+    expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · recorded inventory label');
+    expect(fixture.request).toBeNull();
+    await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="sales" onMakeChange={onMakeChange} />));
+    expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · no registered sales scope');
+    expect(container.textContent).toContain('No unique registered make matches UNREGISTERED');
+    expect(fixture.request).toBeNull();
+    await select('Recorded sales scope', '');
+    expect(onMakeChange).toHaveBeenCalledWith(null, null);
+  });
+  it('restores the shareable supported scope, window and UTC evidence point', async () => {
+    await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE"
+      lens={{ scopeKey: subject.key, days: 2, drill: { bucket: '2026-10-03T00:00:00Z', series: 'selected' }, benchmark: false }} />));
+    expect(fixture.request).toMatchObject({ scope: subject.scope, event_from: '2026-10-02T00:00:00.000Z', evidence_bucket: '2026-10-03T00:00:00Z' });
+    expect(countButton('supported grouping: 2 recorded').getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')?.querySelector('a[href="/vehicle/fixture-vehicle"]')).toBeTruthy();
+  });
   it('resolves the registered make ID, preserves partial denominators and refuses invented ratios/changes', async () => {
     await render('fixture make');
-    expect(fixture.request).toMatchObject({ scope: make.scope, event_from: '2026-10-02T00:00:00.000Z', event_to: '2026-10-04T00:00:00.000Z', evidence_limit: 20 });
+    expect(fixture.request).toMatchObject({ scope: make.scope, event_from: '2026-09-27T00:00:00.000Z', event_to: '2026-10-04T00:00:00.000Z', evidence_limit: 20 });
     expect(container.textContent).toContain('2 recorded sales · 4 captured ended listings');
     expect(container.textContent).toContain('10 recorded sales · 40 captured ended listings');
     expect(container.textContent).toContain('3 unresolved memberships excluded from both series');
     expect(container.textContent).toContain('Source clocks: 0 recorded · 4 unknown. Ended pending: 1');
     expect(container.textContent).toContain('Ratios and period changes: unknown');
-    expect(container.textContent).toContain('Partial capture');
+    expect(container.textContent).toContain('partial capture');
     expect(container.textContent).not.toMatch(/50%|25%|USD|sell-through|market strength/);
     expect(container.querySelector('time')?.dateTime).toBe('2026-10-04T09:00:00Z');
     expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
@@ -132,5 +158,37 @@ describe('recorded sales evidence comparison', () => {
     await render(null); expect(fixture.request?.scope).toEqual(make.scope);
     const refresh = [...container.querySelectorAll('button')].find(b => b.textContent === 'Refresh recorded evidence')!;
     await act(async () => refresh.click()); expect(fixture.retry).toHaveBeenCalledOnce();
+  });
+  it('plots both series on the same count scale without manufacturing missing buckets', async () => {
+    const data = receipt();
+    data.series.push({ ...data.series[0], bucket_start: '2026-10-02T00:00:00Z', value: null, denominator: null });
+    fixture.query.data = data; await render();
+    await act(async () => (container.querySelector('input[aria-label="Show rest of BaT absolute counts"]') as HTMLInputElement).click());
+    expect(container.textContent).toContain('shared count scale 0–10');
+    const bars = [...container.querySelectorAll<HTMLElement>('.sales-count-bar')];
+    expect(bars.map(bar => bar.style.height)).toEqual(['20%', '100%']);
+    expect(countButton('2026-10-02 UTC · FIXTURE MAKE: counts refused').disabled).toBe(true);
+    expect(container.textContent).toContain('Unknown');
+  });
+  it('keeps the chart during a focused read, hides its old contributor payload and focuses loaded evidence', async () => {
+    await render(); fixture.query.isFetching = true;
+    await act(async () => countButton('FIXTURE MAKE: 2 recorded').click());
+    expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeTruthy();
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
+    fixture.query.isFetching = false; await render();
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales contributors"]'));
+  });
+  it('shares the make with live inventory while preserving the narrower grouping qualification', async () => {
+    const onMakeChange = vi.fn();
+    await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" onMakeChange={onMakeChange} />));
+    await select('Recorded sales scope', subject.key);
+    expect(onMakeChange).toHaveBeenCalledWith('FIXTURE MAKE', subject.key);
+    expect(fixture.request?.scope).toEqual(subject.scope);
+    expect(container.textContent).toContain('live grouping membership is unavailable');
+    await select('Recorded sales scope', '');
+    expect(onMakeChange).toHaveBeenLastCalledWith(null, null);
+    await act(async () => root.render(<RecordedSalesComparison make={null} onMakeChange={onMakeChange} />));
+    expect(fixture.request).toBeNull();
+    expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
   });
 });

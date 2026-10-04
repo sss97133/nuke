@@ -101,5 +101,11 @@ export function useSalesScopes() {
 
 export function useRecordedSales(request: SalesRequest | null) {
   return useQuery({ queryKey: ['market-recorded-sales', request], enabled: request != null,
-    queryFn: () => fetchRecordedSales(request!), staleTime: 60_000, retry: false, refetchOnWindowFocus: false });
+    queryFn: () => fetchRecordedSales(request!), staleTime: 60_000, retry: false, refetchOnWindowFocus: false,
+    // Keep the chart while a focused evidence read arrives, but never carry one population into another.
+    placeholderData: (data, previousQuery) => {
+      const previous = previousQuery?.queryKey[1] as SalesRequest | null | undefined;
+      return request && previous && request.event_from === previous.event_from && request.event_to === previous.event_to
+        && JSON.stringify(request.scope) === JSON.stringify(previous.scope) ? data : undefined;
+    } });
 }
