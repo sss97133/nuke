@@ -6,7 +6,11 @@
  * This is a pure function -- no React state or side effects.
  */
 export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForRows: string): any | null {
-  const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
+  // vehicle_events is the canonical reader; its IDs must not enter the legacy listing sync writer.
+  const arr = (Array.isArray(rows) ? rows : []).map((r) => r?.source_url ? {
+    ...r, id: null, platform: r.source_platform, listing_url: r.source_url,
+    listing_status: r.event_status, end_date: r.ended_at, current_bid: r.current_price,
+  } : r).filter((r) => r && r.listing_url && r.platform);
   if (arr.length === 0) return null;
   // NOTE: We intentionally do NOT globally drop active listings when a vehicle has a historical sale.
   // Relists exist (e.g. BaT "-2" URLs), and we want the pulse to reflect the current live auction when present.
@@ -150,9 +154,10 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
     const horizonMs = maxAuctionHorizonMs(String(best.platform || ''), String(best.listing_url || ''));
     const futureEnd = endCandidates
       .filter((x) => x.t > now && (x.t - now) <= horizonMs)
-      .sort((a, b) => a.t - b.t)[0];
-    // If no reasonable future end date exists, don't render a countdown (avoid misleading UI).
-    const mergedEndDate = (futureEnd?.iso || null) as string | null;
+      .sort((a, b) => b.t - a.t)[0];
+    // Keep the recorded deadline after zero: elapsed time alone cannot confirm a soft close.
+    const pastEnd = endCandidates.filter((x) => x.t <= now).sort((a, b) => b.t - a.t)[0];
+    const mergedEndDate = (futureEnd?.iso || pastEnd?.iso || null) as string | null;
 
     const updatedAt = (() => {
       const ts = sorted
@@ -198,8 +203,8 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
       comment_count: mergedCommentCount,
       final_price: maxNum(sorted.map((r) => r?.final_price)),
       sold_at: soldAt,
-      last_bid_at: null as string | null,
-      last_comment_at: null as string | null,
+      last_bid_at: best?.metadata?.live_stream?.last_bid_at || null,
+      last_comment_at: best?.metadata?.live_stream?.last_comment_at || null,
       updated_at: updatedAt,
       metadata: (best?.metadata && typeof best.metadata === 'object') ? best.metadata : null,
       _vehicle_id: vehicleIdForRows,

@@ -576,23 +576,11 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           if (!row) return;
           if (auctionPulse?.listing_url && row.source_url && row.source_url !== auctionPulse.listing_url) return;
 
-          (async () => {
-            try {
-              const { data } = await supabase
-                .from('vehicle_events')
-                .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
-                .eq('vehicle_id', vehicleIdForFilter)
-                .order('updated_at', { ascending: false })
-                .limit(20);
-              const normalized = (Array.isArray(data) ? data : []).map((r: any) => ({
-                platform: r.source_platform, listing_url: r.source_url, listing_status: r.event_status,
-                end_date: r.ended_at, current_bid: r.current_price, bid_count: r.bid_count,
-                watcher_count: r.watcher_count, view_count: r.view_count, metadata: r.metadata, updated_at: r.updated_at,
-              }));
-              const merged = buildAuctionPulseFromExternalListings(normalized, vehicleIdForFilter);
-              if (merged) setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
-            } catch { /* ignore */ }
-          })();
+          const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
+          if (merged) setAuctionPulse((prev: any) => {
+            if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
+            return { ...(prev || {}), ...merged };
+          });
         },
       )
       .on(
@@ -634,18 +622,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const { data: events } = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
+          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
           .limit(20);
 
-        const normalized = (Array.isArray(events) ? events : []).map((r: any) => ({
-          platform: r.source_platform, listing_url: r.source_url, listing_status: r.event_status,
-          end_date: r.ended_at, current_bid: r.current_price, bid_count: r.bid_count,
-          watcher_count: r.watcher_count, view_count: r.view_count, metadata: r.metadata, updated_at: r.updated_at,
-        }));
-        const merged = buildAuctionPulseFromExternalListings(normalized, vehicle!.id);
+        const merged = buildAuctionPulseFromExternalListings(events || [], vehicle!.id);
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
         const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
 
@@ -690,6 +673,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             listing_status: String((merged as any)?.listing_status || auctionPulse?.listing_status || ''),
             end_date: (merged as any)?.end_date ?? auctionPulse?.end_date ?? null,
             current_bid: typeof (merged as any)?.current_bid === 'number' ? (merged as any).current_bid : (auctionPulse?.current_bid ?? null),
+            final_price: (merged as any)?.final_price ?? null,
+            sold_at: (merged as any)?.sold_at ?? null,
             bid_count: typeof (merged as any)?.bid_count === 'number' ? (merged as any).bid_count : (auctionPulse?.bid_count ?? null),
             watcher_count: typeof (merged as any)?.watcher_count === 'number' ? (merged as any).watcher_count : (auctionPulse?.watcher_count ?? null),
             view_count: typeof (merged as any)?.view_count === 'number' ? (merged as any).view_count : (auctionPulse?.view_count ?? null),
