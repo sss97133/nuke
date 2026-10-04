@@ -142,7 +142,7 @@ export default function AuctionEvidence({ vehicleId, onClose }: { vehicleId: str
             </dd></div>)}</dl>}
           {(native || description?.value) ? <>
             {description?.value && <>
-              <div className="auction-evidence-eyebrow">Stored summary · {description.inline_source || 'source unverified'}</div>
+              <div className="auction-evidence-eyebrow">Stored summary</div>
               <p className="auction-evidence-prose">{String(description.value)}</p>
             </>}
             {native && <details className="auction-evidence-native">
