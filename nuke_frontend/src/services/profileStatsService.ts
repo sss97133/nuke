@@ -223,8 +223,6 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     created_at: externalIdentity.first_seen_at || new Date().toISOString(),
   };
 
-  const identityIds = [externalIdentity.id];
-
   // Get listings where this identity is seller
   const { data: listings } = await supabase
     .from('vehicle_events')
@@ -249,30 +247,23 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .order('ended_at', { ascending: false })
     .limit(100);
 
-  // Get comments - EXCLUDE bids
-  // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
-  const { data: batComments } = await supabase
-    .from('auction_comments')
-    .select(`
-      *,
-      listing:auction_events(*, vehicle:vehicles(*))
-    `)
-    .eq('external_identity_id', externalIdentity.id)
-    .eq('platform', 'bat')
-    .is('bid_amount', null)
-    .order('posted_at', { ascending: false })
-    .limit(100);
-
-  const { data: auctionComments } = await supabase
+  // Read the canonical author relation once. The former BaT and all-platform
+  // queries overlapped, and their legacy identity column has no serving index.
+  const { data: auctionComments, error: commentsError } = await supabase
     .from('auction_comments')
     .select(`
       *,
       auction:auction_events(*, vehicle:vehicles(*))
     `)
-    .eq('external_identity_id', externalIdentity.id)
+    .eq('author_external_identity_id', externalIdentity.id)
     .is('bid_amount', null)
     .order('posted_at', { ascending: false })
     .limit(100);
+  if (commentsError) throw commentsError;
+  // Preserve the existing BaT source-link shape without duplicating comments.
+  const comments = (auctionComments || []).map(comment => comment.platform === 'bat'
+    ? { ...comment, listing: comment.auction }
+    : comment);
 
   // Get auction wins
   const { data: auctionWins } = await supabase
@@ -291,7 +282,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   const stats: ProfileStats = {
     total_listings: listings?.length || 0,
     total_bids: batBids?.length || 0,
-    total_comments: (batComments?.length || 0) + (auctionComments?.length || 0),
+    total_comments: comments.length,
     total_auction_wins: auctionWins?.length || 0,
     total_success_stories: 0,
     member_since: externalIdentity.first_seen_at || externalIdentity.created_at,
@@ -302,7 +293,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     stats,
     listings: listings || [],
     bids: batBids || [],
-    comments: [...(batComments || []), ...(auctionComments || [])],
+    comments,
     auction_wins: auctionWins || [],
     success_stories: [],
     comments_of_note: [],
