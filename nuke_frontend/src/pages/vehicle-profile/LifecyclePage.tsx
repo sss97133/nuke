@@ -17,6 +17,7 @@ interface ObservationLite {
   observed_at: string | null;
   content_text: string | null;
   structured_data: Record<string, unknown> | null;
+  public_copy?: boolean;
 }
 
 interface VehicleSummary {
@@ -32,6 +33,7 @@ interface VendorCount {
   slug: string;
   count: number;
   totalUsd: number;
+  publicOnly: boolean;
 }
 
 const LifecyclePage: React.FC = () => {
@@ -40,12 +42,16 @@ const LifecyclePage: React.FC = () => {
   const [obs, setObs] = useState<ObservationLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workOnly, setWorkOnly] = useState(false);
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
 
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setObs([]);
+    setHistoryUnavailable(false);
 
     (async () => {
       // Postgrest caps a single query at ~1000 rows AND the K5 has ~1900
@@ -53,7 +59,7 @@ const LifecyclePage: React.FC = () => {
       // lifecycle-relevant slice separately with a tight kind filter — and
       // for specifications, filter to those tagged with a lifecycle_status
       // (skip wiring specs which don't carry one).
-      const [vehRes, workRes, specRes, condRes, recentRes] = await Promise.all([
+      const [vehRes, workRes, specRes, condRes, recentRes, publicWorkRes] = await Promise.all([
         supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
@@ -93,6 +99,7 @@ const LifecyclePage: React.FC = () => {
           .in('kind', ['work_record', 'condition', 'comment'])
           .order('observed_at', { ascending: false })
           .limit(20),
+        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId }),
       ]);
 
       if (cancelled) return;
@@ -103,6 +110,7 @@ const LifecyclePage: React.FC = () => {
         return;
       }
       setVehicle(vehRes.data as VehicleSummary | null);
+      setHistoryUnavailable([workRes, specRes, condRes, recentRes, publicWorkRes].some(r => !!r.error));
 
       const combined: any[] = [
         ...((workRes.data as any[] | null) || []),
@@ -118,10 +126,31 @@ const LifecyclePage: React.FC = () => {
         seen.add(r.id);
         merged.push(r);
       }
+      // The existing RPC owns masking; directly readable rows win on ID.
+      for (const r of (publicWorkRes.error ? [] : publicWorkRes.data || [])) {
+        if (!r.observation_id || seen.has(r.observation_id)) continue;
+        seen.add(r.observation_id);
+        merged.push({
+          id: r.observation_id,
+          kind: 'work_record',
+          observed_at: r.done_on ?? null,
+          content_text: [r.item, r.category,
+            r.labor_minutes != null ? `${Number(r.labor_minutes)} min` : null]
+            .filter(Boolean).join(' · ') || null,
+          // Build stage is not part-installation evidence. Amounts and part
+          // numbers are absent from this public contract, not zero.
+          structured_data: { vendor: r.supplier ?? null, build_stage: r.build_stage ?? null },
+          public_copy: true,
+        });
+      }
       merged.sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || ''));
       setObs(merged);
       setLoading(false);
-    })();
+    })().catch(() => {
+      if (cancelled) return;
+      setError('Lifecycle history could not be loaded.');
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;
@@ -171,7 +200,7 @@ const LifecyclePage: React.FC = () => {
       partsInstalled: installedPNs.size,
       partsPending: stillPending.length,
       totalSpend,
-      receiptCount: obs.filter((o) => o.kind === 'work_record').length,
+      workCount: obs.filter((o) => o.kind === 'work_record').length,
       commentCount: obs.filter((o) => o.kind === 'comment').length,
       conditionCount: conditions.length,
     };
@@ -188,7 +217,8 @@ const LifecyclePage: React.FC = () => {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
       if (!slug || slug === 'unknown-vendor') continue;
-      const r = m.get(slug) || { name: raw, slug, count: 0, totalUsd: 0 };
+      const r = m.get(slug) || { name: raw, slug, count: 0, totalUsd: 0, publicOnly: true };
+      if (!o.public_copy) r.publicOnly = false;
       r.count += 1;
       const t = sd.total_price ?? sd.total;
       if (typeof t === 'number') r.totalUsd += t;
@@ -198,8 +228,10 @@ const LifecyclePage: React.FC = () => {
   }, [obs]);
 
   const recent = useMemo(
-    () => obs.filter((o) => o.kind === 'work_record' || o.kind === 'condition' || o.kind === 'comment').slice(0, 12),
-    [obs],
+    () => obs.filter((o) => workOnly
+      ? o.kind === 'work_record'
+      : o.kind === 'work_record' || o.kind === 'condition' || o.kind === 'comment').slice(0, 12),
+    [obs, workOnly],
   );
 
   return (
@@ -253,6 +285,20 @@ const LifecyclePage: React.FC = () => {
         </div>
       )}
 
+      {historyUnavailable && (
+        <div role="status" style={{ fontSize: 10, marginBottom: 12 }}>
+          Some history could not be loaded; counts and activity may be incomplete.
+        </div>
+      )}
+
+      {obs.some(o => o.public_copy) && (
+        <p style={{ fontSize: 10, marginBottom: 12 }}>
+          Permitted work records use recorded work dates; ingestion times are unavailable.
+          Build stage does not establish part installation. Amounts and full details are owner-only;
+          visible spend excludes masked amounts.
+        </p>
+      )}
+
       {obs.length > 0 && (
         <>
           {/* Stat tiles */}
@@ -266,13 +312,13 @@ const LifecyclePage: React.FC = () => {
           >
             {([
               ['Observations', stats.totalObservations],
-              ['Receipts', stats.receiptCount],
+              ['Work records', stats.workCount],
               ['Parts purchased', stats.partsPurchased],
               ['Parts installed', stats.partsInstalled],
               ['Parts pending', stats.partsPending],
               ['Comments', stats.commentCount],
               ['Conditions', stats.conditionCount],
-              ['Rolled-up spend', stats.totalSpend > 0 ? `$${stats.totalSpend.toLocaleString()}` : '—'],
+              ['Visible spend', stats.totalSpend > 0 ? `$${stats.totalSpend.toLocaleString()}` : '—'],
             ] as [string, number | string][]).map(([label, value]) => (
               <div
                 key={label}
@@ -317,30 +363,33 @@ const LifecyclePage: React.FC = () => {
                 Top vendors · {topVendors.length}
               </h2>
               <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
-                {topVendors.map((v, i) => (
-                  <Link
-                    key={v.slug}
-                    to={`/vehicle/${vehicleId}/vendor/${v.slug}`}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 70px 110px',
-                      gap: 10,
-                      padding: '6px 8px',
-                      fontFamily: 'Arial, sans-serif',
-                      fontSize: 10,
-                      color: 'var(--text, #1a1a1a)',
-                      textDecoration: 'none',
-                      borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontWeight: 700 }}>{v.name}</span>
-                    <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>{v.count}</span>
-                    <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>
-                      {v.totalUsd > 0 ? `$${v.totalUsd.toLocaleString()}` : ''}
-                    </span>
-                  </Link>
-                ))}
+                {topVendors.map((v, i) => {
+                  const VendorRow = v.publicOnly ? 'div' : Link;
+                  return (
+                    <VendorRow
+                      key={v.slug}
+                      to={v.publicOnly ? undefined : `/vehicle/${vehicleId}/vendor/${v.slug}`}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 70px 110px',
+                        gap: 10,
+                        padding: '6px 8px',
+                        fontFamily: 'Arial, sans-serif',
+                        fontSize: 10,
+                        color: 'var(--text, #1a1a1a)',
+                        textDecoration: 'none',
+                        borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ fontWeight: 700 }}>{v.name}</span>
+                      <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>{v.count}</span>
+                      <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>
+                        {v.totalUsd > 0 ? `$${v.totalUsd.toLocaleString()}` : v.publicOnly ? 'Owner-only detail' : ''}
+                      </span>
+                    </VendorRow>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -360,18 +409,26 @@ const LifecyclePage: React.FC = () => {
                   fontFamily: 'Arial, sans-serif',
                 }}
               >
-                Recent activity · {recent.length}
+                {workOnly ? 'Recorded work' : 'Recent activity'} · {recent.length}
               </h2>
+              {stats.workCount > 0 && (
+                <button type="button" aria-pressed={workOnly} onClick={() => setWorkOnly(value => !value)}
+                  style={{ fontFamily: 'Arial, sans-serif', fontSize: 9, marginBottom: 6, padding: '4px 8px', border: '2px solid var(--text, #1a1a1a)', background: 'var(--bg, #fff)', color: 'var(--text, #1a1a1a)' }}>
+                  {workOnly ? 'Show all activity' : 'Show work records'}
+                </button>
+              )}
               <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
                 {recent.map((r, i) => {
                   const sd = (r.structured_data || {}) as any;
+                  const ActivityRow = r.public_copy ? 'div' : Link;
                   return (
-                    <Link
+                    <ActivityRow
                       key={r.id}
-                      to={`/vehicle/${vehicleId}/observation/${r.id}`}
+                      to={r.public_copy ? undefined : `/vehicle/${vehicleId}/observation/${r.id}`}
+                      data-observation-id={r.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '92px 86px 1fr 100px',
+                        gridTemplateColumns: '76px 74px minmax(0, 1fr)',
                         gap: 8,
                         padding: '6px 8px',
                         fontFamily: 'Arial, sans-serif',
@@ -407,10 +464,12 @@ const LifecyclePage: React.FC = () => {
                           return cut;
                         })()}
                       </span>
-                      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {sd.lifecycle_status || ''}
+                      <span style={{ gridColumn: '3', fontSize: 9, color: 'var(--text-secondary)' }}>
+                        {r.public_copy
+                          ? [sd.build_stage ? `Build stage: ${sd.build_stage}` : null, 'Owner-only detail'].filter(Boolean).join(' · ')
+                          : sd.lifecycle_status || ''}
                       </span>
-                    </Link>
+                    </ActivityRow>
                   );
                 })}
               </div>

@@ -80,6 +80,15 @@ the log from the published record (the backfills) is how the machine gets its pa
 - **The live lot.** The SL500 of 2026-09-30 at 2 h to close (`live_lot_temperature`, PR #482): bid $10,000, higher
   than 68 of 273 comparable sold lots at that point; 38 bids and 15 bidders. Price cold, activity hot.
 
+**Built current reader shape, 2026-10-04.** Permitted work testimony can reach a searchable vehicle
+table (PR #564) and a Lifecycle count/supplier/activity reader (C22 local assay at 22:22 UTC).
+A work filter makes older work reachable when newer conditions fill the recent-activity window.
+The original observation ID gives idempotent reader merging; the public contract's recorded date
+is not an ingest clock, supplier text is not an organization key, build stage is not installation
+evidence, and a readable-amount subtotal is not complete investment. These boundaries expose the
+next structural dependencies without treating a current reader as a historical financial feature.
+See the C22 case for the assay and separate delivery stages.
+
 **A prediction is six blanks.** At moment **t**, from only what is known at t, for lots in population **P**, a
 distribution over outcome **Y** in a stated **form**, graded by rule **S** against baseline **B**. Example (proposed,
 awaiting the owner): "At 2 h to close, for BaT lots with at least 8 same-model comparables, predict the final price as a
