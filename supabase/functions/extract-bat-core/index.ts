@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.2 — bind live bid amount to the actual source page read (2026-10-04)
+ * Version: 4.2.3 — preserve full description through canonical listing intake (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -34,9 +34,10 @@ import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommen
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
+import { recordListingDescription } from "./descriptionObservation.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.2';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.3';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1083,6 +1084,8 @@ Deno.serve(async (req) => {
     let userAgent = "";
     let htmlSource: "snapshot" | "direct" = "direct";
     let sourceFetchedAt: string | null = null;
+    let descriptionSnapshotId: string | null = null;
+    let descriptionSnapshotCustody: { vehicleId?: string; matched?: boolean; sha256?: string | null } | undefined;
 
     // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
     const preferSnapshot = body?.prefer_snapshot === false ? false : true;
@@ -1090,7 +1093,7 @@ Deno.serve(async (req) => {
       try {
         const { data: snap, error: snapErr } = await supabase
           .from("listing_page_snapshots")
-          .select("id, html, http_status, fetched_at")
+          .select("id, html, http_status, fetched_at, html_sha256, metadata")
           .eq("platform", "bat")
           .eq("success", true)
           .eq("http_status", 200)
@@ -1106,6 +1109,9 @@ Deno.serve(async (req) => {
           userAgent = `snapshot:${String((snap as any)?.id || "")}`;
           htmlSource = "snapshot";
           sourceFetchedAt = typeof snap.fetched_at === "string" ? snap.fetched_at : null;
+          descriptionSnapshotId = String(snap.id);
+          descriptionSnapshotCustody = { vehicleId: snap.metadata?.vehicle_id,
+            matched: snap.metadata?.vehicle_matched, sha256: snap.html_sha256 };
           console.log(`extract-bat-core: using snapshot for ${listingUrlCanonical}`);
         }
       } catch (e: any) {
@@ -2639,6 +2645,17 @@ Deno.serve(async (req) => {
     // The bat_listings table has been consolidated into vehicle_events.
 
     mark("auction_events");
+    // Await the existing sanctioned intake. Capture time is not the seller's event time;
+    // preserve full parsed prose independently of manual text and the 480-character summary.
+    const descriptionReceipt = vehicleId ? await recordListingDescription(supabase, {
+      vehicleId, sourceUrl: listingUrlCanonical, text: descriptionRaw || "",
+      capturedAt: sourceFetchedAt, captureBasis: htmlSource,
+      captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
+      snapshotCustody: descriptionSnapshotCustody,
+    }) : { status: "unavailable", reason: "Vehicle unresolved" };
+    if (descriptionReceipt.status === "failed" || descriptionReceipt.status === "refused") {
+      console.warn(`[BAT] description receipt ${descriptionReceipt.status}: ${descriptionReceipt.reason}`);
+    }
     // Save raw listing description history (for Description Entries UI)
     if (vehicleId && descriptionRaw) {
       await trySaveExtractionMetadata({
@@ -2718,6 +2735,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        description_receipt: descriptionReceipt,
         source: "Bring a Trailer",
         site_type: "bat",
         listing_url: listingUrlCanonical,
