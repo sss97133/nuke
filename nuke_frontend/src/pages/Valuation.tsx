@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { comparePriceToSourceSales, type DatedSourceSale } from '../lib/dealRead/batComps';
@@ -49,9 +49,15 @@ type ValuationResult = {
     cohort: { key: string; label: string; basis: string; complete: boolean };
     eligible: DatedSourceSale[]; event_from: string; event_before: string; evidence_as_of: string; computed_at: string;
     knowledge_mode: 'retrospective' | 'known_at'; currency: string; minimum_sales: number;
-    coverage: { member_rows: number; qualified_sales: number; condition_scalar_recorded: number; body_recorded: number; engine_recorded: number; transmission_recorded: number; conflicting_source_lots: number };
+    coverage: { member_rows: number; qualified_sales: number; condition_scalar_recorded: number; body_recorded: number; engine_recorded: number; transmission_recorded: number; conflicting_source_lots: number; inline_raw_verified?: number; archived_admitted?: number };
     exclusions: Record<string, number>;
   };
+};
+
+type ValuationRequest = {
+  p_year: number | null; p_make: string; p_model: string | null;
+  p_event_before: string | null; p_event_from: null; p_evidence_as_of: null;
+  p_currency: string; p_price: null; p_subject_vehicle_id: string | null; p_knowledge_mode: 'retrospective';
 };
 
 const formatPrice = (n: number | null | undefined, currency: string) => {
@@ -87,25 +93,36 @@ export default function Valuation() {
   const [candidatePrice, setCandidatePrice] = useState(params.get('price') ?? '');
   const [eventBefore, setEventBefore] = useState(params.get('as_of') ?? '');
   const [currency, setCurrency] = useState(params.get('currency') || 'USD');
-  const [loading, setLoading] = useState(false);
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ValuationResult | null>(null);
-  const [submittedFilters, setSubmittedFilters] = useState<string | null>(null);
-  const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventBefore,currency]);
+  const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
+  const latestRequest = useRef(0);
+  const result = lookup?.result ?? null;
+  const subjectVehicleId = params.get('vehicle_id') || null;
+  const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventBefore,currency,subjectVehicleId]);
+  const loading = loadingKey != null;
+  const loadingThisContext = loadingKey === filterKey;
 
   const runLookup = useCallback(async () => {
+    const requestId = ++latestRequest.current;
     const trimmedMake = make.trim();
     const trimmedModel = model.trim();
     const parsedYear = year.trim() ? parseInt(year.trim(), 10) : null;
 
     if (!trimmedMake || (!parsedYear && !trimmedModel)) {
       setError('Provide a make plus a year and/or model.');
+      setLoadingKey(null);
       return;
     }
 
-    setLoading(true);
+    setLoadingKey(filterKey);
     setError(null);
-    setResult(null);
+    const request: ValuationRequest = {
+      p_year: parsedYear, p_make: trimmedMake, p_model: trimmedModel || null,
+      p_event_before: eventBefore ? `${eventBefore}T00:00:00Z` : null,
+      p_event_from: null, p_evidence_as_of: null, p_currency: currency,
+      p_price: null, p_subject_vehicle_id: subjectVehicleId, p_knowledge_mode: 'retrospective',
+    };
 
     const next = new URLSearchParams();
     if (parsedYear) next.set('year', String(parsedYear));
@@ -114,29 +131,28 @@ export default function Valuation() {
     if (candidatePrice) next.set('price', candidatePrice);
     if (eventBefore) next.set('as_of', eventBefore);
     next.set('currency', currency);
-    if (params.get('vehicle_id')) next.set('vehicle_id', params.get('vehicle_id')!);
+    if (subjectVehicleId) next.set('vehicle_id', subjectVehicleId);
     setParams(next, { replace: true });
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('valuation_by_ymm', {
-        p_year: parsedYear,
-        p_make: trimmedMake,
-        p_model: trimmedModel || null,
-        p_event_before: eventBefore ? `${eventBefore}T00:00:00Z` : null,
-        p_currency: currency,
-        p_subject_vehicle_id: params.get('vehicle_id') || null,
-      });
+      const { data, error: rpcError } = await supabase.rpc('valuation_by_ymm', request);
+      if (requestId !== latestRequest.current) return;
       if (rpcError) throw rpcError;
       if (data?.error) throw new Error(data.error);
       if (!data?.receipt?.cohort?.complete || !Array.isArray(data.receipt.eligible)) throw new Error('Qualified sale evidence is unavailable. The cohort reader must be updated before price statistics can be shown.');
-      setResult(data as ValuationResult);
-      setSubmittedFilters(filterKey);
+      if (data.receipt.currency !== request.p_currency || data.receipt.knowledge_mode !== request.p_knowledge_mode
+        || data.query?.year !== request.p_year || data.query?.make !== request.p_make || data.query?.model !== request.p_model) {
+        throw new Error('Returned evidence does not match the requested comparison.');
+      }
+      setLookup({ result: data as ValuationResult, request, contextKey: filterKey });
     } catch (e: any) {
-      setError(e?.message || 'Lookup failed');
+      if (requestId === latestRequest.current) setError(e?.message || 'Lookup failed');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoadingKey(null);
     }
-  }, [year, make, model, eventBefore, currency, candidatePrice, params, setParams, filterKey]);
+  }, [year, make, model, eventBefore, currency, candidatePrice, subjectVehicleId, setParams, filterKey]);
+
+  useEffect(() => () => { latestRequest.current++; }, []);
 
   // Auto-run from URL params
   useEffect(() => {
@@ -167,13 +183,13 @@ export default function Valuation() {
   const outputCurrency = receipt?.currency || currency;
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
-  const changedFilters = submittedFilters != null && submittedFilters !== filterKey;
+  const changedFilters = lookup != null && lookup.contextKey !== filterKey;
   const comparison = useMemo(() => receipt && !changedFilters ? comparePriceToSourceSales(receipt.eligible, {
     cohort: receipt.cohort,
-    subject: { amount: candidatePrice.trim() ? Number(candidatePrice) : null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', vehicleId: params.get('vehicle_id') },
+    subject: { amount: candidatePrice.trim() ? Number(candidatePrice) : null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', vehicleId: lookup?.request.p_subject_vehicle_id },
     eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
-  }) : null, [receipt, candidatePrice, params, changedFilters]);
+  }) : null, [receipt, candidatePrice, lookup, changedFilters]);
   const empty = result && stats && stats.sold_count === 0;
   const subject = result
     ? [result.query.year, result.query.make, result.query.model].filter(Boolean).join(' ')
@@ -227,7 +243,7 @@ export default function Valuation() {
         </label>
         <button
           type="submit"
-          disabled={loading || !make.trim()}
+          disabled={loadingThisContext || !make.trim()}
           style={{
             background: 'var(--text)',
             color: 'var(--bg)',
@@ -237,31 +253,36 @@ export default function Valuation() {
             fontWeight: 800,
             letterSpacing: '1.5px',
             textTransform: 'uppercase',
-            cursor: loading ? 'wait' : 'pointer',
-            opacity: loading || !make.trim() ? 0.5 : 1,
+            cursor: loadingThisContext ? 'wait' : 'pointer',
+            opacity: loadingThisContext || !make.trim() ? 0.5 : 1,
             transition: TRANSITION,
             fontFamily: 'inherit',
           }}
         >
-          {loading ? 'Looking' : 'Compare'}
+          {loadingThisContext ? 'Looking' : result ? 'Refresh evidence' : 'Compare'}
         </button>
       </form>
 
       {receipt && <section aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
         <strong>{comparison?.percentile == null ? 'Price percentile unavailable' : `${comparison.percentile.toFixed(1)} percentile in recorded sales`}</strong>
-        {changedFilters && <div>Compare again to apply the changed cohort, currency or date.</div>}
+        {changedFilters && <div>Compare again to apply the changed cohort, currency, date or vehicle.</div>}
+        <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence to include newly admitted source evidence. Save this receipt to keep this calculation.'}</div>
         <div>{receipt.cohort.label} · {receipt.coverage.qualified_sales} qualified source lots from {receipt.coverage.member_rows} public cohort records · {receipt.currency}</div>
+        {typeof receipt.coverage.inline_raw_verified === 'number' && typeof receipt.coverage.archived_admitted === 'number' && <div>{receipt.coverage.inline_raw_verified} verified inline source lots · {receipt.coverage.archived_admitted} admitted archived source lots</div>}
         <div>Source sales from {fmtDate(receipt.event_from)} before {fmtDate(receipt.event_before)}. Evidence through {receipt.evidence_as_of.replace('T',' ')}.</div>
         <div>Earlier sales discovered later can enter this retrospective comparison. Current recorded sale per vehicle; earlier resales may be missing.</div>
-        <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
+        <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Admitted archived sales also include when the verified sale receipt arrived. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
         <div>Published winning bid excludes buyer fees, taxes and transport (<a href="https://bringatrailer.com/policies/" target="_blank" rel="noreferrer">BaT policy</a>). Original currency; no inflation or exchange-rate adjustment. Condition and equipment remain unmatched.</div>
         <div>Current condition field present on {receipt.coverage.condition_scalar_recorded}/{receipt.coverage.qualified_sales}; this does not establish condition at sale. Body {receipt.coverage.body_recorded}, engine {receipt.coverage.engine_recorded}, transmission {receipt.coverage.transmission_recorded}. Visual condition, comment evidence and bid-log coverage are unmeasured.</div>
         {comparison?.percentile != null && <div>{comparison.counts.below} lower · {comparison.counts.equal} equal · {comparison.counts.above} higher. Ties receive half weight. This price position does not establish fair value or a profitable bid.</div>}
         {receipt.coverage.qualified_sales < receipt.minimum_sales && <div>At least {receipt.minimum_sales} qualified sales are required for aggregate prices.</div>}
         <details><summary>Excluded evidence and receipt</summary>
           <div>{Object.entries(receipt.exclusions).map(([reason,n]) => `${reason.replace(/_/g,' ')}: ${n}`).join(' · ') || 'No excluded records'} · conflicting source lots: {receipt.coverage.conflicting_source_lots}</div>
-          <button type="button" onClick={() => {
-            const url = URL.createObjectURL(new Blob([JSON.stringify({ sourceReceipt: receipt, comparison },null,2)], { type: 'application/json' }));
+          <button type="button" disabled={!comparison || changedFilters} onClick={() => {
+            if (!comparison || !lookup) return;
+            const resolvedRequest = { ...lookup.request, p_event_from: receipt.event_from, p_event_before: receipt.event_before,
+              p_evidence_as_of: receipt.evidence_as_of, p_currency: receipt.currency, p_knowledge_mode: receipt.knowledge_mode };
+            const url = URL.createObjectURL(new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), request: lookup.request, resolvedRequest, sourceReceipt: receipt, comparison },null,2)], { type: 'application/json' }));
             const a = document.createElement('a'); a.href=url; a.download='sale-comparison-receipt.json'; a.click(); URL.revokeObjectURL(url);
           }}>Save this evidence receipt</button>
         </details>
