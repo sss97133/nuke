@@ -21,7 +21,7 @@ CI_WRITE_BASELINE=1 scripts/ci/verify.sh  # re-seed baseline.json from current c
 |---|---|---|---|
 | frontend typecheck (`tsc --noEmit`) | **gate** | must be clean | hard fail if red |
 | `no-dead-asset-references` (ghost tables/fns on live paths) | **ratchet** | 18 | 12 webhooks (pending strip) + 6 guarded `vehicle_transactions` |
-| `no-committed-secrets` | **gate** | 0 (hard) | any hit blocks in any mode |
+| `no-committed-secrets` | **gate** | 0 | any hit fails ENFORCE; WARN reports without blocking |
 | `no-raw-fetch` (must use `archiveFetch`) | **ratchet** | 144 | burn down opportunistically |
 | raw-fetch regression fixtures | **gate** | must pass | internal URL continuations, external pages and Firecrawl |
 | `no-raw-testimony-insert` (must use `ingest-observation`) | **ratchet** | 2 | should trend to 0 |
@@ -33,24 +33,31 @@ floor with `CI_WRITE_BASELINE=1`. Never raise it.
 
 The ghost ratchet uses `git grep`, so it sees committed/staged files (exactly what a push carries).
 
-## Rollout status (set up 2026-07-12, ENFORCE mode)
+## Local installation (recorded 2026-07-12)
 
 - `scripts/ci/verify.sh` + `scripts/ci/baseline.json` — the gate, seeded and self-tested (a planted
   ghost ref was confirmed to trip it).
-- `.git/hooks/pre-push` — **installed, ENFORCE mode** (runs `CI_ENFORCE=1 verify.sh`): it **blocks**
+- The original installation's `.git/hooks/pre-push` ran **ENFORCE mode** (`CI_ENFORCE=1 verify.sh`): it **blocks**
   a push that regresses a guardrail, fails typecheck, or commits a secret. Confirmed passing on the
-  current tree.
-  - Bypass once: `git push --no-verify`.  Soften to warn-only: remove `CI_ENFORCE=1` from the hook.
-    Remove entirely: `rm .git/hooks/pre-push`.
+  tree checked at installation. Hook files are local, not proof of another checkout's configuration.
 
-## Opt-in: keep AI agents on rails (not installed — your call)
+Before relying on a hook, inspect `core.hooksPath` and the hook in `git rev-parse --git-common-dir`.
+Run the ENFORCE gate directly in the checkout being published when its hook does not run that
+checkout's gate. Do not bypass checks, soften enforcement or raise a baseline to publish a failing
+change. See `AGENTS.md` for the authorized publication path.
+
+## Agent tool hooks
 
 A Claude Code `PreToolUse` hook can preflight every new edge-function/migration an agent tries to
 write, blocking a duplicate mint of an existing canonical capability and warning on dead-asset refs.
-It touches your interactive `.claude/settings.json`, so it's left for you to enable. The exact JSON +
-copy-paste apply command are in `scripts/guardrails/README.md` (section b).
+Its installation is client-specific; inspect the active client configuration before relying on it.
+`scripts/guardrails/pretooluse-mint-check.sh` is the existing capability-preflight implementation.
+Do not overwrite existing hooks or assume a Claude hook also runs in Codex.
 
 ## Where the authority lives
 
-`docs/ledger/` — `CANONICAL_LEDGER.md`, `CAPABILITY_MAP.md` (check before minting anything),
-`disposition.json` (intent fates), `theory/` (per-subsystem cards). The guardrails read `ledger.json`.
+`AGENTS.md` routes development work. `docs/ledger/theory/data-machine.md` defines owner intent;
+the case ledger records open work and dated acceptance evidence. The guardrails read the audit
+inventory in `ledger.json`, and the local ratchets use `scripts/ci/baseline.json`. These inputs do
+not establish current database health or authorize archival. See `docs/ledger/README.md` and verify
+operational claims against the live atlas and affected writer/reader.

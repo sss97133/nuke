@@ -25,6 +25,27 @@ vocabulary, the open cases, the compass). Before you make
 a new function, table or folder, check `docs/ledger/CAPABILITY_MAP.md`
 (`node scripts/guardrails/check-capability-before-mint.mjs "<name>"`) and extend what already exists.
 
+## Reading the system
+
+The documents have different jobs. Use the relevant entry point instead of treating every file as
+an equally current description of the system:
+
+| Question | Where to start | What it establishes |
+|---|---|---|
+| How should I work on this task? | Current owner instructions, this file and the applicable rules below | Scope, authorization and development procedure |
+| What is the data machine meant to do? | `docs/ledger/theory/data-machine.md` | The owner's model, vocabulary and design invariants |
+| Which problem is open, and what would close it? | `docs/ledger/theory/data-machine-cases.md`, the relevant handoff and recent `DONE.md` entries | Work direction and dated acceptance evidence |
+| What exists and operates now? | Live `v_schema_atlas`, `v_job_health` and a bounded probe of the affected writer/reader | Current schema, ownership, activity and behavior |
+| What is mechanically enforced? | Constraints and permissions; `scripts/ci/verify.sh`; the applicable `.github/workflows/` | The actual checks and their execution paths |
+| What was found in earlier audits? | The inventories in `docs/ledger/` | Historical evidence and candidate capabilities to verify |
+
+Read the documents needed for the task; loading the whole documentation tree is unnecessary.
+Keep the date and limits of a measurement when citing it. A historical inventory cannot establish
+current health or authorize removal. A stated invariant cannot establish enforcement: name the
+constraint, permission, test or gate that implements it, or record the missing mechanism.
+Documentation changes should preserve owner intent while correcting stale navigation and status
+claims. See `docs/ledger/README.md` for the distinction between active guidance and audit outputs.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
