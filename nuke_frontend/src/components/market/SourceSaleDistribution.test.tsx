@@ -24,14 +24,17 @@ beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; host = d
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
 describe('source-qualified sale graph', () => {
-  it('draws actual source members, supplied quantiles and audited price position, with explicit unmatched dimensions', async () => {
+  it('opens with identifiable sale rows, preserves unsupported matching and keeps raw ranks secondary', async () => {
     await render();
-    expect(host.querySelectorAll('svg [role="button"]')).toHaveLength(18);
+    expect(host.querySelectorAll('.source-sales-records>li')).toHaveLength(18);
+    expect(host.querySelector('svg')).toBeNull();
+    expect(host.querySelector<HTMLDetailsElement>('.source-sales-raw-position')?.open).toBe(false);
     expect(host.textContent).toContain('$40,000 · 50.0 percentile');
     expect(host.textContent).toContain('9 sales lower · 0 equal · 9 higher');
     expect(host.textContent).toContain('18 source lots qualify from 1,729 current public cohort records');
     expect(host.textContent).toContain('not complete BaT market coverage');
-    expect(host.textContent).toContain('Condition, restoration, modifications, body style, trim, engine, mileage and equipment');
+    expect(host.textContent).toContain('Sale-time features and condition are not matched');
+    await view('Distribution');
     expect(host.querySelector('.source-sales-band')).not.toBeNull();
     expect(host.querySelectorAll('svg [tabindex="0"]')).toHaveLength(1);
   });
@@ -49,13 +52,14 @@ describe('source-qualified sale graph', () => {
   });
   it('changes the encoding while retaining the same source set, selected record and table equivalent', async () => {
     await render();
+    await view('Distribution');
     const source = host.querySelector('.source-sales-selected a[target="_blank"]')?.getAttribute('href');
     await view('Over time');
     expect(host.querySelector('.source-sales-band')).toBeNull();
     expect(host.querySelector('.source-sales-median')).toBeNull();
     expect(host.querySelector('svg')?.textContent).toContain('2023-10-04');
     expect(host.querySelector('svg')?.textContent).toContain('2026-10-04');
-    await view('Price distribution');
+    await view('Distribution');
     expect(host.querySelector('svg')?.getAttribute('aria-label')).toContain('Sale amount distribution, USD');
     expect(host.querySelectorAll('svg [role="button"]')).toHaveLength(18);
     expect(host.querySelector('.source-sales-selected a[target="_blank"]')?.getAttribute('href')).toBe(source);
@@ -65,7 +69,7 @@ describe('source-qualified sale graph', () => {
   it('shows retained sparse sales without a fabricated median, percentile or band', async () => {
     await render({ sales: props.sales.slice(0, 2), comparison: null, summary: { median: null, p10: null, p90: null } });
     expect(host.textContent).toContain('Aggregate prices require 10 qualified sales');
-    expect(host.querySelectorAll('svg [role="button"]')).toHaveLength(2);
+    expect(host.querySelectorAll('.source-sales-records>li')).toHaveLength(2);
     expect(host.querySelector('.source-sales-band')).toBeNull();
     expect(host.querySelector('.source-sales-candidate')).toBeNull();
   });
@@ -85,6 +89,7 @@ describe('source-qualified sale graph', () => {
   });
   it('uses price order for distribution keyboard movement and reverts removed selection to the latest source', async () => {
     await render();
+    await view('Distribution');
     const latest = host.querySelector<SVGGElement>('svg [tabindex="0"]')!;
     await act(async () => latest.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
     const byPrice = [...props.sales].sort((a,b) => a.amount! - b.amount!);
@@ -95,13 +100,14 @@ describe('source-qualified sale graph', () => {
     expect(host.querySelector('.source-sales-selected')?.textContent).toContain('2026-04-03');
     expect(host.querySelectorAll('svg [tabindex="0"]')).toHaveLength(1);
   });
-  it('retains the source-sale scale for an entered amount beyond all sales and has no marker without a candidate', async () => {
+  it('never turns an entered amount into a vehicle assessment or changes the source price scale', async () => {
     await render();
+    await view('Distribution');
     const positions = [...host.querySelectorAll('.source-sales-point')].map(p => p.getAttribute('cx'));
     await render({ comparison: { ...props.comparison!, subject: { ...props.comparison!.subject, amount: 1000000 } } });
     expect([...host.querySelectorAll('.source-sales-point')].map(p => p.getAttribute('cx'))).toEqual(positions);
-    expect(host.querySelector('.source-sales-candidate')?.getAttribute('x1')).toBe('682');
-    expect(host.textContent).toContain('marker is pinned to the upper edge');
+    expect(host.querySelector('.source-sales-candidate')).toBeNull();
+    expect(host.querySelector<HTMLDetailsElement>('.source-sales-raw-position')?.open).toBe(false);
     await render({ comparison: null });
     expect(host.querySelector('.source-sales-candidate')).toBeNull();
     expect(host.textContent).toContain('Median recorded sale $40,650');
@@ -116,18 +122,23 @@ describe('source-qualified sale graph', () => {
     if (field === 'knowledge') sales[0].knownAt = '2027-01-01T00:00:00Z';
     await render({ sales });
     expect(host.querySelector('svg')).toBeNull();
+    expect(host.querySelector('.source-sales-records')).toBeNull();
     expect(host.querySelector('[role="status"]')?.textContent).toContain('source rows do not match this receipt');
   });
   it('refuses source dates outside the receipt window', async () => {
     await render({ eventBefore: '2026-04-03T12:00:00Z' });
     expect(host.querySelector('svg')).toBeNull();
+    expect(host.querySelector('.source-sales-records')).toBeNull();
     expect(host.querySelector('[role="status"]')?.textContent).toContain('source dates do not match the event window');
   });
   it('shows a recorded label only for the exact selected source, without turning its words into matched peers', async () => {
     const byDate = [...props.sales].sort((a,b) => a.eventAt!.localeCompare(b.eventAt!));
     const latest = byDate[byDate.length-1];
     await render({ recordedLabels: { [latest.sourceUrl!]: '1966 Ford Mustang Race Car' } });
-    expect(host.querySelector('.source-sales-selected')?.textContent).toContain('Current recorded label: 1966 Ford Mustang Race Car');
+    expect(host.querySelector('.source-sales-records>li:first-child')?.textContent).toContain('1966 Ford Mustang Race Car');
+    expect(host.querySelector('.source-sales-records>li:nth-child(2)')?.textContent).toContain('Recorded title unavailable');
+    await act(async () => host.querySelector<HTMLButtonElement>('.source-sales-record-name>button')!.click());
+    expect(host.querySelector('.source-sales-records>li:first-child .source-sales-selected')?.textContent).toContain('Current recorded label: 1966 Ford Mustang Race Car');
     await view('Over time');
     await act(async () => host.querySelector('svg [tabindex="0"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
     expect(host.querySelector('.source-sales-selected')?.textContent).not.toContain('1966 Ford Mustang Race Car');
