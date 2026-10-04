@@ -18,7 +18,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | BaT URL discovery | `bat-url-discovery` (active daily cron) | bat-year-crawler, crawl-bat-active (ghost) |
 | BaT profile pages | `extract-bat-profile-vehicles` | process-profile-queue (wrapper, 0 callers) |
 | Auction comment extraction | `extract-auction-comments` → `auction_comments` table | backfill-comments, analyze-auction-comments (deleted); bat_comments table DOES NOT EXIST |
-| Re-extract from archived snapshots | `batch-extract-snapshots` (reads listing_page_snapshots) | bat-snapshot-parser, process-orphan-snapshots, backfill-*-descriptions zombies |
+| Re-extract from archived snapshots | `batch-extract-snapshots` (reads listing_page_snapshots); service-only `source_sale_qualification` uses the existing private archive with exact snapshot/parent/source/hash custody, defaults to no-write preview, and preserves existing qualification via metadata compare-and-set. Its protected parser attestation has a new qualification clock; current valuation SQL does not consume offloaded attestations yet. | bat-snapshot-parser, process-orphan-snapshots, backfill-*-descriptions zombies |
 | Facebook Marketplace ingestion | `extract-facebook-marketplace` + `refine-fb-listing`; operational lane = com.nuke.fb-* launchd fleet + fb-scraper skill | import-fb-marketplace, fb-marketplace-orchestrator, monitor-fb-marketplace, fb-marketplace-sweep/bot-scraper (ghosts), root fb-* dumps |
 | Craigslist | `extract-craigslist` via import_queue | process-cl-queue, discover-cl-* (dead) |
 | Bonhams | `extract-bonhams` | extract-bonhams-typesense |

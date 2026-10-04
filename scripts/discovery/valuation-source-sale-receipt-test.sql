@@ -47,6 +47,7 @@ RETURNS text LANGUAGE sql AS $$ SELECT CASE WHEN $1 IN ('not_sold','unsold','bid
 \ir ../../supabase/migrations/20260928224500_vehicle_price_facts_live_outcome.sql
 CREATE FUNCTION public.valuation_by_ymm(integer DEFAULT NULL,text DEFAULT NULL,text DEFAULT NULL) RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
 \ir ../../supabase/migrations/20261004073000_valuation_source_sale_receipt.sql
+\ir ../../supabase/migrations/20261004093000_valuation_source_sale_pruning.sql
 
 CREATE FUNCTION pg_temp.seed(n integer,d jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE vid uuid:=md5('vehicle-'||n)::uuid; sid uuid:=md5('snapshot-'||n)::uuid;
