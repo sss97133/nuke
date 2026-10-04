@@ -186,6 +186,12 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
           for (const image of eligibleImages) {
             const parent = parentsByImage.get(image.id);
             if (!parent) { defer('immutable_testimony_missing'); continue; }
+            // Sanitized state fields cannot attest the privacy of the full
+            // original. Only the protected selector can supply this verdict.
+            if (parent.source_is_public !== true) {
+              defer(parent.source_is_public === false ? 'source_not_public' : 'source_visibility_unknown');
+              continue;
+            }
             if (parent.structured_data.scene_type === 'receipt_document') { defer('document_testimony'); continue; }
             const projected = projectImageProperties(parent, image);
             if (projected.deferred) { defer(projected.deferred); continue; }
