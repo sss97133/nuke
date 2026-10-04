@@ -28,12 +28,14 @@ struct CountyLocationRow: Decodable, Identifiable {
     let precision: String?
     let confidence: Double?
     let vehicles: VehicleHeaderRow
+    let isEligible: Bool
 
     // Parse once during decoding, rather than repeatedly during sorting/panning.
     let observedDate: Date?
     enum CodingKeys: String, CodingKey {
         case id, observed_at, source_platform, source_url, postal_code, city, precision, confidence, vehicles
     }
+    private enum EligibilityKeys: String, CodingKey { case status, deleted_at }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -45,6 +47,16 @@ struct CountyLocationRow: Decodable, Identifiable {
         precision = try c.decodeIfPresent(String.self, forKey: .precision)
         confidence = try c.decodeIfPresent(Double.self, forKey: .confidence)
         vehicles = try c.decode(VehicleHeaderRow.self, forKey: .vehicles)
+        let eligibility = try c.nestedContainer(keyedBy: EligibilityKeys.self, forKey: .vehicles)
+        // Both nullable fields must be supplied. A malformed response is a read
+        // failure, rather than silently admitting an unknown vehicle state.
+        for key in [EligibilityKeys.status, .deleted_at] where !eligibility.contains(key) {
+            throw DecodingError.keyNotFound(key, .init(codingPath: eligibility.codingPath,
+                debugDescription: "Missing vehicle eligibility field"))
+        }
+        let status = try eligibility.decodeIfPresent(String.self, forKey: .status)
+        let deleted = try eligibility.decodeIfPresent(String.self, forKey: .deleted_at)
+        isEligible = deleted == nil && !["deleted", "merged", "rejected", "duplicate"].contains(status ?? "")
         observedDate = observed_at.flatMap { Self.fractionalDate.date(from: $0) ?? Self.plainDate.date(from: $0) }
     }
     private static let fractionalDate: ISO8601DateFormatter = {
@@ -176,7 +188,9 @@ struct CountyEvidenceBatch {
         guard let last = page.last else { return Self(rows: [], cursor: cursor, complete: true) }
         let next = last.id.uuidString.lowercased()
         guard cursor == nil || next > cursor! else { throw URLError(.cannotParseResponse) }
-        return Self(rows: page, cursor: next, complete: false)
+        // Advance with the last raw row even when every row is ineligible. Only
+        // an empty server response finishes the read, not an empty local cohort.
+        return Self(rows: page.filter(\.isEligible), cursor: next, complete: false)
     }
 
     static func readAll(after cursor: String?,
@@ -197,10 +211,11 @@ private enum ZIPLocationReader {
     // Nonisolated network/decode work; only page publication returns to the UI.
     static func fetch(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
         var request = SupabaseService.client.from("vehicle_location_observations")
-            .select("id,observed_at,source_platform,source_url,postal_code,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state)")
+            .select("id,observed_at,source_platform,source_url,postal_code,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
             .eq("county_fips", value: fips).gte("confidence", value: 0.5)
-            .is("vehicles.deleted_at", value: nil)
-            .or("status.is.null,status.not.in.(deleted,merged,rejected,duplicate)", referencedTable: "vehicles")
+        // Keep the access-controlled inner join on the server. Apply the same
+        // deleted/status membership rule locally: filtering the embedded join
+        // made the measured complete public read take 13.267s rather than 3.947s.
         if let after { request = request.gt("id", value: after) }
         return try await request.order("id", ascending: true).limit(size).execute().value
     }
