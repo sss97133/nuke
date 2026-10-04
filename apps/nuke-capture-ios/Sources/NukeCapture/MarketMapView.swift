@@ -867,7 +867,8 @@ struct ZIPActivityView: View {
                         .chartXAxis(.hidden)
                         .frame(height: CGFloat(min(fold.sellers.count, 5)) * 32 + 8)
                     }
-                    NavigationLink("Explore all \(fold.sellers.count) sellers and their vehicles") {
+                    if !fold.sellers.isEmpty {
+                      NavigationLink("Explore all \(fold.sellers.count) sellers and their vehicles") {
                         List {
                             ForEach(fold.sellers) { seller in
                                 DisclosureGroup {
@@ -885,10 +886,13 @@ struct ZIPActivityView: View {
                             }
                         }
                         .navigationTitle("ZIP \(group.id) sellers")
+                      }
                     }
-                    Text("\(fold.listingCount) source-matched listings across \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Counts measure represented listings, not completed sales or revenue.")
+                    if !loading && !failed {
+                      Text("\(fold.listingCount) source-matched listings across \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Counts measure represented listings, not completed sales or revenue.")
                         .font(.caption).foregroundStyle(.secondary)
-                    if fold.ambiguousSellerCount > 0 {
+                    }
+                    if !loading && !failed && fold.ambiguousSellerCount > 0 {
                         Text("\(fold.ambiguousSellerCount) source episodes have missing or conflicting seller identity.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
