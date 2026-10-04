@@ -453,3 +453,9 @@ $$);
 4. **The 120s timeout is a compromise.** Some legitimate operations (complex joins across multiple tables for analytics) take longer than 120 seconds. These must be run via direct Postgres connection, bypassing the safety guardrails.
 
 5. **Pipeline registry is advisory only.** There is no database-level enforcement preventing a rogue edge function from writing to a protected field. The registry relies on agent compliance.
+
+### Price-fact timeout post-mortem — 2026-10-04
+
+Cold or parallel valuation requests reached the ten-second timeout; the inner plan isolated repeated sale-rule work in current price facts. PostgreSQL can fold a SQL helper's CTEs and repeat an expensive source rule for each returned field. The staged repair in `20261004212806_vehicle_price_facts_materialized_basis.sql` materializes the existing `vehicle_sale_basis` result once per selected parent inside `vehicle_price_facts`. It retains the twenty-field contract, invoker RLS, owner, grants and source rule.
+
+Keep the legacy auction date cast in a separate inline CTE. Materializing that cast would evaluate malformed dates even when the original result never used them. The actual PostgreSQL fixture `supabase/sql/test_vehicle_price_facts_materialized_basis.sql` compares every returned field against the original helper, checks anonymous/authenticated visibility and input edge cases, and preserves both unused-date success and required-date failure. Plan contrast evidence belongs with its execution role and exact inputs; deployment and visitor latency require separate runtime verification.
