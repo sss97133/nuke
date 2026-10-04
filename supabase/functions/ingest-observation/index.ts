@@ -29,7 +29,7 @@ import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.t
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
-import { observationContentHash } from "../_shared/observationContentHash.ts";
+import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
@@ -44,6 +44,9 @@ interface ObservationInput {
   mode?: string;
   snapshot_id?: string;
   dry_run?: boolean;
+  qualification_version?: string;
+  /** Optional protected-v1 selector. Generic input never assigns this typed FK. */
+  source_vehicle_event_id?: string;
   source_slug: string;
   kind: string;
   observed_at: string;
@@ -114,6 +117,7 @@ interface ObservationInput {
  */
 const SHARE_VERDICTS_PER_HOUR = 20;
 const ARCHIVED_SALE_METHOD = "protected_archived_sale_observation_v1";
+const ARCHIVED_EPISODE_PREVIEW_METHOD = "protected_archived_sale_episode_preview_v2";
 
 /** Derive protected sale testimony here, never from caller-supplied values.
  * This is the canonical intake; database ingested_at is deliberately omitted.
@@ -128,6 +132,8 @@ async function deriveArchivedSale(supabase: any, selectors: ObservationInput) {
   if (!parent || parent.is_public !== true || parent.deleted_at !== null || parent.listing_kind === "non_vehicle_item") {
     return { ok: false as const, reason: "parent_not_public_real_vehicle" };
   }
+  if (selectors.source_vehicle_event_id !== undefined && (typeof selectors.source_vehicle_event_id !== "string"
+    || !uuid.test(selectors.source_vehicle_event_id))) return { ok: false as const, reason: "invalid_source_episode_locator" };
   const { data: facts, error } = await supabase.rpc("vehicle_price_facts", { p_vehicle_ids: [vehicleId] });
   if (error) return { ok: false as const, reason: "current_sale_read_failed" };
   const fact = facts?.find((f: any) => f.vehicle_id === vehicleId);
@@ -164,6 +170,55 @@ async function deriveArchivedSale(supabase: any, selectors: ObservationInput) {
     extraction_metadata: { producer_qualified_at: new Date().toISOString(), clock_basis: "producer_verification_attempt" },
     defer_analysis: true,
   };
+  if (selectors.source_vehicle_event_id !== undefined) {
+    const eventId = selectors.source_vehicle_event_id.toLowerCase();
+    const columns = ["id","vehicle_id","source_platform","source_url","source_listing_id","event_type","event_status",
+      "final_price","sold_at","ended_at","created_at","updated_at","extracted_at"];
+    const { data: event, error: eventError } = await supabase.from("vehicle_events")
+      .select(columns.join(",")).eq("id",eventId).maybeSingle();
+    if (eventError) return { ok: false as const, reason: "source_episode_read_failed" };
+    if (!event || event.id !== eventId || event.vehicle_id !== vehicleId || event.source_platform !== "bat") {
+      return { ok: false as const, reason: "source_episode_attribution_conflict" };
+    }
+    // Same strict supported URL syntax as the typed source guard. Opaque lot
+    // IDs are retained without manufacturing a source URL from their text.
+    const sourceKey = (raw: unknown, schemeLess = false): string | null => {
+      if (typeof raw !== "string" || !(schemeLess
+        ? /^(https?:\/\/)?(www\.)?bringatrailer\.com\/listing\/[a-z0-9-]+\/?([?#].*)?$/i
+        : /^https?:\/\/(www\.)?bringatrailer\.com\/listing\/[a-z0-9-]+\/?([?#].*)?$/i).test(raw)) return null;
+      return raw.replace(/^(https?:\/\/)?(www\.)?/i,"").replace(/[?#].*$/,"").replace(/\/+$/,"").toLowerCase();
+    };
+    const eventKey = sourceKey(event.source_url), listingKey = sourceKey(event.source_listing_id,true);
+    if (!eventKey || eventKey !== sourceKey(capture.snapshot.storedSourceUrl)
+      || eventKey !== sourceKey(receipt.source_url) || (listingKey !== null && listingKey !== eventKey)) {
+      return { ok: false as const, reason: "source_episode_identity_conflict" };
+    }
+    const nativeTime = observationClockMicroseconds(event.sold_at ?? event.ended_at);
+    const sourceDay = observationClockMicroseconds(sale.eventDay + "T00:00:00Z");
+    if (nativeTime === null || nativeTime % 86400000000n !== 0n) {
+      return { ok: false as const, reason: "source_episode_civil_day_unestablished" };
+    }
+    if (typeof event.event_status !== "string" || event.event_status.trim().toLowerCase() !== "sold" || event.final_price == null
+      || !Number.isFinite(Number(event.final_price)) || Number(event.final_price) !== sale.amount
+      || nativeTime !== sourceDay) return { ok: false as const, reason: "source_episode_current_sale_conflict" };
+    for (const key of ["sold_at","ended_at","created_at","updated_at","extracted_at"]) {
+      if (event[key] != null && observationClockMicroseconds(event[key]) === null) {
+        return { ok: false as const, reason: "source_episode_clock_unknown" };
+      }
+    }
+    if (capture.snapshot.storedSha256 !== capture.snapshot.sourceSha256) {
+      return { ok: false as const, reason: "source_episode_capture_hash_shape" };
+    }
+    input.source_vehicle_event_id = eventId;
+    input.extraction_metadata = { ...input.extraction_metadata,
+      source_episode_context: Object.fromEntries(columns.map(key => [key,event[key] ?? null])),
+      source_snapshot_context: { id: capture.snapshot.id, platform: "bat", listing_url: capture.snapshot.storedSourceUrl,
+        success: true, http_status: 200, html_sha256: capture.snapshot.storedSha256,
+        fetched_at: capture.snapshot.fetchedAt, created_at: capture.snapshot.ingestedAt,
+        html_storage_path: capture.snapshot.storagePath, inline_body_present: capture.snapshot.bodySource === "inline",
+        metadata: { vehicle_id: capture.protectedMetadata.vehicle_id, vehicle_matched: true, parsed_at: capture.snapshot.parsedAt } },
+    };
+  }
   return { ok: true as const, input, receipt };
 }
 
@@ -221,16 +276,28 @@ Deno.serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const dryRun = input.dry_run !== false;
+      // The separately reviewed episode-v2 preview is not installed here.
+      // In particular it must never silently fall through to v1 admission.
+      if (input.qualification_version !== undefined && input.qualification_version !== "v1") {
+        return new Response(JSON.stringify({ success: false, reason: input.qualification_version === "episode_v2"
+          ? "episode_admission_not_installed" : "qualification_version_unknown", writes: 0, model_calls: 0 }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       archivedSale = await deriveArchivedSale(supabase,input);
       if (!archivedSale.ok) return new Response(JSON.stringify({ success: false, reason: archivedSale.reason }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (dryRun) return new Response(JSON.stringify({ success: true, dry_run: true, status: "qualified_preview",
         vehicle_id: archivedSale.input.vehicle_id, receipt: archivedSale.receipt, derived_ingested_at: null,
+        ...(archivedSale.input.source_vehicle_event_id ? { proposed_source_vehicle_event_id: archivedSale.input.source_vehicle_event_id,
+          source_episode_context: archivedSale.input.extraction_metadata?.source_episode_context,
+          source_snapshot_context: archivedSale.input.extraction_metadata?.source_snapshot_context,
+          recorded_clock_basis: "database_transaction_start_not_commit_availability", source_public_visibility: "unestablished" } : {}),
         availability_known_at: null, model_calls: 0, writes: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       input = archivedSale.input;
-    } else if (input.extraction_method === ARCHIVED_SALE_METHOD || input.extractor_id === ARCHIVED_SALE_METHOD
-      || (input.structured_data?.source_sale_receipt as Record<string,unknown> | undefined)?.method === ARCHIVED_SALE_METHOD) {
+    } else if ([ARCHIVED_SALE_METHOD,ARCHIVED_EPISODE_PREVIEW_METHOD].includes(input.extraction_method ?? "")
+      || [ARCHIVED_SALE_METHOD,ARCHIVED_EPISODE_PREVIEW_METHOD].includes(input.extractor_id ?? "")
+      || [ARCHIVED_SALE_METHOD,ARCHIVED_EPISODE_PREVIEW_METHOD].includes(String((input.structured_data?.source_sale_receipt as Record<string,unknown> | undefined)?.method ?? ""))) {
       return new Response(JSON.stringify({ error: "Protected sale receipts must be derived through source_sale_qualification" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -238,7 +305,18 @@ Deno.serve(async (req) => {
       if (!archivedSale?.ok) return null;
       const saved = row?.structured_data?.source_sale_receipt;
       const exactTuple = saved && Object.entries(archivedSale.receipt).every(([key,value]) => saved[key] === value);
+      // JSONB may reorder object keys; order is not part of header identity.
+      const ordered = (value: any): any => Array.isArray(value) ? value.map(ordered)
+        : value !== null && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key,ordered(value[key])])) : value;
+      const episodeExact = !input.source_vehicle_event_id || (row?.source_vehicle_event_id === input.source_vehicle_event_id
+        && row.content_hash === contentHash && observationClockMicroseconds(row.ingested_at) !== null
+        && observationClockMicroseconds(row.observed_at) === observationClockMicroseconds(input.observed_at)
+        && ["source_episode_context","source_snapshot_context"].every(key => {
+          const expected = input.extraction_metadata?.[key], actual = row?.extraction_metadata?.[key];
+          return expected && actual && JSON.stringify(ordered(expected)) === JSON.stringify(ordered(actual));
+        }));
       if (!row?.id || row.vehicle_id !== input.vehicle_id || row.source_snapshot_id !== archivedSale.receipt.snapshot_id || !Number.isFinite(Date.parse(row.ingested_at)) || !exactTuple
+        || !episodeExact
         || row.kind !== "sale_result" || row.is_superseded !== false || row.source_id !== source.id
         || row.extraction_method !== ARCHIVED_SALE_METHOD || row.extractor_id !== null
         || row.raw_source_ref !== input.raw_source_ref || row.source_identifier !== input.source_identifier
@@ -248,7 +326,10 @@ Deno.serve(async (req) => {
       }
       return new Response(JSON.stringify({ success: true, dry_run: false, duplicate, observation_id: row.id,
         vehicle_id: input.vehicle_id, receipt: saved, derived_ingested_at: row.ingested_at,
-        availability_known_at: row.ingested_at, model_calls: 0, writes: duplicate ? 0 : 1 }),
+        availability_known_at: input.source_vehicle_event_id ? null : row.ingested_at,
+        ...(input.source_vehicle_event_id ? { source_vehicle_event_id: row.source_vehicle_event_id,
+          recorded_clock_basis: "database_transaction_start_not_commit_availability", source_public_visibility: "unestablished" } : {}),
+        model_calls: 0, writes: duplicate ? 0 : 1 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     };
 
@@ -355,11 +436,18 @@ Deno.serve(async (req) => {
     const contentHash = await observationContentHash(input);
 
     // Check for duplicate
-    const { data: existing } = await supabase
-      .from("vehicle_observations")
-      .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id")
-      .eq("content_hash", contentHash)
-      .maybeSingle();
+    const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at";
+    const replayQuery = () => {
+      let query = supabase.from("vehicle_observations").select(archivedSale?.ok
+        ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "") : "id").eq("content_hash",contentHash);
+      if (archivedSale?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
+      return query.maybeSingle();
+    };
+    const { data: existing, error: replayError } = await replayQuery();
+    if (input.source_vehicle_event_id && archivedSale?.ok && replayError) {
+      return new Response(JSON.stringify({ error: "Typed sale replay unavailable" }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (existing) {
       const protectedResponse = protectedReply(existing,true);
@@ -526,6 +614,7 @@ Deno.serve(async (req) => {
         // Only freshly verified protected admission sets the typed source key.
         // Generic input, including caller-provided source_snapshot_id, is ignored.
         ...(archivedSale?.ok ? { source_snapshot_id: archivedSale.receipt.snapshot_id } : {}),
+        ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,
         vehicle_match_signals: Object.keys(vehicleMatchSignals).length > 0 ? vehicleMatchSignals : null,
         // Polymorphic subject (engineering-manual/20). Conditional spread: with no
@@ -568,11 +657,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (insertError) {
-      // Two identical workers may pass the pre-read simultaneously. Only the
-      // unique content-hash winner is a replay; other constraint failures fail.
+      // Two identical workers may pass the pre-read simultaneously. Protected
+      // replay resolves the complete source/id/kind/hash tuple; other failures fail.
       if (insertError.code === "23505") {
-        const { data: winner } = await supabase.from("vehicle_observations")
-            .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id").eq("content_hash", contentHash).maybeSingle();
+        const { data: winner } = await replayQuery();
         if (winner) {
           const protectedResponse = protectedReply(winner,true);
           if (protectedResponse) return protectedResponse;

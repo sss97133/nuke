@@ -90,6 +90,8 @@ Source filtering is critical: we must be able to toggle BaT off and see only oth
 ### Search
 Not a text search across 10 entity types. A terminal. "1969 Camaro" → market overview, price trends, active inventory, recent comps. Answer the question before showing the list.
 
+**Owner steering, 2026-10-04:** the market answer is measured performance relative to a stated population, timeframe and auction phase. Inventory counts and shared model names do not establish comparable performance. A component finding opens further evidence and purpose-specific cohorts; commentary is measured per target/comment, then episode, cohort and time. Venue coverage must be visible before interpreting the result. The durable direction, Packard acceptance case and release gates are in [Market analysis contract](market/MARKET_MEASUREMENT_UI_CONTRACT.md). This is product direction; delivery and live coverage require their own receipts.
+
 ### Vehicle Pages
 The digital entity mirror. Complete provenance, market context, comparable sales, ownership lineage, condition documentation. This is the canonical record for this vehicle in the world.
 

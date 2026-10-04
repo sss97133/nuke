@@ -198,36 +198,54 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var orphanSessions: [OrphanSession] = []
     @Published private(set) var ownerVehicles: [OwnerVehicle] = []
     @Published private(set) var isLoadingConfirm = false
+    @Published private(set) var confirmLoaded = false
+    @Published private(set) var confirmLoadError: String?
 
     /// Load the sessions awaiting confirmation + the owner's vehicles for the picker.
     func loadConfirmData() async {
-        guard let userId = SupabaseService.currentUserId else { return }
+        guard !isLoadingConfirm else { return }
+        guard let userId = SupabaseService.currentUserId else {
+            confirmLoadError = "Sign in to load your sessions."
+            return
+        }
         isLoadingConfirm = true
+        confirmLoadError = nil
         defer { isLoadingConfirm = false }
         do {
-            orphanSessions = try await SupabaseService.client
+            let sessions: [OrphanSession] = try await SupabaseService.client
                 .rpc("get_orphan_sessions", params: OrphanParams(p_user_id: userId))
                 .execute().value
-        } catch { NSLog("loadConfirmData sessions: %@", String(describing: error)) }
-        do {
-            ownerVehicles = try await SupabaseService.client.from("vehicles")
+            let vehicles: [OwnerVehicle] = try await SupabaseService.client.from("vehicles")
                 .select("id, year, make, model, primary_image_url")
                 .eq("user_id", value: userId)
                 .order("updated_at", ascending: false)
                 .execute().value
-        } catch { NSLog("loadConfirmData vehicles: %@", String(describing: error)) }
+            orphanSessions = sessions
+            ownerVehicles = vehicles
+            confirmLoaded = true
+        } catch {
+            confirmLoadError = "Couldn't load your sessions. Check your connection and try again."
+            NSLog("NukeCapture confirmation load failed: %@", String(describing: error))
+        }
     }
 
     /// Route a whole session to a vehicle (one tap). auth.uid() gates server-side.
     @discardableResult
-    func confirm(session: OrphanSession, vehicleId: String) async -> Int {
-        do {
-            let routed: Int = try await SupabaseService.client
-                .rpc("attribute_image_session",
-                     params: ConfirmParams(p_image_ids: session.image_ids, p_vehicle_id: vehicleId))
-                .execute().value
-            orphanSessions.removeAll { $0.id == session.id }   // it's filed; drop it from the list
-            return routed
-        } catch { NSLog("confirm session: %@", String(describing: error)); return 0 }
+    func confirm(session: OrphanSession, vehicleId: String) async throws -> Int {
+        let routed: Int = try await SupabaseService.client
+            .rpc("attribute_image_session",
+                 params: ConfirmParams(p_image_ids: session.image_ids, p_vehicle_id: vehicleId))
+            .execute().value
+        // A zero-row result is not proof that this session was filed.
+        guard routed > 0 else { throw SessionConfirmationError.noPhotosRouted }
+        orphanSessions.removeAll { $0.id == session.id }
+        return routed
+    }
+
+    enum SessionConfirmationError: LocalizedError {
+        case noPhotosRouted
+        var errorDescription: String? {
+            "No photos were moved. Close this sheet and refresh sessions before trying again."
+        }
     }
 }

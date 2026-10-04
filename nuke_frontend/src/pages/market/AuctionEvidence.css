@@ -1,0 +1,62 @@
+.auction-evidence { border: 2px solid var(--border); margin: 0 0 16px; color: var(--text); background: var(--bg); padding: 16px; font: 12px/1.5 Arial, sans-serif; overflow-wrap: anywhere; scroll-margin-top: calc(var(--header-height) + var(--space-2)); }
+.auction-evidence-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.auction-evidence h3 { font-size: 19px; line-height: 1.3; margin: 3px 0 8px; }
+.auction-evidence h4, .auction-evidence-eyebrow { margin: 0; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.auction-evidence-eyebrow { color: var(--text-secondary); }
+.auction-evidence-close { background: var(--bg); color: var(--text); border: 2px solid var(--border); width: 32px; height: 32px; flex-shrink: 0; font-size: 22px; line-height: 1; }
+.auction-evidence :is(a,button,summary,[role=button]):focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.auction-evidence-links { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+.auction-evidence-links span { color: var(--text-secondary); margin-left: auto; }
+.auction-evidence-layout { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 24px; margin-top: 16px; }
+.auction-evidence-build { border-right: 2px solid var(--border); padding-right: 24px; }
+.auction-evidence-build dl { margin: 12px 0 18px; }
+.auction-evidence-build dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.auction-evidence-build dt { font-size: 10px; color: var(--text-secondary); }
+.auction-evidence-build dd { margin: 0; font-weight: 700; }
+.auction-evidence-spec-source { display: block; font-size: 10px; font-weight: 400; }
+.auction-evidence-conflict { display: block; font-size: 10px; color: var(--warning); }
+.auction-evidence-prose { white-space: pre-wrap; margin: 8px 0; }
+.auction-evidence-native { margin: 12px 0; font-size: 11px; }
+.auction-evidence-native summary { cursor: pointer; font-weight: 700; }
+.auction-evidence-note { font-size: 10px; color: var(--text-secondary); font-weight: 400; margin: 6px 0 12px; display: block; }
+.auction-evidence-chart-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
+.auction-evidence-chart-heading span { font-size: 10px; color: var(--text-secondary); }
+.auction-evidence-chart { display: block; width: 100%; height: auto; min-height: 130px; }
+.auction-evidence-chart text { fill: var(--text-secondary); font: 11px 'Courier New', monospace; }
+.auction-evidence-chart-dates { display: flex; justify-content: space-between; gap: 16px; font: 10px/1.4 'Courier New', monospace; }
+.auction-evidence-chart-dates time:last-child { text-align: right; }
+.auction-evidence-bid-table { font-size: 10px; margin: 12px 0; }
+.auction-evidence-bid-table summary { cursor: pointer; }
+.auction-evidence-bid-table table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.auction-evidence-bid-table :is(th,td) { padding: 6px; border-bottom: 1px solid var(--border); text-align: left; }
+.auction-evidence-bid-table button { font: 12px 'Courier New',monospace; color: var(--text); background: var(--bg); border: 0; min-height: 32px; padding: 0 6px; }
+.auction-evidence-grid { stroke: var(--border); stroke-width: 1; }
+.auction-evidence-path { fill: none; stroke: var(--text-secondary); stroke-width: 1; stroke-dasharray: 3 3; }
+.auction-evidence-point { fill: var(--text); }
+.auction-evidence-chart [role=button] { cursor: pointer; }
+.auction-evidence-chart [role=button]:focus .auction-evidence-point { stroke: var(--text); stroke-width: 6px; }
+.auction-evidence-event { padding: 8px 10px; border: 2px solid var(--text); display: flex; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.auction-evidence-event a { margin-left: auto; }
+.auction-evidence-receipt { display: flex; flex-direction: column; font-size: 10px; color: var(--text-secondary); padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+.auction-evidence-discussion-heading { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; margin-top: 14px; gap: 8px; }
+.auction-evidence-discussion-heading button { border: 0; padding: 0; background: var(--bg); color: var(--text); font-size: 10px; text-decoration: underline; }
+.auction-evidence-discussion { max-height: 420px; overflow-y: auto; padding-right: 8px; }
+.auction-evidence-discussion article { padding: 12px 0; border-top: 1px solid var(--border); }
+.auction-evidence-discussion article:first-child { border-top: 0; padding-top: 0; }
+.auction-evidence-discussion summary { cursor: pointer; }
+.auction-evidence-preview { display: block; margin-top: 4px; }
+.auction-evidence-comment-header { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 10px; align-items: baseline; color: var(--text-secondary); }
+.auction-evidence-comment-header > span { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text); }
+.auction-evidence-comment-header a { margin-left: auto; }
+.auction-evidence-discussion p { margin: 6px 0; white-space: pre-wrap; }
+.auction-evidence-media { display: inline-block; font-size: 11px; margin: 6px 12px 0 0; }
+@media (max-width: 720px) {
+  .auction-evidence { padding: 12px; }
+  .auction-evidence h3 { font-size: 16px; }
+  .auction-evidence-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .auction-evidence-build { border-right: 0; border-bottom: 2px solid var(--border); padding: 0 0 12px; }
+  .auction-evidence-analysis { grid-row: 1; }
+  .auction-evidence-chart text { font-size: 22px; }
+  .auction-evidence-links span { margin-left: 0; }
+  .auction-evidence-discussion { max-height: none; overflow: visible; padding-right: 0; }
+}

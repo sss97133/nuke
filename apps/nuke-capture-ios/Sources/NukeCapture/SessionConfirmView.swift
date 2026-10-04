@@ -26,9 +26,17 @@ struct SessionConfirmView: View {
                     Label("Confirm your days", systemImage: "checkmark.seal")
                 }
             }
-            if attribution.orphanSessions.isEmpty {
+            if let error = attribution.confirmLoadError {
                 Section {
-                    Text(attribution.isLoadingConfirm ? "READING SESSIONS…" : "NOTHING TO CONFIRM")
+                    Text(error).font(.footnote).foregroundStyle(.secondary)
+                    Button("Retry") { Task { await attribution.loadConfirmData() } }
+                        .disabled(attribution.isLoadingConfirm)
+                }
+            }
+            if attribution.orphanSessions.isEmpty && attribution.confirmLoadError == nil {
+                Section {
+                    Text(attribution.isLoadingConfirm || !attribution.confirmLoaded
+                         ? "READING SESSIONS…" : "NOTHING TO CONFIRM")
                         .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             } else {
@@ -36,6 +44,7 @@ struct SessionConfirmView: View {
                     ForEach(attribution.orphanSessions) { s in
                         Button { picking = s } label: { sessionRow(s) }
                             .buttonStyle(.plain)
+                            .disabled(attribution.isLoadingConfirm || attribution.confirmLoadError != nil)
                     }
                 } footer: {
                     Text("Each session is one day at one place — tap to send all its photos to a vehicle.")
@@ -49,11 +58,9 @@ struct SessionConfirmView: View {
         .refreshable { await attribution.loadConfirmData() }
         .sheet(item: $picking) { session in
             VehiclePickerSheet(session: session) { vehicle in
-                Task {
-                    let n = await attribution.confirm(session: session, vehicleId: vehicle.id)
-                    routedNote = "\(n) photos → \(vehicle.label)"
-                    picking = nil
-                }
+                let n = try await attribution.confirm(session: session, vehicleId: vehicle.id)
+                routedNote = "\(n) photos → \(vehicle.label)"
+                picking = nil
             }
         }
     }
@@ -89,16 +96,38 @@ struct SessionConfirmView: View {
 /// Vehicle picker — the owner's vehicles, square thumbnails. Tap routes the session.
 private struct VehiclePickerSheet: View {
     let session: AttributionEngine.OrphanSession
-    let onPick: (AttributionEngine.OwnerVehicle) -> Void
+    let onPick: (AttributionEngine.OwnerVehicle) async throws -> Void
     @ObservedObject private var attribution = AttributionEngine.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var isRouting = false
+    @State private var routingError: String?
 
     var body: some View {
         NavigationStack {
             List {
+                if let error = routingError {
+                    Section {
+                        Text(error).font(.footnote).foregroundStyle(.red)
+                    }
+                }
                 Section {
                     ForEach(attribution.ownerVehicles) { v in
-                        Button { onPick(v) } label: {
+                        Button {
+                            guard !isRouting else { return }
+                            isRouting = true
+                            routingError = nil
+                            Task {
+                                defer { isRouting = false }
+                                do {
+                                    try await onPick(v)
+                                } catch {
+                                    routingError = error is AttributionEngine.SessionConfirmationError
+                                        ? error.localizedDescription
+                                        : "Couldn't move these photos. Your session is still waiting. Try again."
+                                    NSLog("NukeCapture session routing failed: %@", String(describing: error))
+                                }
+                            }
+                        } label: {
                             HStack(spacing: 12) {
                                 AsyncImage(url: SessionConfirmView.thumb(v.primary_image_url)) { img in
                                     img.resizable().scaledToFill()
@@ -111,11 +140,13 @@ private struct VehiclePickerSheet: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .disabled(isRouting)
                     }
                 } header: {
                     Text("\(session.photo_count) photos · \(session.session_day)")
                 } footer: {
-                    Text("Pick the vehicle these photos belong to. If it's not here, add it on nuke.ag first.")
+                    Text(isRouting ? "Moving photos…"
+                         : "Pick the vehicle these photos belong to. If it's not here, add it on nuke.ag first.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -124,8 +155,10 @@ private struct VehiclePickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isRouting)
                 }
             }
         }
+        .interactiveDismissDisabled(isRouting)
     }
 }

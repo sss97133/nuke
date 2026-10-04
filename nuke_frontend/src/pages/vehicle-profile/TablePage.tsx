@@ -16,7 +16,7 @@ interface ObsRow {
   id: string;
   kind: string;
   observed_at: string | null;
-  ingested_at: string;
+  ingested_at: string | null;
   source_url: string | null;
   content_text: string | null;
   confidence: string | null;
@@ -27,6 +27,7 @@ interface ObsRow {
   total: number | null;
   lifecycle_status: string | null;
   source_slug: string | null;
+  public_copy?: boolean;
 }
 
 interface VehicleSummary {
@@ -52,6 +53,7 @@ const TablePage: React.FC = () => {
   const [rows, setRows] = useState<ObsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [publicLogUnavailable, setPublicLogUnavailable] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('observed_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [filter, setFilter] = useState('');
@@ -62,12 +64,13 @@ const TablePage: React.FC = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setPublicLogUnavailable(false);
 
     (async () => {
       // PostgREST caps each call at ~1000 rows; the K5 has ~1900 wire-specs that
       // would crowd out everything else if we ran one combined query. Fetch
       // each lifecycle-relevant kind separately and merge.
-      const [vehRes, workRes, specRes, condRes, commentRes, sourceRes] = await Promise.all([
+      const [vehRes, workRes, specRes, condRes, commentRes, sourceRes, publicWorkRes] = await Promise.all([
         supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
@@ -108,6 +111,7 @@ const TablePage: React.FC = () => {
           .limit(500),
         // Source slugs for the kinds we'll merge
         supabase.from('observation_sources').select('id, slug'),
+        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId }),
       ]);
 
       if (cancelled) return;
@@ -118,6 +122,7 @@ const TablePage: React.FC = () => {
         return;
       }
       setVehicle(vehRes.data as VehicleSummary | null);
+      setPublicLogUnavailable(!!publicWorkRes.error);
 
       const sourceById = new Map<string, string>();
       for (const s of ((sourceRes.data as any[] | null) || [])) {
@@ -157,6 +162,33 @@ const TablePage: React.FC = () => {
           total,
           lifecycle_status: sd.lifecycle_status ?? null,
           source_slug: sourceById.get(r.source_id) || null,
+        });
+      }
+
+      // The RPC owns masking. Keep permitted work searchable for visitors,
+      // while an owner's directly readable observation wins on the same ID.
+      for (const r of (publicWorkRes.error ? [] : publicWorkRes.data || [])) {
+        if (!r.observation_id || seen.has(r.observation_id)) continue;
+        seen.add(r.observation_id);
+        out.push({
+          id: r.observation_id,
+          kind: 'work_record',
+          observed_at: r.done_on ?? null,
+          // The public contract exposes a work date, not an ingest clock.
+          ingested_at: null,
+          source_url: null,
+          content_text: [r.item, r.category, r.build_stage,
+            r.labor_minutes != null ? `${Number(r.labor_minutes)} min` : null]
+            .filter(Boolean).join(' · ') || null,
+          confidence: null,
+          confidence_score: null,
+          vendor: r.supplier ?? null,
+          part_number: null,
+          part_description: null,
+          total: null,
+          lifecycle_status: null,
+          source_slug: null,
+          public_copy: true,
         });
       }
 
@@ -361,6 +393,16 @@ const TablePage: React.FC = () => {
         SHOWING {sorted.length} OF {rows.length}{totalShown > 0 && ` · TOTAL $${totalShown.toLocaleString()}`}
       </div>
 
+      {rows.some(r => r.public_copy) && (
+        <p style={{ fontSize: 10 }}>
+          Public build log: permitted work, suppliers, labor and stages. Receipts, amounts and full details are owner-only.
+          Dates are recorded work dates; ingestion times are unavailable for these copies.
+        </p>
+      )}
+      {publicLogUnavailable && (
+        <p role="status" style={{ fontSize: 10 }}>Public build log unavailable; work history may be incomplete.</p>
+      )}
+
       {loading && rows.length === 0 && (
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading…</div>
       )}
@@ -408,10 +450,13 @@ const TablePage: React.FC = () => {
               <HeaderCell k="source_slug" label="Source" />
             </div>
 
-            {sorted.map((r, i) => (
-              <Link
+            {sorted.map((r, i) => {
+              const Row: React.ElementType = r.public_copy ? 'div' : Link;
+              return (
+              <Row
                 key={r.id}
-                to={`/vehicle/${vehicleId}/observation/${r.id}`}
+                {...(r.public_copy ? {} : { to: `/vehicle/${vehicleId}/observation/${r.id}`, prefetch: 'intent' })}
+                data-observation-id={r.id}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '92px 86px 160px 110px 90px 90px 1fr 110px',
@@ -464,12 +509,14 @@ const TablePage: React.FC = () => {
                 </span>
                 <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 9 }}>
                   {r.content_text || r.part_description || ''}
+                  {r.public_copy && <span> · Owner-only detail</span>}
                 </span>
                 <span style={{ fontFamily: 'Courier New, monospace', fontSize: 8, color: 'var(--text-secondary, #666)' }}>
                   {r.source_slug || ''}
                 </span>
-              </Link>
-            ))}
+              </Row>
+              );
+            })}
           </div>
         </div>
       )}
