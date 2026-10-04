@@ -13,13 +13,14 @@ interface IdentityResult {
   last_seen: string | null;
   claimed: boolean;
   stats: {
-    comments: number;
-    bids: number;
-    wins: number;
-    expertise_score: number;
-    trust_score: number;
+    comments: number | null;
+    bids: number | null;
+    wins: number | null;
+    expertise_score: number | null;
+    trust_score: number | null;
     active_since: string | null;
     last_active: string | null;
+    basis?: { counts: string; awards?: string };
   } | null;
 }
 
@@ -460,10 +461,17 @@ const ClaimExternalIdentity: React.FC = () => {
                   </div>
                   {identity.stats && (
                     <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <div><strong style={{ color: 'var(--text)' }}>{identity.stats.comments.toLocaleString()}</strong> comments</div>
-                      <div><strong style={{ color: 'var(--text)' }}>{identity.stats.bids.toLocaleString()}</strong> bids</div>
-                      {identity.stats.wins > 0 && (
-                        <div><strong style={{ color: 'var(--text)' }}>{identity.stats.wins}</strong> wins</div>
+                      {identity.stats.comments !== null && (
+                        <div><strong style={{ color: 'var(--text)' }}>{identity.stats.comments.toLocaleString()}</strong> captured comments</div>
+                      )}
+                      {identity.stats.bids !== null && (
+                        <div><strong style={{ color: 'var(--text)' }}>{identity.stats.bids.toLocaleString()}</strong> captured bids</div>
+                      )}
+                      {identity.stats.basis?.awards === 'published_buyer_evidence' && identity.stats.wins !== null && identity.stats.wins > 0 && (
+                        <div><strong style={{ color: 'var(--text)' }}>{identity.stats.wins}</strong> published wins</div>
+                      )}
+                      {identity.stats.basis?.counts === 'legacy_baseline_unreplayed' && (
+                        <div>Historical counts unverified</div>
                       )}
                     </div>
                   )}

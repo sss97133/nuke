@@ -114,6 +114,24 @@ describe('signed-in source account visibility', () => {
     expect(container.querySelector('[aria-label="Your source account claim requests"]')?.textContent).toContain('approved');
   });
 
+  it('keeps unknown profile counts and legacy win values from becoming published awards', async () => {
+    fixture.invoke.mockResolvedValue({ data: { results: [
+      { id: 'legacy', platform: 'bat', handle: 'Legacy', profile_url: null, stats: {
+        comments: 3, bids: 1, wins: 9, expertise_score: 0, trust_score: 0,
+      } },
+      { id: 'unknown', platform: 'bat', handle: 'UnknownCounts', profile_url: null, stats: {
+        comments: null, bids: null, wins: null, expertise_score: null, trust_score: null,
+        basis: { counts: 'legacy_baseline_unreplayed', awards: 'unmeasured' },
+      } },
+    ] }, error: null });
+    window.history.replaceState({}, '', '/claim-identity?handle=Legacy');
+    await render(); await act(async () => vi.advanceTimersByTimeAsync(301));
+    expect(container.textContent).toContain('3 captured comments');
+    expect(container.textContent).toContain('Historical counts unverified');
+    expect(container.textContent).not.toContain('published wins');
+    expect(container.textContent).not.toContain('0 captured comments');
+  });
+
   it('stores the existing request without inventing an automatic verifier, SMS destination or access grant', async () => {
     fixture.invoke.mockResolvedValue({ data: { results: [{ id: 'source', platform: 'bat', handle: 'Unclaimed', profile_url: null, stats: null }] }, error: null });
     fixture.rpc.mockResolvedValue({ data: 'request-id', error: null });

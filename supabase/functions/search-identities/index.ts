@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
         // Get BaT-specific stats
         if (identity.platform === "bat") {
-          const profileColumns = "external_identity_id, total_comments, total_bids, total_wins, expertise_score, community_trust_score, first_seen, last_seen";
+          const profileColumns = "external_identity_id, total_comments, total_bids, total_wins, expertise_score, community_trust_score, first_seen, last_seen, metadata";
           let { data: batProfile, error: profileError } = await supabase
             .from("bat_user_profiles")
             .select(profileColumns)
@@ -98,14 +98,33 @@ Deno.serve(async (req) => {
           }
 
           if (batProfile) {
+            const record = batProfile.metadata?.bat_bidder_record;
+            const replayed = record?.method === "published_buyer_v1";
+            const eligible = replayed && record.eligible_closed_presentations > 0;
             result.stats = {
-              comments: batProfile.total_comments || 0,
-              bids: batProfile.total_bids || 0,
-              wins: batProfile.total_wins || 0,
-              expertise_score: batProfile.expertise_score || 0,
-              trust_score: batProfile.community_trust_score || 0,
+              comments: batProfile.total_comments ?? null,
+              bids: batProfile.total_bids ?? null,
+              wins: eligible ? (batProfile.total_wins ?? null) : null,
+              // No assayed expertise/trust model exists. A source-like proxy
+              // is exposed with its actual unit, never as confidence or skill.
+              expertise_score: null,
+              trust_score: null,
+              source_like_points: replayed ? (batProfile.community_trust_score ?? null) : null,
               active_since: batProfile.first_seen,
               last_active: batProfile.last_seen,
+              basis: {
+                scope: "cumulative_captured_history",
+                counts: replayed ? "replayed_then_incremental" : "legacy_baseline_unreplayed",
+                awards: replayed ? "published_buyer_evidence" : "unmeasured",
+                record_refreshed_at: replayed ? (record.refreshed_at ?? null) : null,
+                coverage: replayed ? {
+                  observed_bid_presentations: record.observed_bid_presentations ?? null,
+                  eligible_closed_presentations: record.eligible_closed_presentations ?? null,
+                  unknown_outcome_presentations: record.unknown_outcome_presentations ?? null,
+                  unlinked_presentations: record.unlinked_presentations ?? null,
+                  unkeyed_bid_comments: record.unkeyed_bid_comments ?? null,
+                } : null,
+              },
             };
           }
         }
