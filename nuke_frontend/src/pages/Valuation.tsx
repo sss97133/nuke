@@ -69,7 +69,7 @@ type ValuationResult = {
 
 type ValuationRequest = {
   p_year: number | null; p_make: string; p_model: string | null;
-  p_event_before: string | null; p_event_from: null; p_evidence_as_of: null;
+  p_event_before: string | null; p_event_from: string | null; p_evidence_as_of: null;
   p_currency: string; p_price: null; p_subject_vehicle_id: string | null; p_knowledge_mode: 'retrospective';
 };
 
@@ -119,6 +119,7 @@ export default function Valuation() {
   const [model, setModel] = useState(params.get('model') ?? '');
   const [candidatePrice, setCandidatePrice] = useState(params.get('price') ?? '');
   const [eventBefore, setEventBefore] = useState(params.get('as_of') ?? '');
+  const [eventFrom, setEventFrom] = useState(params.get('sales_from') ?? '');
   const [currency, setCurrency] = useState(params.get('currency') || 'USD');
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +128,7 @@ export default function Valuation() {
   const [sourcePage, setSourcePage] = useState(0);
   const result = lookup?.result ?? null;
   const subjectVehicleId = params.get('vehicle_id') || null;
-  const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventBefore,currency,subjectVehicleId]);
+  const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventFrom,eventBefore,currency,subjectVehicleId]);
   const loading = loadingKey != null;
   const loadingThisContext = loadingKey === filterKey;
 
@@ -137,7 +138,7 @@ export default function Valuation() {
     const trimmedModel = model.trim();
     const requestedYear = yearOverride ?? year;
     const parsedYear = requestedYear.trim() ? parseInt(requestedYear.trim(), 10) : null;
-    const requestedContextKey = JSON.stringify([requestedYear.trim(), make.trim(), model.trim(), eventBefore, currency, subjectVehicleId]);
+    const requestedContextKey = JSON.stringify([requestedYear.trim(), make.trim(), model.trim(), eventFrom, eventBefore, currency, subjectVehicleId]);
 
     if (!trimmedMake || (!parsedYear && !trimmedModel)) {
       setError('Provide a make plus a year and/or model.');
@@ -150,7 +151,7 @@ export default function Valuation() {
     const request: ValuationRequest = {
       p_year: parsedYear, p_make: trimmedMake, p_model: trimmedModel || null,
       p_event_before: eventBefore ? `${eventBefore}T00:00:00Z` : null,
-      p_event_from: null, p_evidence_as_of: null, p_currency: currency,
+      p_event_from: eventFrom ? `${eventFrom}T00:00:00Z` : null, p_evidence_as_of: null, p_currency: currency,
       p_price: null, p_subject_vehicle_id: subjectVehicleId, p_knowledge_mode: 'retrospective',
     };
 
@@ -160,6 +161,7 @@ export default function Valuation() {
     if (trimmedModel) next.set('model', trimmedModel);
     if (candidatePrice) next.set('price', candidatePrice);
     if (eventBefore) next.set('as_of', eventBefore);
+    if (eventFrom) next.set('sales_from', eventFrom);
     next.set('currency', currency);
     if (subjectVehicleId) next.set('vehicle_id', subjectVehicleId);
     setParams(next, { replace: true });
@@ -181,7 +183,7 @@ export default function Valuation() {
     } finally {
       if (requestId === latestRequest.current) setLoadingKey(null);
     }
-  }, [year, make, model, eventBefore, currency, candidatePrice, subjectVehicleId, setParams]);
+  }, [year, make, model, eventFrom, eventBefore, currency, candidatePrice, subjectVehicleId, setParams]);
 
   useEffect(() => () => { latestRequest.current++; }, []);
 
@@ -285,6 +287,7 @@ export default function Valuation() {
         <Field label="Make *" value={make} onChange={setMake} placeholder="Ferrari" required minWidth={150} list="valuation-makes" />
         <Field label="Model" value={model} onChange={setModel} placeholder="328" minWidth={150} />
         <Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />
+        <Field label="Sales from (UTC date)" value={eventFrom} onChange={setEventFrom} placeholder="Default: last 36 months" minWidth={160} />
         <Field label="Sales before (UTC date)" value={eventBefore} onChange={setEventBefore} placeholder="YYYY-MM-DD" minWidth={120} />
         <label style={{ fontSize: FS.label }}>CURRENCY
           <select aria-label="Currency" value={currency} onChange={e => setCurrency(e.target.value)} style={{ display: 'block', border: '2px solid var(--text)', padding: 6 }}>

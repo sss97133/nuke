@@ -103,6 +103,29 @@ describe('qualified cohort sale-price reader UI', () => {
     expect(container.textContent).not.toContain('45.0 percentile'); expect(prior.request.p_year).toBe(1970);
   });
 
+  it('uses the requested older sale window and preserves it when broadening model years', async () => {
+    const data = evidence(); data.receipt.event_from = '2010-01-01T00:00:00Z';
+    const broad = { ...data, query: { ...data.query, year: null } };
+    fixture.rpc.mockResolvedValueOnce({ data, error: null }).mockResolvedValueOnce({ data: broad, error: null });
+    await render('year=1970&make=Synthetic&model=Coupe&price=5000&sales_from=2010-01-01');
+    expect(fixture.rpc.mock.calls[0][1].p_event_from).toBe('2010-01-01T00:00:00Z');
+    expect((await exportedReceipt()).resolvedRequest.p_event_from).toBe('2010-01-01T00:00:00Z');
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'All recorded model years')!.click());
+    expect(fixture.rpc.mock.calls[1][1]).toMatchObject({ p_year: null, p_event_from: '2010-01-01T00:00:00Z' });
+    expect((await exportedReceipt()).request.p_event_from).toBe('2010-01-01T00:00:00Z');
+  });
+
+  it('withholds the old percentile when the sale-start date changes until new evidence arrives', async () => {
+    await render(); const prior = await exportedReceipt();
+    await enter('Sales from (UTC date)', '2010-01-01');
+    expect(container.textContent).toContain('Compare again to apply'); expect(saveButton().disabled).toBe(true);
+    expect(container.textContent).not.toContain('45.0 percentile');
+    const data = evidence(); data.receipt.event_from = '2010-01-01T00:00:00Z';
+    fixture.rpc.mockResolvedValue({ data, error: null }); await submit();
+    expect((await exportedReceipt()).request.p_event_from).toBe('2010-01-01T00:00:00Z');
+    expect(prior.request.p_event_from).toBeNull();
+  });
+
   it('exposes distinct vehicle/capture/source-lot grains, supported ancestry and exact source/vehicle navigation without raw text', async () => {
     const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000001', snapshot = '00000000-0000-4000-8000-000000000002';
     Object.assign(data.receipt.coverage, { dated_source_rows: 16, capture_presentations: 18, qualified_capture_presentations: 12, duplicate_presentations: 2 });
