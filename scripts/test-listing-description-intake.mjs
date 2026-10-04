@@ -119,7 +119,7 @@ function canonicalIntake(options = {}) {
       console: { log() {}, warn() {}, error: (...args) => errors.push(args) },
       Deno: { env: { get: key => env[key] }, serve: callback => { handler = callback; } },
       require: name => {
-        if (name === 'https://esm.sh/@supabase/supabase-js@2') return { createClient: client };
+        if (['https://esm.sh/@supabase/supabase-js@2', 'https://esm.sh/@supabase/supabase-js@2.45.4'].includes(name)) return { createClient: client };
         assert.ok(name.startsWith('.'), `No downloaded import: ${name}`);
         return load(new URL(name, filename));
       },
