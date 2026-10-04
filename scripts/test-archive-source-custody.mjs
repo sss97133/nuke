@@ -42,6 +42,9 @@ const sources = new Map([
   ['parser',compile('../supabase/functions/_shared/batParser.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
+  ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
+  ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
@@ -146,6 +149,9 @@ function fixture(options = {}) {
         if(specifier==='./batParser.ts')return load('parser');
         if(specifier==='../_shared/archiveFetch.ts')return load('archive');
         if(specifier==='../_shared/batParser.ts')return load('parser');
+        if(specifier==='./batLive.ts')return load('liveIntake');
+        if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
+        if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
