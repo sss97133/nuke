@@ -86,6 +86,8 @@ Updated: 2026-03-27
 - **Related**: `certificates_of_authenticity`, `conservation_history` (ENCYCLOPEDIA Section 4)
 
 ### Valuation / Nuke Estimate
+- **Dated source-sale calculators**: `nuke_frontend/src/lib/dealRead/batComps.ts` — existing `comparePriceToSourceSales`; additive `selectSourceSalePopulation` retains episode candidates, qualified captures, explicit relevance and repeat-sale observations. V2 is not yet wired to `/valuation`.
+- **Contracts**: `nuke_frontend/src/lib/dealRead/batComps.test.ts`; ENCYCLOPEDIA Section 5, "Vehicle sale-event population and explicit relevance".
 - **Column**: `vehicles.nuke_estimate`
 - **Compute**: `supabase/functions/compute-vehicle-valuation/index.ts`
 - **Hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)

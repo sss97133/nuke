@@ -408,6 +408,16 @@ appraisals (
 
 The Nuke Estimate for art = the same concept as the Nuke Estimate for vehicles. A computed value derived from comparable sales, trajectory analysis, and condition assessment, with confidence scoring and source citations.
 
+### Vehicle sale-event population and explicit relevance
+
+The deterministic `selectSourceSalePopulation` contract in existing `lib/dealRead/batComps.ts` starts with every supplied sale presentation. Its identity is canonical source platform × listing episode. A vehicle can have several sale episodes; repeated agreeing captures of one episode contribute one sale. Contradictory supported captures refuse that episode and retain all presentation and snapshot references. Native sold/price rows and unadmitted archives remain candidates, not qualified prices.
+
+Qualification requires attributed outcome, positive amount, event day or instant, independent knowledge time, original currency and fee basis. A day remains an interval. Event and knowledge cutoffs are independent; later evidence cannot rewrite an earlier receipt. Episode-bound relevance claims have their own evidence references and knowledge clocks. A missing condition claim remains unknown.
+
+Broad-market distributions are partitioned by currency and fee basis. Matched distributions use an explicit caller policy over named dimensions, retain every matching episode, and disclose mismatches and unknowns. Incomplete supplied populations and sparse matched pools withhold distributions. There is no default exact-year trim, row-count sample, weighting, conversion or fair-value conclusion. Only the subject episode is excluded from comparisons; its earlier resales survive. Consecutive supported resales can show nominal observed price changes, which are not market-index returns or condition-adjusted assessments.
+
+This is an additive local contract, tested with synthetic captures. Existing `valuation_by_ymm` → `/valuation` and its v1 calculator remain unchanged until an existing reader supplies qualified population evidence and explicit coverage. The pure selector does not establish public-source custody or perform source qualification.
+
 ---
 
 ## Section 6: Observation Sources — Tiered

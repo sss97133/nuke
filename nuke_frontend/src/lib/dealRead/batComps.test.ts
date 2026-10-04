@@ -5,6 +5,7 @@ import {
   batSlug, yearFromSlug, classifyEngine, textFeatures, buildCompSet, quantile, median,
   summarize, shareBelow, windowComps, MIN_READABLE_DESCRIPTION,
   comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions,
+  selectSourceSalePopulation, type SourceSaleCapture, type SalePopulationOptions, type SaleRelevanceClaim,
   type VehicleCompRow, type BatListingRow,
 } from './batComps';
 
@@ -122,6 +123,201 @@ describe('dated source sale percentile contract', () => {
     expect(rows).toEqual(original); expect(prior).toEqual(frozen);
     expect(next.counts.eligibleSales).toBe(11); expect(prior.counts.eligibleSales).toBe(10);
     expect(next.conditionAdjustedAssessment).toBe('unmeasured');
+  });
+});
+
+function relevanceClaim(key: string, over: Partial<SaleRelevanceClaim> = {}): SaleRelevanceClaim {
+  return { dimension: 'model', value: 'synthetic-model', sourcePlatform: 'bringatrailer', sourceEpisodeKey: key,
+    knownAt: '2025-06-16T12:00:00Z', basis: 'synthetic episode-specific source fact',
+    evidenceRefs: [{ table: 'listing_page_snapshots', id: `synthetic-snapshot-${key}` }], ...over };
+}
+
+function saleCapture(n: number, over: Partial<SourceSaleCapture> = {}): SourceSaleCapture {
+  const key = `synthetic-cohort-${n}`;
+  return { ...sourceSale(n), capture: { table: 'vehicle_observations', id: `synthetic-observation-${n}` },
+    sourcePlatform: 'bringatrailer', sourceEpisodeKey: key, eventGrain: 'day', eventTimeBasis: 'explicit source sale day',
+    knownAtEvidence: 'synthetic admitted observation ingestion', qualification: { status: 'qualified',
+      basis: 'synthetic independently verified source-sale receipt', evidenceRefs: [{ table: 'listing_page_snapshots', id: `synthetic-snapshot-${n}` }] },
+    relevance: [relevanceClaim(key)], ...over };
+}
+
+function populationOptions(over: Partial<SalePopulationOptions> = {}): SalePopulationOptions {
+  return { population: { key: 'synthetic-supplied-population', label: 'Synthetic supplied sale-event pool',
+      basis: 'complete synthetic input for this declared scope', complete: true },
+    subject: { sourcePlatform: 'bringatrailer', sourceEpisodeKey: 'synthetic-subject', vehicleId: 'synthetic-subject-vehicle',
+      currency: 'USD', priceBasis: 'published_bid_excluding_fees', relevance: [relevanceClaim('synthetic-subject')] },
+    policy: { key: 'synthetic-model-match', basis: 'explicit synthetic model identity match', requiredDimensions: ['model'] },
+    eventFrom: '2024-01-01T00:00:00Z', eventBefore: '2026-01-01T00:00:00Z',
+    evidenceAsOf: '2026-01-02T00:00:00Z', computedAt: '2026-01-03T00:00:00Z', knowledgeMode: 'retrospective',
+    minimumMatchedSales: 2, ...over };
+}
+
+describe('sale-event population and explicit relevance selection v2', () => {
+  it('uses all 150 supplied events and reports unknown condition without an eighteen or hundred row trim', () => {
+    const result = selectSourceSalePopulation(Array.from({ length: 150 }, (_, i) => saleCapture(i + 1)), populationOptions());
+    expect(result.counts).toEqual({ inputCaptures: 150, candidateEpisodes: 150, qualifiedEpisodes: 150, conflictedEpisodes: 0, matchedEpisodes: 150 });
+    expect(result.broadMarket[0].distribution?.n).toBe(150);
+    expect(result.matchedDistribution).toMatchObject({ n: 150, p50: 75500 });
+    expect(result.comparisons.every(c => c.dimensions.find(d => d.dimension === 'condition')?.state === 'unknown')).toBe(true);
+    expect(result.conditionAdjustedAssessment).toBe('unmeasured');
+    expect(result).not.toHaveProperty('fairValue'); expect(result).not.toHaveProperty('percentile');
+  });
+
+  it('preserves two sales of one vehicle, collapses repeated capture of one sale, and excludes only the subject episode', () => {
+    const first = saleCapture(1, { vehicleId: 'synthetic-persistent-vehicle', amount: 10000, eventAt: '2024-06-15' });
+    const second = saleCapture(2, { vehicleId: first.vehicleId, amount: 15000, eventAt: '2025-06-15' });
+    const repeated = { ...first, capture: { table: 'listing_page_snapshots', id: 'synthetic-repeated-snapshot' }, knownAt: '2025-07-01T12:00:00Z' };
+    const result = selectSourceSalePopulation([second, repeated, first], populationOptions({ subject: {
+      ...populationOptions().subject, vehicleId: first.vehicleId, sourceEpisodeKey: second.sourceEpisodeKey,
+      relevance: [relevanceClaim(second.sourceEpisodeKey!)] } }));
+    expect(result.counts).toMatchObject({ inputCaptures: 3, candidateEpisodes: 2, qualifiedEpisodes: 2, matchedEpisodes: 1 });
+    expect(result.matched[0].sourceEpisodeKey).toBe(first.sourceEpisodeKey);
+    expect(result.matched[0].captures).toHaveLength(2);
+    expect(result.comparisons.find(c => c.event.sourceEpisodeKey === second.sourceEpisodeKey)?.reasons).toContain('subject_episode');
+    expect(result.repeatSales[0]).toMatchObject({ vehicleId: first.vehicleId, nominalAmountChange: 5000, nominalPercentChange: 50 });
+    expect(result.repeatSaleInterpretation).toBe('observed_episode_price_change_not_market_index_return');
+    expect(result.matchedDistribution).toBeNull(); expect(result.reasons).toContain('insufficient_matched_sales');
+  });
+
+  it('deduplicates actual BaT aliases with independent capture and qualification snapshot refs', () => {
+    const first = saleCapture(1);
+    const aliasUrl = 'http://www.bringatrailer.com/listing/SYNTHETIC-COHORT-1?utm_source=synthetic#result';
+    const alias = saleCapture(1, { sourceUrl: aliasUrl, unitSource: aliasUrl,
+      capture: { table: 'bat_listings', id: 'synthetic-alias-presentation' }, knownAt: '2025-06-18T12:00:00Z',
+      qualification: { ...first.qualification, evidenceRefs: [{ table: 'listing_page_snapshots', id: 'synthetic-second-snapshot' }] } });
+    const result = selectSourceSalePopulation([alias, first], populationOptions());
+    expect(result.qualified).toHaveLength(1); expect(result.qualified[0].captures).toHaveLength(2);
+    expect(result.qualified[0].knownAt).toBe(new Date(first.knownAt!).toISOString());
+    expect(result.qualified[0].captures.flatMap(c => c.qualification.evidenceRefs).map(r => r.id).sort()).toEqual(['synthetic-second-snapshot', 'synthetic-snapshot-1']);
+  });
+
+  it.each([
+    ['amount', { amount: 2000 }], ['outcome', { outcome: 'not_sold' as const }],
+    ['event', { eventAt: '2025-06-14' }], ['currency', { currency: 'EUR' }],
+    ['priceBasis', { priceBasis: 'buyer_total' as const }], ['vehicle_identity', { vehicleId: 'synthetic-other-vehicle' }],
+  ])('refuses an episode with conflicting %s instead of averaging or choosing a capture', (field, changed) => {
+    const first = saleCapture(1), other = saleCapture(1, { ...changed, capture: { table: 'bat_listings', id: 'synthetic-conflicting' } });
+    const result = selectSourceSalePopulation([first, other], populationOptions());
+    expect(result.qualified).toHaveLength(0); expect(result.conflicts[0].dimensions).toContain(field);
+    expect(result.conflicts[0].captures).toHaveLength(2); expect(result.candidates[0].captures).toHaveLength(2);
+  });
+
+  it('does not let later evidence introduce a conflict into an earlier knowledge receipt', () => {
+    const first = saleCapture(1), later = saleCapture(1, { amount: 2000, knownAt: '2026-01-02T12:00:00Z',
+      capture: { table: 'listing_page_snapshots', id: 'synthetic-late' } });
+    const prior = selectSourceSalePopulation([first, later], populationOptions()), frozen = structuredClone(prior);
+    expect(prior.qualified).toHaveLength(1); expect(prior.candidates[0].excluded).toContainEqual({ capture: later.capture, reason: 'learned_later' });
+    const next = selectSourceSalePopulation([later, first], populationOptions({ evidenceAsOf: '2026-01-03T00:00:00Z' }));
+    expect(next.conflicts).toHaveLength(1); expect(prior).toEqual(frozen);
+  });
+
+  it('retains native sold-price candidates and refused archived captures without promoting them', () => {
+    const native = saleCapture(1, { capture: { table: 'vehicle_events', id: 'synthetic-native' },
+      qualification: { status: 'candidate', basis: null, evidenceRefs: [] }, currency: null, priceBasis: null, knownAt: null, knownAtEvidence: null });
+    const archived = saleCapture(2, { qualification: { status: 'refused', basis: 'synthetic unadmitted archive', evidenceRefs: [] } });
+    const result = selectSourceSalePopulation([native, archived], populationOptions());
+    expect(result.counts.qualifiedEpisodes).toBe(0); expect(result.candidates).toHaveLength(2);
+    expect(result.candidates.flatMap(c => c.excluded).map(e => e.reason)).toEqual(['candidate_unqualified', 'qualification_refused']);
+    expect(result.candidates[0].captures[0]).toEqual(native);
+  });
+
+  it('requires qualification lineage, real event/knowledge provenance and same-source supported units', () => {
+    const rows = [saleCapture(1, { qualification: { status: 'qualified', basis: null, evidenceRefs: [] } }),
+      saleCapture(2, { eventTimeBasis: null }), saleCapture(3, { knownAtEvidence: null }),
+      saleCapture(4, { knownAt: '2025-06-14T23:59:59Z' }), saleCapture(5, { unitSource: 'https://bringatrailer.com/listing/unrelated/' }),
+      saleCapture(6, { knownAt: '2025-06-16' }), saleCapture(7, { eventGrain: 'instant' })];
+    const result = selectSourceSalePopulation(rows, populationOptions());
+    expect(result.qualified).toHaveLength(0);
+    expect(result.candidates.flatMap(c => c.excluded).map(e => e.reason)).toEqual([
+      'qualification_evidence_unknown', 'event_unknown', 'knowledge_unknown', 'knowledge_conflicting', 'unknown_units', 'knowledge_unknown', 'event_grain_conflict',
+    ]);
+  });
+
+  it('keeps broad market strata separate from relevant comparisons and never mixes currency or fees', () => {
+    const unrelated = saleCapture(4, { relevance: [relevanceClaim('synthetic-cohort-4', { value: 'synthetic-other-model' })] });
+    const rows = [saleCapture(1), saleCapture(2, { currency: 'EUR' }), saleCapture(3, { priceBasis: 'buyer_total' }), unrelated];
+    const result = selectSourceSalePopulation(rows, populationOptions());
+    expect(result.broadMarket).toHaveLength(3);
+    expect(result.broadMarket.find(s => s.currency === 'USD' && s.priceBasis === 'published_bid_excluding_fees')?.events).toHaveLength(2);
+    expect(result.matched.map(r => r.sourceEpisodeKey)).toEqual(['synthetic-cohort-1']);
+    expect(result.comparisons.filter(c => c.reasons.includes('different_units'))).toHaveLength(2);
+    expect(result.comparisons.find(c => c.event.sourceEpisodeKey === unrelated.sourceEpisodeKey)?.reasons).toContain('model:mismatch');
+    expect(result.matchedDistribution).toBeNull();
+  });
+
+  it('reports episode-bound relevance lineage, unavailable future facts and unknown condition instead of making them match', () => {
+    const wrongEpisode = relevanceClaim('synthetic-other-episode');
+    const late = relevanceClaim('synthetic-cohort-2', { knownAt: '2026-01-02T12:00:00Z' });
+    const rows = [saleCapture(1, { relevance: [wrongEpisode] }), saleCapture(2, { relevance: [late] }), saleCapture(3)];
+    const result = selectSourceSalePopulation(rows, populationOptions());
+    expect(result.qualified).toHaveLength(3); expect(result.matched).toHaveLength(1);
+    const dimensions = result.comparisons.map(c => c.dimensions.find(d => d.dimension === 'model')!);
+    expect(dimensions[0].candidate.unavailable[0]).toEqual({ claim: wrongEpisode, reason: 'episode_unbound' });
+    expect(dimensions[1].candidate.unavailable[0]).toEqual({ claim: late, reason: 'learned_later' });
+    expect(dimensions[2].candidate.available[0].evidenceRefs).toHaveLength(1);
+    const requiresCondition = selectSourceSalePopulation(rows, populationOptions({ policy: {
+      ...populationOptions().policy, requiredDimensions: ['model', 'condition'] } }));
+    expect(requiresCondition.matched).toHaveLength(0);
+    expect(requiresCondition.comparisons.every(c => c.reasons.includes('condition:unknown'))).toBe(true);
+  });
+
+  it('refuses conflicted relevance while retaining the independently qualified sale in the baseline', () => {
+    const row = saleCapture(1, { relevance: [relevanceClaim('synthetic-cohort-1'), relevanceClaim('synthetic-cohort-1', { value: 'synthetic-conflicting-model' })] });
+    const result = selectSourceSalePopulation([row], populationOptions());
+    expect(result.qualified).toHaveLength(1); expect(result.conflicts).toHaveLength(0);
+    expect(result.comparisons[0].reasons).toContain('model:conflict');
+    expect(result.comparisons[0].dimensions.find(d => d.dimension === 'model')?.candidate.available).toHaveLength(2);
+  });
+
+  it('does not silently prefer an exact year, or select unrelated sales when matching policy is absent', () => {
+    const row = saleCapture(1, { relevance: [relevanceClaim('synthetic-cohort-1'), relevanceClaim('synthetic-cohort-1', { dimension: 'model_year', value: '1978' })] });
+    const options = populationOptions({ subject: { ...populationOptions().subject,
+      relevance: [relevanceClaim('synthetic-subject'), relevanceClaim('synthetic-subject', { dimension: 'model_year', value: '1976' })] } });
+    const result = selectSourceSalePopulation([row], options);
+    expect(result.matched).toHaveLength(1);
+    expect(result.comparisons[0].dimensions.find(d => d.dimension === 'model_year')).toMatchObject({ required: false, state: 'mismatch' });
+    const unspecified = selectSourceSalePopulation([row], { ...options, policy: { ...options.policy, requiredDimensions: [] } });
+    expect(unspecified.matched).toHaveLength(0); expect(unspecified.reasons).toContain('matching_policy_unknown');
+  });
+
+  it('refuses full-population distributions for explicitly incomplete inputs while retaining all admitted rows', () => {
+    const result = selectSourceSalePopulation([saleCapture(1), saleCapture(2)], populationOptions({ population: {
+      ...populationOptions().population, complete: false } }));
+    expect(result.matched).toHaveLength(2); expect(result.reasons).toContain('population_incomplete');
+    expect(result.matchedDistribution).toBeNull(); expect(result.broadMarket[0].distribution).toBeNull();
+  });
+
+  it('requires day-grain events to fit wholly before the cutoff and preserves timestamp grain', () => {
+    const options = populationOptions({ eventBefore: '2025-06-15T18:00:00Z' });
+    const day = selectSourceSalePopulation([saleCapture(1)], options);
+    expect(day.candidates[0].excluded[0].reason).toBe('outside_event_window');
+    const instant = selectSourceSalePopulation([saleCapture(1, { eventAt: '2025-06-15T17:00:00Z', eventGrain: 'instant' })], options);
+    expect(instant.qualified[0]).toMatchObject({ eventAt: '2025-06-15T17:00:00.000Z', eventGrain: 'instant' });
+    const knownAt = selectSourceSalePopulation([saleCapture(1)], { ...options, knowledgeMode: 'known_at' });
+    expect(knownAt.reasons).toContain('invalid_cutoffs');
+  });
+
+  it('does not report a repeat-sale return when units differ or event-day intervals overlap', () => {
+    const sameDay = [saleCapture(1, { vehicleId: 'synthetic-repeat' }), saleCapture(2, { vehicleId: 'synthetic-repeat' })];
+    const overlapping = selectSourceSalePopulation(sameDay, populationOptions());
+    expect(overlapping.repeatSales[0]).toMatchObject({ reasons: ['event_order_unknown'], nominalAmountChange: null, nominalPercentChange: null });
+    const crossUnit = selectSourceSalePopulation([sameDay[0], { ...sameDay[1], eventAt: '2025-07-01', knownAt: '2025-07-02T00:00:00Z', currency: 'EUR' }], populationOptions());
+    expect(crossUnit.repeatSales[0]).toMatchObject({ reasons: ['different_units'], nominalAmountChange: null });
+  });
+
+  it('retains query-identified non-BaT source episodes and refuses a source-binding conflict', () => {
+    const urls = ['https://synthetic.example/auction?lot=1', 'https://synthetic.example/auction?lot=2'];
+    const rows = urls.map((url, i) => saleCapture(i + 1, { sourcePlatform: 'synthetic_source', sourceUrl: url, unitSource: url }));
+    expect(selectSourceSalePopulation(rows, populationOptions()).qualified).toHaveLength(2);
+    const collision = selectSourceSalePopulation([rows[0], { ...rows[1], sourceEpisodeKey: rows[0].sourceEpisodeKey, vehicleId: rows[0].vehicleId, amount: rows[0].amount }], populationOptions());
+    expect(collision.conflicts[0].dimensions).toContain('source_url'); expect(collision.qualified).toHaveLength(0);
+  });
+
+  it('orders ties and capture refs deterministically without mutating input or previous receipts', () => {
+    const rows = [saleCapture(3), saleCapture(1), saleCapture(2), saleCapture(1, { capture: { table: 'bat_listings', id: 'synthetic-alias' } })];
+    const original = structuredClone(rows), options = populationOptions(), first = selectSourceSalePopulation(rows, options);
+    expect(selectSourceSalePopulation([...rows].reverse(), options)).toEqual(first);
+    expect(rows).toEqual(original); expect(first.qualified.map(e => e.sourceEpisodeKey)).toEqual(['synthetic-cohort-1', 'synthetic-cohort-2', 'synthetic-cohort-3']);
   });
 });
 
