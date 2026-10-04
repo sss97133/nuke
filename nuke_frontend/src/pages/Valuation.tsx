@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { comparePriceToSourceSales, type DatedSourceSale } from '../lib/dealRead/batComps';
+import { PrefetchLink } from '../components/PrefetchLink';
 import '../styles/unified-design-system.css';
 import SourceSaleDistribution from '../components/market/SourceSaleDistribution';
 
@@ -42,15 +43,24 @@ type Stats = {
   possible_outlier?: boolean;
 };
 
+/** Sanitized ancestry already returned by the qualified public reader. */
+type SaleEvidence = DatedSourceSale & {
+  snapshotId?: string | null; sourceSha256?: string | null;
+  snapshotFetchedAt?: string | null; snapshotCreatedAt?: string | null; parsedAt?: string | null;
+  sourceVerification?: string | null; derivedObservationId?: string | null; derivedIngestedAt?: string | null;
+  sourceVehicleEventId?: string | null; sourceEpisodeAncestry?: string | null; sourceParser?: string | null; admissionParser?: string | null;
+};
+
 type ValuationResult = {
   query: { year: number | null; make: string; model: string | null };
   stats: Stats;
   comparables: Comparable[];
   receipt: {
     cohort: { key: string; label: string; basis: string; complete: boolean };
-    eligible: DatedSourceSale[]; event_from: string; event_before: string; evidence_as_of: string; computed_at: string;
+    eligible: SaleEvidence[]; event_from: string; event_before: string; evidence_as_of: string; computed_at: string;
     knowledge_mode: 'retrospective' | 'known_at'; currency: string; minimum_sales: number;
-    coverage: { member_rows: number; qualified_sales: number; condition_scalar_recorded: number; body_recorded: number; engine_recorded: number; transmission_recorded: number; conflicting_source_lots: number; inline_raw_verified?: number; archived_admitted?: number };
+    coverage: { member_rows: number; qualified_sales: number; condition_scalar_recorded: number; body_recorded: number; engine_recorded: number; transmission_recorded: number; conflicting_source_lots: number; inline_raw_verified?: number; archived_admitted?: number;
+      dated_source_rows?: number; capture_presentations?: number; qualified_capture_presentations?: number; duplicate_presentations?: number; typed_sale_episode_links?: number };
     exclusions: Record<string, number>;
   };
 };
@@ -73,6 +83,20 @@ const formatPriceFull = (n: number | null | undefined, currency: string) =>
   n == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 
 const fmtDate = (d: string | null) => (d ? d.slice(0, 10) : '—');
+const SOURCE_PAGE_SIZE = 25;
+const utcClock = (value: string | null | undefined) => value
+  && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value))
+  ? new Date(value).toISOString().replace('T', ' ').replace('Z', ' UTC') : 'Unknown';
+const opaqueId = (value: string | null | undefined) => value && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value) ? value : null;
+const parserReference = (value: string | null | undefined) => value && /^batParser:[a-z0-9_.:-]{1,100}$/i.test(value) ? value : 'Unknown';
+function canonicalBatSource(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value), slug = /^\/listing\/([a-z0-9-]+)\/?$/i.exec(url.pathname)?.[1];
+    return ['http:', 'https:'].includes(url.protocol) && /^(www\.)?bringatrailer\.com$/i.test(url.hostname)
+      && !url.username && !url.password && !url.port && slug ? `https://bringatrailer.com/listing/${slug.toLowerCase()}/` : null;
+  } catch { return null; }
+}
 
 // Design system tokens (strict — 8 to 12px only)
 const FS = {
@@ -99,17 +123,20 @@ export default function Valuation() {
   const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
   const latestRequest = useRef(0);
   const filters = useRef<HTMLDetailsElement>(null);
+  const [sourcePage, setSourcePage] = useState(0);
   const result = lookup?.result ?? null;
   const subjectVehicleId = params.get('vehicle_id') || null;
   const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventBefore,currency,subjectVehicleId]);
   const loading = loadingKey != null;
   const loadingThisContext = loadingKey === filterKey;
 
-  const runLookup = useCallback(async () => {
+  const runLookup = useCallback(async (yearOverride?: string) => {
     const requestId = ++latestRequest.current;
     const trimmedMake = make.trim();
     const trimmedModel = model.trim();
-    const parsedYear = year.trim() ? parseInt(year.trim(), 10) : null;
+    const requestedYear = yearOverride ?? year;
+    const parsedYear = requestedYear.trim() ? parseInt(requestedYear.trim(), 10) : null;
+    const requestedContextKey = JSON.stringify([requestedYear.trim(), make.trim(), model.trim(), eventBefore, currency, subjectVehicleId]);
 
     if (!trimmedMake || (!parsedYear && !trimmedModel)) {
       setError('Provide a make plus a year and/or model.');
@@ -117,7 +144,7 @@ export default function Valuation() {
       return;
     }
 
-    setLoadingKey(filterKey);
+    setLoadingKey(requestedContextKey);
     setError(null);
     const request: ValuationRequest = {
       p_year: parsedYear, p_make: trimmedMake, p_model: trimmedModel || null,
@@ -146,13 +173,14 @@ export default function Valuation() {
         || data.query?.year !== request.p_year || data.query?.make !== request.p_make || data.query?.model !== request.p_model) {
         throw new Error('Returned evidence does not match the requested comparison.');
       }
-      setLookup({ result: data as ValuationResult, request, contextKey: filterKey });
+      setLookup({ result: data as ValuationResult, request, contextKey: requestedContextKey });
+      setSourcePage(0);
     } catch (e: any) {
       if (requestId === latestRequest.current) setError(e?.message || 'Lookup failed');
     } finally {
       if (requestId === latestRequest.current) setLoadingKey(null);
     }
-  }, [year, make, model, eventBefore, currency, candidatePrice, subjectVehicleId, setParams, filterKey]);
+  }, [year, make, model, eventBefore, currency, candidatePrice, subjectVehicleId, setParams]);
 
   useEffect(() => () => { latestRequest.current++; }, []);
 
@@ -196,6 +224,15 @@ export default function Valuation() {
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
   }) : null, [receipt, candidatePrice, lookup, changedFilters]);
   const empty = result && stats && stats.sold_count === 0;
+  const sourceEvidence = useMemo(() => receipt ? comparePriceToSourceSales(receipt.eligible, {
+    cohort: receipt.cohort, subject: { amount: null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', vehicleId: lookup?.request.p_subject_vehicle_id },
+    eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
+    computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
+  }) : null, [receipt, lookup]);
+  // Display paging never reduces the calculation's source-sale denominator.
+  const sourceSales = useMemo(() => [...(sourceEvidence?.eligible ?? [])].sort((a, b) =>
+    (b.eventAt ?? '').localeCompare(a.eventAt ?? '') || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')) as SaleEvidence[], [sourceEvidence]);
+  const visibleSourceSales = sourceSales.slice(sourcePage * SOURCE_PAGE_SIZE, (sourcePage + 1) * SOURCE_PAGE_SIZE);
   const subject = result
     ? [result.query.year, result.query.make, result.query.model].filter(Boolean).join(' ')
     : '';
@@ -234,7 +271,10 @@ export default function Valuation() {
         yearRestricted={result?.query.year != null} modelRestricted={result?.query.model != null}
         eventFrom={receipt.event_from} eventBefore={receipt.event_before}
         evidenceAsOf={receipt.evidence_as_of} knowledgeMode={receipt.knowledge_mode}
-        recordedLabels={recordedLabels}
+        recordedLabels={recordedLabels} renderEvidence={sale => <SaleAncestry sale={sale} />}
+        cohortAction={result?.query.year != null && result.query.model && <button type="button" disabled={loading || changedFilters}
+          title="Use exact recorded model labels across years; registered model variants may be absent"
+          onClick={() => { setYear(''); void runLookup(''); }}>All recorded model years</button>}
         summary={{ median: stats.median, p10: stats.p10, p90: stats.p90 }} comparison={comparison}
         candidateInput={<Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />} />}
 
@@ -293,12 +333,18 @@ export default function Valuation() {
         {changedFilters && <div>Compare again to apply the changed cohort, currency, date or vehicle.</div>}
         <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence to include newly admitted source evidence. Save this receipt to keep this calculation.'}</div>
         <div>{receipt.cohort.label} · {receipt.coverage.qualified_sales} qualified source lots from {receipt.coverage.member_rows} public cohort records · {receipt.currency}</div>
+        <div>{result?.query.year == null ? 'All recorded model years' : `Recorded model year ${result.query.year}`} · {result?.query.make} {result?.query.model}. Recorded membership is browse context; generations, condition and equipment are not matched.</div>
+        {result?.query.year == null && ['exact_recorded_year_model_context', 'exact_recorded_make_model_context_all_years'].includes(receipt.cohort.basis) && <div>Exact recorded make/model labels across years. Related model variants may be absent; this is a different population from a registered model context.</div>}
+        <div>{receipt.coverage.dated_source_rows ?? 'Unknown'} dated source vehicle records · {receipt.coverage.capture_presentations ?? 'Unknown'} linked source captures · {receipt.coverage.qualified_capture_presentations ?? 'Unknown'} qualified capture presentations · {receipt.coverage.duplicate_presentations ?? 'Unknown'} duplicate presentations collapsed.</div>
+        <div>Vehicle records, source captures and source lots have different denominators. Exclusion counts describe capture presentations, not missing market sales. Platform-wide coverage is unknown.</div>
+        <div>{receipt.coverage.typed_sale_episode_links ?? 'Unknown'} qualified source lots have revalidated native sale-event links.</div>
         {typeof receipt.coverage.inline_raw_verified === 'number' && typeof receipt.coverage.archived_admitted === 'number' && <div>{receipt.coverage.inline_raw_verified} verified inline source lots · {receipt.coverage.archived_admitted} admitted archived source lots</div>}
         <div>Source sales from {fmtDate(receipt.event_from)} before {fmtDate(receipt.event_before)}. Evidence through {receipt.evidence_as_of.replace('T',' ')}.</div>
         <div>Earlier sales discovered later can enter this retrospective comparison. Current recorded sale per vehicle; earlier resales may be missing.</div>
         <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Admitted archived sales also include when the verified sale receipt arrived. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
         <div>Published winning bid excludes buyer fees, taxes and transport (<a href="https://bringatrailer.com/policies/" target="_blank" rel="noreferrer">BaT policy</a>). Original currency; no inflation or exchange-rate adjustment. Condition and equipment remain unmatched.</div>
         <div>Current condition field present on {receipt.coverage.condition_scalar_recorded}/{receipt.coverage.qualified_sales}; this does not establish condition at sale. Body {receipt.coverage.body_recorded}, engine {receipt.coverage.engine_recorded}, transmission {receipt.coverage.transmission_recorded}. Visual condition, comment evidence and bid-log coverage are unmeasured.</div>
+        <div>Receipt computed {utcClock(receipt.computed_at)} · cohort basis: {receipt.cohort.basis === 'registered_same_year_model_context' ? 'registered recorded make/model context' : ['exact_recorded_year_model_context', 'exact_recorded_make_model_context_all_years'].includes(receipt.cohort.basis) ? 'exact recorded make/model context' : 'reader-declared context; matching basis unavailable'}.</div>
         {comparison?.percentile != null && <div>{comparison.counts.below} lower · {comparison.counts.equal} equal · {comparison.counts.above} higher. Ties receive half weight. This price position does not establish fair value or a profitable bid.</div>}
         {receipt.coverage.qualified_sales < receipt.minimum_sales && <div>At least {receipt.minimum_sales} qualified sales are required for aggregate prices.</div>}
         <details><summary>Excluded evidence and receipt</summary>
@@ -459,66 +505,35 @@ export default function Valuation() {
 
           </details>
 
-          {/* COMPARABLES */}
-          {result.comparables.length > 0 && (
-            <details><summary style={{ fontSize: FS.body, margin: '8px 0', cursor: 'pointer' }}>Recent sale summaries · {result.comparables.length}</summary>
-            <div style={{
-              border: '2px solid var(--text)',
-              background: 'var(--surface)',
-              marginBottom: 12,
-              overflowX: 'auto',
-            }}>
-              <div style={{
-                padding: '6px 10px',
-                borderBottom: '2px solid var(--text)',
-                fontSize: FS.body,
-                fontWeight: 800,
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase',
-                background: 'var(--bg)',
-              }}>
-                Recent Sales · {result.comparables.length}
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg)' }}>
-                    <Th>Date</Th>
-                    <Th right>Price</Th>
-                    <Th right>Bids</Th>
-                    <Th right>Comments</Th>
-                    <Th>Vehicle</Th>
-                    <Th>Listing</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.comparables.map((c, i) => {
-                    const ymm = [c.year, c.make, c.model].filter(Boolean).join(' ');
-                    const slug = c.bat_listing_url.replace(/^https?:\/\/[^/]+\/listing\//, '').replace(/\/$/, '');
-                    return (
-                      <tr key={c.bat_listing_url + i} style={{ borderTop: '1px solid var(--border)' }}>
-                        <Td mono>{fmtDate(c.sale_date)}</Td>
-                        <Td mono right bold>{fmtUsdFull(c.sale_price)}</Td>
-                        <Td mono right>{c.bid_count ?? '—'}</Td>
-                        <Td mono right>{c.comment_count ?? '—'}</Td>
-                        <Td>{ymm || <span style={{ color: 'var(--text-secondary)' }}>—</span>}</Td>
-                        <Td>
-                          <a href={c.bat_listing_url} target="_blank" rel="noreferrer" style={{
-                            color: 'var(--text)',
-                            textDecoration: 'underline',
-                            fontFamily: MONO,
-                            fontSize: FS.body,
-                          }}>
-                            {slug}
-                          </a>
-                        </Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          {sourceSales.length > 0 && <details aria-label="Qualified sale source records" style={{ border: '2px solid var(--text)', marginBottom: 12, fontSize: FS.body }}>
+            <summary style={{ padding: 10, cursor: 'pointer' }}>Source receipts · {sourceSales.length}</summary>
+            <div style={{ padding: 10, borderBottom: '2px solid var(--text)' }}>
+              <strong>Qualified source sales · {sourceSales.length}</strong>
+              <div>Showing {sourcePage * SOURCE_PAGE_SIZE + 1}–{Math.min((sourcePage + 1) * SOURCE_PAGE_SIZE, sourceSales.length)} of {sourceSales.length} source lots. Display paging does not sample the price calculation.</div>
+              {changedFilters && <div>These records belong to the last completed lookup shown above.</div>}
             </div>
-            </details>
-          )}
+            <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {visibleSourceSales.map((sale, index) => {
+                const source = canonicalBatSource(sale.sourceUrl), vehicle = opaqueId(sale.vehicleId);
+                return <li key={`${sale.sourceUrl}:${index}`} style={{ borderBottom: '1px solid var(--border)', padding: 10, overflowWrap: 'anywhere' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
+                    <strong style={{ fontFamily: MONO }}>{formatPriceFull(sale.amount, sale.currency || receipt!.currency)}</strong>
+                    <span>Sale {/^\d{4}-\d{2}-\d{2}$/.test(sale.eventAt ?? '') ? `${sale.eventAt} (day grain)` : utcClock(sale.eventAt)}</span>
+                    {source ? <a href={source} target="_blank" rel="noreferrer">BaT source</a> : <span>Source link unavailable</span>}
+                    {vehicle && <PrefetchLink to={`/vehicle/${vehicle}`}>Vehicle record</PrefetchLink>}
+                    {comparison?.percentile != null && <span>{sale.amount === comparison.subject.amount ? 'Equal to candidate' : sale.amount! < comparison.subject.amount! ? 'Lower than candidate' : 'Higher than candidate'}</span>}
+                  </div>
+                  <div>Evidence known {utcClock(sale.knownAt)} · {sale.currency || 'Currency unknown'} · {sale.priceBasis === 'published_bid_excluding_fees' ? 'published winning bid; fees excluded' : sale.priceBasis === 'buyer_total' ? 'buyer total' : 'fee basis unknown'}</div>
+                  <SaleAncestry sale={sale} />
+                </li>;
+              })}
+            </ol>
+            {sourceSales.length > SOURCE_PAGE_SIZE && <nav aria-label="Source sale pages" style={{ display: 'flex', gap: 8, padding: 10 }}>
+              <button type="button" style={chipBtn} disabled={sourcePage === 0} onClick={() => setSourcePage(p => p - 1)}>Previous source lots</button>
+              <button type="button" style={chipBtn} disabled={(sourcePage + 1) * SOURCE_PAGE_SIZE >= sourceSales.length} onClick={() => setSourcePage(p => p + 1)}>Next source lots</button>
+            </nav>}
+          </details>}
+
 
           {/* Footer note */}
           <div style={{
@@ -534,6 +549,22 @@ export default function Valuation() {
       )}
     </div>
   );
+}
+
+function SaleAncestry({ sale }: { sale: SaleEvidence }) {
+  const knownAncestry = sale.sourceVerification === 'per_read_inline_hash_parser' ? 'Inline source hash and parser verified'
+    : sale.sourceVerification === 'producer_attested_archived_hash_parser' ? 'Admitted archived source receipt' : 'Verification ancestry unavailable';
+  return <details><summary>Source evidence ancestry</summary>
+    <div>{knownAncestry}. This is source-sale evidence, not condition matching.</div>
+    <div>Snapshot reference: {opaqueId(sale.snapshotId) || 'Unknown'}</div>
+    <div>Source capture: {utcClock(sale.snapshotFetchedAt)} · snapshot ingested: {utcClock(sale.snapshotCreatedAt)} · parsed: {utcClock(sale.parsedAt)}</div>
+    <div>Admitted observation: {opaqueId(sale.derivedObservationId) || (sale.derivedObservationId === null ? 'None recorded' : 'Unknown')} · observation ingested: {utcClock(sale.derivedIngestedAt)}</div>
+    <div>Native sale-event reference: {opaqueId(sale.sourceVehicleEventId) || 'Unknown'}</div>
+    <div>Native episode ancestry: {sale.sourceEpisodeAncestry === 'canonical_current_context_verified' ? 'current canonical sale-event link verified; earlier episode history remains incomplete' : 'Unestablished'}</div>
+    <div>Source parser: {parserReference(sale.sourceParser)} · admission parser: {parserReference(sale.admissionParser)}</div>
+    <div>Source SHA-256: {sale.sourceSha256 && /^[a-f0-9]{64}$/i.test(sale.sourceSha256) ? sale.sourceSha256 : 'Unknown'}</div>
+    <div>Capture, ingestion and parse clocks describe evidence availability, not a later sale or a live source read.</div>
+  </details>;
 }
 
 const chipBtn: React.CSSProperties = {
@@ -636,36 +667,5 @@ function StatCell({ label, value, mono, divider }: { label: string; value: strin
         fontWeight: 800,
       }}>{value}</div>
     </div>
-  );
-}
-
-const thTdBase: React.CSSProperties = {
-  padding: '6px 10px',
-  textAlign: 'left',
-  fontSize: 'var(--fs-10)',
-};
-
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return (
-    <th style={{
-      ...thTdBase,
-      textAlign: right ? 'right' : 'left',
-      fontSize: FS.micro,
-      fontWeight: 800,
-      letterSpacing: '1.5px',
-      textTransform: 'uppercase',
-      color: 'var(--text-secondary)',
-    }}>{children}</th>
-  );
-}
-
-function Td({ children, right, bold, mono }: { children: React.ReactNode; right?: boolean; bold?: boolean; mono?: boolean }) {
-  return (
-    <td style={{
-      ...thTdBase,
-      textAlign: right ? 'right' : 'left',
-      fontWeight: bold ? 800 : 400,
-      fontFamily: mono ? MONO : 'inherit',
-    }}>{children}</td>
   );
 }

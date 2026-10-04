@@ -62,6 +62,117 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('qualified cohort sale-price reader UI', () => {
+  it('pages the whole qualified receipt rather than the ten-lot recent preview without sampling the calculation', async () => {
+    const data = evidence(33);
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render();
+    const section = () => container.querySelector('[aria-label="Qualified sale source records"]')!;
+    expect(section().textContent).toContain('Showing 1–25 of 33 source lots');
+    expect(section().querySelectorAll('li')).toHaveLength(25);
+    expect((await exportedReceipt()).comparison.counts.eligibleSales).toBe(33);
+    const next = [...container.querySelectorAll('button')].find(b => b.textContent === 'Next source lots')!;
+    await act(async () => next.click());
+    expect(section().textContent).toContain('Showing 26–33 of 33 source lots'); expect(section().querySelectorAll('li')).toHaveLength(8);
+    expect(next.disabled).toBe(true); expect(fixture.rpc).toHaveBeenCalledTimes(1);
+    const previous = [...container.querySelectorAll('button')].find(b => b.textContent === 'Previous source lots')!;
+    await act(async () => previous.click()); expect(section().querySelectorAll('li')).toHaveLength(25);
+  });
+
+  it('explicitly broadens model years using the same currency, time and subject contract without silently changing the scope', async () => {
+    const data = evidence(33), broad = { ...data, query: { ...data.query, year: null }, receipt: { ...data.receipt,
+      cohort: { ...data.receipt.cohort, label: 'Synthetic Coupe', basis: 'exact_recorded_year_model_context' } } };
+    fixture.rpc.mockResolvedValueOnce({ data: evidence(), error: null }).mockResolvedValueOnce({ data: broad, error: null });
+    await render('year=1970&make=Synthetic&model=Coupe&price=5000&as_of=2026-01-01&currency=USD&vehicle_id=subject-id');
+    expect(fixture.rpc.mock.calls[0][1].p_year).toBe(1970);
+    const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'All recorded model years')!;
+    await act(async () => button.click());
+    expect(fixture.rpc.mock.calls[1]).toEqual(['valuation_by_ymm', expect.objectContaining({ p_year: null, p_make: 'Synthetic', p_model: 'Coupe',
+      p_currency: 'USD', p_event_before: '2026-01-01T00:00:00Z', p_subject_vehicle_id: 'subject-id' })]);
+    expect(container.textContent).toContain('All recorded model years · Synthetic Coupe');
+    expect(container.textContent).toContain('Related model variants may be absent');
+    expect(container.textContent).toContain('generations, condition and equipment are not matched');
+    expect((await exportedReceipt()).request.p_year).toBeNull();
+    expect(saveButton().disabled).toBe(false); expect(container.textContent).not.toContain('Compare again to apply');
+  });
+
+  it('keeps a broader cap failure explicit and does not reinstall or reinterpret the prior narrow receipt', async () => {
+    await render(); const prior = await exportedReceipt();
+    fixture.rpc.mockResolvedValue({ data: { error: 'Cohort exceeds the 10000-member reader boundary; no sampled percentile is returned.' }, error: null });
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'All recorded model years')!.click());
+    expect(container.textContent).toContain('10000-member reader boundary'); expect(saveButton().disabled).toBe(true);
+    expect(container.textContent).toContain('These records belong to the last completed lookup');
+    expect(container.textContent).not.toContain('45.0 percentile'); expect(prior.request.p_year).toBe(1970);
+  });
+
+  it('exposes distinct vehicle/capture/source-lot grains, supported ancestry and exact source/vehicle navigation without raw text', async () => {
+    const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000001', snapshot = '00000000-0000-4000-8000-000000000002';
+    Object.assign(data.receipt.coverage, { dated_source_rows: 16, capture_presentations: 18, qualified_capture_presentations: 12, duplicate_presentations: 2 });
+    Object.assign(data.receipt.eligible[0], { vehicleId: vehicle, snapshotId: snapshot, sourceSha256: 'a'.repeat(64),
+      snapshotFetchedAt: '2025-06-15T12:00:00Z', snapshotCreatedAt: '2025-06-15T12:05:00Z', parsedAt: '2025-06-16T00:00:00Z',
+      sourceVerification: 'per_read_inline_hash_parser', derivedObservationId: null, sourceVehicleEventId: null,
+      privateRawText: 'PRIVATE SYNTHETIC TEXT MUST NOT DISPLAY', sourceParser: 'PRIVATE SYNTHETIC PARSER TEXT' });
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render();
+    expect(container.textContent).toContain('16 dated source vehicle records · 18 linked source captures · 12 qualified capture presentations · 2 duplicate presentations collapsed');
+    const records = container.querySelector('[aria-label="Qualified sale source records"]')!;
+    expect(records.querySelector(`a[href="/vehicle/${vehicle}"]`)?.textContent).toBe('Vehicle record');
+    expect(records.querySelector('a[href="https://bringatrailer.com/listing/synthetic-0/"]')?.textContent).toBe('BaT source');
+    await act(async () => container.querySelector('svg [role="button"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('.source-sales-ancestry')?.textContent).toContain(`Snapshot reference: ${snapshot}`);
+    expect(container.querySelector('.source-sales-ancestry')?.textContent).not.toContain('PRIVATE SYNTHETIC');
+    expect(container.textContent).toContain(`Snapshot reference: ${snapshot}`);
+    expect(container.textContent).toContain('Inline source hash and parser verified'); expect(container.textContent).toContain('snapshot ingested: 2025-06-15 12:05:00.000 UTC');
+    expect(container.textContent).toContain('Native sale-event reference: Unknown'); expect(container.textContent).not.toContain('PRIVATE SYNTHETIC');
+    expect(container.textContent).toContain('Platform-wide coverage is unknown');
+  });
+
+  it('uses only checked canonical BaT source links and reports optional ancestry/clock gaps as unknown', async () => {
+    const data = evidence(), row = data.receipt.eligible[0];
+    row.sourceUrl = 'https://bringatrailer.com.attacker.invalid/listing/synthetic-0/'; row.unitSource = row.sourceUrl;
+    Object.assign(row, { snapshotFetchedAt: 'PRIVATE SYNTHETIC CLOCK TEXT' });
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render();
+    expect(container.querySelector('a[href*="attacker.invalid"]')).toBeNull(); expect(container.textContent).toContain('Source link unavailable');
+    expect(container.textContent).toContain('Verification ancestry unavailable'); expect(container.textContent).toContain('Snapshot reference: Unknown');
+    expect(container.textContent).not.toContain('PRIVATE SYNTHETIC CLOCK'); expect(container.textContent).toContain('Source capture: Unknown');
+    expect(container.textContent).toContain('Unknown dated source vehicle records');
+  });
+
+  it('accepts the additive all-years basis and typed episode ancestry without requiring it on legacy rows', async () => {
+    const data = evidence(), broad = { ...data, query: { ...data.query, year: null }, receipt: { ...data.receipt,
+      cohort: { ...data.receipt.cohort, label: 'Synthetic Coupe', basis: 'exact_recorded_make_model_context_all_years' } } };
+    Object.assign(broad.receipt.coverage, { typed_sale_episode_links: 1 });
+    const event = '00000000-0000-4000-8000-000000000004';
+    Object.assign(broad.receipt.eligible[0], { sourceVehicleEventId: event, sourceEpisodeAncestry: 'canonical_current_context_verified',
+      sourceParser: 'batParser:1.0.0_sale_grammar_with_ambiguity_refusal', admissionParser: 'batParser:source_sale_qualification_v1' });
+    fixture.rpc.mockResolvedValue({ data: broad, error: null }); await render('make=Synthetic&model=Coupe&price=5000&currency=USD');
+    expect(container.textContent).toContain('Related model variants may be absent');
+    expect(container.textContent).toContain('1 qualified source lots have revalidated native sale-event links');
+    expect(container.textContent).toContain(`Native sale-event reference: ${event}`);
+    expect(container.textContent).toContain('current canonical sale-event link verified');
+    expect(container.textContent).toContain('admission parser: batParser:source_sale_qualification_v1');
+    expect(container.textContent).toContain('Native episode ancestry: Unestablished'); expect(fixture.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains distinct sale episodes on one vehicle while collapsing repeated captures of the same source lot', async () => {
+    const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000003';
+    data.receipt.eligible[0].vehicleId = vehicle; data.receipt.eligible[1].vehicleId = vehicle;
+    data.receipt.eligible.push({ ...data.receipt.eligible[0], sourceUrl: 'http://www.bringatrailer.com/listing/SYNTHETIC-0/?ref=synthetic#result' });
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render();
+    const section = container.querySelector('[aria-label="Qualified sale source records"]')!;
+    expect(section.querySelectorAll('li')).toHaveLength(10);
+    expect(section.querySelectorAll(`a[href="/vehicle/${vehicle}"]`)).toHaveLength(2);
+    expect((await exportedReceipt()).comparison.counts.eligibleSales).toBe(10);
+    expect(section.textContent).toContain('Showing 1–10 of 10 source lots');
+  });
+
+  it('connects each source amount with the candidate position locally without a new query', async () => {
+    await render(); const section = container.querySelector('[aria-label="Qualified sale source records"]')!;
+    expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Lower than candidate'))).toHaveLength(4);
+    expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Equal to candidate'))).toHaveLength(1);
+    await enter('Candidate bid / price', '8000');
+    expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Lower than candidate'))).toHaveLength(7);
+    expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Equal to candidate'))).toHaveLength(1);
+    expect(fixture.rpc).toHaveBeenCalledTimes(1);
+  });
+
   it('loads the declared currency/date/subject contract and explains the full denominator and unmatched condition', async () => {
     await render('year=1970&make=Synthetic&model=Coupe&price=5000&as_of=2026-01-01&currency=USD&vehicle_id=subject-id');
     expect(fixture.rpc).toHaveBeenCalledWith('valuation_by_ymm',expect.objectContaining({ p_event_before: '2026-01-01T00:00:00Z', p_currency: 'USD', p_subject_vehicle_id: 'subject-id' }));

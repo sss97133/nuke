@@ -22,6 +22,8 @@ export interface SourceSaleGraphProps {
   summary: { median: number | null; p10: number | null; p90: number | null };
   comparison: Comparison | null;
   candidateInput?: ReactNode;
+  renderEvidence?: (sale: DatedSourceSale) => ReactNode;
+  cohortAction?: ReactNode;
 }
 
 function sourceUrl(raw: string | null) {
@@ -94,6 +96,7 @@ export default function SourceSaleDistribution(props: SourceSaleGraphProps) {
     <div className="source-sales-heading"><div><span className="source-sales-label">Bring a Trailer / qualified recorded sales</span><h2>{label}</h2></div>
       <div className="source-sales-views" aria-label="Sale graph view"><button aria-pressed={view === 'timeline'} onClick={() => setView('timeline')}>Over time</button><button aria-pressed={view === 'distribution'} onClick={() => setView('distribution')}>Price distribution</button></div></div>
     <p className="source-sales-scope">{rows.length} source lots qualify from {memberRows.toLocaleString('en-US')} current public cohort records. This is a qualification subset, not complete BaT market coverage.</p>
+    {props.cohortAction && <div className="source-sales-cohort-action">{props.cohortAction}</div>}
     <p className="source-sales-note">{props.eventFrom && props.eventBefore && <>Requested sale window: {cutoffStamp(props.eventFrom)} to {cutoffStamp(props.eventBefore)} UTC (end excluded). Full source-date intervals must fit. </>}Latest qualifying sale: {sourceRows[sourceRows.length-1].eventAt}. Gaps mean missing qualifying evidence, not zero market sales.
       {props.evidenceAsOf && <> Evidence through {new Date(props.evidenceAsOf).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' })}. {props.knowledgeMode === 'retrospective' ? 'Retrospective: later-discovered sales can enter.' : 'Evidence known at the declared cutoff.'}</>}</p>
     <div className="source-sales-answer">
@@ -123,11 +126,12 @@ export default function SourceSaleDistribution(props: SourceSaleGraphProps) {
     </svg>
     <div className="source-sales-legend"><span>● One source sale</span>{quantiles && view === 'distribution' && <><span className="source-sales-band-key">Shading: whole-window P10–P90</span><span>Dashed: median</span></>}{candidate != null && <span>Solid: entered amount</span>}</div>
     <p className="source-sales-note">{view === 'timeline' ? 'Source dates retain day precision; points are not joined into a trend. Vehicle mix can change across dates.' : 'Horizontal position is the sale amount. Vertical stacking separates colliding marks at this chart’s resolution; height is not time or another measure.'} Nominal {currency}, excluding buyer fees; no inflation or currency adjustment.</p>
-    <div className="source-sales-match"><span><b>Membership</b> {membership}, using current recorded identity.</span><span><b>Unmatched</b> Condition, restoration, modifications, body style, trim, engine, mileage and equipment. This is price position, not fair value or expected auction outcome.</span></div>
+    <div className="source-sales-match"><span><b>Membership</b> {membership}, using current recorded identity. {!props.yearRestricted && 'Related model variants may be absent; this differs from a registered year/model context.'}</span><span><b>Unmatched</b> Condition, restoration, modifications, body style, trim, engine, mileage and equipment. This is price position, not fair value or expected auction outcome.</span></div>
     <div className="source-sales-selected" aria-live="polite"><div><span className="source-sales-label">{selectedSale ? 'Selected source sale' : 'Latest qualified source sale'}</span><strong>{money(current.amount!, currency)} · {current.eventAt}</strong></div>
       <div className="source-sales-links">{current.vehicleId && <Link to={`/vehicle/${current.vehicleId}`}>Vehicle record →</Link>}<a href={sourceUrl(current.sourceUrl)!} target="_blank" rel="noopener noreferrer">Original sold result ↗</a></div>
       <span className="source-sales-note">{props.recordedLabels?.[current.sourceUrl!] ? `Current recorded label: ${props.recordedLabels[current.sourceUrl!]}` : 'Vehicle label not included in this receipt’s bounded summaries.'} A label does not establish matched build or condition.</span>
       <span className="source-sales-note">Evidence known: {current.knownAt ?? 'unknown'}. Sale date is separate from capture and ingestion.</span></div>
+    {props.renderEvidence && <div className="source-sales-ancestry" key={current.sourceUrl}>{props.renderEvidence(current)}</div>}
     <details className="source-sales-table"><summary>Inspect all {rows.length} source sales as a table</summary><div><table><thead><tr><th scope="col">Source sale date</th><th scope="col">Amount · {currency}</th><th scope="col">Evidence</th></tr></thead>
       <tbody>{rows.map(r => <tr key={r.sourceUrl}><td>{r.eventAt}</td><td><button aria-pressed={r === current} onClick={() => inspect(r.sourceUrl!)}>{money(r.amount!, currency)}</button></td><td><a href={sourceUrl(r.sourceUrl)!} target="_blank" rel="noopener noreferrer">Source ↗</a>{r.vehicleId && <Link to={`/vehicle/${r.vehicleId}`}>Record →</Link>}</td></tr>)}</tbody></table></div></details>
   </section>;
