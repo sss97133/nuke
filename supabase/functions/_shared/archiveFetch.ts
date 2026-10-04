@@ -17,6 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { fetchBatPage, type FetchOptions as BatFetchOptions, type FetchResult as BatFetchResult, logFetchCost, isLoginPage } from "./batFetcher.ts";
 import { fetchPage } from "./hybridFetcher.ts";
 import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
+import { parseQualifiedBaTSale } from "./batParser.ts";
 
 export interface ArchiveFetchResult {
   html: string | null;
@@ -426,6 +427,156 @@ export async function readArchivedPage(
     snapshotId: data.id ?? null,
     fetchedAt: data.fetched_at ?? null,
   };
+}
+
+// PostgreSQL capture clocks retain microseconds. Date.parse alone truncates
+// those before ordering a capture, parse, qualification or knowledge cutoff.
+function preciseArchivedClock(raw: string): bigint {
+  const remainder = (/:[0-9]{2}\.(\d+)/.exec(raw)?.[1] ?? "").slice(3,9).padEnd(6,"0");
+  return BigInt(Date.parse(raw)) * 1000000n + BigInt(remainder);
+}
+
+/** Private source custody reader, pinned to one capture rather than URL/latest.
+ * Public-parent eligibility precedes raw access. Never crawls or falls back to a
+ * different snapshot. Callers must not return raw HTML or protected metadata.
+ */
+export async function readPinnedArchivedPage(
+  input: { snapshotId: string; vehicleId: string; sourceUrl: string; evidenceAsOf?: string },
+  deps: { supabase?: ReturnType<typeof getSupabase>; now?: () => Date } = {},
+): Promise<
+  | { ok: false; reason: string }
+  | { ok: true; html: string; protectedMetadata: Record<string, unknown>; snapshot: {
+    id: string; vehicleId: string; sourceUrl: string; storedSourceUrl: string;
+    fetchedAt: string; ingestedAt: string; parsedAt: string; knownAt: string; sourceKnownAt: string;
+    sourceSha256: string; storedSha256: string; bodySource: "inline" | "protected_storage"; byteLength: number;
+    storagePath: string | null;
+  } }
+> {
+  const refuse = (reason: string) => ({ ok: false as const, reason });
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function sourceKey(raw: string): string | null {
+    try {
+      const u = new URL(raw);
+      if (!["http:", "https:"].includes(u.protocol) || u.username || u.password || u.port) return null;
+      const host = u.hostname.toLowerCase().replace(/^www\./, "");
+      const path = u.pathname.toLowerCase().replace(/\/+$/, "");
+      return host === "bringatrailer.com" && /^\/listing\/[^/]+$/.test(path) ? host + path : null;
+    } catch { return null; }
+  }
+  function clock(raw: unknown): number {
+    if (typeof raw !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$/.test(raw)) return NaN;
+    const day = raw.slice(0, 10), midnight = Date.parse(day + "T00:00:00Z");
+    if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== day) return NaN;
+    return Date.parse(raw);
+  }
+  const key = sourceKey(input.sourceUrl);
+  if (!uuid.test(input.snapshotId) || !uuid.test(input.vehicleId) || !key) return refuse("invalid_capture_locator");
+  const now = (deps.now?.() ?? new Date()).getTime();
+  const cutoff = input.evidenceAsOf ? clock(input.evidenceAsOf) : now;
+  if (!Number.isFinite(now) || !Number.isFinite(cutoff) || cutoff > now) return refuse("invalid_knowledge_cutoff");
+  const preciseCutoff = input.evidenceAsOf ? preciseArchivedClock(input.evidenceAsOf) : BigInt(now) * 1000000n;
+  if (preciseCutoff > BigInt(now) * 1000000n) return refuse("invalid_knowledge_cutoff");
+  const supabase = deps.supabase ?? getSupabase();
+  try {
+    const { data: parent, error: parentError } = await supabase.from("vehicles")
+      .select("id,is_public,deleted_at,listing_kind").eq("id", input.vehicleId).maybeSingle();
+    if (parentError) return refuse("parent_read_failed");
+    if (!parent || parent.is_public !== true || parent.deleted_at !== null || parent.listing_kind === "non_vehicle_item") {
+      return refuse("parent_not_public_real_vehicle");
+    }
+    const { data: s, error } = await supabase.from("listing_page_snapshots")
+      .select("id,platform,listing_url,success,http_status,html,html_storage_path,html_sha256,fetched_at,created_at,metadata")
+      .eq("id", input.snapshotId).maybeSingle();
+    if (error) return refuse("snapshot_read_failed");
+    if (!s || s.success !== true || s.http_status !== 200 || s.platform !== "bat"
+      || s.metadata?.vehicle_matched !== true
+      || typeof s.metadata?.vehicle_id !== "string" || s.metadata.vehicle_id.toLowerCase() !== input.vehicleId.toLowerCase()
+      || sourceKey(s.listing_url) !== key) return refuse("snapshot_attribution_conflict");
+    const parsedAt = s.metadata?.parsed_at;
+    const clocks = [s.fetched_at, s.created_at, parsedAt];
+    const times = clocks.map(clock);
+    if (times.some(v => !Number.isFinite(v))) return refuse("source_clock_unknown");
+    if (preciseArchivedClock(s.fetched_at) > preciseArchivedClock(parsedAt)) return refuse("source_clock_conflict");
+    const knownAt = Math.max(...times);
+    const sourceKnownAt = clocks.reduce((latest, value) => preciseArchivedClock(value) > preciseArchivedClock(latest) ? value : latest);
+    if (preciseArchivedClock(sourceKnownAt) > preciseCutoff) return refuse("learned_later");
+    if (typeof s.html_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(s.html_sha256)) return refuse("source_hash_unknown");
+    let bytes: Uint8Array;
+    let bodySource: "inline" | "protected_storage";
+    if (typeof s.html === "string") {
+      bytes = new TextEncoder().encode(s.html);
+      bodySource = "inline";
+    } else if (typeof s.html_storage_path === "string" && s.html_storage_path.length > 0) {
+      if (s.html_storage_path.startsWith("/") || /[:\\\x00-\x1f]/.test(s.html_storage_path)
+        || s.html_storage_path.split("/").some((part: string) => part === "." || part === "..")) return refuse("storage_locator_unknown");
+      const { data: blob, error: storageError } = await supabase.storage.from("listing-snapshots").download(s.html_storage_path);
+      if (storageError || !blob) return refuse("storage_body_unavailable");
+      if (blob.size > 2097152) return refuse("source_body_over_limit");
+      bytes = new Uint8Array(await blob.arrayBuffer());
+      bodySource = "protected_storage";
+    } else return refuse("source_body_unavailable");
+    if (bytes.byteLength > 2097152) return refuse("source_body_over_limit");
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer)))
+      .map(v => v.toString(16).padStart(2, "0")).join("");
+    if (hash !== s.html_sha256.toLowerCase()) return refuse("source_hash_conflict");
+    let html: string;
+    try { html = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+    catch { return refuse("source_encoding_unknown"); }
+    return { ok: true, html, protectedMetadata: s.metadata, snapshot: {
+      id: s.id, vehicleId: input.vehicleId, sourceUrl: `https://${key}/`, storedSourceUrl: s.listing_url,
+      fetchedAt: s.fetched_at, ingestedAt: s.created_at, parsedAt, knownAt: new Date(knownAt).toISOString(), sourceKnownAt,
+      sourceSha256: hash, storedSha256: s.html_sha256, bodySource, byteLength: bytes.byteLength, storagePath: s.html_storage_path ?? null,
+    } };
+  } catch { return refuse("archive_read_failed"); }
+}
+
+/** The registered archive owner attaches derived qualification only. Caller
+ * must have a verified pinned capture; guarded metadata CAS preserves another
+ * parser's update and every raw capture/clock. This is not a testimony intake.
+ */
+export async function attachPinnedArchivedSaleQualification(
+  capture: Extract<Awaited<ReturnType<typeof readPinnedArchivedPage>>, { ok: true }>,
+  receipt: Record<string, unknown>,
+  deps: { supabase?: ReturnType<typeof getSupabase> } = {},
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const refuse = (reason: string) => ({ ok: false as const, reason });
+  if (Object.prototype.hasOwnProperty.call(capture.protectedMetadata,"source_sale_qualification_v1")) return refuse("existing_qualification_preserved");
+  const sale = parseQualifiedBaTSale(capture.html);
+  if (!sale.ok || receipt.method !== "protected_archived_sale_qualification_v1"
+    || receipt.verification_basis !== "producer_attested_archived_hash_parser"
+    || receipt.snapshot_id !== capture.snapshot.id || receipt.vehicle_id !== capture.snapshot.vehicleId
+    || receipt.source_url !== capture.snapshot.sourceUrl || receipt.source_sha256 !== capture.snapshot.sourceSha256
+    || receipt.parser !== sale.parser || receipt.amount !== sale.amount || receipt.currency !== sale.currency
+    || receipt.event_day !== sale.eventDay || receipt.outcome !== "sold" || receipt.event_grain !== "date"
+    || receipt.body_source !== capture.snapshot.bodySource || receipt.byte_length !== capture.snapshot.byteLength
+    || receipt.price_basis !== "published_bid_excluding_fees" || receipt.price_basis_rule !== "bat_published_result_fee_separate_v1"
+    || receipt.price_basis_source !== "https://bringatrailer.com/policies/"
+    || receipt.captured_at !== capture.snapshot.fetchedAt || receipt.source_ingested_at !== capture.snapshot.ingestedAt
+    || receipt.original_parsed_at !== capture.snapshot.parsedAt || receipt.source_known_at !== capture.snapshot.sourceKnownAt) {
+    return refuse("qualification_attribution_conflict");
+  }
+  const qualifiedAt = typeof receipt.qualified_at === "string" ? Date.parse(receipt.qualified_at) : NaN;
+  if (!Number.isFinite(qualifiedAt) || new Date(qualifiedAt).toISOString() !== receipt.qualified_at
+    || qualifiedAt > Date.now() || preciseArchivedClock(receipt.qualified_at as string) < preciseArchivedClock(capture.snapshot.sourceKnownAt)
+    || receipt.knowledge_at !== new Date(Math.max(qualifiedAt,Date.parse(capture.snapshot.knownAt))).toISOString()) {
+    return refuse("qualification_clock_conflict");
+  }
+  const supabase = deps.supabase ?? getSupabase();
+  try {
+    // Full protected-metadata equality is a single database compare-and-set,
+    // rather than a read-then-unconditionally-replace merge of mutable fields.
+    let update = supabase.from("listing_page_snapshots")
+      .update({ metadata: { ...capture.protectedMetadata, source_sale_qualification_v1: receipt } })
+      .eq("id",capture.snapshot.id).eq("metadata",JSON.stringify(capture.protectedMetadata))
+      .eq("html_sha256",capture.snapshot.storedSha256).eq("listing_url",capture.snapshot.storedSourceUrl)
+      .eq("fetched_at",capture.snapshot.fetchedAt).eq("created_at",capture.snapshot.ingestedAt)
+      .eq("platform","bat").eq("success",true).eq("http_status",200);
+    update = capture.snapshot.storagePath === null ? update.is("html_storage_path",null) : update.eq("html_storage_path",capture.snapshot.storagePath);
+    const { data: saved, error } = await update.select("id");
+    if (error) return refuse("qualification_write_failed");
+    if (!saved?.length) return refuse("capture_changed_or_already_qualified");
+    return { ok: true };
+  } catch { return refuse("qualification_write_failed"); }
 }
 
 /**

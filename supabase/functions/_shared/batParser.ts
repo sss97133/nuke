@@ -1028,6 +1028,38 @@ export function parseBaTHTML(html: string): ParsedListing {
   return result;
 }
 
+/** Strict source-sale tuple for evidence comparisons. General extraction keeps
+ * its legacy recipe above; unsupported or conflicting raw claims stay unknown.
+ * Matches the qualified cohort reader's supported grammar and date grain.
+ */
+export function parseQualifiedBaTSale(html: string):
+  | { ok: false; reason: string }
+  | { ok: true; amount: number; currency: "USD" | "EUR" | "GBP"; eventDay: string; outcome: "sold"; parser: string } {
+  const refuse = (reason: string) => ({ ok: false as const, reason });
+  const claims = [...html.matchAll(/(Sold\s+for|Bid\s+to)\s+<strong>(\w+)\s*\$?([\d,]+)<\/strong>\s*<span[^>]*>on\s+(\d+\/\d+\/\d+)/gi)];
+  const unique = new Set(claims.map(m => [m[1].toLowerCase(),m[2].toUpperCase(),m[3],m[4]].join("|")));
+  if (unique.size !== 1 || /class=["'][^"']*status-unsold/i.test(html)) return refuse("source_sale_missing_or_ambiguous");
+  const claim = claims[0];
+  if (!/^sold/i.test(claim[1])) return refuse("source_outcome_not_sold");
+  const currency = claim[2].toUpperCase();
+  if (!["USD", "EUR", "GBP"].includes(currency)) return refuse("currency_unknown");
+  if (!/^([0-9]{1,3}(,[0-9]{3})+|[0-9]+)$/.test(claim[3])) return refuse("source_amount_unknown");
+  const amount = Number(claim[3].replace(/,/g,""));
+  if (!Number.isSafeInteger(amount) || amount <= 0) return refuse("source_amount_unknown");
+  const parts = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(claim[4]);
+  if (!parts) return refuse("source_event_unknown");
+  const year = parts[3].length === 2 ? "20" + parts[3] : parts[3];
+  const eventDay = `${year}-${parts[1].padStart(2,"0")}-${parts[2].padStart(2,"0")}`;
+  const midnight = Date.parse(eventDay + "T00:00:00Z");
+  if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0,10) !== eventDay) return refuse("source_event_unknown");
+  const legacy = parseBaTHTML(html);
+  if (legacy.sale_status !== "sold" || legacy.sale_price !== amount || legacy.sale_currency?.toUpperCase() !== currency) {
+    return refuse("canonical_parser_disagreement");
+  }
+  return { ok: true, amount, currency: currency as "USD" | "EUR" | "GBP", eventDay,
+    outcome: "sold", parser: `${BAT_PARSER_VERSION}:strict_sale_tuple_v1` };
+}
+
 // ─── Pollution detectors (used by extract-bat-core update logic) ─────
 
 export function isPollutedBatField(s: any): boolean {

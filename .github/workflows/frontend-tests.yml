@@ -227,6 +227,11 @@ jobs:
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
+      - name: Verify pinned archive custody and deterministic producer (offline)
+        run: node --test scripts/test-archive-source-custody.mjs
+        env:
+          NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test
