@@ -99,7 +99,7 @@ export type Moment = {
   basis: string; // where the time comes from, in words the page shows
   exact: boolean;
   /** A sale clock, including accepted RNM, is not an auction end clock. */
-  role?: 'auction_end' | 'sale';
+  role?: 'auction_end' | 'sale' | 'listing_start' | 'first_activity';
 } & ({ grain: 'instant' } | { grain: 'day'; day: string });
 
 export interface AuctionDay {
@@ -384,9 +384,9 @@ function buildOne(key: string, items: AuctionItem[], input: SequenceInput): Auct
   let open: Moment | null = null;
   const started = vevs.map(v => isoOrNull(v.started_at)).find((s): s is string => !!s && plausible(s));
   const listed = tl.find(t => t.event_type === 'auction_listed' && t.event_date);
-  if (started) open = { at: started, basis: 'listing start recorded by the extractor', exact: hasClock(started), ...recordedGrain(started) };
-  else if (listed?.event_date) open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, grain: 'day', day: listed.event_date.slice(0, 10) };
-  else if (items.length) open = { at: items[0].at, basis: `first activity — ${items[0].kind === 'bid' ? 'first bid' : 'first comment'}; opening time not recorded`, exact: false, grain: 'instant' };
+  if (started) open = { at: started, basis: 'listing start recorded by the extractor', exact: hasClock(started), role: 'listing_start', ...recordedGrain(started) };
+  else if (listed?.event_date) open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, role: 'listing_start', grain: 'day', day: listed.event_date.slice(0, 10) };
+  else if (items.length) open = { at: items[0].at, basis: `first activity — ${items[0].kind === 'bid' ? 'first bid' : 'first comment'}; opening time not recorded`, exact: false, role: 'first_activity', grain: 'instant' };
 
   let close: Moment | null = null;
   const ended = vevs.map(v => isoOrNull(v.ended_at)).find((s): s is string => !!s && plausible(s));
@@ -446,7 +446,7 @@ function buildOne(key: string, items: AuctionItem[], input: SequenceInput): Auct
 function applyTimelineFallbacks(seq: AuctionSequence, events: TimelineEventLike[]): void {
   if (!seq.open) {
     const listed = events.find(t => t.event_type === 'auction_listed' && t.event_date);
-    if (listed?.event_date) seq.open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, grain: 'day', day: listed.event_date.slice(0, 10) };
+    if (listed?.event_date) seq.open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, role: 'listing_start', grain: 'day', day: listed.event_date.slice(0, 10) };
   }
   if (!seq.close) {
     const end = events.find(t => t.event_type === 'auction_ended' && t.event_date);
@@ -470,6 +470,13 @@ export function auctionMomentLabel(auction: AuctionSequence): string {
 export function auctionMomentDayTitle(auction: AuctionSequence): string {
   if (hasRecordedAuctionEnd(auction)) return `Auction Closed · ${auction.outcome.replace(/_/g, ' ')}`;
   return auction.close?.role === 'sale' ? 'Sale recorded · auction end unknown' : 'Auction end day recorded · time unknown';
+}
+
+export function auctionOpenDayTitle(auction: AuctionSequence): string {
+  if (auction.open?.role === 'first_activity') return 'First observed auction activity · opening time unknown';
+  if (auction.open?.role === 'listing_start') return auction.open.grain === 'instant' && auction.open.exact
+    ? 'Auction Opened' : 'Listing day recorded · time unknown';
+  return 'Auction opening unknown';
 }
 
 /** The single newest sequence, for callers that only want the car's latest listing. */

@@ -12,14 +12,14 @@ import BarcodeTimeline from './BarcodeTimeline';
 import { buildAuctionSequence, type AuctionSequence } from './auctionSequence';
 
 const LOT = 'https://bringatrailer.com/listing/synthetic-cohort-lot/';
-function sequence(end: string | null, sale: string | null = null, status = 'sold', outcome: string | null = null): AuctionSequence {
+function sequence(end: string | null, sale: string | null = null, status = 'sold', outcome: string | null = null, start: string | null = null): AuctionSequence {
   return buildAuctionSequence({
     comments: [
       { id: 'synthetic-bid', posted_at: '2025-01-10T20:00:00Z', comment_type: 'bid', bid_amount: 3000, author_username: 'SyntheticBidder', is_seller: false, comment_text: 'Synthetic bid', bat_comment_id: 101, source_url: LOT, sequence_number: 1, comment_likes: 0 },
       { id: 'synthetic-comment', posted_at: '2025-01-10T20:10:00Z', comment_type: 'observation', bid_amount: null, author_username: 'SyntheticCommenter', is_seller: false, comment_text: 'Synthetic comment before the recorded end', bat_comment_id: 102, source_url: LOT, sequence_number: 2, comment_likes: 0 },
     ],
     auctionEvents: outcome == null ? [] : [{ id: 'synthetic-auction', source: 'bat', source_url: LOT, lot_number: null, outcome, winning_bid: null, total_bids: null, winning_bidder: null, seller_name: null, page_views: null, watchers: null, comments_count: null }],
-    vehicleEvents: [{ id: 'synthetic-event', source_platform: 'bat', source_url: LOT, started_at: null, ended_at: end, sold_at: sale, final_price: null, event_status: status }],
+    vehicleEvents: [{ id: 'synthetic-event', source_platform: 'bat', source_url: LOT, started_at: start, ended_at: end, sold_at: sale, final_price: null, event_status: status }],
     timelineEvents: [], images: [], lotUrlHint: LOT,
   })!;
 }
@@ -81,5 +81,18 @@ describe('visible auction clock and outcome qualification', () => {
     expect(titles).toContain('Profile Created');
     if (expected) expect(container.querySelector('.hm-c[data-date="2025-01-12"]')!.getAttribute('title')).toContain(expected);
     if (expected !== 'Auction Closed') expect(titles).not.toContain('Auction Closed');
+  });
+
+  it.each([
+    [null, 'First observed auction activity'],
+    ['2025-01-08T00:00:00Z', 'Listing day recorded'],
+    ['2025-01-08T14:00:00Z', 'Auction Opened'],
+  ])('qualifies the actual barcode opening title from recorded start %s', async (start, expected) => {
+    fixture.auction = sequence(null, null, 'sold', null, start);
+    await act(async () => root.render(<BarcodeTimeline />));
+    const titles = [...container.querySelectorAll('.hm-c[title]')].map(el => el.getAttribute('title')).join('\n');
+    expect(titles).toContain(expected);
+    if (expected !== 'Auction Opened') expect(titles).not.toContain('Auction Opened');
+    if (start?.includes('T00:00:00')) expect(container.querySelector('.hm-c[data-date="2025-01-08"]')!.getAttribute('title')).toContain(expected);
   });
 });

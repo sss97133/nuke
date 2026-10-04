@@ -3,7 +3,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
 import { useAuctionSequence } from './useAuctionSequence';
-import { auctionMomentDayTitle, momentDay } from './auctionSequence';
+import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auctionSequence';
 
 interface BarcodeTimelineProps {}
 
@@ -199,6 +199,7 @@ function formatEventLabel(ev: any): string {
 
   // A day of the auction: what landed (from auction_comments, timestamped to the moment)
   if (eventType === 'auction_day') return ev.title || 'Auction Day';
+  if (eventType === 'auction_started' && ev.metadata?.moment_role && ev.title) return `${ev.title} (${ev.metadata.basis})`;
   if (eventType === 'auction_started' && ev.metadata?.basis) return `Auction Opened (${ev.metadata.basis})`;
   if (eventType === 'auction_ended' && ev.title) return ev.title;
 
@@ -358,7 +359,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       const openDay = auction.open ? momentDay(auction.open) : null;
       const closeDay = auction.close ? momentDay(auction.close) : null;
       if (openDay) {
-        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}Auction Opened`, metadata: { auction: true, basis: auction.open!.basis } });
+        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}${auctionOpenDayTitle(auction)}`, metadata: { auction: true, basis: auction.open!.basis, moment_role: auction.open!.role, time_known: auction.open!.grain === 'instant' } });
         if (auction.photos.publishedWithListing > 0) {
           auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
         }
