@@ -169,6 +169,50 @@ describe('qualified cohort sale-price reader UI', () => {
     expect(fixture.rpc).toHaveBeenCalledTimes(1);
   });
 
+  it('uses a validated episode receipt to retain prior subject resales and exclude the exact sale across aliases', async () => {
+    const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000003';
+    data.receipt.eligible[0].vehicleId = vehicle;
+    const source = 'https://bringatrailer.com/listing/synthetic-current/';
+    data.receipt.eligible.push({ ...data.receipt.eligible[1], vehicleId: 'alias', sourceUrl: source, unitSource: source });
+    Object.assign(data.receipt, { sale_population_basis: 'source_qualified_episodes_of_current_public_members',
+      subject: { vehicle_id: vehicle, source_key: 'bringatrailer.com/listing/synthetic-current', source_url: source, exclusion_basis: 'exact_source_episode' } });
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render(`year=1970&make=Synthetic&model=Coupe&price=5000&vehicle_id=${vehicle}`);
+    const result = await exportedReceipt();
+    expect(result.comparison.counts.eligibleSales).toBe(10);
+    expect(result.comparison.percentile).toBe(45);
+    expect(result.comparison.eligible.some((r: any) => r.vehicleId === vehicle)).toBe(true);
+    expect(result.comparison.excluded).toContainEqual(expect.objectContaining({ reason: 'subject', sourceKey: 'bringatrailer.com/listing/synthetic-current' }));
+    expect(container.textContent).toContain('earlier resales can count for the same vehicle');
+    expect(container.textContent).not.toContain('Current recorded sale per vehicle');
+  });
+
+  it('withholds an unknown or mismatched subject episode without hiding the source records', async () => {
+    const vehicle = '00000000-0000-4000-8000-000000000003';
+    for (const subject of [
+      { vehicle_id: vehicle, source_key: null, source_url: null, exclusion_basis: 'unestablished' },
+      { vehicle_id: vehicle, source_key: 'bringatrailer.com/listing/wrong', source_url: 'https://bringatrailer.com/listing/synthetic-0/', exclusion_basis: 'exact_source_episode' },
+    ]) {
+      const data = evidence(); data.receipt.eligible[0].vehicleId = vehicle;
+      Object.assign(data.receipt, { sale_population_basis: 'source_qualified_episodes_of_current_public_members', subject });
+      fixture.rpc.mockResolvedValue({ data, error: null });
+      await render(`year=1970&make=Synthetic&model=Coupe&price=5000&vehicle_id=${vehicle}`); await submit();
+      const result = await exportedReceipt();
+      expect(result.comparison.counts.eligibleSales).toBe(10);
+      expect(result.comparison.percentile).toBeNull();
+      expect(result.comparison.reasons).toContain('subject_episode_unknown');
+      expect(container.textContent).toContain('exact comparison sale is unestablished');
+      expect(container.querySelector('[aria-label="Qualified sale source records"]')?.querySelectorAll('li')).toHaveLength(10);
+    }
+  });
+
+  it('preserves legacy vehicle exclusion when an episode contract is absent', async () => {
+    const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000003';
+    data.receipt.eligible[0].vehicleId = vehicle;
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render(`year=1970&make=Synthetic&model=Coupe&price=5000&vehicle_id=${vehicle}`);
+    expect((await exportedReceipt()).comparison.counts.eligibleSales).toBe(9);
+    expect(container.textContent).toContain('Current recorded sale per vehicle');
+  });
+
   it('loads the declared currency/date/subject contract and explains the full denominator and unmatched condition', async () => {
     await render('year=1970&make=Synthetic&model=Coupe&price=5000&as_of=2026-01-01&currency=USD&vehicle_id=subject-id');
     expect(fixture.rpc).toHaveBeenCalledWith('valuation_by_ymm',expect.objectContaining({ p_event_before: '2026-01-01T00:00:00Z', p_currency: 'USD', p_subject_vehicle_id: 'subject-id' }));

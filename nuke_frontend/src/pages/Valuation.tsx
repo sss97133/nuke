@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { comparePriceToSourceSales, type DatedSourceSale } from '../lib/dealRead/batComps';
+import { comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions } from '../lib/dealRead/batComps';
 import { PrefetchLink } from '../components/PrefetchLink';
 import '../styles/unified-design-system.css';
 
@@ -58,8 +58,11 @@ type ValuationResult = {
     cohort: { key: string; label: string; basis: string; complete: boolean };
     eligible: SaleEvidence[]; event_from: string; event_before: string; evidence_as_of: string; computed_at: string;
     knowledge_mode: 'retrospective' | 'known_at'; currency: string; minimum_sales: number;
+    sale_population_basis?: string;
+    subject?: { vehicle_id: string | null; source_key: string | null; source_url: string | null; exclusion_basis: string };
     coverage: { member_rows: number; qualified_sales: number; condition_scalar_recorded: number; body_recorded: number; engine_recorded: number; transmission_recorded: number; conflicting_source_lots: number; inline_raw_verified?: number; archived_admitted?: number;
-      dated_source_rows?: number; capture_presentations?: number; qualified_capture_presentations?: number; duplicate_presentations?: number; typed_sale_episode_links?: number };
+      dated_source_rows?: number; capture_presentations?: number; qualified_capture_presentations?: number; duplicate_presentations?: number; typed_sale_episode_links?: number;
+      native_episode_locators?: number; native_capture_headers?: number };
     exclusions: Record<string, number>;
   };
 };
@@ -212,18 +215,28 @@ export default function Valuation() {
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
   const changedFilters = lookup != null && lookup.contextKey !== filterKey;
+  const subjectEvidence = useMemo((): Pick<SaleComparisonOptions['subject'], 'vehicleId' | 'sourceUrl' | 'exclusionBasis'> => {
+    const requested = lookup?.request.p_subject_vehicle_id;
+    if (!requested || receipt?.sale_population_basis !== 'source_qualified_episodes_of_current_public_members') return { vehicleId: requested };
+    const subject = receipt.subject, source = canonicalBatSource(subject?.source_url ?? null);
+    if (opaqueId(requested) && subject?.vehicle_id === requested && subject.exclusion_basis === 'exact_source_episode'
+      && source === subject.source_url && subject.source_key === source?.replace('https://', '').replace(/\/$/, '')) {
+      return { vehicleId: requested, sourceUrl: source, exclusionBasis: 'exact_source_episode' };
+    }
+    return { vehicleId: requested, exclusionBasis: 'unestablished' };
+  }, [receipt, lookup]);
   const comparison = useMemo(() => receipt && !changedFilters ? comparePriceToSourceSales(receipt.eligible, {
     cohort: receipt.cohort,
-    subject: { amount: candidatePrice.trim() ? Number(candidatePrice) : null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', vehicleId: lookup?.request.p_subject_vehicle_id },
+    subject: { amount: candidatePrice.trim() ? Number(candidatePrice) : null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', ...subjectEvidence },
     eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
-  }) : null, [receipt, candidatePrice, lookup, changedFilters]);
+  }) : null, [receipt, candidatePrice, subjectEvidence, changedFilters]);
   const empty = result && stats && stats.sold_count === 0;
   const sourceEvidence = useMemo(() => receipt ? comparePriceToSourceSales(receipt.eligible, {
-    cohort: receipt.cohort, subject: { amount: null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', vehicleId: lookup?.request.p_subject_vehicle_id },
+    cohort: receipt.cohort, subject: { amount: null, currency: receipt.currency, priceBasis: 'published_bid_excluding_fees', ...subjectEvidence },
     eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
-  }) : null, [receipt, lookup]);
+  }) : null, [receipt, subjectEvidence]);
   // Display paging never reduces the calculation's source-sale denominator.
   const sourceSales = useMemo(() => [...(sourceEvidence?.eligible ?? [])].sort((a, b) =>
     (b.eventAt ?? '').localeCompare(a.eventAt ?? '') || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')) as SaleEvidence[], [sourceEvidence]);
@@ -315,7 +328,11 @@ export default function Valuation() {
         <div>{receipt.coverage.typed_sale_episode_links ?? 'Unknown'} qualified source lots have revalidated native sale-event links.</div>
         {typeof receipt.coverage.inline_raw_verified === 'number' && typeof receipt.coverage.archived_admitted === 'number' && <div>{receipt.coverage.inline_raw_verified} verified inline source lots · {receipt.coverage.archived_admitted} admitted archived source lots</div>}
         <div>Source sales from {fmtDate(receipt.event_from)} before {fmtDate(receipt.event_before)}. Evidence through {receipt.evidence_as_of.replace('T',' ')}.</div>
-        <div>Earlier sales discovered later can enter this retrospective comparison. Current recorded sale per vehicle; earlier resales may be missing.</div>
+        <div>Earlier sales discovered later can enter this retrospective comparison. {receipt.sale_population_basis === 'source_qualified_episodes_of_current_public_members'
+          ? 'Each verified source sale is a separate episode; earlier resales can count for the same vehicle. Stored source coverage remains incomplete.'
+          : 'Current recorded sale per vehicle; earlier resales may be missing.'}</div>
+        {subjectEvidence.exclusionBasis === 'unestablished' && <div>The vehicle’s exact comparison sale is unestablished. Source records remain available; its price percentile is withheld.</div>}
+        {receipt.sale_population_basis === 'source_qualified_episodes_of_current_public_members' && <div>{receipt.coverage.native_episode_locators ?? 'Unknown'} native source episode locators · {receipt.coverage.native_capture_headers ?? 'Unknown'} linked capture headers. Locators identify sources; captured evidence must establish the sale, amount, currency and date.</div>}
         <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Admitted archived sales also include when the verified sale receipt arrived. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
         <div>Published winning bid excludes buyer fees, taxes and transport (<a href="https://bringatrailer.com/policies/" target="_blank" rel="noreferrer">BaT policy</a>). Original currency; no inflation or exchange-rate adjustment. Condition and equipment remain unmatched.</div>
         <div>Current condition field present on {receipt.coverage.condition_scalar_recorded}/{receipt.coverage.qualified_sales}; this does not establish condition at sale. Body {receipt.coverage.body_recorded}, engine {receipt.coverage.engine_recorded}, transmission {receipt.coverage.transmission_recorded}. Visual condition, comment evidence and bid-log coverage are unmeasured.</div>
