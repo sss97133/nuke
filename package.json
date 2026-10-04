@@ -254,6 +254,8 @@
     "day:synthesize": "dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs",
     "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
     "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs",
+    "guardrails:db-writes": "bash scripts/guardrails/block-god-writes.sh",
+    "guardrails:test-db-writes": "node --test scripts/guardrails/block-god-writes.test.mjs",
     "ledger:facts": "node scripts/ledger/refresh-facts.mjs",
     "market:live-bands": "dotenvx run -q -- node scripts/market/live-bands.mjs",
     "bat:keep-fresh": "dotenvx run -- node scripts/bat-keep-fresh.mjs",
