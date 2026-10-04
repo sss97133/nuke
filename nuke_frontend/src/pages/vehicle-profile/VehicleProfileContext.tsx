@@ -576,18 +576,11 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           if (!row) return;
           if (auctionPulse?.listing_url && row.source_url && row.source_url !== auctionPulse.listing_url) return;
 
-          (async () => {
-            try {
-              const { data } = await supabase
-                .from('vehicle_events')
-                .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
-                .eq('vehicle_id', vehicleIdForFilter)
-                .order('updated_at', { ascending: false })
-                .limit(20);
-              const merged = buildAuctionPulseFromExternalListings(data || [], vehicleIdForFilter);
-              if (merged) setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
-            } catch { /* ignore */ }
-          })();
+          const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
+          if (merged) setAuctionPulse((prev: any) => {
+            if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
+            return { ...(prev || {}), ...merged };
+          });
         },
       )
       .on(

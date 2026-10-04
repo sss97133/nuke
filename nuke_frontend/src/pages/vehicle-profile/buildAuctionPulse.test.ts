@@ -32,4 +32,11 @@ describe('canonical auction telemetry across a soft close', () => {
     const pulse = buildAuctionPulseFromExternalListings([{ id: 'legacy', platform: 'bat', listing_url: listing.source_url, listing_status: 'active', current_bid: 1000 }], 'vehicle-1');
     expect(pulse).toMatchObject({ external_listing_id: 'legacy', current_bid: 1000 });
   });
+  it('uses native event clocks from a streamed database payload without waiting for a refresh', () => {
+    const pulse = buildAuctionPulseFromExternalListings([{ ...listing, current_price: 122000,
+      ended_at: '2026-10-04T17:40:00Z', updated_at: '2026-10-04T17:38:01Z',
+      metadata: { live_stream: { last_bid_at: '2026-10-04T17:38:00Z', last_comment_at: '2026-10-04T17:38:00Z' } } }], 'vehicle-1');
+    expect(pulse).toMatchObject({ current_bid: 122000, end_date: '2026-10-04T17:40:00Z',
+      last_bid_at: '2026-10-04T17:38:00Z', last_comment_at: '2026-10-04T17:38:00Z' });
+  });
 });
