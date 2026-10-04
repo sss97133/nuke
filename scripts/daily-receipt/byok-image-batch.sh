@@ -180,9 +180,10 @@ BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
 node - "$RESULT_JSON" "$RESULT_ERR" "$VISION_RC" > "$DIR/vision-receipt.txt" <<'JS'
 const fs = require('node:fs');
 const [resultPath, errorPath, exitCode] = process.argv.slice(2);
-let result = {}, category = 'none', text = '';
+let result = {}, category = 'none', text = '', rawResult = '';
 try {
-  result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+  rawResult = fs.readFileSync(resultPath, 'utf8');
+  result = JSON.parse(rawResult);
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error();
 } catch { result = {}; category = 'malformed_result'; }
 const failed = Number(exitCode) !== 0 || result.is_error === true || result.type === 'error' ||
@@ -190,13 +191,15 @@ const failed = Number(exitCode) !== 0 || result.is_error === true || result.type
 if (failed) {
   category = 'execution_failed';
   // Inspect privately; emit fixed categories/numeric codes, never result/error bodies.
-  text = JSON.stringify([result.error, result.errors, result.result]);
+  // Startup errors can be plaintext on stdout, or use a top-level message field.
+  // Inspect the original privately even when JSON decoding failed; emit categories only.
+  text = rawResult;
   try { text += fs.readFileSync(errorPath, 'utf8'); } catch {}
   if (/authentication_error|oauth.{0,80}expir|invalid.{0,30}(?:token|api key)|not logged in|unauthorized|API Error: 401/i.test(text)) category = 'authentication';
   else if (/rate_limit|rate limit|usage limit|hit your limit|API Error: 429/i.test(text)) category = 'rate_limit';
-  else if (/permission|not allowed|forbidden|API Error: 403/i.test(text)) category = 'permission';
-  else if (/model.{0,80}(?:unavailable|not found|not available)|invalid model/i.test(text)) category = 'model_unavailable';
-  else if (/unknown (?:option|argument)|unrecognized (?:option|argument)|command not found/i.test(text)) category = 'cli_configuration';
+  else if (/permission|not allowed|forbidden|(?:required|missing|insufficient).{0,30}scope|API Error: 403/i.test(text)) category = 'permission';
+  else if (/model.{0,100}(?:unavailable|not found|not available|not exist|not have access)|invalid model|unknown model/i.test(text)) category = 'model_unavailable';
+  else if (/unknown (?:option|argument)|unrecognized (?:option|argument)|command not found|cannot find module|native binary.{0,60}(?:missing|not found)|failed to run command.{0,80}no such file/i.test(text)) category = 'cli_configuration';
   else if (/ECONN|ENOTFOUND|ETIMEDOUT|connection error/i.test(text)) category = 'network';
   if (Number(exitCode) === 124) category = 'timeout';
   if (Number(exitCode) === 137) category = 'terminated';

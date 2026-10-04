@@ -86,7 +86,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify cached image projection receipts (offline)
-        run: node --test scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs
+        run: node --test scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
       - name: Create disposable cached-image ancestry database
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry

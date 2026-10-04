@@ -176,6 +176,20 @@ test('CLI exit zero with structured failure cannot pass even when a verdict pers
   assert.equal(r.status, 1); assert.equal(r.ingested, true);
   assert.match(r.log, /category=rate_limit code=429/);
 });
+for (const [name, result, category, code] of [
+  ['plaintext authentication error', 'API Error: 401 authentication_error SENTINEL', 'authentication', 401],
+  ['top-level JSON message', JSON.stringify({type:'error',message:'API Error: 429 rate_limit_error SENTINEL'}), 'rate_limit', 429],
+  ['selected model unavailable', 'There is an issue with the selected model. It may not exist or you may not have access to it. SENTINEL', 'model_unavailable', 0],
+  ['missing required scopes', 'Token is missing required scope SENTINEL', 'permission', 0],
+  ['missing native executable', 'timeout: failed to run command claude: No such file or directory SENTINEL', 'cli_configuration', 0],
+]) {
+  test(`${name} survives private parsing without leaking the error body`, () => {
+    const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:result});
+    assert.equal(r.status, 1); assert.equal(r.ingested, false);
+    assert.match(r.log, new RegExp(`category=${category} code=${code} verdicts=0`));
+    assert.doesNotMatch(r.output + r.log, /SENTINEL/);
+  });
+}
 test('timeout is classified without logging stderr', () => {
   const r = run('byok-image-batch.sh', { FAKE_CLAUDE_EXIT: '124', FAKE_RESULT: '' });
   assert.equal(r.status, 1); assert.match(r.log, /category=timeout/);
