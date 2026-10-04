@@ -428,7 +428,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // We'd rather show nothing than lie. Allow up to 60 days for legitimate long auctions.
     const maxReasonable = 60 * 24 * 60 * 60 * 1000;
     if (diff > maxReasonable) return null;
-    if (diff <= 0) return 'Ended';
+    if (diff <= 0) return ['sold', 'ended', 'reserve_not_met', 'no_sale', 'unsold', 'expired', 'cancelled'].includes(String(auctionPulse?.listing_status || '').toLowerCase()) ? 'Ended' : 'Result pending';
     const s = Math.floor(diff / 1000);
     const d = Math.floor(s / (60 * 60 * 24));
     const h = Math.floor((s % (60 * 60 * 24)) / (60 * 60));
@@ -461,7 +461,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const maxReasonable = 60 * 24 * 60 * 60 * 1000; // Allow up to 60 days
     if (diff > maxReasonable) return null;
     // Don't show redundant "Ended" when SOLD badge is already visible
-    if (diff <= 0) return skipEndedText ? null : 'Ended';
+    if (diff <= 0) return skipEndedText ? null : formatRemaining(iso);
     // Seconds under 24 h ("2h 19m 04s"), days and hours beyond: the same clock face as the homepage.
     return timeLeft(diff);
   };

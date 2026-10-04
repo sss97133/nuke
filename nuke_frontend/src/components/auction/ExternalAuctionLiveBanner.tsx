@@ -44,17 +44,20 @@ const platformShortNames: Record<string, string> = {
   hagerty: 'HAG',
 };
 
-type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
+type UrgencyLevel = 'ended' | 'pending' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
 
-function formatTimeRemaining(endDate: string | null): { text: string; urgency: UrgencyLevel; ended: boolean } {
+function formatTimeRemaining(endDate: string | null, status: string | null): { text: string; urgency: UrgencyLevel; ended: boolean } {
+  if (['sold', 'ended', 'reserve_not_met', 'no_sale', 'expired', 'cancelled', 'unsold'].includes(String(status || '').toLowerCase())) {
+    return { text: 'ENDED', urgency: 'ended', ended: true };
+  }
   if (!endDate) return { text: 'No end time', urgency: 'normal', ended: false };
 
   const now = Date.now();
   const end = new Date(endDate).getTime();
   const diff = end - now;
 
-  if (diff <= 0) {
-    return { text: 'ENDED', urgency: 'ended', ended: true };
+  if (!Number.isFinite(diff) || diff <= 0) {
+    return { text: 'RESULT PENDING', urgency: 'pending', ended: false };
   }
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -81,6 +84,7 @@ const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
   gettingClose: { color: '#e07960' },
   normal: { color: 'var(--text-secondary)' },
   ended: { color: 'var(--text-disabled)' },
+  pending: { color: 'var(--text-secondary)' },
 };
 
 function formatCurrency(amount: number | null, currencyCode?: string | null): string {
@@ -155,7 +159,10 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   // Live countdown timer
   // Ticks on the page's one shared 1-second clock.
   useSecondClock(Boolean(endDate));
-  const timeState = formatTimeRemaining(endDate);
+  const timeState = formatTimeRemaining(endDate, status);
+  const resultPending = timeState.urgency === 'pending';
+  const observedAt = Date.parse(lastUpdatedAt || '');
+  const staleBid = resultPending || !Number.isFinite(observedAt) || Date.now() - observedAt > 15 * 60 * 1000;
   const [pulsePhase, setPulsePhase] = useState(0);
 
   // Pulsing effect for critical urgency
@@ -219,7 +226,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* LIVE / ENDED indicator */}
-          {isActive && !timeState.ended ? (
+          {isActive && !timeState.ended && !resultPending ? (
             <div
               style={{
                 display: 'flex',
@@ -248,7 +255,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 padding: '2px 8px',
               }}
             >
-              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>ENDED</span>
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>{resultPending ? 'RESULT PENDING' : 'ENDED'}</span>
             </div>
           )}
 
@@ -294,7 +301,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         {/* Action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* BID NOW - primary action, only for live auctions */}
-          {isActive && !timeState.ended && (
+          {isActive && !timeState.ended && !resultPending && (
             <button
               onClick={handleBidNow}
               style={{
@@ -360,7 +367,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             border: '2px solid var(--border)',
           }}
         >
-          <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current Bid</span>
+          <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{staleBid ? 'Last observed bid' : 'Current Bid'}</span>
           <span
             style={{
               fontSize: '16px',
