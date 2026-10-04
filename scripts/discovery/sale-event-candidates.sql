@@ -88,6 +88,30 @@ WITH request AS MATERIALIZED (
     array_agg(DISTINCT p.source_url) FILTER(WHERE p.source_url IS NOT NULL) AS recorded_urls
   FROM presentations p WHERE p.episode_key IS NOT NULL AND coalesce(p.url_key,p.listing_url_key) IS NOT NULL
   GROUP BY p.vehicle_id,p.platform,p.episode_key,coalesce(p.url_key,p.listing_url_key)
+), context_episodes AS MATERIALIZED (
+  -- Count a recorded source episode once across native tables and parent aliases.
+  -- Outcome/date are native claims, independent of any price qualification.
+  SELECT p.platform,p.episode_key,count(*) AS presentations,
+    count(DISTINCT p.vehicle_id)>1 AS multiple_parents,
+    bool_or(p.outcome='sold') AS sold_claim,
+    bool_or(p.outcome='not_sold') AS not_sold_claim,
+    bool_or(p.event_day IS NOT NULL) AS recorded_day
+  FROM presentations p WHERE p.episode_key IS NOT NULL
+  GROUP BY p.platform,p.episode_key
+), presentation_context AS MATERIALIZED (
+  SELECT p.platform,count(*) AS presentation_count,
+    count(*) FILTER(WHERE p.episode_key IS NULL) AS unresolved_count
+  FROM presentations p GROUP BY p.platform
+), episode_context AS MATERIALIZED (
+  SELECT e.platform,count(*) AS episode_count,
+    count(*) FILTER(WHERE e.sold_claim AND NOT e.not_sold_claim) AS reported_sold,
+    count(*) FILTER(WHERE e.not_sold_claim AND NOT e.sold_claim) AS reported_not_sold,
+    count(*) FILTER(WHERE NOT e.sold_claim AND NOT e.not_sold_claim) AS unknown_outcome,
+    count(*) FILTER(WHERE e.sold_claim AND e.not_sold_claim) AS contradictory_outcome,
+    count(*) FILTER(WHERE e.multiple_parents) AS multiple_parent_count,
+    count(*) FILTER(WHERE e.recorded_day) AS recorded_day_count,
+    count(*) FILTER(WHERE NOT e.recorded_day) AS missing_day_count
+  FROM context_episodes e GROUP BY e.platform
 ), capture_headers AS MATERIALIZED (
   -- Exact indexed platform/URL variants only; no metadata/whole-snapshot scan,
   -- current vehicle snapshot locator, raw HTML projection, or archived metadata proof.
@@ -121,6 +145,36 @@ SELECT jsonb_build_object(
       WHEN NOT b.native_complete THEN 'native_presentation_cap_no_sample' END,
     'captureHeadersComplete',(SELECT count(*) FROM capture_headers)<=b.capture_limit,
     'captureHeaderLimit',b.capture_limit,'captureHeadersAtLeast',(SELECT count(*) FROM capture_headers)),
+  'sourceContext',jsonb_build_object(
+    'basis','retained_native_presentations_current_supplied_parent_page',
+    'grain','recorded_source_platform_x_episode_key',
+    'completeWithinPage',b.native_complete,'fleetComplete',false,
+    'priceQualified',false,'publicSourceStatus','unestablished',
+    'knowledgeMode','current_native_rows_not_historical_availability',
+    'windowApplied',false,'comparisonEventBefore',b.event_before,
+    'parentsWithNativePresentations',CASE WHEN b.native_complete THEN
+      (SELECT count(DISTINCT vehicle_id) FROM presentations) END,
+    'parentsWithoutNativePresentations',CASE WHEN b.native_complete THEN
+      (SELECT count(*) FROM parents)-(SELECT count(DISTINCT vehicle_id) FROM presentations) END,
+    'presentationCount',CASE WHEN b.native_complete THEN (SELECT count(*) FROM presentations) END,
+    'identifiedEpisodeCount',CASE WHEN b.native_complete THEN (SELECT count(*) FROM context_episodes) END,
+    'unresolvedIdentityPresentationCount',CASE WHEN b.native_complete THEN
+      (SELECT count(*) FROM presentations WHERE episode_key IS NULL) END,
+    'additionalPresentationsForIdentifiedEpisodes',CASE WHEN b.native_complete THEN
+      (SELECT coalesce(sum(presentations-1),0) FROM context_episodes) END,
+    'sources',coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'platform',p.platform,'presentationCount',p.presentation_count,
+      'identifiedEpisodeCount',coalesce(e.episode_count,0),
+      'unresolvedIdentityPresentationCount',p.unresolved_count,
+      'reportedSoldEpisodes',coalesce(e.reported_sold,0),
+      'reportedNotSoldEpisodes',coalesce(e.reported_not_sold,0),
+      'unknownOutcomeEpisodes',coalesce(e.unknown_outcome,0),
+      'contradictoryOutcomeEpisodes',coalesce(e.contradictory_outcome,0),
+      'episodesWithMultipleParents',coalesce(e.multiple_parent_count,0),
+      'episodesWithRecordedDay',coalesce(e.recorded_day_count,0),
+      'episodesWithoutRecordedDay',coalesce(e.missing_day_count,0)
+    ) ORDER BY p.platform NULLS LAST)
+    FROM presentation_context p LEFT JOIN episode_context e ON e.platform=p.platform),'[]'::jsonb)),
   'candidates',coalesce((SELECT jsonb_agg(jsonb_build_object(
     'capture',jsonb_build_object('table',p.source_table,'id',p.id),
     'vehicleId',p.vehicle_id,'sourcePlatform',p.platform,'sourceEpisodeKey',p.episode_key,
