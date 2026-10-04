@@ -10,13 +10,24 @@ subscriptions. Their board sale_status had already become not_sold, so the
 auction_live-only board recovery selector missed them. The follow-up migration
 resumes recent existing monitors independently of board status and HTML gates,
 until a qualified same-source terminal result. Its PG17 regression passed;
-production deployment and coverage verification of this repair are pending.
+PR 576 merged as `254499406` and deployed through Supabase run 37234778070.
+The minute reader selected all 62 remaining lots at 21:08 UTC. By 21:11 UTC
+they all had sourced terminal outcomes; eligible/missing counts were both zero.
+This is late recovery of the interrupted closing session, not live-close proof.
+
+The 62-lot backfill exposed a control-loop stall: the admission queue drained
+before another heartbeat or protocol ping, causing public_socket_heartbeat_missing.
+The bounded follow-up lets admission drain independently while socket controls
+continue each second. FIFO receipt order and the canonical intake stay intact.
+Its blocked-admission regression verifies continued pings/connected heartbeats;
+production rollout and timing verification of that repair remain pending.
 
 The existing source reader recovered the reported Mustang at 20:49 UTC:
 canonical sold result 123000, buyer robsq22, native sold_at 17:39:28 UTC,
 14 bids. The anonymous production profile showed SOLD $123,000 after reload.
 The open page received pulse updates but other auction readers retained stale
-data; whole-page delivery still needs verification. No waiting production locks.
+data; PR 577 fixes shared price/comment/sequence invalidation and is merged,
+with production deployment still pending at this evidence stage. No waiting production locks.
 Live-second performance under production closing load remains unmeasured.
 
 The reported Mustang (`45122195-393d-4c00-83a2-5b517ae9ce44`, BaT post

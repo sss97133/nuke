@@ -52,6 +52,8 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   let stopped = false, socket: WebSocket | null = null, lastServerAt = 0, lastPingAt = 0;
   let lastHeartbeatAt = 0, lastRecoveryAt = 0, lastError: string | null = null;
   let reconnectAt = 0;
+  let admissionTask: Promise<void> | null = null;
+  let heartbeatTask: Promise<void> | null = null;
   const buffer = new BatLiveBuffer(async frames => {
     await io.admit(frames, []);
     for (const f of frames) {
@@ -126,6 +128,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   const expiresAt = Date.now() + durationMs;
   try {
     while (Date.now() < expiresAt) {
+      const tickStartedAt = Date.now();
       const activeSocket = currentSocket();
       if ((!activeSocket || activeSocket.readyState > 1) && Date.now() >= reconnectAt) connect();
       if (activeSocket?.readyState === 0 && Date.now() >= reconnectAt) activeSocket.close();
@@ -135,25 +138,35 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       if (activeSocket?.readyState === 1 && lastServerAt && Date.now() - lastServerAt > 3000) {
         lastError = "public_socket_heartbeat_missing"; activeSocket.close();
       }
-      try { await buffer.flush(); if (lastError?.startsWith("admission:")) lastError=null; }
-      catch (error) { lastError = `admission:${String(error)}`.slice(0, 500); }
+      // Admission can drain thousands of historical comments. Keep the source
+      // connection and coverage clock running while that independent task waits
+      // for acknowledgements, preserving the existing receipt/recovery order.
+      if (!admissionTask) admissionTask = buffer.flush()
+        .then(() => { if (lastError?.startsWith("admission:")) lastError = null; })
+        .catch(error => { lastError = `admission:${String(error)}`.slice(0, 500); })
+        .finally(() => { admissionTask = null; });
       if (Date.now() - lastRecoveryAt > 45000) {
         for (const target of targets) if (acknowledged.has(`post;single;${target.post_id}`)) scheduleRecovery(target);
         lastRecoveryAt = Date.now();
       }
-      if (Date.now() - lastHeartbeatAt >= 1000) {
+      if (!heartbeatTask && Date.now() - lastHeartbeatAt >= 1000) {
         const at = new Date().toISOString();
-        await io.admit([], targets.map(t => ({ monitored_auction_id: t.id, session_id: sessionId, at,
+        heartbeatTask = io.admit([], targets.map(t => ({ monitored_auction_id: t.id, session_id: sessionId, at,
           connected: ["single", "stats", "list"].every(type => acknowledged.has(`post;${type};${t.post_id}`)),
-          pending: buffer.pending, oldest_received_at: buffer.oldestReceivedAt, error: recoveryErrors.get(t.id) || lastError })));
+          pending: buffer.pending, oldest_received_at: buffer.oldestReceivedAt, error: recoveryErrors.get(t.id) || lastError })))
+          .then(() => { if (lastError?.startsWith("coverage:")) lastError = null; })
+          .catch(error => { lastError = `coverage:${String(error)}`.slice(0, 500); })
+          .finally(() => { heartbeatTask = null; });
         lastHeartbeatAt = Date.now();
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, 1000 - (Date.now() - tickStartedAt))));
     }
   } finally {
     stopped = true;
     currentSocket()?.close();
     await Promise.allSettled([...tasks]);
+    if (heartbeatTask) await heartbeatTask;
+    if (admissionTask) await admissionTask;
     await buffer.flush();
     // Leave the other overlapping worker's session intact.
     await io.admit([], targets.map(t => ({ monitored_auction_id: t.id, session_id: sessionId, at: new Date().toISOString(),
