@@ -45,6 +45,7 @@ describe('qualified cohort sale-price reader UI', () => {
     expect(container.textContent).toContain('10 qualified source lots from 20 public cohort records');
     expect(container.textContent).toContain('Condition and equipment remain unmatched');
     expect(container.textContent).toContain('Earlier sales discovered later');
+    expect(container.textContent).toContain('actual snapshot ingestion');
     expect(container.textContent).toContain('4 lower · 1 equal · 5 higher');
     expect(container.textContent).toContain('condition at sale');
   });

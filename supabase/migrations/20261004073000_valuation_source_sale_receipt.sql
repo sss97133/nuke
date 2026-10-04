@@ -95,7 +95,7 @@ BEGIN
   ), snapshots AS MATERIALIZED (
     -- Mutable vehicle metadata is a locator only. Identity, parse clock and
     -- source body come from the service-written, RLS-protected snapshot row.
-    SELECT f.*,s.id AS found_snapshot_id,s.fetched_at,s.html_sha256 AS source_sha256,
+    SELECT f.*,s.id AS found_snapshot_id,s.fetched_at,s.created_at AS source_ingested_at,s.html_sha256 AS source_sha256,
       CASE WHEN s.metadata->>'parsed_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$'
         AND pg_input_is_valid(s.metadata->>'parsed_at','timestamptz') THEN (s.metadata->>'parsed_at')::timestamptz END AS parsed_at,
       s.success IS TRUE AND s.http_status=200 AND s.platform='bat'
@@ -119,7 +119,7 @@ BEGIN
         '(Sold\s+for|Bid\s+to)\s+<strong>(\w+)\s*\$?([\d,]+)</strong>\s*<span[^>]*>on\s+(\d+/\d+/\d+)','ig') m
     ) r ON true
   ), source_fields AS MATERIALIZED (
-    SELECT r.*,greatest(r.parsed_at,r.fetched_at) AS known_at,r.raw_currency AS currency,
+    SELECT r.*,greatest(r.parsed_at,r.fetched_at,r.source_ingested_at) AS known_at,r.raw_currency AS currency,
       pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(r.source_html,'UTF8')),'hex')=r.source_sha256 AS source_hash_matches,
       CASE WHEN raw_price ~ '^([0-9]{1,3}(,[0-9]{3})+|[0-9]+)$'
         AND pg_input_is_valid(replace(raw_price,',',''),'numeric') THEN replace(raw_price,',','')::numeric END AS source_amount,
@@ -148,7 +148,9 @@ BEGIN
       WHEN currency IS NULL OR currency NOT IN ('USD','EUR','GBP') THEN 'currency_unknown'
       WHEN currency<>p_currency THEN 'different_currency'
       WHEN raw_status IS DISTINCT FROM 'sold' OR source_amount IS DISTINCT FROM sold_amount OR date_matches IS NOT TRUE THEN 'source_sale_conflict'
-      WHEN parsed_at IS NULL OR fetched_at IS NULL OR fetched_at>parsed_at OR fetched_at<(sold_on::timestamptz) THEN 'clock_unknown_or_conflicting'
+      WHEN parsed_at IS NULL OR fetched_at IS NULL OR source_ingested_at IS NULL
+        OR NOT isfinite(parsed_at) OR NOT isfinite(fetched_at) OR NOT isfinite(source_ingested_at)
+        OR fetched_at>parsed_at OR fetched_at<(sold_on::timestamptz) THEN 'clock_unknown_or_conflicting'
       WHEN known_at>v_known THEN 'learned_later'
       ELSE NULL END AS exclusion
     FROM evidence e
@@ -162,7 +164,8 @@ BEGIN
       AND source_url ~* '^https?://(www\.)?bringatrailer\.com/listing/[^/?#]+/?([?#].*)?$'
       AND source_day::timestamptz>=v_from AND (source_day+1)::timestamptz<=v_before
       AND currency IN ('USD','EUR','GBP') AND known_at<=v_known
-      AND parsed_at IS NOT NULL AND fetched_at IS NOT NULL AND fetched_at<=parsed_at
+      AND parsed_at IS NOT NULL AND fetched_at IS NOT NULL AND source_ingested_at IS NOT NULL
+      AND isfinite(parsed_at) AND isfinite(fetched_at) AND isfinite(source_ingested_at) AND fetched_at<=parsed_at
       AND fetched_at>=source_day::timestamptz AND exclusion IS DISTINCT FROM 'subject'
     GROUP BY source_key
   ), coherent AS MATERIALIZED (
@@ -214,7 +217,7 @@ BEGIN
       'exclusions',coalesce((SELECT jsonb_object_agg(exclusion,n) FROM (SELECT exclusion,count(*) AS n FROM classified WHERE exclusion IS NOT NULL GROUP BY exclusion) x),'{}'::jsonb),
       'eligible',coalesce((SELECT jsonb_agg(jsonb_build_object('vehicleId',id,'sourceUrl','https://'||source_key||'/','sourceKey',source_key,'amount',sold_amount,'outcome','sold',
         'eventAt',sold_on,'knownAt',known_at,'currency',currency,'priceBasis','published_bid_excluding_fees','unitSource','https://'||source_key||'/',
-        'conditionEvidence','unknown','snapshotId',found_snapshot_id,'sourceSha256',source_sha256,'snapshotFetchedAt',fetched_at,'parsedAt',parsed_at,'sourceParser','batParser:1.0.0_sale_grammar_with_ambiguity_refusal','soldAmountFrom',sold_amount_from)
+        'conditionEvidence','unknown','snapshotId',found_snapshot_id,'sourceSha256',source_sha256,'snapshotFetchedAt',fetched_at,'snapshotCreatedAt',source_ingested_at,'parsedAt',parsed_at,'sourceParser','batParser:1.0.0_sale_grammar_with_ambiguity_refusal','soldAmountFrom',sold_amount_from)
         ORDER BY sold_on,source_key) FROM dedup),'[]'::jsonb)
     )) INTO v_result FROM totals t;
   RETURN v_result;
@@ -224,6 +227,6 @@ $function$;
 REVOKE ALL ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) TO anon,authenticated,service_role;
 COMMENT ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) IS
-'Public-parent gated cohort sale-price reader, bounded to 10000 members with cap refusal. Existing price facts supply one current recorded sale per vehicle, not a transaction history. Eligibility requires sold/date/source plus independently reparsed raw HTML amount/date/status/currency from a referenced successful same-source, matched-vehicle protected snapshot. Mutable origin metadata is a locator only. Source event interval is inside event window; parsed/snapshot clocks precede knowledge cutoff. Full source-lot dedup/conflict checks; original units, no inflation/FX/buyer fee adjustment. Midrank=(below+equal/2)/N, minimum10 policy is not calibration. Condition/equipment unmatched; no over/under fair-value claim, historic condition or revisioned fleet assessment. Definer reads admin-only raw snapshot attribution but returns sanitized evidence for explicitly public/nondeleted real vehicle parents only; no policy grant or testimony write.';
+'Public-parent gated cohort sale-price reader, bounded to 10000 members with cap refusal. Existing price facts supply one current recorded sale per vehicle, not a transaction history. Eligibility requires sold/date/source plus independently reparsed raw HTML amount/date/status/currency from a referenced successful same-source, matched-vehicle protected snapshot. Mutable origin metadata is a locator only. Source event interval is inside event window; protected parse/capture and actual snapshot-row ingestion clocks precede knowledge cutoff; knownAt is their maximum, with snapshotCreatedAt exposed separately. Full source-lot dedup/conflict checks; original units, no inflation/FX/buyer fee adjustment. Midrank=(below+equal/2)/N, minimum10 policy is not calibration. Condition/equipment unmatched; no over/under fair-value claim, historic condition or revisioned fleet assessment. Definer reads admin-only raw snapshot attribution but returns sanitized evidence for explicitly public/nondeleted real vehicle parents only; no policy grant or testimony write.';
 NOTIFY pgrst,'reload schema';
 COMMIT;

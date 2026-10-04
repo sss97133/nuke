@@ -253,7 +253,7 @@ export default function Valuation() {
         <div>{receipt.cohort.label} · {receipt.coverage.qualified_sales} qualified source lots from {receipt.coverage.member_rows} public cohort records · {receipt.currency}</div>
         <div>Source sales from {fmtDate(receipt.event_from)} before {fmtDate(receipt.event_before)}. Evidence through {receipt.evidence_as_of.replace('T',' ')}.</div>
         <div>Earlier sales discovered later can enter this retrospective comparison. Current recorded sale per vehicle; earlier resales may be missing.</div>
-        <div>Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
+        <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
         <div>Published winning bid excludes buyer fees, taxes and transport (<a href="https://bringatrailer.com/policies/" target="_blank" rel="noreferrer">BaT policy</a>). Original currency; no inflation or exchange-rate adjustment. Condition and equipment remain unmatched.</div>
         <div>Current condition field present on {receipt.coverage.condition_scalar_recorded}/{receipt.coverage.qualified_sales}; this does not establish condition at sale. Body {receipt.coverage.body_recorded}, engine {receipt.coverage.engine_recorded}, transmission {receipt.coverage.transmission_recorded}. Visual condition, comment evidence and bid-log coverage are unmeasured.</div>
         {comparison?.percentile != null && <div>{comparison.counts.below} lower · {comparison.counts.equal} equal · {comparison.counts.above} higher. Ties receive half weight. This price position does not establish fair value or a profitable bid.</div>}

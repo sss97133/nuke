@@ -28,7 +28,7 @@ CREATE TABLE public.vehicles (
 );
 CREATE INDEX ON public.vehicles(lower(make),year,lower(model));
 CREATE TABLE public.listing_page_snapshots (
-  id uuid PRIMARY KEY, listing_url text, fetched_at timestamptz, success boolean, http_status integer, html text, platform text, metadata jsonb, html_sha256 text
+  id uuid PRIMARY KEY, listing_url text, fetched_at timestamptz, success boolean, http_status integer, html text, platform text, metadata jsonb, html_sha256 text, created_at timestamptz NOT NULL
 );
 ALTER TABLE public.listing_page_snapshots ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.listing_page_snapshots TO anon,authenticated;
@@ -58,7 +58,8 @@ BEGIN
     coalesce((d->>'fetched_at')::timestamptz,'2025-06-16T00:00:00Z'),coalesce((d->>'success')::boolean,true),200,
     CASE WHEN d ? 'html' THEN d->>'html' ELSE 'PRIVATE RAW HTML Sold for <strong>'||coalesce(d->>'raw_currency',d->>'currency','USD')||' $'||coalesce(d->>'raw_price',amount::text)||'</strong> <span>on '||coalesce(d->>'raw_date',to_char(sale_day,'FMMM/FMDD/YY')) END,coalesce(d->>'platform','bat'),
     jsonb_build_object('vehicle_id',coalesce(d->>'protected_vehicle_id',vid::text),'vehicle_matched',true,
-      'parsed_at',coalesce(d->>'protected_parsed_at','2025-06-16T12:00:00Z')),NULL);
+      'parsed_at',coalesce(d->>'protected_parsed_at','2025-06-16T12:00:00Z')),NULL,
+    coalesce((d->>'ingested_at')::timestamptz,'2025-06-16T06:00:00Z'));
   UPDATE public.listing_page_snapshots SET html_sha256=encode(sha256(convert_to(html,'UTF8')),'hex') WHERE id=sid;
   INSERT INTO public.vehicles(id,year,make,model,sale_status,sale_price,sale_date,listing_url,canonical_platform,is_public,deleted_at,listing_kind,condition_rating,body_style,origin_metadata)
   VALUES(vid,1970,'Synthetic','Coupe',coalesce(d->>'status','sold'),amount,sale_day,source_url,'bat',coalesce((d->>'public')::boolean,true),
@@ -109,6 +110,15 @@ UPDATE public.vehicles SET sale_price=8000 WHERE id=md5('vehicle-11')::uuid;
 SELECT pg_temp.ok('mutable alias price cannot veto an agreeing protected source receipt',pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,exclusions,source_sale_conflict}'='1');
 UPDATE public.vehicles SET sale_status='not_sold' WHERE id=md5('vehicle-11')::uuid;
 SELECT pg_temp.ok('old source clock cannot date a new mutable outcome veto',pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='0');
+
+SELECT pg_temp.base();
+SELECT pg_temp.seed(11,'{"ingested_at":"2026-01-02T00:00:00Z"}');
+SELECT pg_temp.ok('late snapshot row ingestion refuses earlier known-at even with old capture and parse clocks',pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{stats,sold_count}'='10' AND pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{receipt,exclusions,learned_later}'='1');
+SELECT pg_temp.ok('retrospective receipt exposes actual source row ingestion as the maximum known clock',pg_temp.read()#>>'{stats,sold_count}'='11' AND EXISTS(SELECT 1 FROM jsonb_array_elements(pg_temp.read()#>'{receipt,eligible}') e WHERE e->>'vehicleId'=md5('vehicle-11')::uuid::text AND (e->>'snapshotCreatedAt')::timestamptz='2026-01-02T00:00:00Z' AND (e->>'knownAt')::timestamptz=(e->>'snapshotCreatedAt')::timestamptz));
+SELECT pg_temp.seed(12,'{"source_number":"1","amount":8000,"ingested_at":"2026-01-02T00:00:00Z"}');
+SELECT pg_temp.ok('late-ingested conflicting alias cannot veto an earlier qualified source lot',pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{stats,sold_count}'='10' AND pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{receipt,coverage,conflicting_source_lots}'='0');
+SELECT pg_temp.seed(13,'{"ingested_at":"infinity"}');
+SELECT pg_temp.ok('nonfinite protected ingestion clock is unknown, never qualifying evidence',pg_temp.read()#>>'{receipt,exclusions,clock_unknown_or_conflicting}'='1');
 
 SELECT pg_temp.base();
 SELECT pg_temp.seed(11,'{"raw_currency":"UNKNOWN"}');
