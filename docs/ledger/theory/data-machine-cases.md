@@ -148,7 +148,7 @@ and ingest time are distinct; photograph capture time and model identity remain 
 those limits and warns that multiple views from one source family are not independent confirmations. The
 canonical “Teal Blue” remains a listing claim; this trace does not prove the appearance claim changed that field.
 
-Operating coverage remains open: the live atlas reports NULL `writers_30d` and `last_write` for
+Operating evidence at this check: the live atlas reported NULL `writers_30d` and `last_write` for
 `vehicle_observations`, `observation_witnesses` and `vehicle_images`. The witness projector has a registered owner,
 but its registry entry explicitly records no scheduled cadence/health reader registered by that migration.
 Sample success does not establish corpus throughput, historical coverage or a completeness alarm. Continue
@@ -156,6 +156,25 @@ through the existing receipt/health machinery; do not recreate the repaired clas
 store. Preserve the paused drain and OWNER-OFF desktop intake. No intake, replay, model call, production write or
 schedule change was initiated by this trace. Private evidence: `~/nuke-logs/observation-trace-2026-10-03/trace-receipt.json`;
 prior intake/replay evidence: `~/nuke-logs/dm-ui/image-witness-live-deployment-receipt.json`.
+
+**C17 receipt coverage implementation.** Migration `20261004052152_observe_image_observation_writes.sql`
+attaches the existing `record_write_receipt()` INSERT observer to observations, witnesses and images.
+`ingest-observation` declares its writer on its actual database requests. These labels are producer declarations,
+not authorization; image analysis UPDATEs and historic arrivals are outside this sensor coverage.
+Run the bounded read-only check after CI deployment, with `--since` set to that deployment's time:
+
+```bash
+bash scripts/check-ingestion-health.sh --image-observations \
+  --vehicle <public-vehicle-uuid> --since <deployment-ISO-time> --field interior_color
+```
+
+It checks at most 1,000 observations plus a truncation sentinel for one vehicle and ingest window, same-vehicle
+image links, typed witnesses, public reader citations, enabled sensors and recent table-level receipts. Exit 0
+means `passed_in_scope`; exit 1 means failed/unknown query or missing evidence; exit 2 means incomplete, including
+no eligible arrivals, no measured reader, undeclared writers or truncation. Receipt presence alone is not
+per-observation coverage proof. No new schedule, processing, model call or historical replay is implied.
+Detector failure tests run in the local ENFORCE gate; disposable PG17 fixtures test actual sensor and SQL behavior.
+C17 stays open for processing coverage, historical edges and a scheduled completeness assay.
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 

@@ -66,6 +66,8 @@ if [ "${CI_BUILD:-0}" = 1 ]; then
 fi
 
 echo "• guardrails (ratchet)…"
+if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >/tmp/ci_image_health_tests.out 2>&1; then grn "  ✓ image-health failure assays"
+else red "  ✗ image-health failure assays FAILED"; cat /tmp/ci_image_health_tests.out; fail=1; fi
 if node --test "$GD/no-raw-fetch.test.mjs" >/tmp/ci_rawfetch_tests.out 2>&1; then grn "  ✓ raw-fetch regression tests"
 else red "  ✗ raw-fetch regression tests FAILED"; cat /tmp/ci_rawfetch_tests.out; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"

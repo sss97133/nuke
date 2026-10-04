@@ -2,6 +2,13 @@
 # Quick ingestion health check script
 # Run: bash scripts/check-ingestion-health.sh
 
+# Bounded C17 mode uses the existing read-only Management API path. It never
+# invokes a consumer, model or intake writer. Other legacy modes stay separate.
+if [ "${1:-}" = "--image-observations" ]; then
+    shift
+    exec node "$(dirname "$0")/check-image-observation-health.mjs" "$@"
+fi
+
 echo "🔍 INGESTION HEALTH CHECK"
 echo "========================="
 echo ""
@@ -74,4 +81,3 @@ SELECT
 FROM cron.job
 WHERE jobname LIKE '%import%' OR jobname LIKE '%queue%';
 "
-

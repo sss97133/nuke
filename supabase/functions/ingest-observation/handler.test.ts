@@ -21,14 +21,15 @@ const input = {
 };
 
 async function run(body: unknown, scenario: string, token = "test-key") {
-  const calls: { path: string; method: string; body?: Record<string, unknown> }[] = [];
+  const calls: { path: string; method: string; writer: string | null; body?: Record<string, unknown> }[] = [];
   const originalFetch = globalThis.fetch;
   let observationReads = 0;
   globalThis.fetch = async (request, options) => {
     const url = new URL(typeof request === "string" ? request : request instanceof URL ? request.href : request.url);
     const method = options?.method || "GET";
     const payload = typeof options?.body === "string" ? JSON.parse(options.body) : undefined;
-    calls.push({ path: url.pathname, method, body: payload });
+    const headers = new Headers(options?.headers ?? (request instanceof Request ? request.headers : undefined));
+    calls.push({ path: url.pathname, method, writer: headers.get("x-nuke-writer"), body: payload });
     const response = (data: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(data), {
       status, headers: { "Content-Type": "application/json" },
     }));
@@ -67,6 +68,7 @@ Deno.test("property insert binds FK, caps inference, retains zero cost, defers i
   assert(insert?.body?.property_id === UUID);
   assert(insert?.body?.confidence_score === .6);
   assert(insert?.body?.agent_cost_cents === 0);
+  assert(insert?.writer === "ingest-observation", "the actual log HTTP request must declare its receipt writer");
   assert(!r.calls.some(call => call.path.endsWith("analysis-engine-coordinator")));
 });
 Deno.test("normal intake retains downstream coordinator behavior", async () => {
