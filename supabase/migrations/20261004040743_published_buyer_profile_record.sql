@@ -1,4 +1,4 @@
--- LOCAL FOLLOW-UP PROPOSAL; production approval/deployment remains separate.
+-- Repair existing account refresh and qualify the public profile metric reader.
 -- Live PG17.6, 2026-10-04: refresh_bat_user_profile wrongly counts each user's
 -- own maximum bid on a sold vehicle as a win, without reading the buyer.
 -- Indexed first-1,000-username sample: 997 NULL win_rate/first_seen, 997 default
@@ -196,33 +196,29 @@ COMMENT ON COLUMN public.bat_user_profiles.updated_at IS
 INSERT INTO public.pipeline_registry
   (table_name,column_name,owned_by,description,do_not_write_directly,write_via)
 VALUES
-  ('bat_user_profiles','total_wins','bat_profile_fold',
+  ('bat_user_profiles','total_wins','refresh_bat_user_profile',
    'Published buyer evidence at canonical BaT source-listing grain; NULL without eligible closed participation.',true,'refresh_bat_user_profile'),
-  ('bat_user_profiles','win_rate','bat_profile_fold',
+  ('bat_user_profiles','win_rate','refresh_bat_user_profile',
    'Published awards / eligible captured closed bidding presentations; metadata carries exclusions. Not historical as-of.',true,'refresh_bat_user_profile'),
-  ('bat_user_profiles','community_trust_score','bat_profile_fold',
+  ('bat_user_profiles','community_trust_score','refresh_bat_user_profile',
    'Legacy uncalibrated source-like transform; NULL without measured source count.',true,'refresh_bat_user_profile')
 ON CONFLICT (table_name,column_name) DO NOTHING;
 
--- One conceptual fold, with event INSERT and one-account replay as disjoint
--- maintenance modes. Shared counts use the identical comment_type=bid recipe.
+-- Preserve the existing canonical INSERT owner. One-account refresh is the
+-- sanctioned replay mode, using the identical comment_type=bid recipe.
 INSERT INTO public.pipeline_registry
   (table_name,column_name,owned_by,description,do_not_write_directly,write_via)
 VALUES
-  ('bat_user_profiles','total_comments','bat_profile_fold',
+  ('bat_user_profiles','total_comments','update_user_profile_from_comment',
    'Exact identifiable BaT handle comment count; defective pre-replay baseline is declared by missing bat_bidder_record method.',true,'update_user_profile_from_comment; replay via refresh_bat_user_profile'),
-  ('bat_user_profiles','total_bids','bat_profile_fold',
+  ('bat_user_profiles','total_bids','update_user_profile_from_comment',
    'Exact identifiable BaT handle comments with comment_type=bid; same INSERT/replay recipe, defective pre-replay baseline declared by missing method.',true,'update_user_profile_from_comment; replay via refresh_bat_user_profile'),
-  ('bat_user_profiles','first_seen','bat_profile_fold',
+  ('bat_user_profiles','first_seen','update_user_profile_from_comment',
    'Source posted_at minimum; INSERT widens event bounds, replay rebuilds the BaT source minimum. Legacy baseline is defective until replay.',true,'update_user_profile_from_comment; replay via refresh_bat_user_profile'),
-  ('bat_user_profiles','last_seen','bat_profile_fold',
+  ('bat_user_profiles','last_seen','update_user_profile_from_comment',
    'Source posted_at maximum; INSERT widens event bounds, replay rebuilds the BaT source maximum. Legacy baseline is defective until replay.',true,'update_user_profile_from_comment; replay via refresh_bat_user_profile')
 ON CONFLICT (table_name,column_name) DO NOTHING;
 
--- Align the earlier identity-edge registration with the conceptual owner;
--- its sanctioned INSERT writer remains unchanged. Do not steal another owner.
-UPDATE public.pipeline_registry SET owned_by='bat_profile_fold'
-WHERE table_name='bat_user_profiles' AND column_name='external_identity_id'
-  AND owned_by='update_user_profile_from_comment';
+-- Existing external_identity_id owner registration remains unchanged.
 
 COMMIT;

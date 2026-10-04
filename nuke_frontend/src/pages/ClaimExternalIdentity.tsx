@@ -20,7 +20,7 @@ interface IdentityResult {
     trust_score: number | null;
     active_since: string | null;
     last_active: string | null;
-    basis?: { counts: string };
+    basis?: { counts: string; awards?: string };
   } | null;
 }
 
@@ -467,7 +467,7 @@ const ClaimExternalIdentity: React.FC = () => {
                       {identity.stats.bids !== null && (
                         <div><strong style={{ color: 'var(--text)' }}>{identity.stats.bids.toLocaleString()}</strong> captured bids</div>
                       )}
-                      {identity.stats.wins !== null && identity.stats.wins > 0 && (
+                      {identity.stats.basis?.awards === 'published_buyer_evidence' && identity.stats.wins !== null && identity.stats.wins > 0 && (
                         <div><strong style={{ color: 'var(--text)' }}>{identity.stats.wins}</strong> published wins</div>
                       )}
                       {identity.stats.basis?.counts === 'legacy_baseline_unreplayed' && (

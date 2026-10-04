@@ -101,6 +101,20 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.pipeline_registry
+      WHERE table_name='bat_user_profiles' AND column_name='external_identity_id'
+        AND owned_by='update_user_profile_from_comment')
+    OR (SELECT count(*) FROM public.pipeline_registry WHERE table_name='bat_user_profiles'
+      AND column_name IN ('total_comments','total_bids','first_seen','last_seen')
+      AND owned_by='update_user_profile_from_comment') <> 4
+    OR (SELECT count(*) FROM public.pipeline_registry WHERE table_name='bat_user_profiles'
+      AND column_name IN ('total_wins','win_rate','community_trust_score')
+      AND owned_by='refresh_bat_user_profile') <> 3 THEN
+    RAISE EXCEPTION 'Actual canonical INSERT/replay owners must remain registered';
+  END IF;
+END $$;
+
 SELECT public.refresh_bat_user_profile('winner');
 SELECT public.refresh_bat_user_profile('loser');
 SELECT public.refresh_bat_user_profile('unknown_only');
