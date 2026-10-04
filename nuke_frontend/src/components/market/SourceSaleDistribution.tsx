@@ -53,7 +53,7 @@ export default function SourceSaleDistribution(props: SourceSaleGraphProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const sourceRows = useMemo(() => [...sales].sort((a, b) => (a.eventAt ?? '').localeCompare(b.eventAt ?? '') || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')), [sales]);
   const rows = useMemo(() => view === 'timeline' ? sourceRows : [...sourceRows].sort((a,b) => (a.amount ?? 0) - (b.amount ?? 0) || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')), [sourceRows, view]);
-  if (!rows.length) return null;
+  if (!rows.length) return props.cohortAction ? <div className="source-sales-cohort-action">{props.cohortAction}</div> : null;
   const valid = rows.every(r => r.outcome === 'sold' && r.currency === currency && r.priceBasis === 'published_bid_excluding_fees'
     && r.amount != null && Number.isFinite(r.amount) && r.amount > 0 && day(r.eventAt) != null && sourceUrl(r.sourceUrl)
     && sourceUrl(r.unitSource) === sourceUrl(r.sourceUrl)

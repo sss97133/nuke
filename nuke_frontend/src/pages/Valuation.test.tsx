@@ -62,6 +62,12 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('qualified cohort sale-price reader UI', () => {
+  it('retains the existing all-years action when no source sale qualifies, without rendering an empty price graph', async () => {
+    fixture.rpc.mockResolvedValue({ data: evidence(0), error: null }); await render();
+    expect(container.querySelector('svg')).toBeNull();
+    expect([...container.querySelectorAll('button')].filter(b => b.textContent === 'All recorded model years')).toHaveLength(1);
+    expect(container.textContent).not.toContain('50.0 percentile');
+  });
   it('pages the whole qualified receipt rather than the ten-lot recent preview without sampling the calculation', async () => {
     const data = evidence(33);
     fixture.rpc.mockResolvedValue({ data, error: null }); await render();
