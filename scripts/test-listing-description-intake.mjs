@@ -279,7 +279,7 @@ test('explicit historical append crosses actual canonical intake with exact arch
   assert.equal(row.structured_data.source_captured_at, f.snapshot.fetched_at);
   assert.equal(row.structured_data.source_archive_ingested_at, f.snapshot.created_at);
   assert.equal(row.structured_data.source_text_field, 'listing_page_snapshots.html:batParser.extractDescription');
-  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.2.5');
+  assert.equal(row.structured_data.extractor_version, 'extract-bat-core:4.3.0');
   assert.equal(row.structured_data.source_event_time_status, 'unknown');
   assert.equal(row.raw_source_ref, `listing_page_snapshots:${f.snapshot.id}`);
   assert.equal(row.source_identifier, row.raw_source_ref);
