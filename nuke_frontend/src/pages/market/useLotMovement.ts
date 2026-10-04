@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 
 // The latest bids and comments on a handful of live lots (the homepage's Ending next panel), each weighted against
-// the lot's own usual pace. One read of auction_comments for all the lots (index on vehicle_id; 1 ms as anon for
-// 8 lots on 2026-09-30), newest 40 rows, refreshed every minute. Authors are never selected, so never shown.
+// the lot's own usual pace. The current-listing reader gates each public vehicle and accepts the source URL's
+// trailing-slash alias, then returns at most 40 posted interactions per lot, for at most 8 lots. Historical
+// auctions on the same vehicle cannot enter the current window. Refreshing every minute is a reader cadence;
+// source freshness is separately known or unknown. Authors are never selected, so never shown.
 
 export const MOVEMENT_ROWS = 40;
 
@@ -24,14 +27,48 @@ export interface LotMovement {
   total: number | null; // the lot's comment count so far (highest sequence number in view)
   hoursListed: number | null; // since the lot opened
   burst: number | null; // lastHour / (total / hoursListed)
+  sourceReadAt: number | null; // actual page read; never the browser/vehicle-row write clock
+  sourceReadBasis: 'direct_fetch' | 'cached_snapshot' | 'unknown';
+  readAsOf: number;
 }
 
-interface Row {
+export interface Row {
   vehicle_id: string;
   posted_at: string;
   comment_type: string | null;
   bid_amount: number | string | null;
   sequence_number: number | null;
+  source_url?: string;
+  window_truncated?: boolean;
+  read_as_of?: string;
+  source_read_at?: string | null;
+  source_read_basis?: LotMovement['sourceReadBasis'];
+}
+
+export interface ActivityReceipt {
+  as_of: string;
+  max_lots: number;
+  per_lot_limit: number;
+  input_truncated: boolean;
+  eligible_lots: number;
+  scope: string;
+  lots: Array<{
+    vehicle_id: string;
+    source_url: string;
+    source_read_at: string | null;
+    source_read_basis: LotMovement['sourceReadBasis'];
+    activity_rows: number;
+    has_more: boolean;
+    activity: Row[];
+  }>;
+}
+
+/** Keep the existing hook's row contract while carrying the bounded per-lot read receipt. */
+export function activityRows(receipt: ActivityReceipt): Row[] {
+  return receipt.lots.flatMap(lot => lot.activity.map(row => ({
+    ...row, window_truncated: lot.has_more, read_as_of: receipt.as_of,
+    source_read_at: lot.source_read_at, source_read_basis: lot.source_read_basis,
+  })));
 }
 
 function median(xs: number[]): number | null {
@@ -55,12 +92,18 @@ const HOUR = 3_600_000;
 export const RUN_MS = 7 * 24 * HOUR;
 
 export function weigh(rows: Row[], endsAt: Map<string, number>, now: number): Map<string, LotMovement> {
-  const oldest = rows.length ? Math.min(...rows.map((r) => Date.parse(r.posted_at))) : now;
-  const truncated = rows.length >= MOVEMENT_ROWS && oldest > now - HOUR;
   const byLot = new Map<string, Row[]>();
-  for (const r of rows) byLot.set(r.vehicle_id, [...(byLot.get(r.vehicle_id) ?? []), r]);
+  for (const r of rows) {
+    const at = Date.parse(r.posted_at);
+    if (!Number.isFinite(at)) continue;
+    byLot.set(r.vehicle_id, [...(byLot.get(r.vehicle_id) ?? []), r]);
+  }
   const out = new Map<string, LotMovement>();
   for (const [id, lotRows] of byLot) {
+    const stamp = Date.parse(lotRows[0].read_as_of ?? '');
+    const asOf = Number.isFinite(stamp) ? stamp : now;
+    const oldest = Math.min(...lotRows.map(r => Date.parse(r.posted_at)));
+    const truncated = (lotRows[0].window_truncated ?? lotRows.length >= MOVEMENT_ROWS) && oldest > asOf - HOUR;
     const asc = [...lotRows].sort((a, b) => Date.parse(a.posted_at) - Date.parse(b.posted_at));
     const items: MovementItem[] = [];
     const steps: number[] = [];
@@ -78,8 +121,8 @@ export function weigh(rows: Row[], endsAt: Map<string, number>, now: number): Ma
     const seqs = lotRows.map((r) => r.sequence_number).filter((n): n is number => n != null);
     const total = seqs.length ? Math.max(...seqs) : null;
     const end = endsAt.get(id);
-    const hoursListed = end != null ? Math.min(RUN_MS, now - (end - RUN_MS)) / HOUR : null;
-    const lastHour = items.filter((i) => i.at > now - HOUR).length;
+    const hoursListed = end != null ? Math.min(RUN_MS, asOf - (end - RUN_MS)) / HOUR : null;
+    const lastHour = items.filter((i) => i.at > asOf - HOUR && i.at <= asOf).length;
     const rate = total != null && hoursListed != null && hoursListed >= 1 ? total / hoursListed : null;
     out.set(id, {
       items: items.reverse(),
@@ -90,24 +133,24 @@ export function weigh(rows: Row[], endsAt: Map<string, number>, now: number): Ma
       total,
       hoursListed,
       burst: rate && rate > 0 ? lastHour / rate : null,
+      sourceReadAt: Number.isFinite(Date.parse(lotRows[0].source_read_at ?? '')) ? Date.parse(lotRows[0].source_read_at!) : null,
+      sourceReadBasis: lotRows[0].source_read_basis ?? 'unknown',
+      readAsOf: asOf,
     });
   }
   return out;
 }
 
-async function fetchMovement(ids: string[]): Promise<Row[]> {
-  const { data, error } = await supabase
-    .from('auction_comments')
-    .select('vehicle_id, posted_at, comment_type, bid_amount, sequence_number')
-    .in('vehicle_id', ids)
-    .order('posted_at', { ascending: false })
-    .limit(MOVEMENT_ROWS);
+async function fetchMovement(ids: string[]): Promise<ActivityReceipt> {
+  const { data, error } = await supabase.rpc('market_lot_activity', {
+    p_vehicle_ids: ids.slice(0, 8), p_limit_per_lot: MOVEMENT_ROWS,
+  });
   if (error) throw error;
-  return (data ?? []) as Row[];
+  return data as ActivityReceipt;
 }
 
 export function useLotMovement(ids: string[]) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['lot-movement', ids.join(',')],
     queryFn: () => fetchMovement(ids),
     enabled: ids.length > 0,
@@ -115,4 +158,6 @@ export function useLotMovement(ids: string[]) {
     staleTime: 30_000,
     retry: 1,
   });
+  const data = useMemo(() => query.data ? activityRows(query.data) : undefined, [query.data]);
+  return { ...query, data, coverage: query.data };
 }
