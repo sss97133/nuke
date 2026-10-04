@@ -1,0 +1,118 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { assess, options, query, run, SAMPLE_LIMIT } from './check-image-observation-health.mjs';
+
+const scope = { vehicle: '10000000-0000-0000-0000-000000000001', since: '2026-10-04T05:00:00Z', field: 'interior_color' };
+function fixture() {
+  return {
+    assay: 'image_observation_health_v1', sample_limit: SAMPLE_LIMIT,
+    metrics: { sampled: 1, image_claims: 1, excluded_share: 0, invalid_image_refs: 0, missing_images: 0,
+      mismatched_vehicles: 0, eligible: 1, missing_witnesses: 0, fresh_witnesses: 1, fresh_images: 1,
+      reader_eligible: 1, reader_missing: 0 },
+    sensors: ['vehicle_observations', 'observation_witnesses', 'vehicle_images'].map(tbl => ({
+      tbl, enabled: true, last_receipt_at: '2026-10-04T05:01:00Z', writer_declared: true,
+    })),
+  };
+}
+
+test('complete sample requires persisted witness, reader and receipt evidence', () => {
+  assert.equal(assess(fixture()).status, 'passed_in_scope');
+  for (const key of ['invalid_image_refs', 'missing_images', 'mismatched_vehicles', 'missing_witnesses', 'reader_missing']) {
+    const f = fixture(); f.metrics[key] = 1;
+    assert.equal(assess(f).status, 'failed', key);
+  }
+});
+test('installed sensor cannot conceal a swallowed receipt failure', () => {
+  for (let i = 0; i < 3; i++) {
+    const f = fixture(); f.sensors[i].last_receipt_at = null;
+    assert.equal(assess(f).status, 'failed');
+    assert(assess(f).reasons.includes(`${f.sensors[i].tbl}:receipt_missing`));
+  }
+  const f = fixture(); f.sensors[1].enabled = false;
+  assert.equal(assess(f).status, 'failed');
+});
+test('undeclared writer, no reader and truncated samples stay incomplete', () => {
+  const f = fixture(); f.sensors[0].writer_declared = false;
+  assert.equal(assess(f).status, 'incomplete');
+  const hidden = fixture(); hidden.metrics.reader_eligible = 0;
+  assert.equal(assess(hidden).status, 'incomplete');
+  const capped = fixture(); capped.metrics.sampled = SAMPLE_LIMIT + 1;
+  assert.equal(assess(capped).status, 'incomplete');
+});
+test('zero arrivals never certifies useful processing', () => {
+  const f = fixture(); for (const k of Object.keys(f.metrics)) f.metrics[k] = 0;
+  for (const s of f.sensors) s.last_receipt_at = null;
+  const r = assess(f);
+  assert.equal(r.status, 'incomplete');
+  assert(r.reasons.includes('no_eligible_arrivals') && r.reasons.includes('reader_not_measured'));
+});
+test('malformed, null or inconsistent metrics cannot become zero', () => {
+  for (const patch of [null, '0', -1, NaN, undefined]) {
+    const f = fixture(); f.metrics.sampled = patch;
+    assert.throws(() => assess(f));
+  }
+  const f = fixture(); f.metrics.eligible = 2;
+  assert.throws(() => assess(f));
+  f.metrics.eligible = 1; f.sensors[1].tbl = f.sensors[0].tbl;
+  assert.throws(() => assess(f));
+});
+test('transport, null responses and database errors fail with sanitized unknown coverage', () => {
+  for (const execute of [() => { throw new Error('private credential-bearing error'); },
+    () => 'null', () => '[]', () => JSON.stringify({ error: 'private failure' }),
+    () => JSON.stringify([{ assay: null }])]) {
+    const r = run(scope, execute);
+    assert.equal(r.status, 'failed'); assert.equal(r.coverage, 'unknown');
+    assert(!JSON.stringify(r).includes('private'));
+  }
+});
+test('CLI scope validation prevents injection and requires an explicit ingest boundary', () => {
+  const valid = ['--vehicle', scope.vehicle, '--since', scope.since];
+  assert.equal(options(valid).since, '2026-10-04T05:00:00.000Z');
+  assert.equal(options([...valid, '--field', 'image_visible_rust_severity']).field, 'image_visible_rust_severity');
+  for (const args of [[], ['--vehicle', scope.vehicle], [...valid, '--field', "color');delete"],
+    ['--vehicle', "x';select", '--since', scope.since], [...valid, '--other', '1']]) {
+    assert.throws(() => options(args));
+  }
+});
+test('successful execution still assesses actual evidence and uses a bounded read-only query', () => {
+  let sql;
+  const r = run(scope, q => { sql = q; return JSON.stringify([{ assay: fixture() }]); });
+  assert.equal(r.status, 'passed_in_scope');
+  assert(sql.includes(`LIMIT ${SAMPLE_LIMIT + 1}`));
+  assert(!/\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\s+(?:INTO|public\.)/i.test(sql));
+});
+
+test('actual SQL detects broken links, missing receipts and visibility exclusions', {
+  skip: !process.env.IMAGE_HEALTH_TEST_SOCKET,
+}, () => {
+  const socket = process.env.IMAGE_HEALTH_TEST_SOCKET;
+  assert(socket.startsWith('/private/tmp/nuke-image-health-') && socket.endsWith('/socket'), 'disposable socket only');
+  const sql = (mutation = '', sample = scope) => execFileSync(process.env.IMAGE_HEALTH_TEST_PSQL ?? 'psql',
+    ['-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-h', socket, '-p', '55466',
+      '-d', 'dm_refinement_image_assay', '-c', `BEGIN; ${mutation} ${query(sample)} ROLLBACK;`], { encoding: 'utf8' });
+  const check = (mutation, status, sample = scope) => {
+    const r = assess(JSON.parse(sql(mutation, sample)));
+    assert.equal(r.status, status, mutation || 'healthy baseline');
+    return r;
+  };
+  check('', 'passed_in_scope');
+  check('DELETE FROM public.observation_witnesses;', 'failed');
+  check("UPDATE public.test_reader SET payload = '{\"image_observations\":[]}';", 'failed');
+  check("UPDATE public.vehicle_observations SET structured_data = jsonb_set(structured_data,'{image_id}','\"not-a-uuid\"');", 'failed');
+  check("UPDATE public.vehicle_observations SET structured_data = jsonb_set(structured_data,'{image_id}','\"30000000-0000-0000-0000-000000000009\"');", 'failed');
+  check("UPDATE public.vehicle_images SET vehicle_id = '10000000-0000-0000-0000-000000000009';", 'failed');
+  check('DROP TRIGGER trg_write_receipt_ins ON public.vehicle_images;', 'failed');
+  check("DELETE FROM public.write_receipts WHERE tbl='observation_witnesses';", 'failed');
+  check("UPDATE public.write_receipts SET writer='undeclared' WHERE tbl='vehicle_observations';", 'incomplete');
+  check('UPDATE public.vehicle_images SET is_sensitive=true;', 'incomplete');
+  check('UPDATE public.vehicles SET is_public=false;', 'incomplete');
+  check('UPDATE public.vehicle_observations SET is_superseded=true;', 'incomplete');
+  check("UPDATE public.vehicle_observations SET kind='comment',source_id='20000000-0000-0000-0000-000000000002', structured_data=structured_data || '{\"kind_detail\":\"professional_review\"}';", 'incomplete');
+  check('', 'incomplete', { ...scope, since: '2099-01-01T00:00:00Z' });
+  check(`INSERT INTO public.vehicle_observations
+    SELECT ('60000000-0000-0000-0000-' || lpad(i::text,12,'0'))::uuid,
+      '${scope.vehicle}'::uuid,'20000000-0000-0000-0000-000000000001'::uuid,
+      'specification','{}'::jsonb,false,'2026-10-04T05:02:00Z'::timestamptz
+    FROM generate_series(1,1000) i;`, 'incomplete');
+});

@@ -131,7 +131,11 @@ Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      // Receipt attribution is a producer declaration, never authorization.
+      global: { headers: { "X-Nuke-Writer": "ingest-observation" } },
+    }
   );
 
   try {
