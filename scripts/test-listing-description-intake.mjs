@@ -1,5 +1,6 @@
 // Actual description producer helper + installed Supabase SDK; no live requests.
 import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
@@ -18,6 +19,7 @@ runInNewContext(source, { exports: module.exports, module, Date, BigInt, require
  assert.equal(path,'../_shared/observationContentHash.ts');return hashModule.exports; } });
 const { recordListingDescription } = module.exports;
 const input = { vehicleId: '00000000-0000-4000-8000-000000000001', sourceUrl: 'https://bringatrailer.com/listing/fixture',
+  extractorVersion: 'extract-bat-core:4.2.4',
   text: 'Original parsed seller prose. '.repeat(110)+'Full text tail: trunk floor needs replacement.',
   capturedAt: '2020-01-01T00:00:00.000Z', captureBasis: 'direct', captureSha256: 'a'.repeat(64) };
 function sdk(options={}) {
@@ -62,4 +64,105 @@ for(const [name,options] of [['HTTP refusal',{status:500,refusal:true}],['logica
 test('original zoned capture bytes including microseconds are retained in both intake clocks',async()=>{
  const f=sdk();const capturedAt='2020-01-01 00:00:00.123456+00';await recordListingDescription(f.client,{...input,capturedAt});
  assert.equal(f.requests[0].observed_at,capturedAt);assert.equal(f.requests[0].structured_data.source_captured_at,capturedAt);
+});
+
+// Traverse the actual intake, including authentication, hash/replay and the installed
+// PostgREST SDK. Only the network/server boundary is synthetic. The existing PG17
+// description contract independently proves NULL admission and the slug's 22P02.
+function canonicalIntake(options = {}) {
+  const requests = [], intakes = [], errors = [], committed = new Map(), modules = new Map();
+  let handler;
+  const env = { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'synthetic-service' };
+  async function network(request, init = {}) {
+    const url = new URL(typeof request === 'string' ? request : request.url ?? request.href);
+    const method = init.method ?? request.method ?? 'GET';
+    const body = init.body ? JSON.parse(init.body) : null;
+    requests.push({ path: url.pathname, method, body });
+    if (url.pathname === '/functions/v1/ingest-observation') {
+      const admitted = options.legacyExtractorSlug ? { ...body, extractor_id: 'extract-bat-core' } : body;
+      intakes.push(admitted);
+      return handler(new Request(url, { ...init, body: JSON.stringify(admitted) }));
+    }
+    if (url.pathname === '/rest/v1/observation_sources') return Response.json([{
+      id: '00000000-0000-4000-8000-000000000003', base_trust_score: .85, supported_observations: ['listing'],
+    }]);
+    if (url.pathname === '/rest/v1/vehicle_observations') {
+      if (method === 'GET') {
+        const existing = committed.get(url.searchParams.get('content_hash')?.replace(/^eq\./, ''));
+        return Response.json(existing ? [existing] : []);
+      }
+      if (method === 'POST') {
+        if (body.extractor_id != null && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.extractor_id)) {
+          return Response.json({ code: '22P02', message: `invalid input syntax for type uuid: "${body.extractor_id}"` }, { status: 400 });
+        }
+        const receipt = { id: '00000000-0000-4000-8000-000000000002' };
+        committed.set(body.content_hash, receipt);
+        return Response.json([receipt], { status: 201 });
+      }
+    }
+    throw new Error(`Unexpected request: ${method} ${url.pathname}`);
+  }
+  const client = (url, key, config = {}) => createClient(url, key, {
+    ...config, global: { ...config.global, fetch: network },
+  });
+  function load(filename) {
+    if (modules.has(filename.href)) return modules.get(filename.href).exports;
+    const module = { exports: {} };
+    modules.set(filename.href, module);
+    const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true,
+    });
+    assert.equal(compiled.diagnostics?.length ?? 0, 0, `${filename.pathname} must transpile`);
+    runInNewContext(compiled.outputText, {
+      exports: module.exports, module, Date, BigInt, URL, Request, Response, Headers,
+      TextEncoder, TextDecoder, Uint8Array, crypto: webcrypto, fetch: network, atob, btoa, setTimeout, clearTimeout,
+      console: { log() {}, warn() {}, error: (...args) => errors.push(args) },
+      Deno: { env: { get: key => env[key] }, serve: callback => { handler = callback; } },
+      require: name => {
+        if (name === 'https://esm.sh/@supabase/supabase-js@2') return { createClient: client };
+        assert.ok(name.startsWith('.'), `No downloaded import: ${name}`);
+        return load(new URL(name, filename));
+      },
+    });
+    return module.exports;
+  }
+  load(new URL('../supabase/functions/ingest-observation/index.ts', import.meta.url));
+  assert.equal(typeof handler, 'function');
+  return { client: client(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }),
+    requests, intakes, errors };
+}
+
+test('producer crosses actual intake UUID boundary and replays without inference or raw vehicle writes', async () => {
+  const f = canonicalIntake();
+  const capturedAt = '2020-01-01 00:00:00.123456+00';
+  const receipt = await recordListingDescription(f.client, { ...input, capturedAt });
+  assert.equal(receipt.status, 'recorded', f.errors.flat().map(e => e?.stack ?? JSON.stringify(e)).join('\n'));
+  const insert = f.requests.find(r => r.path === '/rest/v1/vehicle_observations' && r.method === 'POST').body;
+  assert.equal(insert.extractor_id, undefined, 'Unknown optional registry identity remains omitted');
+  assert.equal(insert.extraction_method, 'html_description_capture');
+  assert.equal(insert.structured_data.extractor, 'extract-bat-core');
+  assert.equal(insert.structured_data.extractor_version, input.extractorVersion);
+  assert.equal(insert.content_text, input.text);
+  assert.equal(insert.observed_at, capturedAt);
+  assert.equal(insert.structured_data.source_captured_at, capturedAt);
+  assert.equal(insert.structured_data.source_event_time_status, 'unknown');
+  assert.equal(insert.structured_data.source_completeness, 'unknown');
+  assert.match(insert.content_hash, /^[0-9a-f]{64}$/);
+  const replay = await recordListingDescription(f.client, { ...input, capturedAt });
+  assert.equal(replay.status, 'recorded');
+  assert.equal(replay.duplicate, true);
+  assert.equal(replay.observation_id, receipt.observation_id);
+  assert.equal(f.requests.filter(r => r.method === 'POST' && r.path.startsWith('/rest/')).length, 1);
+  assert.ok(f.requests.every(r => ['/functions/v1/ingest-observation', '/rest/v1/observation_sources',
+    '/rest/v1/vehicle_observations'].includes(r.path)), 'No independent writer, inference or source fetch');
+});
+
+test('pre-repair slug reproduces canonical intake 22P02 and never reports delivery', async () => {
+  const f = canonicalIntake({ legacyExtractorSlug: true });
+  const receipt = await recordListingDescription(f.client, input);
+  assert.equal(receipt.status, 'failed');
+  assert.equal(f.errors.length, 1);
+  assert.equal(f.errors[0][1].code, '22P02', f.errors.flat().map(e => e?.stack ?? JSON.stringify(e)).join('\n'));
+  assert.equal(f.errors[0][1].message, 'invalid input syntax for type uuid: "extract-bat-core"');
+  assert.equal(f.requests.filter(r => r.path === '/rest/v1/vehicle_observations' && r.method === 'POST').length, 1);
 });

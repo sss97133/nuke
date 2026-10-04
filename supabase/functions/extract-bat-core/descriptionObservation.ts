@@ -1,7 +1,7 @@
 /** Full parsed prose belongs to the existing listing intake, not the vehicle summary. */
 import { observationClockMicroseconds } from '../_shared/observationContentHash.ts';
 export async function recordListingDescription(supabase: any, input: {
-  vehicleId: string; sourceUrl: string; text: string; capturedAt: string | null;
+  vehicleId: string; sourceUrl: string; text: string; capturedAt: string | null; extractorVersion: string;
   captureBasis: "direct" | "snapshot"; captureSha256: string; snapshotId?: string | null;
   snapshotCustody?: { vehicleId?: string; matched?: boolean; sha256?: string | null };
 }) {
@@ -25,11 +25,13 @@ export async function recordListingDescription(supabase: any, input: {
     source_slug: "bat", kind: "listing", vehicle_id: input.vehicleId,
     source_url: input.sourceUrl, observed_at: capturedAt, content_text: input.text,
     structured_data: { description_capture: true, source_captured_at: capturedAt,
+      extractor: "extract-bat-core", extractor_version: input.extractorVersion,
       source_event_time_status: "unknown", observation_time_basis: "source_capture",
       source_capture_basis: input.captureBasis === "snapshot" ? "protected_snapshot" : "direct_fetch",
       source_capture_sha256: input.captureSha256, source_completeness: "unknown",
       source_text_field: "extract-bat-core.extractDescription", extractor_input_truncated: false },
-    extraction_method: "html_description_capture", extractor_id: "extract-bat-core",
+    // extractor_id names an optional registry UUID. A producer label is not that identity.
+    extraction_method: "html_description_capture",
     raw_source_ref: input.snapshotId ? `listing_page_snapshots:${input.snapshotId}` : input.sourceUrl,
     defer_analysis: true,
   } });
