@@ -156,7 +156,8 @@ async function deriveArchivedSale(supabase: any, selectors: ObservationInput) {
     observed_at: sale.eventDay + "T00:00:00.000Z", source_url: capture.snapshot.sourceUrl,
     source_identifier: `archived-sale:${capture.snapshot.id}:${sale.parser}`,
     content_text: `Published sold result: ${sale.currency} ${sale.amount} on ${sale.eventDay} (date grain; fees excluded).`,
-    structured_data: { source_sale_receipt: receipt }, extractor_id: ARCHIVED_SALE_METHOD,
+    // No registered extractor UUID is established for this deterministic method.
+    structured_data: { source_sale_receipt: receipt },
     extraction_method: ARCHIVED_SALE_METHOD, raw_source_ref: `listing_page_snapshots:${capture.snapshot.id}`,
     extraction_metadata: { producer_qualified_at: new Date().toISOString(), clock_basis: "producer_verification_attempt" },
     defer_analysis: true,
@@ -224,9 +225,9 @@ Deno.serve(async (req) => {
       if (!archivedSale?.ok) return null;
       const saved = row?.structured_data?.source_sale_receipt;
       const exactTuple = saved && Object.entries(archivedSale.receipt).every(([key,value]) => saved[key] === value);
-      if (!row?.id || row.source_snapshot_id !== archivedSale.receipt.snapshot_id || !Number.isFinite(Date.parse(row.ingested_at)) || !exactTuple
+      if (!row?.id || row.vehicle_id !== input.vehicle_id || row.source_snapshot_id !== archivedSale.receipt.snapshot_id || !Number.isFinite(Date.parse(row.ingested_at)) || !exactTuple
         || row.kind !== "sale_result" || row.is_superseded !== false || row.source_id !== source.id
-        || row.extraction_method !== ARCHIVED_SALE_METHOD || row.extractor_id !== ARCHIVED_SALE_METHOD
+        || row.extraction_method !== ARCHIVED_SALE_METHOD || row.extractor_id !== null
         || row.raw_source_ref !== input.raw_source_ref || row.source_identifier !== input.source_identifier
         || row.source_url !== input.source_url || Date.parse(row.observed_at) !== Date.parse(input.observed_at)) {
         return new Response(JSON.stringify({ error: "Persisted protected sale receipt unavailable" }),
@@ -343,7 +344,7 @@ Deno.serve(async (req) => {
     // Check for duplicate
     const { data: existing } = await supabase
       .from("vehicle_observations")
-      .select(archivedSale?.ok ? "id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id")
+      .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id")
       .eq("content_hash", contentHash)
       .maybeSingle();
 
@@ -558,7 +559,7 @@ Deno.serve(async (req) => {
       // unique content-hash winner is a replay; other constraint failures fail.
       if (insertError.code === "23505") {
         const { data: winner } = await supabase.from("vehicle_observations")
-            .select(archivedSale?.ok ? "id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id").eq("content_hash", contentHash).maybeSingle();
+            .select(archivedSale?.ok ? "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at" : "id").eq("content_hash", contentHash).maybeSingle();
         if (winner) {
           const protectedResponse = protectedReply(winner,true);
           if (protectedResponse) return protectedResponse;

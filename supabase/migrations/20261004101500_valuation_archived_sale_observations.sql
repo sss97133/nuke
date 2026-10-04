@@ -130,7 +130,8 @@ BEGIN
         AND s.html_storage_path !~ '(^/|(^|/)\.\.?(/|$)|[:\\\x00-\x1f])'
         AND o.vehicle_id=f.id AND o.source_snapshot_id=s.id AND o.kind='sale_result' AND o.is_superseded IS FALSE
         AND o.extraction_method='protected_archived_sale_observation_v1'
-        AND o.extractor_id='protected_archived_sale_observation_v1'
+        -- Extractor identity is an unmeasured nullable UUID, never a method slug.
+        AND o.extractor_id IS NULL
         AND o.raw_source_ref='listing_page_snapshots:'||s.id::text
         AND o.source_identifier='archived-sale:'||s.id::text||':batParser:1.0.0_sale_grammar_with_ambiguity_refusal'
         AND r->>'method'='protected_archived_sale_observation_v1'

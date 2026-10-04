@@ -39,7 +39,7 @@ CREATE TABLE public.pipeline_registry(table_name text,column_name text,owned_by 
 INSERT INTO public.observation_sources VALUES ('22222222-2222-2222-2222-222222222222','bat');
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,source_id uuid REFERENCES public.observation_sources,
   kind text,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,
-  source_url text,source_identifier text,raw_source_ref text,extraction_method text,extractor_id text,structured_data jsonb,content_hash text,
+  source_url text,source_identifier text,raw_source_ref text,extraction_method text,extractor_id uuid,structured_data jsonb,content_hash text,
   UNIQUE(source_id,source_identifier,kind,content_hash));
 CREATE INDEX ON public.vehicle_observations(vehicle_id,source_id,kind);
 ALTER TABLE public.vehicle_observations ENABLE ROW LEVEL SECURITY;
@@ -219,14 +219,25 @@ DECLARE s public.listing_page_snapshots;v public.vehicles;r jsonb;BEGIN
     coalesce((row_patch->>'superseded')::boolean,false),coalesce(row_patch->>'source_url',s.listing_url),
     'archived-sale:'||s.id||':batParser:1.0.0_sale_grammar_with_ambiguity_refusal',
     coalesce(row_patch->>'raw_source_ref','listing_page_snapshots:'||s.id),coalesce(row_patch->>'extraction_method','protected_archived_sale_observation_v1'),
-    coalesce(row_patch->>'extractor_id','protected_archived_sale_observation_v1'),jsonb_build_object('source_sale_receipt',r),md5(r::text),
+    (row_patch->>'extractor_id')::uuid,jsonb_build_object('source_sale_receipt',r),md5(r::text),
     CASE WHEN row_patch ? 'source_snapshot_id' THEN (row_patch->>'source_snapshot_id')::uuid ELSE s.id END)
   ON CONFLICT(source_id,source_identifier,kind,content_hash) DO NOTHING;
 END $$;
 
 SELECT pg_temp.base();
 SELECT pg_temp.seed(11);
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO public.vehicle_observations(id,extractor_id) VALUES(gen_random_uuid(),'protected_archived_sale_observation_v1');
+    RAISE EXCEPTION 'Method slug was accepted as extractor UUID';
+  EXCEPTION WHEN invalid_text_representation THEN
+    PERFORM pg_temp.ok('production-shaped extractor UUID refuses prior method slug with 22P02',
+      SQLSTATE='22P02' AND NOT EXISTS(SELECT 1 FROM public.vehicle_observations));
+  END;
+END $$;
 SELECT pg_temp.admit(11);
+SELECT pg_temp.ok('unknown extractor identity remains NULL while canonical method attribution is retained',
+  EXISTS(SELECT 1 FROM public.vehicle_observations WHERE extractor_id IS NULL AND extraction_method='protected_archived_sale_observation_v1'));
 DO $$ DECLARE r jsonb;e jsonb;BEGIN
   r:=pg_temp.read();SELECT x INTO e FROM jsonb_array_elements(r#>'{receipt,eligible}')x WHERE x->>'vehicleId'=md5('vehicle-11')::uuid::text;
   PERFORM pg_temp.ok('admitted protected storage sale extends complete cohort with separate verification basis',r#>>'{stats,sold_count}'='11'
@@ -265,7 +276,7 @@ DO $$ DECLARE patch jsonb;BEGIN
     PERFORM pg_temp.ok('refuse malformed/unprotected receipt '||patch::text,pg_temp.read()#>>'{stats,sold_count}'='10');
   END LOOP;
   FOR patch IN SELECT jsonb_array_elements('[{"superseded":true},{"kind":"listing"},{"ingested_at":null},
-    {"extraction_method":"legacy"},{"extractor_id":"spoofed"},{"source_url":"https://other.invalid/"},{"raw_source_ref":"unknown"},
+    {"extraction_method":"legacy"},{"extractor_id":"00000000-0000-4000-8000-000000000004"},{"source_url":"https://other.invalid/"},{"raw_source_ref":"unknown"},
     {"source_snapshot_id":null}]'::jsonb) LOOP
     PERFORM pg_temp.base();PERFORM pg_temp.seed(11);PERFORM pg_temp.admit(11,'{}',patch);
     PERFORM pg_temp.ok('refuse unadmitted observation state '||patch::text,pg_temp.read()#>>'{stats,sold_count}'='10');

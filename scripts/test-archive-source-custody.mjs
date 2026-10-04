@@ -64,11 +64,13 @@ function fixture(options = {}) {
       }
       assert.equal(request.method,'POST');assert(options.allowObservationWrite,'Explicit productive observation fixture only');
       const row=await request.json();assert(!('ingested_at'in row),'Database owns ingestion time');
+      assert(row.extractor_id == null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.extractor_id),
+        'Production extractor_id is nullable UUID, not a method string');
       assert.equal(row.kind,'sale_result');
       if(options.allowGenericWrite)assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed key');
       else{assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
       if(observations.some(o=>o.content_hash===row.content_hash))return Response.json({code:'23505',message:'unique_observation'},{status:409});
-      const saved={is_superseded:false,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
+      const saved={is_superseded:false,extractor_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
       observations.push(saved);writes.push(row);return Response.json(saved);
     }
     if(u.pathname==='/rest/v1/rpc/vehicle_price_facts') {
@@ -291,6 +293,7 @@ test('concurrent identical canonical submissions converge on one row and origina
   assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(f.observations.length,1);
   assert.equal(a.body.observation_id,b.body.observation_id);assert.equal(a.body.derived_ingested_at,b.body.derived_ingested_at);
   assert.equal(Number(a.body.duplicate)+Number(b.body.duplicate),1);
+  assert.equal(f.observations[0].extractor_id,null);assert.equal(f.observations[0].extraction_method,'protected_archived_sale_observation_v1');
 });
 test('canonical intake derives preview from raw source and refuses generic protected-marker forgery',async()=>{
   const f=fixture(),r=await f.intake({amount:1,currency:'GBP',observed_at:'1900-01-01',ingested_at:'1900-01-01',structured_data:{fake:true}});
@@ -322,7 +325,8 @@ test('legacy badge-only duplicate sharing the exact hash is refused and never pr
   assert.equal(JSON.stringify(f.observations[0]),legacy);assert.equal(f.observations.length,1);assert.equal(f.writes.length,1);
 });
 test('superseded or differently attributed duplicate is refused without restoring its claim',async()=>{
-  for(const patch of [{is_superseded:true},{extractor_id:'legacy'},{raw_source_ref:'unknown'}]){
+  for(const patch of [{is_superseded:true},{extractor_id:'00000000-0000-4000-8000-000000000004'},{raw_source_ref:'unknown'},
+    {vehicle_id:'00000000-0000-4000-8000-000000000099'}]){
     const f=fixture({allowObservationWrite:true});await f.intake({dry_run:false});Object.assign(f.observations[0],patch);
     const original=JSON.stringify(f.observations[0]);assert.equal((await f.intake({dry_run:false})).status,503);
     assert.equal(JSON.stringify(f.observations[0]),original);assert.equal(f.writes.length,1);
