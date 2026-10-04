@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, lotKey, uploadMonth, type AuctionCommentRow } from './auctionSequence';
+import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
 
 const LOT = 'https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/';
 
@@ -23,7 +23,7 @@ describe('buildAuctionSequence — one listing', () => {
     { id: 'i3', taken_at: '2024-02-10T15:00:00Z', source: 'owner_upload', source_url: null },      // a real capture
   ];
 
-  it('reads open from the first activity and close from the final bid when the extractor held only dates', () => {
+  it('reads open from first activity and keeps an end day separate from the last observed bid', () => {
     const { sequences, importStampedDays } = buildAuctionSequences({
       comments, auctionEvents,
       vehicleEvents: [{ id: 've', source_platform: 'bat', source_url: LOT, started_at: null, ended_at: '2024-02-22T00:00:00+00:00', sold_at: '2024-02-22T00:00:00+00:00', final_price: 10420, event_status: 'sold' }],
@@ -34,12 +34,12 @@ describe('buildAuctionSequence — one listing', () => {
     const seq = sequences[0];
     expect(seq.open).toMatchObject({ at: '2024-02-15T22:09:15.000Z', exact: false });
     expect(seq.open!.basis).toMatch(/first bid/);
-    expect(seq.close).toMatchObject({ at: '2024-02-22T20:32:08.000Z', exact: false });
-    expect(seq.close!.basis).toMatch(/final bid/);
+    expect(seq.close).toMatchObject({ at: '2024-02-22T00:00:00.000Z', exact: false, role: 'auction_end' });
+    expect(seq.lastObservedBid).toMatchObject({ id: 'b2', at: '2024-02-22T20:32:08.000Z' });
     expect(seq).toMatchObject({ outcome: 'sold', price: 10420, buyer: 'Threepedalauto', lotNumber: '137270', bidCount: 32, watchers: 685, ordinal: 1, listingCount: 1 });
     // the null-source comment joined the car's own listing
     expect(seq.items.map(i => i.kind)).toEqual(['bid', 'comment', 'seller', 'bid', 'comment']);
-    expect(seq.items.map(i => i.postClose)).toEqual([false, false, false, false, true]);
+    expect(seq.items.map(i => i.postClose)).toEqual([null, null, null, null, null]);
     expect(seq.items[0].url).toBe('https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/#comment-13676223');
     expect(seq.photos).toEqual({ publishedWithListing: 2, attributionUncertain: false });
     expect(importStampedDays).toEqual([new Date('2026-01-31T18:52:37.111Z').toLocaleDateString('en-CA')]);
@@ -111,14 +111,16 @@ describe('buildAuctionSequences — a car that ran three times (1951 Ford F-1)',
     const [s26, s18, s17] = sequences;
     expect(s26).toMatchObject({ lotNumber: '227632', price: 21250, buyer: 'mohlster', outcome: 'sold' });
     expect(s26.open!.basis).toMatch(/listing day/);          // the named listed event
-    expect(s26.close!.at).toBe('2026-01-24T18:49:16.000Z');   // final bid
+    expect(s26.close).toMatchObject({ role: 'sale', exact: false });
+    expect(s26.lastObservedBid!.at).toBe('2026-01-24T18:49:16.000Z');
     expect(s26.items.map(i => i.id)).toEqual(['c1', 'c2', 'c3']);
-    expect(s26.items[2].postClose).toBe(true);
+    expect(s26.items[2].postClose).toBeNull();
     expect(s18).toMatchObject({ lotNumber: '11293', price: 21750, buyer: 'EvanEllis' });
-    expect(s18.close!.at).toBe('2018-08-01T20:52:55.000Z');
+    expect(s18.close).toBeNull();
+    expect(s18.lastObservedBid!.at).toBe('2018-08-01T20:52:55.000Z');
     expect(s17).toMatchObject({ lotNumber: '4653', price: 20750, buyer: 'Paul_Gelpi' });
-    expect(s17.close!.at).toBe('2017-06-23T13:58:52.000Z');   // the misfiled 2026 end is ignored
-    expect(s17.close!.basis).toMatch(/final bid/);
+    expect(s17.close).toBeNull(); // the misfiled 2026 end is ignored
+    expect(s17.lastObservedBid!.at).toBe('2017-06-23T13:58:52.000Z');
     expect(s17.days[s17.days.length - 1].high).toBe(20750);   // the running high does not carry across listings
     expect(s26.days[s26.days.length - 1].high).toBe(21250);
     // photos: by upload month; the one with no path sits on the car's own listing, flagged
@@ -161,5 +163,85 @@ describe('helpers', () => {
   it('builds a comment permalink from the lot URL', () => {
     expect(commentPermalink('https://bringatrailer.com/listing/x', 5)).toBe('https://bringatrailer.com/listing/x/#comment-5');
     expect(commentPermalink('https://bringatrailer.com/listing/x/', null)).toBe('https://bringatrailer.com/listing/x/');
+  });
+});
+
+describe('recorded end clocks and categorical outcomes', () => {
+  const input = (ended_at: string | null, sold_at: string | null = null, event_status = 'sold', outcome: string | null = null) => ({
+    comments: [
+      comment({ id: 'synthetic-bid', posted_at: '2025-01-10T20:00:00Z', bat_comment_id: 101, comment_type: 'bid', bid_amount: 3000 }),
+      comment({ id: 'synthetic-between', posted_at: '2025-01-10T20:10:00Z', bat_comment_id: 102 }),
+      comment({ id: 'synthetic-later', posted_at: '2025-01-10T20:31:00Z', bat_comment_id: 103 }),
+    ],
+    auctionEvents: outcome == null ? [] : [{ id: 'synthetic-auction', source: 'bat', source_url: LOT, lot_number: null, outcome, winning_bid: null, total_bids: null, winning_bidder: null, seller_name: null, page_views: null, watchers: null, comments_count: null }],
+    vehicleEvents: [{ id: 'synthetic-event', source_platform: 'bat', source_url: LOT, started_at: null, ended_at, sold_at, final_price: null, event_status }],
+    timelineEvents: [], images: [], lotUrlHint: LOT,
+  });
+
+  it('retains the last observed bid source mark without creating an end or a post-close classification', () => {
+    const seq = buildAuctionSequence(input(null))!;
+    expect(seq.close).toBeNull();
+    expect(seq.lastObservedBid).toMatchObject({ id: 'synthetic-bid', at: '2025-01-10T20:00:00.000Z' });
+    expect(seq.lastObservedBid!.url).toContain('#comment-101');
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(seq.days.every(d => d.postClose == null)).toBe(true);
+  });
+
+  it('uses the recorded end rather than the earlier last bid to classify intervening comments', () => {
+    const seq = buildAuctionSequence(input('2025-01-10T20:30:00Z'))!;
+    expect(hasRecordedAuctionEnd(seq)).toBe(true);
+    expect(seq.items.map(i => i.postClose)).toEqual([false, false, true]);
+    expect(auctionMomentDayTitle(seq)).toBe('Auction Closed · sold');
+  });
+
+  it('does not manufacture a clock or closed day title from a date-only end', () => {
+    const seq = buildAuctionSequence(input('2025-01-10T00:00:00Z'))!;
+    expect(hasRecordedAuctionEnd(seq)).toBe(false);
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(auctionMomentDayTitle(seq)).toBe('Auction end day recorded · time unknown');
+  });
+
+  it.each([
+    ['UTC', 'auction_end'], ['America/Los_Angeles', 'auction_end'],
+    ['UTC', 'sale'], ['America/Los_Angeles', 'sale'],
+  ])('preserves recorded day in %s for %s without shifting timestamped first activity', (timezone, role) => {
+    const previous = process.env.TZ;
+    try {
+      process.env.TZ = timezone;
+      const fixture = role === 'auction_end' ? input('2025-01-10T00:00:00Z') : input(null, '2025-01-10T00:00:00Z');
+      fixture.comments[0].posted_at = '2025-01-10T01:00:00Z';
+      const seq = buildAuctionSequence(fixture)!;
+      expect(momentDay(seq.close!)).toBe('2025-01-10');
+      expect(fmtMoment(seq.close)).toBe('Jan 10, 2025');
+      expect(seq.close!.exact).toBe(false);
+      expect(seq.close).toMatchObject({ grain: 'day', day: '2025-01-10', role });
+      expect(seq.open).toMatchObject({ grain: 'instant', exact: false, at: '2025-01-10T01:00:00.000Z' });
+      expect(momentDay(seq.open!)).toBe(timezone === 'UTC' ? '2025-01-10' : '2025-01-09');
+      expect(fmtMoment(seq.open)).toContain(timezone === 'UTC' ? 'Jan 10, 2025' : 'Jan 9, 2025');
+    } finally {
+      if (previous == null) delete process.env.TZ; else process.env.TZ = previous;
+    }
+  });
+
+  it('keeps a precise sale or accepted-RNM timestamp distinct from the auction end', () => {
+    const seq = buildAuctionSequence(input(null, '2025-01-10T20:30:00Z'))!;
+    expect(seq.close).toMatchObject({ role: 'sale', exact: true, at: '2025-01-10T20:30:00.000Z' });
+    expect(hasRecordedAuctionEnd(seq)).toBe(false);
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(auctionMomentDayTitle(seq)).toBe('Sale recorded · auction end unknown');
+  });
+
+  it.each([
+    ['unsold', null, 'no_sale'],
+    ['unsold', 'reserve_not_met', 'reserve_not_met'],
+    ['active', 'sold', 'sold'],
+    ['pre_sold', null, 'unknown'],
+  ])('interprets %s and canonical %s as exact recorded categories', (status, outcome, expected) => {
+    expect(buildAuctionSequence(input(null, null, status, outcome))!.outcome).toBe(expected);
+  });
+
+  it('reports unsupported sold/no-sale disagreement instead of inferring a transaction outcome', () => {
+    const seq = buildAuctionSequence(input(null, null, 'unsold', 'sold'))!;
+    expect(seq.outcome).toBe('unknown'); expect(seq.outcomeConflict).toBe(true);
   });
 });

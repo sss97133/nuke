@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
+import { auctionMomentLabel, hasRecordedAuctionEnd, fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
 
 interface Props {
   auction: AuctionSequence;
@@ -37,7 +37,7 @@ const OUTCOME_LABEL: Record<AuctionSequence['outcome'], string> = {
   no_sale: 'NOT SOLD',
   withdrawn: 'WITHDRAWN',
   live: 'LIVE',
-  unknown: 'RESULT NOT RECORDED',
+  unknown: 'RESULT UNKNOWN',
 };
 
 const mono: React.CSSProperties = { fontFamily: 'var(--vp-font-mono)' };
@@ -65,6 +65,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
   const { items, open, close } = auction;
+  const recordedEnd = hasRecordedAuctionEnd(auction);
 
   const geom = useMemo(() => {
     const times = items.map(i => new Date(i.at).getTime());
@@ -106,7 +107,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
       high = amt;
     }
   }
-  if (stepPath && geom.closeT != null) stepPath += ` H ${x(geom.closeT).toFixed(1)}`;
+  if (stepPath && recordedEnd && geom.closeT != null) stepPath += ` H ${x(geom.closeT).toFixed(1)}`;
   // Day labels: a label is drawn only where its own day is wide enough to hold it and it
   // clears the previous drawn label — measured from the rendered text, never a fixed width.
   const measure = makeLabelMeasurer(ref.current);
@@ -121,7 +122,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
     dayLabels.set(d.date, text);
     lastLabelRight = x0 + 3 + w;
   }
-  const closeX = geom.closeT != null ? x(geom.closeT) : null;
+  const closeX = recordedEnd && geom.closeT != null ? x(geom.closeT) : null;
   const resultLabel = `${OUTCOME_LABEL[auction.outcome]}${auction.price != null ? ` ${fmtUsd(auction.price)}` : ''}`;
 
   return (
@@ -136,9 +137,11 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
         )}
         <span style={mono}>OPEN {fmtMoment(open)}</span>
         {open && <span className="auction-band__basis">({open.basis})</span>}
-        <span style={mono}>CLOSE {fmtMoment(close)}</span>
+        <span style={mono}>{auctionMomentLabel(auction)} {fmtMoment(close)}</span>
         {close && <span className="auction-band__basis">({close.basis})</span>}
+        {auction.lastObservedBid && <a href={auction.lastObservedBid.url} target="_blank" rel="noreferrer" style={mono}>LAST OBSERVED BID {fmtDayShort(auction.lastObservedBid.at)} {fmtClock(auction.lastObservedBid.at)}</a>}
         <span style={{ ...mono, fontWeight: 700 }}>{resultLabel}{auction.buyer ? ` · to ${auction.buyer}` : ''}</span>
+        {auction.outcomeConflict && <span className="auction-band__basis">recorded outcomes disagree; result unclassified</span>}
         {auction.activityExtracted ? (
           <span style={mono}>
             {bids.length} bids · {items.length - bids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
@@ -223,9 +226,9 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
       )}
 
       <div className="auction-band__legend">
-        <span>○ bid · ● final bid · line: running high bid</span>
+        <span>○ bid · ● last observed bid · line: running high bid</span>
         <span>| comment · ▍ seller</span>
-        <span>shaded: after the close</span>
+        <span>{recordedEnd ? 'shaded: after the recorded end' : 'auction end clock unknown; after-close activity unclassified'}</span>
         <span>a day opens its record; a mark opens its comment on BaT</span>
       </div>
     </div>
