@@ -6,7 +6,8 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
 import { useLotMovement, weigh, type ActivityReceipt, type LotMovement, type MovementItem } from './useLotMovement';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useSameHourReadings, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
+import RecordedSalesComparison from './RecordedSalesComparison';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their
@@ -24,8 +25,6 @@ const WINDOWS: { id: Window; label: string }[] = [
   { id: '24h', label: 'Ending < 24 h' },
   { id: 'new', label: 'First seen < 24 h' },
   { id: 'nr', label: 'No reserve' },
-  { id: 'hot', label: 'Running hot' },
-  { id: 'cold', label: 'Running cold' },
 ];
 
 // Current auctions appear in close order unless the viewer chooses another sort.
@@ -33,8 +32,6 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'bid', label: 'Highest bid' },
   { id: 'ending', label: 'Ending first' },
   { id: 'newest', label: 'First seen' },
-  { id: 'hottest', label: 'Hottest' },
-  { id: 'coldest', label: 'Coldest' },
 ];
 
 const label: React.CSSProperties = {
@@ -48,11 +45,11 @@ const label: React.CSSProperties = {
 
 const mono: React.CSSProperties = { fontFamily: "'Courier New', monospace" };
 
-function usd(n: number | null | undefined, compact = false): string {
+function bidNumber(n: number | null | undefined, compact = false): string {
   if (n == null) return '—';
-  if (compact && Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (compact && Math.abs(n) >= 10_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n).toLocaleString('en-US')}`;
+  if (compact && Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (compact && Math.abs(n) >= 10_000) return `${Math.round(n / 1_000)}K`;
+  return `${Math.round(n).toLocaleString('en-US')}`;
 }
 
 const left = timeLeft;
@@ -84,7 +81,7 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
   );
 }
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
@@ -151,10 +148,10 @@ function Relativity({ value, weekAgo }: { value: number; weekAgo: BoardReading |
   if (!weekAgo || pct == null) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', alignItems: 'center', padding: '6px 10px', border: '2px solid var(--border)', borderTop: 'none', marginTop: -12, marginBottom: 12 }}>
-      <span title={`${usd(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${rebuilt ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+      <span title={`${bidNumber(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${rebuilt ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
         <span style={label}>vs same time last week </span>
         <span style={{ ...mono, fontWeight: 700, color: pct >= 0 ? 'var(--success)' : 'var(--error)' }}>{rebuilt ? '≈' : ''}{signed(pct)}</span>
-        <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}> from {usd(weekAgo.bids, true)}</span>
+        <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}> from {bidNumber(weekAgo.bids, true)}</span>
       </span>
     </div>
   );
@@ -203,11 +200,11 @@ function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
   const bids = bidded.reduce((s, a) => s + (a.currentBid ?? 0), 0);
   const withN = readings.filter((r) => r.n != null && (r.n as number) > 0);
   const out: Series[] = [
-    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: usd },
+    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: bidNumber },
     { key: 'n', what: 'Auctions with a bid', set: 'all live BaT auctions', value: bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.n as number })), fmt: count },
   ];
   if (bidded.length > 0) {
-    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => usd(v) });
+    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => bidNumber(v) });
   }
   const byMake = readings.filter((r) => r.byMake != null);
   if (byMake.length >= EDGE_MIN_READINGS) {
@@ -222,7 +219,7 @@ function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
       const past = byMake.map((r) => ({ day: r.day, bm: (r.byMake as Record<string, [number, number]>)[make] ?? [0, 0] }));
       const cur = now.get(make) ?? [0, 0];
       if (Math.max(cur[1], ...past.map((p) => p.bm[1])) < MAKE_MIN_AUCTIONS) continue;
-      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: usd });
+      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: bidNumber });
       out.push({ key: `n:${make}`, what: `${make} · auctions with a bid`, set: `live BaT auctions of ${make}`, value: cur[1], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[1]) })), fmt: count });
     }
   }
@@ -326,13 +323,13 @@ function heatParts(a: LiveAuction, heat: Heat) {
   // Quote the checkpoint at or before this point in the auction (17 h left reads the 24 h record, not the 12 h one).
   const [, when, hotAbove, coldBelow] = [...BACKTEST].reverse().find((row) => row[0] >= heat.hoursLeft) ?? BACKTEST[BACKTEST.length - 1];
   return {
-    bid: usd(a.currentBid),
+    bid: bidNumber(a.currentBid),
     left: left(heat.hoursLeft * HOUR),
     comps: band.comps,
-    middle: usd(band.p50),
-    range: `${usd(band.p10)}–${usd(band.p90)}`,
+    middle: bidNumber(band.p50),
+    range: `${bidNumber(band.p10)}–${bidNumber(band.p90)}`,
     share: Math.round(heat.share * 100),
-    typical: usd(about(heat.typicalNow)),
+    typical: bidNumber(about(heat.typicalNow)),
     multiple: multiple(heat.ratio),
     beyond: (a.currentBid ?? 0) > band.p90
       ? 'The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
@@ -464,36 +461,24 @@ function median(xs: number[]): number | null {
 interface MakeNode {
   make: string;
   count: number;
-  bids: number;
-  heats: number[];
 }
 
-function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void; weekAgo: BoardReading | null; heat: Map<string, Heat | null> }) {
-  const byMakeBefore = weekAgo?.source === 'live' ? weekAgo.byMake : null;
-  const makeChange = (m: MakeNode) => {
-    const before = byMakeBefore?.[m.make]?.[0];
-    return before != null ? pctChange(m.bids, before) : null;
-  };
+function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const height = width < 640 ? 240 : 380;
   const makes = useMemo(() => {
     const by = new Map<string, MakeNode>();
     for (const a of auctions) {
-      const n = by.get(a.make) ?? { make: a.make, count: 0, bids: 0, heats: [] };
+      const n = by.get(a.make) ?? { make: a.make, count: 0 };
       n.count += 1;
-      n.bids += a.currentBid ?? 0;
-      const h = heat.get(a.id);
-      if (h) n.heats.push(h.ratio);
       by.set(a.make, n);
     }
     return [...by.values()];
-  }, [auctions, heat]);
-  const makeHeat = (m: MakeNode) => (m.heats.length >= 3 ? median(m.heats) : null);
+  }, [auctions]);
   const rects = useMemo(
-    () => (width > 0 ? squarify(makes.filter((m) => m.bids > 0).map((m) => ({ node: m, area: m.bids })), 0, 0, width, height) : []),
+    () => (width > 0 ? squarify(makes.filter((m) => m.count > 0).map((m) => ({ node: m, area: m.count })), 0, 0, width, height) : []),
     [makes, width, height]
   );
-  const total = makes.reduce((s, m) => s + m.bids, 0);
   const [hovered, setHovered] = useState<string | null>(null);
   const shown = makes.find((m) => m.make === (hovered ?? selected));
 
@@ -502,8 +487,8 @@ function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4, minHeight: 12 }}>
         <span style={{ ...label, color: shown ? 'var(--text)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {shown
-            ? `${shown.make} · ${shown.count} live · ${usd(shown.bids)} bid · ${((shown.bids / total) * 100).toFixed(1)}% of all bids${makeHeat(shown) != null ? ` · bids ${(makeHeat(shown) as number).toFixed(2)}× typical (median of ${shown.heats.length} priced)` : ''}${makeChange(shown) != null ? ` · ${signed(makeChange(shown) as number)} vs last week` : ''}`
-            : 'Current bids by make · area = dollars bid · color = bids vs comparable sales at this point (green hot, red cold) · hover or tap a make'}
+            ? `${shown.make} · ${shown.count} captured live lots`
+            : 'Live lots by make · area = captured lot count · hover or tap a make'}
         </span>
         {selected && (
           <button onClick={() => onSelect(null)} style={{ ...label, color: 'var(--text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
@@ -516,7 +501,6 @@ function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: 
         const active = selected === node.make;
         const dim = selected != null && !active;
         const roomy = w > 64 && h > 34;
-        const tone = heatTone(makeHeat(node));
         return (
           <button
             key={node.make}
@@ -524,7 +508,7 @@ function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: 
             onMouseEnter={() => setHovered(node.make)}
             onFocus={() => setHovered(node.make)}
             aria-pressed={active}
-            aria-label={`${node.make}: ${node.count} live, ${usd(node.bids)} bid`}
+            aria-label={`${node.make}: ${node.count} captured live lots`}
             style={{
               position: 'absolute',
               left: x + 1,
@@ -533,8 +517,8 @@ function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: 
               height: Math.max(0, h - 2),
               padding: roomy ? '5px 6px' : 0,
               border: 'none',
-              background: active ? 'var(--text)' : tone?.bg ?? 'var(--surface)',
-              color: active ? 'var(--bg)' : tone?.fg ?? 'var(--text)',
+              background: active ? 'var(--text)' : 'var(--surface)',
+              color: active ? 'var(--bg)' : 'var(--text)',
               opacity: dim ? 0.45 : 1,
               cursor: 'pointer',
               textAlign: 'left',
@@ -551,7 +535,7 @@ function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: 
                   {node.make}
                 </span>
                 <span style={{ ...mono, fontSize: w > 140 ? 13 : 10, whiteSpace: 'nowrap' }}>
-                  {usd(node.bids, true)} <span style={{ opacity: 0.7 }}>· {node.count}</span>
+                  {node.count} <span style={{ opacity: 0.7 }}>live lots</span>
                 </span>
               </>
             )}
@@ -596,7 +580,7 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
         transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      {usd(auction.currentBid)}
+      {bidNumber(auction.currentBid)}
     </span>
   );
 }
@@ -658,10 +642,10 @@ function Movement({ m, receipt, readAsOf, rowCap }: {
       {items.map((it, i) => (
         <div key={`${it.at}-${i}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', minWidth: 0, whiteSpace: 'nowrap' }}>
           <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0, color: it.kind === 'bid' ? 'var(--text)' : 'var(--text-secondary)' }}>{KIND[it.kind]}</span>
-          {it.amount != null && <span style={{ ...mono, color: 'var(--text)' }}>{usd(it.amount, true)}</span>}
-          {it.step != null && <span style={mono}>+{usd(it.step, true)}</span>}
+          {it.amount != null && <span style={{ ...mono, color: 'var(--text)' }}>{bidNumber(it.amount, true)}</span>}
+          {it.step != null && <span style={mono}>+{bidNumber(it.step, true)}</span>}
           {it.weight != null && m?.medianStep != null && (
-            <WeightBar w={it.weight} title={`A +${usd(it.step)} step against a median step of ${usd(m.medianStep)} over this lot's ${m.steps} bid steps in view`} />
+            <WeightBar w={it.weight} title={`A +${bidNumber(it.step)} step against a median step of ${bidNumber(m.medianStep)} over this lot's ${m.steps} bid steps in view`} />
           )}
           <span style={{ ...mono, marginLeft: 'auto', flexShrink: 0 }}>{ago(now - it.at)}</span>
         </div>
@@ -833,27 +817,16 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
   const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
-  const heat = useMemo(() => new Map(live.map((a) => [a.id, heatOf(a, data?.curve ?? null, now)])), [live, data, now]);
+  // The board has no bound currency contract. Monetary heat is withheld until units can be matched.
+  const heat = useMemo(() => new Map<string, Heat | null>(live.map((a) => [a.id, null])), [live]);
 
   const figures = useMemo(() => {
     const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
     for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now, heat.get(a.id))) f[w.id] += 1;
     return f;
   }, [cohort, now, heat]);
-  const openBids = useMemo(() => currentBidDistribution(cohort).total, [cohort]);
+  const recordedBids = useMemo(() => currentBidDistribution(cohort).recorded, [cohort]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
-
-  // Every series placed against its own readings at this UTC weekday and hour; only the ones at an edge are drawn.
-  const nowIso = new Date(now).toISOString();
-  const hourUtc = nowIso.slice(11, 13);
-  const weekdayUtc = new Date(now).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-  const sameHour = useSameHourReadings(hourUtc, nowIso.slice(0, 10));
-  const readings = useMemo<HourReading[]>(
-    () => sameHour.data ?? (data?.sameHour?.readings ?? []).map((r) => ({ day: r.day, bids: r.bids, n: null, byMake: null, source: '' })),
-    [sameHour.data, data]
-  );
-  const series = useMemo(() => (live.length && readings.length ? edgeSeries(live, readings) : []), [live, readings]);
-  const archiveDays = useMemo(() => new Set(readings.filter((r) => r.source === 'archive').map((r) => r.day)), [readings]);
 
   const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now, heat.get(a.id))), [cohort, win, now, heat]);
   const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
@@ -868,9 +841,9 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
   }, [scoped, selectedBid, sort, heat]);
-  const boardBids = useMemo(() => currentBidDistribution(board).total, [board]);
 
   if (!data && isError) return <>
+    <RecordedSalesComparison key={make ?? 'all'} make={make} />
     <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
     {onUnavailable}
   </>;
@@ -892,6 +865,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
 
+      <RecordedSalesComparison key={make ?? 'all'} make={make} />
+
       <label style={{ ...label, display: 'block', marginBottom: 8 }}>
         Make{' '}
         <select aria-label="Live lot make" value={make ?? ''} onChange={e => setParam('make', e.target.value || null)} style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 4 }}>
@@ -901,8 +876,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </label>
 
       {/* Figures. Each one is a filter on the board below. */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
-        <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of recorded current bids for the selected make across all open lots" compact={narrow} />
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
+        <Figure caption="Recorded bids" value={isLoading ? '…' : recordedBids.toLocaleString('en-US')} active={false} onClick={() => setParam('live', null)} hint="Lots with a recorded bid number; units are unverified, so bids are not summed" compact={narrow} />
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}
@@ -921,12 +896,10 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {!isLoading && <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />}
 
-      {!isLoading && !make && <EdgeStrips series={series} hourUtc={hourUtc} weekdayUtc={weekdayUtc} archiveDays={archiveDays} />}
-      {!isLoading && !make && data?.weekAgo && <Relativity value={openBids} weekAgo={data.weekAgo} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
-          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} weekAgo={data?.weekAgo ?? null} heat={heat} />
+          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} />
         </section>
         {board.length > 0 && <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
@@ -941,7 +914,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
-            {board.length.toLocaleString('en-US')} lots · {usd(boardBids, true)} recorded bid
+            {board.length.toLocaleString('en-US')} lots · source bid units unverified
             {make ? ` · ${make}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
             {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
@@ -977,7 +950,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {data?.source && (
         <div style={{ ...label, marginTop: 8 }}>
-          Source: {data.source}. Current bid = the highest bid on the listing when last read. Hot/cold compares it with where comparable BaT sales on the same model page are usually bid at the same point in the auction; tap a tag for the numbers.
+          Source: {data.source}. Current bid is a recorded listing number; its unit and freshness need source evidence. Monetary totals, medians and hot/cold comparisons are withheld until currencies can be matched.
         </div>
       )}
       <ExplainSheet item={explaining} onClose={closeExplain} narrow={narrow} />
@@ -995,8 +968,7 @@ function BidDistribution({ distribution, lots, scope, selected, onSelect, fetche
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', marginBottom: 6 }}>
         <span style={{ ...label, color: 'var(--text)' }}>{scope}</span>
         <span style={{ fontSize: 12 }}>
-          Median current bid <strong style={mono}>{usd(distribution.median)}</strong>
-          {' '}· {distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid
+          {distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid number
         </span>
       </div>
       {lots === 0 && <div role="status" style={{ fontSize: 12 }}>No open lots in this scope.</div>}
@@ -1020,13 +992,13 @@ function BidDistribution({ distribution, lots, scope, selected, onSelect, fetche
         })}
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
-        Recorded current bids in USD · open BaT lots visible to you · choose a range to see its lots.
+        Recorded bid numbers · source currency unknown · ranges group raw numbers, not comparable monetary values. Choose a range to see its lots.
       </div>
       <details style={{ fontSize: 11, marginTop: 6 }}>
         <summary style={{ cursor: 'pointer' }}>Scope, source and timing</summary>
-        <p style={{ margin: '6px 0' }}>One lot per Nuke record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. The median excludes unrecorded bids. A recorded zero stays zero.</p>
-        <p style={{ margin: '6px 0' }}>These are current listing bids, not sold prices or a valuation. Condition, restoration and build class are not matched. The board can include parts and other nonvehicle lots. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
-        <p style={{ margin: '6px 0' }}>Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in this reader; freshness is unverified. BaT's board is scheduled to be read every 15 minutes.</p>
+        <p style={{ margin: '6px 0' }}>One public, undeleted vehicle record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
+        <p style={{ margin: '6px 0' }}>These are recorded listing numbers, not sold prices or a valuation. Their source currencies are unknown, so monetary aggregates and comparison tags are withheld. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
+        <p style={{ margin: '6px 0' }}>Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. BaT's board is scheduled to be read every 15 minutes; that schedule does not prove freshness.</p>
       </details>
     </section>
   );

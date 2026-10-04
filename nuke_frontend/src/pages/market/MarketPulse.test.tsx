@@ -13,6 +13,7 @@ vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
+vi.mock('./RecordedSalesComparison', () => ({ default: () => <section aria-label="Recorded sales comparison" /> }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 vi.mock('@tanstack/react-virtual', () => ({ useWindowVirtualizer: ({ count, estimateSize }: any) => ({
   getTotalSize: () => count * estimateSize(),
@@ -60,7 +61,8 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('ResizeObserver', class {
-    constructor(private callback: (entries: Array<{ contentRect: { width: number } }>) => void) {}
+    private callback: (entries: Array<{ contentRect: { width: number } }>) => void;
+    constructor(callback: (entries: Array<{ contentRect: { width: number } }>) => void) { this.callback = callback; }
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
@@ -131,7 +133,10 @@ describe('market answer -> supporting lots', () => {
   });
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
-    expect(button('Current bids').textContent).toContain('$25K');
+    expect(button('Recorded bids').textContent).toContain('2');
+    expect(container.textContent).toContain('source currency unknown');
+    expect(container.textContent).not.toContain('USD');
+    expect(container.textContent).not.toContain('$');
     expect(button('Live lots').textContent).toContain('3');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
     await click('Live lots');
@@ -139,11 +144,11 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('board=1');
   });
   it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
-    await render('make=PORSCHE'); await click('$25,000–49,999:');
+    await render('make=PORSCHE'); await click('25,000–49,999:');
     expect(window.location.search).toContain('make=PORSCHE');
     expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/later', '/vehicle/later']);
-    expect(button('$25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
-    await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+    expect(button('25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
+    await click('25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
     await render('make=PORSCHE'); await click('Unrecorded:');
@@ -157,12 +162,13 @@ describe('market answer -> supporting lots', () => {
   it('makes an empty scope recoverable and does not display a zero median', async () => {
     await render('make=MISSING');
     expect(container.textContent).toContain('No open lots match these filters');
-    expect(container.textContent).toContain('Median current bid —');
+    expect(container.textContent).toContain('0 of 0 lots have a recorded bid number');
+    expect(container.textContent).not.toContain('Median current bid');
     await click('Clear market filters'); expect(button('Live lots').textContent).toContain('4');
   });
   it('distinguishes loading, failure, and a failed refresh with previously fetched data', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
-    await render(); expect(button('Current bids').textContent).toContain('…');
+    await render(); expect(button('Recorded bids').textContent).toContain('…');
     expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeNull();
     fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render(); expect(container.textContent).toContain('could not be loaded');
@@ -170,6 +176,16 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('Existing feed fallback');
     fixture.pulse.data = { auctions: [lot('cached', 'PORSCHE', 10_000, 2)] };
     await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
-    expect(container.textContent).toContain('Median current bid $10,000');
+    expect(container.textContent).toContain('1 of 1 lots have a recorded bid number');
+  });
+  it('withholds monetary heat and histories without comparable source units', async () => {
+    fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
+    fixture.pulse.data.auctions[0].band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' };
+    fixture.pulse.data.weekAgo = { bids: 12345, byMake: {}, n: 10, day: '2026-09-26', source: 'live' };
+    await render('make=PORSCHE&live=hot&sort=hottest');
+    expect(container.textContent).not.toMatch(/Running hot|Running cold|vs last week|Current bid per auction|Median current bid/);
+    expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+    await click('PORSCHE ✕');
+    expect(container.textContent).toContain('area = captured lot count');
   });
 });
