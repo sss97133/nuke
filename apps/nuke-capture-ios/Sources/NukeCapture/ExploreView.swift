@@ -92,7 +92,12 @@ struct ExploreView: View {
     /// Search is active once the user types ≥2 chars: the landing (market pulse)
     /// gives way to the search-into-individuals grid + cohort.
     private var isSearching: Bool {
-        query.trimmingCharacters(in: .whitespaces).count >= 2
+        let term = query.trimmingCharacters(in: .whitespaces)
+        // Keep ZIP entry on the map, including intermediate digits while typing.
+        // Vehicle searches still use the established result/cohort destinations.
+        if landingMode == .map && !term.isEmpty && term.count <= 10 &&
+            term.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "-" }) { return false }
+        return term.count >= 2
     }
 
     /// The cohort the query resolves to. FIRST the strict explicit parse (a leading
@@ -174,7 +179,7 @@ struct ExploreView: View {
             // and the Map/Pulse toggle is the real header. (Restored while searching so
             // the search field keeps its chrome.)
             .toolbar(isSearching ? .visible : .hidden, for: .navigationBar)
-            .searchable(text: $query, prompt: "Year, make, or model")
+            .searchable(text: $query, prompt: landingMode == .map ? "ZIP, or vehicle" : "Year, make, or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
@@ -205,10 +210,10 @@ struct ExploreView: View {
                                   injectedNodes: page.nodes,
                                   injectedTitle: page.title)
             }
-            .task { await loadMetros() }
+            .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard term.count >= 2 else { results = []; searched = false; return }
+                guard isSearching else { results = []; searched = false; return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
                 guard !Task.isCancelled else { return }
                 await search(term)
@@ -224,7 +229,7 @@ struct ExploreView: View {
             Group {
                 switch landingMode {
                 case .metros:  metroList
-                case .map:     MarketMapView()
+                case .map:     MarketMapView(query: $query)
                 case .treemap: MarketTreemapView()
                 }
             }

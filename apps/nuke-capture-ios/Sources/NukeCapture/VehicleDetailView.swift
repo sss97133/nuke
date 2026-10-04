@@ -223,6 +223,7 @@ struct VehicleDetailView: View {
     /// TRUE (default) = wrap in own NavigationStack + show Done (sheet call sites).
     /// FALSE = pushed onto an existing stack; that stack owns the bar/back chevron.
     var embedInNavigationStack: Bool = true
+    let mapContext: MapVehicleContext?
     /// DEBUG screenshot loop only: auto-open this spec field's provenance sheet on
     /// load (deterministic capture of the drill state, no fragile sim-tapping).
     var debugOpenField: String? = nil
@@ -276,10 +277,12 @@ struct VehicleDetailView: View {
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
     @State private var cohortTarget: CohortDrill?           // identity chip → its market cohort
 
-    init(vehicleId: String, embedInNavigationStack: Bool = true, debugOpenField: String? = nil) {
+    init(vehicleId: String, embedInNavigationStack: Bool = true, debugOpenField: String? = nil,
+         mapContext: MapVehicleContext? = nil) {
         self.vehicleId = vehicleId
         self.embedInNavigationStack = embedInNavigationStack
         self.debugOpenField = debugOpenField
+        self.mapContext = mapContext
     }
 
     var body: some View {
@@ -319,14 +322,14 @@ struct VehicleDetailView: View {
             }
         }
         .task(id: vehicleId) { await load() }
-        .task(id: vehicleId) { await loadHero() }
+        .task(id: vehicleId) { if mapContext == nil { await loadHero() } }
         .task(id: vehicleId) { await loadSpecs() }
-        .task(id: vehicleId) { await loadValuation() }
-        .task(id: vehicleId) { await loadVehicleDays() }
-        .task(id: vehicleId) { await loadSaleHistory() }
-        .task(id: vehicleId) { await subscribePulse() }
-        .task(id: vehicleId) { await loadBookends() }
-        .task(id: vehicleId) { await loadEngagement() }
+        .task(id: vehicleId) { if mapContext == nil { await loadValuation() } }
+        .task(id: vehicleId) { if mapContext == nil { await loadVehicleDays() } }
+        .task(id: vehicleId) { if mapContext == nil { await loadSaleHistory() } }
+        .task(id: vehicleId) { if mapContext == nil { await subscribePulse() } }
+        .task(id: vehicleId) { if mapContext == nil { await loadBookends() } }
+        .task(id: vehicleId) { if mapContext == nil { await loadEngagement() } }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -428,6 +431,25 @@ struct VehicleDetailView: View {
         return { cohortTarget = CohortDrill(make: mk, model: md, year: yr) }
     }
 
+    @ViewBuilder private var mapContextSection: some View {
+        if let context = mapContext {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Exploring \(context.zip)", systemImage: "map").font(.headline)
+                LabeledContent("Selected area cohort", value: "\(context.cohortVehicleCount) vehicles")
+                if let make = context.make {
+                    LabeledContent("\(make) in this cohort", value: "\(context.makeVehicleCount) vehicles")
+                }
+                if let seller = context.seller { LabeledContent("Source seller", value: seller) }
+                if !context.sources.isEmpty { LabeledContent("Location sources", value: context.sources.joined(separator: ", ")) }
+                if let date = context.latestDate {
+                    LabeledContent("Latest location record", value: date.formatted(date: .abbreviated, time: .omitted))
+                }
+                Text("\(context.observationCount) location \(context.observationCount == 1 ? "observation connects" : "observations connect") this vehicle to your area cohort. This does not establish current presence or the seller's business address.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.font(.subheadline).nukeCard()
+        }
+    }
+
     private var content: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -439,23 +461,43 @@ struct VehicleDetailView: View {
                                                value: geo.frame(in: .named("vdscroll")).minY)
                     }
                     .frame(height: 0)
-                    heroLayer        // BuildStoryHero — parallaxed, faded + CLIPPED under the living bar
-                    loadState            // loading / error (only while the header is absent)
-                    liveAuctionBanner    // LIVE — server-arbitrated bid + countdown (only when live)
-                    buildInstrument      // ONE instrument: the build barcode (collapsed) ⇄ the
-                                         // calendar (expanded). The labor story leads (per Skylar).
-                    heroActionRow        // social action row — Follow + comment bubble/count → sheet
-                    valuationSection.id("worth")     // WORTH — modeled estimate (blocked when not defensible)
-                    saleHistorySection.id("sales")   // SALE HISTORY — the real transacted record (deduped)
-                    beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
-                    ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")  // VALUE BUILT — accrual curve
-                    if vehicle != nil {
-                        InvestmentProofView(vehicleId: vehicleId).id("proof")   // PROOF — dollars in
+                    if mapContext != nil {
+                        Color.clear.frame(height: condensedBarHeight)
+                        mapContextSection
+                        loadState
+                        if let raw = vehicle?.primary_image_url, !raw.isEmpty {
+                            CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: { Color(uiColor: .secondarySystemFill) }
+                            .frame(height: 190).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .padding(.horizontal, 16)
+                        }
+                        photoStrip
+                        NavigationLink {
+                            VehicleDetailView(vehicleId: vehicleId, embedInNavigationStack: false)
+                        } label: {
+                            Label("Complete vehicle record", systemImage: "doc.text.magnifyingglass")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }.nukeCard()
+                        DisclosureGroup("Specifications") { specTable.id("specs") }
+                            .padding(.horizontal, 16)
+                    } else {
+                        heroLayer
+                        loadState
+                        liveAuctionBanner
+                        buildInstrument
+                        heroActionRow
+                        valuationSection.id("worth")
+                        saleHistorySection.id("sales")
+                        beforeAfterSection
+                        ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
+                        if vehicle != nil { InvestmentProofView(vehicleId: vehicleId).id("proof") }
+                        photoStrip
+                        assetWindow.id("asset")
+                        specTable.id("specs")
+                        webCTA
                     }
-                    photoStrip           // the photos (each → its analysis)
-                    assetWindow.id("asset")          // ASSET: his relationship/provenance
-                    specTable.id("specs")            // TECHNICAL reference — demoted below the story
-                    webCTA
                     Spacer(minLength: 0)
                 }
             }
@@ -1117,6 +1159,7 @@ struct VehicleDetailView: View {
     private var collapseStart: CGFloat { 120 }       // px scrolled before the condense begins
     private var collapseEnd:   CGFloat { 240 }       // fully condensed (≈ the 300pt hero)
     private var collapse: CGFloat {                  // 0 (hero full) → 1 (bar condensed), eased
+        if mapContext != nil { return 1 }
         let raw = (-scrollY - collapseStart) / (collapseEnd - collapseStart)
         let t = min(max(raw, 0), 1)
         return t * t * (3 - 2 * t)                   // smoothstep — no linear edge snap
@@ -1147,7 +1190,7 @@ struct VehicleDetailView: View {
                         .minimumScaleFactor(0.7)
                         .layoutPriority(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    PulseStrip(signals: pulseSignals)   // dynamic metric — bid leads when live, else estimate
+                    if mapContext == nil { PulseStrip(signals: pulseSignals) }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -1166,7 +1209,7 @@ struct VehicleDetailView: View {
             .background(.bar)                            // truly opaque — the occlusion guarantee
             .overlay(alignment: .bottom) { Divider().opacity(Double(collapse)) }
             .contentShape(Rectangle())
-            .onTapGesture { showComments = true }        // DRILL preserved: bar → thread
+            .onTapGesture { if mapContext == nil { showComments = true } }
             .allowsHitTesting(collapse > 0.5)            // inert until it leads
         }
     }
