@@ -73,6 +73,57 @@ Deno.test("intake failure keeps every frame in order; bounded overflow is an err
   assert.equal(queue.pending, 0);
 });
 
+Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", async () => {
+  let release!: () => void;
+  const slowAdmission = new Promise<void>(resolve => { release = resolve; });
+  let blocked = false, connections = 0, pings = 0;
+  const heartbeatsDuringAdmission: any[] = [];
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") { pings++; queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) })); }
+  } };
+  const finishAdmission = setTimeout(() => release(), 3200);
+  try {
+    await collectBatLive([{ ...target }], {
+      socket: () => { connections++; queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+      admit: async (f, h) => {
+        if (f.length) { blocked = true; await slowAdmission; blocked = false; }
+        if (blocked) heartbeatsDuringAdmission.push(...h);
+      },
+      missed: async () => ({ comments: [], metadata: { post_id: target.post_id, current_numeric: 100, count: 1 } }),
+    }, 3500);
+    assert.equal(connections, 1);
+    assert.ok(pings >= 4, "one-second source control continues during the blocked admission");
+    assert.ok(heartbeatsDuringAdmission.filter(h => h.connected).length >= 3);
+    assert.ok(heartbeatsDuringAdmission.every(h => h.error === null && h.pending > 0));
+  } finally { clearTimeout(finishAdmission); release(); }
+});
+
+Deno.test("a stalled coverage acknowledgement cannot block source capture or spawn overlapping heartbeat requests", async () => {
+  let release!: () => void;
+  const stalledHeartbeat = new Promise<void>(resolve => { release = resolve; });
+  let pings = 0, connections = 0, heartbeatCallsWhileStalled = 0, stalled = true;
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") { pings++; queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) })); }
+  } };
+  const unblock = setTimeout(() => { stalled = false; release(); }, 3200);
+  try {
+    await collectBatLive([{ ...target }], {
+      socket: () => { connections++; queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+      admit: async (_f, h) => { if (h.length && stalled) { heartbeatCallsWhileStalled++; await stalledHeartbeat; } },
+      missed: async () => ({ comments: [], metadata: { post_id: target.post_id, current_numeric: 100, count: 1 } }),
+    }, 3500);
+    assert.equal(heartbeatCallsWhileStalled, 1);
+    assert.equal(connections, 1);
+    assert.ok(pings >= 4);
+  } finally { clearTimeout(unblock); release(); }
+});
+
 Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", async () => {
   const targets = Array.from({ length: 20 }, (_, i) => ({ ...target,
     id: `00000000-0000-0000-0000-${String(i + 1).padStart(12,"0")}`, post_id: fixture.post_id + i }));
