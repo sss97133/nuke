@@ -406,8 +406,11 @@ one dated event in the persistent vehicle's history.
 
 The owner's words **"repair" and "sale" name cohorts of connected data**. The shape of a repair includes parts,
 labor, actions, participants, documents, payments and condition evidence; a sale has parties, offers/bids, price,
-fees, transfer and supporting testimony. These are evidenced relationships with separately recorded dates and
-states. One payment may settle several repairs, one repair may span ownership periods, and one evidence node can
+fees, transfer and supporting testimony. Fan-out is recursive: a parts cohort contains individual part cohorts;
+labor reaches the performing person's identity, skills, ratings, tools, rates and availability cohorts. Shared
+nodes need explicit roles: the person who entered a labor row is not automatically its performer. These are
+evidenced relationships with separately recorded dates and states. One payment may settle several repairs,
+one repair may span ownership periods, and one evidence node can
 participate in multiple cohorts. Make each membership and edge's meaning explicit before folding or aggregating.
 Keep the evidence cohort describing an episode and the analytical cohort comparing episodes explicit, with their
 own membership rules. Naming an episode "repair" or "sale" does not prove the completeness of its underlying data.
