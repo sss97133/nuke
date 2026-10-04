@@ -679,3 +679,25 @@ media result and changed source coverage. Retain as-of behavior when later evide
 **implemented, tested, merged, deployed and runtime-verified** separately, with a checked commit and
 bounded query receipt. This entry documents the requirements and probes; it changes no production
 data/schema, installs no writer or measure, and proves no arbitrage or high-ranking target vehicle.
+
+**First implementation, 2026-10-04 UTC — source context in the existing candidate query.**
+`scripts/discovery/sale-event-candidates.sql` now computes a `sourceContext` receipt independently
+of price qualification. It counts recorded source episodes across native captures and parent
+aliases, retains earlier resales, reports unresolved identities/outcomes, distinguishes outcome
+contradictions and multiple parent pointers, and exposes parents without native event/listing rows.
+Native overflow withholds totals. The context is a private current-row diagnostic, with no event
+window applied and no historical knowledge or public-source qualification. It establishes neither
+confirmed sales nor market movement. Existing candidate testimony and qualification remain intact.
+
+Focused regression: the prior query fails the new mixed-venue context case; the prepared change
+passes 58 actual PG17 assertions, including a Mustang and sparse Corvette evidence. An EXPLAIN-
+checked live read used 511 public, nondeleted real parents with exact recorded year/make/model
+`1963 / Chevrolet / Corvette`, independent of registered cohort membership. It returned 323 native
+presentations, 316 recorded episode keys and 195 parents without native presentations. Mecum
+contributed 307 presentations / 304 episode keys, including 60 episodes without a recorded day.
+Both 5,000-row selectors were untruncated; 273 capture headers remained candidates. Management
+request time was 1.716 s on the first read and 0.538 s for the warm plan; warm database execution
+was 82.82 ms. These two diagnostic requests do not establish public RPC latency, p95, total Corvette
+coverage or parity with the earlier 1,249-member registered public-reader population. Public reader
+integration, source correction, cohort ranking and market movement remain open. Publication stages
+for this preparation must be taken from its PR receipt rather than inferred from these tests.

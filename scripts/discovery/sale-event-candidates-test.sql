@@ -148,3 +148,55 @@ SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates'
 SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c WHERE c#>>'{capture,id}'='20000000-0000-0000-0000-000000000022' AND c->>'sourcePlatform'='bringatrailer' AND c->>'sourceEpisodeKey'='https://bringatrailer.com/listing/synthetic-platform-alias/' AND c#>>'{qualification,status}'='candidate'),'unestablished platform alias is not silently reassigned to BaT') FROM identity_result;
 SELECT pg_temp.assert_ok((SELECT count(*) FROM jsonb_array_elements(j->'sourceCaptureHeaders') c WHERE c#>>'{capture,id}' IN ('40000000-0000-0000-0000-000000000008','40000000-0000-0000-0000-000000000009'))=2 AND EXISTS(SELECT FROM jsonb_array_elements(j->'sourceCaptureHeaders') c WHERE c#>>'{capture,id}'='40000000-0000-0000-0000-000000000008' AND c->>'sourceEpisodeKey'='https://mecum.com/lot?lot=synthetic-one') AND EXISTS(SELECT FROM jsonb_array_elements(j->'sourceCaptureHeaders') c WHERE c#>>'{capture,id}'='40000000-0000-0000-0000-000000000009' AND c->>'sourceEpisodeKey'='https://mecum.com/lot?lot=synthetic-two'),'exact indexed non-BaT capture pointers remain attributed to their distinct query lots') FROM identity_result;
 SELECT pg_temp.assert_ok((SELECT count(*) FROM jsonb_array_elements(j->'candidates') c WHERE c#>>'{capture,id}' IN ('20000000-0000-0000-0000-000000000023','20000000-0000-0000-0000-000000000024') AND c->'amount'='null'::jsonb AND c#>>'{nativeRow,recordedAmount}' IN ('Infinity','-Infinity') AND c#>>'{flags,pricePositiveFinite}'='false')=2,'infinite native prices cannot break finite-number-or-null candidate DTO') FROM identity_result;
+
+-- Wider market context survives sparse prices, repeat captures and unresolved
+-- identity. These native claims cannot establish qualified sales or a trend.
+INSERT INTO vehicles(id,year,make,model,is_public) VALUES
+ ('90000000-0000-0000-0000-000000000001',1963,'Chevrolet','Corvette',true),
+ ('90000000-0000-0000-0000-000000000002',1970,'Chevrolet','Corvette',true),
+ ('90000000-0000-0000-0000-000000000003',1965,'Ford','Mustang',true),
+ ('90000000-0000-0000-0000-000000000004',1963,'Chevrolet','Corvette',true);
+INSERT INTO vehicle_events(id,vehicle_id,source_platform,source_url,event_status,final_price,sold_at) VALUES
+ ('91000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000001','mecum','https://mecum.com/lots/synthetic-corvette','sold',NULL,NULL),
+ ('91000000-0000-0000-0000-000000000002','90000000-0000-0000-0000-000000000002','mecum','https://mecum.com/lots/synthetic-corvette','sold',125000,'2014-01-24Z'),
+ ('91000000-0000-0000-0000-000000000003','90000000-0000-0000-0000-000000000001','barrett-jackson','https://barrett-jackson.com/lots/synthetic-corvette','no_sale',50000,'2024-01-01Z'),
+ ('91000000-0000-0000-0000-000000000004','90000000-0000-0000-0000-000000000003','bat','https://bringatrailer.com/listing/synthetic-mustang-context/','active',NULL,NULL),
+ ('91000000-0000-0000-0000-000000000005','90000000-0000-0000-0000-000000000001','mecum','https://mecum.com/lots/synthetic-conflict','sold',0,'2025-01-01Z'),
+ ('91000000-0000-0000-0000-000000000006','90000000-0000-0000-0000-000000000001','mecum',NULL,'no_sale',0,'2025-01-01Z'),
+ ('91000000-0000-0000-0000-000000000007','90000000-0000-0000-0000-000000000001','mecum',NULL,NULL,NULL,NULL),
+ ('91000000-0000-0000-0000-000000000008','90000000-0000-0000-0000-000000000003',NULL,'https://synthetic.example/unknown-platform',NULL,NULL,NULL),
+ ('91000000-0000-0000-0000-000000000009','90000000-0000-0000-0000-000000000001','mecum','https://mecum.com/lots/synthetic-earlier-resale','sold',100000,'2013-01-01Z');
+UPDATE vehicle_events SET source_listing_id='https://mecum.com/lots/synthetic-conflict'
+ WHERE id='91000000-0000-0000-0000-000000000006';
+INSERT INTO bat_listings(id,vehicle_id,bat_listing_url,listing_status) VALUES
+ ('92000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000003','http://www.bringatrailer.com/listing/SYNTHETIC-MUSTANG-CONTEXT/?ref=synthetic','active');
+CREATE TEMP TABLE context_result AS SELECT pg_temp.candidates(ARRAY[
+ '90000000-0000-0000-0000-000000000001'::uuid,
+ '90000000-0000-0000-0000-000000000002'::uuid,
+ '90000000-0000-0000-0000-000000000003'::uuid,
+ '90000000-0000-0000-0000-000000000004'::uuid],'2020-01-01Z') j;
+SELECT pg_temp.assert_ok(j#>>'{sourceContext,presentationCount}'='10' AND jsonb_array_length(j->'candidates')=10,
+ 'all source presentations survive a narrower comparison cutoff and absent price qualification') FROM context_result;
+SELECT pg_temp.assert_ok(j#>>'{sourceContext,identifiedEpisodeCount}'='5' AND j#>>'{sourceContext,unresolvedIdentityPresentationCount}'='2'
+ AND j#>>'{sourceContext,additionalPresentationsForIdentifiedEpisodes}'='3',
+ 'episode identity separates repeated captures and unresolved rows without inventing unique vehicle counts') FROM context_result;
+SELECT pg_temp.assert_ok(j#>>'{sourceContext,parentsWithNativePresentations}'='3' AND
+ j#>>'{sourceContext,parentsWithoutNativePresentations}'='1',
+ 'complete native selection exposes parents with no event or listing evidence rather than implying coverage') FROM context_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceContext,sources}') s WHERE s->>'platform'='mecum'
+ AND s->>'presentationCount'='6' AND s->>'identifiedEpisodeCount'='3' AND s->>'reportedSoldEpisodes'='2'
+ AND s->>'contradictoryOutcomeEpisodes'='1' AND s->>'episodesWithMultipleParents'='1'),
+ 'Mecum claims contribute context with two resales, duplicate parents and an explicit outcome conflict') FROM context_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceContext,sources}') s WHERE s->>'platform'='barrett-jackson'
+ AND s->>'reportedNotSoldEpisodes'='1') AND EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceContext,sources}') s
+ WHERE s->>'platform'='bat' AND s->>'presentationCount'='2' AND s->>'identifiedEpisodeCount'='1' AND s->>'unknownOutcomeEpisodes'='1'
+ AND s->>'episodesWithoutRecordedDay'='1'),
+ 'other venues and a non-Corvette retain no-sale and undated unknown-outcome context') FROM context_result;
+SELECT pg_temp.assert_ok(j#>>'{sourceContext,priceQualified}'='false' AND j#>>'{sourceContext,windowApplied}'='false'
+ AND j#>>'{sourceContext,knowledgeMode}'='current_native_rows_not_historical_availability'
+ AND NOT EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c WHERE c#>>'{qualification,status}'<>'candidate'),
+ 'context does not promote native claims into qualified prices or historical market movement') FROM context_result;
+SELECT pg_temp.assert_ok(j#>'{sourceContext,presentationCount}'='null'::jsonb AND j#>>'{sourceContext,completeWithinPage}'='false'
+ AND j#>'{sourceContext,sources}'='[]'::jsonb,
+ 'native overflow withholds context totals instead of presenting sampled or zero market counts')
+ FROM (SELECT pg_temp.candidates(ARRAY['90000000-0000-0000-0000-000000000001'::uuid],NULL,NULL,1,100) j) q;
