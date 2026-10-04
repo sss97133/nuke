@@ -506,12 +506,6 @@ struct CountyZIPDrill: View {
         if let fips = ProcessInfo.processInfo.environment["NUKE_DEBUG_COUNTY"] {
             _county = State(initialValue: CountySelection(fips: fips))
         }
-        if let rawStart = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_FROM"],
-           let rawEnd = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_THROUGH"],
-           let start = AuctionLocationClock.day(rawStart), let end = AuctionLocationClock.day(rawEnd), end >= start {
-            _period = State(initialValue: MapObservationWindow(start: start,
-                end: AuctionLocationClock.calendar.date(byAdding: .day, value: 1, to: end)))
-        }
         #endif
     }
 
