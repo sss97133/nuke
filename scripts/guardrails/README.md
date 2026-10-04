@@ -1,8 +1,9 @@
 # Guardrails — Nuke repo rails for agents
 
-Six self-contained checks (zero deps, chmod +x) that keep agents from repeating the
-failure classes the 2026-07-12 ledger audit found. **All are currently INERT** — nothing
-is hooked into git or Claude Code. Enabling is opt-in (Skylar's call); instructions below.
+These checks keep agents from repeating the failure classes the 2026-07-12 ledger
+audit found. Activation is recorded per check: `check-write-guard.mjs` runs in CI;
+other repository checks are opt-in. The runtime testimony guard is shared by
+Claude Code and Codex when installed and trusted as described below.
 
 Authority: `docs/ledger/` (CANONICAL_LEDGER.md, CAPABILITY_MAP.md, ledger.json).
 
@@ -16,9 +17,31 @@ Authority: `docs/ledger/` (CANONICAL_LEDGER.md, CAPABILITY_MAP.md, ledger.json).
 | `check-capability-before-mint.mjs` | Minting a function/table/page whose capability already has a canonical owner, or resurrecting a DEAD/RETIRED name. Per-name preflight: `check-capability-before-mint.mjs "<name>"` → exit 0 CLEAR / 1 STOP. `--json`, `--test` available. | n/a (preflight, not a sweeper) |
 | `no-schema-baked-labels.mjs` | New migrations baking world-labels as CHECK enums / CREATE TYPE (doctrine: labels are projections of measurement). Advisory — always exits 0. Default scopes to staged migrations; `--all` = full audit. | **282** across 143 historical migrations (`--all`); staged mode currently clean |
 | `check-write-guard.mjs` | An edge function that writes (table/storage/auth.admin/write RPC/raw SQL, or fan-out to a writer) without `requireWriteAuth` from `_shared/writeGuard.ts` and not on the script's allowlist. Runs in `supabase-deploy.yml` before deploy — a hit blocks the deploy. `--list` prints every function's classification. | **0** (2026-09-27: 155 guarded, 13 allowlisted) |
+| `block-god-writes.sh` | Runtime PreToolUse policy for raw testimony mutations and Supabase migrations/function deploys. Recognizes Claude and Codex connector names, Bash and unified exec. Installed copy: `~/.claude/hooks/block-god-writes.sh`. `npm run guardrails:test-db-writes` tests synthetic events without executing SQL. | Runtime activation depends on the agent's hook configuration and trust. |
 | `no-dead-asset-references.mjs` | Live code referencing dropped tables (`.from('vehicle_image_tags')` → silent 404) or DEAD edge functions. ERROR = DB-confirmed ghost on a live path; WARNING = ledger-DEAD. `--no-db`, `--json`, `--strict`. | **6** ERRORs (2026-07-12: 50 ghost ERRORs found → 44 fixed [repointed/guarded/webhooks removed] → 6 remain, all guarded `vehicle_transactions`; ~184 ledger-DEAD WARNINGs) |
 
 Exit convention: 0 = clean, 1 = violation, 2 = setup/usage error.
+
+## Runtime testimony write guard
+
+`block-god-writes.sh` versions the existing installed Claude guard; it replaces
+that implementation rather than creating a second policy. Install the tested
+script to `~/.claude/hooks/block-god-writes.sh` after backing up the installed
+version. Both runtimes call that same installed script.
+
+For Codex, add a `PreToolUse` command hook in `~/.codex/hooks.json`, matching
+`Bash|exec_command|functions\.exec_command|mcp__.*[Ss]upabase.*(execute_sql|apply_migration|deploy_edge_function)`.
+The command is `bash <absolute-home>/.claude/hooks/block-god-writes.sh`, with a
+five-second timeout. Review and trust the exact hook definition through `/hooks`.
+The [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) defines which
+surfaces run local command hooks; cloud orchestration does not run them.
+
+The hook is a text-based agent policy, not a database permission boundary. Its
+existing deliberate maintenance marker is preserved; it never authorizes an
+action the owner has prohibited. Database constraints and sanctioned writer
+checks remain necessary. Verify installed hashes and runtime trust before
+claiming enforcement. Test hooks offline; never probe production with a forbidden
+write merely to demonstrate a blocker.
 
 ## Opt-in enablement (do NOT enable without Skylar's sign-off)
 
