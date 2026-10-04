@@ -200,6 +200,8 @@ test('actual PG17 cached ancestry excludes restricted originals and forbids read
   assert.equal(baseline.metrics.eligible, 3, 'Other valid scalar properties retain arrival eligibility');
   assert.equal(baseline.metrics.reader_eligible, 1, 'Selected-field reader coverage is separate');
   for (const mutation of [
+    "UPDATE public.vehicles SET deleted_at=now() WHERE id='11111111-1111-1111-1111-111111111111';",
+    "UPDATE public.vehicles SET listing_kind='non_vehicle_item' WHERE id='11111111-1111-1111-1111-111111111111';",
     "UPDATE public.vehicle_observations SET is_superseded=true WHERE id='55555555-5555-5555-5555-000000000001';",
     "UPDATE public.vehicle_observations SET vehicle_id='22222222-2222-2222-2222-222222222222' WHERE id='55555555-5555-5555-5555-000000000001';",
     "UPDATE public.vehicle_observations SET structured_data=structured_data||'{\"receipt_id\":\"new-restriction\"}' WHERE id='55555555-5555-5555-5555-000000000001';",
@@ -221,6 +223,26 @@ test('actual PG17 cached ancestry excludes restricted originals and forbids read
   assert.equal(leaked.status, 'failed');
   assert.equal(leaked.metrics.cached_bad_reader_visible, 1);
   assert(leaked.reasons.includes('cached_bad_reader_visible'));
+  const wrongWitness = `UPDATE public.observation_witnesses w
+    SET image_id='44444444-4444-4444-4444-000000000002'
+    FROM public.vehicle_observations o WHERE o.id=w.observation_id
+      AND o.extraction_method='cached_byok_property_projection_v1'
+      AND o.structured_data->>'source_observation_id'='55555555-5555-5555-5555-000000000001';`;
+  const withheld = check(wrongWitness);
+  assert.equal(withheld.status, 'failed', 'Broken typed receipt still needs repair even when reader withholds it');
+  assert.equal(withheld.metrics.cached_bad_reader_visible, 0);
+  assert.equal(withheld.metrics.missing_witnesses, 3);
+  const wrongCitation = check(`${wrongWitness}
+    CREATE OR REPLACE FUNCTION public.get_field_provenance(p_vehicle_id uuid,p_field text)
+    RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+    SELECT jsonb_build_object('image_observations',jsonb_agg(jsonb_build_object(
+      'observation_id',o.id,'image_id',w.image_id,'witness_id',w.id)))
+    FROM public.vehicle_observations o JOIN public.observation_witnesses w ON w.observation_id=o.id
+    WHERE o.vehicle_id=$1 AND o.structured_data ? $2
+      AND o.structured_data->>'source_observation_id'='55555555-5555-5555-5555-000000000001' $$;`);
+  assert.equal(wrongCitation.status, 'failed');
+  assert.equal(wrongCitation.metrics.cached_source_ineligible, 3);
+  assert.equal(wrongCitation.metrics.cached_bad_reader_visible, 1, 'Eligible ancestor cannot justify a different cited image');
   const capped = check(`SET LOCAL app.writer='fixture-sample-bound';
     INSERT INTO public.vehicle_observations(vehicle_id,kind,structured_data,ingested_at)
     SELECT '${sample.vehicle}'::uuid,'specification','{}'::jsonb,'2026-10-04T06:01Z'

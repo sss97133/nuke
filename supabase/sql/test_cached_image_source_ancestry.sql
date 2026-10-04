@@ -18,7 +18,7 @@ $$ SELECT nullif(current_setting('test.auth_uid',true),'')::uuid $$;
 CREATE TYPE public.observation_kind AS ENUM ('listing','sale_result','comment','bid','specification','condition','media','splice');
 CREATE TYPE public.confidence_level AS ENUM ('low','medium','high');
 CREATE TABLE public.vehicles (
- id uuid PRIMARY KEY,is_public boolean,user_id uuid,owner_id uuid,uploaded_by uuid,color text
+ id uuid PRIMARY KEY,is_public boolean,user_id uuid,owner_id uuid,uploaded_by uuid,color text,deleted_at timestamptz,listing_kind text
 );
 CREATE TABLE public.vehicle_images (
  id uuid PRIMARY KEY,vehicle_id uuid,image_url text,source text,is_sensitive boolean,
@@ -407,6 +407,21 @@ DO $$ DECLARE p jsonb; BEGIN
  ASSERT p->'parents'->0->'parent'->'source_is_public'='false'::jsonb;
 END $$;
 ROLLBACK;
+-- A cached claim must cite the same retained source image even when a typed
+-- witness points at another visible image of this vehicle. A blocked typed edge
+-- cannot reopen JSON fallback. Only this cached method gains equality checking.
+BEGIN;
+UPDATE public.observation_witnesses w SET image_id='44444444-4444-4444-4444-000000000002'
+FROM public.vehicle_observations o WHERE o.id=w.observation_id
+ AND o.extraction_method='cached_byok_property_projection_v1'
+ AND o.structured_data->>'source_observation_id'='55555555-5555-5555-5555-000000000001';
+SET LOCAL ROLE anon;
+DO $$ DECLARE p jsonb; BEGIN
+ p:=public.get_field_provenance('11111111-1111-1111-1111-111111111111','image_visible_rust_severity');
+ ASSERT jsonb_array_length(p->'image_observations')=0 AND jsonb_array_length(p->'observations')=0,
+  'Wrong typed cached image must be hidden without JSON fallback';
+END $$;
+ROLLBACK;
 -- Preserve unrelated legacy reader paths, including unknown model/capture.
 BEGIN;
 INSERT INTO public.vehicle_observations(vehicle_id,kind,structured_data,extraction_method)
@@ -415,6 +430,41 @@ DO $$ DECLARE p jsonb; BEGIN
  p:=public.get_field_provenance('11111111-1111-1111-1111-111111111111','color');
  ASSERT jsonb_array_length(p->'image_observations')=1;
  ASSERT p->'image_observations'->0->'agent_model'='null'::jsonb;
+ UPDATE public.observation_witnesses w SET image_id='44444444-4444-4444-4444-000000000002'
+ FROM public.vehicle_observations o WHERE o.id=w.observation_id AND o.extraction_method='fixture-unrelated-review';
+ p:=public.get_field_provenance('11111111-1111-1111-1111-111111111111','color');
+ ASSERT p->'image_observations'->0->>'image_id'='44444444-4444-4444-4444-000000000002',
+  'Unrelated typed-edge authority stays unchanged';
+END $$;
+ROLLBACK;
+-- These flags affect only the public cached path. Existing owner/legacy
+-- vehicle reading remains available, and no source testimony is rewritten.
+BEGIN;
+DO $$ DECLARE p jsonb; before_count bigint; flag text; BEGIN
+ SELECT count(*) INTO before_count FROM public.vehicle_observations;
+ FOR flag IN SELECT unnest(ARRAY['deleted','nonvehicle','private']) LOOP
+  UPDATE public.vehicles SET deleted_at=CASE WHEN flag='deleted' THEN now() END,
+    listing_kind=CASE WHEN flag='nonvehicle' THEN 'non_vehicle_item' END,
+    is_public=(flag<>'private'),owner_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  WHERE id='11111111-1111-1111-1111-111111111111';
+  BEGIN
+   PERFORM public.get_cached_image_projection_parents('11111111-1111-1111-1111-111111111111',
+    ARRAY['44444444-4444-4444-4444-000000000001']::uuid[],'2026-10-04T06:00Z');
+   RAISE EXCEPTION 'Ineligible parent must reject cached selection';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+   PERFORM public.ingest_cached_image_property_batch(claims) FROM public.fixture_cached_claims
+    WHERE parent_id='55555555-5555-5555-5555-000000000001';
+   RAISE EXCEPTION 'Ineligible parent must reject cached admission, even duplicate replay';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  PERFORM set_config('test.auth_uid','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',true);
+  p:=public.get_field_provenance('11111111-1111-1111-1111-111111111111','image_visible_rust_severity');
+  ASSERT jsonb_array_length(p->'image_observations')=0 AND jsonb_array_length(p->'observations')=0;
+  ASSERT public.get_field_provenance('11111111-1111-1111-1111-111111111111','color')->>'value'='fixture',
+   'Existing unrelated owner/legacy reader preserved';
+  PERFORM set_config('test.auth_uid','',true);
+ END LOOP;
+ ASSERT (SELECT count(*) FROM public.vehicle_observations)=before_count;
 END $$;
 ROLLBACK;
 SELECT 'PASS: actual canonical admission/replay, source privacy/supersession/relink, safe clocks/IDs, late cached cutoff, anon/auth/service and legacy reader' AS result;

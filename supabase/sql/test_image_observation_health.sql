@@ -52,3 +52,5 @@ ALTER TABLE public.vehicle_observations ADD COLUMN observed_at timestamptz,
   ADD COLUMN extraction_method text, ADD COLUMN agent_model text,
   ADD COLUMN raw_source_ref text, ADD COLUMN source_identifier text,
   ADD COLUMN confidence text, ADD COLUMN confidence_score numeric;
+
+ALTER TABLE public.vehicles ADD COLUMN deleted_at timestamptz, ADD COLUMN listing_kind text;

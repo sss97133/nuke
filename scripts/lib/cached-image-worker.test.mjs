@@ -12,7 +12,7 @@ function fixture(count = 1) {
     observation_properties: properties.map((property_key, index) => ({ id: id(10 + index), property_key })),
     observation_sources: [{ id: source, slug: 'photo_pipeline' }],
     image_coverage_by_vehicle: [{ vehicle_id: vehicle, seen_t1: count }],
-    vehicles: [{ id: vehicle, is_public: true }],
+    vehicles: [{ id: vehicle, is_public: true, deleted_at: null, listing_kind: null }],
     vehicle_images: Array.from({ length: count }, (_, index) => ({ id: id(100 + index), vehicle_id: vehicle,
       image_url: `https://bringatrailer.com/wp-content/uploads/synthetic-${index}.jpg`, source: 'bat_import',
       vision_gate_status: 'approved', is_sensitive: false, is_duplicate: false, is_superseded: false,
@@ -196,6 +196,17 @@ test('private vehicle never admits public-hosted photos', async () => {
   const f = fixture(); f.rows.vehicles[0].is_public = false;
   const result = await runCachedImageProjection(f.sb, f.options);
   assert.equal(result.deferred.vehicle_not_public, 1); assert.equal(f.writes.length, 0);
+  assert.equal(f.calls.some(call => call.table === 'vehicle_images'), false);
+});
+
+for (const [name, patch, reason] of [
+  ['deleted public parent', { deleted_at: '2026-10-02T00:00:00Z' }, 'vehicle_deleted'],
+  ['non-vehicle public parent', { listing_kind: 'non_vehicle_item' }, 'vehicle_non_vehicle_item'],
+]) test(`${name} defers before cached source access or writes`, async () => {
+  const f = fixture(); Object.assign(f.rows.vehicles[0], patch);
+  const result = await runCachedImageProjection(f.sb, f.options);
+  assert.equal(result.deferred[reason], 1);
+  assert.equal(f.writes.length, 0);
   assert.equal(f.calls.some(call => call.table === 'vehicle_images'), false);
 });
 

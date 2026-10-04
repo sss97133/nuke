@@ -126,13 +126,19 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
         await checkpointAt({ ...initialCheckpoint(new Date(now()).toISOString()), completed_cycles: cursor.completed_cycles + 1 });
         result.status = 'complete'; result.reason = 'bounded_coverage_cycle_complete'; break;
       }
-      const vehicles = await query(() => sb.from('vehicles').select('id,is_public').in('id', vehicleIds)
+      const vehicles = await query(() => sb.from('vehicles').select('id,is_public,deleted_at,listing_kind').in('id', vehicleIds)
         .limit(budget.vehicles), { maxRows: budget.vehicles });
-      const publicIds = new Set(vehicles.filter(row => row.is_public === true).map(row => row.id));
+      const publicIds = new Set(vehicles.filter(row => row.is_public === true && row.deleted_at == null
+        && row.listing_kind !== 'non_vehicle_item').map(row => row.id));
       for (const vehicleId of vehicleIds) {
         if (exhausted()) break;
         result.inspected_vehicles++;
-        if (!publicIds.has(vehicleId)) { defer('vehicle_not_public'); await advanceVehicle(vehicleId); continue; }
+        if (!publicIds.has(vehicleId)) {
+          const parent = vehicles.find(row => row.id === vehicleId);
+          defer(parent?.is_public !== true ? 'vehicle_not_public' :
+            parent.deleted_at != null ? 'vehicle_deleted' : 'vehicle_non_vehicle_item');
+          await advanceVehicle(vehicleId); continue;
+        }
         if (cursor.current_vehicle_id !== vehicleId) await checkpointAt({ ...cursor, current_vehicle_id: vehicleId, image_cursor: null });
         while (!exhausted()) {
           const limit = Math.min(budget.image_page, sourceLimit - result.eligible_source_images,

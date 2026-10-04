@@ -86,7 +86,9 @@ export function query(scope) {
   SELECT r.*, coalesce(r.extraction_method='cached_byok_property_projection_v1'
     OR r.structured_data->>'analysis_kind'='image_property_projection'
     OR r.structured_data->>'projection_version'='byok_image_properties_v1',false) AS cached_projection,
-    coalesce(a.id IS NOT NULL AND a.vehicle_id=r.vehicle_id AND a.kind::text='condition'
+    coalesce(EXISTS(SELECT 1 FROM public.vehicles v WHERE v.id=r.vehicle_id AND v.is_public IS TRUE
+          AND v.deleted_at IS NULL AND coalesce(v.listing_kind,'')<>'non_vehicle_item')
+        AND a.id IS NOT NULL AND a.vehicle_id=r.vehicle_id AND a.kind::text='condition'
         AND a.is_superseded IS NOT TRUE AND public.observation_is_public(a.kind,a.structured_data)
         AND a.structured_data->>'analysis_kind'='image_deep_byok'
         AND a.structured_data->>'image_id'=r.structured_data->>'image_id'
@@ -154,10 +156,11 @@ export function query(scope) {
     count(*) FILTER (WHERE existing_image IS NOT NULL AND NOT excluded_share AND image_vehicle IS DISTINCT FROM vehicle_id) AS mismatched_vehicles,
     count(*) FILTER (WHERE cached_projection) AS cached_projections,
     count(*) FILTER (WHERE cached_projection AND NOT source_eligible) AS cached_source_ineligible,
-    count(*) FILTER (WHERE cached_projection AND NOT source_eligible AND EXISTS (
+    count(*) FILTER (WHERE cached_projection AND EXISTS (
       SELECT 1 FROM reader, jsonb_array_elements(CASE WHEN jsonb_typeof(result->'image_observations') = 'array'
         THEN result->'image_observations' ELSE '[]'::jsonb END) c
-      WHERE c->>'observation_id'=links.id::text)) AS cached_bad_reader_visible,
+      WHERE c->>'observation_id'=links.id::text
+        AND (NOT source_eligible OR c->>'image_id' IS DISTINCT FROM links.image_key::text))) AS cached_bad_reader_visible,
     count(*) FILTER (WHERE eligible) AS eligible,
     count(*) FILTER (WHERE eligible AND witness_id IS NULL) AS missing_witnesses,
     count(*) FILTER (WHERE eligible AND witness_added_at >= '${since}'::timestamptz) AS fresh_witnesses,
@@ -202,7 +205,7 @@ export function assess(assay) {
   if (m.sampled > SAMPLE_LIMIT + 1 || counts.slice(1).some(k => m[k] > m.sampled)
       || m.reader_eligible > m.eligible || m.reader_missing > m.reader_eligible
       || m.missing_witnesses > m.eligible || m.cached_source_ineligible > m.cached_projections
-      || m.cached_bad_reader_visible > m.cached_source_ineligible) throw new Error('inconsistent assay; coverage unknown');
+      || m.cached_bad_reader_visible > m.cached_projections) throw new Error('inconsistent assay; coverage unknown');
   const failures = ['invalid_image_refs', 'missing_images', 'mismatched_vehicles', 'missing_witnesses', 'reader_missing', 'cached_bad_reader_visible'].filter(k => m[k] > 0);
   const incomplete = [];
   for (const s of assay.sensors) {

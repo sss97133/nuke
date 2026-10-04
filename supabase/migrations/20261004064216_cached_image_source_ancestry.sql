@@ -19,7 +19,8 @@ BEGIN
      OR (SELECT count(DISTINCT x) FROM unnest(p_image_ids) x) <> cardinality(p_image_ids) THEN
     RAISE EXCEPTION 'invalid bounded image parent selection' USING ERRCODE='22023';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.vehicles WHERE id=p_vehicle_id AND is_public IS TRUE)
+  IF NOT EXISTS (SELECT 1 FROM public.vehicles WHERE id=p_vehicle_id AND is_public IS TRUE
+       AND deleted_at IS NULL AND coalesce(listing_kind,'')<>'non_vehicle_item')
      OR EXISTS (SELECT 1 FROM unnest(p_image_ids) x LEFT JOIN public.vehicle_images i
        ON i.id=x AND i.vehicle_id=p_vehicle_id WHERE i.id IS NULL) THEN
     RAISE EXCEPTION 'image parent selection requires a public same-vehicle cohort' USING ERRCODE='23514';
@@ -124,6 +125,7 @@ BEGIN
       WHEN 'image_visible_rust_severity' THEN 'rust_severity'
       WHEN 'image_visible_paint_stage' THEN 'paint_state' ELSE 'completeness' END source_key) m
     WHERE v.id IS NULL OR v.is_public IS DISTINCT FROM true
+      OR v.deleted_at IS NOT NULL OR coalesce(v.listing_kind,'')='non_vehicle_item'
       OR i.id IS NULL OR i.vehicle_id IS DISTINCT FROM v.id
       OR i.vision_gate_status::text IS DISTINCT FROM 'approved'
       OR i.is_sensitive IS TRUE OR i.is_superseded IS TRUE OR i.is_duplicate IS TRUE OR i.is_document IS TRUE
@@ -286,7 +288,9 @@ AS $function$
       then (o.structured_data->>'source_observation_id')::uuid end
     where o.vehicle_id = p_vehicle_id and o.is_superseded is not true
       and o.structured_data ? p_field
-      and (not coalesce((o.extraction_method='cached_byok_property_projection_v1' OR o.structured_data->>'analysis_kind'='image_property_projection' OR o.structured_data->>'projection_version'='byok_image_properties_v1'),false) or coalesce(a.id IS NOT NULL AND a.vehicle_id=o.vehicle_id AND a.kind::text='condition'
+      and (not coalesce((o.extraction_method='cached_byok_property_projection_v1' OR o.structured_data->>'analysis_kind'='image_property_projection' OR o.structured_data->>'projection_version'='byok_image_properties_v1'),false) or coalesce(EXISTS(SELECT 1 FROM gate g WHERE g.is_public IS TRUE
+          AND g.deleted_at IS NULL AND coalesce(g.listing_kind,'')<>'non_vehicle_item')
+        AND a.id IS NOT NULL AND a.vehicle_id=o.vehicle_id AND a.kind::text='condition'
         AND a.is_superseded IS NOT TRUE AND public.observation_is_public(a.kind,a.structured_data)
         AND a.structured_data->>'analysis_kind'='image_deep_byok'
         AND a.structured_data->>'image_id'=o.structured_data->>'image_id'
@@ -333,6 +337,8 @@ AS $function$
            i.id as visible_image_id, i.image_url as visible_image_url
     from field_observations o
     join public.observation_witnesses w on w.observation_id = o.id and w.witness_role = 'derived'
+      and (o.extraction_method is distinct from 'cached_byok_property_projection_v1'
+        or w.image_id = o.legacy_image_id)
     join visible_images i on i.id = w.image_id
     union all
     select o.*, null::uuid as witness_id, null::text as witness_role,
@@ -451,6 +457,6 @@ COMMENT ON FUNCTION public.get_cached_image_projection_parents(uuid,uuid[],times
 COMMENT ON FUNCTION public.ingest_cached_image_property_batch(jsonb) IS
 'Owner: ingest-observation-batch cached_image_property_projection_v1. Existing service-only max3000 canonical hashed intake locks original vehicle/image/source/registry; full original visibility, attachment and nonsupersession are checked before any write. Atomic derived-witness/readback, no inference or source edits.';
 COMMENT ON FUNCTION public.get_field_provenance(uuid,text) IS
-'Owner: field provenance reader. Existing public/owner vehicle and image gates preserved. Cached BYOK properties additionally require eligible current full-source ancestry and retained source clocks; source ingest is projection observed_at, original observed_at does not attest image capture/analysis time. No canonical promotion or independent corroboration.';
+'Owner: field provenance reader. Existing public/owner vehicle and image gates preserved. Cached BYOK properties additionally require eligible current public/nondeleted/vehicle full-source ancestry, same retained witness image and source clocks; source ingest is projection observed_at, original observed_at does not attest image capture/analysis time. No canonical promotion or independent corroboration.';
 NOTIFY pgrst,'reload schema';
 COMMIT;
