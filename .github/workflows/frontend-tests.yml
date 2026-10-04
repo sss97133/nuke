@@ -299,6 +299,10 @@ jobs:
         run: createdb dm_fold_listing
       - name: Verify event queue fold and public evidence reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listing -f supabase/sql/test_listing_observation_consensus.sql
+      - name: Create disposable listed-engine contract database
+        run: createdb dm_fold_listed_engine
+      - name: Verify source-bound listed engine phrases and existing listing contracts
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listed_engine -f supabase/sql/test_listed_engine_reported_state.sql
       - name: Create disposable full-description reader database
         run: createdb dm_fold_description
       - name: Verify full native listing prose and qualified public reader
