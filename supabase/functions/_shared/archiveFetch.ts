@@ -429,6 +429,13 @@ export async function readArchivedPage(
   };
 }
 
+// PostgreSQL capture clocks retain microseconds. Date.parse alone truncates
+// those before ordering a capture, parse, qualification or knowledge cutoff.
+function preciseArchivedClock(raw: string): bigint {
+  const remainder = (/:[0-9]{2}\.(\d+)/.exec(raw)?.[1] ?? "").slice(3,9).padEnd(6,"0");
+  return BigInt(Date.parse(raw)) * 1000000n + BigInt(remainder);
+}
+
 /** Private source custody reader, pinned to one capture rather than URL/latest.
  * Public-parent eligibility precedes raw access. Never crawls or falls back to a
  * different snapshot. Callers must not return raw HTML or protected metadata.
@@ -462,17 +469,12 @@ export async function readPinnedArchivedPage(
     if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== day) return NaN;
     return Date.parse(raw);
   }
-  // Preserve PostgreSQL's submillisecond clocks; Date.parse alone truncates them.
-  function preciseClock(raw: string): bigint {
-    const remainder = (/:[0-9]{2}\.(\d+)/.exec(raw)?.[1] ?? "").slice(3,9).padEnd(6,"0");
-    return BigInt(clock(raw)) * 1000000n + BigInt(remainder);
-  }
   const key = sourceKey(input.sourceUrl);
   if (!uuid.test(input.snapshotId) || !uuid.test(input.vehicleId) || !key) return refuse("invalid_capture_locator");
   const now = (deps.now?.() ?? new Date()).getTime();
   const cutoff = input.evidenceAsOf ? clock(input.evidenceAsOf) : now;
   if (!Number.isFinite(now) || !Number.isFinite(cutoff) || cutoff > now) return refuse("invalid_knowledge_cutoff");
-  const preciseCutoff = input.evidenceAsOf ? preciseClock(input.evidenceAsOf) : BigInt(now) * 1000000n;
+  const preciseCutoff = input.evidenceAsOf ? preciseArchivedClock(input.evidenceAsOf) : BigInt(now) * 1000000n;
   if (preciseCutoff > BigInt(now) * 1000000n) return refuse("invalid_knowledge_cutoff");
   const supabase = deps.supabase ?? getSupabase();
   try {
@@ -494,10 +496,10 @@ export async function readPinnedArchivedPage(
     const clocks = [s.fetched_at, s.created_at, parsedAt];
     const times = clocks.map(clock);
     if (times.some(v => !Number.isFinite(v))) return refuse("source_clock_unknown");
-    if (times.some(v => !Number.isFinite(v)) || times[0] > times[2]) return refuse("source_clock_conflict");
+    if (preciseArchivedClock(s.fetched_at) > preciseArchivedClock(parsedAt)) return refuse("source_clock_conflict");
     const knownAt = Math.max(...times);
-    const sourceKnownAt = clocks.reduce((latest, value) => preciseClock(value) > preciseClock(latest) ? value : latest);
-    if (preciseClock(sourceKnownAt) > preciseCutoff) return refuse("learned_later");
+    const sourceKnownAt = clocks.reduce((latest, value) => preciseArchivedClock(value) > preciseArchivedClock(latest) ? value : latest);
+    if (preciseArchivedClock(sourceKnownAt) > preciseCutoff) return refuse("learned_later");
     if (typeof s.html_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(s.html_sha256)) return refuse("source_hash_unknown");
     let bytes: Uint8Array;
     let bodySource: "inline" | "protected_storage";
@@ -555,7 +557,7 @@ export async function attachPinnedArchivedSaleQualification(
   }
   const qualifiedAt = typeof receipt.qualified_at === "string" ? Date.parse(receipt.qualified_at) : NaN;
   if (!Number.isFinite(qualifiedAt) || new Date(qualifiedAt).toISOString() !== receipt.qualified_at
-    || qualifiedAt > Date.now() || qualifiedAt < Date.parse(capture.snapshot.knownAt)
+    || qualifiedAt > Date.now() || preciseArchivedClock(receipt.qualified_at as string) < preciseArchivedClock(capture.snapshot.sourceKnownAt)
     || receipt.knowledge_at !== new Date(Math.max(qualifiedAt,Date.parse(capture.snapshot.knownAt))).toISOString()) {
     return refuse("qualification_clock_conflict");
   }

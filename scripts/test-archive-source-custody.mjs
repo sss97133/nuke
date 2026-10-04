@@ -153,6 +153,11 @@ test('submillisecond ingestion remains distinct from an earlier knowledge cutoff
   assert.equal((await f.read({evidenceAsOf:'2026-01-02T00:00:00.000000Z'})).reason,'learned_later');
   assert.equal((await f.read()).snapshot.sourceKnownAt,'2026-01-02T00:00:00.000001Z');
 });
+test('parse cannot precede capture within the same millisecond',async()=>{
+  const f=fixture({snapshot:{fetched_at:'2025-06-16T12:00:00.000002Z',
+    metadata:{...snapshot.metadata,parsed_at:'2025-06-16T12:00:00.000001Z'}}});
+  assert.equal((await f.read()).reason,'source_clock_conflict');assert.equal(f.requests.length,2);
+});
 test('missing/corrupt/oversize/invalid-UTF8 objects remain explicit unknowns',async()=>{
   assert.equal((await fixture({storageMissing:true}).read()).reason,'storage_body_unavailable');
   assert.equal((await fixture({bytes:Buffer.from(html+' corrupt')}).read()).reason,'source_hash_conflict');
@@ -213,5 +218,12 @@ test('registered archive owner refuses a forged tuple or backdated/future qualif
   assert.equal((await f.attach(capture,{...receipt,currency:'GBP'})).reason,'qualification_attribution_conflict');
   assert.equal((await f.attach(capture,{...receipt,qualified_at:'2025-06-15T00:00:00.000Z'})).reason,'qualification_clock_conflict');
   assert.equal((await f.attach(capture,{...receipt,qualified_at:'2999-01-01T00:00:00.000Z'})).reason,'qualification_clock_conflict');
+  assert.equal(f.writes.length,0);assert(!f.requests.some(r=>r.method==='PATCH'));
+});
+test('qualification cannot precede source knowledge within the same millisecond',async()=>{
+  const f=fixture({snapshot:{created_at:'2025-06-16T12:00:00.000001Z'}});
+  const capture=await f.read(),preview=await f.run(),receipt=preview.body.results[0].receipt;
+  const earlier='2025-06-16T12:00:00.000Z';
+  assert.equal((await f.attach(capture,{...receipt,qualified_at:earlier,knowledge_at:earlier})).reason,'qualification_clock_conflict');
   assert.equal(f.writes.length,0);assert(!f.requests.some(r=>r.method==='PATCH'));
 });
