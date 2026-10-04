@@ -102,7 +102,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         <span className="ev-label">CANONICAL VALUE</span>{' '}
         <strong>{provenance.data.value || 'Unknown'}</strong>
         {!provenance.data.value && <p>The canonical value is unknown. Source reports below remain attributed claims.</p>}
-        {evidence?.hasConflict && evidence.conflictType === 'genuine' && <p role="status">Source claims differ. No resolution is established by this display.</p>}
+        {evidence?.hasConflict && evidence.conflictType === 'genuine'
+          ? <p role="status">Source claims differ. No resolution is established by this display.</p>
+          : sortedSources.length > 1 && <p role="status">Multiple source claims are shown. This display does not establish whether differences have been resolved.</p>}
       </div>}
 
       {/* VIN decode section */}
