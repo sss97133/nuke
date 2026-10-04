@@ -100,6 +100,7 @@ function run(script, overrides = {}, batchStatuses = '1', args = []) {
         FAKE_VEHICLE: vehicle, FAKE_INGEST_MARKER: join(root, 'ingest-marker'),
         FAKE_ATTEMPTS: attempts, FAKE_BATCH_STATUSES: batchStatuses,
         FAKE_RESULT: JSON.stringify({ type: 'result', subtype: 'success', is_error: false }),
+        GITHUB_STEP_SUMMARY: join(root, 'summary'),
         ...overrides,
       },
     });
@@ -109,6 +110,7 @@ function run(script, overrides = {}, batchStatuses = '1', args = []) {
       log: existsSync(join(root, 'logs', 'byok-image-batch.log')) ? readFileSync(join(root, 'logs', 'byok-image-batch.log'), 'utf8') : '',
       attempts: existsSync(attempts) ? Number(readFileSync(attempts, 'utf8')) : 0,
       ingested: existsSync(join(root, 'ingest-marker')),
+      summary: existsSync(join(root, 'summary')) ? readFileSync(join(root, 'summary'), 'utf8') : '',
     };
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
@@ -122,6 +124,23 @@ test('unexpected nonzero batch exit cannot count as successful work', () => {
   const r = run('byok-cloud-drain.sh', {}, '137', ['45']);
   assert.equal(r.status, 1); assert.equal(r.attempts, 3);
   assert.match(r.output, /batches=0 failures=3/);
+});
+test('known quota deferral stops after one attempt and never claims completion', () => {
+  const r = run('byok-cloud-drain.sh', {}, '4', ['45']);
+  assert.equal(r.status, 0); assert.equal(r.attempts, 1);
+  assert.match(r.output, /outcome=deferred_quota batches=0 failures=0 attempts=1 remaining=1/);
+  assert.doesNotMatch(r.output, /outcome=complete|all vehicles drained/);
+  assert.match(r.summary, /quota is unavailable.*analysis remains incomplete/);
+});
+test('quota deferral after some verified work still leaves remaining work explicit', () => {
+  const r = run('byok-cloud-drain.sh', {}, '0,4', ['45']);
+  assert.equal(r.status, 0); assert.equal(r.attempts, 2);
+  assert.match(r.output, /outcome=deferred_quota batches=1 failures=0 attempts=2 remaining=1/);
+});
+test('later quota deferral cannot hide an earlier genuine batch failure', () => {
+  const r = run('byok-cloud-drain.sh', {}, '1,4', ['45']);
+  assert.equal(r.status, 1); assert.equal(r.attempts, 2);
+  assert.match(r.output, /outcome=failed batches=0 failures=1 attempts=2 remaining=1/);
 });
 test('successful batch followed by verified drain completes', () => {
   const r = run('byok-cloud-drain.sh', {}, '0,3', ['45']);
@@ -175,6 +194,22 @@ test('CLI exit zero with structured failure cannot pass even when a verdict pers
   });
   assert.equal(r.status, 1); assert.equal(r.ingested, true);
   assert.match(r.log, /category=rate_limit code=429/);
+});
+for (const [label, result] of [
+  ['subscription quota', 'You have hit your limit. SENTINEL'],
+  ['empty API balance', JSON.stringify({type:'error',message:'API Error: 400 Your credit balance is too low. SENTINEL'})],
+]) {
+  test(`${label} defers without ingest or exposing provider text`, () => {
+    const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:result});
+    assert.equal(r.status, 4); assert.equal(r.ingested, false);
+    assert.match(r.log, /category=quota_exhausted/);
+    assert.doesNotMatch(r.output + r.log, /SENTINEL/);
+  });
+}
+test('non-error receipt metadata cannot change the failure category', () => {
+  const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:JSON.stringify({
+    type:'result',is_error:true,permission_denials:[],result:'The selected model may not exist.'})});
+  assert.equal(r.status, 1); assert.match(r.log, /category=model_unavailable/);
 });
 for (const [name, result, category, code] of [
   ['plaintext authentication error', 'API Error: 401 authentication_error SENTINEL', 'authentication', 401],

@@ -180,11 +180,12 @@ BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
 node - "$RESULT_JSON" "$RESULT_ERR" "$VISION_RC" > "$DIR/vision-receipt.txt" <<'JS'
 const fs = require('node:fs');
 const [resultPath, errorPath, exitCode] = process.argv.slice(2);
-let result = {}, category = 'none', text = '', rawResult = '';
+let result = {}, category = 'none', text = '', rawResult = '', parsed = false;
 try {
   rawResult = fs.readFileSync(resultPath, 'utf8');
   result = JSON.parse(rawResult);
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error();
+  parsed = true;
 } catch { result = {}; category = 'malformed_result'; }
 const failed = Number(exitCode) !== 0 || result.is_error === true || result.type === 'error' ||
   String(result.subtype || '').startsWith('error');
@@ -193,9 +194,10 @@ if (failed) {
   // Inspect privately; emit fixed categories/numeric codes, never result/error bodies.
   // Startup errors can be plaintext on stdout, or use a top-level message field.
   // Inspect the original privately even when JSON decoding failed; emit categories only.
-  text = rawResult;
+  text = parsed ? JSON.stringify([result.error, result.errors, result.result, result.message]) : rawResult;
   try { text += fs.readFileSync(errorPath, 'utf8'); } catch {}
   if (/authentication_error|oauth.{0,80}expir|invalid.{0,30}(?:token|api key)|not logged in|unauthorized|API Error: 401/i.test(text)) category = 'authentication';
+  else if (/hit your limit|usage_limit|usage limit|out of extra usage|credit balance (?:is )?too low|(?:insufficient|not enough) credits|insufficient_quota|quota.{0,20}(?:exhausted|exceeded)|(?:spend|monthly|weekly|daily) limit (?:reached|exceeded)/i.test(text)) category = 'quota_exhausted';
   else if (/rate_limit|rate limit|usage limit|hit your limit|API Error: 429/i.test(text)) category = 'rate_limit';
   else if (/permission|not allowed|forbidden|(?:required|missing|insufficient).{0,30}scope|API Error: 403/i.test(text)) category = 'permission';
   else if (/model.{0,100}(?:unavailable|not found|not available|not exist|not have access)|invalid model|unknown model/i.test(text)) category = 'model_unavailable';
@@ -205,8 +207,8 @@ if (failed) {
   if (Number(exitCode) === 137) category = 'terminated';
 }
 const candidate = result.error?.status || result.error?.status_code || result.status_code ||
-  text.match(/(?:API Error:|HTTP|status["': ]+)\s*(401|403|408|429|500|502|503|504)\b/i)?.[1];
-const code = [401,403,408,429,500,502,503,504].includes(Number(candidate)) ? Number(candidate) : 0;
+  text.match(/(?:API Error:|HTTP|status["': ]+)\s*(400|401|402|403|408|429|500|502|503|504)\b/i)?.[1];
+const code = [400,401,402,403,408,429,500,502,503,504].includes(Number(candidate)) ? Number(candidate) : 0;
 const number = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0;
 const u = result.usage || {};
 console.log([number(result.total_cost_usd), Math.floor(number(u.input_tokens)),
@@ -221,7 +223,12 @@ log "vision cost: \$$COST_USD for $N imgs | tokens in=$IN_TOK out=$OUT_TOK cache
 V=$( [ -f "$SINK" ] && wc -l < "$SINK" | tr -d ' ' || echo 0 )
 log "claude wrote $V verdict lines"
 log "vision receipt: exit=$VISION_RC category=$RESULT_CATEGORY code=$RESULT_CODE verdicts=$V expected=$N"
-if [ "$V" -eq 0 ]; then log "no verdicts produced — abort ingest"; exit 1; fi
+if [ "$V" -eq 0 ]; then
+  if [ "$RESULT_CATEGORY" = quota_exhausted ]; then
+    log "compute quota unavailable — deferred before ingest"; exit 4
+  fi
+  log "no verdicts produced — abort ingest"; exit 1
+fi
 
 # SANITIZE — repair the two things the model gets wrong without discarding good work:
 #  (1) IDs are the harness's job, not the model's. Force vehicle_id, and force each

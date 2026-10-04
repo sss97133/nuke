@@ -126,6 +126,7 @@ log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model 
 did=0
 failures=0
 attempts=0
+quota_deferred=0
 # Space-delimited UUID set; works in both runner Bash and the Mac's Bash 3.
 DRAINED=" "
 is_drained(){ [[ "$DRAINED" == *" $1 "* ]]; }
@@ -139,6 +140,10 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
     case "$rc" in
       3) DRAINED="$DRAINED$vid " ;;                      # vehicle drained → drop from rotation
       0) did=$((did + 1)); progressed=1 ;;              # verified batch receipt
+      4)
+        quota_deferred=1
+        log "compute quota unavailable — defer this shard without further batch attempts"
+        break 2 ;;
       *)
         failures=$((failures + 1))
         log "batch failed: exit=$rc failures=$failures limit=$MAX_FAILURES"
@@ -163,7 +168,17 @@ remaining=0
 for vid in "${VEH[@]}"; do is_drained "$vid" || remaining=$((remaining + 1)); done
 outcome=complete
 [ "$remaining" -gt 0 ] && outcome=incomplete
+[ "$quota_deferred" -eq 1 ] && outcome=deferred_quota
 [ "$failures" -gt 0 ] && outcome=failed
 log "drain receipt: outcome=$outcome batches=$did failures=$failures attempts=$attempts remaining=$remaining"
+if [ "$quota_deferred" -eq 1 ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    printf '### BYOK analysis: %s\n\n' "$outcome"
+    printf 'Compute quota is unavailable. Further batches stopped; analysis remains incomplete.\n\n'
+    printf 'Verified batches: %s; failed attempts: %s; remaining vehicles in this shard: %s.\n' "$did" "$failures" "$remaining"
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
 [ "$failures" -eq 0 ] || exit 1
+# Handled quota deferral is not a processing failure or a completion claim.
+[ "$quota_deferred" -eq 0 ] || exit 0
 [ "$remaining" -eq 0 ] || exit 2
