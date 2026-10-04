@@ -32,6 +32,8 @@ import { validateObservationProperty, isSupportedImagePropertyKey } from "./imag
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
+import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { ingestBatLive } from "./batLive.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -253,6 +255,17 @@ Deno.serve(async (req) => {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === BAT_LIVE_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Live source admission requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify(await ingestBatLive(supabase, input)),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     let archivedSale: Awaited<ReturnType<typeof deriveArchivedSale>> | undefined;
     if (input.mode === "source_sale_qualification") {
       const denied = await requireWriteAuth(req);
