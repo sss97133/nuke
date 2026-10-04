@@ -131,7 +131,7 @@ In addition to the card's list:
 | C19 | Anon writers remaining (§2.10) | 66 functions, 127 unguarded deployed functions, `vehicle_custom_circuits` | open | yes | a census that matches every DML form and dynamic SQL; revoke; a policy fix; a deploy-list diff against the repo |
 | C20 | DDL tripwire is a record, nobody reads it | 1,486 rows, 0 readers | open | yes | a daily drift check that alarms on DDL not from CI; `ddl_audit_log` into `v_job_health` |
 | C21 | Lock 3 refills via default privileges | `superseded_rows` got DELETE/TRUNCATE for service_role | open | yes | ALTER DEFAULT PRIVILEGES; REVOKE on `bat_bids`, `superseded_rows` |
-| C22 | Five profile subpages silently empty for visitors | Opening evidence: all five read `work_record` directly. October 4 table assay: six permitted public work records absent from production table; local corrected table shows 6/6 with masked detail. | partial — table reader implemented and locally verified; production verification pending | yes | Complete table publication/runtime assay; then connect LifecyclePage, VendorsPage, PartPage and VendorPage to the existing masked contract where its fields support the question. |
+| C22 | Five profile subpages silently empty for visitors | Opening evidence: all five read `work_record` directly. Table delivered in [#564](https://github.com/sss97133/nuke/pull/564), ordinary-anonymous production 0 → 6 work rows. October 4 Lifecycle assay: six permitted work records, zero production work rows; local connection and work filter show 6/6. | partial — table delivered; Lifecycle locally verified at 22:22Z | yes | Publish and verify the Lifecycle connection; then connect VendorsPage, PartPage and VendorPage where the masked contract supports their question. |
 | C23 | Band writer is a laptop cron nobody monitors | 294 of 1,347 board lots without a band; silent for 10 h | open | partly | a `v_job_health` row for the band writer; move the band into the temperature fold (model 40) |
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
@@ -162,6 +162,35 @@ direct/public deduplication, zero labor, unknown dates, empty results and explic
 typecheck, build and enforced guardrails pass. Production deployment and the same runtime assay remain
 to be verified at publication. This sample does not establish fleet coverage or completeness of the
 other observation slices, which retain their existing per-kind limits.
+
+**C22 Lifecycle connection — 2026-10-04 22:17–22:22 UTC, preparation evidence.**
+Useful question: how many permitted work records are recorded on this vehicle, by which named
+supplier, and on which recorded dates? The existing Lifecycle reader now merges the same masked
+`vehicle_build_log_public(uuid)` contract by original observation ID, preferring directly readable
+rows. Its work filter prevents newer condition observations from crowding older work out of the
+12-row activity window. Work records are counted as work records, not receipts; public build stage
+is shown as build stage and does not enter purchased/installed part counts. Supplier strings are
+presentation groups, not canonical organization identities. Public-only rows have no withheld
+observation/vendor drill links. Visible spend is a subtotal of readable amounts, excluding masked
+amounts; it is not ownership-period investment or profit.
+
+Entity/grain/keys and clocks are those in the table connection above: current non-superseded work
+observations joined to the vehicle by the existing RPC, ID deduplication, recorded transaction date
+or observation date as `done_on`, no public ingest clock. The 22:16Z atlas identifies
+`ingest-observation` among the observation owners/writers; no new writer, cadence or computed field
+is introduced. Recompute happens on page load; the same inputs produce the same rows/counts. This
+is a current permission-filtered reader, not a historical as-of fold. The observation-to-vehicle join
+is implemented in the RPC; an enforced FK to `vehicles` remains a separate structural prerequisite.
+
+Anonymous production before: six permitted RPC rows, zero Lifecycle work rows. Local after at
+390px: work count six, filter exposes all six original IDs and recorded dates, zero withheld-detail
+links or visible amounts, unknown-ingest notice, no horizontal overflow. Six executable
+`LifecyclePage.test.tsx` contracts cover masking, zero labor, direct/recent/public deduplication,
+owner drill and subtotal, date ordering/unknown dates, condition crowding and filter round trip,
+reader failure, empty results and transport rejection. Final enforced typecheck/build/guardrails pass.
+These are local preparation stages; the publication receipt records the subsequently checked head,
+merge, deployment and production assay. C22 remains partial for the other three readers, and the
+masked contract supplies no part number for a public part-specific join.
 
 **C17 follow-up — 2026-10-04 UTC, bounded read-only trace.** The October 2 intake receipt records observation
 `6c3ca7fa-0147-4542-8785-9f8ffe724ed2` and an exact replay returning `duplicate: true`. The current check finds its
