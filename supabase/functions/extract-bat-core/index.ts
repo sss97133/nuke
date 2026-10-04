@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.4 — retain producer attribution without an invented extractor UUID (2026-10-04)
+ * Version: 4.2.5 — pinned protected description preview and bounded native intake (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -32,12 +32,13 @@ import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } 
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
+import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.4';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.5';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1048,11 +1049,78 @@ Deno.serve(async (req) => {
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
+    const body = await req.json().catch(() => ({}));
+    if (body?.mode === "description_source") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Protected description source requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const allowed = new Set(["mode", "vehicle_id", "snapshot_id", "expected_capture_sha256", "dry_run"]);
+      if (req.method !== "POST" || Object.keys(body).some(key => !allowed.has(key)) ||
+          typeof body.vehicle_id !== "string" || typeof body.snapshot_id !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.vehicle_id) ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.snapshot_id) ||
+          typeof body.expected_capture_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(body.expected_capture_sha256) ||
+          (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) {
+        return new Response(JSON.stringify({ error: "One vehicle, pinned snapshot/hash and boolean dry_run only" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const supabase = createClient(supabaseUrl, serviceRoleKey, {
+        global: { headers: { "X-Nuke-Writer": "extract-bat-core" } },
+      });
+      const publicParent = async () => {
+        const { data, error } = await supabase.from("vehicles")
+          .select("id,listing_url,discovery_url,origin_metadata").eq("id", body.vehicle_id)
+          .eq("is_public", true).is("deleted_at", null)
+          .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item").maybeSingle();
+        if (error || !data || data.id !== body.vehicle_id) throw new Error("Public description parent unavailable");
+        const source = new URL(data.listing_url || data.discovery_url || "");
+        if (!["http:", "https:"].includes(source.protocol) ||
+            !["bringatrailer.com", "www.bringatrailer.com"].includes(source.hostname) ||
+            !source.pathname.startsWith("/listing/")) throw new Error("Public BaT listing source unknown");
+        return data;
+      };
+      const pin = { id: body.snapshot_id, sha256: body.expected_capture_sha256 };
+      let input = await loadDescriptionInput(supabase, await publicParent(), new Date().toISOString(), pin);
+      if (input.custody !== "protected_snapshot" || input.sourceRef !== `listing_page_snapshots:${pin.id}`) {
+        throw new Error("Pinned protected description source unavailable; no fallback");
+      }
+      const textFingerprint = await descriptionInputFingerprint(input);
+      const dryRun = body.dry_run !== false;
+      if (!dryRun) {
+        const current = await loadDescriptionInput(supabase, await publicParent(), new Date().toISOString(), pin);
+        if (current.sourceRef !== input.sourceRef || current.sourceUrl !== input.sourceUrl ||
+            current.capturedAt !== input.capturedAt || current.ingestedAt !== input.ingestedAt ||
+            current.captureSha256 !== input.captureSha256 || current.textField !== input.textField ||
+            await descriptionInputFingerprint(current) !== textFingerprint) {
+          throw new Error("Protected description source changed during admission; intake refused");
+        }
+        input = current;
+      }
+      const receipt = await recordListingDescription(supabase, {
+        vehicleId: body.vehicle_id, sourceUrl: input.sourceUrl, text: input.text,
+        capturedAt: input.capturedAt || null, extractorVersion: EXTRACTOR_VERSION,
+        captureBasis: "snapshot", captureSha256: input.captureSha256 || "", snapshotId: pin.id,
+        snapshotCustody: { vehicleId: body.vehicle_id, matched: true, sha256: input.captureSha256 },
+        sourceTextField: input.textField, sourceArchiveIngestedAt: input.ingestedAt,
+        dryRun, strictReceipt: true,
+      });
+      if (receipt.status !== (dryRun ? "preview" : "recorded")) {
+        throw new Error(`Protected description ${receipt.status}: ${receipt.reason || "No receipt"}`);
+      }
+      return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: dryRun,
+        vehicle_id: body.vehicle_id, snapshot_id: pin.id, ...descriptionPreview(input),
+        input_sha256: textFingerprint, description_receipt: receipt, model_calls: 0,
+        writes: dryRun || receipt.duplicate ? 0 : 1,
+        admission_basis: "service-verified protected capture with repeated checks; multi-request, not atomic" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       global: { headers: { "X-Nuke-Writer": "extract-bat-core" } },
     });
 
-    const body = await req.json().catch(() => ({}));
     const inputUrl = String(body?.url || body?.auction_url || "").trim();
     const providedVehicleId = body?.vehicle_id ? String(body.vehicle_id) : null;
 
