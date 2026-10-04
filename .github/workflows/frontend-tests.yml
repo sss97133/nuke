@@ -215,6 +215,10 @@ jobs:
         run: createdb dm_refinement_sale_receipt
       - name: Verify actual valuation reader, source custody and price-cutoff contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_receipt -f scripts/discovery/valuation-source-sale-receipt-test.sql
+      - name: Create disposable sale-event candidate database
+        run: createdb dm_refinement_sale_event_candidates_ci
+      - name: Verify earlier resales, episode identity and candidate boundaries
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_event_candidates_ci -f scripts/discovery/sale-event-candidates-test.sql
 
   vitest:
     runs-on: ubuntu-latest
@@ -247,6 +251,9 @@ jobs:
         run: node --test scripts/test-archive-source-custody.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
+
+      - name: Verify saved sale-population assay without network or writes
+        run: node --test scripts/assay-sale-population.test.mjs
 
       - name: Run Vitest
         working-directory: ./nuke_frontend

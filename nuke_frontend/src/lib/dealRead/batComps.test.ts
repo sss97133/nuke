@@ -211,6 +211,22 @@ describe('sale-event population and explicit relevance selection v2', () => {
     expect(next.conflicts).toHaveLength(1); expect(prior).toEqual(frozen);
   });
 
+  it('retains a supported no-sale contradiction without requiring a reported price or currency', () => {
+    const sold = saleCapture(1);
+    const noSale = saleCapture(1, { capture: { table: 'listing_page_snapshots', id: 'synthetic-no-sale' },
+      outcome: 'not_sold', amount: null, currency: null, priceBasis: null, unitSource: null });
+    const result = selectSourceSalePopulation([sold, noSale], populationOptions());
+    expect(result.qualified).toHaveLength(0);
+    expect(result.conflicts[0].dimensions).toEqual(['outcome']);
+    expect(result.conflicts[0].captures).toHaveLength(2);
+    const standalone = selectSourceSalePopulation([noSale], populationOptions());
+    expect(standalone.qualified).toHaveLength(0);
+    expect(standalone.candidates[0].excluded[0].reason).toBe('not_sold');
+    const later = selectSourceSalePopulation([sold, { ...noSale, knownAt: '2026-01-03T12:00:00Z' }], populationOptions());
+    expect(later.qualified).toHaveLength(1);
+    expect(later.conflicts).toHaveLength(0);
+  });
+
   it('retains native sold-price candidates and refused archived captures without promoting them', () => {
     const native = saleCapture(1, { capture: { table: 'vehicle_events', id: 'synthetic-native' },
       qualification: { status: 'candidate', basis: null, evidenceRefs: [] }, currency: null, priceBasis: null, knownAt: null, knownAtEvidence: null });
@@ -287,6 +303,19 @@ describe('sale-event population and explicit relevance selection v2', () => {
     expect(result.matchedDistribution).toBeNull(); expect(result.broadMarket[0].distribution).toBeNull();
   });
 
+  it('can measure a complete market population before a subject or matching policy is supplied', () => {
+    const result = selectSourceSalePopulation([saleCapture(1), saleCapture(2)], populationOptions({
+      subject: { sourcePlatform: null, sourceEpisodeKey: null, vehicleId: null, currency: null, priceBasis: null, relevance: [] },
+      policy: { key: '', basis: '', requiredDimensions: [] },
+    }));
+    expect(result.qualified).toHaveLength(2);
+    expect(result.broadMarket[0].distribution?.n).toBe(2);
+    expect(result.broadMarket[0].reasons).toEqual([]);
+    expect(result.reasons).toContain('subject_episode_unknown');
+    expect(result.reasons).toContain('matching_policy_unknown');
+    expect(result.matchedDistribution).toBeNull();
+  });
+
   it('requires day-grain events to fit wholly before the cutoff and preserves timestamp grain', () => {
     const options = populationOptions({ eventBefore: '2025-06-15T18:00:00Z' });
     const day = selectSourceSalePopulation([saleCapture(1)], options);
@@ -303,6 +332,41 @@ describe('sale-event population and explicit relevance selection v2', () => {
     expect(overlapping.repeatSales[0]).toMatchObject({ reasons: ['event_order_unknown'], nominalAmountChange: null, nominalPercentChange: null });
     const crossUnit = selectSourceSalePopulation([sameDay[0], { ...sameDay[1], eventAt: '2025-07-01', knownAt: '2025-07-02T00:00:00Z', currency: 'EUR' }], populationOptions());
     expect(crossUnit.repeatSales[0]).toMatchObject({ reasons: ['different_units'], nominalAmountChange: null });
+  });
+
+  it('preserves database clock precision at exclusive event and knowledge boundaries', () => {
+    const options = populationOptions({ eventBefore: '2025-06-15T17:00:00.123456Z',
+      evidenceAsOf: '2026-01-02T12:00:00.123456Z', computedAt: '2026-01-03T00:00:00Z' });
+    const row = saleCapture(1, { eventAt: '2025-06-15T17:00:00.123455Z', eventGrain: 'instant',
+      knownAt: '2026-01-02T12:00:00.123456Z' });
+    const included = selectSourceSalePopulation([row], options);
+    expect(included.qualified[0]).toMatchObject({ eventAt: row.eventAt, knownAt: row.knownAt });
+    const equal = selectSourceSalePopulation([{ ...row, eventAt: options.eventBefore }], options);
+    expect(equal.candidates[0].excluded[0].reason).toBe('outside_event_window');
+    const learnedLater = selectSourceSalePopulation([{ ...row, knownAt: '2026-01-02T12:00:00.123457Z' }], options);
+    expect(learnedLater.candidates[0].excluded[0].reason).toBe('learned_later');
+    const laterClaim = selectSourceSalePopulation([{ ...row, relevance: [relevanceClaim(row.sourceEpisodeKey!,
+      { knownAt: '2026-01-02T12:00:00.123457Z' })] }], options);
+    expect(laterClaim.comparisons[0].reasons).toContain('model:unknown');
+    expect(laterClaim.comparisons[0].dimensions.find(d => d.dimension === 'model')?.candidate.unavailable[0].reason).toBe('learned_later');
+  });
+
+  it('retains distinct precise event claims and orders resales by time rather than timestamp text', () => {
+    const earlier = saleCapture(1, { vehicleId: 'synthetic-precise-repeat', amount: 1000,
+      eventAt: '2025-06-15T17:00:00.100Z', eventGrain: 'instant' });
+    const later = saleCapture(2, { vehicleId: earlier.vehicleId, amount: 2000,
+      eventAt: '2025-06-15T17:00:00.100100Z', eventGrain: 'instant' });
+    const resales = selectSourceSalePopulation([later, earlier], populationOptions());
+    expect(resales.repeatSales[0]).toMatchObject({ from: { amount: 1000 }, to: { amount: 2000 },
+      reasons: [], nominalAmountChange: 1000 });
+    expect(resales.repeatSales[0].to.eventAt).toBe('2025-06-15T17:00:00.1001Z');
+    const conflict = selectSourceSalePopulation([earlier, { ...earlier, eventAt: later.eventAt,
+      capture: { table: 'listing_page_snapshots', id: 'synthetic-precise-conflict' } }], populationOptions());
+    expect(conflict.conflicts[0].dimensions).toEqual(['event']);
+    const preEpoch = selectSourceSalePopulation([saleCapture(1, { eventAt: '1969-12-31T23:59:59.123456Z',
+      eventGrain: 'instant', knownAt: '1970-01-01T00:00:00.000001Z' })], populationOptions({
+      eventFrom: '1960-01-01T00:00:00Z', eventBefore: '1971-01-01T00:00:00Z' }));
+    expect(preEpoch.qualified[0].eventAt).toBe('1969-12-31T23:59:59.123456Z');
   });
 
   it('retains query-identified non-BaT source episodes and refuses a source-binding conflict', () => {

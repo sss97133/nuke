@@ -418,6 +418,10 @@ Broad-market distributions are partitioned by currency and fee basis. Matched di
 
 This is an additive local contract, tested with synthetic captures. Existing `valuation_by_ymm` → `/valuation` and its v1 calculator remain unchanged until an existing reader supplies qualified population evidence and explicit coverage. The pure selector does not establish public-source custody or perform source qualification.
 
+The read-only `scripts/discovery/sale-event-candidates.sql` receives explicit parent IDs and retains their `vehicle_events` and `bat_listings` presentations without an event-age, exact-year or sold-only filter. Optional event and knowledge cutoffs annotate candidates; they do not discard history. Each native source has a separate declared limit and an overflow sentinel that refuses a sampled result. Protected snapshot headers are independently bounded pointers, never raw-source qualification. Native prices retain unknown currency, fee basis, claim availability and source-publication status; a public vehicle does not make every attached source public. Page results must be reconciled across source episodes before population completeness can be claimed.
+
+`scripts/assay-sale-population.mjs` runs the existing selector on saved `{schemaVersion: 'sale_event_population_v1', rows, options}` JSON, without network, intake, database writes or inference. Run `node scripts/assay-sale-population.mjs --input /private/saved-input.json --out /private/new-receipt.json` with Node 22.18 or newer. The receipt records the input SHA-256 and every candidate, conflict and exclusion; it requires a new private output outside the checkout. Its explicit 256 MiB file limit rejects oversized input instead of truncating it. Do not promote candidate rows or mark a bounded page as the whole market. Synthetic PostgreSQL contracts and offline CLI contracts run in the existing frontend CI workflow.
+
 ---
 
 ## Section 6: Observation Sources — Tiered

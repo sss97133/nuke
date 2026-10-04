@@ -753,9 +753,29 @@ function populationSourceKey(raw: string | null): string | null {
   } catch { return null; }
 }
 
-function saleInstant(raw: string | null): number | null {
-  const interval = sourceEventInterval(raw);
+/** Preserve sub-millisecond DB clocks; Date alone would admit evidence learned later. */
+function populationEventInterval(raw: string | null): [bigint, bigint] | null {
+  const parsed = sourceEventInterval(raw);
+  if (!parsed || !raw) return null;
+  if (parsed[0] !== parsed[1]) return [BigInt(parsed[0]) * 1_000_000n, BigInt(parsed[1]) * 1_000_000n];
+  const time = raw.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,9}))?(?:Z|[+-]\d{2}:\d{2})$/);
+  if (!time) return null;
+  const nanos = BigInt((time[1] ?? '').padEnd(9, '0')) % 1_000_000n;
+  const instant = BigInt(parsed[0]) * 1_000_000n + nanos;
+  return [instant, instant];
+}
+
+function saleInstant(raw: string | null): bigint | null {
+  const interval = populationEventInterval(raw);
   return interval && interval[0] === interval[1] ? interval[0] : null;
+}
+
+function populationTime(instant: bigint): string {
+  // Division truncates toward zero; Date needs the floor for pre-epoch instants.
+  const milliseconds = instant / 1_000_000n - (instant < 0n && instant % 1_000_000n !== 0n ? 1n : 0n);
+  const nanos = (instant % 1_000_000_000n + 1_000_000_000n) % 1_000_000_000n;
+  const fraction = nanos.toString().padStart(9, '0').replace(/0+$/, '').padEnd(3, '0');
+  return `${new Date(Number(milliseconds)).toISOString().slice(0, 19)}.${fraction}Z`;
 }
 
 function continuousSaleSummary(values: readonly number[]): Summary {
@@ -775,7 +795,7 @@ function continuousSaleSummary(values: readonly number[]): Summary {
  * Broad unit strata and explicitly matched sales are different denominators.
  */
 export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], opts: SalePopulationOptions) {
-  const from = sourceEventInterval(opts.eventFrom)?.[0], before = sourceEventInterval(opts.eventBefore)?.[0];
+  const from = populationEventInterval(opts.eventFrom)?.[0], before = populationEventInterval(opts.eventBefore)?.[0];
   const asOf = saleInstant(opts.evidenceAsOf), computed = saleInstant(opts.computedAt);
   const reasons: string[] = [];
   const validCutoffs = from != null && before != null && asOf != null && computed != null
@@ -812,7 +832,7 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
     }
     if (!row.qualification.basis?.trim() || !row.qualification.evidenceRefs.length
       || row.qualification.evidenceRefs.some(r => !validRef(r))) { reject('qualification_evidence_unknown'); continue; }
-    const interval = sourceEventInterval(row.eventAt);
+    const interval = populationEventInterval(row.eventAt);
     if (!interval || !row.eventTimeBasis?.trim()) { reject('event_unknown'); continue; }
     if (row.eventGrain !== (interval[0] === interval[1] ? 'instant' : 'day')) { reject('event_grain_conflict'); continue; }
     const known = saleInstant(row.knownAt);
@@ -821,6 +841,11 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
     if (known > asOf!) { reject('learned_later'); continue; }
     if (interval[0] < from! || interval[0] >= before! || interval[1] > before!) { reject('outside_event_window'); continue; }
     if (row.outcome === 'unknown') { reject('outcome_unknown'); continue; }
+    // A supported no-sale outcome can contradict a sold claim even when the
+    // source reports no amount or units. It never becomes a price comparable.
+    if (row.outcome === 'not_sold') {
+      const group = admitted.get(key) ?? []; group.push(row); admitted.set(key, group); continue;
+    }
     if (row.amount == null || !Number.isFinite(row.amount) || row.amount <= 0) { reject('price_unknown'); continue; }
     if (!row.currency || !/^[A-Z]{3}$/.test(row.currency) || !row.priceBasis
       || populationSourceKey(row.unitSource) !== populationSourceKey(row.sourceUrl)) { reject('unknown_units'); continue; }
@@ -832,9 +857,9 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
   for (const [sourceKey, captures] of [...admitted].sort(([a], [b]) => lexical(a, b))) {
     const changed: string[] = [];
     for (const field of ['outcome', 'amount', 'currency', 'priceBasis'] as const) {
-      if (new Set(captures.map(r => r[field])).size > 1) changed.push(field);
+      if (new Set(captures.map(r => r[field]).filter(value => value != null)).size > 1) changed.push(field);
     }
-    if (new Set(captures.map(r => JSON.stringify(sourceEventInterval(r.eventAt)))).size > 1) changed.push('event');
+    if (new Set(captures.map(r => populationEventInterval(r.eventAt)?.map(String).join(':'))).size > 1) changed.push('event');
     if (new Set(captures.map(r => populationSourceKey(r.sourceUrl))).size > 1) changed.push('source_url');
     const vehicles = [...new Set(captures.map(r => r.vehicleId).filter((id): id is string => !!id))].sort(lexical);
     if (vehicles.length > 1) changed.push('vehicle_identity');
@@ -844,13 +869,14 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
       for (const row of captures) candidates.get(sourceKey)!.excluded.push({ capture: { ...row.capture }, reason: 'not_sold' });
       continue;
     }
-    const interval = sourceEventInterval(first.eventAt)!;
+    const interval = populationEventInterval(first.eventAt)!;
+    const earliestKnown = captures.map(r => saleInstant(r.knownAt)!).reduce((a, b) => a < b ? a : b);
     qualified.push({ sourceKey, sourcePlatform: first.sourcePlatform!, sourceEpisodeKey: first.sourceEpisodeKey!,
       vehicleId: vehicles[0] ?? null, sourceUrls: [...new Set(captures.map(r => r.sourceUrl!))].sort(lexical),
       amount: first.amount!, currency: first.currency!, priceBasis: first.priceBasis!,
-      eventAt: first.eventGrain === 'day' ? first.eventAt! : new Date(interval[0]).toISOString(), eventGrain: first.eventGrain!,
-      eventInterval: { from: new Date(interval[0]).toISOString(), before: new Date(interval[1]).toISOString() },
-      knownAt: new Date(captures.reduce((earliest, r) => Math.min(earliest, saleInstant(r.knownAt)!), Infinity)).toISOString(), captures });
+      eventAt: first.eventGrain === 'day' ? first.eventAt! : populationTime(interval[0]), eventGrain: first.eventGrain!,
+      eventInterval: { from: populationTime(interval[0]), before: populationTime(interval[1]) },
+      knownAt: populationTime(earliestKnown), captures });
   }
 
   const claimsFor = (claims: readonly SaleRelevanceClaim[], platform: string | null, key: string | null, dimension: SaleRelevanceDimension) => {
@@ -892,7 +918,9 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
     const stratum = strata.get(key) ?? { currency: event.currency, priceBasis: event.priceBasis, events: [] };
     stratum.events.push(event); strata.set(key, stratum);
   }
-  const baselineRefusals = reasons.filter(r => ['invalid_cutoffs', 'population_incomplete', 'population_scope_unknown', 'subject_episode_unknown'].includes(r));
+  // Population baselines precede subject matching; an absent subject does not
+  // invalidate a complete, time-qualified and separately unit-stratified pool.
+  const baselineRefusals = reasons.filter(r => ['invalid_cutoffs', 'population_incomplete', 'population_scope_unknown'].includes(r));
   const broadMarket = [...strata].sort(([a], [b]) => lexical(a, b)).map(([, stratum]) => ({ ...stratum,
     reasons: [...baselineRefusals], distribution: baselineRefusals.length ? null : continuousSaleSummary(stratum.events.map(e => e.amount)) }));
 
@@ -903,10 +931,14 @@ export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], o
   const repeatSales: Array<{ vehicleId: string; from: QualifiedSaleEpisode; to: QualifiedSaleEpisode;
     reasons: string[]; nominalAmountChange: number | null; nominalPercentChange: number | null }> = [];
   for (const [vehicleId, group] of [...byVehicle].sort(([a], [b]) => lexical(a, b))) {
-    group.sort((a, b) => lexical(a.eventInterval.from, b.eventInterval.from) || lexical(a.sourceKey, b.sourceKey));
+    group.sort((a, b) => {
+      const first = saleInstant(a.eventInterval.from)!, second = saleInstant(b.eventInterval.from)!;
+      return (first < second ? -1 : first > second ? 1 : 0) || lexical(a.sourceKey, b.sourceKey);
+    });
     for (let i = 1; i < group.length; i++) {
       const earlier = group[i - 1], later = group[i], refusal: string[] = [];
-      if (earlier.eventInterval.before > later.eventInterval.from || earlier.eventInterval.from === later.eventInterval.from) refusal.push('event_order_unknown');
+      if (saleInstant(earlier.eventInterval.before)! > saleInstant(later.eventInterval.from)!
+        || saleInstant(earlier.eventInterval.from)! === saleInstant(later.eventInterval.from)!) refusal.push('event_order_unknown');
       if (earlier.currency !== later.currency || earlier.priceBasis !== later.priceBasis) refusal.push('different_units');
       const change = refusal.length ? null : later.amount - earlier.amount;
       repeatSales.push({ vehicleId, from: earlier, to: later, reasons: refusal, nominalAmountChange: change,
