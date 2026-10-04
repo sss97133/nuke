@@ -9,11 +9,13 @@
  *
  * POST /functions/v1/discover-description-data
  * Body: { "vehicle_id": "uuid" } or { "batch_size": 10 } or { "mode": "condition_backfill" }
+ * Service-only { "mode": "preview", "vehicle_id": "uuid" } reads preserved evidence without mining.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { writeObservation } from "../_shared/observationWriter.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
+  loadDescriptionInput, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +73,8 @@ Example structure (adapt as needed):
   "other": {...}
 }
 
+Preserve uncertainty and distinguish offered parts from installed parts. Do not infer dates,
+originality, ownership, or a positive condition that the source does not assert.
 Be exhaustive. Capture everything. Return ONLY valid JSON.`;
 
 // Condition-specific extraction prompt
@@ -110,6 +114,7 @@ Return a JSON array of condition items. Each item:
   "quote": "exact quote from description"
 }
 
+Preserve uncertainty: an offered part is not an installed part, and needing repair is not completed work.
 Be thorough — extract every condition-relevant statement. Include both positive and negative observations.
 Return ONLY a valid JSON array. If no conditions found, return [].`;
 
@@ -133,8 +138,9 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
       });
       if (resp.ok) {
         const data = await resp.json();
+        if (data.choices?.[0]?.finish_reason === "length") throw new Error("Kimi output truncated");
         const content = data.choices?.[0]?.message?.content || "";
-        if (content) return { content, model: "kimi-k2-turbo" };
+        if (content) return { content, model: data.model || "kimi-k2-turbo-preview" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Kimi ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -158,8 +164,9 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
       });
       if (resp.ok) {
         const data = await resp.json();
+        if (data.choices?.[0]?.finish_reason === "length") throw new Error("Grok output truncated");
         const content = data.choices?.[0]?.message?.content || "";
-        if (content) return { content, model: "grok-3-mini" };
+        if (content) return { content, model: data.model || "grok-3-mini" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -184,8 +191,9 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
       );
       if (resp.ok) {
         const data = await resp.json();
+        if (data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini output truncated");
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (content) return { content, model: "gemini-2.5-flash-lite" };
+        if (content) return { content, model: data.modelVersion || "gemini-2.5-flash-lite" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -213,8 +221,9 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
       });
       if (resp.ok) {
         const data = await resp.json();
+        if (data.stop_reason === "max_tokens") throw new Error("Anthropic output truncated");
         const content = data.content?.[0]?.text || "";
-        if (content) return { content, model: "claude-3-5-haiku-latest" };
+        if (content) return { content, model: data.model || "claude-3-5-haiku-latest" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Anthropic ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -248,7 +257,7 @@ async function discoverWithLLM(
     .replace("{make}", vehicle.make || "Unknown")
     .replace("{model}", vehicle.model || "Unknown")
     .replace("{sale_price}", vehicle.sale_price ? `$${vehicle.sale_price.toLocaleString()}` : "Unknown")
-    .replace("{description}", description.substring(0, 8000));
+    .replace("{description}", () => requireCompleteInput({ text: description } as DescriptionInput).text);
 
   const { content: raw, model } = await callLLM(prompt);
   const content = stripCodeBlocks(raw);
@@ -264,7 +273,7 @@ async function discoverWithLLM(
     }
   }
 
-  return { data: { raw_response: content, parse_failed: true }, model };
+  throw new Error("Discovery returned no JSON object; not cached");
 }
 
 async function extractConditionsWithLLM(
@@ -275,7 +284,7 @@ async function extractConditionsWithLLM(
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
     .replace("{model}", vehicle.model || "Unknown")
-    .replace("{description}", description.substring(0, 8000));
+    .replace("{description}", () => requireCompleteInput({ text: description } as DescriptionInput).text);
 
   const { content: raw, model } = await callLLM(prompt);
   const content = stripCodeBlocks(raw);
@@ -284,15 +293,17 @@ async function extractConditionsWithLLM(
   if (arrayMatch) {
     try {
       const parsed = JSON.parse(arrayMatch[0]);
-      return { conditions: Array.isArray(parsed) ? parsed : [], model };
+      if (!Array.isArray(parsed)) throw new Error("Condition extraction returned no array");
+      return { conditions: parsed, model };
     } catch {
       const repaired = repairJson(arrayMatch[0]);
       const parsed = JSON.parse(repaired);
-      return { conditions: Array.isArray(parsed) ? parsed : [], model };
+      if (!Array.isArray(parsed)) throw new Error("Condition extraction returned no array");
+      return { conditions: parsed, model };
     }
   }
 
-  return { conditions: [], model };
+  throw new Error("Condition extraction returned no JSON array");
 }
 
 async function ingestConditionObservations(
@@ -300,7 +311,8 @@ async function ingestConditionObservations(
   conditions: any[],
   supabaseUrl: string,
   serviceKey: string,
-  modelUsed = "unknown"
+  modelUsed: string,
+  input: DescriptionInput,
 ): Promise<{ ingested: number; errors: number }> {
   let ingested = 0;
   let errors = 0;
@@ -313,30 +325,15 @@ async function ingestConditionObservations(
           "Authorization": `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          source_slug: "ai-description-extraction",
-          kind: "condition",
-          observed_at: new Date().toISOString(),
-          content_text: condition.summary || condition.quote || "Unknown condition",
-          structured_data: {
-            category: condition.category,
-            severity: condition.severity,
-            component: condition.component,
-            is_positive: condition.is_positive ?? false,
-            quote: condition.quote,
-          },
-          vehicle_id: vehicleId,
-          extraction_method: "description_condition_v1",
-          agent_model: modelUsed,
-        }),
+        body: JSON.stringify(conditionObservationInput(vehicleId, condition, input, modelUsed)),
       });
 
-      if (resp.ok) {
+      const result = await resp.json().catch(() => null);
+      if (resp.ok && result?.success === true && result?.observation_id) {
         ingested++;
       } else {
         errors++;
-        const errText = await resp.text().catch(() => "");
-        console.error(`[discover-desc] Ingest failed for ${vehicleId}: ${errText.slice(0, 100)}`);
+        console.error(`[discover-desc] Ingest refused condition for ${vehicleId} (HTTP ${resp.status})`);
       }
     } catch (e: any) {
       errors++;
@@ -358,31 +355,70 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey);
-
-    // At least one LLM key is required
-    const hasAnyKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
-    if (!hasAnyKey) {
-      throw new Error("No LLM API key configured (need KIMI_API_KEY, XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
-    }
 
     const body = await req.json().catch(() => ({}));
     const vehicleId = body.vehicle_id;
     const batchSize = Math.max(1, Math.min(body.batch_size || 10, 50));
     const minPrice = body.min_price ?? 0;
     const mode = body.mode as string | undefined;
+    if (vehicleId !== undefined && (typeof vehicleId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId))) {
+      throw new Error("Invalid vehicle_id");
+    }
+
+    // A private operator preview uses stored evidence only: no model, writes or
+    // continuation. It makes the exact input/refusal verifiable after deployment.
+    if (mode === "preview") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Description preview requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (!vehicleId) {
+        throw new Error("Description preview requires one vehicle_id");
+      }
+      const { data: vehicle, error } = await supabase.from("vehicles")
+        .select("id,listing_url,discovery_url").eq("id", vehicleId)
+        .is("deleted_at", null).or("listing_kind.is.null,listing_kind.neq.non_vehicle_item").single();
+      if (error || !vehicle) throw new Error("Preview vehicle unavailable");
+      const input = await loadDescriptionInput(supabase, vehicle);
+      return new Response(JSON.stringify({ success: true, mode, vehicle_id: vehicleId,
+        ...descriptionPreview(input), model_calls: 0, writes: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Existing discovery is retained. A repeat request never overwrites it or
+    // spends inference again just because a newer full text is now readable.
+    if (vehicleId && mode !== "condition_backfill") {
+      const { data: cached, error } = await supabase.from("description_discoveries")
+        .select("id,discovered_at,keys_found").eq("vehicle_id", vehicleId).maybeSingle();
+      if (error) throw new Error("Discovery cache lookup failed");
+      if (cached) return new Response(JSON.stringify({ success: true, cached: true,
+        discovered: 0, conditions_ingested: 0, discovery_id: cached.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const hasAnyKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
+    if (!hasAnyKey) {
+      throw new Error("No LLM API key configured (need KIMI_API_KEY, XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
+    }
 
     // --- CONDITION BACKFILL MODE ---
     if (mode === "condition_backfill") {
       const backfillBatch = Math.max(1, Math.min(body.batch_size || 20, 50));
-      // Min 500 chars — shorter descriptions rarely contain condition data
-      const { data: rows, error } = await supabase.rpc("execute_sql", {
-        query: `SELECT v.id, v.year, v.make, v.model, v.description
+      // Summary length only admits candidates; the preserved input must be >=500.
+      const { data: rows, error } = vehicleId
+        ? await supabase.from("vehicles").select("id,year,make,model,listing_url,discovery_url")
+          .eq("id", vehicleId).is("deleted_at", null)
+          .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
+        : await supabase.rpc("execute_sql", {
+        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url
                 FROM vehicles v
                 WHERE v.description IS NOT NULL
-                  AND length(v.description) >= 500
+                  AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
                     WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
@@ -408,31 +444,36 @@ Deno.serve(async (req) => {
 
       let totalIngested = 0;
       let totalErrors = 0;
+      const errorDetails: string[] = [];
       const startTime = Date.now();
 
       for (const vehicle of backfillVehicles) {
         if (Date.now() - startTime > 50000) break;
         try {
-          const { conditions, model: condModel } = await extractConditionsWithLLM(vehicle.description, vehicle);
-          console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: LLM=${condModel}, ${conditions.length} conditions found, desc=${vehicle.description.length} chars`);
+          const input = await loadDescriptionInput(supabase, vehicle);
+          if (input.text.length < 500) throw new Error("Preserved source too short for condition backfill");
+          const { conditions, model: condModel } = await extractConditionsWithLLM(input.text, vehicle);
+          console.log(`[discover-desc] ${vehicle.id}: LLM=${condModel}, ${conditions.length} conditions, input=${input.text.length} chars`);
           const { ingested, errors: errs } = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey, condModel
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel, input
           );
           totalIngested += ingested;
           totalErrors += errs;
           console.log(`[discover-desc] Backfill ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${ingested} ingested, ${errs} errors`);
         } catch (e: any) {
           totalErrors++;
+          errorDetails.push(`${vehicle.id}: ${e.message}`);
           console.error(`[discover-desc] Backfill error ${vehicle.id}: ${e.message}`);
         }
       }
 
       // Check if more work exists (fast: just check if 1 more vehicle exists, not full count)
-      const { data: remData } = await supabase.rpc("execute_sql", {
+      const { data: remData } = vehicleId ? { data: [] } : await supabase.rpc("execute_sql", {
         query: `SELECT EXISTS(
                   SELECT 1 FROM vehicles v
-                  WHERE v.description IS NOT NULL AND length(v.description) >= 500
+                  WHERE v.description IS NOT NULL AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
                     WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
@@ -443,9 +484,9 @@ Deno.serve(async (req) => {
       const remaining = hasMore ? -1 : 0; // -1 = more work exists, exact count too expensive
 
       // Self-chain if requested
-      const shouldContinue = body.continue ?? false;
-      // Chain if more work exists — even if this batch had errors (LLM rate limits are transient)
-      if (shouldContinue && hasMore) {
+      const shouldContinue = !vehicleId && (body.continue ?? false);
+      // An all-refused batch must not self-chain indefinitely.
+      if (shouldContinue && hasMore && totalIngested > 0) {
         fetch(`${supabaseUrl}/functions/v1/discover-description-data`, {
           method: "POST",
           headers: {
@@ -462,8 +503,9 @@ Deno.serve(async (req) => {
         processed: backfillVehicles.length,
         conditions_ingested: totalIngested,
         condition_errors: totalErrors,
+        error_details: errorDetails,
         remaining,
-        continued: shouldContinue && hasMore,
+        continued: shouldContinue && hasMore && totalIngested > 0,
         elapsed_ms: Date.now() - startTime,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -474,8 +516,9 @@ Deno.serve(async (req) => {
     if (vehicleId) {
       const { data, error } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, description, sale_price")
+        .select("id, year, make, model, description, sale_price, listing_url, discovery_url")
         .eq("id", vehicleId)
+        .is("deleted_at", null).or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
         .single();
       if (error) throw error;
       if (data) vehicles = [data];
@@ -483,12 +526,13 @@ Deno.serve(async (req) => {
       // Anti-join: get vehicles with descriptions NOT yet discovered
       // Uses primary key ordering (fast) instead of sale_price sort (slow full scan)
       const { data: rows, error } = await supabase.rpc("execute_sql", {
-        query: `SELECT v.id, v.year, v.make, v.model, v.description,
+        query: `SELECT v.id, v.year, v.make, v.model, v.description, v.listing_url, v.discovery_url,
                   COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
                 FROM vehicles v
                 WHERE v.description IS NOT NULL
                   AND length(v.description) >= 100
                   AND v.deleted_at IS NULL
+                  AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                   AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)
                 LIMIT ${batchSize}`
       });
@@ -497,7 +541,7 @@ Deno.serve(async (req) => {
       vehicles = Array.isArray(rows) ? rows : [];
     }
 
-    const shouldContinue = body.continue ?? false;
+    const shouldContinue = !vehicleId && (body.continue ?? false);
     const startTime = Date.now();
 
     if (vehicles.length === 0) {
@@ -530,35 +574,20 @@ Deno.serve(async (req) => {
 
       const chunk = vehicles.slice(i, i + PARALLEL);
       const promises = chunk.map(async (vehicle: any) => {
-        if (!vehicle.description || vehicle.description.length < 100) {
-          return { success: false, error: "Description too short" };
-        }
+        const input = await loadDescriptionInput(supabase, vehicle);
+        if (input.text.length < 100) throw new Error("Preserved listing text too short");
 
         // --- Pass 1: Open-ended discovery (existing) ---
-        const { data: discovered, model: discModel } = await discoverWithLLM(vehicle.description, vehicle);
+        const { data: discovered, model: discModel } = await discoverWithLLM(input.text, vehicle);
         const keysFound = Object.keys(discovered).length;
         const totalFields = countFields(discovered);
-
-        const { error: insertError } = await supabase
-          .from("description_discoveries")
-          .upsert({
-            vehicle_id: vehicle.id,
-            discovered_at: new Date().toISOString(),
-            raw_extraction: discovered,
-            keys_found: keysFound,
-            total_fields: totalFields,
-            description_length: vehicle.description.length,
-            sale_price: vehicle.sale_price,
-          }, { onConflict: "vehicle_id" });
-
-        if (insertError) throw new Error(`Insert: ${insertError.message}`);
 
         // --- Pass 2: Condition extraction (new) ---
         let conditionResult = { ingested: 0, errors: 0 };
         try {
-          const { conditions, model: condModel2 } = await extractConditionsWithLLM(vehicle.description, vehicle);
+          const { conditions, model: condModel2 } = await extractConditionsWithLLM(input.text, vehicle);
           conditionResult = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey, condModel2
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel2, input
           );
           console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${conditionResult.ingested} conditions extracted`);
         } catch (condErr: any) {
@@ -567,15 +596,36 @@ Deno.serve(async (req) => {
           conditionResult.errors = 1;
         }
 
-        // Write observation for the discovered specification data (fire-and-forget)
-        writeObservation(supabase, {
-          vehicleId: vehicle.id,
-          source: { platform: "ai-description-extraction", url: "" },
-          fields: discovered,
-          observationKind: "specification",
-          extractionMethod: `description_discovery_${discModel}`,
-          agentModel: discModel,
-        }).catch((e: any) => console.warn(`[discover-desc] observationWriter error for ${vehicle.id}: ${e?.message}`));
+        // Await the sanctioned observation writer. The old bridge independently
+        // gap-filled canonical vehicle fields; mining only produces cited reports.
+        const { error: observationError, data: observationResult } = await supabase.functions.invoke("ingest-observation", {
+          body: { vehicle_id: vehicle.id, source_slug: "ai-description-extraction", kind: "specification",
+            source_url: input.sourceUrl, raw_source_ref: input.sourceRef,
+            observed_at: input.observedAt || input.ingestedAt,
+            structured_data: { ...discovered, is_inferred: true, ...descriptionSourceMetadata(input) },
+            extraction_metadata: { inference_at: new Date().toISOString(), ...descriptionSourceMetadata(input) },
+            citation: { excerpt: input.text }, extraction_method: "description_discovery_v2_full_source",
+            agent_model: discModel, agent_inferred: true, defer_analysis: true },
+        });
+        if (observationError || observationResult?.success !== true || !observationResult?.observation_id) {
+          throw new Error("Sanctioned discovery observation intake failed");
+        }
+
+        const { error: insertError } = await supabase
+          .from("description_discoveries")
+          .insert({
+            vehicle_id: vehicle.id,
+            discovered_at: new Date().toISOString(),
+            raw_extraction: discovered,
+            keys_found: keysFound,
+            total_fields: totalFields,
+            description_length: input.text.length,
+            model_used: discModel,
+            prompt_version: "full-preserved-source-v1",
+            sale_price: vehicle.sale_price,
+          });
+
+        if (insertError) throw new Error(`Insert: ${insertError.message}`);
 
         // Recompute realization plan with new condition data
         try {
@@ -609,33 +659,20 @@ Deno.serve(async (req) => {
           results.errors++;
           const msg = r.status === "rejected" ? r.reason?.message : r.value?.error;
           results.error_details.push(`${chunk[j]?.id}: ${msg}`);
-          // Insert a failure record so this vehicle doesn't block the queue
-          const failVehicle = chunk[j];
-          if (failVehicle?.id) {
-            await supabase.from("description_discoveries").upsert({
-              vehicle_id: failVehicle.id,
-              discovered_at: new Date().toISOString(),
-              raw_extraction: { parse_failed: true, error: msg?.substring(0, 500) },
-              keys_found: 0,
-              total_fields: 0,
-              description_length: failVehicle.description?.length || 0,
-              sale_price: failVehicle.sale_price,
-            }, { onConflict: "vehicle_id" }).then(() => {
-              console.log(`[discover-desc] Marked ${failVehicle.id} as failed — will not retry`);
-            }).catch((e: any) => {
-              console.error(`[discover-desc] Failed to mark ${failVehicle.id}: ${e.message}`);
-            });
-          }
+          // Refusal/intake failure remains retryable and visible in error_details.
+          // A fake cached discovery would suppress the missing work forever.
+
         }
       }
     }
 
     // Check if more work exists (fast EXISTS, not expensive count)
-    const { data: remData } = await supabase.rpc("execute_sql", {
+    const { data: remData } = vehicleId ? { data: [] } : await supabase.rpc("execute_sql", {
       query: `SELECT EXISTS(
                 SELECT 1 FROM vehicles v
                 WHERE v.description IS NOT NULL AND length(v.description) >= 100
                 AND v.deleted_at IS NULL
+                AND coalesce(v.listing_kind,'') <> 'non_vehicle_item'
                 AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)
               ) AS has_more`
     });
@@ -659,7 +696,7 @@ Deno.serve(async (req) => {
       ...results,
       remaining,
       elapsed_ms: Date.now() - startTime,
-      continued: shouldContinue && remaining > 0,
+      continued: shouldContinue && hasMore && results.discovered > 0,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: any) {
