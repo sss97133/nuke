@@ -88,3 +88,15 @@ it('handles denial, empty, loading and failed reads explicitly', async () => {
   fixture.query = { data: { vehicle: { id, title: 'Empty public case' }, sourceUrl: source, specs: [], interactions: [] } };
   await render(); expect(container.textContent).toContain('No dated bids'); expect(container.textContent).toContain('Capture completeness unknown');
 });
+it('connects recorded identity to sale context with subject exclusion, without lending the bid units', async () => {
+  fixture.query.data.vehicle = { id, title: 'Public source case', year: 1937, make: 'Packard', model: 'Series 115-C Convertible Coupe', high_bid: 45000 };
+  await render();
+  const link = container.querySelector<HTMLAnchorElement>('a[href^="/valuation?"]')!;
+  const params = new URL(link.href).searchParams;
+  expect(params.get('year')).toBe('1937');
+  expect(params.get('make')).toBe('Packard');
+  expect(params.get('model')).toBe('Series 115-C Convertible Coupe');
+  expect(params.get('vehicle_id')).toBe(id);
+  expect(params.has('price')).toBe(false);
+  expect(params.has('currency')).toBe(false);
+});

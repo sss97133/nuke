@@ -62,6 +62,12 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('qualified cohort sale-price reader UI', () => {
+  it('retains the existing all-years action when no source sale qualifies, without rendering an empty price graph', async () => {
+    fixture.rpc.mockResolvedValue({ data: evidence(0), error: null }); await render();
+    expect(container.querySelector('svg')).toBeNull();
+    expect([...container.querySelectorAll('button')].filter(b => b.textContent === 'All recorded model years')).toHaveLength(1);
+    expect(container.textContent).not.toContain('50.0 percentile');
+  });
   it('pages the whole qualified receipt rather than the ten-lot recent preview without sampling the calculation', async () => {
     const data = evidence(33);
     fixture.rpc.mockResolvedValue({ data, error: null }); await render();
@@ -135,8 +141,12 @@ describe('qualified cohort sale-price reader UI', () => {
       privateRawText: 'PRIVATE SYNTHETIC TEXT MUST NOT DISPLAY', sourceParser: 'PRIVATE SYNTHETIC PARSER TEXT' });
     fixture.rpc.mockResolvedValue({ data, error: null }); await render();
     expect(container.textContent).toContain('16 dated source vehicle records · 18 linked source captures · 12 qualified capture presentations · 2 duplicate presentations collapsed');
-    expect(container.querySelector(`a[href="/vehicle/${vehicle}"]`)?.textContent).toBe('Vehicle record');
-    expect(container.querySelector('a[href="https://bringatrailer.com/listing/synthetic-0/"]')?.textContent).toBe('BaT source');
+    const records = container.querySelector('[aria-label="Qualified sale source records"]')!;
+    expect(records.querySelector(`a[href="/vehicle/${vehicle}"]`)?.textContent).toBe('Vehicle record');
+    expect(records.querySelector('a[href="https://bringatrailer.com/listing/synthetic-0/"]')?.textContent).toBe('BaT source');
+    await act(async () => container.querySelector('svg [role="button"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('.source-sales-ancestry')?.textContent).toContain(`Snapshot reference: ${snapshot}`);
+    expect(container.querySelector('.source-sales-ancestry')?.textContent).not.toContain('PRIVATE SYNTHETIC');
     expect(container.textContent).toContain(`Snapshot reference: ${snapshot}`);
     expect(container.textContent).toContain('Inline source hash and parser verified'); expect(container.textContent).toContain('snapshot ingested: 2025-06-15 12:05:00.000 UTC');
     expect(container.textContent).toContain('Native sale-event reference: Unknown'); expect(container.textContent).not.toContain('PRIVATE SYNTHETIC');
@@ -205,6 +215,7 @@ describe('qualified cohort sale-price reader UI', () => {
     expect(result.comparison.percentile).toBe(45);
     expect(result.comparison.eligible.some((r: any) => r.vehicleId === vehicle)).toBe(true);
     expect(result.comparison.excluded).toContainEqual(expect.objectContaining({ reason: 'subject', sourceKey: 'bringatrailer.com/listing/synthetic-current' }));
+    expect(container.querySelector('[aria-label="Source-qualified sale graph"]')?.querySelectorAll('svg [role="button"]')).toHaveLength(10);
     expect(container.textContent).toContain('earlier resales can count for the same vehicle');
     expect(container.textContent).not.toContain('Current recorded sale per vehicle');
   });
@@ -224,6 +235,7 @@ describe('qualified cohort sale-price reader UI', () => {
       expect(result.comparison.percentile).toBeNull();
       expect(result.comparison.reasons).toContain('subject_episode_unknown');
       expect(container.textContent).toContain('exact comparison sale is unestablished');
+      expect([...container.querySelectorAll('[role="status"]')].find(e => e.textContent?.includes('exact comparison sale'))?.closest('details')).toBeNull();
       expect(container.querySelector('[aria-label="Qualified sale source records"]')?.querySelectorAll('li')).toHaveLength(10);
     }
   });

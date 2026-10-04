@@ -126,6 +126,9 @@ export default function AuctionEvidence({ vehicleId, onClose }: { vehicleId: str
     {evidence && <>
       <div className="auction-evidence-links"><Link to={`/vehicle/${vehicleId}`}>Vehicle record →</Link>
         <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Original BaT listing ↗</a>
+        {evidence.vehicle.year && evidence.vehicle.make && evidence.vehicle.model && <Link to={`/valuation?${new URLSearchParams({
+          year: String(evidence.vehicle.year), make: evidence.vehicle.make, model: evidence.vehicle.model, vehicle_id: vehicleId,
+        })}`}>Recorded sale context →</Link>}
         {evidence.vehicle.auction_end_date && <span>Stored scheduled close: {closeStamp(evidence.vehicle.auction_end_date)}</span>}
       </div>
       {query.isError && <p role="status">Refresh failed. The retained read below may be out of date.</p>}

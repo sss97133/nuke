@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { comparePriceToSourceSales, type DatedSourceSale, type SaleComparisonOptions } from '../lib/dealRead/batComps';
 import { PrefetchLink } from '../components/PrefetchLink';
 import '../styles/unified-design-system.css';
+import SourceSaleDistribution from '../components/market/SourceSaleDistribution';
 
 // Top 25 BaT makes by sold_count from mv_treemap_by_brand on 2026-05-26.
 // Powers the <datalist> autocomplete + benchmark hints.
@@ -125,6 +126,7 @@ export default function Valuation() {
   const [error, setError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
   const latestRequest = useRef(0);
+  const filters = useRef<HTMLDetailsElement>(null);
   const [sourcePage, setSourcePage] = useState(0);
   const result = lookup?.result ?? null;
   const subjectVehicleId = params.get('vehicle_id') || null;
@@ -202,7 +204,7 @@ export default function Valuation() {
       const parts = [q.year, q.make, q.model].filter(Boolean).join(' ');
       document.title = `${parts} sale-price evidence – Nuke`;
     } else {
-      document.title = 'Vehicle Valuation – Nuke';
+      document.title = 'Recorded sale prices – Nuke';
     }
   }, [result]);
 
@@ -213,6 +215,9 @@ export default function Valuation() {
 
   const stats = result?.stats;
   const receipt = result?.receipt;
+  const recordedLabels = useMemo(() => Object.fromEntries((result?.comparables ?? []).map(c => [
+    c.bat_listing_url, c.bat_listing_title || [c.year, c.make, c.model].filter(Boolean).join(' '),
+  ])), [result]);
   const outputCurrency = receipt?.currency || currency;
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
@@ -248,7 +253,7 @@ export default function Valuation() {
     : '';
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '20px 12px 60px', color: 'var(--text)' }}>
+    <div className="sale-price-page" style={{ maxWidth: 960, margin: '0 auto', padding: '20px 12px 60px', color: 'var(--text)' }}>
       {/* HEADER */}
       <div style={{ marginBottom: 16 }}>
         <div style={{
@@ -257,7 +262,7 @@ export default function Valuation() {
           letterSpacing: '1.5px',
           textTransform: 'uppercase',
         }}>
-          Vehicle Valuation
+          Recorded sale prices
         </div>
         <div style={{
           fontSize: FS.label,
@@ -267,8 +272,30 @@ export default function Valuation() {
         }}>
           Dated BaT sale prices · cohort evidence · candidate bid percentile
         </div>
+        {receipt && <button type="button" style={{ border: 0, background: 'transparent', color: 'var(--text)', padding: '6px 0', fontSize: FS.body, textDecoration: 'underline', cursor: 'pointer' }} onClick={() => {
+          if (!filters.current) return;
+          filters.current.open = true;
+          filters.current.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          filters.current.querySelector('input')?.focus({ preventScroll: true });
+        }}>Change cohort / sales window ↓</button>}
       </div>
 
+      {subjectEvidence.exclusionBasis === 'unestablished' && <p role="status" style={{ fontSize: FS.body }}>The vehicle’s exact comparison sale is unestablished. Source records remain available; its price percentile is withheld.</p>}
+      {receipt && stats && !changedFilters && <SourceSaleDistribution
+        sales={sourceSales} currency={receipt.currency} label={receipt.cohort.label}
+        basis={receipt.cohort.basis} memberRows={receipt.coverage.member_rows} minimumSales={receipt.minimum_sales}
+        yearRestricted={result?.query.year != null} modelRestricted={result?.query.model != null}
+        eventFrom={receipt.event_from} eventBefore={receipt.event_before}
+        evidenceAsOf={receipt.evidence_as_of} knowledgeMode={receipt.knowledge_mode}
+        recordedLabels={recordedLabels} renderEvidence={sale => <SaleAncestry sale={sale} />}
+        cohortAction={result?.query.year != null && result.query.model && <button type="button" disabled={loading || changedFilters}
+          title="Use exact recorded model labels across years; registered model variants may be absent"
+          onClick={() => { setYear(''); void runLookup(''); }}>All recorded model years</button>}
+        summary={{ median: stats.median, p10: stats.p10, p90: stats.p90 }} comparison={comparison}
+        candidateInput={<Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />} />}
+
+      <details ref={filters} open={!receipt || changedFilters} style={{ marginBottom: 12, scrollMarginTop: 90 }}>
+      <summary style={{ fontSize: FS.body, cursor: 'pointer', marginBottom: 6 }}>Change cohort, currency or sales window</summary>
       {/* SEARCH FORM */}
       <form onSubmit={onSubmit} style={{
         border: '2px solid var(--text)',
@@ -286,7 +313,7 @@ export default function Valuation() {
         <Field label="Year" value={year} onChange={setYear} placeholder="1989" inputMode="numeric" minWidth={80} />
         <Field label="Make *" value={make} onChange={setMake} placeholder="Ferrari" required minWidth={150} list="valuation-makes" />
         <Field label="Model" value={model} onChange={setModel} placeholder="328" minWidth={150} />
-        <Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />
+        {(!receipt || changedFilters) && <Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />}
         <Field label="Sales from (UTC date)" value={eventFrom} onChange={setEventFrom} placeholder="Default: last 36 months" minWidth={160} />
         <Field label="Sales before (UTC date)" value={eventBefore} onChange={setEventBefore} placeholder="YYYY-MM-DD" minWidth={120} />
         <label style={{ fontSize: FS.label }}>CURRENCY
@@ -315,17 +342,16 @@ export default function Valuation() {
           {loadingThisContext ? 'Looking' : result ? 'Refresh evidence' : 'Compare'}
         </button>
       </form>
-
-      {receipt && <section aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
+      </details>
+      {changedFilters && <p role="status" style={{ fontSize: FS.body }}>Filters changed. Compare again to load matching evidence; the previous receipt remains available below.</p>}
+      {receipt && <details aria-label="Sale comparison evidence" style={{ border: '2px solid var(--text)', padding: 10, marginBottom: 12, fontSize: FS.body }}>
+        <summary>Scope, exclusions and source receipt</summary>
         <strong>{comparison?.percentile == null ? 'Price percentile unavailable' : `${comparison.percentile.toFixed(1)} percentile in recorded sales`}</strong>
         {changedFilters && <div>Compare again to apply the changed cohort, currency, date or vehicle.</div>}
         <div>{loading ? 'Refreshing evidence. The receipt below is the last completed lookup.' : 'Refresh evidence to include newly admitted source evidence. Save this receipt to keep this calculation.'}</div>
         <div>{receipt.cohort.label} · {receipt.coverage.qualified_sales} qualified source lots from {receipt.coverage.member_rows} public cohort records · {receipt.currency}</div>
         <div>{result?.query.year == null ? 'All recorded model years' : `Recorded model year ${result.query.year}`} · {result?.query.make} {result?.query.model}. Recorded membership is browse context; generations, condition and equipment are not matched.</div>
         {result?.query.year == null && ['exact_recorded_year_model_context', 'exact_recorded_make_model_context_all_years'].includes(receipt.cohort.basis) && <div>Exact recorded make/model labels across years. Related model variants may be absent; this is a different population from a registered model context.</div>}
-        {result?.query.year != null && result.query.model && <button type="button" style={chipBtn} disabled={loading || changedFilters}
-          title="Use exact recorded model labels across years; registered model variants may be absent"
-          onClick={() => { setYear(''); void runLookup(''); }}>All recorded model years</button>}
         <div>{receipt.coverage.dated_source_rows ?? 'Unknown'} dated source vehicle records · {receipt.coverage.capture_presentations ?? 'Unknown'} linked source captures · {receipt.coverage.qualified_capture_presentations ?? 'Unknown'} qualified capture presentations · {receipt.coverage.duplicate_presentations ?? 'Unknown'} duplicate presentations collapsed.</div>
         <div>Vehicle records, source captures and source lots have different denominators. Exclusion counts describe capture presentations, not missing market sales. Platform-wide coverage is unknown.</div>
         <div>{receipt.coverage.typed_sale_episode_links ?? 'Unknown'} qualified source lots have revalidated native sale-event links.</div>
@@ -334,7 +360,6 @@ export default function Valuation() {
         <div>Earlier sales discovered later can enter this retrospective comparison. {receipt.sale_population_basis === 'source_qualified_episodes_of_current_public_members'
           ? 'Each verified source sale is a separate episode; earlier resales can count for the same vehicle. Stored source coverage remains incomplete.'
           : 'Current recorded sale per vehicle; earlier resales may be missing.'}</div>
-        {subjectEvidence.exclusionBasis === 'unestablished' && <div>The vehicle’s exact comparison sale is unestablished. Source records remain available; its price percentile is withheld.</div>}
         {receipt.sale_population_basis === 'source_qualified_episodes_of_current_public_members' && <div>{receipt.coverage.native_episode_locators ?? 'Unknown'} native source episode locators · {receipt.coverage.native_capture_headers ?? 'Unknown'} linked capture headers. Locators identify sources; captured evidence must establish the sale, amount, currency and date.</div>}
         <div>Evidence cutoff includes source capture, parsing and actual snapshot ingestion. Admitted archived sales also include when the verified sale receipt arrived. Cohort uses today's recorded year/make/model. Historical cohort membership is unavailable.</div>
         <div>Published winning bid excludes buyer fees, taxes and transport (<a href="https://bringatrailer.com/policies/" target="_blank" rel="noreferrer">BaT policy</a>). Original currency; no inflation or exchange-rate adjustment. Condition and equipment remain unmatched.</div>
@@ -352,7 +377,7 @@ export default function Valuation() {
             const a = document.createElement('a'); a.href=url; a.download='sale-comparison-receipt.json'; a.click(); URL.revokeObjectURL(url);
           }}>Save this evidence receipt</button>
         </details>
-      </section>}
+      </details>}
 
       {/* ERROR */}
       {error && (
@@ -423,7 +448,8 @@ export default function Valuation() {
       {/* RESULT */}
       {result && stats && stats.sold_count > 0 && (
         <>
-          {/* Subject + hero stats card */}
+          {/* Secondary numeric summary; the graph is the primary analytical surface. */}
+          <details><summary style={{ fontSize: FS.body, marginBottom: 8, cursor: 'pointer' }}>Numerical summary</summary>
           <div style={{
             border: '2px solid var(--text)',
             background: 'var(--surface)',
@@ -477,8 +503,8 @@ export default function Valuation() {
               <StatCell label="Min" value={fmtUsd(stats.min)} mono />
               <StatCell label="Max" value={fmtUsd(stats.max)} mono divider />
               <StatCell label="Avg" value={fmtUsd(stats.avg)} mono divider />
-              <StatCell label="Avg Bids" value={stats.avg_bid_count != null ? String(stats.avg_bid_count) : '—'} divider />
-              <StatCell label="Avg Comments" value={stats.avg_comment_count != null ? String(stats.avg_comment_count) : '—'} divider />
+              {stats.avg_bid_count != null && <StatCell label="Avg Bids" value={String(stats.avg_bid_count)} divider />}
+              {stats.avg_comment_count != null && <StatCell label="Avg Comments" value={String(stats.avg_comment_count)} divider />}
             </div>
 
             {/* Outlier inline note */}
@@ -492,12 +518,15 @@ export default function Valuation() {
                 letterSpacing: '0.3px',
               }}>
                 <span style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.5px' }}>Outlier flagged</span>
-                {' · '}max {fmtUsd(stats.max)} is &gt;5× median. Likely bad data. Trust the median, not the average.
+                {' · '}max {fmtUsd(stats.max)} is &gt;5× median. Inspect the source evidence and vehicle differences behind this amount dispersion; no data error or condition adjustment is established.
               </div>
             )}
           </div>
 
-          {sourceSales.length > 0 && <section aria-label="Qualified sale source records" style={{ border: '2px solid var(--text)', marginBottom: 12, fontSize: FS.body }}>
+          </details>
+
+          {sourceSales.length > 0 && <details aria-label="Qualified sale source records" style={{ border: '2px solid var(--text)', marginBottom: 12, fontSize: FS.body }}>
+            <summary style={{ padding: 10, cursor: 'pointer' }}>Source receipts · {sourceSales.length}</summary>
             <div style={{ padding: 10, borderBottom: '2px solid var(--text)' }}>
               <strong>Qualified source sales · {sourceSales.length}</strong>
               <div>Showing {sourcePage * SOURCE_PAGE_SIZE + 1}–{Math.min((sourcePage + 1) * SOURCE_PAGE_SIZE, sourceSales.length)} of {sourceSales.length} source lots. Display paging does not sample the price calculation.</div>
@@ -506,8 +535,6 @@ export default function Valuation() {
             <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {visibleSourceSales.map((sale, index) => {
                 const source = canonicalBatSource(sale.sourceUrl), vehicle = opaqueId(sale.vehicleId);
-                const knownAncestry = sale.sourceVerification === 'per_read_inline_hash_parser' ? 'Inline source hash and parser verified'
-                  : sale.sourceVerification === 'producer_attested_archived_hash_parser' ? 'Admitted archived source receipt' : 'Verification ancestry unavailable';
                 return <li key={`${sale.sourceUrl}:${index}`} style={{ borderBottom: '1px solid var(--border)', padding: 10, overflowWrap: 'anywhere' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
                     <strong style={{ fontFamily: MONO }}>{formatPriceFull(sale.amount, sale.currency || receipt!.currency)}</strong>
@@ -517,17 +544,7 @@ export default function Valuation() {
                     {comparison?.percentile != null && <span>{sale.amount === comparison.subject.amount ? 'Equal to candidate' : sale.amount! < comparison.subject.amount! ? 'Lower than candidate' : 'Higher than candidate'}</span>}
                   </div>
                   <div>Evidence known {utcClock(sale.knownAt)} · {sale.currency || 'Currency unknown'} · {sale.priceBasis === 'published_bid_excluding_fees' ? 'published winning bid; fees excluded' : sale.priceBasis === 'buyer_total' ? 'buyer total' : 'fee basis unknown'}</div>
-                  <details><summary>Source evidence ancestry</summary>
-                    <div>{knownAncestry}. This is source-sale evidence, not condition matching.</div>
-                    <div>Snapshot reference: {opaqueId(sale.snapshotId) || 'Unknown'}</div>
-                    <div>Source capture: {utcClock(sale.snapshotFetchedAt)} · snapshot ingested: {utcClock(sale.snapshotCreatedAt)} · parsed: {utcClock(sale.parsedAt)}</div>
-                    <div>Admitted observation: {opaqueId(sale.derivedObservationId) || (sale.derivedObservationId === null ? 'None recorded' : 'Unknown')} · observation ingested: {utcClock(sale.derivedIngestedAt)}</div>
-                    <div>Native sale-event reference: {opaqueId(sale.sourceVehicleEventId) || 'Unknown'}</div>
-                    <div>Native episode ancestry: {sale.sourceEpisodeAncestry === 'canonical_current_context_verified' ? 'current canonical sale-event link verified; earlier episode history remains incomplete' : 'Unestablished'}</div>
-                    <div>Source parser: {parserReference(sale.sourceParser)} · admission parser: {parserReference(sale.admissionParser)}</div>
-                    <div>Source SHA-256: {sale.sourceSha256 && /^[a-f0-9]{64}$/i.test(sale.sourceSha256) ? sale.sourceSha256 : 'Unknown'}</div>
-                    <div>Capture, ingestion and parse clocks describe evidence availability, not a later sale or a live source read.</div>
-                  </details>
+                  <SaleAncestry sale={sale} />
                 </li>;
               })}
             </ol>
@@ -535,7 +552,8 @@ export default function Valuation() {
               <button type="button" style={chipBtn} disabled={sourcePage === 0} onClick={() => setSourcePage(p => p - 1)}>Previous source lots</button>
               <button type="button" style={chipBtn} disabled={(sourcePage + 1) * SOURCE_PAGE_SIZE >= sourceSales.length} onClick={() => setSourcePage(p => p + 1)}>Next source lots</button>
             </nav>}
-          </section>}
+          </details>}
+
 
           {/* Footer note */}
           <div style={{
@@ -551,6 +569,22 @@ export default function Valuation() {
       )}
     </div>
   );
+}
+
+function SaleAncestry({ sale }: { sale: SaleEvidence }) {
+  const knownAncestry = sale.sourceVerification === 'per_read_inline_hash_parser' ? 'Inline source hash and parser verified'
+    : sale.sourceVerification === 'producer_attested_archived_hash_parser' ? 'Admitted archived source receipt' : 'Verification ancestry unavailable';
+  return <details><summary>Source evidence ancestry</summary>
+    <div>{knownAncestry}. This is source-sale evidence, not condition matching.</div>
+    <div>Snapshot reference: {opaqueId(sale.snapshotId) || 'Unknown'}</div>
+    <div>Source capture: {utcClock(sale.snapshotFetchedAt)} · snapshot ingested: {utcClock(sale.snapshotCreatedAt)} · parsed: {utcClock(sale.parsedAt)}</div>
+    <div>Admitted observation: {opaqueId(sale.derivedObservationId) || (sale.derivedObservationId === null ? 'None recorded' : 'Unknown')} · observation ingested: {utcClock(sale.derivedIngestedAt)}</div>
+    <div>Native sale-event reference: {opaqueId(sale.sourceVehicleEventId) || 'Unknown'}</div>
+    <div>Native episode ancestry: {sale.sourceEpisodeAncestry === 'canonical_current_context_verified' ? 'current canonical sale-event link verified; earlier episode history remains incomplete' : 'Unestablished'}</div>
+    <div>Source parser: {parserReference(sale.sourceParser)} · admission parser: {parserReference(sale.admissionParser)}</div>
+    <div>Source SHA-256: {sale.sourceSha256 && /^[a-f0-9]{64}$/i.test(sale.sourceSha256) ? sale.sourceSha256 : 'Unknown'}</div>
+    <div>Capture, ingestion and parse clocks describe evidence availability, not a later sale or a live source read.</div>
+  </details>;
 }
 
 const chipBtn: React.CSSProperties = {
