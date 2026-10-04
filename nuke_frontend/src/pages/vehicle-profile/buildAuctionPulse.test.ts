@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { auctionReaderRevision, buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 
 const listing = {
   id: 'event-1', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/synthetic-soft-close',
@@ -9,6 +9,17 @@ const listing = {
 afterEach(() => vi.useRealTimers());
 
 describe('canonical auction telemetry across a soft close', () => {
+  it('refreshes evidence readers for native bids, comments, extensions and results, without heartbeat refetches', () => {
+    const initial = { ...listing, metadata: { live_stream: { last_comment_id: 10 } } };
+    const revision = auctionReaderRevision(initial);
+    expect(auctionReaderRevision({ ...initial, updated_at: '2026-10-04T17:36:01Z',
+      metadata: { live_stream: { last_comment_id: 10, sessions: { collector: { at: 'now' } }, last_admitted_at: 'now' } } })).toBe(revision);
+    for (const change of [ { current_price: 122000 }, { ended_at: '2026-10-04T17:39:00Z' },
+      { metadata: { live_stream: { last_comment_id: 11 } } },
+      { event_status: 'sold', final_price: 123000, sold_at: '2026-10-04T17:39:28Z' } ]) {
+      expect(auctionReaderRevision({ ...initial, ...change })).not.toBe(revision);
+    }
+  });
   it('reads vehicle_events on initial load and keeps an elapsed active deadline unconfirmed', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-04T17:38:00Z'));
     const pulse = buildAuctionPulseFromExternalListings([listing], 'vehicle-1');

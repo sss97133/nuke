@@ -1,6 +1,7 @@
 /**
  * useAuctionSequence — the rows behind a BaT lot's week (one sequence per listing
- * when the car ran more than once), read once per vehicle.
+ * when the car ran more than once). Shared query invalidation follows the
+ * current-cache Realtime delivery, so an open timeline follows native changes.
  *
  * Four indexed reads on vehicle_id (auction_comments, auction_events,
  * vehicle_events, vehicle_images with only id/taken_at/source), only for a
@@ -9,7 +10,8 @@
  * created_at.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import {
   buildAuctionSequences, type AuctionCommentRow, type AuctionEventRow, type AuctionSequence,
@@ -22,8 +24,6 @@ interface RawRows {
   vehicleEvents: VehicleEventRow[];
   images: ImageStampRow[];
 }
-
-const cache = new Map<string, RawRows>();
 
 const BAT_LOT = /bringatrailer\.com\/listing\//i;
 
@@ -77,21 +77,12 @@ export function useAuctionSequence(
   timelineEvents: TimelineEventLike[],
 ): { auctions: AuctionSequence[]; importStampedDays: string[]; loading: boolean } {
   const lotHint = useMemo(() => looksLikeBatLot(vehicle, timelineEvents), [vehicle, timelineEvents]);
-  const [rows, setRows] = useState<RawRows | null>(vehicleId ? cache.get(vehicleId) ?? null : null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!vehicleId || lotHint === null) return;
-    const cached = cache.get(vehicleId);
-    if (cached) { setRows(cached); return; }
-    let cancelled = false;
-    setLoading(true);
-    fetchRows(vehicleId)
-      .then(r => { cache.set(vehicleId, r); if (!cancelled) setRows(r); })
-      .catch(e => console.warn('[useAuctionSequence]', e?.message ?? e))
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [vehicleId, lotHint]);
+  const { data: rows, isLoading: loading } = useQuery({
+    queryKey: ['auction-sequence', vehicleId],
+    queryFn: () => fetchRows(vehicleId!),
+    enabled: !!vehicleId && lotHint !== null,
+    staleTime: 60_000,
+  });
 
   const built = useMemo(() => {
     if (!rows || lotHint === null) return null;

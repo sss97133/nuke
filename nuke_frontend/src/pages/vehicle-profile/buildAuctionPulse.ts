@@ -5,6 +5,14 @@
  *
  * This is a pure function -- no React state or side effects.
  */
+/** Changes that require the existing price, sequence and comment readers to refresh.
+ * Session/receipt clocks alone never turn a collector heartbeat into a data read.
+ */
+export function auctionReaderRevision(row: any): string {
+  return JSON.stringify([row.source_url, row.event_status, row.ended_at, row.current_price, row.final_price, row.sold_at,
+    row.bid_count, row.view_count, row.watcher_count, row.metadata?.comment_count, row.metadata?.live_stream?.last_comment_id]);
+}
+
 export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForRows: string): any | null {
   // vehicle_events is the canonical reader; its IDs must not enter the legacy listing sync writer.
   const arr = (Array.isArray(rows) ? rows : []).map((r) => r?.source_url ? {
