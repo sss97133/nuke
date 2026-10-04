@@ -135,14 +135,29 @@ struct MarketMapView: View {
                     .rpc("get_make_heatmap", params: ["p_make": mk]).execute().value
                 for r in hm.counties { c[r.fips] = r.count; if let nm = r.county_name { n[r.fips] = nm } }
             } else {
-                let rows: [CountyCount] = try await SupabaseService.client
-                    .rpc("county_density_all").execute().value
-                for r in rows { c[r.fips] = r.count; if let nm = r.name { n[r.fips] = nm } }
+                // PostgREST caps each response. Page in stable FIPS order and
+                // publish only the complete result, including the sparse tail.
+                var offset = 0
+                let pageSize = 500
+                while true {
+                    try Task.checkCancellation()
+                    let rows: [CountyCount] = try await SupabaseService.client
+                        .rpc("county_density_all")
+                        .order("fips", ascending: true)
+                        .range(from: offset, to: offset + pageSize - 1)
+                        .execute().value
+                    guard !rows.isEmpty else { break }
+                    for r in rows { c[r.fips] = r.count; if let nm = r.name { n[r.fips] = nm } }
+                    offset += rows.count
+                }
             }
+            try Task.checkCancellation()
             counts = c; names = n
             breaks = quantileBreaks(Array(c.values), bins: 7)
             loading = false
+            NSLog("NukeCapture map: %d counties loaded", c.count)
         } catch {
+            guard !Task.isCancelled else { return }
             failed = true; loading = false
         }
     }
