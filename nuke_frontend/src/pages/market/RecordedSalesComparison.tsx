@@ -23,7 +23,7 @@ function CountBucket({ point, name, max, refused, active, onClick }: {
         borderColor: active ? 'var(--text)' : 'var(--border)', cursor: unavailable || point.value === 0 ? 'default' : 'pointer' }}>
       <span style={{ ...label, display: 'block', overflowWrap: 'anywhere' }}>{name}</span>
       <span style={{ ...mono, display: 'block', margin: '4px 0' }}>
-        {unavailable ? 'Counts refused' : `${number(point.value)} recorded sales · ${number(point.denominator)} eligible ended`}
+        {unavailable ? 'Counts refused' : `${number(point.value)} recorded sales · ${number(point.denominator)} captured ended listings`}
       </span>
       {!unavailable && <span aria-hidden="true" style={{ display: 'block', height: 6, background: 'var(--surface)' }}>
         <span style={{ display: 'block', height: '100%', width: `${(point.value ?? 0) / max * 100}%`,

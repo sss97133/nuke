@@ -55,8 +55,8 @@ describe('recorded sales evidence comparison', () => {
   it('resolves the registered make ID, preserves partial denominators and refuses invented ratios/changes', async () => {
     await render('fixture make');
     expect(fixture.request).toMatchObject({ scope: make.scope, event_from: '2026-10-02T00:00:00.000Z', event_to: '2026-10-04T00:00:00.000Z', evidence_limit: 20 });
-    expect(container.textContent).toContain('2 recorded sales · 4 eligible ended');
-    expect(container.textContent).toContain('10 recorded sales · 40 eligible ended');
+    expect(container.textContent).toContain('2 recorded sales · 4 captured ended listings');
+    expect(container.textContent).toContain('10 recorded sales · 40 captured ended listings');
     expect(container.textContent).toContain('3 unresolved memberships excluded from both series');
     expect(container.textContent).toContain('Source clocks: 0 recorded · 4 unknown. Ended pending: 1');
     expect(container.textContent).toContain('Ratios and period changes: unknown');
@@ -105,7 +105,7 @@ describe('recorded sales evidence comparison', () => {
     await render(); await select('Recorded sales scope', subject.key); await select('Recorded sales event window', '7');
     expect(fixture.request).toMatchObject({ scope: subject.scope, event_from: '2026-09-27T00:00:00.000Z', event_to: '2026-10-04T00:00:00.000Z' });
     const data = receipt(); data.series[0].value = 0; data.series[0].denominator = 0; fixture.query.data = data; await render();
-    expect(container.textContent).toContain('0 recorded sales · 0 eligible ended');
+    expect(container.textContent).toContain('0 recorded sales · 0 captured ended listings');
     expect(container.textContent).toContain('No matched captured episodes; this does not establish zero demand');
     expect(countButton('supported grouping: 0 recorded').disabled).toBe(true);
   });
@@ -115,7 +115,7 @@ describe('recorded sales evidence comparison', () => {
     await render('UNREGISTERED'); expect(fixture.request).toBeNull();
     expect(container.textContent).toContain('No unique registered make matches UNREGISTERED');
     const zero = receipt(); zero.series[0].value = 0; fixture.query.data = zero; await render();
-    expect(container.textContent).toContain('0 recorded sales · 4 eligible ended');
+    expect(container.textContent).toContain('0 recorded sales · 4 captured ended listings');
     expect(container.textContent).not.toContain('No matched captured episodes');
     fixture.query.data = undefined;
     await render(); fixture.query.isFetching = true; await render();

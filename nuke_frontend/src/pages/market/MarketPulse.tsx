@@ -877,7 +877,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {/* Figures. Each one is a filter on the board below. */}
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
-        <Figure caption="Recorded bids" value={isLoading ? '…' : recordedBids.toLocaleString('en-US')} active={false} onClick={() => setParam('live', null)} hint="Lots with a recorded bid number; units are unverified, so bids are not summed" compact={narrow} />
+        <Figure caption="Lots with bid data" value={isLoading ? '…' : recordedBids.toLocaleString('en-US')} active={false} onClick={() => setParam('live', null)} hint="Lots with a recorded bid number; units are unverified, so bids are not summed" compact={narrow} />
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}

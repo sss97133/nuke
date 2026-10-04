@@ -133,7 +133,7 @@ describe('market answer -> supporting lots', () => {
   });
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
-    expect(button('Recorded bids').textContent).toContain('2');
+    expect(button('Lots with bid data').textContent).toContain('2');
     expect(container.textContent).toContain('source currency unknown');
     expect(container.textContent).not.toContain('USD');
     expect(container.textContent).not.toContain('$');
@@ -168,7 +168,7 @@ describe('market answer -> supporting lots', () => {
   });
   it('distinguishes loading, failure, and a failed refresh with previously fetched data', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
-    await render(); expect(button('Recorded bids').textContent).toContain('…');
+    await render(); expect(button('Lots with bid data').textContent).toContain('…');
     expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeNull();
     fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render(); expect(container.textContent).toContain('could not be loaded');
