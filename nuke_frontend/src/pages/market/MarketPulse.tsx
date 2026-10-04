@@ -7,7 +7,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
 import { useLotMovement, weigh, type ActivityReceipt, type LotMovement, type MovementItem } from './useLotMovement';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
-import RecordedSalesComparison from './RecordedSalesComparison';
+import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their
@@ -84,12 +84,19 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
 function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
-  useEffect(() => {
-    if (!ref.current) return;
+  const observed = useRef<{ node: T; observer: ResizeObserver } | null>(null);
+  useLayoutEffect(() => {
+    if (observed.current?.node === ref.current) return;
+    observed.current?.observer.disconnect();
+    observed.current = null;
+    const node = ref.current;
+    if (!node) return;
     const ro = new ResizeObserver((entries) => setW(Math.floor(entries[0].contentRect.width)));
-    ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, []);
+    observed.current = { node, observer: ro };
+    setW(Math.floor(node.getBoundingClientRect().width));
+    ro.observe(node);
+  });
+  useEffect(() => () => { observed.current?.observer.disconnect(); observed.current = null; }, []);
   return [ref, w];
 }
 
@@ -463,18 +470,23 @@ interface MakeNode {
   count: number;
 }
 
-function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void }) {
+const recordedModel = (a: LiveAuction) => a.model?.trim() || 'Model unrecorded';
+
+function MarketMap({ auctions, selected, onSelect, models = false }: {
+  auctions: LiveAuction[]; selected: string | null; onSelect: (group: string | null) => void; models?: boolean;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const height = width < 640 ? 240 : 380;
   const makes = useMemo(() => {
     const by = new Map<string, MakeNode>();
     for (const a of auctions) {
-      const n = by.get(a.make) ?? { make: a.make, count: 0 };
+      const key = models ? recordedModel(a) : a.make;
+      const n = by.get(key) ?? { make: key, count: 0 };
       n.count += 1;
-      by.set(a.make, n);
+      by.set(key, n);
     }
     return [...by.values()];
-  }, [auctions]);
+  }, [auctions, models]);
   const rects = useMemo(
     () => (width > 0 ? squarify(makes.filter((m) => m.count > 0).map((m) => ({ node: m, area: m.count })), 0, 0, width, height) : []),
     [makes, width, height]
@@ -482,12 +494,44 @@ function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; 
   const [hovered, setHovered] = useState<string | null>(null);
   const shown = makes.find((m) => m.make === (hovered ?? selected));
 
+  const [showAll, setShowAll] = useState(false);
+  const ranked = [...makes].sort((a, b) => b.count - a.count || a.make.localeCompare(b.make));
+  const leading = width < 640 ? 6 : 10;
+  const visible = showAll ? ranked : ranked.slice(0, leading);
+
+  if (models || width < 640) return <div ref={ref} aria-label={models ? 'Inventory by recorded model' : 'Inventory by stored make'}>
+    <div style={{ fontSize: 11, marginBottom: 8 }}>{models
+      ? 'Bars count captured vehicle records by recorded model label. Aliases, generations and comparison equivalence are unresolved.'
+      : `Bring a Trailer · ${auctions.length} captured open vehicle records by stored make label. Complete platform coverage and unresolved make identity are unknown.`}</div>
+    <div style={{ display: 'grid', gap: 2 }}>
+      {visible.map(group => <button key={group.make} aria-pressed={selected === group.make}
+        aria-label={models ? `${group.make}: ${group.count} captured lots. Filter this recorded model` : `${group.make}: ${group.count} captured live lots`}
+        onClick={() => onSelect(selected === group.make ? null : group.make)}
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) minmax(0, 2fr) 40px', gap: 8, alignItems: 'center', minHeight: 44,
+          padding: '4px 8px', border: '2px solid var(--border)', fontFamily: 'Arial, sans-serif', fontSize: 12, textAlign: 'left',
+          background: selected === group.make ? 'var(--text)' : 'var(--bg)', color: selected === group.make ? 'var(--bg)' : 'var(--text)' }}>
+        <span style={{ overflowWrap: 'anywhere' }}>{group.make}</span>
+        <span aria-hidden="true" style={{ height: 12, width: `${group.count / Math.max(1, ranked[0]?.count ?? 1) * 100}%`,
+          background: selected === group.make ? 'var(--bg)' : 'var(--text-secondary)' }} />
+        <span style={{ ...mono, textAlign: 'right' }}>{group.count}</span>
+      </button>)}
+    </div>
+    {ranked.length > leading && <button onClick={() => setShowAll(!showAll)} style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, marginTop: 6,
+      background: 'var(--bg)', color: 'var(--text)', border: '2px solid var(--border)', padding: '6px 8px' }}>
+      {showAll ? 'Show leading groups' : `Show all ${ranked.length} ${models ? 'recorded model groups' : 'stored make groups'}`}
+    </button>}
+  </div>;
+
   return (
-    <div>
+    <div ref={ref}>
+      <div style={{ fontSize: 11, marginBottom: 6, lineHeight: 1.4 }}>
+        Bring a Trailer · {auctions.length.toLocaleString('en-US')} captured open vehicle lots across all makes in this inventory window.
+        {' '}Area counts vehicle records; source-wide inventory completeness is unknown.
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4, minHeight: 12 }}>
         <span style={{ ...label, color: shown ? 'var(--text)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {shown
-            ? `${shown.make} · ${shown.count} captured live lots`
+            ? `${shown.make} · ${shown.count} of ${auctions.length} captured live lots`
             : 'Live lots by make · area = captured lot count · hover or tap a make'}
         </span>
         {selected && (
@@ -496,7 +540,7 @@ function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; 
           </button>
         )}
       </div>
-    <div ref={ref} style={{ position: 'relative', height, background: 'var(--border)' }} onMouseLeave={() => setHovered(null)}>
+    <div style={{ position: 'relative', height, background: 'var(--border)' }} onMouseLeave={() => setHovered(null)}>
       {rects.map(({ node, x, y, w, h }) => {
         const active = selected === node.make;
         const dim = selected != null && !active;
@@ -613,13 +657,14 @@ function WeightBar({ w, title: t }: { w: number; title: string }) {
 
 const MOVEMENT_ITEMS = 3;
 
-function Movement({ m, receipt, readAsOf, rowCap }: {
+function Movement({ m, receipt, readAsOf, rowCap, limit = MOVEMENT_ITEMS }: {
   m: LotMovement | undefined; receipt: ActivityReceipt['lots'][number] | undefined;
   readAsOf: string | undefined; rowCap: number | undefined;
+  limit?: number;
 }) {
   const now = useSecondClock();
   if (!m && !receipt) return null;
-  const items = (m?.items ?? []).slice(0, MOVEMENT_ITEMS);
+  const items = (m?.items ?? []).slice(0, limit);
   const asOf = readAsOf ? Date.parse(readAsOf) : m?.readAsOf;
   const sourceAt = receipt ? Date.parse(receipt.source_read_at ?? '') : m?.sourceReadAt;
   const sourceBasis = receipt?.source_read_basis ?? m?.sourceReadBasis ?? 'unknown';
@@ -660,47 +705,46 @@ function Movement({ m, receipt, readAsOf, rowCap }: {
   );
 }
 
-function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction[]; risenIds: Set<string>; stale: boolean; heat: Map<string, Heat | null> }) {
-  const next = auctions.slice(0, 8);
-  const key = next.map((a) => a.id).join(',');
-  const ids = useMemo(() => (key ? key.split(',') : []), [key]);
-  const { data: rows, dataUpdatedAt, coverage } = useLotMovement(ids);
-  const movement = useMemo(
-    () => (rows ? weigh(rows, new Map(next.map((a) => [a.id, a.endsAt])), dataUpdatedAt || Date.now()) : null),
-    [rows, dataUpdatedAt] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  if (next.length === 0) return null;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {next.map((a) => (
-        <Link
-          key={a.id}
-          to={`/vehicle/${a.id}`}
-          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 8px', borderBottom: '2px solid var(--border)', textDecoration: 'none', color: 'var(--text)' }}
-        >
-          <Thumb src={a.imageUrl} size={54} />
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11, marginTop: 2 }}>
-              <BidCell auction={a} risen={risenIds.has(a.id)} stale={stale} />
-              <Countdown endsAt={a.endsAt} strong />
-            </div>
-            {heat.get(a.id) && heat.get(a.id)?.state !== 'in line' && (
-              <div style={{ display: 'flex', marginTop: 3 }}><HeatTag a={a} heat={heat.get(a.id)} /></div>
-            )}
-            <Movement m={movement?.get(a.id)} receipt={coverage?.lots.find(l => l.vehicle_id === a.id)} readAsOf={coverage?.as_of} rowCap={coverage?.per_lot_limit} />
-          </div>
-        </Link>
-      ))}
+function ActivityDrill({ auction, onClose }: { auction: LiveAuction; onClose: () => void }) {
+  const ids = useMemo(() => [auction.id], [auction.id]);
+  const query = useLotMovement(ids);
+  const movement = useMemo(() => query.data
+    ? weigh(query.data, new Map([[auction.id, auction.endsAt]]), query.dataUpdatedAt || Date.now()) : null,
+    [query.data, query.dataUpdatedAt, auction.id, auction.endsAt]);
+  const receipt = query.coverage?.lots.find(l => l.vehicle_id === auction.id);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    ref.current?.focus({ preventScroll: true });
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
+    return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, [auction.id]);
+  return <section ref={ref} tabIndex={-1} aria-label="Listing activity evidence" onKeyDown={e => { if (e.key === 'Escape') onClose(); }} style={{ border: '2px solid var(--border)', padding: 10, marginBottom: 12 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+      <h3 style={{ fontSize: 13, margin: 0 }}>{title(auction)} · captured activity</h3>
+      <button onClick={onClose} style={{ ...label, background: 'var(--bg)', color: 'var(--text)', border: '2px solid var(--border)', padding: 6 }}>Close activity</button>
     </div>
-  );
+    <div style={{ fontSize: 11, marginTop: 6 }}>
+      <Link to={`/vehicle/${auction.id}`}>Vehicle evidence</Link>{' · '}
+      {auction.listingUrl && <a href={auction.listingUrl} target="_blank" rel="noopener noreferrer">BaT source listing ↗</a>}
+    </div>
+    {query.isFetching && <div role="status">Reading current listing interactions…</div>}
+    {query.isError && <div role="status">Activity could not be refreshed. <button onClick={() => void query.refetch()}>Retry activity</button></div>}
+    {!query.isFetching && !query.isError && query.coverage && !receipt && <div role="status">No eligible current-listing receipt at this read. The listing may have ended or become unavailable.</div>}
+    <Movement m={movement?.get(auction.id)} receipt={receipt} readAsOf={query.coverage?.as_of} rowCap={query.coverage?.per_lot_limit} limit={40} />
+    {receipt?.source_bid_amount != null && <div style={{ fontSize: 11, marginTop: 6 }}>
+      Source bid number {bidNumber(receipt.source_bid_amount)} · recorded at capture {bidNumber(receipt.current_bid_at_capture)} · currency unverified.
+      {' '}{receipt.source_bid_match === 'matched' ? 'Numbers match at capture.' : receipt.source_bid_match === 'mismatched' ? 'Numbers differ at capture.' : 'Comparison unknown.'}
+    </div>}
+    <p style={{ fontSize: 11, margin: '8px 0 0', color: 'var(--text-secondary)' }}>Captured current-listing interactions, limited to 40. Missing earlier events and unscored opinions do not establish mood or a historical bidding rate.</p>
+  </section>;
 }
 
 // Fixed row heights so the board can render only the rows on screen.
 const ROW_H = 52;
 const ROW_H_NARROW = 50;
 
-function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean; heat: Heat | null | undefined }) {
+function BoardRow({ a, risen, narrow, stale, heat, onActivity }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean; heat: Heat | null | undefined; onActivity: (a: LiveAuction) => void }) {
   const nr = a.noReserve && <span style={{ ...label, color: 'var(--text)', border: '2px solid var(--text)', padding: '0 3px', flexShrink: 0 }}>NR</span>;
   const tagged = (heat != null && heat.state !== 'in line') || a.noReserve;
   const name = <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>;
@@ -723,8 +767,10 @@ function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: bo
       {!narrow && nr}
       <div style={{ width: narrow ? 76 : 104, textAlign: 'right', flexShrink: 0 }}>
         <BidCell auction={a} risen={risen} stale={stale} />
+        <button aria-label={`Inspect activity for ${title(a)}`} onClick={() => onActivity(a)} style={{ ...label, display: 'block', marginLeft: 'auto',
+          padding: '3px 0', background: 'var(--bg)', color: 'var(--text)', border: 'none', textDecoration: 'underline' }}>Activity</button>
       </div>
-      {a.listingUrl && (
+      {a.listingUrl && !narrow && (
         <a
           href={a.listingUrl}
           target="_blank"
@@ -740,7 +786,7 @@ function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: bo
 }
 
 // Every row stays reachable by scrolling; only the ones near the viewport are in the DOM.
-function Board({ rows, risenIds, narrow, stale, heat }: { rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; heat: Map<string, Heat | null> }) {
+function Board({ rows, risenIds, narrow, stale, heat, onActivity }: { rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; heat: Map<string, Heat | null>; onActivity: (a: LiveAuction) => void }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
   useLayoutEffect(() => {
@@ -760,7 +806,7 @@ function Board({ rows, risenIds, narrow, stale, heat }: { rows: LiveAuction[]; r
         const a = rows[item.index];
         return (
           <div key={a.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} narrow={narrow} stale={stale} heat={heat.get(a.id)} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} narrow={narrow} stale={stale} heat={heat.get(a.id)} onActivity={onActivity} />
           </div>
         );
       })}
@@ -790,22 +836,52 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const openExplain = useCallback((a: LiveAuction, heat: Heat) => setExplaining({ a, heat }), []);
   const closeExplain = useCallback(() => setExplaining(null), []);
 
-  const make = params.get('make')?.toUpperCase() ?? null;
+  const makeParam = params.get('make')?.toUpperCase();
+  const make = makeParam === 'ALL' ? null : makeParam ?? null;
+  const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
+  const model = make ? params.get('model') : null;
+  const [activityLot, setActivityLot] = useState<LiveAuction | null>(null);
+  const salesDay = params.get('day');
+  const salesLens: MarketSalesLens = {
+    scopeKey: params.get('salesScope'), days: params.get('days') === '2' ? 2 : 7,
+    drill: salesDay && /^\d{4}-\d{2}-\d{2}$/.test(salesDay) && Number.isFinite(Date.parse(salesDay))
+      ? { bucket: `${salesDay}T00:00:00Z`, series: params.get('series') === 'benchmark' ? 'benchmark' : 'selected' } : null,
+    benchmark: params.get('benchmark') === '1' || params.get('series') === 'benchmark',
+  };
   const win = (WINDOWS.some((w) => w.id === params.get('live')) ? params.get('live') : 'all') as Window;
   const sort = (SORTS.some((s) => s.id === params.get('sort')) ? params.get('sort') : 'ending') as Sort;
   const selectedBid = BID_BUCKETS.find(b => b.id === params.get('bidRange'))?.id ?? null;
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
-    if (value == null) next.delete(key);
+    if (key === 'make' && value == null) next.set(key, 'all');
+    else if (value == null) next.delete(key);
     else next.set(key, value);
     if (key === 'live' || (key === 'make' && value != null) || key === 'bidRange') next.set('board', '1');
     if (key === 'live' || key === 'make') next.delete('bidRange');
-    setParams(next, { replace: true });
-    if (key === 'live' || key === 'bidRange') window.requestAnimationFrame(() => {
-      boardRef.current?.scrollIntoView?.({ block: 'start' });
-      boardRef.current?.focus({ preventScroll: true });
-    });
+    if (key === 'make' || key === 'view') next.delete('model');
+    if (key === 'view') next.delete('bidRange');
+    if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
+    setActivityLot(null);
+    setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort' });
+  };
+  const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
+    const next = new URLSearchParams(params);
+    next.set('make', nextMake ?? 'all');
+    ['model', 'bidRange', 'day', 'series', 'salesScope'].forEach(k => next.delete(k));
+    if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
+    setActivityLot(null);
+    setParams(next);
+  };
+  const setSalesLens = (change: Partial<MarketSalesLens>) => {
+    const next = new URLSearchParams(params);
+    if (change.days != null) next.set('days', String(change.days));
+    if (change.benchmark != null) { if (change.benchmark) next.set('benchmark', '1'); else next.delete('benchmark'); }
+    if ('drill' in change) {
+      next.delete('day'); next.delete('series');
+      if (change.drill) { next.set('day', change.drill.bucket.slice(0, 10)); next.set('series', change.drill.series); }
+    }
+    setParams(next);
   };
 
   // Figures and filters are evaluated against the clock once a minute; the countdowns tick on their own.
@@ -825,14 +901,18 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now, heat.get(a.id))) f[w.id] += 1;
     return f;
   }, [cohort, now, heat]);
-  const recordedBids = useMemo(() => currentBidDistribution(cohort).recorded, [cohort]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
   const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now, heat.get(a.id))), [cohort, win, now, heat]);
   const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
+  // The make map is the wider inventory context. Window/range changes reshape its actual population;
+  // the selected make is highlighted within it rather than erasing all other brands.
+  const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now, heat.get(a.id))
+    && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, heat, selectedBid]);
 
   const board = useMemo(() => {
-    const rows = scoped.filter(a => selectedBid == null || bidBucket(a.currentBid) === selectedBid);
+    const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid) === selectedBid)
+      && (model == null || recordedModel(a) === model));
     const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
@@ -840,44 +920,47 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [scoped, selectedBid, sort, heat]);
+  }, [scoped, selectedBid, sort, heat, model]);
 
-  if (!data && isError) return <>
-    <RecordedSalesComparison key={make ?? 'all'} make={make} />
+  if (!data && isError && view === 'inventory') return <>
+    <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
     <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
     {onUnavailable}
   </>;
 
   return (
     <ExplainContext.Provider value={openExplain}>
-    <div style={{ fontFamily: 'Arial, sans-serif', color: 'var(--text)', background: 'var(--bg)', padding: '12px 12px 32px' }}>
+    <div className="market-explorer" style={{ fontFamily: 'Arial, sans-serif', color: 'var(--text)', background: 'var(--bg)', padding: '12px 12px 32px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.14em' }}>MARKET</span>
-          <span style={label}>Live lots · Bring a Trailer{make ? ` · ${make}` : ''}</span>
+          <span style={label}>Bring a Trailer · captured vehicle auctions</span>
         </div>
-        {data?.syncedAt != null && (
+        {view === 'inventory' && data?.syncedAt != null && (
           <span style={label} title={data.source}>
             Latest record write {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}
           </span>
         )}
       </div>
 
-      {isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
+      {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
 
-      <RecordedSalesComparison key={make ?? 'all'} make={make} />
+      <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
 
-      <label style={{ ...label, display: 'block', marginBottom: 8 }}>
-        Make{' '}
-        <select aria-label="Live lot make" value={make ?? ''} onChange={e => setParam('make', e.target.value || null)} style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 4 }}>
-          <option value="">All makes</option>
-          {[...new Set([...live.map(a => a.make), ...(make ? [make] : [])])].sort().map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </label>
+      {view === 'inventory' && <>
+      <div style={{ fontSize: 12, margin: '8px 0', lineHeight: 1.4 }}>
+        <strong>Open inventory · {make ?? 'All makes'}</strong>{' · '}
+        {isLoading ? 'Reading captured lots…' : `${cohort.length.toLocaleString('en-US')} of ${live.length.toLocaleString('en-US')} captured BaT vehicle lots`}
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Public vehicle records marked live with future listing ends. Complete BaT coverage is unknown.</div>
+      </div>
+      <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
+        <button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('make', null)}>All captured makes</button>
+        {make && <><span aria-hidden="true">→</span><button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}>{make}</button></>}
+        {model && <><span aria-hidden="true">→</span><span>Recorded model: {model}</span></>}
+      </div>
 
       {/* Figures. Each one is a filter on the board below. */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
-        <Figure caption="Lots with bid data" value={isLoading ? '…' : recordedBids.toLocaleString('en-US')} active={false} onClick={() => setParam('live', null)} hint="Lots with a recorded bid number; units are unverified, so bids are not summed" compact={narrow} />
+      <div role="group" aria-label="Open inventory filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}
@@ -894,21 +977,21 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         ))}
       </div>
 
-      {!isLoading && <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />}
+      {!isLoading && <details open={selectedBid != null} style={{ fontSize: 11, marginBottom: 12 }}>
+        <summary>Filter live lots by recorded bid number · currency unverified</summary>
+        <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
+      </details>}
 
 
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
+      <div style={{ marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
-          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} />
+          <div style={{ ...label, marginBottom: 4 }}>Inventory by {make ? 'recorded model' : 'stored make label'} · {WINDOWS.find(w => w.id === win)?.label}{selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}</div>
+          {mappedInventory.some(a => make == null || a.make === make) && <MarketMap auctions={make ? mappedInventory.filter(a => a.make === make) : mappedInventory}
+            models={make != null} selected={make ? model : null} onSelect={(group) => setParam(make ? 'model' : 'make', group)} />}
         </section>
-        {board.length > 0 && <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
-          <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
-          <div style={{ fontSize: 9, color: 'var(--text-secondary)', padding: '4px 8px', borderBottom: '2px solid var(--border)' }}>
-            Captured bids and comments on each current listing. × compares a bid increment with the median increment in view. Source clock and capture limits appear per lot; this sample does not establish the listing's complete activity.
-          </div>
-          <EndingNext auctions={[...board].sort((a, b) => a.endsAt - b.endsAt)} risenIds={risenIds} stale={syncBehind} heat={heat} />
-        </section>}
       </div>
+
+      {activityLot && <ActivityDrill auction={activityLot} onClose={() => setActivityLot(null)} />}
 
       <div ref={boardRef} tabIndex={-1} aria-label="Supporting live lots">
       <section style={{ border: '2px solid var(--border)' }}>
@@ -916,6 +999,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
           <span style={label}>
             {board.length.toLocaleString('en-US')} lots · source bid units unverified
             {make ? ` · ${make}` : ''}
+            {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
             {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
           </span>
@@ -942,13 +1026,16 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         {!isLoading && board.length === 0 && <div role="status" style={{ padding: 12 }}>No open lots match these filters. <button onClick={() => {
           const next = new URLSearchParams(params);
           ['make', 'live', 'bidRange'].forEach(k => next.delete(k));
+          next.delete('model');
+          next.set('make', 'all');
           setParams(next, { replace: true });
         }}>Clear market filters</button></div>}
-        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} />}
+        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={setActivityLot} />}
       </section>
       </div>
+      </>}
 
-      {data?.source && (
+      {view === 'inventory' && data?.source && (
         <div style={{ ...label, marginTop: 8 }}>
           Source: {data.source}. Current bid is a recorded listing number; its unit and freshness need source evidence. Monetary totals, medians and hot/cold comparisons are withheld until currencies can be matched.
         </div>
@@ -1013,7 +1100,9 @@ function Figure({ caption, value, active, onClick, hint, compact }: { caption: s
       style={{
         textAlign: 'left',
         padding: compact ? '6px 6px' : '8px 10px',
-        border: 'none',
+        border: '2px solid var(--border)',
+        flex: '1 1 100px',
+        minHeight: 44,
         background: active ? 'var(--text)' : 'var(--bg)',
         color: active ? 'var(--bg)' : 'var(--text)',
         cursor: 'pointer',
@@ -1021,7 +1110,7 @@ function Figure({ caption, value, active, onClick, hint, compact }: { caption: s
       }}
     >
       <div style={{ ...label, color: 'inherit', opacity: 0.8 }}>{caption}</div>
-      <div style={{ ...mono, fontSize: compact ? 17 : 20, fontWeight: 700, marginTop: 2 }}>{value}</div>
+      <div style={{ ...mono, fontSize: 15, fontWeight: 700, marginTop: 2 }}>{value}</div>
     </button>
   );
 }
