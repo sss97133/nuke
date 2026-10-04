@@ -504,7 +504,9 @@ export interface DatedSourceSale {
 
 export interface SaleComparisonOptions {
   cohort: { key: string; label: string; basis: string; complete: boolean };
-  subject: { amount: number | null; currency: string | null; priceBasis: DatedSourceSale['priceBasis']; sourceUrl?: string | null; vehicleId?: string | null };
+  subject: { amount: number | null; currency: string | null; priceBasis: DatedSourceSale['priceBasis']; sourceUrl?: string | null; vehicleId?: string | null;
+    /** Explicit episode receipts may retain the same vehicle's earlier sales. Legacy callers exclude the vehicle. */
+    exclusionBasis?: 'exact_source_episode' | 'unestablished' };
   eventFrom: string;
   /** Exclusive source-event cutoff; do not include subject or later sales. */
   eventBefore: string;
@@ -566,7 +568,8 @@ export function comparePriceToSourceSales(rows: readonly DatedSourceSale[], opts
   const groups = new Map<string, DatedSourceSale[]>();
   const excluded: Array<{ sourceKey: string | null; vehicleIds: Array<string | null>; reason: SaleExclusion }> = [];
   const eligible: Array<DatedSourceSale & { sourceKey: string }> = [];
-  const subjectKey = saleSourceKey(subject.sourceUrl);
+  const subjectKey = subject.exclusionBasis === 'unestablished' ? null : saleSourceKey(subject.sourceUrl);
+  if (subject.exclusionBasis === 'unestablished' || (subject.exclusionBasis === 'exact_source_episode' && !subjectKey)) reasons.push('subject_episode_unknown');
   for (const row of rows) {
     const key = saleSourceKey(row.sourceUrl);
     if (!key) { excluded.push({ sourceKey: null, vehicleIds: [row.vehicleId], reason: 'source_unknown' }); continue; }
@@ -574,7 +577,7 @@ export function comparePriceToSourceSales(rows: readonly DatedSourceSale[], opts
   }
   for (const [sourceKey, group] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
     const exclude = (reason: SaleExclusion) => excluded.push({ sourceKey, vehicleIds: group.map(r => r.vehicleId), reason });
-    if (sourceKey === subjectKey || (subject.vehicleId && group.some(r => r.vehicleId === subject.vehicleId))) { exclude('subject'); continue; }
+    if (sourceKey === subjectKey || (subject.exclusionBasis == null && subject.vehicleId && group.some(r => r.vehicleId === subject.vehicleId))) { exclude('subject'); continue; }
     const boundaryClaims = group.filter(r => {
       const event = sourceEventInterval(r.eventAt), clock = sourceEventInterval(r.knownAt)?.[0];
       return event && from != null && before != null && event[0] >= from && event[0] < before && event[1] <= before

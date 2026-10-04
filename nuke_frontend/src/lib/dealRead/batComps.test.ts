@@ -60,6 +60,30 @@ describe('dated source sale percentile contract', () => {
     expect(result.percentile).toBeNull();
   });
 
+  it('retains a subject vehicle’s earlier sale only when exact episode exclusion is explicit', () => {
+    const rows = [sourceSale(1, { vehicleId: 'repeat' }), sourceSale(2, { vehicleId: 'repeat' }), sourceSale(3)];
+    const subject = { ...saleOptions().subject, vehicleId: 'repeat', sourceUrl: rows[1].sourceUrl };
+    const legacy = comparePriceToSourceSales(rows, saleOptions({ subject, minimumSales: 2 }));
+    expect(legacy.counts.eligibleSales).toBe(1);
+    const exact = comparePriceToSourceSales([...rows, { ...rows[1], vehicleId: 'alias' }], saleOptions({
+      subject: { ...subject, exclusionBasis: 'exact_source_episode' }, minimumSales: 2 }));
+    expect(exact.eligible.map(r => r.amount)).toEqual([1000, 3000]);
+    expect(exact.excluded).toHaveLength(1);
+    expect(exact.percentile).toBe(100);
+  });
+
+  it('withholds an unestablished episode comparison while preserving the source population', () => {
+    for (const subject of [
+      { ...saleOptions().subject, vehicleId: 'synthetic-1', exclusionBasis: 'unestablished' as const },
+      { ...saleOptions().subject, vehicleId: 'synthetic-1', sourceUrl: 'invalid', exclusionBasis: 'exact_source_episode' as const },
+    ]) {
+      const result = comparePriceToSourceSales(ten(), saleOptions({ subject }));
+      expect(result.counts.eligibleSales).toBe(10);
+      expect(result.reasons).toContain('subject_episode_unknown');
+      expect(result.percentile).toBeNull();
+    }
+  });
+
   it('excludes bids, unknown outcomes, junk amounts and invalid source dates', () => {
     const rows = [sourceSale(1, { outcome: 'not_sold' }), sourceSale(2, { outcome: 'unknown' }),
       sourceSale(3, { amount: Infinity }), sourceSale(4, { eventAt: '2025-02-30' }),
