@@ -101,8 +101,14 @@ UPDATE public.listing_page_snapshots SET fetched_at='2026-01-02T00:00:00Z',metad
 SELECT pg_temp.ok('late conflicting alias cannot change earlier known-at denominator',pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{stats,sold_count}'='10');
 
 SELECT pg_temp.base();
-SELECT pg_temp.seed(11,'{"source_number":"1","amount":1000,"status":"not_sold","parsed_status":"bid_to"}');
+SELECT pg_temp.seed(11,'{"source_number":"1","amount":1000,"status":"not_sold","parsed_status":"bid_to","html":"Bid to <strong>USD $1,000</strong> <span>on 6/15/25"}');
 SELECT pg_temp.ok('explicit unsold alias conflicts with sold result',pg_temp.read()#>>'{stats,sold_count}'='9' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='1');
+SELECT pg_temp.base();
+SELECT pg_temp.seed(11,'{"source_number":"1","amount":1000}');
+UPDATE public.vehicles SET sale_price=8000 WHERE id=md5('vehicle-11')::uuid;
+SELECT pg_temp.ok('mutable alias price cannot veto an agreeing protected source receipt',pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,exclusions,source_sale_conflict}'='1');
+UPDATE public.vehicles SET sale_status='not_sold' WHERE id=md5('vehicle-11')::uuid;
+SELECT pg_temp.ok('old source clock cannot date a new mutable outcome veto',pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='0');
 
 SELECT pg_temp.base();
 SELECT pg_temp.seed(11,'{"raw_currency":"UNKNOWN"}');

@@ -118,15 +118,19 @@ BEGIN
       FROM regexp_matches(CASE WHEN s.snapshot_matches IS TRUE THEN s.source_html END,
         '(Sold\s+for|Bid\s+to)\s+<strong>(\w+)\s*\$?([\d,]+)</strong>\s*<span[^>]*>on\s+(\d+/\d+/\d+)','ig') m
     ) r ON true
-  ), evidence AS MATERIALIZED (
+  ), source_fields AS MATERIALIZED (
     SELECT r.*,greatest(r.parsed_at,r.fetched_at) AS known_at,r.raw_currency AS currency,
       pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(r.source_html,'UTF8')),'hex')=r.source_sha256 AS source_hash_matches,
       CASE WHEN raw_price ~ '^([0-9]{1,3}(,[0-9]{3})+|[0-9]+)$'
         AND pg_input_is_valid(replace(raw_price,',',''),'numeric') THEN replace(raw_price,',','')::numeric END AS source_amount,
-      (r.date_parts[1]::integer=extract(month FROM r.sold_on)
-        AND r.date_parts[2]::integer=extract(day FROM r.sold_on)
-        AND (r.date_parts[3]=to_char(r.sold_on,'YYYY') OR r.date_parts[3]=to_char(r.sold_on,'YY'))) IS TRUE AS date_matches
+      CASE WHEN pg_input_is_valid(concat(
+        CASE WHEN length(date_parts[3])=2 THEN '20'||date_parts[3] ELSE date_parts[3] END,
+        '-',date_parts[1],'-',date_parts[2]),'date') THEN concat(
+        CASE WHEN length(date_parts[3])=2 THEN '20'||date_parts[3] ELSE date_parts[3] END,
+        '-',date_parts[1],'-',date_parts[2])::date END AS source_day
     FROM raw_sale r
+  ), evidence AS MATERIALIZED (
+    SELECT r.*,(r.source_day=r.sold_on) IS TRUE AS date_matches FROM source_fields r
   ), classified AS MATERIALIZED (
     SELECT e.*,CASE
       WHEN id=p_subject_vehicle_id OR source_key=v_subject_source_key THEN 'subject'
@@ -151,15 +155,15 @@ BEGIN
   ), source_groups AS MATERIALIZED (
     -- Disagreement within the declared event/knowledge boundary is unresolved.
     -- A later alias must not change an earlier evidence-as-of denominator.
-    SELECT source_key,
-      count(DISTINCT outcome) FILTER(WHERE outcome IN ('sold','reserve_not_met'))>1
-      OR count(DISTINCT sold_amount) FILTER(WHERE sold_basis IS NOT NULL)>1
-      OR count(DISTINCT sold_on) FILTER(WHERE sold_basis IS NOT NULL)>1
-      OR count(DISTINCT currency) FILTER(WHERE sold_basis IS NOT NULL)>1 AS conflicting
-    FROM classified WHERE source_key IS NOT NULL AND known_at<=v_known
+    SELECT source_key,count(DISTINCT raw_status)>1 OR count(DISTINCT source_amount)>1
+      OR count(DISTINCT source_day)>1 OR count(DISTINCT currency)>1 AS conflicting
+    FROM classified WHERE source_key IS NOT NULL AND snapshot_matches IS TRUE AND source_hash_matches IS TRUE
+      AND claim_count=1 AND raw_status IN ('sold','bid_to') AND source_amount>0 AND source_day IS NOT NULL
+      AND source_url ~* '^https?://(www\.)?bringatrailer\.com/listing/[^/?#]+/?([?#].*)?$'
+      AND source_day::timestamptz>=v_from AND (source_day+1)::timestamptz<=v_before
+      AND currency IN ('USD','EUR','GBP') AND known_at<=v_known
       AND parsed_at IS NOT NULL AND fetched_at IS NOT NULL AND fetched_at<=parsed_at
-      AND exclusion IS DISTINCT FROM 'outside_event_window'
-      AND exclusion IS DISTINCT FROM 'subject'
+      AND fetched_at>=source_day::timestamptz AND exclusion IS DISTINCT FROM 'subject'
     GROUP BY source_key
   ), coherent AS MATERIALIZED (
     SELECT c.* FROM classified c JOIN source_groups g USING(source_key)
