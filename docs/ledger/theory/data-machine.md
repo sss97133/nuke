@@ -1,5 +1,16 @@
 # DATA MACHINE — theory card
 
+## Construction direction, owner priority 2026-10-04
+
+The worked examples below are a construction brief, not a ceiling or evidence that Nuke is complete.
+Recurring engineering should develop missing structure and useful answers from existing testimony:
+useful question → source testimony → canonical entity relationships → current/replayable measurement
+→ reader or downstream consumer. Each bounded capability names its grain, keys, event and ingest
+clocks, writer and executable acceptance assay. Extend this brief and the case ledger as behavior is
+proved, retaining dated owner intent and exact implementation, test, merge, deployment and runtime
+stages. A masked current reader may expose useful work history while lacking the clocks and fields
+needed for a historical financial model; record that boundary rather than inventing the missing inputs.
+
 Promoted by the owner on 2026-09-30 as "the absolute most important thing": the database structure, its vocabulary,
 and how the owner and every agent talk about it. Read this before designing any table, feature, cohort or prediction.
 
