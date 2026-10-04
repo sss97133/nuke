@@ -643,6 +643,320 @@ export function comparePriceToSourceSales(rows: readonly DatedSourceSale[], opts
   };
 }
 
+export interface SaleCaptureRef { table: string; id: string }
+
+export const SALE_RELEVANCE_DIMENSIONS = [
+  'make', 'model', 'comparison_group', 'model_year', 'engine', 'transmission',
+  'body_style', 'condition', 'region', 'provenance',
+] as const;
+export type SaleRelevanceDimension = typeof SALE_RELEVANCE_DIMENSIONS[number];
+
+/** An attributed fact about this listing episode, not a current vehicle-row fact. */
+export interface SaleRelevanceClaim {
+  dimension: SaleRelevanceDimension;
+  value: string | null;
+  sourcePlatform: string | null;
+  sourceEpisodeKey: string | null;
+  knownAt: string | null;
+  basis: string | null;
+  evidenceRefs: readonly SaleCaptureRef[];
+}
+
+/**
+ * Existing readers supply candidates and independently supported qualifications.
+ * The pure selector neither admits archived material nor promotes a native row.
+ * Native created_at/updated_at do not establish the claim's knownAt.
+ */
+export interface SourceSaleCapture extends DatedSourceSale {
+  capture: SaleCaptureRef;
+  sourcePlatform: string | null;
+  sourceEpisodeKey: string | null;
+  eventGrain: 'day' | 'instant' | null;
+  eventTimeBasis: string | null;
+  knownAtEvidence: string | null;
+  qualification: {
+    status: 'qualified' | 'candidate' | 'refused';
+    basis: string | null;
+    evidenceRefs: readonly SaleCaptureRef[];
+  };
+  relevance: readonly SaleRelevanceClaim[];
+}
+
+export interface SalePopulationOptions {
+  population: { key: string; label: string; basis: string; complete: boolean };
+  subject: {
+    sourcePlatform: string | null;
+    sourceEpisodeKey: string | null;
+    vehicleId: string | null;
+    currency: string | null;
+    priceBasis: DatedSourceSale['priceBasis'];
+    relevance: readonly SaleRelevanceClaim[];
+  };
+  /** Explicit matching policy; no default year-first trim or inferred weights. */
+  policy: { key: string; basis: string; requiredDimensions: readonly SaleRelevanceDimension[] };
+  eventFrom: string;
+  eventBefore: string;
+  evidenceAsOf: string;
+  computedAt: string;
+  knowledgeMode: 'retrospective' | 'known_at';
+  minimumMatchedSales: number;
+}
+
+export type SalePopulationExclusion = 'capture_ref_unknown' | 'source_unknown' | 'candidate_unqualified'
+  | 'qualification_refused' | 'qualification_evidence_unknown' | 'event_unknown' | 'event_grain_conflict'
+  | 'outside_event_window' | 'knowledge_unknown' | 'knowledge_conflicting' | 'learned_later'
+  | 'outcome_unknown' | 'not_sold' | 'price_unknown' | 'unknown_units' | 'invalid_cutoffs';
+
+export interface QualifiedSaleEpisode {
+  sourceKey: string;
+  sourcePlatform: string;
+  sourceEpisodeKey: string;
+  vehicleId: string | null;
+  sourceUrls: string[];
+  amount: number;
+  currency: string;
+  priceBasis: NonNullable<DatedSourceSale['priceBasis']>;
+  eventAt: string;
+  eventGrain: 'day' | 'instant';
+  eventInterval: { from: string; before: string };
+  knownAt: string;
+  /** Every agreeing presentation, including independent snapshot refs. */
+  captures: SourceSaleCapture[];
+}
+
+const lexical = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
+const refKey = (r: SaleCaptureRef): string => JSON.stringify([r.table, r.id]);
+const validRef = (r: SaleCaptureRef): boolean => !!r.table?.trim() && !!r.id?.trim();
+const episodeKey = (platform: string | null, key: string | null): string | null =>
+  platform?.trim() && key?.trim() ? JSON.stringify([platform, key]) : null;
+
+/** Object property order must not decide which capture is displayed first. */
+function saleStableKey(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(saleStableKey).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => lexical(a, b))
+    .map(([k, v]) => `${JSON.stringify(k)}:${saleStableKey(v)}`).join(',')}}`;
+  return JSON.stringify(value) ?? 'undefined';
+}
+
+/** BaT's known aliases collapse; other sources retain query-based lot identity. */
+function populationSourceKey(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    const path = url.pathname.replace(/\/+$/, '');
+    if (!path) return null;
+    if (host === 'bringatrailer.com' && /^\/listing\/[^/]+$/i.test(path)) return `${host}${path.toLowerCase()}`;
+    url.searchParams.sort();
+    return `${host}${url.port ? `:${url.port}` : ''}${path}${url.search}`;
+  } catch { return null; }
+}
+
+/** Preserve sub-millisecond DB clocks; Date alone would admit evidence learned later. */
+function populationEventInterval(raw: string | null): [bigint, bigint] | null {
+  const parsed = sourceEventInterval(raw);
+  if (!parsed || !raw) return null;
+  if (parsed[0] !== parsed[1]) return [BigInt(parsed[0]) * 1_000_000n, BigInt(parsed[1]) * 1_000_000n];
+  const time = raw.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,9}))?(?:Z|[+-]\d{2}:\d{2})$/);
+  if (!time) return null;
+  const nanos = BigInt((time[1] ?? '').padEnd(9, '0')) % 1_000_000n;
+  const instant = BigInt(parsed[0]) * 1_000_000n + nanos;
+  return [instant, instant];
+}
+
+function saleInstant(raw: string | null): bigint | null {
+  const interval = populationEventInterval(raw);
+  return interval && interval[0] === interval[1] ? interval[0] : null;
+}
+
+function populationTime(instant: bigint): string {
+  // Division truncates toward zero; Date needs the floor for pre-epoch instants.
+  const milliseconds = instant / 1_000_000n - (instant < 0n && instant % 1_000_000n !== 0n ? 1n : 0n);
+  const nanos = (instant % 1_000_000_000n + 1_000_000_000n) % 1_000_000_000n;
+  const fraction = nanos.toString().padStart(9, '0').replace(/0+$/, '').padEnd(3, '0');
+  return `${new Date(Number(milliseconds)).toISOString().slice(0, 19)}.${fraction}Z`;
+}
+
+function continuousSaleSummary(values: readonly number[]): Summary {
+  const ordered = [...values].sort((a, b) => a - b);
+  const q = (p: number) => {
+    if (!ordered.length) return null;
+    const rank = (ordered.length - 1) * p, lower = Math.floor(rank), upper = Math.ceil(rank);
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * (rank - lower);
+  };
+  return { n: ordered.length, min: ordered[0] ?? null, max: ordered[ordered.length - 1] ?? null,
+    p10: q(.1), p25: q(.25), p50: q(.5), p75: q(.75), p90: q(.9) };
+}
+
+/**
+ * V2 population contract, deliberately not wired to /valuation yet.
+ * No input cap, price floor, inferred cohort, weighting or under/over conclusion.
+ * Broad unit strata and explicitly matched sales are different denominators.
+ */
+export function selectSourceSalePopulation(rows: readonly SourceSaleCapture[], opts: SalePopulationOptions) {
+  const from = populationEventInterval(opts.eventFrom)?.[0], before = populationEventInterval(opts.eventBefore)?.[0];
+  const asOf = saleInstant(opts.evidenceAsOf), computed = saleInstant(opts.computedAt);
+  const reasons: string[] = [];
+  const validCutoffs = from != null && before != null && asOf != null && computed != null
+    && from < before && before <= computed && asOf <= computed
+    && (opts.knowledgeMode !== 'known_at' || asOf <= before);
+  if (!validCutoffs) reasons.push('invalid_cutoffs');
+  if (!opts.population.complete) reasons.push('population_incomplete');
+  if (!opts.population.key.trim() || !opts.population.basis.trim()) reasons.push('population_scope_unknown');
+  const required = [...new Set(opts.policy.requiredDimensions)].sort(lexical);
+  const validPolicy = !!opts.policy.key.trim() && !!opts.policy.basis.trim() && required.length > 0
+    && required.every(d => SALE_RELEVANCE_DIMENSIONS.includes(d));
+  if (!validPolicy) reasons.push('matching_policy_unknown');
+  if (!Number.isInteger(opts.minimumMatchedSales) || opts.minimumMatchedSales < 2) reasons.push('invalid_minimum');
+  const subjectKey = episodeKey(opts.subject.sourcePlatform, opts.subject.sourceEpisodeKey);
+  if (!subjectKey) reasons.push('subject_episode_unknown');
+  if (!opts.subject.currency || !opts.subject.priceBasis) reasons.push('subject_units_unknown');
+
+  const ordered = [...rows].sort((a, b) => lexical(refKey(a.capture), refKey(b.capture)) || lexical(saleStableKey(a), saleStableKey(b)));
+  const candidates = new Map<string, { sourceKey: string; captures: SourceSaleCapture[];
+    excluded: Array<{ capture: SaleCaptureRef; reason: SalePopulationExclusion }> }>();
+  const admitted = new Map<string, SourceSaleCapture[]>();
+  for (const row of ordered) {
+    const key = episodeKey(row.sourcePlatform, row.sourceEpisodeKey);
+    // Unknown identity stays separate by presentation; no invented vehicle episode.
+    const auditKey = key ?? `unresolved:${refKey(row.capture)}`;
+    const candidate = candidates.get(auditKey) ?? { sourceKey: auditKey, captures: [], excluded: [] };
+    candidate.captures.push(row); candidates.set(auditKey, candidate);
+    const reject = (reason: SalePopulationExclusion) => candidate.excluded.push({ capture: { ...row.capture }, reason });
+    if (!validRef(row.capture)) { reject('capture_ref_unknown'); continue; }
+    if (!key || !populationSourceKey(row.sourceUrl)) { reject('source_unknown'); continue; }
+    if (!validCutoffs) { reject('invalid_cutoffs'); continue; }
+    if (row.qualification.status !== 'qualified') {
+      reject(row.qualification.status === 'refused' ? 'qualification_refused' : 'candidate_unqualified'); continue;
+    }
+    if (!row.qualification.basis?.trim() || !row.qualification.evidenceRefs.length
+      || row.qualification.evidenceRefs.some(r => !validRef(r))) { reject('qualification_evidence_unknown'); continue; }
+    const interval = populationEventInterval(row.eventAt);
+    if (!interval || !row.eventTimeBasis?.trim()) { reject('event_unknown'); continue; }
+    if (row.eventGrain !== (interval[0] === interval[1] ? 'instant' : 'day')) { reject('event_grain_conflict'); continue; }
+    const known = saleInstant(row.knownAt);
+    if (known == null || !row.knownAtEvidence?.trim()) { reject('knowledge_unknown'); continue; }
+    if (known < interval[0]) { reject('knowledge_conflicting'); continue; }
+    if (known > asOf!) { reject('learned_later'); continue; }
+    if (interval[0] < from! || interval[0] >= before! || interval[1] > before!) { reject('outside_event_window'); continue; }
+    if (row.outcome === 'unknown') { reject('outcome_unknown'); continue; }
+    // A supported no-sale outcome can contradict a sold claim even when the
+    // source reports no amount or units. It never becomes a price comparable.
+    if (row.outcome === 'not_sold') {
+      const group = admitted.get(key) ?? []; group.push(row); admitted.set(key, group); continue;
+    }
+    if (row.amount == null || !Number.isFinite(row.amount) || row.amount <= 0) { reject('price_unknown'); continue; }
+    if (!row.currency || !/^[A-Z]{3}$/.test(row.currency) || !row.priceBasis
+      || populationSourceKey(row.unitSource) !== populationSourceKey(row.sourceUrl)) { reject('unknown_units'); continue; }
+    const group = admitted.get(key) ?? []; group.push(row); admitted.set(key, group);
+  }
+
+  const conflicts: Array<{ sourceKey: string; dimensions: string[]; captures: SourceSaleCapture[] }> = [];
+  const qualified: QualifiedSaleEpisode[] = [];
+  for (const [sourceKey, captures] of [...admitted].sort(([a], [b]) => lexical(a, b))) {
+    const changed: string[] = [];
+    for (const field of ['outcome', 'amount', 'currency', 'priceBasis'] as const) {
+      if (new Set(captures.map(r => r[field]).filter(value => value != null)).size > 1) changed.push(field);
+    }
+    if (new Set(captures.map(r => populationEventInterval(r.eventAt)?.map(String).join(':'))).size > 1) changed.push('event');
+    if (new Set(captures.map(r => populationSourceKey(r.sourceUrl))).size > 1) changed.push('source_url');
+    const vehicles = [...new Set(captures.map(r => r.vehicleId).filter((id): id is string => !!id))].sort(lexical);
+    if (vehicles.length > 1) changed.push('vehicle_identity');
+    if (changed.length) { conflicts.push({ sourceKey, dimensions: changed, captures }); continue; }
+    const first = captures[0];
+    if (first.outcome !== 'sold') {
+      for (const row of captures) candidates.get(sourceKey)!.excluded.push({ capture: { ...row.capture }, reason: 'not_sold' });
+      continue;
+    }
+    const interval = populationEventInterval(first.eventAt)!;
+    const earliestKnown = captures.map(r => saleInstant(r.knownAt)!).reduce((a, b) => a < b ? a : b);
+    qualified.push({ sourceKey, sourcePlatform: first.sourcePlatform!, sourceEpisodeKey: first.sourceEpisodeKey!,
+      vehicleId: vehicles[0] ?? null, sourceUrls: [...new Set(captures.map(r => r.sourceUrl!))].sort(lexical),
+      amount: first.amount!, currency: first.currency!, priceBasis: first.priceBasis!,
+      eventAt: first.eventGrain === 'day' ? first.eventAt! : populationTime(interval[0]), eventGrain: first.eventGrain!,
+      eventInterval: { from: populationTime(interval[0]), before: populationTime(interval[1]) },
+      knownAt: populationTime(earliestKnown), captures });
+  }
+
+  const claimsFor = (claims: readonly SaleRelevanceClaim[], platform: string | null, key: string | null, dimension: SaleRelevanceDimension) => {
+    const sourceClaims = claims.filter(c => c.dimension === dimension).sort((a, b) => lexical(saleStableKey(a), saleStableKey(b)));
+    const available: SaleRelevanceClaim[] = [], unavailable: Array<{ claim: SaleRelevanceClaim; reason: string }> = [];
+    for (const claim of sourceClaims) {
+      const known = saleInstant(claim.knownAt);
+      const reason = !platform || !key || claim.sourcePlatform !== platform || claim.sourceEpisodeKey !== key ? 'episode_unbound'
+        : !claim.value?.trim() ? 'value_unknown'
+        : !claim.basis?.trim() || !claim.evidenceRefs.length || claim.evidenceRefs.some(r => !validRef(r)) ? 'evidence_unknown'
+        : known == null ? 'knowledge_unknown' : asOf == null || known > asOf ? 'learned_later' : null;
+      if (reason) unavailable.push({ claim, reason }); else available.push(claim);
+    }
+    const values = [...new Set(available.map(c => c.value!))].sort(lexical);
+    return { values, available, unavailable };
+  };
+  const comparisons = qualified.map(event => {
+    const dimensions = SALE_RELEVANCE_DIMENSIONS.map(dimension => {
+      const subject = claimsFor(opts.subject.relevance, opts.subject.sourcePlatform, opts.subject.sourceEpisodeKey, dimension);
+      const candidate = claimsFor(event.captures.flatMap(c => [...c.relevance]), event.sourcePlatform, event.sourceEpisodeKey, dimension);
+      const state = subject.values.length > 1 || candidate.values.length > 1 ? 'conflict'
+        : !subject.values.length || !candidate.values.length ? 'unknown'
+        : subject.values[0] === candidate.values[0] ? 'match' : 'mismatch';
+      return { dimension, required: required.includes(dimension), state, subject, candidate };
+    });
+    const refusal: string[] = [];
+    if (!validPolicy) refusal.push('matching_policy_unknown');
+    if (event.sourceKey === subjectKey) refusal.push('subject_episode');
+    if (event.currency !== opts.subject.currency || event.priceBasis !== opts.subject.priceBasis) refusal.push('different_units');
+    for (const dimension of dimensions.filter(d => d.required && d.state !== 'match')) refusal.push(`${dimension.dimension}:${dimension.state}`);
+    return { event, dimensions, reasons: refusal, matched: refusal.length === 0 };
+  });
+  const matched = comparisons.filter(c => c.matched).map(c => c.event);
+  if (matched.length < opts.minimumMatchedSales) reasons.push('insufficient_matched_sales');
+
+  const strata = new Map<string, { currency: string; priceBasis: QualifiedSaleEpisode['priceBasis']; events: QualifiedSaleEpisode[] }>();
+  for (const event of qualified.filter(e => e.sourceKey !== subjectKey)) {
+    const key = JSON.stringify([event.currency, event.priceBasis]);
+    const stratum = strata.get(key) ?? { currency: event.currency, priceBasis: event.priceBasis, events: [] };
+    stratum.events.push(event); strata.set(key, stratum);
+  }
+  // Population baselines precede subject matching; an absent subject does not
+  // invalidate a complete, time-qualified and separately unit-stratified pool.
+  const baselineRefusals = reasons.filter(r => ['invalid_cutoffs', 'population_incomplete', 'population_scope_unknown'].includes(r));
+  const broadMarket = [...strata].sort(([a], [b]) => lexical(a, b)).map(([, stratum]) => ({ ...stratum,
+    reasons: [...baselineRefusals], distribution: baselineRefusals.length ? null : continuousSaleSummary(stratum.events.map(e => e.amount)) }));
+
+  const byVehicle = new Map<string, QualifiedSaleEpisode[]>();
+  for (const event of qualified) if (event.vehicleId) {
+    const group = byVehicle.get(event.vehicleId) ?? []; group.push(event); byVehicle.set(event.vehicleId, group);
+  }
+  const repeatSales: Array<{ vehicleId: string; from: QualifiedSaleEpisode; to: QualifiedSaleEpisode;
+    reasons: string[]; nominalAmountChange: number | null; nominalPercentChange: number | null }> = [];
+  for (const [vehicleId, group] of [...byVehicle].sort(([a], [b]) => lexical(a, b))) {
+    group.sort((a, b) => {
+      const first = saleInstant(a.eventInterval.from)!, second = saleInstant(b.eventInterval.from)!;
+      return (first < second ? -1 : first > second ? 1 : 0) || lexical(a.sourceKey, b.sourceKey);
+    });
+    for (let i = 1; i < group.length; i++) {
+      const earlier = group[i - 1], later = group[i], refusal: string[] = [];
+      if (saleInstant(earlier.eventInterval.before)! > saleInstant(later.eventInterval.from)!
+        || saleInstant(earlier.eventInterval.from)! === saleInstant(later.eventInterval.from)!) refusal.push('event_order_unknown');
+      if (earlier.currency !== later.currency || earlier.priceBasis !== later.priceBasis) refusal.push('different_units');
+      const change = refusal.length ? null : later.amount - earlier.amount;
+      repeatSales.push({ vehicleId, from: earlier, to: later, reasons: refusal, nominalAmountChange: change,
+        nominalPercentChange: change == null ? null : 100 * change / earlier.amount });
+    }
+  }
+
+  return { method: 'source_sale_population_selection_v2' as const,
+    population: { ...opts.population }, policy: { ...opts.policy, requiredDimensions: required }, subject: opts.subject,
+    eventFrom: opts.eventFrom, eventBefore: opts.eventBefore, evidenceAsOf: opts.evidenceAsOf, computedAt: opts.computedAt, knowledgeMode: opts.knowledgeMode,
+    priceAdjustment: 'nominal_original_currency_no_fees_fx_or_inflation' as const,
+    conditionAdjustedAssessment: 'unmeasured' as const, repeatSaleInterpretation: 'observed_episode_price_change_not_market_index_return' as const,
+    reasons, counts: { inputCaptures: rows.length, candidateEpisodes: candidates.size, qualifiedEpisodes: qualified.length,
+      conflictedEpisodes: conflicts.length, matchedEpisodes: matched.length },
+    candidates: [...candidates.values()].sort((a, b) => lexical(a.sourceKey, b.sourceKey)), conflicts, qualified,
+    broadMarket, comparisons, matched, matchedDistribution: reasons.length ? null : continuousSaleSummary(matched.map(e => e.amount)), repeatSales };
+}
+
 export function fmtMoney(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return 'n/a';
   return `$${Math.round(n).toLocaleString('en-US')}`;
