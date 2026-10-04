@@ -40,11 +40,13 @@ const sources = new Map([
 
 function fixture(options = {}) {
   const requests = [], modelPrompts = [], intake = [], cacheWrites = [];
+  const successfulIntake = new Map();
   const rows = {
     vehicles: [options.vehicle ?? vehicle],
     vehicle_observations: options.observations ?? [observation],
     extraction_metadata: options.metadata ?? [],
-    description_discoveries: options.cached ? [{ id: 'existing-cache', vehicle_id: vehicleId, keys_found: 4 }] : [],
+    description_discoveries: options.cached ? [{ id: 'existing-cache', vehicle_id: vehicleId, keys_found: 4,
+      raw_extraction: options.cacheArtifact ? { __description_condition_extraction: options.cacheArtifact } : {} }] : [],
   };
   const env = { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'svc-test',
     ...(options.noModelKey ? {} : { KIMI_API_KEY: 'model-test' }) };
@@ -73,7 +75,12 @@ function fixture(options = {}) {
       if (options.intakeFailure || (options.conditionFailure && body.kind === 'condition')) {
         return Response.json({ error: 'Synthetic intake refusal' }, { status: options.intakeHttpOk ? 200 : 500 });
       }
-      return Response.json({ success: true, observation_id: `inferred-${intake.length}`, duplicate: false });
+      const hash = await load('hash').observationContentHash(body);
+      const existing = successfulIntake.get(hash);
+      if (existing) return Response.json({ success: true, observation_id: existing, duplicate: true });
+      const id = `inferred-${successfulIntake.size + 1}`;
+      successfulIntake.set(hash, id);
+      return Response.json({ success: true, observation_id: id, duplicate: false });
     }
     if (url.pathname.endsWith('/functions/v1/discover-description-data')) {
       assert.fail('A single-vehicle or refused batch must not start continuation');
@@ -94,6 +101,7 @@ function fixture(options = {}) {
       assert.ok(intake.some(row => row.kind === 'specification'), 'Cache success follows awaited specification intake');
       assert.ok(!headers.get('prefer')?.includes('resolution=merge-duplicates'), 'Cached discoveries are not overwritten');
       cacheWrites.push(body);
+      rows.description_discoveries.push({ ...body, id: 'new-cache' });
       return new Response(null, { status: 201 });
     }
     assert.equal(method, 'GET');
@@ -152,7 +160,8 @@ function fixture(options = {}) {
     }));
     return { status: response.status, result: await response.json() };
   }
-  return { run, requests, modelPrompts, intake, cacheWrites, input: load('input'), hash: load('hash') };
+  return { run, requests, modelPrompts, intake, cacheWrites, successfulIntake,
+    input: load('input'), hash: load('hash') };
 }
 
 test('normal miner sends the entire preserved source to both passes, then awaits cited inferred intake', async () => {
@@ -176,6 +185,8 @@ test('normal miner sends the entire preserved source to both passes, then awaits
     assert.equal(claim.structured_data.is_inferred, true);
     assert.equal(claim.agent_inferred, true);
     assert.equal(claim.defer_analysis, true);
+    assert.equal(claim.structured_data.source_completeness, 'unknown');
+    assert.equal(claim.structured_data.miner_input_truncated, false);
   }
   assert.equal(f.intake.find(row => row.kind === 'condition').citation.excerpt, quote);
   assert.equal(f.intake.find(row => row.kind === 'specification').citation.excerpt, fullText);
@@ -278,6 +289,15 @@ test('newer explicit full metadata is used instead of an observation summary', a
   assert.ok(f.intake.every(row => row.raw_source_ref === 'extraction_metadata:raw-capture'));
 });
 
+test('a 480-char structured summary cannot hide fuller content from the same capture', async () => {
+  const f = fixture({ observations: [{ ...observation, structured_data: { description: fullText.slice(0, 480) } }] });
+  const { result } = await f.run({ vehicle_id: vehicleId });
+  assert.equal(result.discovered, 1);
+  assert.ok(f.modelPrompts.every(prompt => prompt.includes(fullText)));
+  assert.ok(f.intake.every(row => row.structured_data.source_text_field === 'vehicle_observations.content_text'));
+  assert.ok(f.intake.every(row => row.structured_data.source_completeness === 'unknown'));
+});
+
 test('a source outside the five recent candidates is unavailable, rather than pretending complete coverage', async () => {
   const f = fixture({ observations: [observation, ...Array.from({ length: 5 }, (_, i) => ({ ...observation,
     id: `other-${i}`, source_url: `https://other.invalid/${i}`, observed_at: `2020-02-0${i + 1}T00:00:00Z` }))] });
@@ -311,6 +331,51 @@ test('conditions must quote source verbatim; refusal is reported without blockin
   assert.equal(result.condition_errors, 1);
   assert.equal(result.conditions_ingested, 0);
   assert.ok(f.intake.every(row => row.kind !== 'condition'));
+});
+
+test('partial condition intake retries from the retained artifact without model calls, cache overwrites or duplicate assessments', async () => {
+  const options = { conditionFailure: true };
+  const f = fixture(options);
+  const first = await f.run({ vehicle_id: vehicleId });
+  assert.equal(first.result.discovered, 1);
+  assert.equal(first.result.condition_errors, 1);
+  assert.equal(first.result.condition_retries[0].cached_conditions_only, true);
+  assert.equal(f.successfulIntake.size, 1);
+  assert.equal(f.cacheWrites.length, 1);
+  const retainedCache = JSON.stringify(f.cacheWrites[0]);
+  assert.ok(f.cacheWrites[0].raw_extraction.__description_condition_extraction.conditions.length > 0);
+  options.conditionFailure = false;
+  const retry = await f.run(first.result.condition_retries[0]);
+  assert.equal(retry.result.cached_condition_passes, 1);
+  assert.equal(retry.result.conditions_ingested, 1);
+  assert.equal(f.modelPrompts.length, 2, 'Only the initial normal request pays for its two passes');
+  assert.equal(f.successfulIntake.size, 2);
+  const repeated = await f.run({ mode: 'condition_backfill', vehicle_id: vehicleId });
+  assert.equal(repeated.result.conditions_ingested, 0);
+  assert.equal(repeated.result.conditions_replayed, 1);
+  assert.equal(f.successfulIntake.size, 2, 'Canonical content hash returns the same condition on replay');
+  assert.equal(f.cacheWrites.length, 1);
+  assert.equal(JSON.stringify(f.cacheWrites[0]), retainedCache);
+});
+
+test('matching cached condition output works with no model key; changed source content is not reused', async () => {
+  const f = fixture({ noModelKey: true });
+  const input = { text: fullText, sourceRef: 'vehicle_observations:original-capture', sourceUrl: listingUrl,
+    observedAt: eventTime, ingestedAt: captureTime, textField: 'vehicle_observations.content_text' };
+  const artifact = await f.input.conditionExtractionArtifact(input, [{ quote }], 'original-model');
+  const cached = fixture({ cached: true, noModelKey: true, cacheArtifact: JSON.parse(JSON.stringify(artifact)) });
+  const replay = await cached.run({ mode: 'condition_backfill', vehicle_id: vehicleId });
+  assert.equal(replay.result.cached_condition_passes, 1);
+  assert.equal(replay.result.conditions_ingested, 1);
+  assert.equal(cached.modelPrompts.length + cached.cacheWrites.length, 0);
+  assert.equal(cached.intake[0].agent_model, 'original-model');
+  for (const changed of [{ content_text: `${fullText} Changed.` }, { id: 'relinked' }, { observed_at: captureTime }]) {
+    const stale = fixture({ cached: true, cacheArtifact: artifact,
+      observations: [{ ...observation, ...changed }] });
+    const result = await stale.run({ mode: 'condition_backfill', vehicle_id: vehicleId, cached_conditions_only: true });
+    assert.match(result.result.error_details[0], /retry refused without inference/);
+    assert.equal(stale.modelPrompts.length + stale.intake.length + stale.cacheWrites.length, 0);
+  }
 });
 
 test('truncated or malformed model output cannot become a successful cache record', async () => {

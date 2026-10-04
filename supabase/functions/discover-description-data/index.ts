@@ -14,8 +14,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
-import { conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
-  loadDescriptionInput, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
+import { conditionExtractionArtifact, conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
+  loadDescriptionInput, requireCompleteInput, reusableConditionExtraction, type DescriptionInput } from "./descriptionInput.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -313,8 +313,9 @@ async function ingestConditionObservations(
   serviceKey: string,
   modelUsed: string,
   input: DescriptionInput,
-): Promise<{ ingested: number; errors: number }> {
+): Promise<{ ingested: number; duplicates: number; errors: number }> {
   let ingested = 0;
+  let duplicates = 0;
   let errors = 0;
 
   for (const condition of conditions) {
@@ -330,7 +331,8 @@ async function ingestConditionObservations(
 
       const result = await resp.json().catch(() => null);
       if (resp.ok && result?.success === true && result?.observation_id) {
-        ingested++;
+        if (result.duplicate === true) duplicates++;
+        else ingested++;
       } else {
         errors++;
         console.error(`[discover-desc] Ingest refused condition for ${vehicleId} (HTTP ${resp.status})`);
@@ -341,7 +343,7 @@ async function ingestConditionObservations(
     }
   }
 
-  return { ingested, errors };
+  return { ingested, duplicates, errors };
 }
 
 Deno.serve(async (req) => {
@@ -400,7 +402,7 @@ Deno.serve(async (req) => {
     }
 
     const hasAnyKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
-    if (!hasAnyKey) {
+    if (!hasAnyKey && mode !== "condition_backfill") {
       throw new Error("No LLM API key configured (need KIMI_API_KEY, XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
     }
 
@@ -443,7 +445,9 @@ Deno.serve(async (req) => {
       console.log(`[discover-desc] Condition backfill: ${backfillVehicles.length} vehicles`);
 
       let totalIngested = 0;
+      let totalDuplicates = 0;
       let totalErrors = 0;
+      let cachedPasses = 0;
       const errorDetails: string[] = [];
       const startTime = Date.now();
 
@@ -452,12 +456,22 @@ Deno.serve(async (req) => {
         try {
           const input = await loadDescriptionInput(supabase, vehicle);
           if (input.text.length < 500) throw new Error("Preserved source too short for condition backfill");
-          const { conditions, model: condModel } = await extractConditionsWithLLM(input.text, vehicle);
+          const { data: cache, error: cacheError } = await supabase.from("description_discoveries")
+            .select("raw_extraction").eq("vehicle_id", vehicle.id).maybeSingle();
+          if (cacheError) throw new Error("Condition cache lookup failed; inference refused");
+          const cached = await reusableConditionExtraction(cache?.raw_extraction, input);
+          if (!cached && body.cached_conditions_only === true) {
+            throw new Error("Cached condition output missing or changed; retry refused without inference");
+          }
+          if (!cached && !hasAnyKey) throw new Error("No reusable condition output or configured model key");
+          const { conditions, model: condModel } = cached || await extractConditionsWithLLM(input.text, vehicle);
+          if (cached) cachedPasses++;
           console.log(`[discover-desc] ${vehicle.id}: LLM=${condModel}, ${conditions.length} conditions, input=${input.text.length} chars`);
-          const { ingested, errors: errs } = await ingestConditionObservations(
+          const { ingested, duplicates, errors: errs } = await ingestConditionObservations(
             vehicle.id, conditions, supabaseUrl, serviceKey, condModel, input
           );
           totalIngested += ingested;
+          totalDuplicates += duplicates;
           totalErrors += errs;
           console.log(`[discover-desc] Backfill ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${ingested} ingested, ${errs} errors`);
         } catch (e: any) {
@@ -502,7 +516,9 @@ Deno.serve(async (req) => {
         mode: "condition_backfill",
         processed: backfillVehicles.length,
         conditions_ingested: totalIngested,
+        conditions_replayed: totalDuplicates,
         condition_errors: totalErrors,
+        cached_condition_passes: cachedPasses,
         error_details: errorDetails,
         remaining,
         continued: shouldContinue && hasMore && totalIngested > 0,
@@ -562,7 +578,9 @@ Deno.serve(async (req) => {
       error_details: [] as string[],
       samples: [] as any[],
       conditions_ingested: 0,
+      conditions_replayed: 0,
       condition_errors: 0,
+      condition_retries: [] as any[],
     };
 
     for (let i = 0; i < vehicles.length; i += PARALLEL) {
@@ -583,9 +601,11 @@ Deno.serve(async (req) => {
         const totalFields = countFields(discovered);
 
         // --- Pass 2: Condition extraction (new) ---
-        let conditionResult = { ingested: 0, errors: 0 };
+        let conditionResult = { ingested: 0, duplicates: 0, errors: 0 };
+        let conditionArtifact = null;
         try {
           const { conditions, model: condModel2 } = await extractConditionsWithLLM(input.text, vehicle);
+          conditionArtifact = await conditionExtractionArtifact(input, conditions, condModel2);
           conditionResult = await ingestConditionObservations(
             vehicle.id, conditions, supabaseUrl, serviceKey, condModel2, input
           );
@@ -616,12 +636,13 @@ Deno.serve(async (req) => {
           .insert({
             vehicle_id: vehicle.id,
             discovered_at: new Date().toISOString(),
-            raw_extraction: discovered,
+            raw_extraction: { ...discovered,
+              ...(conditionArtifact ? { __description_condition_extraction: conditionArtifact } : {}) },
             keys_found: keysFound,
             total_fields: totalFields,
             description_length: input.text.length,
             model_used: discModel,
-            prompt_version: "full-preserved-source-v1",
+            prompt_version: "full-preserved-source-v2",
             sale_price: vehicle.sale_price,
           });
 
@@ -637,6 +658,8 @@ Deno.serve(async (req) => {
         return {
           success: true,
           conditionResult,
+          conditionRetry: conditionResult.errors > 0 ? { mode: "condition_backfill", vehicle_id: vehicle.id,
+            continue: false, cached_conditions_only: conditionArtifact !== null } : null,
           sample: {
             vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
             price: vehicle.sale_price,
@@ -653,7 +676,9 @@ Deno.serve(async (req) => {
         if (r.status === "fulfilled" && r.value.success) {
           results.discovered++;
           results.conditions_ingested += r.value.conditionResult?.ingested || 0;
+          results.conditions_replayed += r.value.conditionResult?.duplicates || 0;
           results.condition_errors += r.value.conditionResult?.errors || 0;
+          if (r.value.conditionRetry) results.condition_retries.push(r.value.conditionRetry);
           if (results.samples.length < 3) results.samples.push(r.value.sample);
         } else {
           results.errors++;

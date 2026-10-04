@@ -8,6 +8,7 @@ export interface DescriptionInput {
   sourceUrl: string;
   observedAt: string | null;
   ingestedAt: string;
+  textField?: string;
 }
 
 function urlKey(value: unknown): string | null {
@@ -77,15 +78,24 @@ export async function loadDescriptionInput(
     // Metadata records an extraction clock, not the listing's publication/event
     // clock. Do not manufacture one from a different read of the same URL.
     return requireCompleteInput({ text: raw.field_value, sourceRef: `extraction_metadata:${raw.id}`,
-      sourceUrl: raw.source_url, observedAt: null, ingestedAt: raw.extracted_at });
+      sourceUrl: raw.source_url, observedAt: null, ingestedAt: raw.extracted_at,
+      textField: "extraction_metadata.field_value" });
   }
   if (source) {
     const data = source.structured_data || {};
-    const text = data.raw_description || data.description || source.content_text;
+    // These fields have no enforced completeness contract. Within this one
+    // capture, a short description must not hide a longer preserved body.
+    const candidates = [["vehicle_observations.structured_data.raw_description", data.raw_description],
+      ["vehicle_observations.content_text", source.content_text],
+      ["vehicle_observations.structured_data.description", data.description]]
+      .filter(([, text]) => typeof text === "string" && text.trim().length >= 100)
+      .sort((a, b) => String(b[1]).length - String(a[1]).length);
+    const [textField, text] = candidates[0] || [];
     // Old BaT rows contain only a title/marker (often 16 chars); that is not prose.
     if (typeof text === "string" && text.trim().length >= 100) {
       return requireCompleteInput({ text, sourceRef: `vehicle_observations:${source.id}`,
-        sourceUrl: source.source_url, observedAt: source.observed_at, ingestedAt: source.ingested_at });
+        sourceUrl: source.source_url, observedAt: source.observed_at, ingestedAt: source.ingested_at,
+        textField });
     }
   }
   throw new Error("Full preserved listing text unavailable for this source; summary not mined");
@@ -96,7 +106,31 @@ export function descriptionSourceMetadata(input: DescriptionInput) {
     source_observed_at: input.observedAt, source_ingested_at: input.ingestedAt,
     source_event_time_status: input.observedAt ? "known" : "unknown",
     observation_time_basis: input.observedAt ? "source_event" : "source_capture",
-    input_characters: input.text.length, input_truncated: false };
+    source_text_field: input.textField || "unknown", source_completeness: "unknown",
+    input_characters: input.text.length, miner_input_truncated: false };
+}
+
+export async function descriptionInputFingerprint(input: DescriptionInput): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input.text));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// Private learning-cache artifact; not a new vehicle fact. Retain the original
+// generated items so retrying partial intake does not pay for or vary an assessment.
+export async function conditionExtractionArtifact(input: DescriptionInput, conditions: any[], model: string) {
+  return { ...descriptionSourceMetadata(input), input_sha256: await descriptionInputFingerprint(input),
+    conditions, model };
+}
+
+export async function reusableConditionExtraction(rawExtraction: any, input: DescriptionInput) {
+  const cached = rawExtraction?.__description_condition_extraction;
+  if (!cached || cached.source_ref !== input.sourceRef || cached.source_url !== input.sourceUrl ||
+      cached.source_observed_at !== input.observedAt || cached.source_ingested_at !== input.ingestedAt ||
+      cached.input_sha256 !== await descriptionInputFingerprint(input)) return null;
+  if (!Array.isArray(cached.conditions) || typeof cached.model !== "string" || !cached.model) {
+    throw new Error("Cached condition artifact malformed; retry refused");
+  }
+  return { conditions: cached.conditions, model: cached.model };
 }
 
 export function conditionObservationInput(
