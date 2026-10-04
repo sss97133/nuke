@@ -30,6 +30,7 @@ CREATE INDEX ON public.vehicles(lower(make),year,lower(model));
 CREATE TABLE public.listing_page_snapshots (
   id uuid PRIMARY KEY, listing_url text, fetched_at timestamptz, success boolean, http_status integer, html text, platform text, metadata jsonb, html_sha256 text, created_at timestamptz NOT NULL,html_storage_path text
 );
+CREATE INDEX ON public.listing_page_snapshots(platform,listing_url,fetched_at DESC);
 ALTER TABLE public.listing_page_snapshots ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.listing_page_snapshots TO anon,authenticated;
 -- No public raw-snapshot policy: the reader may return sanitized attribution only.
@@ -40,6 +41,9 @@ INSERT INTO public.observation_sources VALUES ('22222222-2222-2222-2222-22222222
 CREATE TABLE public.vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,
   source_platform text,source_url text,source_listing_id text,event_type text,event_status text,final_price numeric,
   sold_at timestamptz,ended_at timestamptz,created_at timestamptz,updated_at timestamptz,extracted_at timestamptz);
+CREATE INDEX ON public.vehicle_events(vehicle_id);
+CREATE TABLE public.bat_listings(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,bat_listing_url text);
+CREATE INDEX ON public.bat_listings(vehicle_id);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,source_id uuid REFERENCES public.observation_sources,
   kind text,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,
   source_url text,source_identifier text,raw_source_ref text,extraction_method text,extractor_id uuid,structured_data jsonb,content_hash text,
@@ -66,6 +70,9 @@ CREATE FUNCTION public.valuation_by_ymm(integer DEFAULT NULL,text DEFAULT NULL,t
 ALTER TABLE public.vehicle_observations ADD COLUMN source_vehicle_event_id uuid REFERENCES public.vehicle_events;
 ALTER TABLE public.vehicle_observations ADD COLUMN extraction_metadata jsonb;
 \ir ../../supabase/migrations/20261004190312_valuation_typed_sale_episode_ancestry.sql
+CREATE TEMP TABLE previous_episode_reader_permissions AS SELECT proacl,proconfig,prosecdef,proowner FROM pg_proc
+WHERE oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure;
+\ir ../../supabase/migrations/20261004201917_valuation_earlier_source_sale_episodes.sql
 
 CREATE FUNCTION pg_temp.seed(n integer,d jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE vid uuid:=md5('vehicle-'||n)::uuid; sid uuid:=md5('snapshot-'||n)::uuid;
@@ -89,7 +96,7 @@ BEGIN
       'sale_date',coalesce(d->>'parsed_date',to_char(sale_day,'FMMM/FMDD/YY')))));
 END $$;
 CREATE FUNCTION pg_temp.base() RETURNS void LANGUAGE plpgsql AS $$ BEGIN
-  TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events;
+  TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events,public.bat_listings;
   FOR n IN 1..10 LOOP PERFORM pg_temp.seed(n); END LOOP;
 END $$;
 CREATE FUNCTION pg_temp.read(d jsonb DEFAULT '{}'::jsonb) RETURNS jsonb LANGUAGE sql AS $$
@@ -166,11 +173,11 @@ SELECT pg_temp.ok('public route returns sanitized evidence but cannot read raw s
 RESET ROLE;
 SELECT pg_temp.ok('only one RPC signature remains',(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='valuation_by_ymm')=1);
 
-TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events;
+TRUNCATE public.vehicles,public.listing_page_snapshots,public.vehicle_observations,public.vehicle_events,public.bat_listings;
 INSERT INTO public.vehicles(id,year,make,model,is_public)
 SELECT md5('cap-'||n)::uuid,1970,'Synthetic','Coupe',true FROM generate_series(1,10001) n;
 SELECT pg_temp.ok('10001-member cap refuses rather than returning a sampled statistic',pg_temp.read() ? 'error' AND pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>'{stats}'='null'::jsonb);
-TRUNCATE public.vehicles,public.vehicle_observations,public.vehicle_events;
+TRUNCATE public.vehicles,public.vehicle_observations,public.vehicle_events,public.bat_listings;
 SELECT pg_temp.ok('zero eligible means unknown aggregates, not zero prices',pg_temp.read()#>>'{stats,sold_count}'='0' AND pg_temp.read()#>'{stats,median}'='null'::jsonb AND pg_temp.read()#>'{receipt,percentile}'='null'::jsonb);
 
 -- The same fixtures execute against parseBaTHTML in batComps.test.ts. This reader
@@ -513,3 +520,234 @@ SELECT pg_temp.ok('equivalent explicitly zoned microsecond native context agrees
 UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-11')::uuid;
 SELECT pg_temp.ok('typed ancestry never publishes a private parent or its aggregate contribution',
   pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,typed_sale_episode_links}'='0');
+
+-- Native rows below are identity locators with deliberately absent or contrary
+-- prices/statuses/clocks. ONLY the matched protected body owns the sale tuple.
+CREATE FUNCTION pg_temp.episode(parent integer,n integer,d jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE vid uuid:=md5('vehicle-'||parent)::uuid; sid uuid:=md5('native-capture-'||n)::uuid;
+  url text:=coalesce(d->>'source_url','https://bringatrailer.com/listing/synthetic-episode-'||coalesce(d->>'episode_number',n::text)||'/');
+  amount numeric:=coalesce((d->>'amount')::numeric,12000);
+  sale_day date:=coalesce((d->>'date')::date,'2024-06-15');
+BEGIN
+  IF d->>'table'='bat_listings' THEN
+    INSERT INTO public.bat_listings VALUES(md5('native-listing-'||n)::uuid,vid,url);
+  ELSE
+    INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,source_listing_id,event_status,final_price,sold_at,ended_at,created_at,updated_at,extracted_at)
+    VALUES(md5('native-event-'||n)::uuid,vid,coalesce(d->>'platform','bat'),url,
+      CASE WHEN d ? 'source_listing_id' THEN d->>'source_listing_id' ELSE url END,
+      'active',NULL,NULL,NULL,NULL,NULL,NULL);
+  END IF;
+  INSERT INTO public.listing_page_snapshots(id,platform,listing_url,success,http_status,html,html_storage_path,fetched_at,created_at,metadata)
+  VALUES(sid,'bat',coalesce(d->>'snapshot_url',url),coalesce((d->>'success')::boolean,true),200,
+    CASE WHEN d ? 'html' THEN d->>'html' ELSE 'PRIVATE EARLIER SOURCE Sold for <strong>'||coalesce(d->>'currency','USD')||' $'||amount::text||'</strong> <span>on '||to_char(sale_day,'FMMM/FMDD/YY') END,
+    CASE WHEN d->>'offloaded'='true' THEN 'private-not-admitted/path.html' END,
+    coalesce((d->>'fetched_at')::timestamptz,'2025-06-16T00:00:00Z'),
+    coalesce((d->>'ingested_at')::timestamptz,'2025-06-16T06:00:00Z'),
+    jsonb_build_object('vehicle_matched',true,'vehicle_id',coalesce(d->>'protected_vehicle_id',vid::text),
+      'parsed_at',coalesce(d->>'parsed_at','2025-06-16T12:00:00Z'),
+      'source_sale_qualification',jsonb_build_object('qualified',true,'price',999999,'currency','USD','private_name','Taylor Synthetic')));
+  UPDATE public.listing_page_snapshots SET html_sha256=encode(sha256(convert_to(html,'UTF8')),'hex') WHERE id=sid;
+END $$;
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101); SELECT pg_temp.episode(1,102,'{"amount":14000,"date":"2024-12-01"}');
+DO $$ DECLARE r jsonb;BEGIN
+  r:=pg_temp.read();
+  PERFORM pg_temp.ok('one vehicle retains two additional sold source episodes without native prices/statuses/clocks',
+    r#>>'{stats,sold_count}'='12' AND r#>>'{receipt,coverage,qualified_additional_source_episodes}'='2'
+    AND (SELECT count(*) FROM jsonb_array_elements(r#>'{receipt,eligible}') e WHERE e->>'vehicleId'=md5('vehicle-1')::uuid::text)=3);
+  PERFORM pg_temp.ok('native clocks and units stay unestablished; source grammar supplies original amount/date/unit',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(r#>'{receipt,eligible}') e WHERE e->>'sourceKey'='bringatrailer.com/listing/synthetic-episode-101'
+      AND e->>'amount'='12000' AND e->>'eventAt'='2024-06-15' AND e->>'currency'='USD'
+      AND e->>'priceBasis'='published_bid_excluding_fees' AND e->>'knownAt'='2025-06-16T12:00:00+00:00'));
+  PERFORM pg_temp.ok('native locator IDs do not impersonate canonical observation ancestry',
+    r#>>'{receipt,coverage,typed_sale_episode_links}'='0'
+    AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r#>'{receipt,eligible}') e WHERE e->'sourceVehicleEventId'<>'null'::jsonb)
+    AND r::text NOT LIKE '%PRIVATE EARLIER SOURCE%' AND r::text NOT LIKE '%Taylor Synthetic%' AND r::text NOT LIKE '%private-not-admitted%');
+  PERFORM pg_temp.ok('episode population and availability boundaries are explicit',
+    r#>>'{receipt,sale_population_basis}'='source_qualified_episodes_of_current_public_members'
+    AND r#>>'{receipt,coverage,complete}'='true' AND r#>>'{receipt,subject,exclusion_basis}'='not_requested'
+    AND r#>>'{receipt,sale_population_caveat}' LIKE '%not source publication%');
+END $$;
+UPDATE public.vehicles SET sale_price=999999,sale_status='active' WHERE id=md5('vehicle-1')::uuid;
+SELECT pg_temp.ok('latest vehicle price/outcome cannot reprice or remove its additional source episodes',
+  pg_temp.read()#>>'{stats,sold_count}'='11' AND pg_temp.read()#>>'{receipt,coverage,qualified_additional_source_episodes}'='2');
+UPDATE public.vehicle_events SET final_price=999999,event_status='unsold',sold_at='2026-01-02',created_at='2026-01-02',updated_at='2026-01-02';
+SELECT pg_temp.ok('changed native price/outcome/date/row clocks remain locators, not source tuple vetoes',pg_temp.read()#>>'{stats,sold_count}'='11');
+
+SELECT pg_temp.base(); SELECT pg_temp.seed(11); SELECT pg_temp.typed_admit(11);
+UPDATE public.vehicles SET listing_url='https://bringatrailer.com/listing/new-current-context/',sale_price=999999,sale_status='active',sale_date=NULL,
+  origin_metadata='{}'::jsonb WHERE id=md5('vehicle-11')::uuid;
+DO $$ DECLARE r jsonb;BEGIN
+  r:=pg_temp.read();
+  PERFORM pg_temp.ok('already-admitted canonical archive keeps its independent earlier episode after latest source/outcome changes',
+    r#>>'{stats,sold_count}'='11' AND r#>>'{receipt,coverage,archived_admitted}'='1'
+    AND r#>>'{receipt,coverage,qualified_additional_source_episodes}'='1'
+    AND EXISTS(SELECT 1 FROM jsonb_array_elements(r#>'{receipt,eligible}') e WHERE e->>'sourceKey'='bringatrailer.com/listing/synthetic-11'
+      AND e->>'amount'='11000' AND e->>'sourceVehicleEventId'=md5('episode-11')::uuid::text
+      AND e->>'sourceVerification'='producer_attested_archived_hash_parser'));
+  PERFORM pg_temp.ok('earlier archived availability still includes canonical observation DB ingestion',
+    pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}')#>>'{stats,sold_count}'='10');
+END $$;
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101); SELECT pg_temp.episode(1,102,'{"episode_number":"101","table":"bat_listings"}');
+SELECT pg_temp.episode(1,103,'{"episode_number":"101","source_url":"http://www.bringatrailer.com/listing/SYNTHETIC-EPISODE-101?ref=x#bid"}');
+SELECT pg_temp.ok('one sale three captures and native event/listing aliases counts once with separate grains',
+  pg_temp.read()#>>'{stats,sold_count}'='11' AND pg_temp.read()#>>'{receipt,coverage,native_episode_locators}'='1'
+  AND pg_temp.read()#>>'{receipt,coverage,native_vehicle_event_presentations}'='2'
+  AND pg_temp.read()#>>'{receipt,coverage,native_bat_listing_presentations}'='1'
+  AND pg_temp.read()#>>'{receipt,coverage,qualified_capture_presentations}'='13'
+  AND pg_temp.read()#>>'{receipt,coverage,duplicate_presentations}'='2');
+SELECT pg_temp.ok('agreeing captures choose deterministic earliest known source evidence',
+  EXISTS(SELECT 1 FROM jsonb_array_elements(pg_temp.read()#>'{receipt,eligible}') e WHERE e->>'sourceKey'='bringatrailer.com/listing/synthetic-episode-101'
+    AND e->>'snapshotId'=(SELECT min(id::text) FROM public.listing_page_snapshots WHERE id IN (md5('native-capture-101')::uuid,md5('native-capture-102')::uuid,md5('native-capture-103')::uuid))));
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101,'{"source_url":"https://bringatrailer.com/listing/synthetic-1/","amount":1000,"date":"2025-06-15"}');
+UPDATE public.vehicles SET sale_price=999999,sale_status='active',sale_date=NULL WHERE id=md5('vehicle-1')::uuid;
+SELECT pg_temp.ok('current native episode source tuple also stays independent of latest price/outcome/day',
+  pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,duplicate_presentations}'='1');
+UPDATE public.listing_page_snapshots SET html='Sold for <strong>EUR $1,000</strong> <span>on 6/15/25',
+  html_sha256=encode(sha256(convert_to('Sold for <strong>EUR $1,000</strong> <span>on 6/15/25','UTF8')),'hex') WHERE id=md5('native-capture-101')::uuid;
+SELECT pg_temp.ok('all current native alias captures join the conflict set, including other currency',
+  pg_temp.read()#>>'{stats,sold_count}'='9' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='1');
+
+DO $$ DECLARE raw text;BEGIN
+  FOREACH raw IN ARRAY ARRAY['Sold for <strong>USD $13,000</strong> <span>on 6/15/24',
+    'Sold for <strong>EUR $12,000</strong> <span>on 6/15/24',
+    'Bid to <strong>USD $12,000</strong> <span>on 6/15/24',
+    'Sold for <strong>USD $12,000</strong> <span>on 6/16/24'] LOOP
+    PERFORM pg_temp.base(); PERFORM pg_temp.episode(1,101); PERFORM pg_temp.episode(1,102,jsonb_build_object('episode_number','101','html',raw));
+    PERFORM pg_temp.ok('additional episode contrary protected tuple withheld, never averaged '||raw,
+      pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='1');
+    UPDATE public.listing_page_snapshots SET created_at='2026-01-02' WHERE id=md5('native-capture-102')::uuid;
+    PERFORM pg_temp.ok('future-ingested contrary tuple cannot veto earlier known-at episode '||raw,
+      pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}')#>>'{stats,sold_count}'='11'
+      AND pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}')#>>'{receipt,coverage,conflicting_source_lots}'='0');
+  END LOOP;
+END $$;
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101); SELECT pg_temp.episode(1,102,'{"episode_number":"101","date":"2023-06-15","amount":13000}');
+SELECT pg_temp.ok('outside-window source contradiction does not veto in-window episode',pg_temp.read()#>>'{stats,sold_count}'='11' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='0');
+SELECT pg_temp.episode(2,103,'{"episode_number":"101"}');
+SELECT pg_temp.ok('native same episode attributed to two different parents fails closed',pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,conflicting_source_lots}'='1');
+
+SELECT pg_temp.base();
+SELECT pg_temp.episode(1,101,'{"source_listing_id":"https://bringatrailer.com/listing/different/"}');
+SELECT pg_temp.episode(1,102,'{"source_url":"https://bringatrailer.com.evil/listing/forged/"}');
+SELECT pg_temp.episode(1,103,'{"snapshot_url":"https://bringatrailer.com/listing/different/"}');
+SELECT pg_temp.episode(1,104,jsonb_build_object('protected_vehicle_id',md5('vehicle-2')::uuid));
+SELECT pg_temp.episode(1,105,'{"html":null,"offloaded":true}');
+SELECT pg_temp.episode(1,106,'{"currency":"UNKNOWN"}');
+SELECT pg_temp.episode(1,107,'{"currency":"EUR"}');
+SELECT pg_temp.episode(1,108,'{"parsed_at":"bad timestamp"}');
+SELECT pg_temp.episode(1,109,'{"html":"Sold for <strong>USD $1,000</strong> <span>on 6/15/24 Sold for <strong>USD $2,000</strong> <span>on 6/15/24"}');
+SELECT pg_temp.episode(1,110,'{"date":"2026-01-01","fetched_at":"2026-01-02T00:00:00Z","parsed_at":"2026-01-02T12:00:00Z"}');
+SELECT pg_temp.episode(1,111);
+UPDATE public.listing_page_snapshots SET html='forged body after captured hash' WHERE id=md5('native-capture-111')::uuid;
+SELECT pg_temp.ok('unknown/contradictory native identity is refused before borrowing a source capture',
+  pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,coverage,native_identity_refusals}'='2');
+SELECT pg_temp.ok('protected parent/URL mismatches and unadmitted archive metadata never qualify native prices',
+  pg_temp.read()#>>'{receipt,exclusions,source_body_unavailable_or_over_limit}'='1'
+  AND pg_temp.read()#>>'{receipt,exclusions,snapshot_unmatched}'='2');
+SELECT pg_temp.ok('unknown units and conflicting hash/clock/grammar remain excluded',
+  pg_temp.read()#>>'{receipt,exclusions,currency_unknown}'='1' AND pg_temp.read()#>>'{receipt,exclusions,different_currency}'='1'
+  AND pg_temp.read()#>>'{receipt,exclusions,clock_unknown_or_conflicting}'='1'
+  AND pg_temp.read()#>>'{receipt,exclusions,source_body_hash_unknown_or_conflicting}'='1');
+SELECT pg_temp.ok('additional episode EUR remains original EUR with USD pool withheld',pg_temp.read('{"currency":"EUR"}')#>>'{stats,sold_count}'='1');
+SELECT pg_temp.ok('native source day cannot precede same-day intraday comparison cutoff',pg_temp.read('{"before":"2026-01-01T18:00:00Z"}')#>>'{stats,sold_count}'='10');
+
+SELECT pg_temp.base();
+SELECT pg_temp.episode(1,101,jsonb_build_object('protected_vehicle_id',md5('vehicle-2')::uuid));
+SELECT pg_temp.episode(1,102,'{"success":false}');
+UPDATE public.listing_page_snapshots SET html=repeat('PRIVATE UNMATCHED SOURCE ',50000)||'Sold for <strong>USD $999,999</strong> <span>on 6/15/24'
+WHERE id IN (md5('native-capture-101')::uuid,md5('native-capture-102')::uuid);
+UPDATE public.listing_page_snapshots SET html_sha256=encode(sha256(convert_to(html,'UTF8')),'hex')
+WHERE id IN (md5('native-capture-101')::uuid,md5('native-capture-102')::uuid);
+SELECT pg_temp.ok('large unmatched successful-wrong-parent/failed headers keep snapshot refusal, grain and raw privacy',
+  pg_temp.read()#>>'{stats,sold_count}'='10' AND pg_temp.read()#>>'{receipt,exclusions,snapshot_unmatched}'='2'
+  AND pg_temp.read()#>>'{receipt,coverage,capture_presentations}'='12'
+  AND pg_temp.read()#>>'{receipt,coverage,native_capture_headers}'='2'
+  AND pg_temp.read()::text NOT LIKE '%PRIVATE UNMATCHED SOURCE%');
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101); SELECT pg_temp.episode(1,102);
+DO $$ DECLARE r jsonb;BEGIN
+  r:=pg_temp.read(jsonb_build_object('subject',md5('vehicle-1')::uuid));
+  PERFORM pg_temp.ok('exact subject source episode excluded while same subject vehicle earlier episodes survive',
+    r#>>'{stats,sold_count}'='11' AND r#>>'{receipt,subject,exclusion_basis}'='exact_source_episode'
+    AND r#>>'{receipt,subject,source_url}'='https://bringatrailer.com/listing/synthetic-1/'
+    AND (SELECT count(*) FROM jsonb_array_elements(r#>'{receipt,eligible}') e WHERE e->>'vehicleId'=md5('vehicle-1')::uuid::text)=2);
+END $$;
+UPDATE public.vehicles SET listing_url='https://other.example/unestablished/' WHERE id=md5('vehicle-1')::uuid;
+DO $$ DECLARE r jsonb;BEGIN
+  r:=pg_temp.read(jsonb_build_object('subject',md5('vehicle-1')::uuid));
+  PERFORM pg_temp.ok('unknown requested subject episode withholds comparison but retains evidence',
+    r#>>'{receipt,subject,exclusion_basis}'='unestablished' AND r#>'{receipt,percentile}'='null'::jsonb
+    AND r#>'{receipt,comparison_reasons}'='["subject_episode_unknown"]'::jsonb AND jsonb_array_length(r#>'{receipt,eligible}')=11);
+END $$;
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101); SELECT pg_temp.episode(2,102); SELECT pg_temp.episode(3,103); SELECT pg_temp.episode(4,104);
+UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-1')::uuid;
+UPDATE public.vehicles SET deleted_at='2025-06-01' WHERE id=md5('vehicle-2')::uuid;
+UPDATE public.vehicles SET listing_kind='non_vehicle_item' WHERE id=md5('vehicle-3')::uuid;
+UPDATE public.vehicles SET is_public=NULL WHERE id=md5('vehicle-4')::uuid;
+SET ROLE anon;
+SELECT pg_temp.ok('anon native parent gates precede episode/header counts and preserve protected raw privacy',
+  pg_temp.read()#>>'{receipt,coverage,member_rows}'='6' AND pg_temp.read()#>>'{receipt,coverage,native_vehicle_event_presentations}'='0'
+  AND pg_temp.read()#>>'{stats,sold_count}'='6' AND (SELECT count(*) FROM public.listing_page_snapshots)=0);
+SELECT pg_temp.ok('private subject cannot establish a public source key',
+  pg_temp.read(jsonb_build_object('subject',md5('vehicle-1')::uuid))#>>'{receipt,subject,exclusion_basis}'='unestablished'
+  AND pg_temp.read(jsonb_build_object('subject',md5('vehicle-1')::uuid))#>'{receipt,subject,source_url}'='null'::jsonb);
+RESET ROLE;
+SET ROLE authenticated;
+SELECT pg_temp.ok('authenticated native reader has the same public parent and protected capture boundaries',
+  pg_temp.read()#>>'{stats,sold_count}'='6' AND (SELECT count(*) FROM public.listing_page_snapshots)=0);
+RESET ROLE;
+
+SELECT pg_temp.base();
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url)
+SELECT md5('native-cap-'||n)::uuid,md5('vehicle-1')::uuid,'bat','https://bringatrailer.com/listing/native-cap/' FROM generate_series(1,10001) n;
+ANALYZE public.vehicle_events;
+SELECT pg_temp.ok('10001 native event presentations refuse totals before dedup or raw bodies',
+  pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>'{stats}'='null'::jsonb
+  AND pg_temp.read()#>>'{coverage,native_vehicle_event_presentations_at_least}'='10001');
+DELETE FROM public.vehicle_events WHERE id=md5('native-cap-10001')::uuid;
+SELECT pg_temp.ok('exact 10000 native presentations are complete, not an arbitrary small sample',
+  pg_temp.read()#>>'{receipt,coverage,native_vehicle_event_presentations}'='10000' AND pg_temp.read()#>>'{stats,sold_count}'='10');
+SELECT pg_temp.base();
+INSERT INTO public.bat_listings SELECT md5('listing-cap-'||n)::uuid,md5('vehicle-1')::uuid,'https://bringatrailer.com/listing/listing-cap/' FROM generate_series(1,10001) n;
+ANALYZE public.bat_listings;
+SELECT pg_temp.ok('independent 10001 compatibility listing presentations refuse a sampled distribution',
+  pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>'{stats}'='null'::jsonb
+  AND pg_temp.read()#>>'{coverage,native_bat_listing_presentations_at_least}'='10001');
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101);
+INSERT INTO public.listing_page_snapshots(id,platform,listing_url,success,http_status,html,fetched_at,created_at,metadata)
+SELECT md5('header-cap-'||n)::uuid,'bat','https://bringatrailer.com/listing/synthetic-episode-101/',true,200,NULL,
+  '2025-06-16','2025-06-16',jsonb_build_object('vehicle_matched',true,'vehicle_id',md5('vehicle-1')::uuid,'parsed_at','2025-06-16T12:00:00Z')
+FROM generate_series(1,10000) n;
+ANALYZE public.listing_page_snapshots;
+SELECT pg_temp.ok('10001 exact native headers refuse before raw materialization, even mostly absent bodies',
+  pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>'{stats}'='null'::jsonb
+  AND pg_temp.read()#>>'{coverage,native_capture_headers_at_least}'='10001');
+UPDATE public.listing_page_snapshots SET created_at='2026-01-02' WHERE id IN (SELECT md5('header-cap-'||n)::uuid FROM generate_series(1,10000) n);
+ANALYZE public.listing_page_snapshots;
+SELECT pg_temp.ok('known future exact header candidates do not consume earlier source capture cap',
+  pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}')#>>'{stats,sold_count}'='11'
+  AND pg_temp.read('{"known":"2026-01-01T00:00:00Z","mode":"known_at"}')#>>'{receipt,coverage,native_capture_headers}'='1');
+DELETE FROM public.listing_page_snapshots WHERE id IN (SELECT md5('header-cap-'||n)::uuid FROM generate_series(9990,10000) n);
+UPDATE public.listing_page_snapshots SET created_at='2025-06-16' WHERE id IN (SELECT md5('header-cap-'||n)::uuid FROM generate_series(1,9989) n);
+ANALYZE public.listing_page_snapshots;
+SELECT pg_temp.ok('exact combined 10000 source references remain complete with all missing-body exclusions retained',
+  pg_temp.read()#>>'{stats,sold_count}'='11' AND pg_temp.read()#>>'{receipt,coverage,capture_presentations}'='10000'
+  AND pg_temp.read()#>>'{receipt,coverage,native_capture_headers}'='9990'
+  AND pg_temp.read()#>>'{receipt,exclusions,source_body_unavailable_or_over_limit}'='9989');
+
+CREATE TEMP TABLE final_reader_contract AS SELECT p.proacl,p.proconfig,md5(p.prosrc) AS body_md5 FROM pg_proc p
+WHERE p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure;
+SELECT pg_temp.ok('native episode extension preserves original owner/security mode/ACL/search path/time limit',
+  EXISTS(SELECT 1 FROM previous_episode_reader_permissions old JOIN pg_proc p
+    ON p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure
+    WHERE old.proacl=p.proacl AND old.proconfig=p.proconfig AND old.prosecdef=p.prosecdef AND old.proowner=p.proowner));
+\ir ../../supabase/migrations/20261004201917_valuation_earlier_source_sale_episodes.sql
+SELECT pg_temp.ok('reader migration is repeatable with identical body/ACL/config and no new signature',
+  EXISTS(SELECT 1 FROM final_reader_contract old JOIN pg_proc p ON p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure
+    WHERE old.proacl=p.proacl AND old.proconfig=p.proconfig AND old.body_md5=md5(p.prosrc))
+  AND (SELECT count(*) FROM pg_proc WHERE proname='valuation_by_ymm')=1);

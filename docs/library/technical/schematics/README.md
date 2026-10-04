@@ -22,6 +22,10 @@ The extraction pipeline in detail: the three-tier AI agent hierarchy (Haiku/Sonn
 ### [4. Observation System](./observation-system.md)
 The observation architecture: how ingest-observation works, the trust scoring mechanism, content hashing for deduplication, vehicle resolution logic (VIN match, URL match, fuzzy match), the relationship between observation_sources and vehicle_observations, and the path toward a fully source-agnostic data model.
 
+### Source-qualified sale episodes (staged 2026-10-04)
+
+The existing `valuation_by_ymm` extension follows current public cohort members → native `vehicle_events` / compatibility `bat_listings` episode URLs → exact indexed protected `listing_page_snapshots` aliases → independently verified source tuples. Native price/outcome/row clocks are locators and context; they do not supply an earlier sale's amount, units or availability. Already-admitted canonical archived observations retain their separate snapshot/observation ingestion and typed ancestry checks. Agreeing captures deduplicate by source episode; different episodes of a persistent vehicle survive. Member, native-presentation and capture sentinels refuse sampled distributions. The additive receipt declares current membership, capture/DB-ingestion/parse knowledge clocks, unavailable historical native availability and exact subject-episode exclusion; unknown subject identity withholds comparison while retaining evidence. This is a locally tested reader change awaiting integration/deployment, with no source admission or permissions change. Actual SQL contracts: `scripts/discovery/valuation-source-sale-receipt-test.sql`.
+
 ---
 
 ## How to Read These Documents
