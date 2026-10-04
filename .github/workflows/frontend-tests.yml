@@ -175,6 +175,10 @@ jobs:
         run: createdb dm_refinement_market_trends
       - name: Verify existing market-trends privacy and supported-sale contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_trends -f supabase/sql/test_market_trends_public_sale_eligibility.sql
+      - name: Create disposable recorded-sale counts database
+        run: createdb dm_refinement_market_counts
+      - name: Verify recorded episodes, bounded membership, privacy and cap contracts
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_counts -f supabase/sql/test_market_trends_recorded_sale_counts.sql
 
   valuation-source-sale-contract:
     runs-on: ubuntu-latest
