@@ -94,6 +94,25 @@ function classifyConflict(
   primary: string,
   others: string[],
 ): ConflictType {
+  // Compare numeric fields before text normalization can erase decimal points,
+  // signs or magnitude differences. Units, ranges and qualifiers stay unresolved.
+  const numericFields = ['mileage', 'odometer', 'horsepower', 'displacement', 'sale_price', 'asking_price'];
+  if (numericFields.some(nf => field.toLowerCase().includes(nf))) {
+    const scalar = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/;
+    const nums = [primary, ...others].map(value => {
+      const literal = value.trim();
+      return scalar.test(literal) ? Number(literal.replace(/,/g, '')) : NaN;
+    });
+    // An unknown alternative must not be discarded to manufacture agreement.
+    if (!nums.every(Number.isFinite)) return 'genuine';
+    if (nums.every(n => n === nums[0])) return 'synonym';
+    const range = Math.max(...nums) - Math.min(...nums);
+    const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+    // Preserve the existing strict 5%-of-mean measurement variance rule.
+    if (mean > 0 && range / mean < 0.05) return 'variance';
+    return 'genuine';
+  }
+
   const pNorm = norm(primary);
 
   // Synonym: values normalize to the same string or are domain synonyms
@@ -128,20 +147,6 @@ function classifyConflict(
     for (const t of shorter) { if (longer.has(t)) overlap++; }
     return overlap / shorter.size > 0.5;
   })) return 'refinement';
-
-  // Variance: numeric fields within tolerance
-  const numericFields = ['mileage', 'odometer', 'horsepower', 'displacement', 'sale_price', 'asking_price'];
-  if (numericFields.some(nf => field.toLowerCase().includes(nf))) {
-    const nums = [primary, ...others]
-      .map(v => parseFloat(v.replace(/[^0-9.]/g, '')))
-      .filter(n => !isNaN(n));
-    if (nums.length >= 2) {
-      const range = Math.max(...nums) - Math.min(...nums);
-      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
-      // Within 5% of mean = measurement variance
-      if (mean > 0 && range / mean < 0.05) return 'variance';
-    }
-  }
 
   return 'genuine';
 }
