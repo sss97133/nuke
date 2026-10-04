@@ -56,13 +56,13 @@ export interface MarketPulse {
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
-// Disjoint ranges of the recorded current bid, in USD. Missing is not a zero bid.
+// Disjoint raw numeric ranges. Source units are unverified; missing is not zero.
 export const BID_BUCKETS = [
-  { id: 'under10k', label: 'Under $10,000' },
-  { id: '10k25k', label: '$10,000–24,999' },
-  { id: '25k50k', label: '$25,000–49,999' },
-  { id: '50k100k', label: '$50,000–99,999' },
-  { id: '100kplus', label: '$100,000+' },
+  { id: 'under10k', label: 'Under 10,000' },
+  { id: '10k25k', label: '10,000–24,999' },
+  { id: '25k50k', label: '25,000–49,999' },
+  { id: '50k100k', label: '50,000–99,999' },
+  { id: '100kplus', label: '100,000+' },
   { id: 'unknown', label: 'Unrecorded' },
 ] as const;
 export type BidBucket = typeof BID_BUCKETS[number]['id'];
