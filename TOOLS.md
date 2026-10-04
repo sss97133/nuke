@@ -21,7 +21,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract any listing URL (unknown source) | `extract-vehicle-data-ai` | Handles generic AI extraction |
-| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. (`complete-bat-import` was deleted from deployment in the March 2026 triage; it 404s live.) |
+| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. Service-only `mode: live_stream` continuously multiplexes every closing BaT lot through `ingest-observation` `bat_live_events_v1`; `dry_run: true` previews targets. Private `ingest_bat_live_events` admits/folds native frames atomically. Current coverage: `get_live_auction_health().closing_stream` and `v_job_health` `bat-live-pull` assay. See `docs/ledger/BAT_CLOSING_STREAM_2026-10-04.md` for rollout stages. (`complete-bat-import` was deleted/404s.) |
 | Extract Cars & Bids listing | `extract-cars-and-bids-core` | Handles C&B structure |
 | Extract Hagerty Marketplace listing | `extract-hagerty-listing` | |
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |

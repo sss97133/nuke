@@ -1029,6 +1029,7 @@ Deno.serve(async (req) => {
           .from("vehicles")
           .update({ auction_status: "ended", sale_status: "not_sold" })
           .eq("auction_status", "active")
+          .neq("platform_source", "bringatrailer") // BaT soft-close clocks require a native terminal record.
           .lt("auction_end_date", new Date().toISOString())
           .not("auction_end_date", "is", null)
           .select("id", { count: "exact", head: true });
