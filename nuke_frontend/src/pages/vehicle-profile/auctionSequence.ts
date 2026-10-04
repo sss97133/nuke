@@ -88,16 +88,19 @@ export interface AuctionItem {
   url: string;              // the comment on BaT, or the lot when no comment id is held
   likes: number;
   seq: number | null;
-  postClose: boolean;
+  /** null when the auction end clock is unknown; not a claim that it is still open. */
+  postClose: boolean | null;
   /** the listing this item belongs to (normalized lot key) */
   listingKey: string;
 }
 
-export interface Moment {
+export type Moment = {
   at: string;   // ISO
   basis: string; // where the time comes from, in words the page shows
   exact: boolean;
-}
+  /** A sale clock, including accepted RNM, is not an auction end clock. */
+  role?: 'auction_end' | 'sale';
+} & ({ grain: 'instant' } | { grain: 'day'; day: string });
 
 export interface AuctionDay {
   date: string;      // local YYYY-MM-DD
@@ -105,7 +108,7 @@ export interface AuctionDay {
   comments: number;  // non-bid comments, seller's included
   seller: number;
   high: number | null; // running high bid at the end of the day
-  postClose: boolean;
+  postClose: boolean | null;
 }
 
 export interface AuctionSequence {
@@ -118,7 +121,10 @@ export interface AuctionSequence {
   listingCount: number;
   open: Moment | null;
   close: Moment | null;
+  /** Last bid in the fetched evidence, independent of any recorded end. */
+  lastObservedBid: AuctionItem | null;
   outcome: 'sold' | 'reserve_not_met' | 'no_sale' | 'withdrawn' | 'live' | 'unknown';
+  outcomeConflict: boolean;
   price: number | null;
   buyer: string | null;
   seller: string | null;
@@ -143,14 +149,23 @@ export function localDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-CA');
 }
 
+/** A recorded day stays a calendar day; a clocked event uses the viewer's timezone. */
+export function momentDay(moment: Moment): string {
+  return moment.grain === 'day' ? moment.day : localDate(moment.at);
+}
+
 const isoOrNull = (s: string | null | undefined): string | null => {
   if (!s) return null;
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
 
-/** A timestamp that is exactly midnight UTC came from a date column, not a clock. */
+/** Conservatively keep UTC-midnight timestamps at day precision. */
 const hasClock = (iso: string): boolean => !/T00:00:00(\.000)?Z$/.test(iso);
+
+const recordedGrain = (iso: string): { grain: 'instant' } | { grain: 'day'; day: string } => hasClock(iso)
+  ? { grain: 'instant' }
+  : { grain: 'day', day: iso.slice(0, 10) };
 
 const BAT_LOT = /bringatrailer\.com\/listing\/([^/?#]+)/i;
 
@@ -333,13 +348,23 @@ function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void 
     url: commentPermalink(lotUrlFor(key), c.bat_comment_id),
     likes: c.comment_likes ?? 0,
     seq: c.sequence_number,
-    postClose: false,
+    postClose: null,
     listingKey: key,
   });
 }
 
 function sortItems(list: AuctionItem[]): void {
   list.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : (a.seq ?? 0) - (b.seq ?? 0)));
+}
+
+function recordedOutcome(value: string | null | undefined): AuctionSequence['outcome'] {
+  const state = (value ?? '').trim().toLowerCase().replace(/[ -]+/g, '_');
+  if (state === 'sold') return 'sold';
+  if (state === 'reserve_not_met') return 'reserve_not_met';
+  if (state === 'no_sale' || state === 'unsold') return 'no_sale';
+  if (state === 'withdrawn') return 'withdrawn';
+  if (state === 'active' || state === 'live') return 'live';
+  return 'unknown';
 }
 
 function buildOne(key: string, items: AuctionItem[], input: SequenceInput): AuctionSequence {
@@ -359,30 +384,33 @@ function buildOne(key: string, items: AuctionItem[], input: SequenceInput): Auct
   let open: Moment | null = null;
   const started = vevs.map(v => isoOrNull(v.started_at)).find((s): s is string => !!s && plausible(s));
   const listed = tl.find(t => t.event_type === 'auction_listed' && t.event_date);
-  if (started) open = { at: started, basis: 'listing start recorded by the extractor', exact: hasClock(started) };
-  else if (listed?.event_date) open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false };
-  else if (items.length) open = { at: items[0].at, basis: `first activity — ${items[0].kind === 'bid' ? 'first bid' : 'first comment'}; the listing opened some hours before`, exact: false };
+  if (started) open = { at: started, basis: 'listing start recorded by the extractor', exact: hasClock(started), ...recordedGrain(started) };
+  else if (listed?.event_date) open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, grain: 'day', day: listed.event_date.slice(0, 10) };
+  else if (items.length) open = { at: items[0].at, basis: `first activity — ${items[0].kind === 'bid' ? 'first bid' : 'first comment'}; opening time not recorded`, exact: false, grain: 'instant' };
 
   let close: Moment | null = null;
-  const ended = vevs.map(v => isoOrNull(v.ended_at) ?? isoOrNull(v.sold_at)).find((s): s is string => !!s && plausible(s));
+  const ended = vevs.map(v => isoOrNull(v.ended_at)).find((s): s is string => !!s && plausible(s));
+  const soldAt = vevs.map(v => isoOrNull(v.sold_at)).find((s): s is string => !!s && plausible(s));
   const finalBid = bids.length ? bids[bids.length - 1] : null;
-  if (ended && hasClock(ended)) close = { at: ended, basis: 'auction end recorded by the extractor', exact: true };
-  else if (finalBid) close = { at: finalBid.at, basis: 'final bid — BaT closes within two minutes of the last bid; the exact end is not recorded', exact: false };
-  else if (ended) close = { at: ended, basis: 'sale day; time not recorded', exact: false };
+  if (ended) close = { at: ended, basis: hasClock(ended) ? 'auction end recorded by the extractor' : 'auction end day; time not recorded', exact: hasClock(ended), role: 'auction_end', ...recordedGrain(ended) };
+  else if (soldAt) close = { at: soldAt, basis: hasClock(soldAt) ? 'sale recorded by the extractor; auction end unknown' : 'sale day; auction end time not recorded', exact: hasClock(soldAt), role: 'sale', ...recordedGrain(soldAt) };
   else {
-    const sold = tl.find(t => (t.event_type === 'auction_sold' || t.event_type === 'auction_ended') && t.event_date);
-    if (sold?.event_date) close = { at: new Date(`${sold.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'sale day; time not recorded', exact: false };
+    const end = tl.find(t => t.event_type === 'auction_ended' && t.event_date);
+    const sold = tl.find(t => t.event_type === 'auction_sold' && t.event_date);
+    const day = end ?? sold;
+    if (day?.event_date) close = { at: new Date(`${day.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: end ? 'auction end day; time not recorded' : 'sale day; auction end time not recorded', exact: false, role: end ? 'auction_end' : 'sale', grain: 'day', day: day.event_date.slice(0, 10) };
   }
-  if (close) for (const i of items) i.postClose = i.at > close.at && i.kind !== 'bid';
+  if (close?.role === 'auction_end' && close.exact) for (const i of items) i.postClose = i.at > close.at && i.kind !== 'bid';
 
-  const statusText = `${ev?.outcome ?? ''} ${vevs.map(v => v.event_status ?? '').join(' ')}`.toLowerCase();
-  const outcome: AuctionSequence['outcome'] =
-    /sold/.test(statusText) ? 'sold'
-      : /reserve_not_met|reserve not met/.test(statusText) ? 'reserve_not_met'
-        : /no_sale|unsold/.test(statusText) ? 'no_sale'
-          : /withdrawn/.test(statusText) ? 'withdrawn'
-            : /active|live/.test(statusText) ? 'live'
-              : 'unknown';
+  const primaryOutcome = recordedOutcome(ev?.outcome);
+  const states = new Set([primaryOutcome, ...vevs.map(v => recordedOutcome(v.event_status))].filter(s => s !== 'unknown'));
+  const soldAndNoSale = states.has('sold') && (states.has('no_sale') || states.has('reserve_not_met'));
+  const compatibleNoSale = [...states].every(s => s === 'no_sale' || s === 'reserve_not_met');
+  const outcomeConflict = soldAndNoSale || (primaryOutcome === 'unknown' && states.size > 1 && !compatibleNoSale);
+  const outcome: AuctionSequence['outcome'] = outcomeConflict ? 'unknown'
+    : primaryOutcome !== 'unknown' ? primaryOutcome
+      : states.has('reserve_not_met') && compatibleNoSale ? 'reserve_not_met'
+        : [...states][0] ?? 'unknown';
   const price = ev?.winning_bid ?? vevs.map(v => v.final_price).find((p): p is number => p != null) ?? (finalBid?.amount ?? null);
 
   const dayMap = new Map<string, AuctionDay>();
@@ -393,14 +421,14 @@ function buildOne(key: string, items: AuctionItem[], input: SequenceInput): Auct
     if (i.kind === 'bid') { row.bids += 1; if (i.amount != null && (high == null || i.amount > high)) high = i.amount; }
     else { row.comments += 1; if (i.kind === 'seller') row.seller += 1; }
     row.high = high;
-    row.postClose = row.postClose && i.postClose;
+    row.postClose = row.postClose == null || i.postClose == null ? null : row.postClose && i.postClose;
     dayMap.set(d, row);
   }
 
   return {
     key, lotUrl: lotUrlFor(key), lotNumber: ev?.lot_number ?? null,
     ordinal: 1, listingCount: 1,
-    open, close, outcome, price,
+    open, close, lastObservedBid: finalBid, outcome, outcomeConflict, price,
     buyer: ev?.winning_bidder ?? null,
     seller: ev?.seller_name ?? null,
     bidCount: ev?.total_bids ?? (bids.length || null),
@@ -418,12 +446,30 @@ function buildOne(key: string, items: AuctionItem[], input: SequenceInput): Auct
 function applyTimelineFallbacks(seq: AuctionSequence, events: TimelineEventLike[]): void {
   if (!seq.open) {
     const listed = events.find(t => t.event_type === 'auction_listed' && t.event_date);
-    if (listed?.event_date) seq.open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false };
+    if (listed?.event_date) seq.open = { at: new Date(`${listed.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'listing day; time not recorded', exact: false, grain: 'day', day: listed.event_date.slice(0, 10) };
   }
   if (!seq.close) {
-    const sold = events.find(t => (t.event_type === 'auction_sold' || t.event_type === 'auction_ended') && t.event_date);
-    if (sold?.event_date) seq.close = { at: new Date(`${sold.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: 'sale day; time not recorded', exact: false };
+    const end = events.find(t => t.event_type === 'auction_ended' && t.event_date);
+    const sold = events.find(t => t.event_type === 'auction_sold' && t.event_date);
+    const day = end ?? sold;
+    if (day?.event_date) seq.close = { at: new Date(`${day.event_date.slice(0, 10)}T12:00:00`).toISOString(), basis: end ? 'auction end day; time not recorded' : 'sale day; auction end time not recorded', exact: false, role: end ? 'auction_end' : 'sale', grain: 'day', day: day.event_date.slice(0, 10) };
   }
+}
+
+/** Only a recorded ended_at clock can establish the after-end boundary. */
+export function hasRecordedAuctionEnd(auction: AuctionSequence): boolean {
+  return auction.close?.role === 'auction_end' && auction.close.exact && auction.close.grain === 'instant';
+}
+
+export function auctionMomentLabel(auction: AuctionSequence): string {
+  if (auction.close?.role === 'sale') return auction.close.exact ? 'SALE RECORDED' : 'SALE DAY (time unknown)';
+  return hasRecordedAuctionEnd(auction) || !auction.close ? 'CLOSE' : 'END DAY (time unknown)';
+}
+
+/** Day projection keeps a sale or date-only end distinct from a clocked close. */
+export function auctionMomentDayTitle(auction: AuctionSequence): string {
+  if (hasRecordedAuctionEnd(auction)) return `Auction Closed · ${auction.outcome.replace(/_/g, ' ')}`;
+  return auction.close?.role === 'sale' ? 'Sale recorded · auction end unknown' : 'Auction end day recorded · time unknown';
 }
 
 /** The single newest sequence, for callers that only want the car's latest listing. */
@@ -447,7 +493,7 @@ export function fmtDayShort(iso: string): string {
 
 export function fmtMoment(m: Moment | null): string {
   if (!m) return 'not recorded';
-  const d = new Date(m.at);
+  const d = m.grain === 'day' ? new Date(`${m.day}T12:00:00`) : new Date(m.at);
   const day = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  return m.exact || m.basis.startsWith('first activity') || m.basis.startsWith('final bid') ? `${day} ${fmtClock(m.at)}` : day;
+  return m.grain === 'instant' ? `${day} ${fmtClock(m.at)}` : day;
 }

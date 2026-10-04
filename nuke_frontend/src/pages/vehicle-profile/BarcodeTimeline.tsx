@@ -3,6 +3,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
 import { useAuctionSequence } from './useAuctionSequence';
+import { auctionMomentDayTitle, momentDay } from './auctionSequence';
 
 interface BarcodeTimelineProps {}
 
@@ -36,11 +37,13 @@ function dateStr(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-/** Normalize to YYYY-MM-DD in local timezone so midnight UTC doesn't shift days. */
+/** Calendar dates keep their source day; timestamped events use the viewer's timezone. */
 function toDateOnly(d: string | undefined): string | null {
   if (!d) return null;
-  const date = new Date(String(d).trim());
+  const raw = String(d).trim();
+  const date = new Date(raw);
   if (isNaN(date.getTime())) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   return date.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
 }
 
@@ -352,8 +355,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     const auctionDays: Array<Record<string, unknown>> = [];
     for (const auction of auctions) {
       const lot = auctions.length > 1 ? `Lot ${auction.lotNumber ?? auction.ordinal} · ` : '';
-      const openDay = auction.open ? toDateOnly(auction.open.at) : null;
-      const closeDay = auction.close ? toDateOnly(auction.close.at) : null;
+      const openDay = auction.open ? momentDay(auction.open) : null;
+      const closeDay = auction.close ? momentDay(auction.close) : null;
       if (openDay) {
         auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}Auction Opened`, metadata: { auction: true, basis: auction.open!.basis } });
         if (auction.photos.publishedWithListing > 0) {
@@ -365,7 +368,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         auctionDays.push({ event_date: d.date, event_type: 'auction_day', title: `${lot}${parts.join(' · ')}${d.high != null ? ` · high bid $${Math.round(d.high).toLocaleString()}` : ''}${d.postClose ? ' · after the close' : ''}`, metadata: { auction: true, bids: d.bids, comments: d.comments } });
       }
       if (closeDay) {
-        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `${lot}Auction Closed · ${auction.outcome.replace(/_/g, ' ')}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis } });
+        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `${lot}${auctionMomentDayTitle(auction)}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis, moment_role: auction.close!.role, time_known: auction.close!.grain === 'instant' } });
       }
     }
 
