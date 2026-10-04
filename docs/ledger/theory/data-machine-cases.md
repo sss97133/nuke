@@ -285,7 +285,8 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
   show), against the cohort baseline. External facts enter as testimony with a source and date.
 - **Ownership is an entity, not a column.** Single, group, fractional, a share of a cohort, a share of a job.
   A bridge: asset × party × share × as-of. The sale rule is one transfer event on that bridge. Open the beast only
-  after the market event and the chain are folds.
+  after the market event and the chain are folds. The owner's 2026-10-04 refinement below adds the ownership
+  period's attributed investment and cash outcome to that design; it does not authorize productive admissions.
 - **Value = cohort baseline + provenance residual.** KBB computes the first and cannot compute the second. The
   S tier is a residual that persists across every stacked cohort. Arbitrage is the residual between the price on
   offer and what cohorts plus provenance expect at the moment of the market event. A plan of action (a build, a
@@ -396,3 +397,52 @@ estimate, not data.
   - interior ×0.95;
   - title flag n = 1.
 - **The reference was Iverson's 1979 Turing lecture, "Notation as a Tool of Thought"** (session of 2026-09-30, 19:40Z): schema = theory, data = models, query = theorem, backtest = experiment. The cost of this case is what happens when the notation is missing.
+
+**Owner refinement, 2026-10-04: investment during an ownership period.** "Restoration" is a spectrum of
+interventions, including preserving condition, maintenance, repair and improvement. The accounting of investment
+made while a holder owns or funds an asset is a separate measurement from the vehicle's acquisition-to-sale price
+change. Spending is evidence of cost; it does not establish an equal increase in value. An observed sale remains
+one dated event in the persistent vehicle's history.
+
+The grain to reconcile is **vehicle × evidenced holder/interest × ownership period**, with separately attributed
+acquisition, disposal, work, documents and money movements. Legal title, possession, operational custody and an
+unverified claim are different relationships. Current profile ownership or an external handle is insufficient to
+assign an earlier cost to a holder. Folded vehicle aliases retain their original testimony and canonical lineage.
+
+Keep these measures distinct:
+
+- **Observed price change:** source-qualified acquisition and disposal prices, with their dates, original currency
+  and fee basis. It is neither the holder's complete cash outcome nor a market index.
+- **Documented holder cash outcome:** reconciled, attributed ownership-related money in and money out, with costs,
+  fees, refunds and reimbursements separately visible. Estimates, unpaid work, owner labor and financing principal
+  are not silently treated as paid vehicle costs. Net proceeds and already-deducted fees must not be counted twice.
+  Missing or unallocated evidence remains unknown; a partial total must not be labelled complete profit.
+- **Declared return measure:** a named investment basis, holder share, cashflow timing and completeness policy are
+  prerequisites for ROI. Preserve maintenance, preservation and improvement allocations and their evidence; an
+  accounting interpretation of profit or expense recovery must name its policy rather than follow a blanket
+  "restored" label.
+- **Market and intervention context:** condition/equipment evidence at both sale dates and comparable-market
+  baselines over that period. Spending or a price residual alone does not prove an intervention caused an uplift.
+
+An invoice, receipt, work order and payment may be several witnesses to the same economic item. Reconcile their
+references before aggregation; do not sum every representation. A payment can settle multiple items, and an item
+can span vehicles, holders or periods. Attributed allocations must conserve the supported amount in its original
+currency and expose unresolved remainders. Event time, payment/work time and database recording time stay separate.
+Later evidence produces a new measurement revision without replacing the earlier receipt or leaking into an
+earlier as-of comparison. Private amounts and documents require their own source-publication decision.
+
+**Implementation boundary.** Reuse existing ownership, transfer, payment, receipt, timeline and work structures;
+inspect live ownership and constraints before selecting a writer or adding a relation. The live schema inspection
+on 2026-10-04 found `vehicle_ownerships` with dated holder links, `ownership_transfers` with distinct user/external
+identity references, and existing receipt/work/payment structures. Several locator columns are not foreign keys:
+`receipts.vehicle_id`, `receipts.timeline_event_id`, `work_orders.vehicle_id`,
+`vehicle_ownerships.proof_event_id`, and `payment_events.source_observation_id`. Existing financial-document
+allocations have typed payment/document links in their own subsystem; this does not establish vehicle-period cost
+attribution. These are measured relation gaps, not permission to validate held keys, duplicate a financial ledger,
+scan private accounts, backfill testimony directly or activate a planned writer.
+
+**Closure evidence required.** A documented ownership period must trace acquisition, disposal and each admitted
+cost to source evidence; demonstrate one charge counted once across multiple documents; expose refunds, uncertain
+dates, holder/vehicle allocations, unit conflicts and uncovered categories; and retain prior as-of results when a
+new receipt changes the outcome. Carefully documented cases can validate these mechanisms before any population
+claim about improvement returns. This refinement is a design contract; it installs no relation, ROI reader or fold.
