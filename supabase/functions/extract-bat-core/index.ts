@@ -1,7 +1,7 @@
 /**
  * extract-bat-core
  *
- * Version: 4.2.0 — comment identity links at insert (2026-10-02)
+ * Version: 4.2.2 — bind live bid amount to the actual source page read (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
  * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
@@ -36,7 +36,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.2.1';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.2.2';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -2506,7 +2506,7 @@ Deno.serve(async (req) => {
 
       const endAt = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
-      const readClock = sourceReadClock(htmlSource, sourceFetchedAt);
+      const readClock = sourceReadClock(htmlSource, sourceFetchedAt, outcome === 'live' ? essentials.high_bid : null);
 
       const { data, error } = await supabase
         .from("auction_events")

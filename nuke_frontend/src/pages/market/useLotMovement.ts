@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 
 // The latest bids and comments on a handful of live lots (the homepage's Ending next panel), each weighted against
-// the lot's own usual pace. The current-listing reader gates each public vehicle and accepts the source URL's
+// observed median bid increment. The current-listing reader gates each public vehicle and accepts the source URL's
 // trailing-slash alias, then returns at most 40 posted interactions per lot, for at most 8 lots. Historical
 // auctions on the same vehicle cannot enter the current window. Refreshing every minute is a reader cadence;
 // source freshness is separately known or unknown. Authors are never selected, so never shown.
@@ -25,8 +25,8 @@ export interface LotMovement {
   lastHour: number; // comments and bids posted in the last hour
   lastHourFloor: boolean; // true when the 40-row window may have cut the hour short
   total: number | null; // the lot's comment count so far (highest sequence number in view)
-  hoursListed: number | null; // since the lot opened
-  burst: number | null; // lastHour / (total / hoursListed)
+  hoursListed: number | null; // legacy close-minus-seven-days assumption; never observed opening time
+  burst: number | null; // legacy assumed-duration ratio; not a supported bid-velocity measure
   sourceReadAt: number | null; // actual page read; never the browser/vehicle-row write clock
   sourceReadBasis: 'direct_fetch' | 'cached_snapshot' | 'unknown';
   readAsOf: number;
@@ -57,6 +57,14 @@ export interface ActivityReceipt {
     source_url: string;
     source_read_at: string | null;
     source_read_basis: LotMovement['sourceReadBasis'];
+    source_auction_event_id?: string | null; // auction row, not an observation UUID
+    source_bid_amount?: number | null; // bound live bid on the source page at source_read_at
+    source_bid_ingested_at?: string | null; // auction event's latest write; not bid posted_at
+    current_bid_at_capture?: number | null; // vehicle current bid sampled at receipt.as_of
+    source_bid_match?: 'matched' | 'mismatched' | 'unknown'; // numeric agreement only; not money/freshness
+    source_bid_currency?: string | null; // currently unverified; no USD default
+    current_bid_currency_at_capture?: string | null;
+    source_bid_match_basis?: 'numeric_amount_only_currency_unverified' | 'unknown';
     activity_rows: number;
     has_more: boolean;
     activity: Row[];
