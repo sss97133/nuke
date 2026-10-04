@@ -24,9 +24,6 @@ struct TodayView: View {
         NavigationStack {
             List {
                 // ── Errors / permission banner ──
-                // Only the ACTIONABLE permission state earns a banner. The old
-                // engine.lastError banner (a stale per-upload error) was noise the
-                // owner can't act on — dropped; failures live in the logs.
                 if engine.authorizationDenied {
                     Section {
                         Label(
@@ -35,6 +32,13 @@ struct TodayView: View {
                         )
                         .font(.footnote)
                         .foregroundStyle(.orange)
+                    }
+                }
+                if let error = engine.backfillError, engine.backfillRemaining > 0 {
+                    Section {
+                        Text(error).font(.footnote).foregroundStyle(.secondary)
+                        Button("Retry uploads") { Task { await syncNow() } }
+                            .disabled(engine.isSyncing || engine.isPaused || engine.authorizationDenied)
                     }
                 }
 
@@ -90,11 +94,11 @@ struct TodayView: View {
                 // reason the Engine tab earns its place: a home to develop + run tools.
                 Section {
                     Button {
-                        Task { await engine.sync() }
+                        Task { await syncNow() }
                     } label: {
                         Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
                     }
-                    .disabled(engine.isSyncing)
+                    .disabled(engine.isSyncing || engine.isPaused)
 
                     // Analyze Today — user-triggered on-device attribution run
                     // (the tuning surface: the owner decides when to route the
@@ -177,9 +181,14 @@ struct TodayView: View {
                 AccountView()
             }
             .refreshable {
-                await engine.sync()
+                await syncNow()
             }
         }
+    }
+
+    private func syncNow() async {
+        await engine.sync()
+        await engine.resumeBackfillIfNeeded()
     }
 }
 
@@ -429,8 +438,11 @@ private struct LiveMetricsStrip: View {
             // The local drain — this device's upload queue with an HONEST ETA
             // from the measured rate (C4: "estimating…" until a real rate exists).
             if engine.backfillRemaining > 0 {
-                Text(Self.etaLine(remaining: engine.backfillRemaining,
-                                  perMinute: engine.uploadsPerMinute))
+                Text(engine.isPaused ? "Uploads paused · \(engine.backfillRemaining) photos queued"
+                     : engine.isSyncing
+                        ? Self.etaLine(remaining: engine.backfillRemaining,
+                                       perMinute: engine.uploadsPerMinute)
+                        : "\(engine.backfillRemaining) photos queued · Sync Now to retry")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
