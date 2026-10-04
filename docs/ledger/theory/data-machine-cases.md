@@ -176,6 +176,29 @@ per-observation coverage proof. No new schedule, processing, model call or histo
 Detector failure tests run in the local ENFORCE gate; disposable PG17 fixtures test actual sensor and SQL behavior.
 C17 stays open for processing coverage, historical edges and a scheduled completeness assay.
 
+**C17 cached input coverage assay.** The arrival check above begins with landed observations. To detect
+qualified cached readings whose claims never arrived, use the same worker's canonical projection and
+readback rules in explicit read-only mode:
+
+```bash
+bash scripts/check-ingestion-health.sh --image-observations --cached-coverage \
+  --vehicle <public-vehicle-uuid> --sources 20
+```
+
+This uses the existing Supabase environment configuration. It inspects one public vehicle, at most 100 newest
+approved public-source image candidates, and up to 20 qualified cached sources by default (`--sources` accepts
+1–100). It selects current immutable BYOK testimony through the existing bounded parent reader, computes
+expected qualified claims, and verifies existing canonical output and typed public reader citations. Source
+and image eligibility reuse the worker's rules; mutable image metadata is not promoted to testimony.
+The budget is 20 client requests, 10 seconds per request and 60 seconds overall, with zero intake/model calls
+or processing checkpoint writes. Scheduled apply settings do not affect this command.
+
+Exit 0 means the selected vehicle's uncapped eligible sample was verified; exit 1 means missing claims,
+invalid output, absent witness/reader evidence or query failure; exit 2 means incomplete, including no eligible
+claims or a work cap. This measures cached output coverage, not new photo throughput, capture-clock accuracy,
+source independence, fleet completion or recurring execution. The scheduled processing entry point and its
+push/apply trigger are unchanged. Both detector suites run in the existing image-projection CI job.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026

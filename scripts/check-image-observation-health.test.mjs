@@ -1,9 +1,61 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { assess, options, query, run, SAMPLE_LIMIT } from './check-image-observation-health.mjs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { assess, options, query, run, SAMPLE_LIMIT, cachedAssayOptions } from './check-image-observation-health.mjs';
 
 const scope = { vehicle: '10000000-0000-0000-0000-000000000001', since: '2026-10-04T05:00:00Z', field: 'interior_color' };
+
+test('cached coverage requires an explicit bounded vehicle scope and always selects read-only mode', () => {
+  const args = ['--cached-coverage', '--vehicle', scope.vehicle];
+  assert.deepEqual(cachedAssayOptions(args), { verifyOnly: true, apply: false, vehicleId: scope.vehicle, sourceLimit: 20 });
+  assert.equal(cachedAssayOptions([...args, '--sources', '100']).sourceLimit, 100);
+  for (const invalid of [[], ['--cached-coverage'], [...args, '--sources', '101'], [...args, '--sources', '0'],
+    [...args, '--sources', '1e2'], [...args, '--apply', '1'], [...args, '--vehicle', scope.vehicle],
+    ['--cached-coverage', '--vehicle', "x';select"]]) assert.throws(() => cachedAssayOptions(invalid));
+});
+
+test('actual cached coverage CLI ignores apply and progress configuration and cannot call a writer', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cached-image-coverage-test-'));
+  try {
+    const script = join(directory, 'assay.mjs'), checkpoint = join(directory, 'checkpoint.json');
+    await copyFile(new URL('./check-image-observation-health.mjs', import.meta.url), script);
+    await mkdir(join(directory, 'lib'));
+    for (const name of ['cached-image-worker.mjs', 'image-property-projection.mjs']) {
+      await copyFile(new URL(`./lib/${name}`, import.meta.url), join(directory, 'lib', name));
+    }
+    for (const name of ['dotenv', '@supabase/supabase-js']) {
+      const target = join(directory, 'node_modules', name); await mkdir(target, { recursive: true });
+      await writeFile(join(target, 'package.json'), JSON.stringify({ type: 'module', main: 'index.js' }));
+    }
+    await writeFile(join(directory, 'node_modules/dotenv/index.js'), 'export default { config() {} };');
+    await writeFile(join(directory, 'node_modules/@supabase/supabase-js/index.js'), `
+      export function createClient() {
+        const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12,'0');
+        const data = { observation_properties: ['image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state']
+          .map((property_key,i) => ({id:id(i+1),property_key})), observation_sources: [{id:id(10),slug:'photo_pipeline'}],
+          vehicles: [{id:${JSON.stringify(scope.vehicle)},is_public:true}], vehicle_images: [] };
+        return {from(table) { if (!(table in data)) throw Error('unexpected table');
+          const q = new Proxy({}, {get(_, key) { if (key === 'then') return resolve => resolve({data:data[table],error:null});
+            if (['insert','update','delete','upsert'].includes(key)) throw Error('write forbidden'); return () => q; }}); return q; },
+          rpc() {throw Error('unexpected RPC');}, functions: {invoke() {throw Error('write forbidden');}}};
+      }
+    `);
+    await writeFile(checkpoint, 'preserved owner progress');
+    const result = spawnSync(process.execPath, [script, '--cached-coverage', '--vehicle', scope.vehicle], {
+      encoding: 'utf8', timeout: 5000, env: { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'offline-only',
+        IMAGE_CACHE_APPLY: '1', IMAGE_CACHE_SOURCE_LIMIT: '100000', IMAGE_CACHE_CHECKPOINT: checkpoint, IMAGE_PROCESSING_MODE: 'cached' },
+    });
+    assert.equal(result.error, undefined); assert.equal(result.status, 2, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.mode, 'cached_assay'); assert.equal(receipt.reason, 'no_eligible_claims');
+    assert.equal(receipt.budget.sources, 20); assert.equal(receipt.checkpoint_saved, false);
+    assert.equal(receipt.canonical_batch_calls, 0); assert.equal(receipt.newly_persisted_claims, 0);
+    assert.equal(await readFile(checkpoint, 'utf8'), 'preserved owner progress');
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 function fixture() {
   return {
     assay: 'image_observation_health_v1', sample_limit: SAMPLE_LIMIT,
