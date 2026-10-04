@@ -74,11 +74,28 @@ Deno.serve(async (req) => {
 
         // Get BaT-specific stats
         if (identity.platform === "bat") {
-          const { data: batProfile } = await supabase
+          const profileColumns = "external_identity_id, total_comments, total_bids, total_wins, expertise_score, community_trust_score, first_seen, last_seen";
+          let { data: batProfile, error: profileError } = await supabase
             .from("bat_user_profiles")
-            .select("total_comments, total_bids, total_wins, expertise_score, community_trust_score, first_seen, last_seen")
+            .select(profileColumns)
+            .eq("external_identity_id", identity.id)
             .eq("username", identity.handle)
-            .single();
+            .maybeSingle();
+          if (profileError) throw profileError;
+
+          // Historical profiles have no UUID until a real BaT event reaches
+          // the fold. Retain exact platform-qualified enrichment for those
+          // rows only; never borrow another identity's keyed profile.
+          if (!batProfile) {
+            const legacy = await supabase
+              .from("bat_user_profiles")
+              .select(profileColumns)
+              .eq("username", identity.handle)
+              .is("external_identity_id", null)
+              .maybeSingle();
+            if (legacy.error) throw legacy.error;
+            batProfile = legacy.data;
+          }
 
           if (batProfile) {
             result.stats = {

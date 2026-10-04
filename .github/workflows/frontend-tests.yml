@@ -10,7 +10,19 @@ on:
     - cron: '0 7 * * *' # daily
 
 jobs:
+<<<<<<< HEAD
   sold-context-contract:
+=======
+  discovery-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify discovery failure and evidence contracts
+        run: python3 scripts/discovery/inclusion_pass_test.py
+
+  profile-fold-contract:
+>>>>>>> origin/main
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -29,10 +41,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+<<<<<<< HEAD
       - name: Create disposable sold-context contract database
         run: createdb dm_refinement_popup_comps
       - name: Verify supported scope and canonical sale provenance
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_popup_comps -f supabase/sql/test_popup_comps_supported_scope.sql
+=======
+      - name: Create disposable contract database
+        run: createdb dm_refinement_bat_profile
+      - name: Verify the actual profile migration and replay contract
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+>>>>>>> origin/main
 
   vitest:
     runs-on: ubuntu-latest
@@ -50,6 +69,11 @@ jobs:
       - name: Install dependencies
         working-directory: ./nuke_frontend
         run: npm ci
+
+      - name: Verify actual identity reader with installed dependencies
+        run: node --test scripts/test-search-identity-profile-link.mjs
+        env:
+          NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
       - name: Run Vitest
         working-directory: ./nuke_frontend
