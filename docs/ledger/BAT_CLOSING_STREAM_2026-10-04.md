@@ -1,8 +1,23 @@
 # BaT closing acquisition — October 4, 2026
 
-Prepared implementation and focused tests. Not merged, deployed, or verified in
-Nuke production. The minute/cap-three HTML workaround in the earlier draft is
-superseded by the stream migration in this PR.
+PRs 565 and 566 are merged and deployed. The owner explicitly approved PR 566's
+schema rollout at checked head `0e98bbc41` (full head recorded in PR 566).
+Supabase deployment run 37232927835 applied the migration and deployed all three
+affected functions. The minute/cap-three HTML workaround is superseded.
+
+At 20:46 UTC, runtime health exposed 63 unresolved clock-retired lots and no
+subscriptions. Their board sale_status had already become not_sold, so the
+auction_live-only board recovery selector missed them. The follow-up migration
+resumes recent existing monitors independently of board status and HTML gates,
+until a qualified same-source terminal result. Its PG17 regression passed;
+production deployment and coverage verification of this repair are pending.
+
+The existing source reader recovered the reported Mustang at 20:49 UTC:
+canonical sold result 123000, buyer robsq22, native sold_at 17:39:28 UTC,
+14 bids. The anonymous production profile showed SOLD $123,000 after reload.
+The open page received pulse updates but other auction readers retained stale
+data; whole-page delivery still needs verification. No waiting production locks.
+Live-second performance under production closing load remains unmeasured.
 
 The reported Mustang (`45122195-393d-4c00-83a2-5b517ae9ce44`, BaT post
 `119935516`, lot 266577) was last read at 16:45 UTC with $118,888 and ten bids.
@@ -114,7 +129,7 @@ deno run --allow-write=/private/tmp/nuke-bat-prepared-fixture.json supabase/sql/
 psql -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
 ```
 
-Production schema rollout requires the owner's explicit authorization under
+Production schema rollout received the owner's explicit authorization under
 AGENTS.md. After checked merge, existing CI applies migrations then deploys
 `extract-bat-core`, `ingest-observation`, `sync-live-auctions`. Inspect locks,
 live schema/function versions, actual subscribed coverage and receipt-to-intake
