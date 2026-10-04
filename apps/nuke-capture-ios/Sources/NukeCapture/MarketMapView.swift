@@ -21,6 +21,7 @@ struct MarketMapView: View {
 struct CountyLocationRow: Decodable, Identifiable {
     let id: UUID
     let observed_at: String?
+    let source_type: String?
     let source_platform: String?
     let source_url: String?
     let postal_code: String?
@@ -32,14 +33,16 @@ struct CountyLocationRow: Decodable, Identifiable {
 
     // Parse once during decoding, rather than repeatedly during sorting/panning.
     let observedDate: Date?
+    var auctionClock = AuctionLocationClock.pending
     enum CodingKeys: String, CodingKey {
-        case id, observed_at, source_platform, source_url, postal_code, city, precision, confidence, vehicles
+        case id, observed_at, source_type, source_platform, source_url, postal_code, city, precision, confidence, vehicles
     }
     private enum EligibilityKeys: String, CodingKey { case status, deleted_at }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         observed_at = try c.decodeIfPresent(String.self, forKey: .observed_at)
+        source_type = try c.decodeIfPresent(String.self, forKey: .source_type)
         source_platform = try c.decodeIfPresent(String.self, forKey: .source_platform)
         source_url = try c.decodeIfPresent(String.self, forKey: .source_url)
         postal_code = try c.decodeIfPresent(String.self, forKey: .postal_code)
@@ -75,6 +78,108 @@ struct CountyLocationRow: Decodable, Identifiable {
     }
 }
 
+// Auction dates belong to a source episode, not a vehicle snapshot or intake.
+// The existing public graph supplies these records; no clock is inferred from
+// observed_at, scraped_at, model year, another relisting, or a sale price.
+struct AuctionClockRecord: Decodable {
+    let id: UUID
+    let vehicle_id: UUID
+    let source_url: String?
+    let ended_at: String?
+    let event_type: String?
+}
+
+struct AuctionClockParent: Decodable {
+    let id: UUID
+    let status: String?
+    let deleted_at: String?
+    let auction_events: [AuctionClockRecord]
+    let vehicle_events: [AuctionClockRecord]
+    let bat_listings: [AuctionClockRecord]
+}
+
+struct AuctionLocationClock {
+    let date: Date? // Calendar day, UTC. Midnight legacy dates stay on that day.
+    let evidenceIDs: [UUID]
+    let note: String
+    static let pending = Self(date: nil, evidenceIDs: [], note: "Auction dates not read")
+    static var calendar: Calendar {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(secondsFromGMT: 0)!; return c
+    }
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.calendar = calendar; f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd"; f.isLenient = false; return f
+    }()
+    private static let timestamp = ISO8601DateFormatter()
+    private static let fractionalTimestamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
+    static func day(_ raw: String) -> Date? {
+        if raw.count == 10, let date = dayFormatter.date(from: raw), dayFormatter.string(from: date) == raw { return date }
+        guard let instant = fractionalTimestamp.date(from: raw) ?? timestamp.date(from: raw) else { return nil }
+        return calendar.startOfDay(for: instant)
+    }
+    static func label(_ date: Date) -> String {
+        var style = Date.FormatStyle(date: .abbreviated, time: .omitted); style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
+    static func sourceKey(_ raw: String?) -> String? {
+        guard let raw, let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              url.user == nil, url.password == nil, url.port == nil, let host = url.host?.lowercased() else { return nil }
+        let domain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !path.isEmpty else { return nil }
+        // Match the established listingUrl.ts key for these known venues.
+        // Other sources retain case and query parameters that may identify a lot.
+        if domain == "bringatrailer.com", path.hasPrefix("listing/") {
+            return domain + "/" + path.lowercased()
+        }
+        if domain == "carsandbids.com", path.hasPrefix("auctions/") {
+            return domain + "/" + path.lowercased()
+        }
+        return domain + "/" + path + (url.query.map { "?" + $0 } ?? "")
+    }
+    static func resolve(_ row: CountyLocationRow, parent: AuctionClockParent?) -> Self {
+        func unknown(_ note: String, _ ids: [UUID] = []) -> Self { Self(date: nil, evidenceIDs: ids, note: note) }
+        guard row.source_type == "listing", let key = sourceKey(row.source_url) else { return unknown("No auction source link") }
+        guard let parent, parent.id == row.vehicles.id, parent.deleted_at == nil,
+              !["deleted", "merged", "rejected", "duplicate"].contains(parent.status ?? "") else { return unknown("Auction records unavailable") }
+        // Refuse a possible embedded transport cap instead of choosing from a
+        // partial episode history. Parent IDs themselves are read in full.
+        guard [parent.auction_events.count, parent.vehicle_events.count, parent.bat_listings.count].allSatisfy({ $0 < 1_000 }) else {
+            return unknown("Auction history exceeds embedded reader coverage")
+        }
+        let matches = (parent.auction_events + parent.bat_listings
+            + parent.vehicle_events.filter { $0.event_type == "auction" }).filter {
+            $0.vehicle_id == row.vehicles.id && sourceKey($0.source_url) == key
+        }
+        let ids = matches.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        guard !matches.isEmpty else { return unknown("No matching auction episode") }
+        let rawDates = matches.compactMap(\.ended_at).filter { !$0.isEmpty }
+        let dates = rawDates.compactMap(day)
+        guard dates.count == rawDates.count else { return unknown("Invalid auction date", ids) }
+        let days = Set(dates)
+        guard days.count <= 1 else { return unknown("Conflicting auction dates", ids) }
+        guard let date = days.first else { return unknown("Auction close date unrecorded", ids) }
+        return Self(date: date, evidenceIDs: ids, note: "Source-linked auction close · UTC day")
+    }
+}
+
+struct AuctionClockCoverage {
+    let first: Date?
+    let last: Date?
+    let datedVehicles: Int
+    let undatedVehicles: Int
+    init(rows: [CountyLocationRow]) {
+        let dates = rows.compactMap { $0.auctionClock.date }
+        first = dates.min(); last = dates.max()
+        let dated = Set(rows.filter { $0.auctionClock.date != nil }.map { $0.vehicles.id })
+        datedVehicles = dated.count
+        undatedVehicles = Set(rows.map { $0.vehicles.id }).subtracting(dated).count
+    }
+}
+
 struct CountyVehicleEvidence: Identifiable {
     let vehicle: VehicleHeaderRow
     let observations: [CountyLocationRow]
@@ -95,11 +200,11 @@ struct MapObservationWindow: Hashable {
     var label: String {
         guard let start, let end else { return "All time" }
         let lastDay = end.addingTimeInterval(-1)
-        return "\(start.formatted(date: .abbreviated, time: .omitted)) – \(lastDay.formatted(date: .abbreviated, time: .omitted))"
+        return "\(AuctionLocationClock.label(start)) – \(AuctionLocationClock.label(lastDay))"
     }
     func includes(_ row: CountyLocationRow) -> Bool {
         if start == nil && end == nil { return true }
-        guard let date = row.observedDate else { return false }
+        guard let date = row.auctionClock.date else { return false }
         return start.map { date >= $0 } != false && end.map { date < $0 } != false
     }
 }
@@ -152,13 +257,13 @@ struct CountyEvidenceSummary {
             let byVehicle = Dictionary(grouping: observations, by: { $0.vehicles.id })
             let vehicles = byVehicle.values.map { evidence -> CountyVehicleEvidence in
                 let sorted = evidence.sorted {
-                    let a = $0.observedDate ?? .distantPast; let b = $1.observedDate ?? .distantPast
+                    let a = $0.auctionClock.date ?? .distantPast; let b = $1.auctionClock.date ?? .distantPast
                     return a == b ? $0.id.uuidString < $1.id.uuidString : a > b
                 }
                 return CountyVehicleEvidence(vehicle: sorted[0].vehicles, observations: sorted)
             }.sorted {
-                let a = $0.observations[0].observedDate ?? .distantPast
-                let b = $1.observations[0].observedDate ?? .distantPast
+                let a = $0.observations[0].auctionClock.date ?? .distantPast
+                let b = $1.observations[0].auctionClock.date ?? .distantPast
                 return a == b ? $0.id.uuidString < $1.id.uuidString : a > b
             }
             let label = key == "conflict" ? "ZIP / county conflict"
@@ -211,7 +316,7 @@ private enum ZIPLocationReader {
     // Nonisolated network/decode work; only page publication returns to the UI.
     static func fetch(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
         var request = SupabaseService.client.from("vehicle_location_observations")
-            .select("id,observed_at,source_platform,source_url,postal_code,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
+            .select("id,observed_at,source_type,source_platform,source_url,postal_code,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
             .eq("county_fips", value: fips).gte("confidence", value: 0.5)
         // Keep the access-controlled inner join on the server. Apply the same
         // deleted/status membership rule locally: filtering the embedded join
@@ -219,6 +324,40 @@ private enum ZIPLocationReader {
         if let after { request = request.gt("id", value: after) }
         return try await request.order("id", ascending: true).limit(size).execute().value
     }
+
+    static func readClocks(rows: [CountyLocationRow]) async throws -> [UUID: AuctionClockParent] {
+        let ids = Set(rows.filter { $0.source_type == "listing" && AuctionLocationClock.sourceKey($0.source_url) != nil }
+            .map { $0.vehicles.id.uuidString.lowercased() }).sorted()
+        let chunks = stride(from: 0, to: ids.count, by: 125).map { Array(ids[$0..<min($0 + 125, ids.count)]) }
+        return try await withThrowingTaskGroup(of: [AuctionClockParent].self) { group in
+            var next = 0; var result: [UUID: AuctionClockParent] = [:]
+            func enqueue() {
+                let chunk = chunks[next]; next += 1
+                group.addTask {
+                    try Task.checkCancellation()
+                    let page: [AuctionClockParent] = try await SupabaseService.client.from("vehicles")
+                        .select("id,status,deleted_at,auction_events(id,vehicle_id,source_url,ended_at:auction_end_date),vehicle_events(id,vehicle_id,source_url,ended_at,event_type),bat_listings(id,vehicle_id,source_url:bat_listing_url,ended_at:auction_end_date)")
+                        .in("id", values: chunk).limit(chunk.count).execute().value
+                    let requested = Set(chunk)
+                    guard page.count <= chunk.count, page.allSatisfy({ requested.contains($0.id.uuidString.lowercased()) }) else {
+                        throw URLError(.cannotParseResponse)
+                    }
+                    return page
+                }
+            }
+            for _ in 0..<min(4, chunks.count) { enqueue() }
+            while let page = try await group.next() {
+                try Task.checkCancellation()
+                for parent in page {
+                    guard result[parent.id] == nil else { throw URLError(.cannotParseResponse) }
+                    result[parent.id] = parent
+                }
+                if next < chunks.count { enqueue() }
+            }
+            return result
+        }
+    }
+
 }
 
 final class ZIPAreaLabel: NSObject, MKAnnotation {
@@ -333,6 +472,8 @@ struct CountyZIPDrill: View {
     @State private var observations: [CountyLocationRow] = []
     @State private var cursor: String?
     @State private var complete = false
+    @State private var clockLoading = false
+    @State private var clockRevision = 0
     @State private var loading = false
     @State private var failed = false
     @Binding var query: String
@@ -365,6 +506,12 @@ struct CountyZIPDrill: View {
         if let fips = ProcessInfo.processInfo.environment["NUKE_DEBUG_COUNTY"] {
             _county = State(initialValue: CountySelection(fips: fips))
         }
+        if let rawStart = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_FROM"],
+           let rawEnd = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_THROUGH"],
+           let start = AuctionLocationClock.day(rawStart), let end = AuctionLocationClock.day(rawEnd), end >= start {
+            _period = State(initialValue: MapObservationWindow(start: start,
+                end: AuctionLocationClock.calendar.date(byAdding: .day, value: 1, to: end)))
+        }
         #endif
     }
 
@@ -385,7 +532,7 @@ struct CountyZIPDrill: View {
                     }
                     Button { showDates = true } label: {
                         Label(period == .all ? "All time" : "Date range", systemImage: "calendar")
-                    }
+                    }.disabled(loading || failed || observations.isEmpty)
                     Button { showInfo = true } label: { Image(systemName: "info.circle") }
                         .accessibilityLabel("Map sources and coverage")
                 }
@@ -395,7 +542,8 @@ struct CountyZIPDrill: View {
                 } else if loading || geometryLoading || projectionBusy {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.mini)
-                        Text(loading ? "\(observations.count.formatted()) records · loading all matching records"
+                        Text(clockLoading ? "Matching source auction dates"
+                             : loading ? "\(observations.count.formatted()) records · loading all matching records"
                              : geometryLoading ? "Loading ZIP boundaries" : "Updating date window")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -403,7 +551,7 @@ struct CountyZIPDrill: View {
                     Text("\(summary.zipVehicleCount.formatted()) vehicles with ZIP evidence · historical")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if period != .all { Text(period.label).font(.caption2).foregroundStyle(.secondary) }
+                if period != .all { Text("\(period.label) · auction close dates, UTC").font(.caption2).foregroundStyle(.secondary) }
                 if !scale.needsPreciseEvidence && !counts.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Vehicles per ZIP").font(.caption2).foregroundStyle(.secondary)
@@ -455,7 +603,7 @@ struct CountyZIPDrill: View {
                 }
                 if failed || geometryFailed {
                     HStack {
-                        Text(geometryFailed ? "ZIP boundaries couldn't load." : "Record loading stopped; your map is retained.")
+                        Text(geometryFailed ? "ZIP boundaries couldn't load." : "Evidence loading stopped; dates may be incomplete. Your map is retained.")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task {
@@ -474,20 +622,21 @@ struct CountyZIPDrill: View {
             if CountyLocationRow.zip(value) != nil { searchZIP() }
         }
         .sheet(isPresented: $showMakePicker) { MakePickerSheet(selected: $make, makes: availableMakes) }
-        .sheet(isPresented: $showDates) { MapDateWindowPicker(window: $period, earliest: earliest, latest: latest) }
+        .sheet(isPresented: $showDates) { MapDateWindowPicker(window: $period, earliest: earliest, latest: latest, undatedRecords: observations.filter { $0.auctionClock.date == nil }.count) }
         .sheet(isPresented: $showReport) {
             if let group = selectedGroup {
-                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete, selectedMake: make) }
+                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete && !loading && !failed, selectedMake: make) }
             }
         }
         .sheet(isPresented: $showInfo) {
             NavigationStack {
                 List {
                     Text("\(observations.count.formatted()) location observations read; \(summary.vehicleCount.formatted()) distinct vehicles in the selected date and make cohort. \(complete ? "All matching pages were read." : "The read is still incomplete.")")
-                    if let latest { Text("Latest recorded location: \(latest.formatted(date: .abbreviated, time: .omitted)).") }
-                    Text("Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts. The date window uses the location observation's recorded clock; records without that clock remain available in All time.")
+                    if let latest { Text("Latest matched auction close: \(AuctionLocationClock.label(latest)) · UTC.") }
+                    Text("\(observations.filter { $0.auctionClock.date == nil }.count.formatted()) location records lack a supported auction close date; they remain in All time and are excluded from date ranges.")
+                    Text("Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts. The date window uses the matching source auction's close date, as a UTC calendar day. End dates do not establish a completed sale. Conflicting or absent dates remain undated; intake dates never substitute for auction dates.")
                 Text("County keys partition the indexed database reads as you move around the map. The active partition is \(county?.fips ?? "not selected"). This is not a national census of every vehicle.")
-                Text("Completed region reads are reused for up to 10 minutes during this map session. Source observation dates, rather than the cache age, describe when the location was recorded.")
+                Text("Completed region reads are reused for up to 10 minutes during this map session. Auction event dates and location intake dates are separate. This is a current read of recorded evidence, not an immutable historical snapshot.")
                     Text("ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. County conflicts and missing source ZIPs remain available under Coverage.")
                     Text("Street, building and parking-space scales require precise, dated presence evidence. Historical ZIP observations cannot answer whether a car is still there.")
                     Link("Census ZIP area definitions", destination: URL(string: "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html")!)
@@ -516,7 +665,7 @@ struct CountyZIPDrill: View {
         .task(id: county?.fips) {
             guard let county else { return }
             loading = false; geometryLoading = false
-            observations = []; cursor = nil; complete = false; failed = false
+            observations = []; cursor = nil; complete = false; failed = false; clockLoading = false; clockRevision += 1
             selectedZIP = nil; latest = nil; earliest = nil
             async let records: Void = loadAll(county)
             async let boundaries: Void = loadGeometry(county)
@@ -528,13 +677,13 @@ struct CountyZIPDrill: View {
             }
             #endif
         }
-        .task(id: ProjectionKey(fips: county?.fips, count: observations.count, make: make, window: period)) {
+        .task(id: ProjectionKey(fips: county?.fips, count: observations.count, clockRevision: clockRevision, make: make, window: period)) {
             await project()
         }
     }
 
     private struct ProjectionKey: Hashable {
-        let fips: String?; let count: Int; let make: String?; let window: MapObservationWindow
+        let fips: String?; let count: Int; let clockRevision: Int; let make: String?; let window: MapObservationWindow
     }
 
     private func selectCounty(_ fips: String) {
@@ -607,13 +756,13 @@ struct CountyZIPDrill: View {
     }
 
     private func loadAll(_ county: CountySelection) async {
-        guard !loading, !complete else { return }
+        guard !loading, !complete || failed else { return }
         loading = true; failed = false
-        defer { if self.county?.fips == county.fips { loading = false } }
+        defer { if self.county?.fips == county.fips { loading = false; clockLoading = false } }
         if cursor == nil, let cached = await ZIPMapReadCache.shared.get(county.fips) {
             guard !Task.isCancelled, self.county?.fips == county.fips else { return }
             observations = cached; complete = true
-            latest = cached.compactMap(\.observedDate).max(); earliest = cached.compactMap(\.observedDate).min()
+            latest = cached.compactMap { $0.auctionClock.date }.max(); earliest = cached.compactMap { $0.auctionClock.date }.min()
             return
         }
         do {
@@ -626,13 +775,27 @@ struct CountyZIPDrill: View {
                 try Task.checkCancellation()
                 guard self.county?.fips == county.fips else { throw CancellationError() }
                 observations.append(contentsOf: batch.rows); cursor = batch.cursor; complete = batch.complete
-                let dates = batch.rows.compactMap(\.observedDate)
-                if let date = dates.max(), latest == nil || date > latest! { latest = date }
-                if let date = dates.min(), earliest == nil || date < earliest! { earliest = date }
                 NSLog("NukeCapture county %@: %d observations, complete=%d, read=%.3f seconds", county.fips,
                       observations.count, complete ? 1 : 0, Date().timeIntervalSince(start))
             })
-            await ZIPMapReadCache.shared.put(county.fips, observations)
+            clockLoading = true
+            let parents = try await ZIPLocationReader.readClocks(rows: observations)
+            try Task.checkCancellation()
+            guard self.county?.fips == county.fips else { return }
+            let sourceRows = observations
+            let enriched = await Task.detached(priority: .userInitiated) {
+                sourceRows.map { original -> CountyLocationRow in
+                    var row = original; row.auctionClock = AuctionLocationClock.resolve(row, parent: parents[row.vehicles.id]); return row
+                }
+            }.value
+            try Task.checkCancellation()
+            guard self.county?.fips == county.fips else { return }
+            observations = enriched; clockRevision += 1
+            let coverage = AuctionClockCoverage(rows: enriched)
+            earliest = coverage.first; latest = coverage.last
+            NSLog("NukeCapture county %@: auction dates matched for %d vehicles, %d undated, total read %.3f seconds",
+                  county.fips, coverage.datedVehicles, coverage.undatedVehicles, Date().timeIntervalSince(start))
+            await ZIPMapReadCache.shared.put(county.fips, enriched)
         } catch {
             guard !Task.isCancelled, self.county?.fips == county.fips else { return }
             failed = true
@@ -644,6 +807,7 @@ struct MapDateWindowPicker: View {
     @Binding var window: MapObservationWindow
     let earliest: Date?
     let latest: Date?
+    let undatedRecords: Int
     @Environment(\.dismiss) private var dismiss
     @State private var start = Date()
     @State private var end = Date()
@@ -655,25 +819,31 @@ struct MapDateWindowPicker: View {
                     DatePicker("From", selection: $start, displayedComponents: .date)
                     DatePicker("Through", selection: $end, in: start..., displayedComponents: .date)
                     Button("Apply date range") {
-                        let calendar = Calendar.current
+                        let calendar = AuctionLocationClock.calendar
                         window = MapObservationWindow(start: calendar.startOfDay(for: start),
                                                       end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: max(start, end))))
                         dismiss()
                     }.disabled(end < start)
                 } header: { Text("Any time interval") }
                 if let earliest, let latest {
-                    Section("Recorded location dates") {
-                        Text("\(earliest.formatted(date: .abbreviated, time: .omitted)) – \(latest.formatted(date: .abbreviated, time: .omitted))")
-                        Text("The map filters recorded location observations. These are not sale or bid timestamps.")
+                    Section("Matched auction close dates · UTC") {
+                        Text("\(AuctionLocationClock.label(earliest)) – \(AuctionLocationClock.label(latest))")
+                        Text("Filters the close date of the auction matched to each location source. A close does not establish a sale.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
+                Section {
+                    Text("\(undatedRecords.formatted()) location records have no supported auction close date. All time retains them; a date range excludes them.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }
-            .navigationTitle("Time window").navigationBarTitleDisplayMode(.inline)
+            .environment(\.timeZone, AuctionLocationClock.calendar.timeZone)
+            .environment(\.calendar, AuctionLocationClock.calendar)
+            .navigationTitle("Auction dates").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .onAppear {
-                start = Calendar.current.startOfDay(for: window.start ?? earliest ?? Date())
-                end = Calendar.current.startOfDay(for: window.end?.addingTimeInterval(-1) ?? latest ?? Date())
+                start = AuctionLocationClock.calendar.startOfDay(for: window.start ?? earliest ?? Date())
+                end = AuctionLocationClock.calendar.startOfDay(for: window.end?.addingTimeInterval(-1) ?? latest ?? Date())
             }
             .onChange(of: start) { _, value in if end < value { end = value } }
         }
@@ -833,8 +1003,8 @@ struct ZIPActivityView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("ZIP \(group.id)").font(.largeTitle.bold())
                 Text("\(selectedMake ?? "All makes") · historical location cohort").font(.subheadline).foregroundStyle(.secondary)
-                Text(window == .all ? "All recorded location dates" : window.label).font(.subheadline.weight(.medium))
-                Text(recordedSpan).font(.caption).foregroundStyle(.secondary)
+                Text(window == .all ? "All time · undated evidence retained" : "\(window.label) · auction closes, UTC").font(.subheadline.weight(.medium))
+                Text(auctionSpan).font(.caption).foregroundStyle(.secondary)
                 if !complete { Text("Area loading · counts are provisional").font(.caption).foregroundStyle(.secondary) }
                 HStack(spacing: 0) {
                     metric(group.vehicles.count.formatted(), "Vehicles")
@@ -851,7 +1021,7 @@ struct ZIPActivityView: View {
                             Text("\(source.count.formatted()) vehicles").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
-                    Text("Captured coverage for this cohort. Location-record dates define the window; auction and sale dates are not measured here. A vehicle may appear on several platforms.")
+                    Text("Captured coverage for this cohort. Dates refer to the matching source auction close, not intake or sale confirmation. A vehicle may appear on several platforms.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 activityCard("Leading Bring a Trailer sellers") {
@@ -958,13 +1128,14 @@ struct ZIPActivityView: View {
         #endif
     }
 
-    private var recordedSpan: String {
-        let rows = group.vehicles.flatMap(\.observations)
-        let dates = rows.compactMap(\.observedDate)
-        guard let first = dates.min(), let last = dates.max() else { return "Location-record dates unknown" }
-        let missing = rows.count - dates.count
-        return "Recorded \(first.formatted(date: .abbreviated, time: .omitted)) – \(last.formatted(date: .abbreviated, time: .omitted))"
-            + (missing > 0 ? " · \(missing) undated records" : "")
+    private var auctionSpan: String {
+        let coverage = AuctionClockCoverage(rows: group.vehicles.flatMap(\.observations))
+        let span: String
+        if let first = coverage.first, let last = coverage.last {
+            span = "Auction closes: \(AuctionLocationClock.label(first)) – \(AuctionLocationClock.label(last)) · UTC"
+        } else { span = "Auction close dates unknown" }
+        return span + "\n\(coverage.datedVehicles) of \(group.vehicles.count) vehicles have matched auction dates"
+            + (coverage.undatedVehicles > 0 ? " · \(coverage.undatedVehicles) undated" : "")
     }
 
     private func platformName(_ source: String) -> String {
@@ -1081,6 +1252,7 @@ struct MapVehicleContext {
     let sources: [String]
     let firstDate: Date?
     let latestDate: Date?
+    let latestAuctionClose: Date?
     let seller: String?
     init(group: CountyZIPGroup, evidence: CountyVehicleEvidence, seller: String? = nil) {
         vehicleTitle = evidence.vehicle.title
@@ -1095,6 +1267,7 @@ struct MapVehicleContext {
         sources = Set(evidence.observations.compactMap(\.source_platform)).sorted()
         firstDate = evidence.observations.compactMap(\.observedDate).min()
         latestDate = evidence.observations.compactMap(\.observedDate).max()
+        latestAuctionClose = evidence.observations.compactMap { $0.auctionClock.date }.max()
         self.seller = seller
     }
 }
@@ -1138,9 +1311,11 @@ struct CountyZIPVehicles: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(evidence.vehicle.title.isEmpty ? "Vehicle record" : evidence.vehicle.title)
                                     .font(.subheadline.weight(.semibold))
-                                if let date = evidence.observations.first?.observedDate {
-                                    Text("Location observation: \(date.formatted(date: .abbreviated, time: .omitted))")
+                                if let date = evidence.observations.first?.auctionClock.date {
+                                    Text("Auction close: \(AuctionLocationClock.label(date)) · UTC")
                                         .font(.caption).foregroundStyle(.secondary)
+                                } else {
+                                    Text("Auction close date unknown").font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -1150,8 +1325,15 @@ struct CountyZIPVehicles: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text([row.source_platform, row.city, row.postal_code].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                                     .font(.subheadline)
+                                if let date = row.auctionClock.date {
+                                    Text("Auction close: \(AuctionLocationClock.label(date)) · UTC")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text(row.auctionClock.note).font(.caption).foregroundStyle(.secondary)
+                                Text("\(row.auctionClock.evidenceIDs.count) matching auction records")
+                                    .font(.caption).foregroundStyle(.secondary)
                                 if let date = row.observedDate {
-                                    Text("Observation date: \(date.formatted(date: .abbreviated, time: .shortened))")
+                                    Text("Location recorded: \(date.formatted(date: .abbreviated, time: .shortened))")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 if let precision = row.precision {
