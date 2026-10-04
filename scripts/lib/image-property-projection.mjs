@@ -83,9 +83,9 @@ export function projectImageProperties(observation, image) {
 
 // PostgreSQL retains microseconds; Date.parse alone would accept sub-ms drift.
 // Normalize only for comparison: never change source payloads or replay hashes.
-function instantMicros(value) {
+export function instantMicros(value) {
   if (typeof value !== 'string') return null;
-  const match = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  const match = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
   if (!match || !Number.isFinite(Date.parse(value))) return null;
   return BigInt(Date.parse(value)) * 1000n + BigInt((match[1] ?? '').padEnd(6, '0').slice(3));
 }

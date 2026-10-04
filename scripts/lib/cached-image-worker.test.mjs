@@ -98,6 +98,9 @@ function fixture(count = 1) {
         kind: claim.kind, source_id: source, source_identifier: claim.source_identifier,
         property_id: rows.observation_properties.find(p => p.property_key === claim.property_key).id,
         confidence_score: controls.readbackMismatch ? 0.9 : 0.6, is_superseded: false,
+        observed_at: claim.observed_at, ingested_at: new Date(Date.parse(claim.observed_at) + 1000).toISOString(),
+        extraction_method: claim.extraction_method, agent_model: claim.agent_model,
+        raw_source_ref: claim.raw_source_ref,
         structured_data: structuredClone(claim.structured_data),
       });
       return { inserted, duplicates: 0, verified: inserted, failed: inserted === claims.length ? 0 : 1,
@@ -471,6 +474,54 @@ test('coverage validates existing values instead of treating identity presence a
   const result = await runCachedImageProjection(f.sb, f.assay);
   assert.equal(result.reason, 'canonical_readback_mismatch'); assert.equal(cachedWorkerExitCode(result), 1);
 });
+
+for (const [name, mutate] of [
+  ['missing event clock', row => { delete row.observed_at; }],
+  ['null event clock', row => { row.observed_at = null; }],
+  ['one-microsecond event drift', row => { row.observed_at = '2026-10-01T02:00:00.000001Z'; }],
+  ['missing ingest clock', row => { delete row.ingested_at; }],
+  ['null ingest clock', row => { row.ingested_at = null; }],
+  ['one-microsecond early ingest', row => { row.ingested_at = '2026-10-01T01:59:59.999999Z'; }],
+  ['invalid ingest clock', row => { row.ingested_at = 'unknown'; }],
+  ['wrong extraction method', row => { row.extraction_method = 'unrelated-method'; }],
+  ['missing model', row => { delete row.agent_model; }],
+  ['wrong model', row => { row.agent_model = 'unrelated-model'; }],
+  ['wrong source reference', row => { row.raw_source_ref = 'unrelated-source'; }],
+  ['unknown currentness', row => { delete row.is_superseded; }],
+  ['null currentness', row => { row.is_superseded = null; }],
+  ['invented capture clock', row => { row.structured_data.capture_at = row.observed_at; }],
+  ['invented analysis clock', row => { row.structured_data.analyzed_at = row.observed_at; }],
+  ['wrong source method', row => { row.structured_data.source_extraction_method = 'unrelated-method'; }],
+  ['missing source clock basis', row => { delete row.structured_data.observed_at_basis; }],
+  ['wrong source observed clock', row => { row.structured_data.source_observed_at = row.observed_at; }],
+]) {
+  test(`coverage rejects ${name} before confirming reader evidence or advancing the image`, async () => {
+    const f = await assayFixture(); mutate(f.rows.vehicle_observations.at(-1));
+    const result = await runCachedImageProjection(f.sb, f.assay);
+    assert.equal(result.reason, 'canonical_readback_mismatch'); assert.equal(cachedWorkerExitCode(result), 1);
+    assert.equal(result.verified_sources, 0); assert.equal(result.confirmed_reader_visible_claims, 0);
+    assert.equal(result.checkpoint.image_cursor, null);
+    assert.equal(f.calls.some(call => call.table === 'get_field_provenance'), false);
+    assert.equal(f.writes.length + f.saved.length, 0);
+  });
+}
+
+for (const [name, observedAt, ingestedAt] of [
+  ['timezone', '2026-10-01T07:45:00.000000+05:45', '2026-10-01T02:00:00.000001Z'],
+  ['PostgreSQL space', '2026-10-01 02:00:00.000000+00:00', '2026-10-01 02:00:00.000001+00:00'],
+]) {
+  test(`coverage accepts equivalent ${name} clocks and retained microseconds without changing source identities`, async () => {
+    const f = await assayFixture();
+    const before = JSON.stringify(f.rows.vehicle_observations.map(row => row.source_identifier));
+    for (const row of f.rows.vehicle_observations.filter(row => row.source_id === source)) {
+      row.observed_at = observedAt; row.ingested_at = ingestedAt;
+    }
+    const result = await runCachedImageProjection(f.sb, f.assay);
+    assert.equal(cachedWorkerExitCode(result), 0); assert.equal(result.confirmed_reader_visible_claims, 3);
+    assert.equal(JSON.stringify(f.rows.vehicle_observations.map(row => row.source_identifier)), before);
+    assert.equal(f.writes.length + f.saved.length, 0);
+  });
+}
 
 test('empty, private, missing-testimony and unresolved samples remain incomplete', async () => {
   for (const mutate of [f => { f.rows.vehicle_images = []; }, f => { f.rows.vehicles[0].is_public = false; },
