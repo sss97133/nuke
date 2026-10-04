@@ -5,6 +5,53 @@
 -- Live canonical intake's optional extractor reference is UUID, not a producer label.
 -- Keep that real PG boundary in the fixture; the SDK test traverses the actual handler.
 ALTER TABLE public.vehicle_observations ADD COLUMN extractor_id uuid;
+-- Actual live replay ownership, not a fictional global UNIQUE(content_hash).
+-- Nullable legacy identifiers permit duplicate hashes; pinned historical native
+-- receipts use their existing source ref as a non-NULL source_identifier.
+ALTER TABLE public.observation_sources ADD CONSTRAINT observation_sources_slug_key UNIQUE(slug);
+ALTER TABLE public.vehicle_observations ADD COLUMN source_identifier text, ADD COLUMN content_hash text;
+ALTER TABLE public.vehicle_observations ADD CONSTRAINT unique_observation
+  UNIQUE(source_id,source_identifier,kind,content_hash);
+CREATE INDEX idx_observations_content_hash ON public.vehicle_observations(content_hash);
+BEGIN;
+INSERT INTO public.vehicles(id,is_public) VALUES('00000000-0000-4000-8000-000000000001',true);
+INSERT INTO public.observation_sources VALUES('00000000-0000-4000-8000-000000000003','bat',.85);
+DO $$ DECLARE v uuid := '00000000-0000-4000-8000-000000000001';
+ s uuid := '00000000-0000-4000-8000-000000000003'; ref text := 'listing_page_snapshots:00000000-0000-4000-8000-000000000004';
+BEGIN
+ INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,kind,content_hash)
+ VALUES(gen_random_uuid(),v,s,'listing','legacy-null-identifier'),(gen_random_uuid(),v,s,'listing','legacy-null-identifier');
+ ASSERT (SELECT count(*)=2 FROM public.vehicle_observations WHERE content_hash='legacy-null-identifier'),
+   'NULL source identifiers do not arbitrate concurrent canonical hashes';
+ INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,source_identifier,kind,content_hash,
+   observed_at,ingested_at,content_text,structured_data,source_url)
+ VALUES(gen_random_uuid(),v,s,ref,'listing','pinned-description-payload',
+   '2020-01-01T00:00:00.123456Z','2021-01-01T00:00:00.654321Z',repeat('Preserved historic prose. ',100),
+   '{"source_captured_at":"2020-01-01 00:00:00.123456+00","observation_time_basis":"source_capture"}'::jsonb,
+   'https://bringatrailer.com/listing/fixture');
+ BEGIN
+   INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,source_identifier,kind,content_hash)
+   VALUES(gen_random_uuid(),v,s,ref,'listing','pinned-description-payload');
+   RAISE EXCEPTION 'Identical complete receipt key unexpectedly admitted twice';
+ EXCEPTION WHEN unique_violation THEN NULL; END;
+ ASSERT (SELECT count(*)=1 FROM public.vehicle_observations WHERE source_id=s AND source_identifier=ref
+   AND kind='listing' AND content_hash='pinned-description-payload');
+ ASSERT (SELECT is_superseded=false AND ingested_at IS NOT NULL FROM public.vehicle_observations
+   WHERE content_hash='pinned-description-payload');
+ ASSERT (SELECT (x->'source_descriptions'->0->>'source_captured_at')::timestamptz='2020-01-01T00:00:00.123456Z'::timestamptz
+   FROM jsonb_array_elements(public.get_vehicle_specs(v)) x WHERE x->>'field'='description'),
+   'Pinned native receipt reaches the existing reader with microseconds';
+ BEGIN
+   INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,kind)
+   VALUES(gen_random_uuid(),v,'00000000-0000-4000-8000-000000000099','listing');
+   RAISE EXCEPTION 'Unknown registry source unexpectedly bypassed its actual FK';
+ EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+ BEGIN
+   INSERT INTO public.observation_sources VALUES(gen_random_uuid(),'bat',.85);
+   RAISE EXCEPTION 'BaT slug unexpectedly admitted twice';
+ EXCEPTION WHEN unique_violation THEN NULL; END;
+END $$;
+ROLLBACK;
 DO $$ BEGIN
   ASSERT (SELECT atttypid = 'uuid'::regtype AND NOT attnotnull FROM pg_attribute
     WHERE attrelid = 'public.vehicle_observations'::regclass AND attname = 'extractor_id');
@@ -161,4 +208,4 @@ SET LOCAL ROLE service_role;
 SELECT public.get_vehicle_specs('11111111-1111-1111-1111-111111111111');
 RESET ROLE;
 ROLLBACK;
-SELECT 'PASS: actual description reader, full preserved tail, unchanged manual value, clocks/unknowns, all roles, public/restricted/deleted/nonvehicle/relinked/superseded ancestry, cutoff, safe-size refusal and five-capture limit' result;
+SELECT 'PASS: actual description reader, full preserved tail, unchanged manual value, clocks/unknowns, all roles, public/restricted/deleted/nonvehicle/relinked/superseded ancestry, cutoff, safe-size refusal, five-observation limit and actual source FK/composite receipt/NULL-identifier controls' result;

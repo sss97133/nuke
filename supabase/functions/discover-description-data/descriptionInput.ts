@@ -42,10 +42,11 @@ export async function loadDescriptionInput(
   supabase: any,
   vehicle: { id: string; listing_url?: string | null; discovery_url?: string | null; origin_metadata?: any },
   asOf = new Date().toISOString(),
+  snapshotPin?: { id: string; sha256: string },
 ): Promise<DescriptionInput> {
   const expectedUrl = urlKey(vehicle.listing_url || vehicle.discovery_url);
   const observations = await supabase.from("vehicle_observations")
-      .select("id,source_url,content_text,structured_data,observed_at,ingested_at")
+      .select("id,source_url,content_text,structured_data,observed_at,ingested_at,raw_source_ref,extraction_method")
       .eq("vehicle_id", vehicle.id).eq("kind", "listing").eq("subject_type", "vehicle")
       .or("is_superseded.eq.false,is_superseded.is.null")
       .lte("observed_at", asOf).lte("ingested_at", asOf)
@@ -74,7 +75,7 @@ export async function loadDescriptionInput(
   // mutable origin metadata is only a locator, never custody for its text/values.
   // Derive directly from the existing admin/service-only snapshot, and require
   // that its protected parser record matched this vehicle and source URL.
-  const snapshotId = vehicle.origin_metadata?.bat_snapshot_parsed?.snapshot_id;
+  const snapshotId = snapshotPin?.id ?? vehicle.origin_metadata?.bat_snapshot_parsed?.snapshot_id;
   if (snapshotId !== undefined) {
     if (typeof snapshotId !== "string" ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snapshotId)) {
@@ -93,9 +94,34 @@ export async function loadDescriptionInput(
         ingestion > Date.parse(asOf)) {
       throw new Error("Protected same-source snapshot unavailable; source custody unknown, mining refused");
     }
+    const captureMicros = observationClockMicroseconds(snapshot.fetched_at);
+    const archiveMicros = observationClockMicroseconds(snapshot.created_at);
+    const cutoffMicros = observationClockMicroseconds(asOf);
+    if (snapshotPin && (!/^[0-9a-f]{64}$/i.test(snapshotPin.sha256) ||
+        snapshot.html_sha256?.toLowerCase() !== snapshotPin.sha256.toLowerCase() ||
+        captureMicros === null || archiveMicros === null || cutoffMicros === null ||
+        captureMicros > cutoffMicros || archiveMicros > cutoffMicros || archiveMicros < captureMicros)) {
+      throw new Error("Pinned snapshot fingerprint or capture/archive clocks invalid; intake refused");
+    }
+    // A retry can see its own already-retained native receipt. It must still
+    // revalidate the protected body, not accept a mutable locator as custody.
+    const data = source?.structured_data || {};
+    const sourceIngestMicros = observationClockMicroseconds(source?.ingested_at);
+    const sameRetainedCapture = snapshotPin && source?.raw_source_ref === `listing_page_snapshots:${snapshot.id}` &&
+      source.extraction_method === "html_description_capture" && data.description_capture === true &&
+      data.source_capture_basis === "protected_snapshot" && data.source_event_time_status === "unknown" &&
+      typeof data.source_capture_sha256 === "string" &&
+      data.source_capture_sha256.toLowerCase() === snapshot.html_sha256?.toLowerCase() &&
+      observationClockMicroseconds(data.source_captured_at) === captureMicros &&
+      observationClockMicroseconds(source.observed_at) === captureMicros;
+    const pinnedTimeEligible = !source || (captureMicros !== null && sourceIngestMicros !== null &&
+      captureMicros >= sourceIngestMicros) || sameRetainedCapture;
+    if (snapshotPin && !pinnedTimeEligible) {
+      throw new Error("Newer listing evidence cannot be reconstructed from the pinned older capture; intake refused");
+    }
     // Never use an older capture to reconstruct a newer missing read. Receipt-only
     // snapshots and storage paths are explicit refusals; this reader adds no raw access.
-    if (!source || capture >= Date.parse(source.ingested_at)) {
+    if (!source || capture >= Date.parse(source.ingested_at) || (snapshotPin && pinnedTimeEligible)) {
       if (typeof snapshot.html !== "string" || !snapshot.html || snapshot.html.length > 5_000_000) {
         throw new Error("Protected snapshot text unavailable or oversized; mining refused");
       }
@@ -105,12 +131,16 @@ export async function loadDescriptionInput(
       }
       const text = extractDescription(snapshot.html);
       if (!text || text.length < 100) throw new Error("Protected snapshot prose unavailable; mining refused");
+      if (sameRetainedCapture && source.content_text !== text) {
+        throw new Error("Retained source text differs from its protected capture; intake refused");
+      }
       return requireCompleteInput({ text, sourceRef: `listing_page_snapshots:${snapshot.id}`,
         sourceUrl: snapshot.listing_url, observedAt: null, capturedAt: snapshot.fetched_at,
         ingestedAt: snapshot.created_at, textField: "listing_page_snapshots.html:batParser.extractDescription",
         custody: "protected_snapshot", captureSha256: snapshot.html_sha256.toLowerCase() });
     }
   }
+  if (snapshotPin) throw new Error("Pinned protected source unavailable; intake refused without fallback");
   if (source) {
     const data = source.structured_data || {};
     // These fields have no enforced completeness contract. Within this one
