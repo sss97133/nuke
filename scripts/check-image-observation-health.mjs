@@ -1,12 +1,54 @@
 // C12/C17 bounded, read-only assay; no processing, inference or testimony writes.
 // --since must be at/after the receipt deployment; older arrivals have no receipts.
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CACHE_ASSAY_BUDGET, runCachedImageProjection, cachedWorkerExitCode } from './lib/cached-image-worker.mjs';
 
 export const SAMPLE_LIMIT = 1000;
 const TABLES = ['vehicle_observations', 'observation_witnesses', 'vehicle_images'];
 const FIELD = /^[a-z][a-z0-9_]{0,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function cachedAssayOptions(args) {
+  if (args[0] !== '--cached-coverage') throw new Error('invalid assay arguments');
+  const scope = {};
+  for (let i = 1; i < args.length; i += 2) {
+    const key = args[i]?.replace(/^--/, '');
+    if (!['vehicle', 'sources'].includes(key) || !args[i].startsWith('--') ||
+        !args[i + 1] || scope[key] !== undefined) throw new Error('invalid assay arguments');
+    scope[key] = args[i + 1];
+  }
+  const sourceLimit = scope.sources === undefined ? CACHE_ASSAY_BUDGET.default_sources :
+    /^\d+$/.test(scope.sources) ? Number(scope.sources) : NaN;
+  if (!UUID.test(scope.vehicle ?? '') || !Number.isInteger(sourceLimit) ||
+      sourceLimit < 1 || sourceLimit > CACHE_ASSAY_BUDGET.maximum_sources) throw new Error('invalid assay scope');
+  return { verifyOnly: true, apply: false, vehicleId: scope.vehicle, sourceLimit };
+}
+
+export async function runCachedCoverage(args) {
+  try {
+    const scope = cachedAssayOptions(args);
+    const { default: dotenv } = await import('dotenv');
+    dotenv.config({ path: fileURLToPath(new URL('../.env.local', import.meta.url)), quiet: true });
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error('missing configuration');
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    // The assay receives no Edge Function invocation capability. Its only RPCs are readers.
+    const readers = new Set(['get_cached_image_projection_parents', 'get_field_provenance']);
+    const readonly = { from: table => sb.from(table), rpc(name, input) {
+      if (!readers.has(name)) throw new Error('unknown reader');
+      return sb.rpc(name, input);
+    } };
+    const { checkpoint, ...result } = await runCachedImageProjection(readonly, scope);
+    return { ...result, measured_cutoff: checkpoint?.cutoff ?? null,
+      scope_note: 'One public vehicle; newest approved public-source image candidates. Reuses immutable testimony and canonical projection rules. Empty or capped samples are incomplete. No intake, checkpoint writes, inference, corpus or fresh-throughput claim.' };
+  } catch {
+    return { mode: 'cached_assay', status: 'failed', reason: 'cached_assay_initialization_failed', coverage: 'unknown' };
+  }
+}
 
 export function options(args) {
   const result = { field: 'interior_color' };
@@ -135,13 +177,15 @@ export function run(scope, execute = sql => execFileSync('/bin/bash', [fileURLTo
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
-    const result = run(options(process.argv.slice(2)));
+    const args = process.argv.slice(2);
+    const result = args[0] === '--cached-coverage' ? await runCachedCoverage(args) : run(options(args));
     console.log(JSON.stringify(result, null, 2));
-    process.exitCode = result.status === 'passed_in_scope' ? 0 : result.status === 'incomplete' ? 2 : 1;
+    process.exitCode = result.mode === 'cached_assay' ? cachedWorkerExitCode(result) :
+      result.status === 'passed_in_scope' ? 0 : result.status === 'incomplete' ? 2 : 1;
   } catch {
-    console.error('usage: node scripts/check-image-observation-health.mjs --vehicle <uuid> --since <ISO timestamp> [--field interior_color]');
+    console.error('usage: node scripts/check-image-observation-health.mjs --vehicle <uuid> --since <ISO timestamp> [--field interior_color]; or --cached-coverage --vehicle <uuid> [--sources 1..100]');
     process.exitCode = 2;
   }
 }

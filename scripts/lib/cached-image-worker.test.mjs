@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CACHE_BUDGET, CACHE_WORKER_VERSION, initialCheckpoint, validateCheckpoint,
+import { CACHE_BUDGET, CACHE_ASSAY_BUDGET, CACHE_WORKER_VERSION, initialCheckpoint, validateCheckpoint,
   publicCachedImageEligible, runCachedImageProjection, cachedWorkerExitCode } from './cached-image-worker.mjs';
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -69,7 +69,8 @@ function fixture(count = 1) {
               image_observations: controls.emptyReader ? [] : rows.vehicle_observations
                 .filter(row => row.source_id === source && row.structured_data[rpcArgs.p_field])
                 .map(row => ({ observation_id: row.id, image_id: row.structured_data.image_id,
-                  witness_id: witness, witness_role: 'derived', value: row.structured_data[rpcArgs.p_field] })) }, error: null };
+                  witness_id: controls.missingReaderWitness ? null : witness,
+                  witness_role: 'derived', value: row.structured_data[rpcArgs.p_field] })) }, error: null };
           }
           let data = (rows[table] ?? []).filter(row => filters.every(filter => filter(row)));
           data = [...data].sort((a, b) => {
@@ -396,4 +397,95 @@ test('a completed coverage cycle automatically revisits previously missing testi
   assert.equal(first.checkpoint.cutoff, '2026-10-05T00:00:00.000Z');
   const next = await runCachedImageProjection(f.sb, { ...f.options, checkpoint: first.checkpoint });
   assert.equal(next.verified_sources, 1); assert.equal(next.newly_persisted_claims, 3);
+});
+
+async function assayFixture(count = 1) {
+  const f = fixture(count);
+  await runCachedImageProjection(f.sb, f.options);
+  f.calls.length = 0; f.writes.length = 0; f.saved.length = 0;
+  f.assay = { checkpoint: initialCheckpoint(cutoff), verifyOnly: true, apply: false, vehicleId: vehicle,
+    saveCheckpoint() { assert.fail('Read-only coverage must never save processing progress'); },
+    applyClaims() { assert.fail('Read-only coverage must never invoke intake'); } };
+  return f;
+}
+
+test('coverage verifies expected immutable-source claims and reader witnesses without writes or a fleet query', async () => {
+  const f = await assayFixture();
+  const result = await runCachedImageProjection(f.sb, f.assay);
+  assert.equal(result.mode, 'cached_assay'); assert.equal(cachedWorkerExitCode(result), 0);
+  assert.equal(result.existing_claims, 3); assert.equal(result.missing_claims, 0);
+  assert.equal(result.confirmed_reader_visible_claims, 3);
+  assert.equal(result.canonical_batch_calls, 0); assert.equal(result.newly_persisted_claims, 0);
+  assert.equal(result.checkpoint_saved, false); assert.equal(result.budget.run_ms, 60000);
+  assert.equal(result.budget.image_visits, 100); assert.equal(result.budget.queries, 20);
+  assert.equal(f.calls.some(call => call.table === 'image_coverage_by_vehicle'), false);
+  assert.equal(f.writes.length + f.saved.length, 0); assert.equal(result.full_history_verified, false);
+});
+
+test('coverage detects a claim that never arrived, without repairing it as a side effect', async () => {
+  const f = await assayFixture(); f.rows.vehicle_observations.pop();
+  const result = await runCachedImageProjection(f.sb, f.assay);
+  assert.equal(cachedWorkerExitCode(result), 1);
+  assert.equal(result.reason, 'canonical_readback_incomplete');
+  assert.equal(result.eligible_claims, 3); assert.equal(result.existing_claims, 2); assert.equal(result.missing_claims, 1);
+  assert.equal(f.writes.length + f.saved.length, 0);
+});
+
+for (const control of ['emptyReader', 'missingReaderWitness', 'readerThrows']) {
+  test(`coverage fails for ${control} despite all claims being stored`, async () => {
+    const f = await assayFixture(); f.controls[control] = true;
+    const result = await runCachedImageProjection(f.sb, f.assay);
+    assert.equal(cachedWorkerExitCode(result), 1); assert.equal(result.existing_claims, 3);
+    assert.equal(result.confirmed_reader_visible_claims, 0);
+    assert.equal(f.writes.length + f.saved.length, 0);
+  });
+}
+
+test('coverage validates existing values instead of treating identity presence as evidence', async () => {
+  const f = await assayFixture(); const row = f.rows.vehicle_observations.at(-1);
+  row.structured_data.image_visible_assembly_state = 'stripped';
+  const result = await runCachedImageProjection(f.sb, f.assay);
+  assert.equal(result.reason, 'canonical_readback_mismatch'); assert.equal(cachedWorkerExitCode(result), 1);
+});
+
+test('empty, private, missing-testimony and unresolved samples remain incomplete', async () => {
+  for (const mutate of [f => { f.rows.vehicle_images = []; }, f => { f.rows.vehicles[0].is_public = false; },
+    f => { f.rows.vehicle_observations = []; }, f => { f.rows.vehicle_observations[0].structured_data.needs_review = true; }]) {
+    const f = await assayFixture(); mutate(f);
+    const result = await runCachedImageProjection(f.sb, f.assay);
+    assert.equal(result.reason, 'no_eligible_claims'); assert.equal(cachedWorkerExitCode(result), 2);
+    assert.equal(result.confirmed_reader_visible_claims, 0);
+  }
+});
+
+test('coverage caps sources and image visits; verified capped samples cannot exit healthy', async () => {
+  const f = await assayFixture(101);
+  const result = await runCachedImageProjection(f.sb, { ...f.assay, sourceLimit: 100 });
+  assert.equal(result.inspected_images, 100); assert.equal(result.confirmed_reader_visible_claims, 300);
+  assert.equal(result.reason, 'work_budget_reached'); assert.equal(cachedWorkerExitCode(result), 2);
+  assert.equal(result.checkpoint_saved, false);
+});
+
+test('coverage cannot inherit apply mode, another vehicle checkpoint or expanded source budget', async () => {
+  for (const override of [{ apply: true }, { vehicleId: null }, { sourceLimit: 101 }, { sourceLimit: 0 },
+    { checkpoint: { ...initialCheckpoint(cutoff), current_vehicle_id: id(999) } }]) {
+    const f = await assayFixture(); const result = await runCachedImageProjection(f.sb, { ...f.assay, ...override });
+    assert.equal(result.reason, 'invalid_work_budget'); assert.equal(cachedWorkerExitCode(result), 1);
+    assert.equal(f.calls.length, 0);
+  }
+  assert.throws(() => { CACHE_ASSAY_BUDGET.image_visits = 100000; }, TypeError);
+});
+
+test('coverage query failure stays unknown instead of reporting no missing output', async () => {
+  const f = await assayFixture(); f.controls.badTable = 'vehicle_observations';
+  const result = await runCachedImageProjection(f.sb, f.assay);
+  assert.equal(result.reason, 'database_query_failed'); assert.equal(cachedWorkerExitCode(result), 1);
+  assert.equal(result.confirmed_reader_visible_claims, 0);
+});
+
+test('coverage run deadline is incomplete and never expands or writes progress', async () => {
+  const f = await assayFixture(); let time = 0;
+  const result = await runCachedImageProjection(f.sb, { ...f.assay, now: () => time += 30000 });
+  assert.equal(result.reason, 'run_budget_exhausted'); assert.equal(cachedWorkerExitCode(result), 2);
+  assert.equal(f.writes.length + f.saved.length, 0);
 });
