@@ -352,7 +352,6 @@ struct CountyZIPDrill: View {
     @State private var scale = GeographicScale.state
     @State private var summary = CountyEvidenceSummary(rows: [], fips: "", make: nil, crosswalk: [:])
     @State private var counts: [String: Int] = [:]
-    @State private var breaks: [Int] = []
     @State private var latest: Date?
     @State private var earliest: Date?
     @State private var focus: MKMapRect?
@@ -372,7 +371,7 @@ struct CountyZIPDrill: View {
     var body: some View {
         let selectedGroup = summary.groups.first { $0.id == selectedZIP }
         ZStack(alignment: .topLeading) {
-            CountyChoropleth(counts: scale.needsPreciseEvidence ? [:] : counts, breaks: breaks,
+            CountyChoropleth(counts: scale.needsPreciseEvidence ? [:] : counts,
                              geometry: areas, focus: focus, highlighted: selectedZIP,
                              areaLabels: scale.needsPreciseEvidence ? [] : areaLabels,
                              drawsAreas: !scale.needsPreciseEvidence,
@@ -405,6 +404,22 @@ struct CountyZIPDrill: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if period != .all { Text(period.label).font(.caption2).foregroundStyle(.secondary) }
+                if !scale.needsPreciseEvidence && !counts.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Vehicles per ZIP").font(.caption2).foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            ForEach(Array(ZIPMapPalette.labels.enumerated()), id: \.offset) { bin, title in
+                                HStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color(uiColor: ZIPMapPalette.color(bin: bin)))
+                                        .frame(width: 12, height: 12)
+                                    Text(title).font(.caption2.monospacedDigit())
+                                }
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
                 if let searchIssue { Text(searchIssue).font(.caption).foregroundStyle(.secondary) }
             }
             .padding(10).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -462,7 +477,7 @@ struct CountyZIPDrill: View {
         .sheet(isPresented: $showDates) { MapDateWindowPicker(window: $period, earliest: earliest, latest: latest) }
         .sheet(isPresented: $showReport) {
             if let group = selectedGroup {
-                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete) }
+                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete, selectedMake: make) }
             }
         }
         .sheet(isPresented: $showInfo) {
@@ -470,7 +485,7 @@ struct CountyZIPDrill: View {
                 List {
                     Text("\(observations.count.formatted()) location observations read; \(summary.vehicleCount.formatted()) distinct vehicles in the selected date and make cohort. \(complete ? "All matching pages were read." : "The read is still incomplete.")")
                     if let latest { Text("Latest recorded location: \(latest.formatted(date: .abbreviated, time: .omitted)).") }
-                    Text("Color shows distinct vehicles with source ZIP evidence, not completed sales, current availability or the number of bids. The date window uses the location observation's recorded clock; records without that clock remain available in All time.")
+                    Text("Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts. The date window uses the location observation's recorded clock; records without that clock remain available in All time.")
                 Text("County keys partition the indexed database reads as you move around the map. The active partition is \(county?.fips ?? "not selected"). This is not a national census of every vehicle.")
                 Text("Completed region reads are reused for up to 10 minutes during this map session. Source observation dates, rather than the cache age, describe when the location was recorded.")
                     Text("ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. County conflicts and missing source ZIPs remain available under Coverage.")
@@ -554,7 +569,6 @@ struct CountyZIPDrill: View {
         guard !Task.isCancelled else { return }
         summary = result.0; availableMakes = result.1
         counts = Dictionary(uniqueKeysWithValues: result.0.groups.filter(\.isZIP).map { ($0.id, $0.vehicles.count) })
-        breaks = quantileBreaks(Array(counts.values), bins: 7)
         projectionBusy = false
     }
 
@@ -802,6 +816,7 @@ struct ZIPActivityView: View {
     let group: CountyZIPGroup
     let window: MapObservationWindow
     let complete: Bool
+    var selectedMake: String? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var fold: ZIPActivityFold?
     @State private var listings: [ZIPListingRow] = []
@@ -813,60 +828,92 @@ struct ZIPActivityView: View {
     #endif
 
     var body: some View {
-        List {
-            Section {
-                Text("\(group.vehicles.count.formatted()) vehicles with source location evidence")
-                    .font(.headline)
-                Text(window.label).font(.subheadline).foregroundStyle(.secondary)
-                if !complete { Text("The area is still loading; these counts are provisional.").font(.caption).foregroundStyle(.secondary) }
+        ScrollView {
+          VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("ZIP \(group.id)").font(.largeTitle.bold())
+                Text("\(selectedMake ?? "All makes") · historical location cohort").font(.subheadline).foregroundStyle(.secondary)
+                Text(window == .all ? "All recorded location dates" : window.label).font(.subheadline.weight(.medium))
+                Text(recordedSpan).font(.caption).foregroundStyle(.secondary)
+                if !complete { Text("Area loading · counts are provisional").font(.caption).foregroundStyle(.secondary) }
+                HStack(spacing: 0) {
+                    metric(group.vehicles.count.formatted(), "Vehicles")
+                    metric(loading || failed ? "—" : (fold?.sellers.count ?? 0).formatted(), "BaT sellers")
+                    metric(loading || failed ? "—" : (fold?.listingCount ?? 0).formatted(), "Matched listings")
+                }.padding(.top, 8)
             }
             if let fold {
-                Section("Bring a Trailer sellers") {
-                    if fold.sellers.isEmpty {
-                        Text(loading ? "Reading seller relationships…" : "No source-matched sellers recorded for this cohort.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(fold.sellers) { seller in
-                        DisclosureGroup {
-                            ForEach(seller.listings) { listing in
-                                if let evidence = group.vehicles.first(where: { $0.id == listing.vehicle_id }) {
-                                    NavigationLink {
-                                        VehicleDetailView(vehicleId: evidence.id.uuidString.lowercased(), embedInNavigationStack: false,
-                                                          mapContext: MapVehicleContext(group: group, evidence: evidence, seller: seller.name))
-                                    } label: { Text(evidence.vehicle.title.isEmpty ? "Vehicle record" : evidence.vehicle.title) }
-                                }
-                            }
-                        } label: {
-                            LabeledContent(seller.name, value: "\(seller.listings.count) source listings")
+                activityCard("Platforms represented") {
+                    ForEach(fold.sources) { source in
+                        HStack {
+                            Text(platformName(source.label)).font(.subheadline.weight(.medium))
+                            Spacer()
+                            Text("\(source.count.formatted()) vehicles").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
-                    Text("Source-matched BaT records for \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Ranked by represented listings.")
+                    Text("Captured coverage for this cohort. Location-record dates define the window; auction and sale dates are not measured here. A vehicle may appear on several platforms.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                activityCard("Leading Bring a Trailer sellers") {
+                    if fold.sellers.isEmpty {
+                        Text(loading ? "Reading seller relationships…" : failed ? "Seller records unavailable." : "No sellers linked to these location records.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Chart(Array(fold.sellers.prefix(5))) { seller in
+                            BarMark(x: .value("Represented listings", seller.listings.count), y: .value("Seller", seller.name))
+                                .foregroundStyle(.blue.opacity(0.65))
+                                .annotation(position: .trailing) { Text(seller.listings.count.formatted()).font(.caption.monospacedDigit()) }
+                        }
+                        .chartXAxis(.hidden)
+                        .frame(height: CGFloat(min(fold.sellers.count, 5)) * 32 + 8)
+                    }
+                    NavigationLink("Explore all \(fold.sellers.count) sellers and their vehicles") {
+                        List {
+                            ForEach(fold.sellers) { seller in
+                                DisclosureGroup {
+                                    ForEach(seller.listings) { listing in
+                                        if let evidence = group.vehicles.first(where: { $0.id == listing.vehicle_id }) {
+                                            NavigationLink {
+                                                VehicleDetailView(vehicleId: evidence.id.uuidString.lowercased(), embedInNavigationStack: false,
+                                                                  mapContext: MapVehicleContext(group: group, evidence: evidence, seller: seller.name))
+                                            } label: { Text(evidence.vehicle.title.isEmpty ? "Vehicle record" : evidence.vehicle.title) }
+                                        }
+                                    }
+                                } label: {
+                                    LabeledContent(seller.name, value: seller.listings.count.formatted())
+                                }
+                            }
+                        }
+                        .navigationTitle("ZIP \(group.id) sellers")
+                    }
+                    Text("\(fold.listingCount) source-matched listings across \(fold.linkedVehicleCount) of \(group.vehicles.count) vehicles. Counts measure represented listings, not completed sales or revenue.")
                         .font(.caption).foregroundStyle(.secondary)
                     if fold.ambiguousSellerCount > 0 {
                         Text("\(fold.ambiguousSellerCount) source episodes have missing or conflicting seller identity.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Section("Vehicle mix") {
-                    Chart(Array(fold.makes.prefix(10))) { item in
+                activityCard("Vehicle mix") {
+                    Chart(Array(fold.makes.prefix(6))) { item in
                         BarMark(x: .value("Vehicles", item.count), y: .value("Make", item.label))
+                            .foregroundStyle(.teal.opacity(0.65))
+                            .annotation(position: .trailing) { Text(item.count.formatted()).font(.caption.monospacedDigit()) }
                     }
-                    .frame(height: CGFloat(min(fold.makes.count, 10)) * 28 + 24)
-                    ForEach(fold.makes) { item in
-                        LabeledContent(item.label, value: "\(item.count.formatted()) vehicles")
+                    .chartXAxis(.hidden)
+                    .frame(height: CGFloat(min(fold.makes.count, 6)) * 28 + 16)
+                    if fold.makes.count > 6 {
+                        DisclosureGroup("All \(fold.makes.count) makes") {
+                            ForEach(fold.makes) { item in
+                                LabeledContent(item.label, value: item.count.formatted()).font(.subheadline)
+                            }
+                        }
                     }
-                }
-                Section("Data sources") {
-                    ForEach(fold.sources) { item in
-                        LabeledContent(item.label, value: "\(item.count.formatted()) vehicles")
-                    }
-                    Text("A vehicle can have evidence from several sources.").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Section("Linked businesses") {
+            activityCard("Linked businesses") {
                 let visible = publicBusinessLinks
                 if visible.isEmpty {
-                    Text(loading ? "Reading business relationships…" : "No public businesses are linked to these vehicles.")
+                    Text(loading ? "Reading business relationships…" : failed ? "Business records unavailable." : "No public businesses are linked to these vehicles.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(visible) { business in
@@ -887,13 +934,13 @@ struct ZIPActivityView: View {
                 Text("Business addresses are recorded separately from vehicle locations. These links may describe historical work.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if loading { Section { HStack { ProgressView(); Text("Reading seller and business evidence") } } }
-            if failed { Section { Button("Seller / business records couldn't load · Retry") { Task { await load() } } } }
-            Section {
-                NavigationLink { CountyZIPVehicles(group: group) } label: { Label("Inspect vehicle evidence", systemImage: "doc.text.magnifyingglass") }
-            }
+            if loading { HStack { ProgressView(); Text("Reading seller and business evidence").font(.caption) } }
+            if failed { Button("Seller / business records couldn't load · Retry") { Task { await load() } } }
+            NavigationLink { CountyZIPVehicles(group: group) } label: { Label("Inspect all \(group.vehicles.count) vehicles", systemImage: "doc.text.magnifyingglass") }
+          }.padding(16)
         }
-        .navigationTitle("ZIP \(group.id) activity").navigationBarTitleDisplayMode(.inline)
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Area activity").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .task(id: group.vehicles.flatMap { $0.observations.map(\.id) }) { await load() }
         #if DEBUG
@@ -905,6 +952,38 @@ struct ZIPActivityView: View {
             }
         }
         #endif
+    }
+
+    private var recordedSpan: String {
+        let rows = group.vehicles.flatMap(\.observations)
+        let dates = rows.compactMap(\.observedDate)
+        guard let first = dates.min(), let last = dates.max() else { return "Location-record dates unknown" }
+        let missing = rows.count - dates.count
+        return "Recorded \(first.formatted(date: .abbreviated, time: .omitted)) – \(last.formatted(date: .abbreviated, time: .omitted))"
+            + (missing > 0 ? " · \(missing) undated records" : "")
+    }
+
+    private func platformName(_ source: String) -> String {
+        switch source.lowercased() {
+        case "bat", "bringatrailer", "bringatrailer.com", "bring_a_trailer": "Bring a Trailer"
+        case "carsandbids", "carsandbids.com", "cars_and_bids": "Cars & Bids"
+        default: source
+        }
+    }
+
+    private func metric(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value).font(.title2.bold().monospacedDigit())
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func activityCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            content()
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var publicBusinessLinks: [ZIPBusinessRow.Business] {
@@ -1089,27 +1168,25 @@ struct CountyZIPVehicles: View {
     }
 }
 
-// ─── Color ramp: pale warm → deep rich, alpha climbing with density ──────────────
-private func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double { a + (b - a) * max(0, min(1, t)) }
-
-/// t in 0…1 → the fill color. Pale amber (sparse) to deep red (dense); alpha rises
-/// so empty counties read as bare map, hot ones as solid blocks.
-func rampUIColor(t: Double) -> UIColor {
-    UIColor(red: lerp(0.99, 0.60, t), green: lerp(0.86, 0.08, t),
-            blue: lerp(0.42, 0.11, t), alpha: lerp(0.32, 0.88, t))
-}
-
-/// Quantile breaks so a few giant counties don't flatten everyone else into one bin.
-func quantileBreaks(_ values: [Int], bins: Int) -> [Int] {
-    let s = values.filter { $0 > 0 }.sorted()
-    guard s.count >= bins else { return s }
-    return (1..<bins).map { s[Int(Double($0) / Double(bins) * Double(s.count))] }
+// Fixed count bands keep the meaning stable while changing region/date/make.
+enum ZIPMapPalette {
+    static let labels = ["1–4", "5–19", "20–99", "100+"]
+    static func bin(_ count: Int) -> Int {
+        count < 5 ? 0 : count < 20 ? 1 : count < 100 ? 2 : 3
+    }
+    static func color(bin: Int) -> UIColor {
+        let tones: [(Double, Double, Double, Double)] = [
+            (0.38, 0.72, 0.84, 0.22), (0.20, 0.58, 0.77, 0.32),
+            (0.10, 0.40, 0.66, 0.42), (0.08, 0.25, 0.52, 0.54)
+        ]
+        let c = tones[max(0, min(tones.count - 1, bin))]
+        return UIColor(red: c.0, green: c.1, blue: c.2, alpha: c.3)
+    }
 }
 
 // ─── The MKMapView choropleth ────────────────────────────────────────────────────
 struct CountyChoropleth: UIViewRepresentable {
     let counts: [String: Int]
-    let breaks: [Int]
     var geometry: [MKOverlay]? = nil
     var focus: MKMapRect? = nil
     var highlighted: String? = nil
@@ -1150,12 +1227,12 @@ struct CountyChoropleth: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
         var parent: CountyChoropleth
         private var overlays: [MKOverlay] = []
-        private var appliedCounts: [String: Int] = [:]
-        private var appliedBreaks: [Int] = []
         private var appliedHighlight: String?
-        private var appliedDrawsAreas = true
         private var suppliedIDs: [ObjectIdentifier] = []
         private var labelIDs: [String] = []
+        private var renderedBands: [Int: MKMultiPolygon] = [:]
+        private var bandMembers: [Int: [ObjectIdentifier]] = [:]
+        private var selectionOverlay: MKMultiPolygon?
         private var countyHitAreas: [MKOverlay] = []
         private var appliedFocus: MKMapRect?
         init(_ parent: CountyChoropleth) { self.parent = parent }
@@ -1170,7 +1247,6 @@ struct CountyChoropleth: UIViewRepresentable {
                     self.countyHitAreas = parsed
                     if self.parent.geometry == nil {
                         self.overlays = parsed
-                        map.addOverlays(parsed)
                     }
                     self.applyCountsIfReady(map)
                     self.reportRegion(map)
@@ -1188,51 +1264,95 @@ struct CountyChoropleth: UIViewRepresentable {
             guard let geometry = parent.geometry else { return }
             let ids = geometry.map { ObjectIdentifier($0 as AnyObject) }
             if ids != suppliedIDs {
-                map.removeOverlays(overlays); overlays = geometry; suppliedIDs = ids
-                map.addOverlays(geometry)
+                overlays = geometry; suppliedIDs = ids
             }
-            let labels = parent.areaLabels.filter { parent.counts[$0.zip, default: 0] > 0 }
-            let keys = labels.map { "\($0.zip):\(parent.counts[$0.zip, default: 0])" }
+            applyLabels(map)
+        }
+
+        private func applyLabels(_ map: MKMapView) {
+            // Regional views communicate through areas, not a field of badges.
+            // At neighborhood scale keep only readable, separated ZIP names.
+            let visible = map.bounds.inset(by: UIEdgeInsets(top: 170, left: 32, bottom: 140, right: 32))
+            var occupied: [CGRect] = []
+            let candidates = parent.areaLabels.filter {
+                parent.drawsAreas && parent.counts[$0.zip, default: 0] > 0 &&
+                    ($0.zip == parent.highlighted || map.region.span.longitudeDelta <= 0.35)
+            }.sorted {
+                if ($0.zip == parent.highlighted) != ($1.zip == parent.highlighted) { return $0.zip == parent.highlighted }
+                let a = map.convert($0.coordinate, toPointTo: map)
+                let b = map.convert($1.coordinate, toPointTo: map)
+                let center = CGPoint(x: map.bounds.midX, y: map.bounds.midY)
+                return hypot(a.x - center.x, a.y - center.y) < hypot(b.x - center.x, b.y - center.y)
+            }
+            var labels: [ZIPAreaLabel] = []
+            for area in candidates {
+                let point = map.convert(area.coordinate, toPointTo: map)
+                guard visible.contains(point) else { continue }
+                let frame = CGRect(x: point.x - 38, y: point.y - 20, width: 76, height: 40)
+                guard !occupied.contains(where: { $0.intersects(frame) }) else { continue }
+                occupied.append(frame); labels.append(area)
+                if labels.count == 8 { break }
+            }
+            let keys = labels.map { "\($0.zip):\(parent.counts[$0.zip, default: 0]):\($0.zip == parent.highlighted)" }
             if keys != labelIDs {
                 map.removeAnnotations(map.annotations); labelIDs = keys
                 map.addAnnotations(labels)
             }
         }
 
-        // When the counts arrive after the overlays, re-render with the real fills.
+        private func polygons(_ overlay: MKOverlay) -> [MKPolygon] {
+            if let polygon = overlay as? MKPolygon { return [polygon] }
+            return (overlay as? MKMultiPolygon)?.polygons ?? []
+        }
+
+        // Hundreds of independent overlay renderers exhausted MapKit's Metal
+        // resources on selection. Draw at most four shared color layers instead;
+        // retain the original individual ZIP shapes for exact tap hit-testing.
         func applyCountsIfReady(_ map: MKMapView) {
-            guard !overlays.isEmpty,
-                  parent.counts != appliedCounts || parent.breaks != appliedBreaks || parent.highlighted != appliedHighlight || parent.drawsAreas != appliedDrawsAreas else { return }
-            if let selected = parent.highlighted, selected != appliedHighlight,
-               let area = overlays.first(where: { ($0 as? MKShape)?.title == selected }) {
-                map.setVisibleMapRect(area.boundingMapRect, edgePadding: UIEdgeInsets(top: 90, left: 25, bottom: 120, right: 25), animated: true)
+            var groups: [Int: [MKOverlay]] = [:]
+            if parent.drawsAreas {
+                for area in overlays {
+                    let count = parent.counts[(area as? MKShape)?.title ?? "", default: 0]
+                    if count > 0 { groups[ZIPMapPalette.bin(count), default: []].append(area) }
+                }
             }
-            appliedCounts = parent.counts; appliedBreaks = parent.breaks
-            appliedHighlight = parent.highlighted
-            appliedDrawsAreas = parent.drawsAreas
-            for o in overlays where map.renderer(for: o) != nil {
-                recolor(map.renderer(for: o)!, o)
+            for bin in ZIPMapPalette.labels.indices {
+                let members = groups[bin] ?? []
+                let ids = members.map { ObjectIdentifier($0 as AnyObject) }
+                if ids == bandMembers[bin, default: []] { continue }
+                if let previous = renderedBands.removeValue(forKey: bin) { map.removeOverlay(previous) }
+                bandMembers[bin] = ids
+                let parts = members.flatMap { polygons($0) }
+                if !parts.isEmpty {
+                    let layer = MKMultiPolygon(parts); layer.title = "band:\(bin)"
+                    renderedBands[bin] = layer; map.addOverlay(layer)
+                }
+            }
+            let selected = parent.drawsAreas ? parent.highlighted : nil
+            let area = overlays.first { ($0 as? MKShape)?.title == selected }
+            if selected != appliedHighlight || selectionOverlay?.polygons.first !== area.flatMap({ polygons($0).first }) {
+                if let previous = selectionOverlay { map.removeOverlay(previous) }
+                selectionOverlay = nil
+                let changedSelection = selected != appliedHighlight
+                appliedHighlight = selected
+                if let area, selected != nil {
+                    let outline = MKMultiPolygon(polygons(area)); outline.title = "selection"
+                    selectionOverlay = outline; map.addOverlay(outline)
+                    if changedSelection {
+                        map.setVisibleMapRect(area.boundingMapRect, edgePadding: UIEdgeInsets(top: 140, left: 25, bottom: 140, right: 25), animated: true)
+                    }
+                }
             }
         }
 
         private func recolor(_ renderer: MKOverlayRenderer, _ overlay: MKOverlay) {
-            let fips = (overlay as? MKShape)?.title ?? ""
-            let color = parent.counts[fips].map { rampUIColor(t: self.tForCount($0)) } ?? .clear
+            let title = (overlay as? MKShape)?.title ?? ""
+            let bin = title.hasPrefix("band:") ? Int(title.dropFirst(5)) : nil
             if let r = renderer as? MKOverlayPathRenderer {
-                r.fillColor = color
-                r.strokeColor = !parent.drawsAreas && !fips.hasPrefix("county:") ? .clear
-                    : fips.hasPrefix("county:") || fips == parent.highlighted ? .label : UIColor.separator.withAlphaComponent(0.55)
-                r.lineWidth = fips.hasPrefix("county:") || fips == parent.highlighted ? 2 : 0.5
-                r.setNeedsDisplay()
+                r.fillColor = bin.map { ZIPMapPalette.color(bin: $0) } ?? .clear
+                r.strokeColor = title == "selection" ? .systemBlue : UIColor.systemBlue.withAlphaComponent(0.20)
+                r.lineWidth = title == "selection" ? 0.8 : 0.25
             }
-        }
-
-        private func tForCount(_ count: Int) -> Double {
-            guard count > 0 else { return 0 }
-            let b = parent.breaks
-            guard !b.isEmpty else { return 1 }
-            var bin = 0; for br in b where count > br { bin += 1 }
-            return Double(bin) / Double(b.count)
         }
 
         // MKMapViewDelegate — color each county on first render from current counts.
@@ -1249,14 +1369,18 @@ struct CountyChoropleth: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             guard let area = annotation as? ZIPAreaLabel else { return nil }
-            let view = MKAnnotationView(annotation: area, reuseIdentifier: nil)
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: "zip-name") ?? MKAnnotationView(annotation: area, reuseIdentifier: "zip-name")
+            view.annotation = area
+            view.subviews.forEach { $0.removeFromSuperview() }
             let label = UILabel()
-            label.text = "\(area.zip) · \(parent.counts[area.zip, default: 0])"
+            label.text = area.zip
             label.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
-            label.textColor = .label; label.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.85)
+            label.textColor = .label; label.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.80)
             label.sizeToFit(); view.frame.size = CGSize(width: label.bounds.width + 8, height: 22)
             label.frame = view.bounds; label.textAlignment = .center; view.addSubview(label)
             view.displayPriority = .defaultLow
+            view.collisionMode = .rectangle
+            view.layer.cornerRadius = 5; view.clipsToBounds = true
             view.accessibilityLabel = "ZIP \(area.zip), \(parent.counts[area.zip, default: 0]) vehicles with location evidence"
             return view
         }
@@ -1266,6 +1390,7 @@ struct CountyChoropleth: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            applyLabels(mapView)
             reportRegion(mapView)
         }
 
