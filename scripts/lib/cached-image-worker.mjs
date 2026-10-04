@@ -1,4 +1,4 @@
-import { projectImageProperties, applyImagePropertyClaims } from './image-property-projection.mjs';
+import { projectImageProperties, applyImagePropertyClaims, instantMicros } from './image-property-projection.mjs';
 
 export const CACHE_WORKER_VERSION = 'public_cached_image_properties_v1';
 export const CACHE_BUDGET = Object.freeze({ vehicles: 60, image_page: 1000, image_visits: 100000,
@@ -214,7 +214,7 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
               for (let start = 0; start < groups.length; start += 100) {
                 const ids = groups.slice(start, start + 100).map(group => group.parent.id);
                 const rows = await query(() => sb.from('vehicle_observations')
-                  .select('id,vehicle_id,kind,source_id,source_identifier,property_id,structured_data,confidence_score,is_superseded')
+                  .select('id,vehicle_id,kind,source_id,source_identifier,property_id,structured_data,confidence_score,is_superseded,observed_at,ingested_at,extraction_method,agent_model,raw_source_ref')
                   .eq('vehicle_id', vehicleId).eq('source_id', sourceId).eq('kind', 'condition')
                   .eq('structured_data->>analysis_kind', 'image_property_projection')
                   .eq('structured_data->>projection_version', 'byok_image_properties_v1')
@@ -251,13 +251,18 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
               const rowsByIdentity = new Map(landed.map(row => [row.source_identifier, row]));
               for (const claim of claims) {
                 const row = rowsByIdentity.get(claim.source_identifier);
+                const eventTime = instantMicros(row?.observed_at);
+                const ingestTime = instantMicros(row?.ingested_at);
+                const expectedEventTime = instantMicros(claim.observed_at);
                 if (!UUID.test(row?.id ?? '') || row.vehicle_id !== vehicleId || row.source_id !== sourceId ||
-                    row.kind !== 'condition' || row.is_superseded === true || row.property_id !== propertyIds.get(claim.property_key) ||
-                    row.structured_data?.image_id !== claim.structured_data.image_id ||
-                    row.structured_data?.source_observation_id !== claim.structured_data.source_observation_id ||
-                    row.structured_data?.source_result_hash !== claim.structured_data.source_result_hash ||
-                    row.structured_data?.source_recorded_at !== claim.structured_data.source_recorded_at ||
-                    row.structured_data?.[claim.property_key] !== claim.structured_data[claim.property_key] ||
+                    row.kind !== claim.kind || row.is_superseded !== false || row.property_id !== propertyIds.get(claim.property_key) ||
+                    row.extraction_method !== claim.extraction_method || row.agent_model !== claim.agent_model ||
+                    row.raw_source_ref !== claim.raw_source_ref ||
+                    eventTime === null || ingestTime === null || expectedEventTime === null ||
+                    eventTime !== expectedEventTime || ingestTime < eventTime ||
+                    // Check the retained source provenance and explicit unknown clocks,
+                    // not merely the identity/hash and scalar value.
+                    Object.entries(claim.structured_data).some(([key, value]) => row.structured_data?.[key] !== value) ||
                     !Number.isFinite(row.confidence_score) || row.confidence_score < 0 || row.confidence_score > 0.6) fail('canonical_readback_mismatch');
               }
               // Refresh after ALL writes; caching an earlier reader response would hide later claims.
