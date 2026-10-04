@@ -94,10 +94,12 @@ BEGIN
     -- Cheap selector IDs only. The typed source FK remains a durable locator
     -- after mutable current metadata advances. Full custody/admission checks
     -- below determine evidence; no badge supplies a source price or clock.
-    SELECT id,snapshot_id FROM (
-      SELECT f.id,f.snapshot_id FROM facts f WHERE f.snapshot_id IS NOT NULL
-      UNION
-      SELECT f.id,o.source_snapshot_id FROM facts f
+    SELECT refs.id,refs.snapshot_id,array_agg(refs.admission_id ORDER BY refs.admission_id)
+      FILTER(WHERE refs.admission_id IS NOT NULL) AS admission_ids
+    FROM (
+      SELECT f.id,f.snapshot_id,NULL::uuid AS admission_id FROM facts f WHERE f.snapshot_id IS NOT NULL
+      UNION ALL
+      SELECT f.id,o.source_snapshot_id,o.id FROM facts f
       JOIN public.vehicle_observations o ON o.vehicle_id=f.id AND o.kind='sale_result'
       JOIN public.observation_sources os ON os.id=o.source_id AND os.slug='bat'
       WHERE o.source_snapshot_id IS NOT NULL AND o.is_superseded IS FALSE
@@ -109,7 +111,20 @@ BEGIN
         AND lower(regexp_replace(regexp_replace(regexp_replace(o.source_url,'^https?://(www\.)?','','i'),'[?#].*$',''),'/+$',''))=f.source_key
         -- Future derived arrivals do not consume an earlier knowledge cap.
         AND o.ingested_at IS NOT NULL AND isfinite(o.ingested_at) AND o.ingested_at<=v_known
-    ) refs ORDER BY id,snapshot_id LIMIT 10001
+    ) refs JOIN facts f ON f.id=refs.id
+    LEFT JOIN public.listing_page_snapshots cutoff ON cutoff.id=refs.snapshot_id
+    -- Matched future source headers are not earlier knowledge. This reads
+    -- identity/clocks only, before the sentinel and any raw HTML projection.
+    WHERE (cutoff.success IS TRUE AND cutoff.http_status=200 AND cutoff.platform='bat'
+      AND cutoff.metadata->>'vehicle_matched'='true'
+      AND CASE WHEN pg_input_is_valid(cutoff.metadata->>'vehicle_id','uuid') THEN (cutoff.metadata->>'vehicle_id')::uuid END=refs.id
+      AND lower(regexp_replace(regexp_replace(regexp_replace(cutoff.listing_url,'^https?://(www\.)?','','i'),'[?#].*$',''),'/+$',''))=f.source_key
+      AND (isfinite(cutoff.fetched_at) AND cutoff.fetched_at>v_known
+        OR isfinite(cutoff.created_at) AND cutoff.created_at>v_known
+        OR CASE WHEN cutoff.metadata->>'parsed_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$'
+          AND pg_input_is_valid(cutoff.metadata->>'parsed_at','timestamptz')
+          THEN isfinite((cutoff.metadata->>'parsed_at')::timestamptz) AND (cutoff.metadata->>'parsed_at')::timestamptz>v_known ELSE false END)) IS NOT TRUE
+    GROUP BY refs.id,refs.snapshot_id ORDER BY refs.id,refs.snapshot_id LIMIT 10001
   ), snapshots AS MATERIALIZED (
     -- Both selected captures retain raw/custody/conflict checks. Available bad
     -- inline HTML on a capture cannot use its archived receipt as a fallback.
@@ -122,19 +137,29 @@ BEGIN
         AND s.metadata->>'vehicle_matched'='true'
         AND CASE WHEN pg_input_is_valid(s.metadata->>'vehicle_id','uuid') THEN (s.metadata->>'vehicle_id')::uuid END=f.id
         AND lower(regexp_replace(regexp_replace(regexp_replace(s.listing_url,'^https?://(www\.)?','','i'),'[?#].*$',''),'/+$',''))=f.source_key AS snapshot_matches,
-      CASE WHEN octet_length(s.html)<=2097152 THEN s.html END AS source_html,
+      CASE WHEN refs.snapshot_id IS NOT NULL AND octet_length(s.html)<=2097152 THEN s.html END AS source_html,
       s.html IS NOT NULL AS inline_body_present,a.receipt AS admitted_receipt,
       a.id AS derived_observation_id,a.ingested_at AS derived_ingested_at
     FROM facts f LEFT JOIN capture_refs refs ON refs.id=f.id
-    LEFT JOIN public.listing_page_snapshots s ON s.id=refs.snapshot_id
+    -- With no knowable selector, retain only current header classification.
+    LEFT JOIN public.listing_page_snapshots s ON s.id=coalesce(refs.snapshot_id,f.snapshot_id)
     LEFT JOIN LATERAL (
       -- Only the service-only canonical intake derives this immutable method.
       -- JSON source pointers are checked against exact protected identity and
       -- clocks; old metadata qualifications are never accepted as evidence.
       SELECT o.id,o.ingested_at,o.structured_data->'source_sale_receipt' AS receipt
-      FROM public.vehicle_observations o JOIN public.observation_sources os ON os.id=o.source_id AND os.slug='bat'
+      FROM (
+        -- Canonical ID lookups avoid rescanning a vehicle's observation family
+        -- for every retained capture. Metadata-only locators use the existing
+        -- vehicle/source/kind path, including later arrival classification.
+        SELECT matched.* FROM unnest(refs.admission_ids) admission_id
+          JOIN public.vehicle_observations matched ON matched.id=admission_id
+        UNION ALL
+        SELECT located.* FROM public.vehicle_observations located
+          WHERE refs.admission_ids IS NULL AND located.vehicle_id=f.id AND located.kind='sale_result'
+      ) o JOIN public.observation_sources os ON os.id=o.source_id AND os.slug='bat'
       CROSS JOIN LATERAL (SELECT o.structured_data->'source_sale_receipt' AS r) q
-      WHERE s.html IS NULL AND nullif(s.html_storage_path,'') IS NOT NULL
+      WHERE refs.snapshot_id IS NOT NULL AND s.html IS NULL AND nullif(s.html_storage_path,'') IS NOT NULL
         AND s.html_storage_path !~ '(^/|(^|/)\.\.?(/|$)|[:\\\x00-\x1f])'
         AND o.vehicle_id=f.id AND o.source_snapshot_id=s.id AND o.kind='sale_result' AND o.is_superseded IS FALSE
         AND o.extraction_method='protected_archived_sale_observation_v1'
@@ -223,6 +248,10 @@ BEGIN
       WHEN sold_on::timestamptz<v_from OR (sold_on+1)::timestamptz>v_before THEN 'outside_event_window'
       WHEN source_url !~* '^https?://(www\.)?bringatrailer\.com/listing/[^/?#]+/?([?#].*)?$' OR source_url IS NULL THEN 'source_unknown'
       WHEN found_snapshot_id IS NULL OR snapshot_matches IS NOT TRUE THEN 'snapshot_unmatched'
+      -- A protected future header is excluded without reading its HTML.
+      WHEN known_at>v_known AND parsed_at IS NOT NULL AND fetched_at IS NOT NULL AND source_ingested_at IS NOT NULL
+        AND isfinite(parsed_at) AND isfinite(fetched_at) AND isfinite(source_ingested_at)
+        AND fetched_at<=parsed_at AND fetched_at>=sold_on::timestamptz THEN 'learned_later'
       WHEN source_html_available IS NOT TRUE THEN 'source_body_unavailable_or_over_limit'
       WHEN source_hash_matches IS NOT TRUE THEN 'source_body_hash_unknown_or_conflicting'
       WHEN claim_count<>1 OR raw_unsold IS TRUE THEN 'source_sale_missing_or_ambiguous'
@@ -232,7 +261,6 @@ BEGIN
       WHEN parsed_at IS NULL OR fetched_at IS NULL OR source_ingested_at IS NULL
         OR NOT isfinite(parsed_at) OR NOT isfinite(fetched_at) OR NOT isfinite(source_ingested_at)
         OR fetched_at>parsed_at OR fetched_at<(sold_on::timestamptz) THEN 'clock_unknown_or_conflicting'
-      WHEN known_at>v_known THEN 'learned_later'
       ELSE NULL END AS exclusion
     FROM evidence e
   ), source_groups AS MATERIALIZED (
@@ -315,6 +343,6 @@ $function$;
 REVOKE ALL ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) TO anon,authenticated,service_role;
 COMMENT ON FUNCTION public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text) IS
-'Public-parent gated cohort sale-price reader, bounded to 10000 members with cap refusal. Existing price facts supply one current recorded sale per vehicle, not a transaction history. Eligibility requires sold/date/source plus a referenced successful same-source, matched-vehicle protected snapshot. Inline HTML is independently hash-verified and reparsed; absent offloaded bodies may use ONLY exact immutable sale_result receipts derived by the service-only ingest-observation protected method. Mutable or legacy metadata receipts are never proof; bad or over-limit available inline HTML never falls back. Mutable origin metadata is a current locator only; durable source selectors also follow exact canonical non-superseded protected sale_result source_snapshot_id references after metadata advances. Both witnesses remain in source-lot conflict checks, including price/currency/outcome disagreements; future derived arrivals do not consume an earlier knowledge cap. Source-reference pairs are bounded to 10000 with explicit 10001 sentinel refusal before raw HTML materialization; no sampled distribution. Vehicle member/dated-source counts remain distinct from capture presentations. Source event interval is inside event window; protected parse/capture and actual snapshot-row ingestion clocks precede knowledge cutoff; knownAt is their maximum including the admitted observation DB ingested_at, with snapshotCreatedAt and derivedIngestedAt exposed separately. Qualification attempt time is not a database availability clock; sourceVerification distinguishes per-read raw verification from protected producer attestation. Raw HTML ends at the single hash/parser stage; downstream materialized folds carry typed evidence only. Full source-lot dedup/conflict checks; original units, no inflation/FX/buyer fee adjustment. Midrank=(below+equal/2)/N, minimum10 policy is not calibration. Condition/equipment unmatched; no over/under fair-value claim, historic condition or revisioned fleet assessment. Definer reads admin-only raw snapshot attribution but returns sanitized evidence for explicitly public/nondeleted real vehicle parents only; no policy grant or testimony write.';
+'Public-parent gated cohort sale-price reader, bounded to 10000 members with cap refusal. Existing price facts supply one current recorded sale per vehicle, not a transaction history. Eligibility requires sold/date/source plus a referenced successful same-source, matched-vehicle protected snapshot. Inline HTML is independently hash-verified and reparsed; absent offloaded bodies may use ONLY exact immutable sale_result receipts derived by the service-only ingest-observation protected method. Mutable or legacy metadata receipts are never proof; bad or over-limit available inline HTML never falls back. Mutable origin metadata is a current locator only; durable source selectors also follow exact canonical non-superseded protected sale_result source_snapshot_id references after metadata advances. Both witnesses remain in source-lot conflict checks, including price/currency/outcome disagreements; future derived arrivals and matched future protected source clocks do not consume an earlier knowledge cap. Current future-only locators retain header classification without raw HTML reads; canonical admission IDs use the existing primary key instead of rescanning each vehicle family. Source-reference pairs are bounded to 10000 with explicit 10001 sentinel refusal before raw HTML materialization; no sampled distribution. Vehicle member/dated-source counts remain distinct from capture presentations. Source event interval is inside event window; protected parse/capture and actual snapshot-row ingestion clocks precede knowledge cutoff; knownAt is their maximum including the admitted observation DB ingested_at, with snapshotCreatedAt and derivedIngestedAt exposed separately. Qualification attempt time is not a database availability clock; sourceVerification distinguishes per-read raw verification from protected producer attestation. Raw HTML ends at the single hash/parser stage; downstream materialized folds carry typed evidence only. Full source-lot dedup/conflict checks; original units, no inflation/FX/buyer fee adjustment. Midrank=(below+equal/2)/N, minimum10 policy is not calibration. Condition/equipment unmatched; no over/under fair-value claim, historic condition or revisioned fleet assessment. Definer reads admin-only raw snapshot attribution but returns sanitized evidence for explicitly public/nondeleted real vehicle parents only; no policy grant or testimony write.';
 NOTIFY pgrst,'reload schema';
 COMMIT;

@@ -393,3 +393,29 @@ SELECT pg_temp.ok('capture sentinel refuses rather than returning a sampled dist
   pg_temp.read()->>'error' LIKE '%10000-source-capture%' AND pg_temp.read()->'stats'='null'::jsonb
   AND pg_temp.read()#>>'{coverage,complete}'='false' AND pg_temp.read()#>>'{coverage,capture_refs_at_least}'='10001'
   AND pg_temp.read()#>>'{coverage,member_rows}'='11' AND NOT (pg_temp.read() ? 'receipt'));
+
+-- Exact allowed boundary: independently admitted captures share one vehicle,
+-- but each receipt is resolved by its canonical observation primary key.
+DELETE FROM public.vehicle_observations WHERE source_snapshot_id IN
+  (SELECT md5('extra-capture-'||k)::uuid FROM generate_series(1,11) k);
+DELETE FROM public.listing_page_snapshots WHERE id IN
+  (SELECT md5('extra-capture-'||k)::uuid FROM generate_series(1,11) k);
+UPDATE public.vehicle_observations SET ingested_at='2026-01-02T03:00:00Z'
+  WHERE source_snapshot_id<>md5('snapshot-11')::uuid;
+SELECT pg_temp.ok('exact 10000 capture boundary resolves complete source evidence at distinct vehicle grain',
+  pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{stats,sold_count}'='11'
+  AND pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{receipt,coverage,capture_presentations}'='10000'
+  AND pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{receipt,coverage,dated_source_rows}'='11');
+INSERT INTO public.listing_page_snapshots(id,listing_url,fetched_at,success,http_status,html,platform,metadata,html_sha256,created_at)
+SELECT md5('snapshot-11-future-boundary')::uuid,listing_url,'2026-01-02T12:00:00Z',true,200,NULL,'bat',
+  jsonb_build_object('vehicle_id',md5('vehicle-11')::uuid,'vehicle_matched',true,'parsed_at','2026-01-02T12:00:01Z'),
+  NULL,'2026-01-02T12:00:00Z'
+FROM public.listing_page_snapshots WHERE id=md5('snapshot-11')::uuid;
+UPDATE public.vehicles SET origin_metadata=jsonb_set(origin_metadata,'{bat_snapshot_parsed,snapshot_id}',
+  to_jsonb(md5('snapshot-11-future-boundary')::uuid::text)) WHERE id=md5('vehicle-11')::uuid;
+SELECT pg_temp.ok('future current locator cannot turn exactly 10000 earlier source captures into a cap refusal',
+  pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{stats,sold_count}'='11'
+  AND pg_temp.read('{"known":"2026-01-02T06:00:00Z"}')#>>'{receipt,coverage,capture_presentations}'='10000');
+SELECT pg_temp.ok('the same new locator counts once known and makes the 10001 capture refusal explicit',
+  pg_temp.read()->>'error' LIKE '%10000-source-capture%' AND pg_temp.read()->'stats'='null'::jsonb
+  AND pg_temp.read()#>>'{coverage,capture_refs_at_least}'='10001');
