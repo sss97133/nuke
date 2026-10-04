@@ -1,5 +1,6 @@
 .market-sales-comparison button:focus-visible,
 .market-sales-comparison select:focus-visible,
+.market-sales-comparison input:focus-visible,
 .market-sales-comparison a:focus-visible,
 .market-sales-comparison summary:focus-visible,
 .market-sales-comparison [tabindex="-1"]:focus {
@@ -8,6 +9,7 @@
 }
 
 .market-explorer button:focus-visible,
+.market-explorer a:focus-visible,
 .market-explorer summary:focus-visible,
 .market-explorer [tabindex="-1"]:focus {
   outline: 2px solid var(--text) !important;

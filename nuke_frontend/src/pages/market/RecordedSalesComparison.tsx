@@ -59,6 +59,8 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const option = view === 'sales' && chosen != null
     ? chosenOption?.make.toUpperCase() === requestedMake?.toUpperCase() ? chosenOption : undefined
     : matchSalesMake(options, requestedMake);
+  // A stored inventory label may have no unique registry entry; preserve that scope in the control.
+  const unmatchedMake = requestedMake && !option ? requestedMake : null;
   const request = useMemo(() => option && view === 'sales' ? recordedSalesRequest(option.scope, window, drill) : null, [option, window, drill, view]);
   const query = useRecordedSales(request);
   const response = option && view === 'sales' ? query.data : undefined;
@@ -88,9 +90,10 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
       <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
-        <select aria-label="Recorded sales scope" value={option?.key ?? ''} style={control}
+        <select aria-label="Recorded sales scope" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')} style={control}
           onChange={e => { setChosen(e.target.value || null); setDrill(null); onMakeChange?.(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null); }}>
           <option value="">{onMakeChange ? 'All makes · live inventory' : 'Choose a registered make or supported grouping'}</option>
+          {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
           <optgroup label="Make populations">{options.filter(o => o.scope.kind === 'canonical_make').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>

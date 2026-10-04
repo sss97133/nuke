@@ -58,6 +58,19 @@ describe('recorded sales evidence comparison', () => {
     expect(container.querySelector('[aria-label="Recorded sales event window"]')).toBeNull();
     expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
   });
+  it('preserves an unregistered stored make in the shared control without inventing a sales scope', async () => {
+    const onMakeChange = vi.fn();
+    await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="inventory" onMakeChange={onMakeChange} />));
+    const scope = container.querySelector('select[aria-label="Recorded sales scope"]') as HTMLSelectElement;
+    expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · recorded inventory label');
+    expect(fixture.request).toBeNull();
+    await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="sales" onMakeChange={onMakeChange} />));
+    expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · no registered sales scope');
+    expect(container.textContent).toContain('No unique registered make matches UNREGISTERED');
+    expect(fixture.request).toBeNull();
+    await select('Recorded sales scope', '');
+    expect(onMakeChange).toHaveBeenCalledWith(null, null);
+  });
   it('restores the shareable supported scope, window and UTC evidence point', async () => {
     await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE"
       lens={{ scopeKey: subject.key, days: 2, drill: { bucket: '2026-10-03T00:00:00Z', series: 'selected' }, benchmark: false }} />));
