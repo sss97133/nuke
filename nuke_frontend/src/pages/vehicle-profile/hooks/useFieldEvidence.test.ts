@@ -86,7 +86,8 @@ describe('native evidence conflict classification', () => {
   });
 
   it('retains the strict existing 5%-of-mean boundary', async () => {
-    expect((await group('mileage', '100000', ['105200'])).conflictType).toBe('genuine');
+    // Range 10 / mean 200 is exactly 5%, which does not meet the strict rule.
+    expect((await group('mileage', '195', ['205'])).conflictType).toBe('genuine');
   });
 
   it.each([
