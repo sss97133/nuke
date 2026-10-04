@@ -126,6 +126,7 @@ export default function Valuation() {
   const [error, setError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ result: ValuationResult; request: ValuationRequest; contextKey: string } | null>(null);
   const latestRequest = useRef(0);
+  const initialLookup = useRef<Promise<Awaited<ReturnType<typeof supabase.rpc>>> | null>(null);
   const filters = useRef<HTMLDetailsElement>(null);
   const [sourcePage, setSourcePage] = useState(0);
   const result = lookup?.result ?? null;
@@ -134,7 +135,7 @@ export default function Valuation() {
   const loading = loadingKey != null;
   const loadingThisContext = loadingKey === filterKey;
 
-  const runLookup = useCallback(async (yearOverride?: string) => {
+  const runLookup = useCallback(async (yearOverride?: string, reuseInitialLookup = false) => {
     const requestId = ++latestRequest.current;
     const trimmedMake = make.trim();
     const trimmedModel = model.trim();
@@ -169,7 +170,13 @@ export default function Valuation() {
     setParams(next, { replace: true });
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('valuation_by_ymm', request);
+      // StrictMode may replay the arrival effect. Share its actual promise (the
+      // Supabase builder is a thenable that would fetch again on each await).
+      // Explicit refreshes always make a new request and retain the stale guard.
+      const response = reuseInitialLookup
+        ? (initialLookup.current ??= Promise.resolve(supabase.rpc('valuation_by_ymm', request)))
+        : supabase.rpc('valuation_by_ymm', request);
+      const { data, error: rpcError } = await response;
       if (requestId !== latestRequest.current) return;
       if (rpcError) throw rpcError;
       if (data?.error) throw new Error(data.error);
@@ -181,7 +188,9 @@ export default function Valuation() {
       setLookup({ result: data as ValuationResult, request, contextKey: requestedContextKey });
       setSourcePage(0);
     } catch (e: any) {
-      if (requestId === latestRequest.current) setError(e?.message || 'Lookup failed');
+      if (requestId === latestRequest.current) setError(e?.code === '57014' || /statement timeout/i.test(e?.message ?? '')
+        ? 'Sale evidence took too long to load. Choose a narrower year, model or sales window and try again. No new comparison was produced.'
+        : e?.message || 'Sale evidence could not be loaded. Try again.');
     } finally {
       if (requestId === latestRequest.current) setLoadingKey(null);
     }
@@ -192,7 +201,7 @@ export default function Valuation() {
   // Auto-run from URL params
   useEffect(() => {
     if (params.get('make') && (params.get('year') || params.get('model')) && !result && !loading) {
-      runLookup();
+      runLookup(undefined, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -381,7 +390,7 @@ export default function Valuation() {
 
       {/* ERROR */}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           border: '2px solid var(--error)',
           background: 'var(--error-dim)',
           padding: '8px 10px',

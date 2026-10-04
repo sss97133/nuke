@@ -62,6 +62,25 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('qualified cohort sale-price reader UI', () => {
+  it('shares one initial reader promise during StrictMode replay and refreshes explicitly afterward', async () => {
+    const pending = deferred(); fixture.rpc.mockReturnValueOnce(pending.promise);
+    await act(async () => root.render(<React.StrictMode><MemoryRouter initialEntries={['/valuation?year=1970&make=Synthetic&model=Coupe&currency=USD']}><RoutedValuation /></MemoryRouter></React.StrictMode>));
+    expect(fixture.rpc).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve({ data: evidence(), error: null }));
+    expect(container.querySelector('.source-sales')).not.toBeNull();
+    expect(container.textContent).toContain('Median recorded sale');
+    await submit(); expect(fixture.rpc).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.source-sales')).not.toBeNull();
+  });
+  it('explains a source-reader timeout without exposing SQL or inventing a comparison', async () => {
+    fixture.rpc.mockResolvedValueOnce({ data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } });
+    await render();
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Choose a narrower year, model or sales window');
+    expect(container.textContent).toContain('No new comparison was produced');
+    expect(container.textContent).not.toContain('canceling statement');
+    expect(container.querySelector('.source-sales')).toBeNull();
+    expect(fixture.rpc).toHaveBeenCalledTimes(1);
+  });
   it('retains the existing all-years action when no source sale qualifies, without rendering an empty price graph', async () => {
     fixture.rpc.mockResolvedValue({ data: evidence(0), error: null }); await render();
     expect(container.querySelector('svg')).toBeNull();
