@@ -98,6 +98,50 @@ fed by the cron `bat-live-pull` (live lots) and the `import_queue` backfill; `ve
 second identity, geography or cohort table beside an existing one; store a derived number without its as-of time;
 describe a column in a doc but not in the database.
 
+## Drilling through cohorts, 2026-10-04
+
+The owner's "repair" and "sale" are names for recursive cohorts of connected evidence (§10 of the case ledger).
+A useful drill has two kinds of depth: **relationships** into smaller/shared evidence cohorts, and **folds** into
+measures and measures of measures. A larger diagram alone does not establish either one.
+
+For each node, declare its grain before connecting it. A catalog part design, one physical part, one purchased
+line and one installation are different grains. A labor task, its entry author, its performer, a skill claim and
+a dated record of supported outcomes are different grains too. Reuse the same evidenced entities across jobs,
+ownership periods and market events; bridges carry role, period and attribution. Preserve unresolved matches.
+
+An example drill is **repair → labor task → performer → skill record → prior job → observed outcome → supporting
+observation → original source**. The prior job can point back into the repair graph: fan-out is a graph with shared
+nodes, not duplicated ownership of every descendant. A missing outcome is unobserved, not successful work. A
+rating has a reviewer, criterion and work context; it is not automatically a measurement of technical skill.
+
+Above that evidence, follow the card's five layers:
+
+1. **Log:** source-keyed claims/events and corrections, with their event and recording clocks.
+2. **State:** supported records keyed to an entity and as-of time; update affected records incrementally.
+3. **Baselines:** distributions over explicitly eligible comparison populations and stacked dimensions.
+4. **Features of features:** contextual records → measured associations with outcomes → a combined job/vehicle/lot
+   assessment with declared dependence and uncertainty. Do not silently add overlapping effects or call an
+   association causal. Sparse or unqualified evidence can withhold the measure.
+5. **Prediction:** the six blanks, then replay and grading against the declared baseline.
+
+Comparison membership is explicit: for example procedure × part family × vehicle specification × region × date ×
+evidence coverage. Keep all retained source episodes available before qualification and relevance; retain unknowns,
+conflicts and the reason for each exclusion. For every aggregate name its unit, denominator, eligibility, source
+lineage, event cutoff, knowledge cutoff and revision. A retrospective assessment using later evidence is distinct
+from what was supportable at the earlier moment. A row-created timestamp alone is not proof of commit availability.
+
+A new event updates the affected incremental folds and marks affected baseline/feature work for their declared
+cadence. A duplicate source event counts once. Later evidence may revise today's reading of an earlier ownership
+period while an earlier assessment receipt remains reproducible. No full-log rescan belongs in a page request.
+Every proposed fold still needs an owner, writer, assay, described keys and a reader before it can count as operating.
+
+**Existing anchors, checked 2026-10-04:** the capability map designates `work_sessions` as the work ledger and
+`catalog_parts` as the parts catalog. Live metadata confirms typed work-session links to vehicles, users, places
+and technician phone links, and a catalog-part link to catalog sources. This does not establish a complete
+performer/skill/payment/part-instance chain. The repository's `create-work-session-from-evidence` currently creates
+an image-backed pending-analysis `timeline_events` row; its name alone cannot prove work-session ingestion. These
+are a bounded design and metadata/code inspection, not a runtime assay or permission to mint parallel structures.
+
 **Before you build here:** read this card, SCHEMA_LAW, `docs/ledger/CAPABILITY_MAP.md`, and the `v_schema_atlas` row
 of every table you touch.
 
