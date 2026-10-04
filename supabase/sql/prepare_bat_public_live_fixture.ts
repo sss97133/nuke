@@ -5,4 +5,6 @@ const target = { id: "00000000-0000-0000-0000-000000000001", vehicle_id: "000000
   post_id: fixture.post_id, source_url: fixture.source_url, last_comment_id: 0 };
 const frames = await Promise.all(fixture.events.map(f => prepareBatLiveFrame({ ...f,
   monitored_auction_id: target.id, transport: "public_pusher" }, target)));
-await Deno.writeTextFile("/private/tmp/nuke-bat-prepared-fixture.json", JSON.stringify({ frames }));
+const prepared = JSON.stringify({ frames });
+if (Deno.args.includes("--stdout")) console.log(prepared);
+else await Deno.writeTextFile("/private/tmp/nuke-bat-prepared-fixture.json", prepared);
