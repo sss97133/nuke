@@ -3,8 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
-vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 import Valuation from './Valuation';
 
 function evidence(n = 10, currency = 'USD') {
@@ -50,6 +50,9 @@ async function enter(label: string,value: string) {
 }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  fixture.from.mockReset();
+  const labels = { select: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), is: vi.fn().mockReturnThis(), or: vi.fn().mockResolvedValue({ data: [], error: null }) };
+  fixture.from.mockReturnValue(labels);
   fixture.rpc.mockReset(); fixture.rpc.mockResolvedValue({ data: evidence(), error: null });
   exports=[];
   vi.stubGlobal('URL',class extends OriginalURL {
@@ -62,6 +65,59 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('qualified cohort sale-price reader UI', () => {
+  it('reads bounded public current labels without using them as sale-time features or changing the receipt', async () => {
+    const data = evidence();
+    const vehicle = '00000000-0000-4000-8000-000000000001';
+    data.receipt.eligible[0].vehicleId = vehicle;
+    const query = fixture.from.getMockImplementation()!();
+    query.or.mockResolvedValue({ data: [{ id: vehicle, title: null, bat_listing_title: 'Engine-swapped coupe', listing_url: data.receipt.eligible[0].sourceUrl, discovery_url: null }], error: null });
+    fixture.rpc.mockResolvedValue({ data, error: null });
+    await render();
+    expect(container.querySelector('.source-sales-records')?.textContent).toContain('Engine-swapped coupe');
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector<HTMLDetailsElement>('.source-sales-raw-position')?.open).toBe(false);
+    expect(container.textContent).toContain('Sale-time features and condition are not matched');
+    expect(query.in).toHaveBeenCalledWith('id', [vehicle]);
+    expect(query.eq).toHaveBeenCalledWith('is_public', true);
+    expect(query.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(query.or).toHaveBeenCalledWith('listing_kind.is.null,listing_kind.neq.non_vehicle_item');
+    const receipt = await exportedReceipt();
+    expect(receipt.sourceReceipt).toEqual(data.receipt);
+    expect(receipt.comparison.eligible[0].conditionEvidence).toBe('unknown');
+    await enter('Amount reference', '8000');
+    expect(fixture.from).toHaveBeenCalledTimes(1);
+    expect(fixture.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each(['different episode', 'duplicate rows', 'read error'])('withholds a %s label while retaining the attributed sold amounts', async reason => {
+    const data = evidence(), vehicle = '00000000-0000-4000-8000-000000000001';
+    data.receipt.eligible[0].vehicleId = vehicle;
+    const row = { id: vehicle, title: 'Borrowed restomod title', bat_listing_title: null, listing_url: data.receipt.eligible[0].sourceUrl, discovery_url: null };
+    const query = fixture.from.getMockImplementation()!();
+    query.or.mockResolvedValue({ data: reason === 'different episode' ? [{ ...row, listing_url: 'https://bringatrailer.com/listing/another-episode/' }] : [row, row], error: reason === 'read error' ? { message: 'label read failed' } : null });
+    fixture.rpc.mockResolvedValue({ data, error: null }); await render();
+    expect(container.querySelector('.source-sales-records')?.textContent).not.toContain('Borrowed restomod title');
+    expect(container.querySelectorAll('.source-sales-records>li')).toHaveLength(10);
+    expect(container.querySelector('.source-sales-records>li:last-child')?.textContent).toContain('Recorded title unavailable');
+    expect((await exportedReceipt()).sourceReceipt).toEqual(data.receipt);
+    if (reason === 'read error') expect(container.querySelector('[role=status]')?.textContent).toContain('Current vehicle labels could not be read');
+  });
+  it('ignores a late metadata response after a refreshed receipt changes the source episode', async () => {
+    const first = evidence(), next = evidence(), vehicle = '00000000-0000-4000-8000-000000000001';
+    first.receipt.eligible[0].vehicleId = vehicle; next.receipt.eligible[0].vehicleId = vehicle;
+    next.receipt.eligible[0].sourceUrl = 'https://bringatrailer.com/listing/later-source/';
+    next.receipt.eligible[0].unitSource = next.receipt.eligible[0].sourceUrl;
+    let resolve!: (value: { data: unknown[]; error: null }) => void;
+    const pending = new Promise<{ data: unknown[]; error: null }>(yes => { resolve = yes; });
+    const query = fixture.from.getMockImplementation()!();
+    query.or.mockReturnValueOnce(pending).mockResolvedValue({ data: [{ id: vehicle, title: 'New episode label', listing_url: next.receipt.eligible[0].sourceUrl }], error: null });
+    fixture.rpc.mockResolvedValueOnce({ data: first, error: null }).mockResolvedValueOnce({ data: next, error: null });
+    await render(); await submit();
+    expect(container.querySelector('.source-sales-records')?.textContent).toContain('New episode label');
+    await act(async () => resolve({ data: [{ id: vehicle, title: 'Old episode label', listing_url: first.receipt.eligible[0].sourceUrl }], error: null }));
+    expect(container.querySelector('.source-sales-records')?.textContent).toContain('New episode label');
+    expect(container.querySelector('.source-sales-records')?.textContent).not.toContain('Old episode label');
+    expect((await exportedReceipt()).sourceReceipt).toEqual(next.receipt);
+  });
   it('shares one initial reader promise during StrictMode replay and refreshes explicitly afterward', async () => {
     const pending = deferred(); fixture.rpc.mockReturnValueOnce(pending.promise);
     await act(async () => root.render(<React.StrictMode><MemoryRouter initialEntries={['/valuation?year=1970&make=Synthetic&model=Coupe&currency=USD']}><RoutedValuation /></MemoryRouter></React.StrictMode>));
@@ -163,7 +219,7 @@ describe('qualified cohort sale-price reader UI', () => {
     const records = container.querySelector('[aria-label="Qualified sale source records"]')!;
     expect(records.querySelector(`a[href="/vehicle/${vehicle}"]`)?.textContent).toBe('Vehicle record');
     expect(records.querySelector('a[href="https://bringatrailer.com/listing/synthetic-0/"]')?.textContent).toBe('BaT source');
-    await act(async () => container.querySelector('svg [role="button"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await act(async () => container.querySelector<HTMLButtonElement>('.source-sales-records>li:last-child .source-sales-record-name>button')!.click());
     expect(container.querySelector('.source-sales-ancestry')?.textContent).toContain(`Snapshot reference: ${snapshot}`);
     expect(container.querySelector('.source-sales-ancestry')?.textContent).not.toContain('PRIVATE SYNTHETIC');
     expect(container.textContent).toContain(`Snapshot reference: ${snapshot}`);
@@ -215,7 +271,7 @@ describe('qualified cohort sale-price reader UI', () => {
     await render(); const section = container.querySelector('[aria-label="Qualified sale source records"]')!;
     expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Lower than candidate'))).toHaveLength(4);
     expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Equal to candidate'))).toHaveLength(1);
-    await enter('Candidate bid / price', '8000');
+    await enter('Amount reference', '8000');
     expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Lower than candidate'))).toHaveLength(7);
     expect([...section.querySelectorAll('li')].filter(li => li.textContent?.includes('Equal to candidate'))).toHaveLength(1);
     expect(fixture.rpc).toHaveBeenCalledTimes(1);
@@ -234,7 +290,7 @@ describe('qualified cohort sale-price reader UI', () => {
     expect(result.comparison.percentile).toBe(45);
     expect(result.comparison.eligible.some((r: any) => r.vehicleId === vehicle)).toBe(true);
     expect(result.comparison.excluded).toContainEqual(expect.objectContaining({ reason: 'subject', sourceKey: 'bringatrailer.com/listing/synthetic-current' }));
-    expect(container.querySelector('[aria-label="Source-qualified sale graph"]')?.querySelectorAll('svg [role="button"]')).toHaveLength(10);
+    expect(container.querySelector('[aria-label="Source-qualified sale graph"]')?.querySelectorAll('.source-sales-records>li')).toHaveLength(10);
     expect(container.textContent).toContain('earlier resales can count for the same vehicle');
     expect(container.textContent).not.toContain('Current recorded sale per vehicle');
   });
@@ -282,7 +338,7 @@ describe('qualified cohort sale-price reader UI', () => {
   });
 
   it('recomputes candidate prices locally from the same evidence, without another query', async () => {
-    await render(); await enter('Candidate bid / price','8000');
+    await render(); await enter('Amount reference','8000');
     expect(container.textContent).toContain('75.0 percentile'); expect(fixture.rpc).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('7 lower · 1 equal · 2 higher');
   });
@@ -315,7 +371,7 @@ describe('qualified cohort sale-price reader UI', () => {
   });
 
   it('exports evaluated request and resolved receipt while candidate-only changes preserve the source universe and cutoff', async () => {
-    await render(); const first=await exportedReceipt(); await enter('Candidate bid / price','8000'); const next=await exportedReceipt();
+    await render(); const first=await exportedReceipt(); await enter('Amount reference','8000'); const next=await exportedReceipt();
     expect(next.request).toEqual(first.request);
     expect(next.request).toMatchObject({ p_year: 1970,p_make: 'Synthetic',p_model: 'Coupe',p_price: null,p_evidence_as_of: null });
     expect(next.resolvedRequest).toMatchObject({ p_event_from: '2024-01-01T00:00:00Z',p_event_before: '2026-01-01T00:00:00Z',p_evidence_as_of: '2026-01-02T00:00:00Z' });

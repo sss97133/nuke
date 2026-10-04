@@ -129,6 +129,7 @@ export default function Valuation() {
   const initialLookup = useRef<Promise<Awaited<ReturnType<typeof supabase.rpc>>> | null>(null);
   const filters = useRef<HTMLDetailsElement>(null);
   const [sourcePage, setSourcePage] = useState(0);
+  const [recordLabels, setRecordLabels] = useState<{ key: string; labels: Record<string, string>; failed: boolean } | null>(null);
   const result = lookup?.result ?? null;
   const subjectVehicleId = params.get('vehicle_id') || null;
   const filterKey = JSON.stringify([year.trim(),make.trim(),model.trim(),eventFrom,eventBefore,currency,subjectVehicleId]);
@@ -224,9 +225,6 @@ export default function Valuation() {
 
   const stats = result?.stats;
   const receipt = result?.receipt;
-  const recordedLabels = useMemo(() => Object.fromEntries((result?.comparables ?? []).map(c => [
-    c.bat_listing_url, c.bat_listing_title || [c.year, c.make, c.model].filter(Boolean).join(' '),
-  ])), [result]);
   const outputCurrency = receipt?.currency || currency;
   const fmtUsd = (n: number | null | undefined) => formatPrice(n, outputCurrency);
   const fmtUsdFull = (n: number | null | undefined) => formatPriceFull(n, outputCurrency);
@@ -256,7 +254,45 @@ export default function Valuation() {
   // Display paging never reduces the calculation's source-sale denominator.
   const sourceSales = useMemo(() => [...(sourceEvidence?.eligible ?? [])].sort((a, b) =>
     (b.eventAt ?? '').localeCompare(a.eventAt ?? '') || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')) as SaleEvidence[], [sourceEvidence]);
-  const visibleSourceSales = sourceSales.slice(sourcePage * SOURCE_PAGE_SIZE, (sourcePage + 1) * SOURCE_PAGE_SIZE);
+  const visibleSourceSales = useMemo(() => sourceSales.slice(sourcePage * SOURCE_PAGE_SIZE, (sourcePage + 1) * SOURCE_PAGE_SIZE), [sourceSales, sourcePage]);
+  const labelKey = JSON.stringify(visibleSourceSales.map(s => [s.vehicleId, s.sourceUrl]));
+  useEffect(() => {
+    // One bounded public metadata read for the visible page. These are current
+    // labels, never source-sale features or inputs to the amount calculation.
+    const ids = [...new Set(visibleSourceSales.map(s => opaqueId(s.vehicleId)).filter((id): id is string => id != null))];
+    if (!ids.length) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error: labelError } = await supabase.from('vehicles').select('id,title,bat_listing_title,listing_url,discovery_url')
+          .in('id', ids).eq('is_public', true).is('deleted_at', null)
+          .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item');
+        if (cancelled) return;
+        if (labelError) throw labelError;
+        const labels: Record<string, string> = {};
+        for (const sale of visibleSourceSales) {
+          const matches = (data ?? []).filter(row => row.id === sale.vehicleId
+            && (canonicalBatSource(row.listing_url) || canonicalBatSource(row.discovery_url)) === sale.sourceUrl);
+          const title = matches.length === 1 ? matches[0].bat_listing_title || matches[0].title : null;
+          if (typeof title === 'string' && title.trim()) labels[sale.sourceUrl!] = title;
+        }
+        setRecordLabels({ key: labelKey, labels, failed: false });
+      } catch {
+        if (!cancelled) setRecordLabels({ key: labelKey, labels: {}, failed: true });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [labelKey, visibleSourceSales]);
+  const recordedLabels = useMemo(() => {
+    const titles = new Map<string, string[]>();
+    for (const c of result?.comparables ?? []) {
+      if (c.bat_listing_title?.trim() && canonicalBatSource(c.bat_listing_url) === c.bat_listing_url) {
+        titles.set(c.bat_listing_url, [...(titles.get(c.bat_listing_url) ?? []), c.bat_listing_title]);
+      }
+    }
+    const labels = Object.fromEntries([...titles].filter(([, values]) => values.length === 1).map(([url, values]) => [url, values[0]]));
+    return { ...labels, ...(recordLabels?.key === labelKey ? recordLabels.labels : {}) };
+  }, [result, recordLabels, labelKey]);
   const subject = result
     ? [result.query.year, result.query.make, result.query.model].filter(Boolean).join(' ')
     : '';
@@ -279,7 +315,7 @@ export default function Valuation() {
           letterSpacing: '0.5px',
           marginTop: 2,
         }}>
-          Dated BaT sale prices · cohort evidence · candidate bid percentile
+          Bring a Trailer · recorded sale evidence
         </div>
         {receipt && <button type="button" style={{ border: 0, background: 'transparent', color: 'var(--text)', padding: '6px 0', fontSize: FS.body, textDecoration: 'underline', cursor: 'pointer' }} onClick={() => {
           if (!filters.current) return;
@@ -297,11 +333,13 @@ export default function Valuation() {
         eventFrom={receipt.event_from} eventBefore={receipt.event_before}
         evidenceAsOf={receipt.evidence_as_of} knowledgeMode={receipt.knowledge_mode}
         recordedLabels={recordedLabels} renderEvidence={sale => <SaleAncestry sale={sale} />}
+        page={sourcePage} onPageChange={setSourcePage}
         cohortAction={result?.query.year != null && result.query.model && <button type="button" disabled={loading || changedFilters}
           title="Use exact recorded model labels across years; registered model variants may be absent"
           onClick={() => { setYear(''); void runLookup(''); }}>All recorded model years</button>}
         summary={{ median: stats.median, p10: stats.p10, p90: stats.p90 }} comparison={comparison}
-        candidateInput={<Field label="Candidate bid / price" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />} />}
+        candidateInput={<Field label="Amount reference" value={candidatePrice} onChange={setCandidatePrice} placeholder="Amount" inputMode="decimal" minWidth={100} />} />}
+      {recordLabels?.key === labelKey && recordLabels.failed && !changedFilters && <p role="status" style={{ fontSize: FS.body }}>Current vehicle labels could not be read. Sale amounts and source links remain available.</p>}
 
       <details ref={filters} open={!receipt || changedFilters} style={{ marginBottom: 12, scrollMarginTop: 90 }}>
       <summary style={{ fontSize: FS.body, cursor: 'pointer', marginBottom: 6 }}>Change cohort, currency or sales window</summary>
