@@ -1,14 +1,18 @@
 # Guardrails — Nuke repo rails for agents
 
-Six self-contained checks (zero deps, chmod +x) that keep agents from repeating the
-failure classes the 2026-07-12 ledger audit found. **All are currently INERT** — nothing
-is hooked into git or Claude Code. Enabling is opt-in (Skylar's call); instructions below.
+Checks that address failure classes found by the 2026-07-12 ledger audit. Their execution paths
+determine enforcement: `scripts/ci/verify.sh` runs local checks and ratchets, and
+`.github/workflows/supabase-deploy.yml` runs write-guard validation before edge-function deployment.
+Some checks are advisory; local tool and Git hooks vary by installation. Do not infer that every
+agent has a hook installed or that every documented invariant has an executable guard.
 
-Authority: `docs/ledger/` (CANONICAL_LEDGER.md, CAPABILITY_MAP.md, ledger.json).
+Development instructions: `AGENTS.md` and the applicable `.claude/rules/`. Design requirements:
+`docs/ledger/theory/data-machine.md`. The guard scripts consume dated ledger inventory where
+specified; current operational claims still require live verification.
 
 ## The suite
 
-| Script | Catches | Violations today (2026-07-12) |
+| Script | Catches | 2026-07-12 measurements unless otherwise dated |
 |---|---|---|
 | `no-raw-fetch.sh` | Edge functions fetching external pages directly instead of via `_shared/archiveFetch` (results must land in `listing_page_snapshots`). Allowlists internal/LLM/OAuth calls; escape hatch `// guardrail-allow: raw-fetch`. | **144** (~70-80% genuine raw scrapes; rest internal-in-disguise — wire as a ratchet, not a hard block) |
 | `no-raw-testimony-insert.mjs` | Raw INSERT/UPSERT into testimony tables (`vehicle_observations`, `vehicle_user_permissions`) bypassing the `ingest-observation` front door — in migrations (incl. DO blocks) and edge functions. Marker bypass: `ALLOW_RAW_TESTIMONY_WRITE`. | **2** (+1 grandfathered baseline) |
@@ -20,79 +24,41 @@ Authority: `docs/ledger/` (CANONICAL_LEDGER.md, CAPABILITY_MAP.md, ledger.json).
 
 Exit convention: 0 = clean, 1 = violation, 2 = setup/usage error.
 
-## Opt-in enablement (do NOT enable without Skylar's sign-off)
+These counts are historical measurements. For the local ratchet's configured limits, read
+`scripts/ci/baseline.json`; for current findings, run the relevant check in the checkout being
+published. A bypass marker documented by a script does not grant authorization to bypass an
+owner restriction.
 
-### (a) Git pre-commit hook — the three safe fail-on-violation guards
+## Where checks run
 
-`no-committed-secrets` is safe as a hard block today (0 violations). `no-raw-fetch` has 144
-pre-existing violations and `no-raw-testimony-insert` has 2 — the hook below runs them as
-**ratchets** (fail only if the count grows) so day-one commits aren't bricked.
+| Execution path | What runs | Boundary |
+|---|---|---|
+| `scripts/ci/verify.sh` | Frontend typecheck, raw-fetch regression tests, ghost/raw-fetch/testimony ratchets, secret scan, advisory schema-label scan; optional build | `CI_ENFORCE=1` blocks a failing local gate; default WARN mode reports and returns success |
+| `.github/workflows/pre-deploy-check.yml` | Raw-fetch regression tests, frontend typecheck and build; lint reports without blocking | Pull requests and pushes to main; inspect actual check results |
+| `.github/workflows/supabase-deploy.yml` | `check-write-guard.mjs` | Blocks edge-function deployment when a writing function lacks the required guard or explicit script allowlist |
+| Local Git and agent-tool hooks | Whatever the active installation configures | Client/checkout-specific; inspect the installed configuration before claiming coverage |
 
-```bash
-cat > /Users/skylar/nuke/.git/hooks/pre-commit <<'HOOK'
-#!/bin/bash
-# Nuke guardrails pre-commit — see scripts/guardrails/README.md
-set -u
-R=/Users/skylar/nuke
-fail=0
+The local ratchets permit existing findings up to the configured baseline. They do not prove
+that all code satisfies the design requirements. The write-guard scanner checks source wiring;
+runtime caller rejection is implemented by the guarded function and must be verified separately.
 
-# Hard block: secrets in the index (0 baseline — any hit is new)
-"$R/scripts/guardrails/no-committed-secrets.sh" || fail=1
+## Use the existing checks
 
-# Ratchets: fail only if violation count exceeds recorded baseline
-check_ratchet() { # name, baseline, cmd...
-  local name=$1 base=$2; shift 2
-  local out n
-  out=$("$@" 2>&1); n=$(grep -cE '^[^ ].*:[0-9]+' <<<"$out" || true)
-  # fall back to script exit semantics if count parse fails
-  if [ "${n:-0}" -gt "$base" ]; then
-    echo "GUARDRAIL RATCHET FAIL: $name went from $base to $n violations"; echo "$out" | tail -20; fail=1
-  fi
-}
-check_ratchet no-raw-fetch          144 "$R/scripts/guardrails/no-raw-fetch.sh"
-check_ratchet no-raw-testimony      2   "$R/scripts/guardrails/no-raw-testimony-insert.mjs"
-
-exit $fail
-HOOK
-chmod +x /Users/skylar/nuke/.git/hooks/pre-commit
-```
-
-To disable: `rm /Users/skylar/nuke/.git/hooks/pre-commit`. As violations get burned down,
-lower the baseline numbers in the hook (ratchet down, never up).
-
-### (b) Claude Code PreToolUse hook — capability preflight + dead-asset warning
-
-Add to `/Users/skylar/nuke/.claude/settings.json` under `"hooks"` (merge with existing keys).
-Fires when an agent is about to Write/Edit a new edge function or migration: blocks a
-duplicate mint (exit 1 → deny), and prints dead-asset warnings non-blockingly.
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep -qE 'supabase/(functions/[^/]+/index\\.ts|migrations/[^/]+\\.sql)$' && { NAME=$(jq -r '.tool_input.file_path' <<<\"$CLAUDE_TOOL_INPUT\" 2>/dev/null | sed -E 's|.*functions/([^/]+)/index.ts|\\1|; s|.*migrations/[0-9_]*([a-z_]+)\\.sql|\\1|'); /Users/skylar/nuke/scripts/guardrails/check-capability-before-mint.mjs \"$NAME\" || exit 2; /Users/skylar/nuke/scripts/guardrails/no-dead-asset-references.mjs --no-db 2>/dev/null | head -5; }; exit 0"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Copy-paste apply (backs up settings first):
+From the checkout being published:
 
 ```bash
-cd /Users/skylar/nuke/.claude
-cp settings.json settings.json.bak-$(date +%Y%m%d)
-# then merge the JSON above into settings.json (jq -s '.[0] * .[1]' or by hand)
+CI_ENFORCE=1 scripts/ci/verify.sh
+node scripts/guardrails/check-capability-before-mint.mjs "<name-or-capability>"
 ```
 
-Notes: exit 2 from a PreToolUse hook blocks the tool call and feeds stderr back to the
-agent — that's the STOP verdict. The dead-asset check is informational only (head -5,
-always exit 0). `no-schema-baked-labels.mjs` needs no hook: it is advisory and its
-default staged mode can simply be added to the pre-commit hook body if wanted.
+The capability preflight consumes the existing inventory; verify the proposed owner against the
+current atlas and writer before minting. `scripts/guardrails/pretooluse-mint-check.sh` is the
+existing tool-hook implementation for this preflight, not proof that a client invokes it.
+
+Inspect `core.hooksPath` and the hooks in `git rev-parse --git-common-dir` before relying on a Git
+hook. Worktrees may share a hook that points at another checkout; run the gate directly in your
+own checkout when needed. Inspect the active client configuration for tool hooks. Claude and
+Codex hook coverage must be established separately.
+
+Preserve existing checks, use the current owner-authorized scope for configuration changes, and record the actual
+execution path and its limits. See `scripts/ci/README.md` for local gate behavior.
