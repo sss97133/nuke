@@ -5,7 +5,7 @@ import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
-import { useLotMovement, weigh, type LotMovement, type MovementItem } from './useLotMovement';
+import { useLotMovement, weigh, type ActivityReceipt, type LotMovement, type MovementItem } from './useLotMovement';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useSameHourReadings, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
@@ -602,9 +602,8 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
 }
 
 // ---- Movement -----------------------------------------------------------------------------------
-// Under each lot in Ending next: its latest bids and comments (auction_comments), each with its weight against the
-// lot's own pace. A bid's weight is its step over the lot's previous bid against the median step in view; the
-// comment line counts the last hour against the lot's average hour since it opened. Amounts and times only.
+// Captured interactions on the current listing, qualified by the reader's as-of, bounds and source clock.
+// Bid-step weight compares only the observed increments in view; no assumed listing-duration rate is shown.
 
 function ago(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -616,7 +615,7 @@ function ago(ms: number): string {
 
 const KIND: Record<MovementItem['kind'], string> = { bid: 'Bid', comment: 'Comment', question: 'Question', seller: 'Seller' };
 
-// Weight as a bar: 1x (the lot's usual) fills a quarter, 4x or more fills it; 1.5x or more is drawn strong.
+// Weight as a bar: 1x the observed median step fills a quarter; 4x or more fills it.
 function WeightBar({ w, title: t }: { w: number; title: string }) {
   return (
     <span title={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -630,30 +629,47 @@ function WeightBar({ w, title: t }: { w: number; title: string }) {
 
 const MOVEMENT_ITEMS = 3;
 
-function Movement({ m }: { m: LotMovement }) {
+function Movement({ m, receipt, readAsOf, rowCap }: {
+  m: LotMovement | undefined; receipt: ActivityReceipt['lots'][number] | undefined;
+  readAsOf: string | undefined; rowCap: number | undefined;
+}) {
   const now = useSecondClock();
-  const items = m.items.slice(0, MOVEMENT_ITEMS);
-  if (items.length === 0) return null;
-  const pace = m.total != null && m.hoursListed ? m.total / m.hoursListed : null;
+  if (!m && !receipt) return null;
+  const items = (m?.items ?? []).slice(0, MOVEMENT_ITEMS);
+  const asOf = readAsOf ? Date.parse(readAsOf) : m?.readAsOf;
+  const sourceAt = receipt ? Date.parse(receipt.source_read_at ?? '') : m?.sourceReadAt;
+  const sourceBasis = receipt?.source_read_basis ?? m?.sourceReadBasis ?? 'unknown';
+  const knownSource = sourceBasis !== 'unknown' && sourceAt != null && Number.isFinite(sourceAt);
+  const captured = receipt?.activity_rows ?? m?.items.length ?? 0;
+  const truncated = receipt?.has_more ?? m?.lastHourFloor ?? false;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
+    <div aria-label="Captured lot activity" style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, fontSize: 10, color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
+      <div style={{ fontSize: 9, lineHeight: 1.4 }}>
+        Captured activity as of {asOf != null && Number.isFinite(asOf)
+          ? <time dateTime={new Date(asOf).toISOString()}>{clock(asOf)}</time> : 'unknown time'}.
+        {' '}{knownSource
+          ? <span>Source read <time dateTime={new Date(sourceAt!).toISOString()}>{ago(now - sourceAt!)}</time> · {sourceBasis === 'cached_snapshot' ? 'Cached snapshot' : 'Direct fetch'}.</span>
+          : <span>Source read time unknown.</span>}
+      </div>
+      <div style={{ fontSize: 9, lineHeight: 1.4 }}>
+        Showing {items.length} of {captured} captured interactions{rowCap != null ? ` · read limit ${rowCap}` : ''}.
+        {truncated && ' Window truncated; earlier interactions are omitted.'}
+      </div>
       {items.map((it, i) => (
         <div key={`${it.at}-${i}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', minWidth: 0, whiteSpace: 'nowrap' }}>
           <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0, color: it.kind === 'bid' ? 'var(--text)' : 'var(--text-secondary)' }}>{KIND[it.kind]}</span>
           {it.amount != null && <span style={{ ...mono, color: 'var(--text)' }}>{usd(it.amount, true)}</span>}
           {it.step != null && <span style={mono}>+{usd(it.step, true)}</span>}
-          {it.weight != null && m.medianStep != null && (
+          {it.weight != null && m?.medianStep != null && (
             <WeightBar w={it.weight} title={`A +${usd(it.step)} step against a median step of ${usd(m.medianStep)} over this lot's ${m.steps} bid steps in view`} />
           )}
           <span style={{ ...mono, marginLeft: 'auto', flexShrink: 0 }}>{ago(now - it.at)}</span>
         </div>
       ))}
-      {m.burst != null && pace != null && m.lastHour > 0 && (
+      {m != null && m.lastHour > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
-          <span style={{ ...label, fontSize: 8, width: 52, flexShrink: 0 }}>Last hour</span>
+          <span style={{ ...label, fontSize: 8, flexShrink: 0 }}>Captured hour before read</span>
           <span style={mono}>{m.lastHourFloor ? '≥' : ''}{m.lastHour} posted</span>
-          <WeightBar w={m.burst} title={`${m.lastHour} comments and bids in the last hour against this lot's average of ${pace.toFixed(1)} an hour (${m.total} over ${Math.round(m.hoursListed as number)} h since it opened, BaT's 7-day run)`} />
-          <span>vs {pace.toFixed(1)}/h usual</span>
         </div>
       )}
     </div>
@@ -664,7 +680,7 @@ function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction
   const next = auctions.slice(0, 8);
   const key = next.map((a) => a.id).join(',');
   const ids = useMemo(() => (key ? key.split(',') : []), [key]);
-  const { data: rows, dataUpdatedAt } = useLotMovement(ids);
+  const { data: rows, dataUpdatedAt, coverage } = useLotMovement(ids);
   const movement = useMemo(
     () => (rows ? weigh(rows, new Map(next.map((a) => [a.id, a.endsAt])), dataUpdatedAt || Date.now()) : null),
     [rows, dataUpdatedAt] // eslint-disable-line react-hooks/exhaustive-deps
@@ -688,7 +704,7 @@ function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction
             {heat.get(a.id) && heat.get(a.id)?.state !== 'in line' && (
               <div style={{ display: 'flex', marginTop: 3 }}><HeatTag a={a} heat={heat.get(a.id)} /></div>
             )}
-            {movement?.get(a.id) && <Movement m={movement.get(a.id) as LotMovement} />}
+            <Movement m={movement?.get(a.id)} receipt={coverage?.lots.find(l => l.vehicle_id === a.id)} readAsOf={coverage?.as_of} rowCap={coverage?.per_lot_limit} />
           </div>
         </Link>
       ))}
@@ -915,7 +931,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         {board.length > 0 && <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
           <div style={{ fontSize: 9, color: 'var(--text-secondary)', padding: '4px 8px', borderBottom: '2px solid var(--border)' }}>
-            Latest bids and comments. × = against the lot's own usual: a bid's step vs its median step in view; the last hour vs its average hour since it opened.
+            Captured bids and comments on each current listing. × compares a bid increment with the median increment in view. Source clock and capture limits appear per lot; this sample does not establish the listing's complete activity.
           </div>
           <EndingNext auctions={[...board].sort((a, b) => a.endsAt - b.endsAt)} risenIds={risenIds} stale={syncBehind} heat={heat} />
         </section>}

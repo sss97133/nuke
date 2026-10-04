@@ -4,13 +4,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, retry: vi.fn() }));
+const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, retry: vi.fn() }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
   useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }),
 }));
 vi.mock('./useLotMovement', async importOriginal => ({
-  ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => ({ data: [] }),
+  ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
@@ -21,6 +21,7 @@ vi.mock('@tanstack/react-virtual', () => ({ useWindowVirtualizer: ({ count, esti
 
 import MarketPulse from './MarketPulse';
 import { currentBidDistribution, type LiveAuction } from './useMarketPulse';
+import { activityRows, type ActivityReceipt } from './useLotMovement';
 
 let root: Root, container: HTMLDivElement;
 const HOUR = 3_600_000;
@@ -39,16 +40,83 @@ function button(prefix: string) {
 }
 async function click(prefix: string) { await act(async () => button(prefix).click()); }
 function boardTitles() { return [...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.textContent); }
+function movementReceipt(basis: 'direct_fetch' | 'cached_snapshot' | 'unknown', sourceAt: string | null, truncated = false): ActivityReceipt {
+  const asOf = '2026-10-03T11:58:00Z';
+  const count = truncated ? 40 : 3;
+  return { as_of: asOf, max_lots: 8, per_lot_limit: 40, input_truncated: false, eligible_lots: 1,
+    scope: 'captured current listing interactions', lots: [{ vehicle_id: 'first',
+      source_url: 'https://bringatrailer.com/listing/local-fixture-first/', source_read_at: sourceAt, source_read_basis: basis,
+      activity_rows: count, has_more: truncated, activity: Array.from({ length: count }, (_, i) => ({
+        vehicle_id: 'first', source_url: 'https://bringatrailer.com/listing/local-fixture-first/',
+        posted_at: new Date(Date.parse(asOf) - (i + 1) * 60_000).toISOString(),
+        comment_type: 'bid', bid_amount: 5000 - i * 100, sequence_number: count - i,
+      })) }] };
+}
+function setMovement(receipt: ActivityReceipt) {
+  fixture.movement = { data: activityRows(receipt), coverage: receipt, dataUpdatedAt: Date.now() };
+}
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(private callback: (entries: Array<{ contentRect: { width: number } }>) => void) {}
+    observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
+    disconnect() {}
+  });
   fixture.retry.mockReset();
+  fixture.movement = { data: [], coverage: undefined, dataUpdatedAt: Date.now() };
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
     lot('unknown', 'PORSCHE', null, 10), lot('other-make', 'FORD', 100_000, 1)], syncedAt: Date.now(), curve: null },
     isLoading: false, isError: false, risenIds: new Set(), refetch: fixture.retry, dataUpdatedAt: Date.now() };
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+});
+
+describe('captured lot activity clocks and bounds', () => {
+  it('labels unknown source time and captured as-of without an assumed usual rate', async () => {
+    setMovement(movementReceipt('unknown', '2026-10-03T11:59:00Z'));
+    await render('make=PORSCHE');
+    const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
+    expect(activity.textContent).toContain('Source read time unknown');
+    expect(activity.querySelector('time')?.dateTime).toBe('2026-10-03T11:58:00.000Z');
+    expect(activity.textContent).toContain('Showing 3 of 3 captured interactions · read limit 40');
+    expect(activity.textContent).toContain('Captured hour before read3 posted');
+    expect(container.textContent).not.toMatch(/usual|since it opened|7-day run/);
+    expect(activity.closest('a')?.getAttribute('href')).toBe('/vehicle/first');
+  });
+  it('preserves old cached source age separately from a recent captured read', async () => {
+    setMovement(movementReceipt('cached_snapshot', '2026-10-02T11:00:00Z'));
+    await render('make=PORSCHE');
+    const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
+    expect(activity.textContent).toContain('Source read 1d ago · Cached snapshot');
+    expect([...activity.querySelectorAll('time')].map(t => t.dateTime)).toEqual([
+      '2026-10-03T11:58:00.000Z', '2026-10-02T11:00:00.000Z',
+    ]);
+    expect(activity.textContent).not.toContain('Direct fetch');
+  });
+  it('labels direct reads and truncated per-lot windows on the phone layout', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    setMovement(movementReceipt('direct_fetch', '2026-10-03T11:55:00Z', true));
+    await render('make=PORSCHE');
+    const activity = container.querySelector('[aria-label="Captured lot activity"]') as HTMLElement;
+    expect(activity.textContent).toContain('Source read 5m ago · Direct fetch');
+    expect(activity.textContent).toContain('Showing 3 of 40 captured interactions · read limit 40');
+    expect(activity.textContent).toContain('Window truncated; earlier interactions are omitted');
+    expect(activity.textContent).toContain('≥40 posted');
+    expect(activity.style.overflowWrap).toBe('anywhere');
+    expect([...container.querySelectorAll('div')].some(d => d.style.gridTemplateColumns === 'repeat(4, 1fr)')).toBe(true);
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
+    expect(container.querySelector('a[title="The listing on Bring a Trailer"]')?.getAttribute('href')).toContain('local-fixture-first');
+  });
+  it('shows a captured zero without inventing activity when a source receipt exists', async () => {
+    const receipt = movementReceipt('unknown', null); receipt.lots[0].activity = []; receipt.lots[0].activity_rows = 0;
+    setMovement(receipt); await render('make=PORSCHE');
+    const activity = container.querySelector('[aria-label="Captured lot activity"]')!;
+    expect(activity.textContent).toContain('Showing 0 of 0 captured interactions');
+    expect(activity.textContent).toContain('Source read time unknown');
+    expect(activity.textContent).not.toContain('posted');
+  });
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
