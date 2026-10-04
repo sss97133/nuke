@@ -411,10 +411,14 @@ const VehicleBriefing: React.FC = () => {
               letterSpacing: '0.05em',
             }}
           >
-            {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} COMPARABLE SALE{comps.length !== 1 ? 'S' : ''}
+            {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} RECENT SOLD RECORD{comps.length !== 1 ? 'S' : ''}
           </button>
           {showComps && (
             <div style={{ marginTop: '4px' }}>
+              <div title={vehicleIntel?.recent_comps_scope?.basis || undefined} style={{ fontSize: '9px', color: 'var(--text-secondary, #666)', marginBottom: '4px' }}>
+                {vehicleIntel?.recent_comps_scope?.label && <span>{vehicleIntel.recent_comps_scope.label} · </span>}
+                Condition not matched
+              </div>
               {comps.slice(0, 5).map((comp, i) => (
                 <CompRow key={comp.id || i} comp={comp} />
               ))}

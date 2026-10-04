@@ -8,6 +8,14 @@ export interface VehicleIntel {
   scores: ScoreData | null;
   apparitions: Apparition[] | null;
   recent_comps: CompSale[] | null;
+  recent_comps_scope?: CompScope | null;
+}
+
+export interface CompScope {
+  label: string | null;
+  basis: string | null;
+  condition_matched: boolean;
+  condition_note: string;
 }
 
 export interface CommentIntel {

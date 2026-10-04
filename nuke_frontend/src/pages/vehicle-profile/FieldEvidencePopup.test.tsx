@@ -43,6 +43,17 @@ describe('canonical value -> attributed observation', () => {
     expect(html).toContain('Source claims differ'); expect(html).toContain('No resolution is established');
     expect(html).toContain('structured_import'); expect(html).not.toContain('Ingest time: Unavailable');
   });
+  it('qualifies multiple claims when opened before the parent evidence group arrives', () => {
+    fixture.provenance.data.value = '4x4';
+    fixture.provenance.data.evidence = [
+      { source: 'nhtsa', source_type: 'vin_decode', value: '4x2' },
+      { source: 'bat', source_type: 'bat', value: '4x4' },
+    ];
+    const html = render();
+    expect(html).toContain('4x2'); expect(html).toContain('4x4');
+    expect(html).toContain('This display does not establish whether differences have been resolved');
+    expect(html).not.toContain('Source claims differ.');
+  });
   it('renders denial without leaking a supplied value or treating failure as absence', () => {
     fixture.provenance.data = null;
     const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-private" field="vin" label="VIN" value="DO-NOT-EXPOSE" />);

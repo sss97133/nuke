@@ -24,6 +24,7 @@ import { useInterests } from '../../hooks/useInterests';
 import { MakePopup } from './MakePopup';
 import { ModelPopup } from './ModelPopup';
 import { SourcePopup } from './SourcePopup';
+import type { CompScope } from '../../pages/vehicle-profile/hooks/useVehicleIntel';
 
 interface Props {
   vehicle: FeedVehicle;
@@ -36,6 +37,7 @@ interface VehicleIntel {
   scores: ScoreData | null;
   apparitions: Apparition[] | null;
   recent_comps: CompSale[] | null;
+  recent_comps_scope?: CompScope | null;
 }
 
 interface CommentIntel {
@@ -384,7 +386,11 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
       {/* Comparable sales — specific vehicles, not stats */}
       {comps && comps.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
-          <Label>RECENT COMPARABLE SALES</Label>
+          <Label>RECENT SOLD CONTEXT</Label>
+          <div title={intel?.recent_comps_scope?.basis || undefined} style={{ fontFamily: SANS, fontSize: 9, color: '#666', marginTop: 4 }}>
+            {intel?.recent_comps_scope?.label && <span>{intel.recent_comps_scope.label} · </span>}
+            Condition not matched
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 6 }}>
             {comps.slice(0, 5).map((c) => (
               <div

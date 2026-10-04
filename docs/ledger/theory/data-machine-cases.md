@@ -126,7 +126,7 @@ In addition to the card's list:
 | C14 | Craigslist stores share URLs, no post id, no HTML diff, no second sighting | 100% of rows since August | open | yes | read the post id from the detail page; snapshot the detail page (`archiveFetch`); diff the search snapshot per poll into appear/disappear events |
 | C15 | Block auctions: no sale entity, no catalog-before, no video | `auction_events` last house row 2026-04-01 | open | yes (catalog); video needs a cost plan | a sale entity (house, start, end, location, catalog); catalog-before per event; results after; video clips as documentation later |
 | C16 | Facebook dead since 2026-06-12, 111,669 phantom actives | monitor cron off | open | no (Mac fetch) | per-metro request budget and sighting log; the cloud only folds and checks |
-| C17 | Photo classifier fails 100% silently | 1,042 rows `classifier_failed=true`, no error text; cron 478 paused | open | yes (diagnosis) | read the orchestrator's classifier path and the function logs; fix; re-drive 452 pending in a bounded batch |
+| C17 | Photo pipeline operating coverage | Opening sample: 1,042 rows `classifier_failed=true`, no error text. Writer repair [#506](https://github.com/sss97133/nuke/pull/506) and typed witness [#507](https://github.com/sss97133/nuke/pull/507) merged. Read-only 2026-10-04 UTC: one existing observation has one typed witness and reaches the public field drill; 3/3 cited images load. Cron 478 remains paused. | open — one image-to-reader path verified | yes (bounded diagnosis) | Continue the existing cached-result/receipt lane; prove eligible arrivals reach durable observations, witnesses and a useful reader. Preserve processing holds; the opening backlog count is not a current re-drive instruction. See follow-up below. |
 | C18 | Sensitive photos hidden by RLS, still public by URL | 474 flagged | open | yes | move sensitive objects out of the public bucket or sign URLs |
 | C19 | Anon writers remaining (§2.10) | 66 functions, 127 unguarded deployed functions, `vehicle_custom_circuits` | open | yes | a census that matches every DML form and dynamic SQL; revoke; a policy fix; a deploy-list diff against the repo |
 | C20 | DDL tripwire is a record, nobody reads it | 1,486 rows, 0 readers | open | yes | a daily drift check that alarms on DDL not from CI; `ddl_audit_log` into `v_job_health` |
@@ -136,6 +136,26 @@ In addition to the card's list:
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
+
+**C17 follow-up — 2026-10-04 UTC, bounded read-only trace.** The October 2 intake receipt records observation
+`6c3ca7fa-0147-4542-8785-9f8ffe724ed2` and an exact replay returning `duplicate: true`. The current check finds its
+single derived witness `f25d069e-3a1b-49a9-852e-8681f105ee4b`, the enabled insert trigger and the same IDs in
+`get_field_provenance`. An anonymous visitor to the [1967 Corvette profile](https://nuke.ag/vehicle/12cde831-8981-471b-9631-588bc1251259)
+can open interior color and inspect all three cited photographs; no browser errors were observed.
+
+The traced claim is **visible blue upholstery**, confidence 0.6, from source family `mecum:1159827`. Review time
+and ingest time are distinct; photograph capture time and model identity remain unknown. The reader preserves
+those limits and warns that multiple views from one source family are not independent confirmations. The
+canonical “Teal Blue” remains a listing claim; this trace does not prove the appearance claim changed that field.
+
+Operating coverage remains open: the live atlas reports NULL `writers_30d` and `last_write` for
+`vehicle_observations`, `observation_witnesses` and `vehicle_images`. The witness projector has a registered owner,
+but its registry entry explicitly records no scheduled cadence/health reader registered by that migration.
+Sample success does not establish corpus throughput, historical coverage or a completeness alarm. Continue
+through the existing receipt/health machinery; do not recreate the repaired classifier or another observation
+store. Preserve the paused drain and OWNER-OFF desktop intake. No intake, replay, model call, production write or
+schedule change was initiated by this trace. Private evidence: `~/nuke-logs/observation-trace-2026-10-03/trace-receipt.json`;
+prior intake/replay evidence: `~/nuke-logs/dm-ui/image-witness-live-deployment-receipt.json`.
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
