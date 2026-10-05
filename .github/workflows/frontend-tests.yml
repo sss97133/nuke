@@ -269,6 +269,9 @@ jobs:
       - name: Verify saved sale-population assay without network or writes
         run: node --test scripts/assay-sale-population.test.mjs
 
+      - name: Verify public-reader coverage failure detection without network or writes
+        run: node --test scripts/assays/public-reader-coverage.test.mjs
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test

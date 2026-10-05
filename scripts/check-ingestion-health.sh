@@ -2,6 +2,13 @@
 # Quick ingestion health check script
 # Run: bash scripts/check-ingestion-health.sh
 
+# Public-reader mode is an anonymous, bounded assay. It does not execute the
+# legacy full-count checks below, process intake or invoke a writer.
+if [ "${1:-}" = "--public-readers" ]; then
+    shift
+    exec node "$(dirname "$0")/assays/public-reader-coverage.mjs" "$@"
+fi
+
 # Bounded C17 mode uses the existing read-only Management API path. It never
 # invokes a consumer, model or intake writer. Other legacy modes stay separate.
 if [ "${1:-}" = "--image-observations" ]; then
