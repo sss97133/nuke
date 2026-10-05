@@ -7,6 +7,8 @@
 -- Execute in BEGIN READ ONLY with statement_timeout='5s'. Private receipt only.
 -- Source header hashes are compared, never presented as recomputed raw proof.
 -- Existing readers expose CURRENT permitted evidence, not historical replay.
+-- Reader exposure is independent of requested-relation verification. A visible
+-- field may still fail its supplied capture/episode/property/hash contract.
 WITH document AS MATERIALIZED (
   SELECT $1::jsonb doc,
     CASE WHEN jsonb_typeof($1::jsonb->'requests')='array' THEN $1::jsonb->'requests' ELSE '[]'::jsonb END items,
@@ -128,6 +130,25 @@ WITH document AS MATERIALIZED (
       WHEN vehicle_bound AND field_extracted AND property_bound THEN 'linked'
       ELSE 'extracted_unresolved' END stage
   FROM exposure x
+), requested_relation_checks AS MATERIALIZED (
+  SELECT s.*, jsonb_build_object(
+    'vehicle',CASE WHEN vehicle_id IS NULL THEN 'not_requested'
+      WHEN vehicle_bound THEN 'passed' ELSE 'failed' END,
+    'capture',CASE WHEN capture_id IS NULL THEN 'not_requested'
+      WHEN capture_bound THEN 'passed' ELSE 'failed' END,
+    'episode',CASE WHEN event_id IS NULL THEN 'not_requested'
+      WHEN event_bound THEN 'passed' ELSE 'failed' END,
+    'property',CASE WHEN property_key IS NULL THEN 'not_requested'
+      WHEN property_bound THEN 'passed' ELSE 'failed' END,
+    'sourceHeaderDigest',CASE WHEN expected_digest IS NULL THEN 'not_requested'
+      WHEN stored_digest IS NULL THEN 'unestablished'
+      WHEN digest_agrees THEN 'passed' ELSE 'failed' END,
+    'captureClock',CASE WHEN capture_id IS NULL THEN 'not_requested'
+      WHEN capture_clock='within_cutoff' THEN 'passed'
+      WHEN capture_clock='after_cutoff' THEN 'failed' ELSE 'unestablished' END,
+    'sourceRole',CASE WHEN required_role IS NULL THEN 'not_requested' ELSE 'unestablished' END
+  ) requested_relation_checks
+  FROM stages s
 ), findings AS MATERIALIZED (
   SELECT s.*, CASE
     WHEN found_observation IS NULL AND found_capture IS NOT NULL AND parsed_status='extracted_unadmitted' THEN 'parsed_claim_not_admitted_or_observation_locator_missing'
@@ -148,7 +169,7 @@ WITH document AS MATERIALIZED (
     WHEN folded_source IS NOT NULL AND folded_source<>found_observation THEN 'fold_selected_other_testimony'
     WHEN NOT fold_matches AND NOT specs_value_exposed THEN 'fold_or_bounded_reader_path_unestablished'
     ELSE NULL END finding
-  FROM stages s
+  FROM requested_relation_checks s
 ), ownership AS MATERIALIZED (
   SELECT table_name,jsonb_agg(DISTINCT owned_by ORDER BY owned_by) owners
   FROM public.pipeline_registry
@@ -175,6 +196,13 @@ SELECT jsonb_build_object(
     'links',jsonb_build_object('vehicle',vehicle_bound,'typedCapture',capture_bound,
       'typedEpisode',event_bound,'registeredProperty',property_bound,'snapshotParentAttested',snapshot_parent_attested,
       'sourceQualification','not_established_by_this_assay'),
+    'requestedRelations',jsonb_build_object(
+      'status',(SELECT CASE WHEN bool_or(value='failed') THEN 'failed'
+        WHEN bool_or(value='unestablished') THEN 'unestablished'
+        WHEN bool_or(value='passed') THEN 'passed' ELSE 'not_requested' END
+        FROM jsonb_each_text(requested_relation_checks)),
+      'checks',requested_relation_checks,'basis','explicit_requested_relations_only',
+      'sourceQualification','not_established_by_this_assay','rawHashRecomputed',false),
     'clocks',jsonb_build_object('observationEventAt',observed_at,'observationIngestedAt',ingested_at,
       'captureFetchedAt',fetched_at,'captureIngestedAt',capture_ingested_at,'foldAsOf',fold_as_of,
       'observationState',observation_clock,'captureState',capture_clock,'historicalNativeAvailability','unestablished'),

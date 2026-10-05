@@ -166,6 +166,62 @@ SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.ite
 SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc((SELECT jsonb_agg(jsonb_build_object('key','many_'||n,'field','color')) FROM generate_series(1,51) n)))->>'status'='refused','overcap refuses unsampled request set');
 SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.item(1,'color')||jsonb_build_object('captureId',pg_temp.uid(301),'sourceDigest',repeat('0',64)))))->'items'->0->>'finding'='source_header_digest_mismatch_or_missing','digest mismatch preserved');
 SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.item(1,'color')||'{"requiredRole":"current"}'::jsonb)))->'items'->0->>'finding'='source_role_requires_episode_qualification','current scalar not installed-role proof');
+-- A visible field does not verify a caller-supplied source relationship. Keep
+-- the measured reader success while reporting the failed/unknown contract.
+SELECT pg_temp.check(pg_temp.result('case_1')->'requestedRelations'->>'status'='passed',
+ 'explicit matching capture and episode relations pass');
+SELECT pg_temp.check(pg_temp.result('case_2')->'requestedRelations'->>'status'='failed',
+ 'missing typed capture fails requested relation contract');
+SELECT pg_temp.check(pg_temp.result('case_3')->'requestedRelations'->>'status'='failed',
+ 'unknown property fails requested relation contract');
+SELECT pg_temp.check(pg_temp.result('case_13')->'requestedRelations'->>'status'='not_requested',
+ 'omitted source requirements are not green verification');
+SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.item(1,'color')
+ ||jsonb_build_object('vehicleId',pg_temp.uid(102),'captureId',pg_temp.uid(301),'eventId',pg_temp.uid(401))
+ )))->'items'->0->'requestedRelations'->>'status'='failed',
+ 'wrong requested vehicle fails even when capture and episode match the original observation');
+SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.item(1,'color')
+ ||jsonb_build_object('vehicleId',pg_temp.uid(102),'captureId',pg_temp.uid(301),'eventId',pg_temp.uid(401))
+ )))->'items'->0->'links'->>'vehicle'='false',
+ 'wrong requested vehicle retains failed parent binding');
+SELECT pg_temp.check(pg_temp.result('case_13')->'requestedRelations'->'checks'->>'vehicle'='not_requested',
+ 'omitted vehicle requirement remains not requested');
+SELECT pg_temp.check(pg_temp.result('case_1')->'requestedRelations'->>'rawHashRecomputed'='false'
+ AND pg_temp.result('case_1')->'requestedRelations'->>'sourceQualification'='not_established_by_this_assay',
+ 'passing relation contract does not claim recomputed source truth');
+CREATE TEMP TABLE relation_results AS SELECT scenario,pg_temp.reconcile(pg_temp.doc(jsonb_build_array(
+ pg_temp.item(1,'color')||requirements)))->'items'->0 item
+FROM (VALUES
+ ('wrong_capture',jsonb_build_object('captureId',pg_temp.uid(302))),
+ ('wrong_episode',jsonb_build_object('eventId',pg_temp.uid(402))),
+ ('wrong_digest',jsonb_build_object('captureId',pg_temp.uid(301),'sourceDigest',repeat('0',64))),
+ ('matching_digest',jsonb_build_object('captureId',pg_temp.uid(301),'sourceDigest',
+   encode(sha256(convert_to('DO_NOT_PRINT_SOURCE_PAYLOAD','UTF8')),'hex'))),
+ ('unlocated_digest',jsonb_build_object('sourceDigest',repeat('0',64))),
+ ('current_role',jsonb_build_object('requiredRole','current'))
+) controls(scenario,requirements);
+SELECT pg_temp.check((SELECT bool_and(item->>'stage'='exposed'
+ AND item->'reader'->>'specsValueCurrent'='true'
+ AND item->'requestedRelations'->>'status'='failed') FROM relation_results
+ WHERE scenario IN ('wrong_capture','wrong_episode','wrong_digest')),
+ 'reader exposure cannot conceal wrong capture episode or digest');
+SELECT pg_temp.check((SELECT item->'requestedRelations'->>'status'='passed'
+ AND item->'requestedRelations'->'checks'->>'sourceHeaderDigest'='passed'
+ AND item->'requestedRelations'->>'rawHashRecomputed'='false' FROM relation_results
+ WHERE scenario='matching_digest'),'matching stored header digest is bounded relation proof only');
+SELECT pg_temp.check((SELECT item->'requestedRelations'->>'status'='unestablished'
+ FROM relation_results WHERE scenario='unlocated_digest'),
+ 'requested digest without located header remains unestablished');
+SELECT pg_temp.check((SELECT item->>'stage'='exposed'
+ AND item->'requestedRelations'->>'status'='unestablished'
+ AND item->'requestedRelations'->'checks'->>'sourceRole'='unestablished'
+ FROM relation_results WHERE scenario='current_role'),
+ 'visible phrase does not verify requested installed role');
+UPDATE public.listing_page_snapshots SET fetched_at=NULL WHERE id=pg_temp.uid(301);
+SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(pg_temp.item(1,'color')
+ ||jsonb_build_object('captureId',pg_temp.uid(301)))))->'items'->0->'requestedRelations'->>'status'='unestablished',
+ 'typed source relation with unknown capture clock cannot pass');
+UPDATE public.listing_page_snapshots SET fetched_at='2025-01-01' WHERE id=pg_temp.uid(301);
 SELECT pg_temp.check(pg_temp.reconcile(pg_temp.doc(jsonb_build_array(
  pg_temp.item(1,'color')||jsonb_build_object('vehicleId',pg_temp.uid(102))
 )))->'items'->0->'reader'->>'specsValueCurrent'='false','wrong requested public parent cannot expose different parent observation');

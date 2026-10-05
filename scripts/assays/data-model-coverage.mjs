@@ -1,0 +1,170 @@
+// Operator mode of check-ingestion-health.sh; output belongs outside the public repo.
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { constants, openSync, closeSync, fstatSync, readSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { inspectAgentWork } from './agent-work-coverage.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const HASH = text => createHash('sha256').update(text).digest('hex');
+const STAGES = new Set(['retained_only', 'retention_locator_only', 'retention_unestablished',
+  'parsed_unadmitted', 'privacy_withheld', 'superseded_retained', 'clock_withheld',
+  'conflict_withheld', 'extracted_unresolved', 'linked', 'folded', 'exposed']);
+
+export function options(args) {
+  const parsed = {};
+  for (let i = 0; i < args.length; i += 2) {
+    const key = args[i];
+    if (!['--out', '--cases', '--lanes', '--worker-state'].includes(key) || !args[i + 1]
+      || args[i + 1].startsWith('--') || parsed[key]) throw new Error('invalid_arguments');
+    parsed[key] = resolve(args[i + 1]);
+  }
+  if (!parsed['--out']) throw new Error('private_output_required');
+  return parsed;
+}
+
+export function boundedDocument(path) {
+  let fd, doc;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.size > 65536) throw new Error('invalid_cases_file');
+    const buffer = Buffer.alloc(65537);
+    let length = 0;
+    while (length < buffer.length) {
+      const n = readSync(fd, buffer, length, buffer.length - length, null);
+      if (!n) break;
+      length += n;
+    }
+    const after = fstatSync(fd);
+    if (length > 65536 || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+      throw new Error('invalid_cases_file');
+    doc = JSON.parse(buffer.subarray(0, length).toString('utf8'));
+  } finally { if (fd !== undefined) closeSync(fd); }
+  if (!Array.isArray(doc?.requests) || doc.requests.length < 1 || doc.requests.length > 50
+    || !Number.isFinite(Date.parse(doc.asOf))) throw new Error('invalid_cases_scope');
+  return doc;
+}
+
+export function readonlySQL(sql) {
+  return `BEGIN READ ONLY; SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='1s';\n${sql}\nROLLBACK;`;
+}
+
+export function readQuery(sql, column, run = execFileSync) {
+  const output = run('bash', [resolve(ROOT, 'scripts/data/q.sh'), readonlySQL(sql)],
+    { cwd: ROOT, encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+  const rows = JSON.parse(output);
+  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0]?.[column]
+    || typeof rows[0][column] !== 'object') throw new Error('invalid_database_response');
+  return rows[0][column];
+}
+
+export function assess(database, reconciliation, agents) {
+  const failures = [], unmeasured = [], followups = [];
+  if (database?.version !== 'data_model_health_v1' || !Number.isFinite(Date.parse(database.measured_at))
+    || !Array.isArray(database.scope?.tables) || !database.scope.tables.length
+    || !Array.isArray(database.scope?.jobs) || !database.scope.jobs.length
+    || !Array.isArray(database.tables) || !Array.isArray(database.jobs)) {
+    unmeasured.push('invalid_database_contract');
+  } else {
+  for (const name of database.scope.tables) {
+    const matches = database.tables.filter(row => row?.table_name === name);
+    if (matches.length !== 1) { unmeasured.push(`table_metadata:${name}`); continue; }
+    const table = matches[0];
+    if (table.catalog_present !== true || table.atlas_present !== true) {
+      unmeasured.push(`table_metadata:${name}`); continue;
+    }
+    if (table.constraints?.unvalidated?.length) followups.push(`constraint_validation_pending:${name}`);
+    if (!Number.isInteger(table.columns?.total) || !Number.isInteger(table.columns?.described)
+      || table.columns.described < table.columns.total) followups.push(`column_meanings_incomplete:${name}`);
+    if (!Array.isArray(table.registry?.owners) || !table.registry.owners.length) followups.push(`owner_unregistered:${name}`);
+    if (!table.write_receipt?.last_write) unmeasured.push(`write_receipt:${name}`);
+  }
+  for (const name of database.scope.jobs) {
+    const matches = database.jobs.filter(row => row?.job_name === name);
+    if (matches.length !== 1) { unmeasured.push(`job:${name}`); continue; }
+    const job = matches[0];
+    if (job.present !== true) { unmeasured.push(`job:${name}`); continue; }
+    if (job.active !== true) { unmeasured.push(`paused_job_output:${name}`); continue; }
+    if (job.execution?.last_status === 'failed' || job.execution?.consecutive_failures > 0)
+      failures.push(`job_execution:${name}`);
+    if (job.reported_health_status === 'failed') failures.push(`job_operational_health:${name}`);
+    if (job.assay?.reported_status === 'failed') failures.push(`job_output:${name}`);
+    else if (job.assay?.reported_status !== 'passed') unmeasured.push(`job_output:${name}`);
+  }
+  }
+  if (!reconciliation) unmeasured.push('source_to_reader:no_explicit_cases');
+  else {
+    if (reconciliation.schemaVersion !== 'intake_reader_reconciliation_v1'
+      || reconciliation.status !== 'measured_request_set' || !Array.isArray(reconciliation.items)
+      || reconciliation.items.length !== reconciliation.requestedItems || !reconciliation.items.length)
+      unmeasured.push('invalid_reconciliation_contract');
+    else for (const item of reconciliation.items) {
+      if (!item || !STAGES.has(item.stage)) { unmeasured.push('invalid_reconciliation_stage'); continue; }
+      // Exposure and typed source relations must both be measured; neither proves source truth.
+      if (item.reader?.specsValueCurrent !== true) unmeasured.push(`reader:${item.key}:${item.stage}`);
+      if (!item.requestedRelations) unmeasured.push(`requested_relations:${item.key}`);
+      else if (item.requestedRelations.status === 'failed') failures.push(`requested_relations:${item.key}`);
+      else if (item.requestedRelations.status !== 'passed') unmeasured.push(`requested_relations:${item.key}`);
+      if (item.reader?.provenanceMeasurement !== 'measured') unmeasured.push(`provenance_reader:${item.key}`);
+    }
+  }
+  if (agents?.lanes?.status !== 'observed') unmeasured.push('agent_lane_coverage');
+  if (!agents?.lanes?.items?.some(item => item.freshness === 'fresh')) unmeasured.push('no_fresh_agent_declaration');
+  if (!agents?.worker?.status || agents.worker.status === 'unknown') unmeasured.push('scheduled_agent_activity');
+  if (agents?.worker?.status === 'reported_failed') failures.push('scheduled_agent_execution');
+  if (agents?.worker?.ageSeconds > 17100) unmeasured.push('scheduled_agent_receipt_overdue');
+  // No declaration, successful process, or count of commits verifies the model.
+  unmeasured.push('independent_agent_delivery_verification');
+  return { status: failures.length ? 'failed' : 'incomplete', failures, unmeasured, followups };
+}
+
+export function runMonitor(args, dependencies = {}) {
+  const opts = options(args);
+  const query = dependencies.query ?? readQuery;
+  const inspect = dependencies.inspect ?? inspectAgentWork;
+  const healthSQL = readFileSync(resolve(ROOT, 'scripts/discovery/data-model-health.sql'), 'utf8');
+  const report = { version: 'data_model_coverage_v1', measuredAt: new Date().toISOString(),
+    database: null, sourceToReader: null, agentWork: null,
+    evidence: { healthSQLSha256: HASH(healthSQL) },
+    limits: ['Seven named tables and five named jobs; no fleet completeness or source truth claim.',
+      'Constraint validation and descriptions do not establish semantic correctness.',
+      'Source cases are explicit operator inventory, not a representative population.',
+      'Agent declarations, process existence and reported stages are not independent verification.'] };
+  const errors = [];
+  try { report.database = query(healthSQL, 'health'); }
+  catch { errors.push('database_measurement_unavailable'); }
+  if (opts['--cases']) {
+    try {
+      const doc = boundedDocument(opts['--cases']);
+      const sql = readFileSync(resolve(ROOT, 'scripts/discovery/intake-reader-reconciliation.sql'), 'utf8');
+      const literal = `'${JSON.stringify(doc).replaceAll("'", "''")}'`;
+      // Function replacement preserves literal dollar sequences inside source input.
+      report.sourceToReader = query(sql.replace(/\$1\b/g, () => literal), 'receipt');
+      report.evidence.reconciliationSQLSha256 = HASH(sql);
+      report.evidence.casesSha256 = HASH(JSON.stringify(doc));
+    } catch { errors.push('source_to_reader_measurement_unavailable'); }
+  }
+  try { report.agentWork = inspect({ lanesDirectory: opts['--lanes'], workerStateDirectory: opts['--worker-state'] }); }
+  catch { errors.push('agent_measurement_unavailable'); }
+  try { report.assessment = assess(report.database, report.sourceToReader, report.agentWork); }
+  catch { errors.push('measurement_contract_incomplete'); report.assessment = { status: 'incomplete', failures: [], unmeasured: [], followups: [] }; }
+  report.assessment.unmeasured.push(...errors);
+  // Never overwrite a receipt, follow an output symlink, or print raw database errors.
+  writeFileSync(opts['--out'], JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+  return { report, exitCode: report.assessment.failures.length ? 1 : 2 };
+}
+
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--help')) {
+    console.log('check-ingestion-health.sh --data-model --out /private/new.json [--cases /private/requests.json] [--lanes /path/to/.claude/agents/active] [--worker-state /path/to/night-shift]\nRead-only. Exit 1: observed failure; 2: incomplete coverage/unavailable. No whole-model pass.');
+  } else {
+    try {
+      const { report, exitCode } = runMonitor(process.argv.slice(2));
+      console.log(JSON.stringify({ status: report.assessment.status, failures: report.assessment.failures.length,
+        unmeasured: report.assessment.unmeasured.length, followups: report.assessment.followups.length }));
+      process.exitCode = exitCode;
+    } catch { console.error('data-model monitor could not record a private receipt; check arguments/output path'); process.exitCode = 2; }
+  }
+}
