@@ -2,6 +2,11 @@
 
 ## Current repair and operating boundary, 2026-10-04
 
+**Owner scope: connected Gmail only.** The dedicated alerts mailbox and its Apple Mail daemon
+are excluded from this repair's rollout. The Mac findings below explain the old path's failure;
+they are not instructions to enable, repair or expand that account. Select the connected mailbox
+explicitly when importing its raw-email manifest.
+
 The v3 reader extends the earlier BHCC repair to KSL, BaT announcements and Cars & Bids.
 KSL Mailgun destinations are decoded locally. The two auction publishers often put canonical
 listing URLs in their plain-text MIME alternative while wrapping the HTML links in trackers.
@@ -42,13 +47,22 @@ The reader checks the selected recipient and sender, uses the original MIME byte
 receipt time separately from the sender Date and database ingest time:
 
 ```sh
-python3 scripts/ingest-mail-alerts.py --source all --target-email "$ALERTS_EMAIL" \
+python3 scripts/ingest-mail-alerts.py --source all --target-email "$MAIL_ALERT_TARGET" \
   --message-manifest /private/path/messages.json --dry-run
 ```
 
 Omitting `--dry-run` requires the existing encrypted Supabase environment and enabled source
 configurations. Raw messages and receipts remain private; tests use synthetic emails only.
 `defer_analysis` keeps this deterministic intake from dispatching paid analysis.
+
+The connected chat Gmail tool can provide authorized message exports during a session. It does
+not provision credentials for the standalone worker. A presence-only environment check found
+no `GOOGLE_REFRESH_TOKEN` or separate Gmail refresh token. Continuous deterministic acquisition
+from the selected account therefore still needs an authorized read-only Gmail transport. Do not
+run the legacy `scripts/gmail-poller.mjs` setup/daemon unchanged: it requests modify access,
+changes unread state and calls the old URL-only edge processor. Preparing that transport and
+verifying its exact account, readonly scope, durable pagination and failure handling precede
+any activation. The paused cloud cron remains paused.
 
 The local assay covers 30 cached KSL messages (30 matches, 79 recommendations) plus current
 KSL, BaT and Cars & Bids MIME samples. It checks per-card boundaries and replay/failure behavior;
