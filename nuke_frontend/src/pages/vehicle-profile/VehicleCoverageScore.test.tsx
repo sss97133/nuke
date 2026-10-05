@@ -3,15 +3,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any, loading: false, error: null as string | null }));
+const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any, loading: false, error: null as string | null,
+  priceFacts: null as any, priceSettled: true, priceFailed: false }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({
   vehicle: fixture.vehicle, vehicleId: fixture.vehicle.id, canEdit: false,
   isVerifiedOwner: false, isMobile: true, setGalleryFilter: vi.fn(), auctionPulse: null,
 }) }));
 vi.mock('./hooks/useFieldEvidence', () => ({ useFieldEvidence: () => ({ evidence: fixture.evidence, loading: fixture.loading, error: fixture.error }) }));
-vi.mock('./hooks/useVehiclePriceFacts', () => ({
-  useVehiclePriceFacts: () => ({ priceFacts: null }), priceKindLabel: () => 'PRICE',
-}));
+vi.mock('./hooks/useVehiclePriceFacts', async () => {
+  const actual = await vi.importActual<typeof import('./hooks/useVehiclePriceFacts')>('./hooks/useVehiclePriceFacts');
+  return { ...actual, useVehiclePriceFacts: () => ({ priceFacts: fixture.priceFacts, priceSettled: fixture.priceSettled, priceFailed: fixture.priceFailed }) };
+});
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('../../components/popups/usePopup', () => ({ usePopup: () => ({ openPopup: vi.fn() }) }));
 vi.mock('../../hooks/useAuctionComments', () => ({ useAuctionCommentStats: () => ({ data: { commentCount: 0 } }) }));
@@ -38,6 +40,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixture.loading = false;
   fixture.error = null;
+  fixture.priceFacts = null;
+  fixture.priceSettled = true;
+  fixture.priceFailed = false;
   fixture.vehicle = {
     id: 'local-public-profile', year: 1966, make: 'Ford', model: 'Mustang', mileage: 87,
     data_quality_score: 100, confidence_score: 100, updated_at: '2026-09-27T16:47:45.300576Z',
@@ -168,5 +173,48 @@ describe('dossier claim coverage does not assert verification', () => {
     expect(coverage.textContent).toContain('Source claim coverage unavailable');
     expect(coverage.textContent).not.toContain('of 16 core fields');
     expect(doc.querySelector('[data-field="mileage"]')?.textContent).toContain('87000');
+  });
+});
+
+describe('dossier sold badge uses only the settled typed price outcome', () => {
+  const hasSoldBadge = () => renderToStaticMarkup(<VehicleDossierPanel />).includes('>SOLD</span>');
+
+  it.each([
+    ['estimate with a positive amount', { price_kind: 'estimate', price_amount: 40000 }],
+    ['asking price', { price_kind: 'ask', price_amount: 40000 }],
+    ['bid', { price_kind: 'bid', price_amount: 40000, price_live: false }],
+    ['unknown typed kind', { price_kind: null, price_amount: 40000 }],
+    ['missing typed amount', { price_kind: 'sold', price_amount: null }],
+  ])('does not call %s SOLD when raw status and sale_price look positive', (_name, facts) => {
+    fixture.vehicle.sale_status = 'sold';
+    fixture.vehicle.auction_outcome = 'sold';
+    fixture.vehicle.sale_price = 40000;
+    fixture.priceFacts = facts;
+    expect(hasSoldBadge()).toBe(false);
+  });
+
+  it('waits for the typed reader to settle before showing SOLD', () => {
+    fixture.vehicle.sale_price = 40000;
+    fixture.priceFacts = { price_kind: 'sold', price_amount: 40000 };
+    fixture.priceSettled = false;
+    expect(hasSoldBadge()).toBe(false);
+    fixture.priceSettled = true;
+    expect(hasSoldBadge()).toBe(true);
+  });
+
+  it('does not reuse a cached sold result after the typed reader fails', () => {
+    fixture.vehicle.sale_price = 40000;
+    fixture.priceFacts = { price_kind: 'sold', price_amount: 40000 };
+    fixture.priceSettled = true;
+    fixture.priceFailed = true;
+    expect(hasSoldBadge()).toBe(false);
+  });
+
+  it('shows SOLD for a settled typed sold result even when raw status fields disagree', () => {
+    fixture.vehicle.sale_status = 'available';
+    fixture.vehicle.auction_outcome = null;
+    fixture.vehicle.sale_price = null;
+    fixture.priceFacts = { price_kind: 'sold', price_amount: 40000 };
+    expect(hasSoldBadge()).toBe(true);
   });
 });

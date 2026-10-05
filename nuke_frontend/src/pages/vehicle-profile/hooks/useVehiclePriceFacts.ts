@@ -52,6 +52,7 @@ export function useVehiclePriceFacts(vehicleId: string | undefined) {
     priceFacts: data ?? null,
     // settled = answered or failed; until then a reader shows no price rather than a raw one
     priceSettled: !!vehicleId && (!isLoading || isError),
+    priceFailed: isError,
   };
 }
 
