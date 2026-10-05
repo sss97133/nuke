@@ -297,7 +297,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   // close — from auction_comments / auction_events / vehicle_events, one per listing
   // when the car ran more than once. Empty for any vehicle that was never a BaT lot
   // (no query is made).
-  const { auctions, importStampedDays } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
+  const { auctions, importStampedDays, activityUnavailable, hasUnpositionedActivity } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
 
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
@@ -913,6 +913,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
           {/* Each BaT listing's week, newest first: open, every bid and comment at its
               time, the close and result, post-close comments. Each mark opens its source. */}
+          {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
+          {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
           {auctions.filter(a => a.activityExtracted || a.open || a.close).map(a => (
             <React.Suspense key={a.key} fallback={null}>
               <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay} />

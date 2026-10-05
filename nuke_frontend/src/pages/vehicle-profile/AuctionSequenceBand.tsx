@@ -147,7 +147,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
             {bids.length} bids · {items.length - bids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
           </span>
         ) : (
-          <span className="auction-band__basis">bids and comments not extracted yet</span>
+          <span className="auction-band__basis">no timed bid or comment entries in this read</span>
         )}
         {auction.photos.publishedWithListing > 0 && (
           <span style={mono}>{auction.photos.publishedWithListing} photos published with the listing (no capture time{auction.photos.attributionUncertain ? '; some carry no listing path and sit on the latest listing' : ''})</span>
