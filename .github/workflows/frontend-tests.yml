@@ -105,6 +105,10 @@ jobs:
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_ancestry -f supabase/sql/test_cached_image_source_ancestry.sql
+      - name: Verify retained listing property source, clocks and public consumers
+        env:
+          RETAINED_PROPERTY_TEST_CI: '1'
+        run: node scripts/discovery/retained-listing-property-test.mjs
       - name: Create disposable bounded provenance database
         run: createdb dm_refinement_bounded_provenance_ci
       - name: Verify provenance collection limits and preserved source visibility
