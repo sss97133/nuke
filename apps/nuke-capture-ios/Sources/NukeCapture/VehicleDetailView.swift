@@ -540,7 +540,7 @@ struct VehicleDetailView: View {
                         sectionError("auction discussion") { Task { await loadMapEvidence() } }
                     } else {
                         let discussion = mapComments.filter { $0.comment_type != "bid" }
-                        Text("\(discussion.count) comment records · \(Set(mapComments.compactMap(\.author_username)).count) participants in this sample")
+                        Text("\(discussion.count) comment records · \(sourceHandleCount) source handles in this sample")
                             .font(.caption).foregroundStyle(.secondary)
                         ForEach(Array(discussion.filter { !($0.comment_text ?? "").isEmpty }.prefix(3))) { comment in
                             VStack(alignment: .leading, spacing: 4) {
@@ -562,6 +562,16 @@ struct VehicleDetailView: View {
         case "carsandbids.com": "Cars & Bids"
         default: url.host ?? "Source"
         }
+    }
+
+    private var sourceHandleCount: Int {
+        Set(mapComments.compactMap { row -> String? in
+            guard let handle = row.author_username?.trimmingCharacters(in: .whitespacesAndNewlines), !handle.isEmpty,
+                  let key = AuctionLocationClock.sourceKey(row.source_url) else { return nil }
+            // A handle identifies an account on one source, not a person across
+            // platforms or someone resident in the vehicle's ZIP.
+            return String(key.prefix { $0 != "/" }) + "|" + handle.lowercased()
+        }).count
     }
 
     private var content: some View {
@@ -1609,7 +1619,9 @@ struct VehicleDetailView: View {
         do {
             let parents: [MapAuctionParent] = try await SupabaseService.client.from("vehicles")
                 .select("id,status,deleted_at,auction_events(id,vehicle_id,source_url,auction_end_date,seller_name,outcome,total_bids)")
-                .eq("id", value: vehicleId).limit(1).execute().value
+                .eq("id", value: vehicleId).eq("is_public", value: true)
+                .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
+                .limit(1).execute().value
             try Task.checkCancellation()
             guard let parent = parents.first, parents.count == 1,
                   parent.id.uuidString.lowercased() == vehicleId.lowercased(), parent.deleted_at == nil,
@@ -1644,8 +1656,9 @@ struct VehicleDetailView: View {
             let comments: [MapSourceComment] = try await SupabaseService.client.from("auction_comments")
                 .select("id,vehicle_id,source_url,posted_at,author_username,comment_type,comment_text,bid_amount,vehicles!inner(id,status,deleted_at)")
                 .eq("vehicle_id", value: vehicleId).in("source_url", values: aliases)
+                .eq("vehicles.is_public", value: true)
                 .is("vehicles.deleted_at", value: nil)
-                .or("status.is.null,status.not.in.(deleted,merged,rejected,duplicate)", referencedTable: "vehicles")
+                .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
                 .order("posted_at", ascending: false).limit(100).execute().value
             try Task.checkCancellation()
             mapComments = comments.filter {
