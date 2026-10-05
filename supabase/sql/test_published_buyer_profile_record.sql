@@ -172,4 +172,55 @@ END $$;
 SELECT public.refresh_bat_user_profile(NULL);
 SELECT public.refresh_bat_user_profile('Unknown');
 SELECT public.refresh_bat_user_profile('   ');
+-- Exercise the migration's selected, sanctioned source-account repair itself.
+INSERT INTO public.external_identities VALUES ('7f021030-ada8-4f76-84ab-18b2c2a4bda6','bat','skylarwilliams');
+INSERT INTO public.auction_comments (source_key,platform,author_username,comment_type,posted_at)
+VALUES ('selected-repair-fixture','bat','skylarwilliams','observation','2026-01-01');
+UPDATE public.bat_user_profiles SET external_identity_id=NULL WHERE username='skylarwilliams';
+\ir ../migrations/20261005023541_repair_bat_profile_source_account_link.sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.bat_user_profiles WHERE username='skylarwilliams'
+    AND external_identity_id='7f021030-ada8-4f76-84ab-18b2c2a4bda6' AND total_comments=1 AND total_bids=0)
+    OR (SELECT count(*) FROM public.auction_comments WHERE source_key='selected-repair-fixture')<>1 THEN
+    RAISE EXCEPTION 'Selected sanctioned repair failed or source testimony changed';
+  END IF;
+END $$;
+
+-- Reproduce a pre-key historical fold. Replay fills only the exact source key,
+-- preserving opaque metadata and the current published-award recipe.
+UPDATE public.bat_user_profiles SET external_identity_id=NULL WHERE username='winner';
+SELECT public.refresh_bat_user_profile('winner');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.bat_user_profiles WHERE username='winner'
+    AND external_identity_id='00000000-0000-0000-0000-000000000001'
+    AND total_comments=12 AND total_bids=11 AND total_wins=2 AND win_rate=0.6667
+    AND expertise_score=42 AND metadata->>'preserved'='yes') THEN
+    RAISE EXCEPTION 'Missing exact source key or unrelated state was not preserved';
+  END IF;
+END $$;
+-- A conflicting established key is evidence of a different account. Reject
+-- the entire refresh instead of overwriting it or changing its profile metrics.
+UPDATE public.bat_user_profiles
+SET external_identity_id='00000000-0000-0000-0000-000000000002',total_comments=123
+WHERE username='winner';
+DO $$ BEGIN
+  BEGIN PERFORM public.refresh_bat_user_profile('winner');
+    RAISE EXCEPTION 'Canonical source-key conflict was silently accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  IF NOT EXISTS (SELECT 1 FROM public.bat_user_profiles WHERE username='winner'
+    AND external_identity_id='00000000-0000-0000-0000-000000000002' AND total_comments=123) THEN
+    RAISE EXCEPTION 'Conflicting key or metrics were overwritten';
+  END IF;
+END $$;
+-- Exact handle/case is required; a matching handle on another platform is not a key.
+INSERT INTO public.external_identities VALUES
+ ('00000000-0000-0000-0000-000000000003','carsandbids','observer'),
+ ('00000000-0000-0000-0000-000000000004','bat','Case');
+SELECT public.refresh_bat_user_profile('observer');
+SELECT public.refresh_bat_user_profile('case');
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.bat_user_profiles WHERE username IN ('observer','case') AND external_identity_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Case or platform boundary crossed';
+  END IF;
+END $$;
 SELECT 'PASS: published awards, presentation grain, outcome coverage, exact source/author, NULL metrics, replay/forward compatibility' AS result;

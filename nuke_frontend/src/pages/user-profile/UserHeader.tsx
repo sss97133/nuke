@@ -130,7 +130,7 @@ const UserHeader: React.FC = () => {
             aria-expanded={openDoor === 'listings'}
             onClick={() => toggleDoor('listings')}
           >
-            <span className="up-stat-pill__label">LISTINGS</span>
+            <span className="up-stat-pill__label">BAT LISTING RECORDS</span>
             {totalListings}
           </button>
         )}
@@ -201,7 +201,7 @@ const StatDoorPanel: React.FC<{
 }> = ({ door, workedOn, listings, comments, onClose }) => {
   const title =
     door === 'worked' ? `WORKED ON · ${workedOn ?? 0}`
-      : door === 'listings' ? `LISTINGS · ${listings.length}`
+      : door === 'listings' ? `BAT LISTING RECORDS · ${listings.length} LOADED`
         : `COMMENTS · ${comments.length}`;
 
   return (
@@ -226,6 +226,7 @@ const StatDoorPanel: React.FC<{
 
       {door === 'listings' && (
         <div className="up-stat-door__body">
+          <div className="up-stat-door__empty">Captured BaT records for linked source handles. Total consignment history is unknown.</div>
           {listings.length === 0 ? (
             <div className="up-stat-door__empty">No listings.</div>
           ) : (
@@ -235,7 +236,7 @@ const StatDoorPanel: React.FC<{
                 href={l.vehicle?.id ? `/vehicle/${l.vehicle.id}` : (l.source_url || '#')}
                 className="up-stat-door__row"
               >
-                <span className="up-stat-door__row-main">{vehLabel(l.vehicle)}</span>
+                <span className="up-stat-door__row-main">{l.vehicle ? vehLabel(l.vehicle) : l.bat_listing_title || 'BAT LISTING'}</span>
                 <span className="up-stat-door__row-meta">
                   {l.event_status ? String(l.event_status).toUpperCase() : 'LISTED'}
                   {l.sale_price ? ` · $${Number(l.sale_price).toLocaleString()}` : ''}
