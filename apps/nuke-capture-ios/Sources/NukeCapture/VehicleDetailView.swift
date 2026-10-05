@@ -441,6 +441,7 @@ struct VehicleDetailView: View {
                 }
                 if let seller = context.seller { LabeledContent("Source seller", value: seller) }
                 if !context.sources.isEmpty { LabeledContent("Location sources", value: context.sources.joined(separator: ", ")) }
+                LabeledContent("Latest auction close · UTC", value: context.latestAuctionClose.map(AuctionLocationClock.label) ?? "Unknown")
                 if let date = context.latestDate {
                     LabeledContent("Latest location record", value: date.formatted(date: .abbreviated, time: .omitted))
                 }
