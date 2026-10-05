@@ -436,8 +436,8 @@ const VehicleDossierPanel: React.FC = () => {
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
   // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
-  const { priceFacts } = useVehiclePriceFacts(vehicle?.id);
-  const priceKind = priceKindLabel(priceFacts);
+  const { priceFacts, priceSettled, priceFailed } = useVehiclePriceFacts(vehicle?.id);
+  const priceKind = priceSettled && !priceFailed ? priceKindLabel(priceFacts) : null;
 
   // Auto-expand fields with multi-source evidence
   const autoExpandFields = useMemo(() => {
@@ -487,7 +487,7 @@ const VehicleDossierPanel: React.FC = () => {
     if (!vehicle) return [];
     const v = vehicle as any;
     const b: Array<{ text: string; cls: string }> = [];
-    if (v.sale_status === 'sold' || v.auction_outcome === 'sold' || (v.sale_price && Number(v.sale_price) > 0)) {
+    if (priceKind === 'Sold') {
       b.push({ text: 'SOLD', cls: 'badge-sold' });
     }
     const hasBat = Object.values(evidence).some(g =>
@@ -501,7 +501,7 @@ const VehicleDossierPanel: React.FC = () => {
     if (reserveStatus === 'no_reserve') b.push({ text: 'NO RESERVE', cls: 'badge-user' });
     else if (reserveStatus === 'reserve_not_met') b.push({ text: 'RNM', cls: 'badge-ai' });
     return b;
-  }, [vehicle, evidence, hasModification]);
+  }, [vehicle, evidence, hasModification, priceKind]);
 
   if (!vehicle) return null;
 
