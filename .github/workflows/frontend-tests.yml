@@ -161,6 +161,8 @@ jobs:
           deno-version: v2.x
       - name: Verify daily close reconciliation through canonical native intake
         run: node --test scripts/check-auction-reconciliation.test.mjs
+      - name: Verify late recovery watermarks and raw comment cache authorization
+        run: node --test scripts/check-structure-review-closeout.test.mjs
 
   sold-context-contract:
     runs-on: ubuntu-latest
