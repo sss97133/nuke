@@ -31,16 +31,17 @@ const { example, related } = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from(table: string) {
+      let dayRead = false;
       const query: any = {
         select: () => query, eq: () => query, neq: () => query,
-        filter: () => query, gte: () => query, lte: () => query, order: () => query, abortSignal: () => query,
+        filter: () => query, gte: () => { dayRead = true; return query; }, lte: () => query, lt: () => query, order: () => query, abortSignal: () => query,
         maybeSingle: () => Promise.resolve({ data: table === 'vehicles' ? { id: 'vehicle-example', year: 1983, make: 'GMC', model: 'K2500' } : example }),
         limit: () => query,
-        then: (resolve: any) => Promise.resolve({ data: [example, related] }).then(resolve),
+        then: (resolve: any) => Promise.resolve({ data: dayRead ? [example] : [example, related] }).then(resolve),
       };
       return query;
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: () => ({ abortSignal: () => Promise.resolve({ data: null, error: null }) }),
   },
 }));
 vi.mock('react-router-dom', async (original) => ({
