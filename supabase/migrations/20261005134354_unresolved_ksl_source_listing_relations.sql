@@ -4,6 +4,34 @@ BEGIN;
 SET LOCAL lock_timeout = '2s';
 SET LOCAL statement_timeout = '30s';
 
+DO $baseline$
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM public.observation_sources WHERE id='fc991f17-c465-42a5-b4e1-31d9985299a4' AND slug='ksl')
+     OR (SELECT count(*) FROM public.observation_sources WHERE slug='ksl')<>1
+     OR NOT EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid='public.vehicle_events'::regclass
+                   AND attname='vehicle_id' AND attnotnull AND NOT attisdropped)
+     OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.vehicle_events'::regclass
+                   AND conname='vehicle_events_vehicle_id_fkey' AND contype='f' AND confdeltype='r' AND NOT convalidated
+                   AND confrelid='public.vehicles'::regclass
+                   AND conkey=ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid='public.vehicle_events'::regclass AND attname='vehicle_id')])
+     OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.vehicle_events'::regclass
+                   AND conname='vehicle_events_pkey' AND contype='p'
+                   AND conkey=ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid='public.vehicle_events'::regclass AND attname='id')])
+     OR NOT EXISTS(SELECT 1 FROM pg_class WHERE oid='public.vehicle_events'::regclass AND relrowsecurity)
+     OR (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='vehicle_events')<>2
+     OR NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='vehicle_events'
+                   AND policyname='vehicle_events_public_read' AND permissive='PERMISSIVE' AND cmd='SELECT'
+                   AND roles::text[]=ARRAY['public'] AND qual='true' AND with_check IS NULL)
+     OR NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='vehicle_events'
+                   AND policyname='vehicle_events_service_write' AND permissive='PERMISSIVE' AND cmd='ALL'
+                   AND roles::text[]=ARRAY['service_role'] AND qual='true' AND with_check='true')
+     OR md5(pg_get_viewdef('public.vehicle_event_summary'::regclass,true))<>'18099d4e169f18e1e7aabde4ae9ba559'
+     OR to_regclass('public.vehicle_event_observations') IS NOT NULL THEN
+    RAISE EXCEPTION 'KSL source/event constraint/view/RLS baseline drifted; refusing model extension' USING ERRCODE='55000';
+  END IF;
+END;
+$baseline$;
+
 ALTER TABLE public.vehicle_events ALTER COLUMN vehicle_id DROP NOT NULL;
 ALTER TABLE public.vehicle_events ADD CONSTRAINT vehicle_events_unresolved_listing_shape CHECK (
   vehicle_id IS NOT NULL OR (
@@ -18,6 +46,8 @@ ALTER TABLE public.vehicle_events ADD CONSTRAINT vehicle_events_unresolved_listi
     AND started_at IS NULL AND ended_at IS NULL AND sold_at IS NULL
     AND bid_count IS NULL AND comment_count IS NULL AND view_count IS NULL AND watcher_count IS NULL
     AND extracted_at IS NULL
+    AND seller_identifier IS NULL AND buyer_identifier IS NULL
+    AND seller_external_identity_id IS NULL AND buyer_external_identity_id IS NULL
   ) IS TRUE
 ) NOT VALID;
 COMMENT ON CONSTRAINT vehicle_events_unresolved_listing_shape ON public.vehicle_events IS
@@ -106,8 +136,8 @@ BEGIN
   IF NOT pg_try_advisory_xact_lock(hashtextextended('ksl-listing-relation-v1',0)) THEN
     RAISE EXCEPTION 'source listing relation admission already active' USING ERRCODE='55P03';
   END IF;
-  SELECT id INTO source_uuid FROM public.observation_sources WHERE slug='ksl';
-  IF source_uuid IS NULL THEN RAISE EXCEPTION 'canonical KSL source missing'; END IF;
+  SELECT id INTO source_uuid FROM public.observation_sources WHERE slug='ksl' AND id='fc991f17-c465-42a5-b4e1-31d9985299a4';
+  IF source_uuid IS NULL THEN RAISE EXCEPTION 'canonical KSL source identity changed'; END IF;
   FOREACH one_id IN ARRAY ids LOOP
     SELECT * INTO o FROM public.vehicle_observations WHERE id=one_id FOR SHARE NOWAIT;
     IF NOT FOUND OR o.source_id IS DISTINCT FROM source_uuid OR o.kind::text IS DISTINCT FROM 'listing'
@@ -137,9 +167,9 @@ BEGIN
     -- Link its source entity only; do not mutate original observation attribution,
     -- parent monetary/state fields, or protected sale ancestry. Multiple episodes,
     -- contradictory key/URL tuples and other event kinds refuse atomically.
-    SELECT array_agg(e.id ORDER BY e.id) INTO candidate_ids FROM public.vehicle_events e WHERE e.source_platform='ksl'
+    SELECT array_agg(e.id ORDER BY e.id) INTO candidate_ids FROM (SELECT e.id FROM public.vehicle_events e WHERE e.source_platform='ksl'
       AND (e.source_listing_id IN (source_key,listing_id,'cars.ksl.com/listing/'||listing_id,canonical_url,'https://cars.ksl.com/listing/'||listing_id)
-           OR e.source_url IN (canonical_url,'https://cars.ksl.com/listing/'||listing_id));
+           OR e.source_url IN (canonical_url,'https://cars.ksl.com/listing/'||listing_id)) LIMIT 2) e;
     IF cardinality(candidate_ids)>1 THEN RAISE EXCEPTION 'multiple canonical listing candidates require review' USING ERRCODE='23514'; END IF;
     IF cardinality(candidate_ids)=1 THEN
       SELECT * INTO candidate FROM public.vehicle_events WHERE id=candidate_ids[1] FOR SHARE NOWAIT;
@@ -160,10 +190,11 @@ BEGIN
     END IF;
     IF NOT EXISTS(SELECT 1 FROM public.vehicle_events WHERE id=event_uuid) THEN
       INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_listing_id,source_url,event_type,event_status,metadata,extraction_method,
-        bid_count,comment_count,view_count,watcher_count,extracted_at)
+        bid_count,comment_count,view_count,watcher_count,extracted_at,
+        seller_identifier,buyer_identifier,seller_external_identity_id,buyer_external_identity_id)
       VALUES(event_uuid,NULL,'ksl',source_key,canonical_url,'listing','observed',
         jsonb_build_object('identity_state','unresolved_source_listing','writer','ingest-observation:ksl_listing_relation_v1'),
-        'ksl_listing_relation_v1',NULL,NULL,NULL,NULL,NULL) RETURNING id INTO event_uuid;
+        'ksl_listing_relation_v1',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL) RETURNING id INTO event_uuid;
     END IF;
     END IF;
     SELECT vehicle_event_id INTO existing_uuid FROM public.vehicle_event_observations WHERE observation_id=one_id;

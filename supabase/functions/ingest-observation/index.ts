@@ -274,7 +274,8 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Expected only 1-100 admitted observation UUIDs" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { data, error } = await supabase.rpc("link_ksl_listing_observations", { p_observation_ids: ids });
+      const { data, error } = await supabase.rpc("link_ksl_listing_observations", { p_observation_ids: ids })
+        .abortSignal(AbortSignal.timeout(8000));
       if (error) return new Response(JSON.stringify({ error: "Source listing relation admission refused" }),
         { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify(data),

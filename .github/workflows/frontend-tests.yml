@@ -301,7 +301,7 @@ jobs:
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
-      - name: Verify pinned archive custody and deterministic producer (offline)
+      - name: Verify archive custody and canonical source listing selector/auth/deadline (offline)
         run: node --test scripts/test-archive-source-custody.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules

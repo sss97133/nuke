@@ -34,7 +34,9 @@ BEGIN
             WHERE to_jsonb(b)<>to_jsonb(n)) THEN RAISE EXCEPTION 'source testimony changed'; END IF;
   IF EXISTS(SELECT FROM public.vehicle_events WHERE vehicle_id IS NULL AND (current_price IS NOT NULL
             OR final_price IS NOT NULL OR started_at IS NOT NULL OR sold_at IS NOT NULL
-            OR event_status<>'observed')) THEN RAISE EXCEPTION 'unknown promoted to vehicle/price/availability/sale'; END IF;
+            OR extracted_at IS NOT NULL OR seller_identifier IS NOT NULL OR buyer_identifier IS NOT NULL
+            OR seller_external_identity_id IS NOT NULL OR buyer_external_identity_id IS NOT NULL
+            OR event_status<>'observed')) THEN RAISE EXCEPTION 'unknown promoted to vehicle/price/availability/sale/identity'; END IF;
 END;
 $$;
 
