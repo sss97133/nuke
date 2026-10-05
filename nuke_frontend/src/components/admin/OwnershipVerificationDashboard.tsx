@@ -13,7 +13,7 @@ interface OwnershipVerification {
   updated_at: string;
   profiles?: {
     full_name: string;
-    email: string;
+    username: string;
   };
   vehicle?: {
     year: number;
@@ -107,7 +107,7 @@ const OwnershipVerificationDashboard = () => {
           // Fetch user profile
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, email')
+            .select('full_name, username')
             .eq('id', verification.user_id)
             .single();
 
@@ -419,7 +419,7 @@ const OwnershipVerificationDashboard = () => {
                   <strong>Name:</strong> {selectedVerification.profiles?.full_name}
                 </div>
                 <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                  <strong>Email:</strong> {selectedVerification.profiles?.email}
+                  <strong>Username:</strong> {selectedVerification.profiles?.username}
                 </div>
                 <div style={{ fontSize: '11px', marginBottom: '4px' }}>
                   <strong>Vehicle:</strong> {selectedVerification.vehicle?.year} {selectedVerification.vehicle?.make} {selectedVerification.vehicle?.model}

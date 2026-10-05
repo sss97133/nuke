@@ -1,3 +1,4 @@
+import { ProfileService } from '../services/profileService';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { secureDocumentService } from '../services/secureDocumentService';
@@ -62,22 +63,7 @@ export const ProfileVerification: React.FC = () => {
         return;
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(`
-          phone_verified,
-          phone_number,
-          id_verification_status,
-          id_document_type,
-          id_document_url,
-          verification_level,
-          verified_at,
-          verification_notes,
-          user_type,
-          payment_verified
-        `)
-        .eq('id', user.id)
-        .single();
+      const { data: profile, error } = await ProfileService.getProfileRecord(user.id);
 
       if (error) {
         console.warn('profiles fetch error:', error.message);

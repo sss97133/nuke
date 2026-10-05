@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { PUBLIC_PROFILE_FIELDS } from '../types/profile';
 
 export interface ProfileStats {
   total_listings: number;
@@ -71,7 +72,7 @@ export interface OrganizationProfileData {
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
   // Profile + claimed identities are independent — fetch in parallel.
   const [profileRes, identitiesRes] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase.from('profiles').select(PUBLIC_PROFILE_FIELDS).eq('id', userId).single(),
     supabase
       .from('external_identities')
       .select('id, platform, handle')
@@ -731,4 +732,3 @@ export async function updateOrganizationProfileStats(orgId: string): Promise<voi
   });
   if (error) throw error;
 }
-
