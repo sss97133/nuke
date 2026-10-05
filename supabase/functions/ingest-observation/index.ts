@@ -34,6 +34,7 @@ import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { ingestBatLive } from "./batLive.ts";
+import { RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -266,6 +267,38 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(await ingestBatLive(supabase, input)),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    let retainedSourceId: string | null = null;
+    if (input.mode === RETAINED_INTERIOR_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained projection requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const sourceId = retainedInteriorSelector(input as unknown as Record<string, unknown>);
+      if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const parent = await supabase.from("vehicle_observations")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data")
+        .eq("id", sourceId).maybeSingle();
+      if (parent.error) throw new Error("Retained source unavailable");
+      const row = parent.data;
+      if (!row) return new Response(JSON.stringify({ error: "Retained source unavailable" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const vehicle = await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle();
+      const source = await supabase.from("observation_sources").select("id,slug").eq("id", row.source_id).maybeSingle();
+      if (vehicle.error || source.error) throw new Error("Retained source qualification unavailable");
+      const derived = deriveRetainedInterior(row, vehicle.data, source.data);
+      if (!derived) return new Response(JSON.stringify({ error: "Retained source ineligible" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      input = derived;
+      retainedSourceId = sourceId;
+    } else if (input.extraction_method === RETAINED_INTERIOR_METHOD ||
+        input.structured_data?.analysis_kind === "retained_listing_property_projection") {
+      return new Response(JSON.stringify({ error: "Retained projection requires its source selector" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     let archivedSale: Awaited<ReturnType<typeof deriveArchivedSale>> | undefined;
     if (input.mode === "source_sale_qualification") {
       const denied = await requireWriteAuth(req);
@@ -408,7 +441,8 @@ Deno.serve(async (req) => {
 
     let propertyRow = null;
     if (input.property_key !== undefined) {
-      if (!isSupportedImagePropertyKey(input.property_key)) {
+      if (!isSupportedImagePropertyKey(input.property_key) &&
+          !(retainedSourceId && input.property_key === "interior_color")) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -421,7 +455,7 @@ Deno.serve(async (req) => {
       }
       propertyRow = lookup.data;
     }
-    const property = validateObservationProperty(input, propertyRow);
+    const property = validateObservationProperty(input, propertyRow, retainedSourceId !== null);
     if (!property.ok) {
       return new Response(JSON.stringify({ error: property.error }),
         { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -615,6 +649,7 @@ Deno.serve(async (req) => {
         // Generic input, including caller-provided source_snapshot_id, is ignored.
         ...(archivedSale?.ok ? { source_snapshot_id: archivedSale.receipt.snapshot_id } : {}),
         ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
+        ...(retainedSourceId ? { source_observation_id: retainedSourceId } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,
         vehicle_match_signals: Object.keys(vehicleMatchSignals).length > 0 ? vehicleMatchSignals : null,
         // Polymorphic subject (engineering-manual/20). Conditional spread: with no
