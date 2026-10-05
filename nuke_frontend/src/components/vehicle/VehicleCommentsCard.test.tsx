@@ -16,7 +16,7 @@ import { VehicleCommentsCard } from './VehicleCommentsCard';
 let root:Root, node:HTMLDivElement;
 const row=(vehicle:string,text:string,handle?:string)=>({comment_id:`${vehicle}-comment`,vehicle_id:vehicle,source_category:'auction',platform:'bat',author_username:handle,comment_text:text,observed_at:'2026-10-05T12:00:00Z'});
 const deferred=()=>{let resolve!:(v:any)=>void,reject!:(e:any)=>void;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
-async function render(vehicle='A'){await act(async()=>{root.render(<VehicleCommentsCard vehicleId={vehicle} session={null} collapsed={false}/>);});}
+async function render(vehicle='A',props:Partial<React.ComponentProps<typeof VehicleCommentsCard>>={}){await act(async()=>{root.render(<VehicleCommentsCard vehicleId={vehicle} session={null} collapsed={false} {...props}/>);});}
 beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;fixture.query={};fixture.lookups.clear();fixture.calls.length=0;fixture.refetch.mockClear();fixture.navigate.mockClear();node=document.createElement('div');document.body.append(node);root=createRoot(node);});
 afterEach(async()=>{await act(async()=>root.unmount());node.remove();});
 
@@ -44,6 +44,19 @@ it('ignores late enrichment errors and binds current processing failure to its v
 it('withholds cached testimony after a failed refresh',async()=>{
  const rows=[row('A','cached testimony')];fixture.query={data:rows};await render();expect(node.textContent).toContain('cached testimony');
  fixture.query={data:rows,isError:true};await render();expect(node.textContent).not.toContain('cached testimony');expect(node.textContent).toContain('absence has not been established');
+});
+
+it('hides only a successfully read empty public section when requested',async()=>{
+ fixture.query={data:[]};await render('A',{hideWhenEmpty:true});expect(node.textContent).toBe('');
+ fixture.query={data:[row('A','readable testimony')]};await render('A',{hideWhenEmpty:true});expect(node.textContent).toContain('readable testimony');
+ fixture.query={data:[],isError:true};await render('A',{hideWhenEmpty:true});expect(node.textContent).toContain('absence has not been established');expect(node.querySelector('button')?.textContent).toBe('Retry comments');
+});
+it('shows the next subject loading state after an empty public section',async()=>{
+ fixture.query={data:[]};await render('A',{hideWhenEmpty:true});expect(node.textContent).toBe('');
+ fixture.query={isLoading:true};await render('B',{hideWhenEmpty:true});expect(node.textContent).toContain('Loading comments');expect(node.textContent).toContain('(—)');
+});
+it('keeps the signed-in composer available on an empty section',async()=>{
+ fixture.query={data:[]};await render('A',{hideWhenEmpty:true,session:{user:{id:'offline-user'}}});expect(node.querySelector('textarea')).not.toBeNull();expect(node.textContent).toContain('(0)');
 });
 
 const native='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002';
