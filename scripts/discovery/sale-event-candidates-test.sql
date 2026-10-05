@@ -8,6 +8,10 @@ DO $$ BEGIN
 END $$;
 CREATE TABLE vehicles(id uuid PRIMARY KEY,year int,make text,model text,is_public boolean,
  deleted_at timestamptz,listing_kind text);
+-- Empty at first: the existing unestablished-alias assertions still apply.
+-- Duplicate rows below deliberately prove no native fan-out on bad metadata.
+CREATE TABLE source_alias_mapping(raw_value text,canonical_slug text);
+CREATE INDEX source_alias_raw_value ON source_alias_mapping(raw_value);
 CREATE TABLE vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid,source_platform text,source_url text,
  source_listing_id text,event_status text,final_price numeric,sold_at timestamptz,ended_at timestamptz,
  created_at timestamptz DEFAULT '2026-01-01Z',updated_at timestamptz DEFAULT '2026-02-01Z',
@@ -200,3 +204,69 @@ SELECT pg_temp.assert_ok(j#>'{sourceContext,presentationCount}'='null'::jsonb AN
  AND j#>'{sourceContext,sources}'='[]'::jsonb,
  'native overflow withholds context totals instead of presenting sampled or zero market counts')
  FROM (SELECT pg_temp.candidates(ARRAY['90000000-0000-0000-0000-000000000001'::uuid],NULL,NULL,1,100) j) q;
+
+-- Exact current catalog links may connect platform spellings. They do not
+-- qualify the source, admit prices or invent historical alias availability.
+INSERT INTO source_alias_mapping VALUES
+ ('cars_and_bids','cars-and-bids'),('bringatrailer','bat'),
+ ('synthetic-ambiguous','cars-and-bids'),('synthetic-ambiguous','bat'),
+ ('synthetic-empty',NULL);
+INSERT INTO vehicle_events(id,vehicle_id,source_platform,source_url,event_status,final_price,sold_at) VALUES
+ ('93000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000004','cars_and_bids','https://carsandbids.com/auctions/synthetic-alias','sold',1000,'2025-01-01Z'),
+ ('93000000-0000-0000-0000-000000000002','90000000-0000-0000-0000-000000000004','cars-and-bids','https://carsandbids.com/auctions/synthetic-alias','sold',1000,'2025-01-01Z'),
+ ('93000000-0000-0000-0000-000000000003','90000000-0000-0000-0000-000000000004','synthetic-ambiguous','https://carsandbids.com/auctions/synthetic-ambiguous','sold',1000,'2025-01-01Z'),
+ ('93000000-0000-0000-0000-000000000004','90000000-0000-0000-0000-000000000004','synthetic-unknown','https://carsandbids.com/auctions/synthetic-unknown','sold',1000,'2025-01-01Z'),
+ ('93000000-0000-0000-0000-000000000005','90000000-0000-0000-0000-000000000004','bringatrailer','https://bringatrailer.com/listing/synthetic-bat-alias/','sold',1000,'2025-01-01Z'),
+ ('93000000-0000-0000-0000-000000000006','90000000-0000-0000-0000-000000000004','synthetic-empty','https://synthetic.example/empty','sold',1000,'2025-01-01Z');
+INSERT INTO listing_page_snapshots VALUES
+ ('94000000-0000-0000-0000-000000000001','cars-and-bids','https://carsandbids.com/auctions/synthetic-alias','2026-01-01Z','2026-01-02Z',200,true,repeat('a',64),'SYNTHETIC CANONICAL LABEL',NULL,'{}'),
+ ('94000000-0000-0000-0000-000000000002','cars_and_bids','https://carsandbids.com/auctions/synthetic-alias','2026-01-01Z','2026-01-02Z',200,true,repeat('b',64),'SYNTHETIC RECORDED LABEL',NULL,'{}'),
+ ('94000000-0000-0000-0000-000000000003','bat','https://carsandbids.com/auctions/synthetic-alias','2026-01-01Z','2026-01-02Z',200,true,repeat('c',64),'SYNTHETIC WRONG PLATFORM',NULL,'{}'),
+ ('94000000-0000-0000-0000-000000000004','bat','https://bringatrailer.com/listing/synthetic-bat-alias','2026-01-01Z','2026-01-02Z',200,true,repeat('d',64),'SYNTHETIC BAT ALIAS',NULL,'{}');
+CREATE TEMP TABLE alias_result AS SELECT pg_temp.candidates(ARRAY['90000000-0000-0000-0000-000000000004'::uuid]) j;
+SELECT pg_temp.assert_ok(jsonb_array_length(j->'candidates')=6 AND j#>>'{sourceContext,presentationCount}'='6',
+ 'ambiguous alias lookup never multiplies or removes native presentations') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{capture,id}'='93000000-0000-0000-0000-000000000001'
+ AND c->>'sourcePlatform'='cars-and-bids' AND c->>'sourcePlatformRaw'='cars_and_bids'
+ AND c->>'sourcePlatformBasis'='current_exact_alias_mapping'),
+ 'exact registered platform alias is attributed while original label survives') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceContext,sources}') s
+ WHERE s->>'platform'='cars-and-bids' AND s->>'presentationCount'='2' AND s->>'identifiedEpisodeCount'='1'),
+ 'known source spellings share one episode rather than two claimed sales') FROM alias_result;
+SELECT pg_temp.assert_ok((SELECT count(*) FROM jsonb_array_elements(j->'sourceCaptureHeaders') h
+ WHERE h->>'sourcePlatform'='cars-and-bids')=2
+ AND EXISTS(SELECT FROM jsonb_array_elements(j->'sourceCaptureHeaders') h
+ WHERE h->>'sourcePlatformRaw'='cars_and_bids'),
+ 'raw and canonical capture labels connect once to the same attributed episode') FROM alias_result;
+SELECT pg_temp.assert_ok(NOT EXISTS(SELECT FROM jsonb_array_elements(j->'sourceCaptureHeaders') h
+ WHERE h#>>'{capture,id}'='94000000-0000-0000-0000-000000000003'),
+ 'same URL on an unrelated platform is not lent to the episode') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c->>'sourcePlatform'='synthetic-ambiguous'
+ AND c->>'sourcePlatformBasis'='ambiguous_or_empty_alias_kept_raw'),
+ 'contradictory alias mappings retain unresolved recorded source context') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c->>'sourcePlatform'='synthetic-unknown'
+ AND c->>'sourcePlatformBasis'='recorded_platform_context_alias_unestablished'),
+ 'a familiar domain does not invent a missing platform alias') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c->>'sourcePlatform'='synthetic-empty'
+ AND c->>'sourcePlatformBasis'='ambiguous_or_empty_alias_kept_raw'),
+ 'empty registered alias target stays unresolved instead of deleting source context') FROM alias_result;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'sourceCaptureHeaders') h
+ WHERE h#>>'{capture,id}'='94000000-0000-0000-0000-000000000004'
+ AND h->>'sourcePlatform'='bat' AND h->>'sourceEpisodeKey'='bringatrailer.com/listing/synthetic-bat-alias'),
+ 'explicit BaT platform alias reaches the existing exact listing URL aliases') FROM alias_result;
+SELECT pg_temp.assert_ok(j#>>'{sourceContext,priceQualified}'='false'
+ AND NOT EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c->'currency'<>'null'::jsonb OR c->'knownAt'<>'null'::jsonb
+ OR c->>'publicSourceStatus'<>'unestablished' OR c#>>'{qualification,status}'<>'candidate'),
+ 'current alias resolution never supplies units, source publication or historical knowledge') FROM alias_result;
+UPDATE vehicle_events SET event_status='no_sale'
+ WHERE id='93000000-0000-0000-0000-000000000002';
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceContext,sources}') s
+ WHERE s->>'platform'='cars-and-bids' AND s->>'contradictoryOutcomeEpisodes'='1'
+ AND s->>'reportedSoldEpisodes'='0' AND s->>'reportedNotSoldEpisodes'='0'),
+ 'opposing outcomes under a known alias remain a conflict rather than a sold episode')
+ FROM (SELECT pg_temp.candidates(ARRAY['90000000-0000-0000-0000-000000000004'::uuid]) j) q;
