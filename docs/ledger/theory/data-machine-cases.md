@@ -136,7 +136,7 @@ In addition to the card's list:
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
-| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — private context query delivered; repair assay prepared; public integration and source corrections open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
+| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — public RPC context and private Mecum capture preview delivered; typed binding, price/configuration qualification, UI and latency open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
 
 **C22 table connection — 2026-10-04 UTC.** Useful question: what work was recorded on this vehicle,
 by which permitted supplier, and at what build stage? Existing `work_record` testimony is read through
@@ -549,6 +549,39 @@ source mapping, event reconciliation, media binding, cohort construction and the
 owner asks for repairs that make the existing evidence better and immediately queryable for **all
 vehicles**. More individual appraisals do not close this case. Extend C9, C10, C14, C15, C17 and C26
 through their existing owners; this case connects their consequences to one useful answer.
+
+### Continuation brief for future agents
+
+The [retained evidence repair guide](../../market/RETAINED_EVIDENCE_REPAIR_GUIDE.md) records the
+remaining relationships, existing owners, disagreement cases and receipt locations. Start there
+after the theory card. The preparation entries below preserve their dated stages; the following
+delivery receipt establishes what this implementation batch subsequently completed.
+
+**Delivery receipt, 2026-10-05 UTC.** PR [#600](https://github.com/sss97133/nuke/pull/600), checked
+`c2ea13304d90`, merged as `02c34847e322`; full commit references are in the linked PR and private
+completion receipt. Supabase run
+[37251537436](https://github.com/sss97133/nuke/actions/runs/37251537436) succeeded.
+Its additive `valuation_by_ymm.source_context` was anonymous-runtime-verified for Corvette,
+Mustang and BMW after 189 local PostgreSQL assertions and all 21 applicable PR checks passed.
+Corvette returned 942 recorded auction URL groups, including 372 Mecum and 85 Barrett-Jackson,
+alongside 21 separately qualified prices. These are different grains and eligibility populations;
+the URL groups are not verified unique sales or newly qualified price comparisons.
+
+PR [#624](https://github.com/sss97133/nuke/pull/624), checked
+`163888b2c62e`, merged as `2eb495d61956`; full commit references are in the linked PR and private
+completion receipt. Supabase run
+[37275853026](https://github.com/sss97133/nuke/actions/runs/37275853026) succeeded.
+All 21 applicable PR checks passed; local verification included 127 synthetic tests and one
+private retained-capture replay. The same service-only preview changed HTTP400 → HTTP200 in
+1.427 seconds and recovered lot173892's civil scheduled run day, 2014-01-24, with a verified raw
+hash. Anonymous access returned HTTP401. Currency, fee basis, actual sale clock and parent/event
+binding remain unestablished; the result is unqualified. Neither repair changed the public UI.
+
+**No persisted evidence-model repair was applied:** no tables, columns, constraints, typed
+relationships or canonical historical testimony changed. PR600 replaced an existing SQL reader
+through its specifically approved migration; PR624 changed read-only edge code. Historical intake
+and production source corrections remain held. Initial concurrent valuation timeouts remain an
+open reliability concern despite subsequent successful warm probes. C27 is still partial.
 
 The owner's latest correction is central: other Corvettes support market volume and movement even
 when they are not close price comparables. A 1963/427 configuration is a thin slice inside the
