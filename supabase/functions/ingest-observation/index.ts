@@ -43,6 +43,7 @@ const corsHeaders = {
 
 interface ObservationInput {
   mode?: string;
+  observation_ids?: string[];
   snapshot_id?: string;
   dry_run?: boolean;
   qualification_version?: string;
@@ -256,6 +257,29 @@ Deno.serve(async (req) => {
 
   try {
     let input: ObservationInput = await req.json();
+    // Typed source-listing membership is separate from protected sale ancestry.
+    // Select only already-admitted evidence; never accept parent fields or prices.
+    if (input.mode === "ksl_listing_relation_v1") {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Source listing relations require service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const ids = input.observation_ids;
+      if (Object.keys(input).some(key => !["mode", "observation_ids"].includes(key))
+          || !Array.isArray(ids) || ids.length < 1 || ids.length > 100
+          || ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+        return new Response(JSON.stringify({ error: "Expected only 1-100 admitted observation UUIDs" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { data, error } = await supabase.rpc("link_ksl_listing_observations", { p_observation_ids: ids });
+      if (error) return new Response(JSON.stringify({ error: "Source listing relation admission refused" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(data),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (input.mode === BAT_LIVE_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
