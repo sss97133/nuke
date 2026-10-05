@@ -1055,10 +1055,10 @@ const VehicleDossierPanel: React.FC = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Condition Score (Phase 5A)                                         */
+/*  Stored condition assessment — source/calibration not exposed        */
 /* ------------------------------------------------------------------ */
 
-const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+export const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   const [score, setScore] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -1077,18 +1077,23 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
 
   if (!score) return null;
 
+  const reportedScore = score.condition_score != null && Number.isFinite(Number(score.condition_score))
+    && Number(score.condition_score) >= 0 && Number(score.condition_score) <= 100
+    ? Number(score.condition_score) : null;
   const domains = [
     { label: 'EXTERIOR', value: score.exterior_score },
     { label: 'INTERIOR', value: score.interior_score },
     { label: 'MECHANICAL', value: score.mechanical_score },
     { label: 'PROVENANCE', value: score.provenance_score },
     { label: 'PRESENTATION', value: score.presentation_score },
-  ].filter(d => d.value != null);
+  ].filter(d => d.value != null && Number.isFinite(Number(d.value)) && Number(d.value) >= 0 && Number(d.value) <= 100);
+
+  if (reportedScore == null && domains.length === 0) return null;
 
   return (
     <div style={{
       background: 'var(--surface-elevated)',
-      border: '2px solid var(--accent)',
+      border: '2px solid var(--border)',
       padding: '8px 10px',
       marginBottom: '8px',
     }}>
@@ -1100,7 +1105,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
         textTransform: 'uppercase',
         marginBottom: '6px',
       }}>
-        CONDITION SPECTROMETER
+        STORED CONDITION ASSESSMENT
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px' }}>
         <span style={{
@@ -1108,7 +1113,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           fontSize: '20px',
           fontWeight: 700,
         }}>
-          {Math.round(score.condition_score)}
+          {reportedScore != null ? Math.round(reportedScore) : 'Unknown'}
         </span>
         <span style={{
           fontFamily: 'Arial, sans-serif',
@@ -1117,10 +1122,8 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
         }}>
-          / 100 &middot; {score.condition_tier}
-          {score.percentile_within_ymm != null && (
-            <> &middot; {Math.round(score.percentile_within_ymm)}th percentile</>
-          )}
+          {reportedScore != null && <>/ 100 &middot; reported score</>}
+          {score.condition_tier && <> &middot; reported tier: {score.condition_tier}</>}
         </span>
       </div>
       {domains.length > 0 && (
@@ -1140,7 +1143,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
                 <div style={{
                   height: '100%',
                   width: `${Math.min(100, Math.max(0, d.value))}%`,
-                  background: d.value >= 70 ? 'var(--success)' : d.value >= 40 ? 'var(--warning)' : 'var(--error)',
+                  background: 'var(--text-secondary)',
                 }} />
               </div>
               <span style={{
@@ -1154,6 +1157,12 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           ))}
         </div>
       )}
+      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+        Inputs, method and assessment time unavailable. Condition matching unverified.
+        {score.percentile_within_ymm != null && (
+          <div>Reported percentile: {score.percentile_within_ymm} &middot; comparison group, size and eligibility unavailable.</div>
+        )}
+      </div>
     </div>
   );
 };
