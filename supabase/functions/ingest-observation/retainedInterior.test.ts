@@ -1,4 +1,4 @@
-import { deriveRetainedInterior, retainedInteriorSelector, RETAINED_INTERIOR_MODE } from "./retainedInterior.ts";
+import { deriveRetainedInterior, retainedInteriorSelector, RETAINED_INTERIOR_MODE, RETAINED_EXTERIOR_MODE } from "./retainedInterior.ts";
 import { validateObservationProperty } from "./imageProperties.ts";
 function assert(value: unknown) { if (!value) throw new Error("assertion failed"); }
 const id="11111111-1111-4111-8111-111111111111", vehicleId="22222222-2222-4222-8222-222222222222";
@@ -39,4 +39,21 @@ Deno.test("non-image property requires server-owned verified path and registered
  assert(validateObservationProperty(input,property,true).ok);
  assert(!validateObservationProperty(input,{...property,namespace:"pending"},true).ok);
  assert(!validateObservationProperty({...input,property_key:"engine_configuration"},property,true).ok);
+});
+Deno.test("exterior selector projects only retained extractor color and keeps uncertainty",()=>{
+ const parent={...source,structured_data:{...source.structured_data,color:"Azzurro Aquarius"}};
+ assert(retainedInteriorSelector({mode:RETAINED_EXTERIOR_MODE,source_observation_id:id})===id);
+ assert(retainedInteriorSelector({mode:RETAINED_EXTERIOR_MODE,source_observation_id:id,property_key:"exterior_color"})===null);
+ const result=deriveRetainedInterior(parent,vehicle,registry,RETAINED_EXTERIOR_MODE)!;
+ assert(result.property_key==="exterior_color" && result.structured_data.exterior_color==="Azzurro Aquarius");
+ assert(result.structured_data.source_field==="color" && result.structured_data.source_observation_id===id);
+ assert(result.structured_data.source_observed_at===source.observed_at && result.observed_at===source.ingested_at);
+ assert(result.content_text.includes("not established verbatim seller text") && result.structured_data.limitation.includes("heuristics"));
+ assert(result.structured_data.factory_configuration_status==="unknown" && result.structured_data.independent_source===false);
+ assert(!validateObservationProperty(result,{id,namespace:"core",deprecated_at:null,applies_to_kinds:["specification"]}).ok);
+ assert(validateObservationProperty(result,{id,namespace:"core",deprecated_at:null,applies_to_kinds:["specification"]},true).ok);
+ for(const patch of [{structured_data:{exterior_color:"Invented"}},{structured_data:{color:"unknown"}},{is_superseded:true},{ingested_at:"unknown"}])
+ assert(deriveRetainedInterior({...parent,...patch},vehicle,registry,RETAINED_EXTERIOR_MODE)===null);
+ assert(deriveRetainedInterior(parent,vehicle,registry,"invented")===null);
+ assert(JSON.stringify(deriveRetainedInterior(parent,vehicle,registry))===JSON.stringify(deriveRetainedInterior(source,vehicle,registry)));
 });
