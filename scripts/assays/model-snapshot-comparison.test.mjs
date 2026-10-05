@@ -127,6 +127,27 @@ test('backward cutoffs, reversed snapshot order and missing clocks refuse improv
   }
 });
 
+test('invalid source clocks and cutoffs cannot declare a directional regression', () => {
+  for (const [reason, mutate] of [
+    ['case_cutoff_uncomparable', value => {
+      value.sourceToReader.asOf = value.evidence.sections.sourceToReader.cutoffAt = '2026-10-04T23:59:00Z';
+    }],
+    ['section_clock_uncomparable:sourceToReader', value => {
+      value.evidence.sections.sourceToReader.startedAt = '2026-10-04T23:59:00Z';
+      value.evidence.sections.sourceToReader.completedAt = '2026-10-04T23:59:01Z';
+    }],
+    ['section_clock_uncomparable:sourceToReader', value => {
+      delete value.evidence.sections.sourceToReader.completedAt;
+    }],
+  ]) {
+    const [before, after] = pair(); item(after).requestedRelations.checks.capture = 'failed'; mutate(after);
+    const result = compareModelSnapshots(before, after);
+    assert.equal(result.status, 'uncomparable'); assert.ok(result.reasons.includes(reason));
+    assert.equal(result.counts.regressed, 0); assert.equal(result.counts.improved, 0);
+    assert.deepEqual(result.comparisons, []);
+  }
+});
+
 test('reader exposure outside the admissible observation clock or retention is unknown', () => {
   for (const mutate of [
     value => { item(value).clocks.observationState = 'after_cutoff'; },

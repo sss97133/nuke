@@ -91,14 +91,20 @@ export function compareModelSnapshots(before, after) {
         if (section === 'sourceToReader') return result;
       }
       const times = [left?.startedAt, left?.completedAt, right?.startedAt, right?.completedAt].map(Date.parse);
-      if (times.some(t => !Number.isFinite(t)) || times[1] < times[0] || times[2] < times[1] || times[3] < times[2]) block(`section_clock_uncomparable:${section}`);
+      if (times.some(t => !Number.isFinite(t)) || times[1] < times[0] || times[2] < times[1] || times[3] < times[2]) {
+        block(`section_clock_uncomparable:${section}`);
+        // Source time ordering is required for either directional verdict.
+        if (section === 'sourceToReader') return result;
+      }
     }
     const cutoffA = Date.parse(sourceA.asOf), cutoffB = Date.parse(sourceB.asOf);
-    if (!Number.isFinite(cutoffA) || !Number.isFinite(cutoffB) || cutoffB < cutoffA
-      || cutoffA !== Date.parse(before.evidence.sections?.sourceToReader?.cutoffAt)
-      || cutoffB !== Date.parse(after.evidence.sections?.sourceToReader?.cutoffAt)) block('case_cutoff_uncomparable');
     result.cutoffs = { before: Number.isFinite(cutoffA) ? new Date(cutoffA).toISOString() : null,
       after: Number.isFinite(cutoffB) ? new Date(cutoffB).toISOString() : null };
+    if (!Number.isFinite(cutoffA) || !Number.isFinite(cutoffB) || cutoffB < cutoffA
+      || cutoffA !== Date.parse(before.evidence.sections?.sourceToReader?.cutoffAt)
+      || cutoffB !== Date.parse(after.evidence.sections?.sourceToReader?.cutoffAt)) {
+      block('case_cutoff_uncomparable'); return result;
+    }
 
     function items(source, label, evidence) {
       if (source?.status !== 'measured_request_set' || evidence?.status !== 'returned'
