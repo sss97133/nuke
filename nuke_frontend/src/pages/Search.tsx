@@ -233,6 +233,13 @@ export default function Search() {
       {/* Active search: filters + results */}
       {query && !urlExtraction && (
         <>
+          {vehicleCount > 0 && (
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              {displayVehicleCount} of {vehicleCount} loaded vehicle records shown.
+              {' '}Recorded prices may be past sales, estimates, or asks. Current purchase availability is unverified.
+              {(filters.priceMin || filters.priceMax) && ' Price bounds apply to these loaded records; unknown prices are excluded. This is not an exhaustive market shortlist.'}
+            </p>
+          )}
           {/* Cohort terminal link — only when the query is a clean year-make-model */}
           {cohortTarget && (
             <Link
