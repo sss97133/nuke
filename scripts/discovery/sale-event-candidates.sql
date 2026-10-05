@@ -8,6 +8,9 @@
 -- A caller must walk its declared population and reconcile episode identity across
 -- pages before claiming a complete distribution. Do not publish candidate amounts:
 -- parent visibility does not establish source publication/consent or price units.
+-- Current exact source_alias_mapping rows connect recorded platform spellings;
+-- raw labels remain in the receipt. No fuzzy, domain or slug fallback establishes
+-- an alias. Ambiguous mappings stay raw; this is not historical registry replay.
 WITH request AS MATERIALIZED (
   SELECT $1::uuid[] AS parent_ids,$2::timestamptz AS event_before,
     $3::timestamptz AS evidence_as_of,$4::integer AS native_limit,$5::integer AS capture_limit,
@@ -21,7 +24,8 @@ WITH request AS MATERIALIZED (
     AND v.deleted_at IS NULL AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item'
 ), native_events AS MATERIALIZED (
   SELECT 'vehicle_events'::text AS source_table,e.id,e.vehicle_id,
-    nullif(lower(btrim(e.source_platform)),'') AS platform,e.source_url AS source_url,
+    nullif(lower(btrim(e.source_platform)),'') AS recorded_platform,
+    e.source_platform AS raw_platform,e.source_url AS source_url,
     nullif(btrim(e.source_listing_id),'') AS listing_id,e.event_status AS recorded_outcome,
     e.final_price::numeric AS amount,coalesce(e.sold_at,e.ended_at) AS event_at,
     NULL::date AS typed_day,
@@ -32,7 +36,8 @@ WITH request AS MATERIALIZED (
   FROM parents p JOIN public.vehicle_events e ON e.vehicle_id=p.id
   ORDER BY e.id LIMIT (SELECT CASE WHEN valid THEN native_limit+1 ELSE 0 END FROM request)
 ), native_listings AS MATERIALIZED (
-  SELECT 'bat_listings'::text AS source_table,l.id,l.vehicle_id,'bat'::text AS platform,
+  SELECT 'bat_listings'::text AS source_table,l.id,l.vehicle_id,'bat'::text AS recorded_platform,
+    'bat'::text AS raw_platform,
     l.bat_listing_url AS source_url,nullif(btrim(l.bat_lot_number),'') AS listing_id,
     l.listing_status AS recorded_outcome,l.sale_price::numeric AS amount,
     NULL::timestamptz AS event_at,coalesce(l.sale_date,l.auction_end_date) AS typed_day,
@@ -49,6 +54,24 @@ WITH request AS MATERIALIZED (
   FROM request r
 ), native AS MATERIALIZED (
   SELECT * FROM native_events UNION ALL SELECT * FROM native_listings
+), platform_aliases AS MATERIALIZED (
+  -- One indexed raw-value lookup per distinct recorded source. The sentinel
+  -- prevents a corrupt/ambiguous mapping from multiplying native presentations.
+  SELECT p.raw_platform,a.rows,a.canonical_slug
+  FROM (SELECT DISTINCT raw_platform FROM native) p
+  CROSS JOIN LATERAL (
+    SELECT count(*) AS rows,min(nullif(btrim(x.canonical_slug),'')) AS canonical_slug
+    FROM (SELECT canonical_slug FROM public.source_alias_mapping
+      WHERE raw_value=p.raw_platform LIMIT 2) x
+  ) a
+), mapped_native AS MATERIALIZED (
+  SELECT n.*,
+    CASE WHEN a.rows=1 AND a.canonical_slug IS NOT NULL
+      THEN a.canonical_slug ELSE n.recorded_platform END AS platform,
+    CASE WHEN a.rows=1 AND a.canonical_slug IS NOT NULL THEN 'current_exact_alias_mapping'
+      WHEN a.rows>0 THEN 'ambiguous_or_empty_alias_kept_raw'
+      ELSE 'recorded_platform_context_alias_unestablished' END AS platform_basis
+  FROM native n JOIN platform_aliases a ON a.raw_platform IS NOT DISTINCT FROM n.raw_platform
 ), normalized AS MATERIALIZED (
   SELECT n.*,
     -- Only the established BaT listing aliases share a normalized key. Other
@@ -74,7 +97,7 @@ WITH request AS MATERIALIZED (
     CASE WHEN n.typed_day IS NOT NULL OR n.event_at IS NOT NULL AND isfinite(n.event_at)
       AND (n.event_at AT TIME ZONE 'UTC')::time='00:00:00' THEN 'day'
       WHEN n.event_at IS NOT NULL AND isfinite(n.event_at) THEN 'instant' END AS event_grain
-  FROM native n CROSS JOIN boundary b WHERE b.native_complete
+  FROM mapped_native n CROSS JOIN boundary b WHERE b.native_complete
 ), presentations AS MATERIALIZED (
   SELECT n.*,
     CASE WHEN n.platform IS NOT NULL AND (n.url_key IS NULL OR n.listing_url_key IS NULL OR n.url_key=n.listing_url_key)
@@ -85,7 +108,8 @@ WITH request AS MATERIALIZED (
   FROM normalized n
 ), episodes AS MATERIALIZED (
   SELECT p.vehicle_id,p.platform,p.episode_key,coalesce(p.url_key,p.listing_url_key) AS url_key,
-    array_agg(DISTINCT p.source_url) FILTER(WHERE p.source_url IS NOT NULL) AS recorded_urls
+    array_agg(DISTINCT p.source_url) FILTER(WHERE p.source_url IS NOT NULL) AS recorded_urls,
+    array_agg(DISTINCT p.raw_platform) FILTER(WHERE p.raw_platform IS NOT NULL) AS recorded_platforms
   FROM presentations p WHERE p.episode_key IS NOT NULL AND coalesce(p.url_key,p.listing_url_key) IS NOT NULL
   GROUP BY p.vehicle_id,p.platform,p.episode_key,coalesce(p.url_key,p.listing_url_key)
 ), context_episodes AS MATERIALIZED (
@@ -115,7 +139,7 @@ WITH request AS MATERIALIZED (
 ), capture_headers AS MATERIALIZED (
   -- Exact indexed platform/URL variants only; no metadata/whole-snapshot scan,
   -- current vehicle snapshot locator, raw HTML projection, or archived metadata proof.
-  SELECT DISTINCT s.id,s.platform,s.listing_url,s.fetched_at,s.created_at,
+  SELECT DISTINCT s.id,s.platform AS raw_platform,e.platform,s.listing_url,s.fetched_at,s.created_at,
     s.http_status,s.success,s.html_sha256,s.html IS NOT NULL AS inline_body_present,
     nullif(s.html_storage_path,'') IS NOT NULL AS archived_body_recorded,
     e.vehicle_id,e.episode_key,
@@ -123,7 +147,9 @@ WITH request AS MATERIALIZED (
       WHEN pg_input_is_valid(s.metadata->>'vehicle_id','uuid') THEN (s.metadata->>'vehicle_id')::uuid END=e.vehicle_id AS parent_attested,
     CASE WHEN s.metadata->>'parsed_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}.*(Z|[+-][0-9]{2}(:?[0-9]{2})?)$'
       AND pg_input_is_valid(s.metadata->>'parsed_at','timestamptz') THEN (s.metadata->>'parsed_at')::timestamptz END AS parsed_at
-  FROM episodes e JOIN public.listing_page_snapshots s ON s.platform=e.platform AND s.listing_url=ANY(coalesce(e.recorded_urls,'{}'::text[])||
+  FROM episodes e JOIN public.listing_page_snapshots s
+    ON s.platform=ANY(coalesce(e.recorded_platforms,'{}'::text[])||ARRAY[e.platform])
+    AND s.listing_url=ANY(coalesce(e.recorded_urls,'{}'::text[])||
     CASE WHEN e.platform='bat' AND e.url_key ~ '^bringatrailer\.com/listing/[a-z0-9-]+$' THEN ARRAY[
     'https://'||e.url_key,'https://'||e.url_key||'/',
     'http://'||e.url_key,'http://'||e.url_key||'/',
@@ -147,7 +173,8 @@ SELECT jsonb_build_object(
     'captureHeaderLimit',b.capture_limit,'captureHeadersAtLeast',(SELECT count(*) FROM capture_headers)),
   'sourceContext',jsonb_build_object(
     'basis','retained_native_presentations_current_supplied_parent_page',
-    'grain','recorded_source_platform_x_episode_key',
+    'grain','current_exact_platform_alias_or_recorded_context_x_episode_key',
+    'platformMapping','current_exact_source_alias_mapping; ambiguous/missing aliases remain recorded context, not verified source identity',
     'completeWithinPage',b.native_complete,'fleetComplete',false,
     'priceQualified',false,'publicSourceStatus','unestablished',
     'knowledgeMode','current_native_rows_not_historical_availability',
@@ -177,7 +204,8 @@ SELECT jsonb_build_object(
     FROM presentation_context p LEFT JOIN episode_context e ON e.platform=p.platform),'[]'::jsonb)),
   'candidates',coalesce((SELECT jsonb_agg(jsonb_build_object(
     'capture',jsonb_build_object('table',p.source_table,'id',p.id),
-    'vehicleId',p.vehicle_id,'sourcePlatform',p.platform,'sourceEpisodeKey',p.episode_key,
+    'vehicleId',p.vehicle_id,'sourcePlatform',p.platform,
+    'sourcePlatformRaw',p.raw_platform,'sourcePlatformBasis',p.platform_basis,'sourceEpisodeKey',p.episode_key,
     'sourceUrl',p.source_url,'sourceListingId',p.listing_id,
     'eventAt',p.formatted_event,'eventDay',p.event_day,'eventGrain',p.event_grain,'eventTimeBasis',p.event_basis,
     'recordedOutcome',p.recorded_outcome,'outcome',p.outcome,
@@ -199,7 +227,9 @@ SELECT jsonb_build_object(
   ) ORDER BY p.source_table,p.id) FROM presentations p),'[]'::jsonb),
   'sourceCaptureHeaders',CASE WHEN (SELECT count(*) FROM capture_headers)>b.capture_limit THEN '[]'::jsonb ELSE
     coalesce((SELECT jsonb_agg(jsonb_build_object('capture',jsonb_build_object('table','listing_page_snapshots','id',h.id),
-      'vehicleId',h.vehicle_id,'sourcePlatform',h.platform,'sourceEpisodeKey',h.episode_key,'sourceUrl',h.listing_url,
+      'vehicleId',h.vehicle_id,'sourcePlatform',h.platform,'sourcePlatformRaw',h.raw_platform,
+      'sourcePlatformBasis','exact_recorded_or_current_mapped_native_platform',
+      'sourceEpisodeKey',h.episode_key,'sourceUrl',h.listing_url,
       'fetchedAt',h.fetched_at,'sourceIngestedAt',h.created_at,'parsedAt',h.parsed_at,
       'success',h.success,'httpStatus',h.http_status,'storedSha256',h.html_sha256,
       'parentAttested',h.parent_attested,'inlineBodyPresent',h.inline_body_present,'archivedBodyRecorded',h.archived_body_recorded,
