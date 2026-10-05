@@ -140,98 +140,13 @@ function fmtVal(field: string, val: any): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Epistemological layer computation (P15)                             */
+/*  Retained claims: source categories do not establish verification    */
 /* ------------------------------------------------------------------ */
 
-type EpistemologicalLayer = 'claim' | 'consensus' | 'inspection' | 'bedrock';
-
-const LAYER_COLORS: Record<EpistemologicalLayer, string> = {
-  claim: 'transparent',
-  consensus: 'var(--info, #3b82f6)',
-  inspection: 'var(--success, #10b981)',
-  bedrock: 'var(--vp-brg, #006747)',
-};
-
-function computeEpistemologicalLayer(group: FieldEvidenceGroup | undefined): EpistemologicalLayer {
-  if (!group || group.sources.length === 0) return 'claim';
-
-  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
-
-  // Scientific test: has physical measurement source
-  if (sourceTypes.some(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'))) {
-    return 'bedrock';
-  }
-
-  // Inspection: has photo-verified evidence
-  if (sourceTypes.some(s => s.includes('photo_verified') || s.includes('vin_plate_photo'))) {
-    return 'inspection';
-  }
-
-  // Consensus: 2+ independent source TYPES agree on the value
-  const distinctSourceTypes = new Set(sourceTypes.map(s => {
-    if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
-    if (s.includes('bat')) return 'bat';
-    if (s.includes('ai') || s.includes('vision')) return 'ai';
-    if (s.includes('user')) return 'user';
-    if (s.includes('enrich')) return 'enrich';
-    return s;
-  }));
-
-  // Check that distinct source types agree on value
-  if (distinctSourceTypes.size >= 2) {
-    const values = group.sources.map(s => (s.field_value || '').toLowerCase().trim());
-    const primaryVal = values[0];
-    const agreeing = values.filter(v => v === primaryVal || v.includes(primaryVal) || primaryVal.includes(v));
-    if (agreeing.length >= 2) return 'consensus';
-  }
-
-  return 'claim';
-}
-
-/** Build a human-readable tooltip explaining why a field has its epistemological layer */
-function buildLayerTooltip(layer: EpistemologicalLayer, group: FieldEvidenceGroup | undefined): string {
-  if (!group || group.sources.length === 0) return 'Claim: no evidence sources';
-  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
-
-  if (layer === 'bedrock') {
-    const measurement = sourceTypes.find(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'));
-    return `Scientific test: ${(measurement || 'measurement').replace(/_/g, ' ')} data`;
-  }
-
-  if (layer === 'inspection') {
-    return 'Inspection: photo-verified evidence on file';
-  }
-
-  if (layer === 'consensus') {
-    const typeLabels: Record<string, string> = {
-      vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
-      user: 'user input', enrich: 'enrichment',
-    };
-    const mapped = new Set(sourceTypes.map(s => {
-      if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
-      if (s.includes('bat')) return 'bat';
-      if (s.includes('ai') || s.includes('vision')) return 'ai';
-      if (s.includes('user')) return 'user';
-      if (s.includes('enrich')) return 'enrich';
-      return s;
-    }));
-    const labels = [...mapped].map(k => typeLabels[k] || k).slice(0, 3);
-    return `Consensus: ${labels.join(' + ')} agree`;
-  }
-
-  // claim — single source
-  const typeLabels: Record<string, string> = {
-    vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
-    user: 'user input', enrich: 'enrichment',
-  };
-  const st = sourceTypes[0];
-  const label = st.includes('vin') || st.includes('nhtsa') ? typeLabels.vin :
-    st.includes('bat') ? typeLabels.bat :
-    st.includes('ai') || st.includes('vision') ? typeLabels.ai :
-    st.includes('user') ? typeLabels.user :
-    st.includes('enrich') ? typeLabels.enrich :
-    st.replace(/_/g, ' ');
-  return `Claim: ${label} (single source)`;
+function buildClaimTooltip(group: FieldEvidenceGroup | undefined): string {
+  const count = group?.sources.length ?? 0;
+  if (count === 0) return 'No retained claims loaded for this field. Verification unknown.';
+  return `${count} retained claim record${count === 1 ? '' : 's'}. Independent support and verification unknown.${group?.hasConflict ? ' Reported values differ; no resolution is established.' : ''}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -379,9 +294,7 @@ const FieldRow: React.FC<{
 }> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick }) => {
   const [hovered, setHovered] = useState(false);
 
-  // Compute epistemological layer (P15)
-  const layer = useMemo(() => computeEpistemologicalLayer(group), [group]);
-  const layerTooltip = useMemo(() => buildLayerTooltip(layer, group), [layer, group]);
+  const claimTooltip = useMemo(() => buildClaimTooltip(group), [group]);
 
   // Deduplicated source badges
   const sourceBadges = useMemo(() => {
@@ -398,11 +311,9 @@ const FieldRow: React.FC<{
     <div
       style={{
         borderBottom: '1px solid var(--border)',
-        borderLeft: layer !== 'claim' ? `3px solid ${LAYER_COLORS[layer]}` : 'none',
-        paddingLeft: layer !== 'claim' ? '0px' : '0px',
       }}
       data-field={field}
-      title={layer !== 'claim' ? layerTooltip : undefined}
+      title={claimTooltip}
     >
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
@@ -413,7 +324,7 @@ const FieldRow: React.FC<{
           display: 'grid',
           gridTemplateColumns: '120px 1fr auto 20px',
           alignItems: 'center',
-          padding: layer !== 'claim' ? '4px 10px 4px 7px' : '4px 10px',
+          padding: '4px 10px',
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
@@ -516,7 +427,7 @@ const VehicleDossierPanel: React.FC = () => {
   const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
-  const { evidence, loading } = useFieldEvidence(vehicle?.id);
+  const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
   // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
   const { priceFacts } = useVehiclePriceFacts(vehicle?.id);
   const priceKind = priceKindLabel(priceFacts);
@@ -560,31 +471,8 @@ const VehicleDossierPanel: React.FC = () => {
   const withEvidence = useMemo(() => {
     return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length > 0).length;
   }, [evidence]);
-  const coverage = withEvidence / FIELD_ORDER.length;
-  // Count fields with 2+ distinct sources for "multi-source" label
-  const multiSourceCount = useMemo(() => {
-    return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length >= 2).length;
-  }, [evidence]);
-  const isMultiSource = multiSourceCount >= 5 && coverage >= 0.5;
-  const verificationLabel = isMultiSource ? 'MULTI-SOURCE VERIFIED' : coverage >= 0.5 ? 'PARTIAL VERIFICATION' : 'UNVERIFIED';
-  const verificationClass = isMultiSource ? 'verified' : 'partial';
-
-  // Epistemological layer distribution (P15)
-  const layerDistribution = useMemo(() => {
-    let bedrock = 0, inspection = 0, consensus = 0, claims = 0, empty = 0;
-    for (const f of FIELD_ORDER) {
-      const group = evidence[f];
-      if (!group || group.sources.length === 0) {
-        empty++;
-        continue;
-      }
-      const layer = computeEpistemologicalLayer(group);
-      if (layer === 'bedrock') bedrock++;
-      else if (layer === 'inspection') inspection++;
-      else if (layer === 'consensus') consensus++;
-      else claims++;
-    }
-    return { bedrock, inspection, consensus, claims, empty, total: FIELD_ORDER.length };
+  const differingValuesCount = useMemo(() => {
+    return FIELD_ORDER.filter(f => evidence[f]?.sources.length > 0 && evidence[f].hasConflict).length;
   }, [evidence]);
 
   // Identity badges
@@ -621,7 +509,6 @@ const VehicleDossierPanel: React.FC = () => {
       {/* Identity stripped — YMM, VIN, owner, badges are in the sticky badge bar.
            Go straight to the spec table. */}
       <div style={{ display: 'none' }}>
-        <span data-verification={verificationLabel} data-class={verificationClass} />
         {canEdit && <span data-can-edit="true" data-vehicle-id={vehicle?.id} />}
         <span>{ymm}</span>
         {v.vin && (
@@ -913,92 +800,25 @@ const VehicleDossierPanel: React.FC = () => {
         })()}
       </div>
 
-      {/* Provenance Coverage with epistemological layer distribution (P15) */}
-      <div style={{
+      {/* Claim presence uses a fixed core-field denominator, not a verification tier. */}
+      <div data-testid="source-claim-coverage" style={{
         background: 'var(--surface-elevated)',
-        border: '2px solid var(--accent)',
+        border: '2px solid var(--border)',
         padding: '8px 10px',
         marginBottom: '8px',
+        fontSize: '9px',
       }}>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          marginBottom: '4px',
-        }}>
-          PROVENANCE COVERAGE
-        </div>
-        {/* Segmented layer distribution bar */}
-        <div style={{
-          width: '100%',
-          height: '6px',
-          background: 'var(--border)',
-          marginBottom: '4px',
-          display: 'flex',
-        }}>
-          {layerDistribution.bedrock > 0 && (
-            <div
-              title={`${layerDistribution.bedrock} scientifically tested`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.bedrock / layerDistribution.total) * 100)}%`,
-                background: 'var(--vp-brg, #006747)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.inspection > 0 && (
-            <div
-              title={`${layerDistribution.inspection} physically inspected`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.inspection / layerDistribution.total) * 100)}%`,
-                background: 'var(--success, #10b981)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.consensus > 0 && (
-            <div
-              title={`${layerDistribution.consensus} multi-source consensus`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.consensus / layerDistribution.total) * 100)}%`,
-                background: 'var(--info, #3b82f6)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.claims > 0 && (
-            <div
-              title={`${layerDistribution.claims} single-source claims`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.claims / layerDistribution.total) * 100)}%`,
-                background: 'var(--text-disabled)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-        </div>
-        {/* Layer distribution summary text */}
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '8px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          color: 'var(--text-secondary)',
-        }}>
-          {[
-            layerDistribution.bedrock > 0 ? `${layerDistribution.bedrock} BEDROCK` : null,
-            layerDistribution.inspection > 0 ? `${layerDistribution.inspection} INSPECTED` : null,
-            layerDistribution.consensus > 0 ? `${layerDistribution.consensus} CONSENSUS` : null,
-            `${layerDistribution.claims} CLAIMS`,
-            `${layerDistribution.empty} EMPTY`,
-          ].filter(Boolean).join(' \u00B7 ')}
-        </div>
+        <div className="ev-label">SOURCE CLAIM COVERAGE</div>
+        {evidenceError ? <p role="status">Source claim coverage unavailable.</p>
+          : loading ? <p role="status">Loading source claim coverage…</p>
+          : <>
+            <div role="img" aria-label={`${withEvidence} of ${FIELD_ORDER.length} core fields have claim records`}
+              style={{ height: '6px', background: 'var(--border)', margin: '4px 0' }}>
+              <div style={{ height: '100%', width: `${withEvidence / FIELD_ORDER.length * 100}%`, background: 'var(--text-secondary)' }} />
+            </div>
+            <div>{withEvidence} of {FIELD_ORDER.length} core fields have claim records · {differingValuesCount} have differing reported values</div>
+          </>}
+        <p style={{ margin: '4px 0 0' }}>Claim record counts do not establish independent support or verification.</p>
       </div>
 
       {/* Stored coverage heuristic; does not assess fact verification. */}
