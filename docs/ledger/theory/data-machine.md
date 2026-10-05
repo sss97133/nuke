@@ -11,6 +11,30 @@ proved, retaining dated owner intent and exact implementation, test, merge, depl
 stages. A masked current reader may expose useful work history while lacking the clocks and fields
 needed for a historical financial model; record that boundary rather than inventing the missing inputs.
 
+**Schema-aware repair loop, owner clarification 2026-10-04.** Reusable configuration relations are
+one application of the model's work. The worker must recognize relationships in retained evidence,
+inspect existing structure and choose a useful repair across vehicles, identities, work, parts,
+sales, comments and media. The owner should not need to supply each model's distinctions.
+
+1. Start with a useful question and exact retained evidence. Name the entity, row grain, source
+   region, event and recording clocks, and unresolved claims; preserve the wider candidate population.
+2. Inspect the current atlas, property/catalog vocabulary, canonical writer and downstream owner.
+   Decide whether the gap is capture, extraction, identity/property binding, state maintenance or
+   reader exposure. A missing scalar or property FK on a multi-field envelope is not proof of lost data.
+3. Produce a concrete repair: original evidence IDs, missing relationship, existing owning path,
+   intended consumer and an executable acceptance case. Missing vocabulary uses the existing
+   `schema_proposals` curator path. A diagnostic suggests work; it does not authorize a write.
+4. Implement the authorized repair in its existing owner, preserving testimony, privacy, unknowns
+   and explicit holds. Prove the same source-to-consumer case plus the relevant disagreement case.
+5. Record delivery stages separately, then use the next observed gap to choose the next repair.
+   Byte accounting, descriptor presence and a passing sample are not semantic or fleet completion.
+
+The read-only `scripts/discovery/intake-reader-reconciliation.sql` locates gaps between retained
+source, observation, fold and current reader. `configuration-catalog-relations.sql` drills existing
+property/model/OEM relationships and proposes owned repairs. Both require explicit bounded inputs;
+neither installs an autonomous worker, admits claims or qualifies valuation. See the database
+operations manual for execution and acceptance boundaries.
+
 Promoted by the owner on 2026-09-30 as "the absolute most important thing": the database structure, its vocabulary,
 and how the owner and every agent talk about it. Read this before designing any table, feature, cohort or prediction.
 

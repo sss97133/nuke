@@ -68,6 +68,11 @@ comparable, market or opportunity reader, read **C27 / §11** in
 [`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md#11-whole-market-evidence-and-immediate-vehicle-questions)
 and the existing [`market reader contract`](docs/market/MARKET_MEASUREMENT_UI_CONTRACT.md).
 
+For ongoing database repair, follow the **schema-aware repair loop** in `data-machine.md`:
+recognize relationships from retained evidence, find the existing owner, implement an authorized
+repair and prove its consumer. Configuration is one application; a diagnostic report alone does
+not close the work. The bounded discovery assays are operator tools, not autonomous write authority.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.

@@ -309,6 +309,14 @@ jobs:
         run: createdb dm_fold_listed_engine
       - name: Verify source-bound listed engine phrases and existing listing contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listed_engine -f supabase/sql/test_listed_engine_reported_state.sql
+      - name: Create disposable intake reconciliation database
+        run: createdb dm_fold_reconcile_ci
+      - name: Verify retained evidence, typed relations, current fold and reader reconciliation
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_reconcile_ci -f scripts/discovery/intake-reader-reconciliation-test.sql
+      - name: Create disposable configuration relation database
+        run: createdb dm_refinement_config_relations
+      - name: Verify property, model and factory reference repair diagnostics
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_config_relations -f scripts/discovery/configuration-catalog-relations-test.sql
       - name: Create disposable full-description reader database
         run: createdb dm_fold_description
       - name: Verify full native listing prose and qualified public reader
