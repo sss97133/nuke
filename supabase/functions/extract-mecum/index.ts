@@ -98,7 +98,7 @@ export function parseMecumSourceResultCandidate(html: string): MecumSourceResult
   };
   const refuse = (reason: string) => { out.refusalReasons.push(reason); return out; };
   if (typeof html !== "string" || new TextEncoder().encode(html).byteLength > 2097152) return refuse("source_body_invalid_or_over_limit");
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
     .filter(m => /(?:^|\s)id\s*=\s*(["'])__NEXT_DATA__\1/i.test(m[1]));
   out.nextDataScriptCount = scripts.length;
   if (scripts.length !== 1) return refuse(scripts.length ? "source_presentations_ambiguous" : "next_data_missing");

@@ -867,8 +867,8 @@ metadata and storage locators stay out of the response. Vehicle/event custody is
 The predeployment live request returned HTTP400 (unsupported action). Local replay of the exact
 retained lot173892 capture through the actual handler/archive/auth code now recovers **2014-01-24**
 and its unqualified reported sold amount. The source hash matches; no source was fetched or
-production record changed. **126 focused tests pass**, including that private replay and existing
-BaT archive/intake custody regressions; public CI runs125 synthetic tests. The enforced checkout
+production record changed. **127 focused tests pass**, including that private replay and existing
+BaT archive/intake custody regressions; public CI runs126 synthetic tests. The enforced checkout
 gate and write guard pass. Publication/deployment stages belong to this repair's PR receipt; this
 is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
 binding, episode configuration semantics and qualified cross-venue prices remain held/open.

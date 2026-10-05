@@ -163,6 +163,12 @@ test('single-quoted script ID works but a different data-id is not the source co
   assert.equal(parse(html(base()).replace('id="__NEXT_DATA__"', "id='__NEXT_DATA__'")).saleResult, 'sold');
   refuses(parse(html(base()).replace('id="__NEXT_DATA__"', 'data-id="__NEXT_DATA__"')), 'next_data_missing');
 });
+test('HTML closing-tag whitespace works and does not hide a second source presentation', () => {
+  const spaced = html(base()).replace('</script>', '</ScRiPt \n\t>');
+  assert.equal(parse(spaced).saleResult, 'sold');
+  refuses(parse(spaced + html(base())), 'source_presentations_ambiguous');
+  refuses(parse(html(base()).replace('</script>', '</scripture>')), 'next_data_missing');
+});
 test('UTF8 source size limit refuses without treating a prefix as the complete source', () => {
   refuses(parse('é'.repeat(2 ** 20 + 1)), 'source_body_invalid_or_over_limit');
 });
