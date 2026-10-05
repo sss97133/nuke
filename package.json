@@ -4,6 +4,9 @@
   "description": "We turn scattered car history into structured, tradable intelligence.",
   "private": true,
   "scripts": {
+    "mail:intake": "python3 scripts/ingest-mail-alerts.py",
+    "mail:intake:test": "python3 scripts/email-alerts/test_intake.py",
+    "mail:intake:health": "python3 scripts/ingest-mail-alerts.py --check",
     "ask-codex": "scripts/ask-codex",
     "ask-claude": "scripts/ask-claude",
     "access:firecrawl-logs": "tsx scripts/access-firecrawl-logs-api.ts",
