@@ -38,7 +38,7 @@ SELECT ('20000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,
   CASE WHEN n>4 THEN '30000000-0000-0000-0000-000000000001'::uuid END,
   CASE WHEN n=1 THEN NULL WHEN n IN (2,4) THEN 'unorganized' ELSE 'organized' END,
   CASE n WHEN 1 THEN 'complete' WHEN 2 THEN 'completed' WHEN 3 THEN 'failed' WHEN 4 THEN 'pending' WHEN 5 THEN 'processing' END,
-  'front',NULL,n*10,
+  'front',CASE WHEN n IN (1,5) THEN '{"make":"fixture"}'::jsonb WHEN n=2 THEN 'null'::jsonb END,n*10,
   CASE WHEN n<=4 THEN 'image_library' WHEN n=5 THEN 'manual' WHEN n=7 THEN 'foreign-source' END,
   CASE WHEN n IN (1,2) THEN 'a' WHEN n=4 THEN 'b' WHEN n=6 THEN 'c' END,
   n=2,CASE WHEN n=2 THEN '2026-01-01'::timestamptz END,n=3,
@@ -71,7 +71,13 @@ END $$;
 -- Match the live atlas: there is no legacy vehicle_suggestions table.
 \ir ../migrations/20261005025602_remove_absent_photo_suggestions_reader.sql
 \ir ../migrations/20261005031512_bound_photo_recent_output_probe.sql
+\ir ../migrations/20261005034243_share_photo_owner_bitmap_read.sql
 SET ROLE anon;
+DO $$ BEGIN
+  BEGIN PERFORM public._read_photo_library_owner_images('10000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'Public caller accessed internal image census';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 DO $$ BEGIN
   BEGIN PERFORM public.get_photo_library_stats('10000000-0000-0000-0000-000000000001');
     RAISE EXCEPTION 'Anonymous caller accessed photo coverage';
@@ -80,6 +86,11 @@ END $$;
 RESET ROLE;
 
 SET ROLE authenticated;
+DO $$ BEGIN
+  BEGIN PERFORM public._read_photo_library_owner_images('10000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'Public caller accessed internal image census';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 SELECT set_config('request.jwt.claims','{"role":"authenticated"}',false);
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',false);
 DO $$ BEGIN
@@ -88,13 +99,19 @@ DO $$ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',false);
-DO $$ DECLARE s jsonb; c jsonb; BEGIN
+DO $$ DECLARE s jsonb; c jsonb; index_scan_before text:=current_setting('enable_indexscan'); bitmap_scan_before text:=current_setting('enable_bitmapscan'); BEGIN
   s:=public.get_photo_library_stats(auth.uid())::jsonb; c:=s->'source_analysis';
+  IF current_setting('enable_indexscan') IS DISTINCT FROM index_scan_before
+     OR current_setting('enable_bitmapscan') IS DISTINCT FROM bitmap_scan_before THEN
+    RAISE EXCEPTION 'Reader planner setting escaped into its caller';
+  END IF;
   IF s->'ai_suggestions_count'<>'null'::jsonb OR s->>'ai_suggestions_state'<>'unavailable' THEN
     RAISE EXCEPTION 'Absent suggestion substrate became zero or blocked coverage: %',s;
   END IF;
   IF s->>'total_photos'<>'4' OR s->>'unorganized_photos'<>'3' OR s->>'organized_photos'<>'3'
-     OR s->>'total_file_size'<>'100' OR s#>>'{ai_status_breakdown,complete}'<>'2' THEN
+     OR s->>'total_file_size'<>'100' OR s#>>'{ai_status_breakdown,complete}'<>'2'
+     OR s->>'pending_ai_processing'<>'1' OR s#>>'{angle_breakdown,front}'<>'4'
+     OR s#>>'{vehicle_detection,found}'<>'2' OR s#>>'{vehicle_detection,not_found}'<>'2' THEN
     RAISE EXCEPTION 'Legacy inbox grain changed: %',s;
   END IF;
   IF c->>'records'<>'6' OR c->>'distinct_hashed_files'<>'3' OR c->>'without_hash'<>'2'
@@ -127,6 +144,11 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 SET ROLE service_role;
+DO $$ BEGIN
+  BEGIN PERFORM public._read_photo_library_owner_images('10000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'Public caller accessed internal image census';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 SELECT set_config('request.jwt.claims','{"role":"service_role"}',false);
 DO $$ BEGIN
   IF public.get_photo_library_stats('10000000-0000-0000-0000-000000000001')::jsonb#>>'{source_analysis,records}'<>'6' THEN
@@ -143,6 +165,11 @@ SELECT ('90000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,
  '2026-03-01'::timestamptz+n*interval '1 minute','{}'::jsonb
 FROM generate_series(1,110)n;
 SET ROLE authenticated;
+DO $$ BEGIN
+  BEGIN PERFORM public._read_photo_library_owner_images('10000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'Public caller accessed internal image census';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',false);
 SELECT set_config('request.jwt.claims','{"role":"authenticated"}',false);
 DO $$ DECLARE c jsonb; BEGIN
