@@ -76,7 +76,9 @@ configuration and cohort support; do not present that claim while only its displ
 
 The existing witness is [Mecum lot173892](https://www.mecum.com/lots/173892/1963-chevrolet-corvette-resto-mod/),
 vehicle `b2414fd1-33eb-4911-bf14-2832ccc432f7`, native event
-`efae4387-582f-45f2-b9ba-d70cf2325496`. The retained source identifies Kissimmee 2014, lot F208.
+`efae4387-582f-45f2-b9ba-d70cf2325496`. This is a historical comparison and reconciliation witness;
+it is not an established identity match to the marketplace lead. The retained source identifies
+Kissimmee 2014, lot F208.
 The repaired preview recovers **2014-01-24 as a scheduled civil run day**, not an asserted sale or
 settlement instant. Parent custody, original currency and fee basis remain unestablished.
 
