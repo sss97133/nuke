@@ -46,6 +46,7 @@ const sources = new Map([
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
+  ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -159,6 +160,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/urlNormalization.ts')return {normalizeListingUrl:value=>value,normalizeVin:value=>value};
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
+        if(specifier==='./retainedInterior.ts')return load('retainedInterior');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
         if(specifier==='./cachedProperties.ts')return load('cached');
