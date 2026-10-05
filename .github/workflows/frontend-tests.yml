@@ -169,6 +169,10 @@ jobs:
         run: createdb dm_refinement_profile_privacy_ci
       - name: Verify private column protection and owner-only profile RPC
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_privacy_ci -f supabase/sql/test_profile_column_privacy.sql
+      - name: Create disposable photo coverage database
+        run: createdb dm_refinement_photo_coverage_ci
+      - name: Verify owner source coverage, output fanout and empty-search-path repair
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_photo_coverage_ci -f supabase/sql/test_photo_source_analysis_coverage.sql
       - name: Setup Deno for native auction fixtures
         uses: denoland/setup-deno@v2
         with:

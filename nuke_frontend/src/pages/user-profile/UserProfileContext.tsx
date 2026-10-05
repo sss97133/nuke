@@ -11,7 +11,7 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { ProfileService } from '../../services/profileService';
 import { getUserProfileData, getPublicProfileByExternalIdentity } from '../../services/profileStatsService';
-import { PersonalPhotoLibraryService } from '../../services/personalPhotoLibraryService';
+import { PersonalPhotoLibraryService, type LibraryStats } from '../../services/personalPhotoLibraryService';
 import type { UserProfile, UserProfileStats, UserComprehensiveData, ContributionEvent, ActivityEvent, GalleryFilter } from './types';
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,8 @@ interface UserProfileContextValue {
   // Stats & data
   stats: UserProfileStats | null;
   comprehensiveData: UserComprehensiveData | null;
-  photoLibraryStats: any | null;
+  photoLibraryStats: LibraryStats | null;
+  photoLibraryError: string | null;
 
   // Events
   contributionEvents: ContributionEvent[];
@@ -105,7 +106,8 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserProfileStats | null>(null);
   const [comprehensiveData, setComprehensiveData] = useState<UserComprehensiveData | null>(null);
-  const [photoLibraryStats, setPhotoLibraryStats] = useState<any>(null);
+  const [photoLibraryStats, setPhotoLibraryStats] = useState<LibraryStats | null>(null);
+  const [photoLibraryError, setPhotoLibraryError] = useState<string | null>(null);
   const [contributionEvents, setContributionEvents] = useState<ContributionEvent[]>([]);
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
 
@@ -164,6 +166,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setStats(null);
     setComprehensiveData(null);
     setPhotoLibraryStats(null);
+    setPhotoLibraryError(null);
     try {
       if (externalIdentityId) {
         // External identity (unclaimed BaT user)
@@ -200,6 +203,13 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setLoading(false);
       }
 
+      // Start independent owner coverage before the slower profile statistics.
+      if (isOwnProfile) {
+        PersonalPhotoLibraryService.getLibraryStats()
+          .then((s) => { if (loadingForUidRef.current === loadKey) setPhotoLibraryStats(s); })
+          .catch(() => { if (loadingForUidRef.current === loadKey) setPhotoLibraryError('Photo coverage could not load. Reload to retry.'); });
+      }
+
       // Background: comprehensive stats data + per-day contribution aggregates.
       // getContributionDays replaces the ProfileService.getProfileData leg here:
       // that path ran three wide row-level selects (vehicle_images /
@@ -223,12 +233,6 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         buildContributionEvents(contributionDays);
       }
 
-      // Photo library stats (own profile only, uses auth session internally)
-      if (isOwnProfile) {
-        PersonalPhotoLibraryService.getLibraryStats()
-          .then((s) => { if (loadingForUidRef.current === loadKey) setPhotoLibraryStats(s); })
-          .catch(() => {});
-      }
     } catch (err) {
       console.error('[UserProfileContext] Error loading profile:', err);
     } finally {
@@ -362,6 +366,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     stats,
     comprehensiveData,
     photoLibraryStats,
+    photoLibraryError,
     contributionEvents,
     activityEvents,
     session,
@@ -376,7 +381,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     uploadAvatar,
   }), [
     resolvedUserId, profile, isOwnProfile, isExternalIdentity,
-    stats, comprehensiveData, photoLibraryStats,
+    stats, comprehensiveData, photoLibraryStats, photoLibraryError,
     contributionEvents, activityEvents,
     session, isAdmin, currentUserId,
     loading, isMobile, galleryFilter,
