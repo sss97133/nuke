@@ -19,9 +19,8 @@ import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/u
 import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
 // ---------------------------------------------------------------------------
-// Eye read — the evidence-graded appraisal (vehicle_condition_scores).
-// When present it OWNS the value story; the model estimate is demoted.
-// A price we can't defend is never the headline (valuation-block doctrine).
+// Stored appraisal (vehicle_condition_scores). Its range is a reported output;
+// this reader does not expose contributing inputs or calibration evidence.
 // ---------------------------------------------------------------------------
 
 interface EyeRead {
@@ -29,9 +28,9 @@ interface EyeRead {
   conditionClass: string | null;
   tier: string;
   score: number;
-  frames: number | null;
+  reportedInputCount: number | null;
   method: string;
-  computedAt: string;
+  computedAt: string | null;
 }
 
 function useEyeRead(vehicleId: string | undefined): EyeRead | null {
@@ -55,7 +54,7 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
           conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
           tier: data.condition_tier,
           score: Number(data.condition_score),
-          frames: data.observation_count,
+          reportedInputCount: data.observation_count,
           method: data.computation_version || 'appraisal',
           computedAt: data.computed_at,
         });
@@ -116,32 +115,12 @@ function generateHeadline(
   eyeRead: EyeRead | null = null,
   priceFacts: PriceFacts | null = null,
 ): HeadlineResult | null {
-  // Priority 0: the Eye's evidence-graded read. When it exists, THE value story
-  // is the band vs the real price — never the undefended model estimate.
+  // Priority 0: preserve the stored range without making an unqualified deal verdict.
   if (eyeRead?.band) {
     const [lo, hi] = eyeRead.band;
     const fmt = (n: number) => '$' + Math.round(n / 100) / 10 + 'k';
-    // a real price is a sale, a bid or a current ask, said as what it is; an estimate is not a price
-    const real = priceFacts && priceFacts.price_kind !== 'estimate' ? priceFacts : null;
-    const price = real?.price_amount;
-    const cls = eyeRead.conditionClass ? ` · ${eyeRead.conditionClass}` : '';
-    if (real && price && price > 0) {
-      const on = real.price_as_of
-        ? ' (' + new Date(real.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) + ')'
-        : '';
-      const said = real.price_kind === 'sold' ? `sold ${fmt(price)}${on}`
-        : real.price_kind === 'ask' ? `asking ${fmt(price)}`
-        : real.price_live ? `current bid ${fmt(price)}`
-        : `high bid ${fmt(price)}${on}`;
-      const pos = price < lo ? `${said} is BELOW the band`
-        : price <= hi ? `${said} is IN BAND`
-        : `${said} is ${fmt(price - hi)} above what the evidence proves`;
-      return {
-        text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls} — ${pos}`,
-        severity: price <= hi ? 'ok' : 'warning',
-      };
-    }
-    return { text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls}`, severity: 'info' };
+    const cls = eyeRead.conditionClass ? ` · reported condition: ${eyeRead.conditionClass}` : '';
+    return { text: `Stored appraisal range: ${fmt(lo)}–${fmt(hi)} USD${cls}`, severity: 'info' };
   }
   // Priority 1: HIGH-severity red flags only (real warnings, not trivia)
   const flags = intel?.description_intel?.red_flags;
@@ -309,19 +288,20 @@ const VehicleBriefing: React.FC = () => {
   const pills: StatPillProps[] = [];
 
   if (eyeRead?.band) {
-    // The Eye leads; carry the date so freshness is never a mystery.
+    // Computation time is distinct from source capture and sale time.
     const [lo, hi] = eyeRead.band;
     pills.push({
-      label: 'EYE READ',
+      label: 'APPRAISAL',
       value: `$${Math.round(lo / 100) / 10}k–$${Math.round(hi / 100) / 10}k`,
     });
+    const computed = eyeRead.computedAt ? new Date(eyeRead.computedAt) : null;
     pills.push({
-      label: 'READ ON',
-      value: new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      label: 'COMPUTED (UTC)',
+      value: computed && Number.isFinite(computed.getTime())
+        ? computed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+        : 'Unknown',
     });
-    if (eyeRead.frames) {
-      pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
-    }
+    pills.push({ label: 'INPUT COUNT', value: eyeRead.reportedInputCount != null ? `${eyeRead.reportedInputCount} reported` : 'Unknown' });
   } else if (estimate && estimate > 0 && defended.estimate) {
     // Legacy model estimate only when no evidence read exists — and labeled as such.
     pills.push({
@@ -378,6 +358,12 @@ const VehicleBriefing: React.FC = () => {
       {pills.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: comps && comps.length > 0 ? '6px' : 0 }}>
           {pills.map((p, i) => <StatPill key={i} {...p} />)}
+        </div>
+      )}
+
+      {eyeRead?.band && (
+        <div style={{ ...MONO, color: 'var(--text-secondary, #666)', marginTop: '4px', marginBottom: '4px' }}>
+          Input IDs, count meaning and calibration unavailable. Condition matching unverified.
         </div>
       )}
 

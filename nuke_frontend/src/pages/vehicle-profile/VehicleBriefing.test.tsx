@@ -3,13 +3,13 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ context: {} as any }));
+const fixture = vi.hoisted(() => ({ context: {} as any, condition: null as any, price: null as any }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.context }));
 vi.mock('./hooks/useVehiclePriceFacts', () => ({
-  useVehiclePriceFacts: () => ({ priceFacts: null, priceSettled: true }), priceKindLabel: () => null,
+  useVehiclePriceFacts: () => ({ priceFacts: fixture.price, priceSettled: true }), priceKindLabel: () => null,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }),
+  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: fixture.condition }) }) }) }),
 } }));
 import VehicleBriefing from './VehicleBriefing';
 
@@ -17,6 +17,7 @@ let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.context = { vehicle: { id: 'offline-subject' }, vehicleIntelLoading: false, observationCount: 0 };
+  fixture.condition = null; fixture.price = null;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -66,4 +67,33 @@ it('preserves the existing sold-context scope and unmatched-condition label', as
   expect(host.textContent).toContain('RECENT SOLD RECORD');
   expect(host.textContent).toContain('Registered source scope');
   expect(host.textContent).toContain('Condition not matched');
+});
+
+it.each([10000, 25000, 50000])('preserves the stored range without interpreting price %s as a proved deal', async amount => {
+  fixture.condition = { descriptor_summary: { as_is_band_usd: [20000, 30000], condition_class: 'Driver (reported rubric)' },
+    observation_count: 79, computed_at: '2026-07-14T00:30:00Z' };
+  fixture.price = { price_kind: 'sold', price_amount: amount, price_as_of: '2026-07-01' };
+  await mount(null);
+  expect(host.textContent).toContain('Stored appraisal range: $20k–$30k USD');
+  expect(host.textContent).toContain('reported condition: Driver');
+  expect(host.textContent).toContain('INPUT COUNT79 reported');
+  expect(host.textContent).toContain('COMPUTED (UTC)Jul 14, 2026');
+  expect(host.textContent).toContain('Input IDs, count meaning and calibration unavailable. Condition matching unverified.');
+  expect(host.textContent).not.toMatch(/what the evidence proves|Evidence read:|BELOW|IN BAND|FRAMES|READ ON/);
+  expect(host.querySelector('[style*="vp-brg"], [style*="vp-danger"]')).toBeNull();
+});
+
+it.each([0, null, undefined])('distinguishes reported input count %s from unavailable count semantics', async count => {
+  fixture.condition = { descriptor_summary: { as_is_band_usd: [20000, 30000] }, observation_count: count, computed_at: null };
+  await mount(null);
+  expect(host.textContent).toContain(count === 0 ? 'INPUT COUNT0 reported' : 'INPUT COUNTUnknown');
+  expect(host.textContent).toContain('COMPUTED (UTC)Unknown');
+  expect(host.textContent).not.toContain('Invalid Date');
+  expect(host.textContent).not.toContain('1970');
+});
+
+it('keeps a score-only record outside the appraisal range surface', async () => {
+  fixture.condition = { descriptor_summary: {}, observation_count: 79, computed_at: '2026-07-14T00:30:00Z' };
+  await mount(null);
+  expect(host.textContent).toBe('');
 });
