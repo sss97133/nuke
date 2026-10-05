@@ -294,9 +294,18 @@ function commentClient(extra = {}) {
 }
 
 test('comment family requires an explicit manifest and rejects a price cursor', () => {
-  assert.equal(options(['--out','private','--family','comments','--subjects','manifest']).scope,'explicit_manifest');
+  const defaults=options(['--out','private','--family','comments','--subjects','manifest']);
+  assert.equal(defaults.scope,'explicit_manifest');assert.equal(defaults.commentLimit,1000);
   for (const extra of [[], ['--subjects','manifest','--scope','all'], ['--subjects','manifest','--after',id(1)], ['--subjects','manifest','--page-size','20']])
     assert.throws(() => options(['--out','private','--family','comments',...extra]));
+});
+
+test('comment collection ceiling is explicit, finite and isolated from other reader families', () => {
+  const args=['--out','private','--family','comments','--subjects','manifest','--comment-limit'];
+  assert.equal(options([...args,'10000']).commentLimit,10000);
+  for (const bad of ['0','999','10001','1.5','Infinity','no-limit']) assert.throws(()=>options([...args,bad]));
+  assert.throws(()=>options(['--out','private','--comment-limit','10000']));
+  assert.throws(()=>options(['--out','private','--family','specifications','--subjects','manifest','--comment-limit','10000']));
 });
 
 test('comment transport selects only bounded non-bid headers and parent-scoped source metadata', async () => {
@@ -375,6 +384,20 @@ test('native header overflow refuses totals and skips source context, rather tha
   assert.equal(c.requests,7);assert.equal(r.completedParents,0);assert.equal(r.measuredCommentHeaders,0);assert.equal(r.exitCode,2);
   assert.equal(r.gaps.comment_header_cap_unmeasured,1);assert.equal(events.find(x=>x.type==='comment_parent_unmeasured').atLeast,1001);
   assert.equal(c.calls.some(x=>x.reader==='auction_events'||x.reader==='external_identities'),false);
+});
+
+test('explicit larger ceiling completes a high-volume collection only after an empty keyed page', async () => {
+  const headers=Array.from({length:1001},(_,i)=>comment(i));
+  const checked=inspectCommentHeaders(id(1),headers,10000);
+  assert.equal(checked.complete,true);assert.equal(checked.headers.length,1001);
+  assert.equal(inspectCommentHeaders(id(1),headers,Infinity).safe,false);
+  const c=commentClient({headers}),events=[];
+  const r=await runCommentLineage(c,scope({commentLimit:10000}),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+  assert.equal(r.commentLimit,10000);assert.equal(r.measuredCommentHeaders,1001);assert.equal(r.completedParents,1);
+  assert.equal(r.identityStates.legacyOnly,1001);assert.equal(r.exitCode,0);assert.deepEqual(r.failures,{});
+  assert.equal(events.filter(x=>x.type==='comment_source_page').at(-1).returned,0);
+  assert.equal(c.calls.filter(x=>x.reader==='auction_comments').length,7);
+  assert.match(r.boundary,/10000/);assert.match(r.boundary,/resource ceiling/);
 });
 
 test('two similar comment-reader failures stop even when successful gate or header reads intervene', async () => {
