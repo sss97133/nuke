@@ -2,7 +2,7 @@
 /** Bounded local refinery. No discovery: exact private manifest, cached replay, canonical landing.
  * --manifest /private/batch.json --cache-dir /private/cache [--infer] [--write]
  * Manifest: {vehicle_id,event_id,model:"qwen2.5vl:7b",comment_ids:[UUID,...]}.
- * Default is read-only preparation. Inference/admission require separate reviewed invocations.
+ * Default is read-only preparation. --write is mechanically disabled pending extractor qualification.
  */
 import { readFileSync, mkdirSync, writeFileSync, renameSync, existsSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { createHash, webcrypto } from 'node:crypto';
@@ -98,6 +98,24 @@ export function bindSelections(content, comments, spans) {
   const validEntries = bound.filter(e=>!bindingErrors[comments[e?.comment_index-1]?.id]);
   return {input:JSON.stringify(validEntries),selections,bindingErrors};
 }
+export function verifySelectedOffsets(parsed, bound, comments, spans) {
+  const indices = new Map(), rejected = new Set();
+  for (const claim of parsed.claims) {
+    const choices=bound.selections.filter(x=>x.comment_id===claim.comment_id);
+    const index=indices.get(claim.comment_id) ?? 0;
+    indices.set(claim.comment_id,index+1);
+    const selection=choices[index], span=spans.find(x=>x.span_id===selection?.span_id);
+    const exact=span?.text.trim();
+    const start=span ? span.start+span.text.indexOf(exact) : -1;
+    const comment=comments.find(x=>x.id===claim.comment_id);
+    if (!span || selection.claim_type!==claim.claim_type || claim.source_quote_start!==start || claim.source_quote_end!==start+exact.length || claim.source_quote_actual!==exact || comment?.comment_text.slice(start,start+exact.length)!==exact) rejected.add(claim.comment_id);
+  }
+  for(const id of rejected) parsed.commentErrors[id]=[...(parsed.commentErrors[id] ?? []),'selected_span_offset_mismatch'];
+  parsed.claims=parsed.claims.filter(c=>!rejected.has(c.comment_id));
+  parsed.processedCommentIds=parsed.processedCommentIds.filter(id=>!rejected.has(id));
+  parsed.parseErrors.push(...[...rejected].map(()=> 'selected_span_offset_mismatch'));
+  return parsed;
+}
 export function validateProgress(m, rows, expected, prior) {
   if (rows.length !== m.comment_ids.length || new Set(rows.map(r=>r.comment_id)).size !== rows.length) throw Error('exact_progress_rows_required');
   for (const p of rows) {
@@ -110,6 +128,7 @@ export function validateProgress(m, rows, expected, prior) {
   }
 }
 export async function run(argv = process.argv.slice(2)) {
+  if (argv.includes('--write')) throw Error('extractor_not_qualified');
   const allowed = new Set(['--manifest','--cache-dir','--infer','--write']);
   for (let i=0;i<argv.length;i++) { if (!allowed.has(argv[i])) throw Error('unsupported_argument'); if (['--manifest','--cache-dir'].includes(argv[i])) i++; }
   const arg = key => argv[argv.indexOf(key)+1];
@@ -164,7 +183,7 @@ export async function run(argv = process.argv.slice(2)) {
   if (!cache) return {stage:'prepared',comment_ids:m.comment_ids,cache_path:cachePath,source_hash:expected.source_hash};
   const bound = bindSelections(cache.content,comments,cache.span_map);
   privateReceipt(path.join(cacheDir,'bound-receipt.json'),{...expected,output_hash:cache.output_hash,bound_input_hash:hash(bound.input),...bound,bound_at:new Date().toISOString()});
-  const parsed = parser.exports.parseClaimResponse(bound.input,comments);
+  const parsed = verifySelectedOffsets(parser.exports.parseClaimResponse(bound.input,comments),bound,comments,cache.span_map);
   privateReceipt(path.join(cacheDir,'parsed-receipt.json'),{...expected,parsed,binding_errors:bound.bindingErrors,bound_input_hash:hash(bound.input),parsed_at:new Date().toISOString()});
   let landed;
   if (argv.includes('--write')) {

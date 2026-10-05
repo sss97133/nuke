@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { validateManifest, validateSources, validateProgress, validateCache, hash, VERSION, ownerModule, sourceSpans, bindSelections, selectorPrompt } from './refinery-extract-claims.mjs';
+import { validateManifest, validateSources, validateProgress, validateCache, hash, VERSION, ownerModule, sourceSpans, bindSelections, selectorPrompt, verifySelectedOffsets, run } from './refinery-extract-claims.mjs';
 const vid='713dfda0-38f2-4377-ad21-43a1d0b35c9d', eid='f1f0e1d1-6f72-4882-8606-88d5801948aa', id='06b341fc-476e-48cc-8c91-dc65d1a09515';
 const manifest={vehicle_id:vid,event_id:eid,model:'qwen2.5vl:7b',comment_ids:[id]};
 const comment={id,vehicle_id:vid,auction_event_id:eid,platform:'bat',bid_amount:null,comment_text:'Was the recall completed?',posted_at:'2026-10-01T00:00:00Z',created_at:'2026-10-02T00:00:00Z',source_url:'https://bringatrailer.com/listing/test/#comment-1'};
@@ -79,4 +79,19 @@ test('bound selectors preserve semantic contradictions; never convert model scop
  const raw=JSON.stringify([{comment_index:1,claims:[{span_id:'c1s1',claim_type:'work_performed',proposed_value:'repair completed',confidence:.5,epistemic_status:'asserted',action_status:'completed'}]}]);
  const bound=bindSelections(raw,[c],sourceSpans([c]));
  assert.equal(parser.parseClaimResponse(bound.input,[c]).processedCommentIds.length,0);
+});
+test('unqualified extractor write refuses before configuration, source reads or admission',async()=>{
+ const original=globalThis.fetch;
+ let requests=0;globalThis.fetch=()=>{requests++;throw Error('network must not run');};
+ try { await assert.rejects(run(['--write']),/extractor_not_qualified/);assert.equal(requests,0); }
+ finally {globalThis.fetch=original;}
+});
+test('selected repeated quote cannot silently acquire first-occurrence offsets',()=>{
+ const c={...comment,comment_text:'Paint is grey. Paint is grey.'};const spans=sourceSpans([c]);
+ const raw=JSON.stringify([{comment_index:1,claims:[{span_id:'c1s2',claim_type:'paint_identity',proposed_value:'grey',confidence:.5,epistemic_status:'asserted',action_status:'not_applicable',subject_scope:'vehicle'}]}]);
+ const bound=bindSelections(raw,[c],spans),parser=ownerModule('supabase/functions/_shared/commentRefinery.ts').exports;
+ const parsed=verifySelectedOffsets(parser.parseClaimResponse(bound.input,[c]),bound,[c],spans);
+ assert.equal(parsed.claims.length,0);assert.equal(parsed.processedCommentIds.length,0);assert.deepEqual(parsed.commentErrors[id],['selected_span_offset_mismatch']);
+ const first=bindSelections(raw.replace('c1s2','c1s1'),[c],spans);
+ assert.equal(verifySelectedOffsets(parser.parseClaimResponse(first.input,[c]),first,[c],spans).claims.length,1);
 });
