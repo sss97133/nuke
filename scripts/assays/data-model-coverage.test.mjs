@@ -116,7 +116,7 @@ test('job timeout preserves table/config metadata and independent source failure
   const dir = mkdtempSync(join(tmpdir(), 'nuke-monitor-partial-'));
   try {
     const input = join(dir, 'cases.json');
-    writeFileSync(input, JSON.stringify({ asOf: '2026-10-05T00:00:00Z', requests: [{ key: 'claim' }] }));
+    writeFileSync(input, JSON.stringify({ asOf: '2026-10-05T00:00:00Z', requests: [{ key: 'claim', field: 'engine_size' }] }));
     const result = runMonitor(['--out', join(dir, 'out.json'), '--cases', input], {
       query: (sql, column) => {
         if (column === 'receipt') return receipt();
@@ -132,6 +132,8 @@ test('job timeout preserves table/config metadata and independent source failure
     assert.equal(result.report.database.sections.metadata.status, 'measured');
     assert.equal(result.report.database.sections.jobHealth.status, 'unavailable');
     assert.equal(result.report.evidence.sections.jobHealth.sqlstate, '57014');
+    assert.equal(result.report.evidence.caseContract.version, 'source_case_contract_v1');
+    assert.equal(result.report.evidence.caseContract.members[0].key, 'claim');
     assert.ok(result.report.assessment.failures.includes('requested_relations:claim'));
     assert.ok(result.report.assessment.unmeasured.includes('job_output:fold'));
     assert.ok(result.report.assessment.unmeasured.includes('job_health_measurement_unavailable'));

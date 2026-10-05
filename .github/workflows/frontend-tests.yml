@@ -66,7 +66,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify agent declarations and source-reader monitoring boundaries
-        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs
+        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs scripts/assays/model-snapshot-comparison.test.mjs
       - name: Create disposable value-queue retry database
         run: createdb dm_refinement_value_retry_ci
       - name: Verify retained failures, bounded drain and concurrent row locking

@@ -5,6 +5,7 @@ import { constants, openSync, closeSync, fstatSync, readSync, readFileSync, real
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectAgentWork } from './agent-work-coverage.mjs';
+import { buildCaseContract, compareModelSnapshots } from './model-snapshot-comparison.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HASH = text => createHash('sha256').update(text).digest('hex');
@@ -17,21 +18,25 @@ export function options(args) {
   const parsed = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
-    if (!['--out', '--cases', '--lanes', '--worker-state'].includes(key) || !args[i + 1]
+    if (!['--out', '--cases', '--lanes', '--worker-state', '--before', '--after'].includes(key) || !args[i + 1]
       || args[i + 1].startsWith('--') || parsed[key]) throw new Error('invalid_arguments');
     parsed[key] = resolve(args[i + 1]);
   }
   if (!parsed['--out']) throw new Error('private_output_required');
+  if ((parsed['--before'] || parsed['--after']) && (!parsed['--before'] || !parsed['--after']
+    || ['--cases', '--lanes', '--worker-state'].some(key => parsed[key]))) throw new Error('invalid_comparison_arguments');
   return parsed;
 }
 
-export function boundedDocument(path) {
-  let fd, doc;
+function boundedJSON(path, limit, rejectParentLinks = false) {
+  let fd;
   try {
+    // Reject links in both the leaf and its parent path before opening it.
+    if (rejectParentLinks && realpathSync(path) !== resolve(path)) throw new Error('symlink_input');
     fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const before = fstatSync(fd);
-    if (!before.isFile() || before.size > 65536) throw new Error('invalid_cases_file');
-    const buffer = Buffer.alloc(65537);
+    if (!before.isFile() || before.size > limit) throw new Error('invalid_input_file');
+    const buffer = Buffer.alloc(limit + 1);
     let length = 0;
     while (length < buffer.length) {
       const n = readSync(fd, buffer, length, buffer.length - length, null);
@@ -39,10 +44,14 @@ export function boundedDocument(path) {
       length += n;
     }
     const after = fstatSync(fd);
-    if (length > 65536 || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
-      throw new Error('invalid_cases_file');
-    doc = JSON.parse(buffer.subarray(0, length).toString('utf8'));
+    if (length > limit || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+      throw new Error('invalid_input_file');
+    return JSON.parse(buffer.subarray(0, length).toString('utf8'));
   } finally { if (fd !== undefined) closeSync(fd); }
+}
+
+export function boundedDocument(path) {
+  const doc = boundedJSON(path, 65536);
   if (!Array.isArray(doc?.requests) || doc.requests.length < 1 || doc.requests.length > 50
     || !Number.isFinite(Date.parse(doc.asOf))) throw new Error('invalid_cases_scope');
   return doc;
@@ -151,6 +160,17 @@ export function assess(database, reconciliation, agents) {
 
 export function runMonitor(args, dependencies = {}) {
   const opts = options(args);
+  if (opts['--before']) {
+    const inputs = {}, unavailable = [];
+    for (const side of ['before', 'after']) {
+      try { inputs[side] = boundedJSON(opts[`--${side}`], 2 * 1024 * 1024, true); }
+      catch { unavailable.push(`${side}_receipt_unavailable`); }
+    }
+    const report = compareModelSnapshots(inputs.before, inputs.after);
+    report.reasons.push(...unavailable);
+    writeFileSync(opts['--out'], JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    return { report, exitCode: report.status === 'regressed' ? 1 : report.status === 'uncomparable' ? 2 : 0 };
+  }
   const query = dependencies.query ?? readQuery;
   const inspect = dependencies.inspect ?? inspectAgentWork;
   const healthSQL = readFileSync(resolve(ROOT, 'scripts/discovery/data-model-health.sql'), 'utf8');
@@ -188,6 +208,7 @@ export function runMonitor(args, dependencies = {}) {
       report.evidence.reconciliationSQLSha256 = evidence.sqlSha256 = HASH(sql);
       const doc = boundedDocument(opts['--cases']);
       report.evidence.casesSha256 = evidence.casesSha256 = HASH(JSON.stringify(doc));
+      report.evidence.caseContract = buildCaseContract(doc);
       evidence.cutoffAt = doc.asOf;
       const literal = `'${JSON.stringify(doc).replaceAll("'", "''")}'`;
       // Function replacement preserves literal dollar sequences inside source input.
@@ -210,12 +231,14 @@ export function runMonitor(args, dependencies = {}) {
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--help')) {
-    console.log('check-ingestion-health.sh --data-model --out /private/new.json [--cases /private/requests.json] [--lanes /path/to/.claude/agents/active] [--worker-state /path/to/night-shift]\nRead-only. Exit 1: observed failure; 2: incomplete coverage/unavailable. No whole-model pass.');
+    console.log('check-ingestion-health.sh --data-model --out /private/new.json [--cases /private/requests.json] [--lanes /path/to/.claude/agents/active] [--worker-state /path/to/night-shift]\nRead-only. Exit 1: observed failure; 2: incomplete coverage/unavailable. No whole-model pass.\nOffline comparison: --data-model --before /private/before.json --after /private/after.json --out /private/new-comparison.json\nComparison exits: 0 improved/unchanged retained cases, 1 regressed, 2 uncomparable; no agent causation or delivery verification.');
   } else {
     try {
       const { report, exitCode } = runMonitor(process.argv.slice(2));
-      console.log(JSON.stringify({ status: report.assessment.status, failures: report.assessment.failures.length,
-        unmeasured: report.assessment.unmeasured.length, followups: report.assessment.followups.length }));
+      console.log(JSON.stringify(report.version === 'model_snapshot_comparison_v1'
+        ? { version: report.version, scope: report.scope, status: report.status, counts: report.counts }
+        : { status: report.assessment.status, failures: report.assessment.failures.length,
+          unmeasured: report.assessment.unmeasured.length, followups: report.assessment.followups.length }));
       process.exitCode = exitCode;
     } catch { console.error('data-model monitor could not record a private receipt; check arguments/output path'); process.exitCode = 2; }
   }
