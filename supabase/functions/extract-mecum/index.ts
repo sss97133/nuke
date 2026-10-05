@@ -23,6 +23,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parse as parseHtml } from "https://esm.sh/parse5@7.3.0";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
@@ -98,12 +99,24 @@ export function parseMecumSourceResultCandidate(html: string): MecumSourceResult
   };
   const refuse = (reason: string) => { out.refusalReasons.push(reason); return out; };
   if (typeof html !== "string" || new TextEncoder().encode(html).byteLength > 2097152) return refuse("source_body_invalid_or_over_limit");
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
-    .filter(m => /(?:^|\s)id\s*=\s*(["'])__NEXT_DATA__\1/i.test(m[1]));
+  // Parse HTML structure rather than matching tags: comments and template
+  // content are not active source containers; quoted '>' and end-tag attributes
+  // must follow HTML semantics. No script executes during this parse.
+  const scripts: string[] = [];
+  const nodes: any[] = [parseHtml(html)];
+  while (nodes.length) {
+    const node = nodes.pop();
+    if (node.tagName === "script" && node.namespaceURI === "http://www.w3.org/1999/xhtml"
+      && node.attrs?.some((attr: any) => attr.name === "id" && attr.value === "__NEXT_DATA__")) {
+      scripts.push((node.childNodes ?? []).filter((child: any) => child.nodeName === "#text")
+        .map((child: any) => child.value).join(""));
+    }
+    for (let i = (node.childNodes?.length ?? 0) - 1; i >= 0; i--) nodes.push(node.childNodes[i]);
+  }
   out.nextDataScriptCount = scripts.length;
   if (scripts.length !== 1) return refuse(scripts.length ? "source_presentations_ambiguous" : "next_data_missing");
   let parsed: any;
-  try { parsed = JSON.parse(scripts[0][2]); } catch { return refuse("next_data_malformed"); }
+  try { parsed = JSON.parse(scripts[0]); } catch { return refuse("next_data_malformed"); }
   const post = parsed?.props?.pageProps?.post;
   if (!post || typeof post !== "object" || Array.isArray(post)) return refuse("source_post_missing_or_invalid");
   out.saleResults = taxonomy("saleResults", post);

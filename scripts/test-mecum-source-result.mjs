@@ -5,11 +5,14 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createHash, createHmac, webcrypto } from 'node:crypto';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 
 const require = createRequire(resolve('nuke_frontend/package.json'));
 const ts = require('typescript');
+const { parse: parseHtml } = require('parse5');
+assert.equal(JSON.parse(readFileSync(resolve(dirname(require.resolve('parse5')), '../../package.json'), 'utf8')).version,
+  '7.3.0', 'Installed parser matches the pinned edge import');
 const owner = 'supabase/functions/extract-mecum/index.ts';
 const source = readFileSync(owner, 'utf8');
 const ast = ts.createSourceFile(owner, source, ts.ScriptTarget.Latest, true);
@@ -19,14 +22,17 @@ const statements = ast.statements.filter(s => ts.isFunctionDeclaration(s) && fun
 assert.equal(statements.length, 6, 'Load exact actual-owner pure dependency closure');
 // Importing the complete edge entrypoint would execute Deno.serve. Compile only
 // actual pure declarations, with no remote imports, fetch/writer or serve code.
-const isolated = ts.createPrinter().printFile(ts.factory.updateSourceFile(ast, statements)) + '\nexport { parseNextData };';
+const isolated = ts.createPrinter().printFile(ts.factory.updateSourceFile(ast, statements))
+  + '\nconst parseHtml = globalThis.__nukeMecumTestHtmlParser;\nexport { parseNextData };';
 const code = ts.transpileModule(isolated, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
 const previousDeno = globalThis.Deno, previousFetch = globalThis.fetch;
+const previousHtmlParser = globalThis.__nukeMecumTestHtmlParser;
+globalThis.__nukeMecumTestHtmlParser = parseHtml;
 globalThis.Deno = { serve() { throw Error('Offline import executed Deno.serve'); } };
 globalThis.fetch = () => { throw Error('Offline import made a network call'); };
 let loaded;
 try { loaded = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')); }
-finally { globalThis.Deno = previousDeno; globalThis.fetch = previousFetch; }
+finally { globalThis.Deno = previousDeno; globalThis.fetch = previousFetch; globalThis.__nukeMecumTestHtmlParser = previousHtmlParser; }
 const { parseMecumSourceResultCandidate: parse, parseNextData: legacy } = loaded;
 const taxonomy = (...values) => ({ edges: values.map(([name, slug = name]) => ({ node: { name, slug } })) });
 const base = () => ({ title: '2000 Synthetic Example', databaseId: 999999, uri: '/lots/synthetic-source/', lotNumber: 'X1',
@@ -166,8 +172,16 @@ test('single-quoted script ID works but a different data-id is not the source co
 test('HTML closing-tag whitespace works and does not hide a second source presentation', () => {
   const spaced = html(base()).replace('</script>', '</ScRiPt \n\t>');
   assert.equal(parse(spaced).saleResult, 'sold');
+  assert.equal(parse(html(base()).replace('</script>', '</script\t\n bar>')).saleResult, 'sold');
   refuses(parse(spaced + html(base())), 'source_presentations_ambiguous');
-  refuses(parse(html(base()).replace('</script>', '</scripture>')), 'next_data_missing');
+  refuses(parse(html(base()).replace('</script>', '</scripture>')), 'next_data_malformed');
+});
+test('actual HTML containers survive quoted attributes while comments and inactive template content stay out', () => {
+  const quoted = html(base()).replace('type="application/json"', 'data-note="quoted > marker" type="application/json"');
+  assert.equal(parse(quoted).saleResult, 'sold');
+  assert.equal(parse('<!--' + html(base()) + '-->' + html(base())).nextDataScriptCount, 1);
+  refuses(parse('<template>' + html(base()) + '</template>'), 'next_data_missing');
+  refuses(parse('<svg>' + html(base()) + '</svg>'), 'next_data_missing');
 });
 test('UTF8 source size limit refuses without treating a prefix as the complete source', () => {
   refuses(parse('é'.repeat(2 ** 20 + 1)), 'source_body_invalid_or_over_limit');
@@ -244,6 +258,7 @@ function previewFixture(options = {}) {
       Deno: { env: { get: key => env[key] }, serve: callback => handlers.set(name, callback) },
       require: specifier => {
         if (specifier.startsWith('https://esm.sh/@supabase/supabase-js@')) return { createClient: () => supabase };
+        if (specifier === 'https://esm.sh/parse5@7.3.0') return { parse: parseHtml };
         if (specifier === '../_shared/archiveFetch.ts') return load('archive');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path') };
