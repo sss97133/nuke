@@ -32,19 +32,21 @@ export function options(args, now = Date.now()) {
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i];
-    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects', '--comment-limit', '--bid-limit'].includes(name) ||
+    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects', '--comment-limit', '--bid-limit', '--comment-measurements'].includes(name) ||
       seen.has(name) || !args[i + 1] || args[i + 1].startsWith('--')) throw new AssayError('invalid_arguments');
     seen.add(name);
     const v = args[i + 1];
     if (name === '--page-size') o.pageSize = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--comment-limit') o.commentLimit = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--bid-limit') o.bidLimit = /^\d+$/.test(v) ? Number(v) : NaN;
+    else if (name === '--comment-measurements') { if (v !== 'true') throw new AssayError('invalid_measurement_scope'); o.commentMeasurements = true; }
     else if (name === '--max-pages') o.maxPages = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
   if (!o.out || !['price', 'specifications', 'comments', 'bids'].includes(o.family) ||
     (seen.has('--comment-limit') && o.family !== 'comments') ||
+    (seen.has('--comment-measurements') && o.family !== 'comments') ||
     (o.commentLimit !== undefined && (!Number.isInteger(o.commentLimit) || o.commentLimit < 1000 || o.commentLimit > 10000)) ||
     (seen.has('--bid-limit') && o.family !== 'bids') ||
     (o.bidLimit !== undefined && (!Number.isInteger(o.bidLimit) || o.bidLimit < 1000 || o.bidLimit > 10000)) ||
@@ -129,11 +131,11 @@ export function publicClient(config, fetcher = fetch) {
         or: '(listing_kind.is.null,listing_kind.neq.non_vehicle_item)', id: `in.(${ids.join(',')})`, order: 'id.asc', limit: String(ids.length) });
       return request(`vehicles?${q}`);
     },
-    commentHeaders(id, cursor) {
-      if (!UUID.test(id)) throw new AssayError('invalid_reader_scope');
+    commentHeaders(id, cursor, measurements = false) {
+      if (!UUID.test(id) || typeof measurements !== 'boolean') throw new AssayError('invalid_reader_scope');
       if (cursor !== undefined && (!object(cursor) || !UUID.test(cursor.id ?? '') || !commentClock(cursor.postedAt))) throw new AssayError('invalid_reader_scope');
       const q = new URLSearchParams({
-        select: 'id,vehicle_id,auction_event_id,posted_at,platform,external_identity_id,author_external_identity_id,comment_type,is_seller',
+        select: 'id,vehicle_id,auction_event_id,posted_at,platform,external_identity_id,author_external_identity_id,comment_type,is_seller' + (measurements ? ',sentiment_score,analyzed_at,community_stance_score,condition_polarity,stance_scored_at,stance_model,rubric_version' : ''),
         vehicle_id: `eq.${id}`, bid_amount: 'is.null', posted_at: 'not.is.null',
         order: 'posted_at.desc,id.desc', limit: '200',
       });
@@ -352,11 +354,11 @@ function commentFollows(previous, current) {
   return previous.id.toLowerCase() > current.id.toLowerCase();
 }
 
-async function commentCollection(client, id, until, now, emit, limit) {
+async function commentCollection(client, id, until, now, emit, limit, measurements = false) {
   const rows = [], ids = new Set(), hashes = []; let previous;
   for (let page = 0; page < 100; page++) {
     if (now() >= until) return { ok: true, complete: false, gaps: { comment_collection_time_unmeasured: 1 }, stopReason: 'time_budget_reached' };
-    const response = await client.commentHeaders(id, previous && { id: previous.id, postedAt: previous.posted_at });
+    const response = await client.commentHeaders(id, previous && { id: previous.id, postedAt: previous.posted_at }, measurements);
     if (!response.ok) return response;
     const checked = inspectCommentHeaders(id, response.value);
     if (!checked.safe || response.value.length > 200) return { ok: true, safe: false, failures: { comment_header_scope_or_shape_invalid: 1 } };
@@ -598,6 +600,61 @@ export async function runBidLineage(client, o, subjects, { now = Date.now, emit 
   await emit({ type: 'summary', ...summary }); return summary;
 }
 
+/** Coverage and provenance of stored measurements; no score means or quality verdicts. */
+export function inspectCommentMeasurements(headers) {
+  const result = { headers: headers.length, axes: {}, failures: {}, gaps: {},
+    boundary: 'Stored per-comment metadata only. NULL is unscored; missing columns are unavailable. Zero is a score. Stance/condition rubric and model strata remain separate; sentiment has no method/version in this projection. Retain at most 64 rubric/model strata per axis; overflow headers are explicitly unretained. Posting and analysis clocks are distinct. No mood, verified condition, source independence, historical cohort or price-effect claim.' };
+  const add = (group, key) => { group[key] = (group[key] ?? 0) + 1; };
+  for (const [axis, field, low, high] of [
+    ['sentiment', 'sentiment_score', -100, 100],
+    ['stance', 'community_stance_score', -1, 1],
+    ['condition', 'condition_polarity', -1, 1],
+  ]) {
+    const counts = result.axes[axis] = { unavailable: 0, unscored: 0, validStoredScore: 0, zeroStoredScore: 0, invalidStoredScore: 0,
+      sourceClockMissing: 0, analysisClockMissing: 0, methodUnestablished: 0, rubricUnestablished: 0,
+      versionedMetadata: 0, strataUnretained: 0, strata: {} };
+    for (const row of headers) {
+      if (!Object.hasOwn(row, field) || row[field] === undefined) { counts.unavailable++; add(result.gaps, `${axis}_measurement_column_unavailable`); continue; }
+      if (row[field] === null) { counts.unscored++; continue; }
+      const score = number(row[field]);
+      if (score === null || score < low || score > high) { counts.invalidStoredScore++; add(result.failures, `${axis}_stored_score_outside_reader_scale`); continue; }
+      counts.validStoredScore++;
+      if (score === 0) counts.zeroStoredScore++;
+      if (instant(row.posted_at) === null) { counts.sourceClockMissing++; add(result.gaps, `${axis}_source_post_clock_unmeasured`); }
+      const clock = axis === 'sentiment' ? row.analyzed_at : row.stance_scored_at;
+      if (instant(clock) === null) { counts.analysisClockMissing++; add(result.gaps, `${axis}_analysis_clock_unmeasured`); }
+      // The shared rubric/model fields describe stance and condition, not sentiment.
+      const model = axis !== 'sentiment' && typeof row.stance_model === 'string' && row.stance_model.trim() ? row.stance_model : null;
+      const rubric = axis !== 'sentiment' && Number.isInteger(row.rubric_version) && row.rubric_version > 0 && row.rubric_version <= 32767 ? row.rubric_version : null;
+      if (!model) { counts.methodUnestablished++; add(result.gaps, `${axis}_model_unestablished`); }
+      if (!rubric) { counts.rubricUnestablished++; add(result.gaps, `${axis}_rubric_unestablished`); }
+      if (model && rubric && instant(clock) !== null) counts.versionedMetadata++;
+      const key = `${rubric ?? 'unknown'}:${model ? hash(model) : 'unknown'}`;
+      if (!Object.hasOwn(counts.strata, key) && Object.keys(counts.strata).length >= 64) {
+        counts.strataUnretained++; add(result.gaps, `${axis}_measurement_strata_budget_unmeasured`);
+      } else counts.strata[key] = (counts.strata[key] ?? 0) + 1;
+    }
+  }
+  return result;
+}
+
+function mergeCommentMeasurements(target, part) {
+  target.headers += part.headers;
+  for (const group of ['failures', 'gaps']) for (const [key, count] of Object.entries(part[group])) target[group][key] = (target[group][key] ?? 0) + count;
+  for (const axis of ['sentiment', 'stance', 'condition']) {
+    const to = target.axes[axis], from = part.axes[axis];
+    for (const key of Object.keys(to).filter(key => key !== 'strata')) to[key] += from[key];
+    for (const [key, count] of Object.entries(from.strata)) {
+      if (!Object.hasOwn(to.strata, key) && Object.keys(to.strata).length >= 64) {
+        to.strataUnretained += count;
+        const gap = `${axis}_measurement_strata_budget_unmeasured`;
+        target.gaps[gap] = (target.gaps[gap] ?? 0) + count;
+      }
+      else to.strata[key] = (to.strata[key] ?? 0) + count;
+    }
+  }
+}
+
 export async function runCommentLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
   const commentLimit = o.commentLimit ?? 1000;
   const summary = { stage: 'read_only_public_comment_header_lineage_assay', startedAt: new Date(now()).toISOString(),
@@ -607,6 +664,7 @@ export async function runCommentLineage(client, o, subjects, { now = Date.now, e
     identityStates: { absent: 0, legacyOnly: 0, canonicalOnly: 0, agreeing: 0, conflicting: 0 },
     failures: {}, gaps: {}, commentLimit, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
     boundary: `Explicit manifest, current anonymous public-parent gate. 200-row microsecond/UUID keyset pages continue until empty, at most 100 pages/${commentLimit} posted non-bid headers per parent; overflow refuses that collection. This is a resource ceiling, not a record target or evidence of exhaustion. Separate current reads are not an immutable snapshot. Header and identity counters cover completed collections only. Metadata only, not quotes, inferred atoms, mood, expertise, independent sources, source publication or historical identity replay. Namespace label differences preserve unresolved aliases. Missing child context is unknown, never zero activity.` };
+  if (o.commentMeasurements) summary.commentMeasurements = inspectCommentMeasurements([]);
   let consecutiveFailures = 0;
   const readerFailures = {};
   const failed = reader => {
@@ -629,7 +687,7 @@ export async function runCommentLineage(client, o, subjects, { now = Date.now, e
     await emit({ type: 'comment_gate', requested: batch.length, eligible: eligible.size, absentOrIneligible: batch.length - eligible.size, responseSha256: hash(gate.value), durationMs: gate.durationMs });
     for (const id of batch.filter(id => eligible.has(id))) {
       if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
-      const source = await commentCollection(client, id, o.until, now, emit, commentLimit); summary.inspectedParents++;
+      const source = await commentCollection(client, id, o.until, now, emit, commentLimit, o.commentMeasurements === true); summary.inspectedParents++;
       if (!source.ok) {
         merge({ failures: { comment_header_reader_failed: 1 }, gaps: { comment_header_parent_unmeasured: 1 } }); consecutiveFailures++;
         failed('auction_comments');
@@ -669,6 +727,10 @@ export async function runCommentLineage(client, o, subjects, { now = Date.now, e
         if (summary.stopReason) break outer;
         if (!complete) continue; // Missing reads do not become missing relations.
         const measured = inspectCommentLineage(inspected.headers, auctions, identities); merge(measured);
+        if (o.commentMeasurements) {
+          measured.measurements = inspectCommentMeasurements(inspected.headers); merge(measured.measurements);
+          mergeCommentMeasurements(summary.commentMeasurements, measured.measurements);
+        }
         summary.completedParents++; summary.measuredCommentHeaders += measured.commentHeaders;
         summary.matchedAuctionParents += measured.matchedAuctionParents; summary.matchingRecordedNamespaces += measured.matchingRecordedNamespaces;
         for (const [key, count] of Object.entries(measured.identityStates)) summary.identityStates[key] += count;
