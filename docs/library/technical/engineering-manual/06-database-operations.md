@@ -474,6 +474,12 @@ Use the SQL files as parameterized SELECTs through an existing operator connecti
 
 Keep manifests and operator receipts private. The scripts return relation/clock/coverage diagnostics rather than source prose or field values; they are not public endpoints or general privacy classifiers. Local acceptance runs the two corresponding `*-test.sql` files in fresh disposable PG17 databases (`dm_fold_reconcile_*` and `dm_refinement_config_*`), from the repository root with `psql -X -v ON_ERROR_STOP=1`. These fixtures create synthetic tables and must never run against production. The existing listing-state CI job exercises both files in separate databases.
 
+### Historical source-account fold missing its canonical key 2026 10 05
+
+Forward BaT comment intake resolves the exact platform and handle, but historical `refresh_bat_user_profile` did not fill a missing identity key. A retained account fold could contain comment counts while its canonical account remained disconnected. Migration `20261005023541_repair_bat_profile_source_account_link.sql` extends that existing replay owner with the forward owner's exact lookup, preserves non-NULL keys, rejects conflicting canonical keys atomically, and declares replay alongside the existing writer registration. Its one selected repair uses the sanctioned function; source testimony and person claims remain unchanged. A source-account relation does not verify the person claiming it.
+
+The published-buyer PG17 fixture applies this actual migration and checks the selected repair, missing keys, conflicting established keys, exact platform/case, opaque metadata and retained award metrics. The existing profile reader also uses native BaT listing records and linked seller handles, matching the track-record consumer, so an absent sparse event fold no longer hides retained listings. Its headline names the captured record grain and leaves total consignment history unknown. Frontend tests retain native records without an event and propagate reader errors instead of manufacturing zero seller activity.
+
 ### Private profile column exposure post mortem 2026 10 04
 
 The anonymous profile API returned populated contact fields and a private tool valuation even when tool inventory publication was disabled. Public row policies permitted the entire profile row, and the page mounted its settings drawer for visitors. Moving the drawer offscreen did not remove its private data from the DOM.
