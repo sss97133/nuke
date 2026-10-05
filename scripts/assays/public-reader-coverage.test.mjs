@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, runCommentLineage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -471,4 +471,148 @@ test('uninterpretable cursor, collection page budget and elapsed clock remain un
   const ended=await runCommentLineage(timed,scope({until:5}),subjects,{now:()=>clock});
   assert.equal(ended.stopReason,'time_budget_reached');assert.equal(ended.gaps.comment_collection_time_unmeasured,1);
   assert.equal(ended.completedParents,0);assert.equal(ended.measuredCommentHeaders,0);assert.equal(ended.exitCode,2);
+});
+
+const bid = (n, extra={}) => ({comment_id:id(100+n),vehicle_id:id(1),observed_at:'2026-10-01T10:00:00.123456+00:00',
+  comment_type:'bid',platform:'bat',external_identity_id:id(20),auction_event_id:id(10),source_category:'auction',source_slug:'bat',...extra});
+const bidSource = (n, extra={}) => comment(n,{comment_type:'bid',...extra});
+function bidClient(extra={}) {
+  const c=commentClient(extra),ok=value=>({ok:true,status:200,durationMs:1,value});
+  c.bidHeaders=async (vehicleId,after)=>{
+    c.calls.push({reader:'vehicle_comments_unified',vehicleId,after});
+    const rows=[...(extra.bids??[bid(1)])].sort((a,b)=>a.comment_id.localeCompare(b.comment_id));
+    return extra.bidResponse??ok(rows.filter(x=>!after||x.comment_id>after).slice(0,extra.serverPageSize??200));
+  };
+  c.bidOrigins=async (vehicleId,ids)=>{c.calls.push({reader:'auction_comments',vehicleId,ids});
+    return extra.nativeResponse??ok((extra.origins??[bidSource(1)]).filter(x=>ids.includes(x.id)));};
+  c.bidObservationOrigins=async (vehicleId,ids)=>{c.calls.push({reader:'vehicle_observations',vehicleId,ids});
+    return extra.observationResponse??ok((extra.observations??[]).filter(x=>ids.includes(x.id)));};
+  return c;
+}
+
+test('positive bid family uses explicit subjects and its own finite collection ceiling',()=>{
+  const args=['--out','private','--family','bids','--subjects','manifest'];
+  assert.equal(options(args).bidLimit,1000);assert.equal(options([...args,'--bid-limit','10000']).bidLimit,10000);
+  for(const value of ['999','10001','Infinity','1.5'])assert.throws(()=>options([...args,'--bid-limit',value]));
+  assert.throws(()=>options(['--out','private','--family','bids']));
+  assert.throws(()=>options([...args,'--comment-limit','10000']));
+  assert.throws(()=>options(['--out','private','--family','comments','--subjects','manifest','--bid-limit','10000']));
+});
+
+test('positive bid transport is metadata-only, parent-scoped and never reads restricted bat_bids',async()=>{
+  const urls=[],c=publicClient(anonymousConfiguration(env('anon')),async url=>{urls.push(new URL(url));return new Response('[]',{status:200});});
+  await c.bidHeaders(id(1),id(101));await c.bidOrigins(id(1),[id(101)]);await c.bidObservationOrigins(id(1),[id(102)]);
+  assert.equal(urls[0].pathname,'/rest/v1/vehicle_comments_unified');assert.equal(urls[0].searchParams.get('bid_amount'),'gt.0');
+  assert.equal(urls[0].searchParams.get('comment_id'),`gt.${id(101)}`);assert.equal(urls[0].searchParams.get('order'),'comment_id.asc');
+  for(const u of urls){assert.equal(u.searchParams.get('vehicle_id'),`eq.${id(1)}`);assert.equal(u.pathname.includes('bat_bids'),false);
+    for(const field of ['bid_amount','comment_text','author_username','structured_data','metadata','*'])assert.equal(u.searchParams.get('select').includes(field),false);}
+  assert.throws(()=>c.bidHeaders(id(1),'a handle'));assert.throws(()=>c.bidOrigins(undefined,[id(101)]));
+  assert.throws(()=>c.bidObservationOrigins(undefined,[id(102)]));assert.throws(()=>c.bidOrigins(id(1),[id(101),id(101)]));
+});
+
+test('bid header validator rejects foreign, duplicate, unsupported-source and malformed identities',()=>{
+  assert.equal(inspectBidHeaders(id(1),[bid(1)]),true);
+  assert.equal(inspectBidHeaders(id(1),[bid(1,{observed_at:null})]),true);
+  for(const rows of [[bid(1),bid(1)],[bid(1,{vehicle_id:id(9)})],[bid(1,{source_category:'user'})],
+    [bid(1,{external_identity_id:'a handle'})],[bid(1,{auction_event_id:undefined})],[bid(1,{source_slug:null})]])
+    assert.equal(inspectBidHeaders(id(1),rows),false);
+});
+
+test('native bid projection keeps source microseconds and exposes fields that fail to reach the view',()=>{
+  const source=[bidSource(1,{author_external_identity_id:id(20)})],auctions=[{id:id(10),vehicle_id:id(1),source:'bat'}],identities=[{id:id(20),platform:'bat'}];
+  const equal=inspectBidLineage([bid(1,{observed_at:'2026-10-01T03:00:00.123456-07:00'})],source,[],[],auctions,identities);
+  assert.equal(equal.matchingNativeProjections,1);assert.equal(equal.finiteNativePostClocks,1);assert.equal(equal.nativeAuthorStates.agreeing,1);
+  assert.deepEqual(equal.failures,{});assert.equal(equal.matchingAuctionParents,1);
+  const mismatch=inspectBidLineage([bid(1,{observed_at:'2026-10-01T10:00:00.123455+00:00',external_identity_id:id(21)})],source,[],[],auctions,identities);
+  assert.equal(mismatch.matchingNativeProjections,0);assert.equal(mismatch.failures.native_bid_post_clock_projection_mismatch,1);
+  assert.equal(mismatch.failures.native_bid_projection_external_identity_id_mismatch,1);
+});
+
+test('unknown native clock/platform and source-slug default cannot imply timed BaT bidding',()=>{
+  const r=inspectBidLineage([bid(1,{observed_at:null,platform:null})],[bidSource(1,{posted_at:null,platform:null})],[],[],[],[]);
+  assert.equal(r.matchingNativeProjections,1);assert.equal(r.finiteNativePostClocks,0);
+  assert.equal(r.gaps.native_bid_post_clock_unmeasured,1);assert.equal(r.gaps.source_slug_defaults_bat_without_retained_platform,1);
+  assert.equal(r.matchingRecordedIdentityNamespaces,0);assert.equal(r.gaps.source_auction_parent_unavailable_or_unlinked,1);
+});
+
+test('observation bid role, supersession and native source pointer remain distinct from native bid events',()=>{
+  const h=bid(2,{source_category:'observation',platform:null,external_identity_id:null,auction_event_id:null,source_slug:'unknown'});
+  const obs={id:id(102),vehicle_id:id(1),observed_at:h.observed_at,kind:'comment',source_comment_id:id(103),confidence_score:0.6,is_superseded:true,extraction_method:'offline-model'};
+  const r=inspectBidLineage([h],[],[obs],[bidSource(3)],[],[]);
+  assert.equal(r.observationHeaders,1);assert.equal(r.nativeHeaders,0);assert.equal(r.matchingObservationClocks,1);
+  assert.equal(r.linkedObservationSourceComments,1);assert.equal(r.gaps.observation_bid_source_role_and_episode_unqualified,1);
+  assert.equal(r.gaps.superseded_observation_exposed_as_positive_bid,1);assert.equal(r.nativeAuthorStates.absent,0);
+});
+
+test('bid runner gates private parents, follows short pages to empty and omits all payloads',async()=>{
+  const c=bidClient({bids:[bid(1,{comment_text:'PRIVATE QUOTE',bid_amount:999999}),bid(2)],
+    origins:[bidSource(1,{author_username:'PRIVATE HANDLE'}),bidSource(2)],serverPageSize:1}),events=[];
+  const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.completedParents,1);assert.equal(r.measured.bidHeaders,2);
+  assert.equal(r.measured.matchingNativeProjections,2);assert.equal(r.nativeAuthorStates.legacyOnly,2);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='vehicle_comments_unified').map(x=>x.after),[undefined,id(101),id(102)]);
+  for(const text of ['PRIVATE QUOTE','PRIVATE HANDLE','999999',id(2)])assert.equal(JSON.stringify(events).includes(text),false);
+  assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);assert.equal(r.exitCode,0);
+});
+
+test('unsafe bid gate/headers/origin context stop without exposing foreign identifiers',async()=>{
+  for(const extra of [{parents:[parent(9)]},{bids:[bid(1,{vehicle_id:id(9)})]},
+    {nativeResponse:{ok:true,value:[bidSource(1,{vehicle_id:id(9)})]}},
+    {nativeResponse:{ok:true,value:[bidSource(1),bidSource(1)]}}]){
+    const c=bidClient(extra),events=[],r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.status,'failed');assert.equal(r.completedParents,0);assert.equal(JSON.stringify(events).includes(id(9)),false);
+  }
+});
+
+test('bid observation context follows only its exact typed public source pointer and retains unknown role',async()=>{
+  const h=bid(2,{source_category:'observation',platform:null,external_identity_id:null,auction_event_id:null,source_slug:'unknown'});
+  const obs={id:id(102),vehicle_id:id(1),observed_at:h.observed_at,kind:'comment',source_comment_id:id(103),confidence_score:0.6,is_superseded:true,extraction_method:'offline-model'};
+  const c=bidClient({bids:[h],observations:[obs],origins:[bidSource(3)]});
+  const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.completedParents,1);assert.equal(r.measured.observationHeaders,1);assert.equal(r.measured.nativeHeaders,0);
+  assert.equal(r.measured.linkedObservationSourceComments,1);assert.equal(r.measured.matchingObservationClocks,1);
+  assert.equal(r.gaps.observation_bid_source_role_and_episode_unqualified,1);assert.equal(r.gaps.superseded_observation_exposed_as_positive_bid,1);
+  assert.deepEqual(c.calls.find(x=>x.reader==='auction_comments').ids,[id(103)]);assert.equal(r.exitCode,0);
+});
+
+test('repeated or out-of-order bid UUID pages refuse source/context claims',async()=>{
+  for(const pages of [[[bid(2)],[bid(1)]],[[bid(1)],[bid(1)]],[[bid(2),bid(1)]]]){
+    const c=bidClient();c.bidHeaders=async vehicleId=>{c.calls.push({reader:'vehicle_comments_unified',vehicleId});return {ok:true,value:pages.shift()};};
+    const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+    assert.equal(r.failures.bid_header_order_or_repeated_id,1);assert.equal(r.measured.bidHeaders,0);assert.equal(r.exitCode,1);
+    assert.equal(c.calls.some(x=>x.reader==='auction_comments'),false);
+  }
+});
+
+test('bid reader/context failures stop after two similar failures and never become zero relationships',async()=>{
+  for(const extra of [{bidResponse:{ok:false,status:503,code:'57014'}},{nativeResponse:{ok:false,status:403,code:'42501'}}]){
+    const c=bidClient({...extra,parents:[parent(1),parent(2),parent(3)]});
+    if(!extra.bidResponse)c.bidHeaders=async (vehicleId,after)=>{c.calls.push({reader:'vehicle_comments_unified',vehicleId,after});return {ok:true,value:after?[]:[bid(1,{vehicle_id:vehicleId})]};};
+    const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])));
+    assert.equal(r.inspectedParents,2);assert.equal(r.stopReason,'repeated_bid_reader_failure_inspect_cause');
+    assert.equal(r.completedParents,0);assert.equal(r.measured.bidHeaders,0);assert.equal(r.exitCode,1);
+  }
+});
+
+test('bid collection caps/time/refused projection shape stay unmeasured',async()=>{
+  const bids=Array.from({length:1001},(_,i)=>bid(i)),origins=Array.from({length:1001},(_,i)=>bidSource(i));
+  const c=bidClient({bids,origins}),cap=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(cap.completedParents,0);assert.equal(cap.measured.bidHeaders,0);assert.equal(cap.gaps.bid_collection_cap_unmeasured,1);assert.equal(cap.exitCode,2);
+  assert.equal(c.calls.some(x=>x.reader==='auction_comments'),false);
+  const large=await runBidLineage(bidClient({bids,origins}),scope({bidLimit:10000}),lineageSubjects(manifest([id(1)])));
+  assert.equal(large.completedParents,1);assert.equal(large.measured.bidHeaders,1001);assert.equal(large.exitCode,0);
+  const timed=bidClient();let clock=0;
+  timed.bidHeaders=async vehicleId=>{timed.calls.push({reader:'vehicle_comments_unified',vehicleId});clock=10;return {ok:true,value:[bid(1)]};};
+  const end=await runBidLineage(timed,scope({until:5}),lineageSubjects(manifest([id(1)])),{now:()=>clock});
+  assert.equal(end.stopReason,'time_budget_reached');assert.equal(end.completedParents,0);assert.equal(end.exitCode,2);
+});
+
+test('bid CLI retains its reader family and finite private source-hash receipt',async t=>{
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-bid-assay-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  assert.equal(await main(['--out',out,'--family','bids','--subjects',input],{env:env('anon'),client:bidClient(),print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(rows[0].readers.includes('vehicle_comments_unified'),true);assert.equal(rows[0].readers.includes('bat_bids'),false);
+  assert.equal(rows[0].options.bidLimit,1000);assert.equal(rows.at(-1).measured.matchingNativeProjections,1);
+  assert.equal((await stat(out)).mode&0o777,0o600);assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
 });
