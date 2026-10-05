@@ -23,6 +23,10 @@ name: BYOK Analysis Drain
 on:
   workflow_dispatch:
     inputs:
+      diagnostic_only:
+        description: Inspect CLI installation and credential selection without model calls or database access
+        type: boolean
+        default: false
       user_id:
         description: Owner whose vehicles to analyze
         default: '0b9f107a-d124-49de-9ded-94698f63c1c4'
@@ -99,7 +103,32 @@ jobs:
           # (drain step 6 fills phash from the already-downloaded frames; see Ch.19).
           pip install requests imagehash Pillow pillow-heif
 
+      - name: Diagnose CLI without inference
+        if: ${{ inputs.diagnostic_only && matrix.shard == 0 }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          unset ANTHROPIC_API_KEY
+          claude --version
+          auth_result=$(mktemp)
+          auth_error=$(mktemp)
+          trap 'rm -f "$auth_result" "$auth_error"' EXIT
+          rc=0
+          claude auth status >"$auth_result" 2>"$auth_error" || rc=$?
+          node - "$auth_result" "$rc" <<'JS'
+          const fs = require('node:fs');
+          let result;
+          try { result = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); } catch {}
+          const methods = ['none','claude.ai','oauth_token','api_key','api_key_helper','third_party'];
+          console.log(JSON.stringify({exit: Number(process.argv[3]),
+            parsed: !!result, loggedIn: result?.loggedIn === true,
+            authMethod: methods.includes(result?.authMethod) ? result.authMethod : 'unknown',
+            model_calls: 0, database_calls: 0}));
+          process.exit(Number(process.argv[3]) === 0 && result?.loggedIn === true ? 0 : 1);
+          JS
+
       - name: Run cloud drain
+        if: ${{ !inputs.diagnostic_only }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
