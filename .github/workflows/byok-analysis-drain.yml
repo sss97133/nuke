@@ -66,7 +66,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: byok-analysis-drain
+  group: ${{ inputs.diagnostic_only && format('byok-diagnostic-{0}', github.run_id) || 'byok-analysis-drain' }}
   cancel-in-progress: false
 
 jobs:
@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: ${{ fromJSON(inputs.diagnostic_only && '[0]' || '[0,1,2,3]') }}
     steps:
       - uses: actions/checkout@v4
 
