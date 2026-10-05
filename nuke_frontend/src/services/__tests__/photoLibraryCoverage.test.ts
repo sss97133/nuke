@@ -28,3 +28,9 @@ it('keeps a missing aggregate distinct from an empty library', async () => {
   fixture.session = { user: { id: 'owner' } };
   await expect(PersonalPhotoLibraryService.getLibraryStats()).rejects.toThrow('returned no data');
 });
+it('preserves unavailable suggestion counts instead of coercing them to zero', async () => {
+  fixture.session = { user: { id: 'owner' } };
+  fixture.data = { total_photos: 28000, ai_suggestions_count: null, ai_suggestions_state: 'unavailable' };
+  const result = await PersonalPhotoLibraryService.getLibraryStats();
+  expect(result.ai_suggestions_count).toBeNull(); expect(result.ai_suggestions_state).toBe('unavailable');
+});

@@ -118,7 +118,8 @@ export interface LibraryStats {
   unorganized_photos: number;
   organized_photos: number;
   pending_ai_processing: number;
-  ai_suggestions_count: number;
+  ai_suggestions_count: number | null;
+  ai_suggestions_state?: 'unavailable';
   total_file_size: number;
   source_analysis?: PhotoSourceAnalysis;
 }
@@ -297,7 +298,8 @@ export class PersonalPhotoLibraryService {
         unorganized_photos: rpcData.unorganized_photos || 0,
         organized_photos: rpcData.organized_photos || 0,
         pending_ai_processing: rpcData.pending_ai_processing || 0,
-        ai_suggestions_count: rpcData.ai_suggestions_count || 0,
+        ai_suggestions_count: rpcData.ai_suggestions_count ?? null,
+        ai_suggestions_state: rpcData.ai_suggestions_state,
         total_file_size: rpcData.total_file_size || 0,
         ai_status_breakdown: rpcData.ai_status_breakdown,
         angle_breakdown: rpcData.angle_breakdown,
