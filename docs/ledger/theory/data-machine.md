@@ -253,3 +253,12 @@ unrecorded supplier, using original observation IDs and recorded dates. Supplier
 presentation groups, not organization entities or verified bridges; current masked work supplies no
 ingest clock or complete monetary outcome. The case ledger records executable acceptance and exact
 delivery boundaries. This extends the useful answer without inventing the missing relationship.
+
+
+**Construction evidence, 2026-10-05: a supplier group reaches its permitted work.** C22's
+supplier-detail reader joins the existing masked build-log contract by original observation ID.
+Exact supplier-text selection and an explicit unresolved selector make the group drill reproducible
+without treating a slug as an organization identity. The same six retained anonymous sources reach
+six local detail rows where production previously showed zero. Event dates remain recorded dates;
+missing source/ingest/organization relationships remain missing. See C22 and its delivery receipt for
+separate implementation, publication and runtime stages; this is one current consumer connection.

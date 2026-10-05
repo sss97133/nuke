@@ -221,6 +221,32 @@ date 2026-02-25; its table link reaches all six original observations, with no i
 links, amounts or page overflow. Enforced typecheck, build and guardrails pass. Production deployment
 and the same frozen six-source runtime assay remain pending publication; C22 stays partial for VendorPage and PartPage.
 
+**C22 supplier detail — 2026-10-05 UTC, bounded construction evidence.** The directory delivery
+above is recorded by [PR615](https://github.com/sss97133/nuke/pull/615). The next question is which
+permitted work observations belong to a supplier group, including an unresolved supplier. At 07:42Z,
+the anonymous detail reader returned zero observations for the same six retained public work rows.
+Connecting `vehicle_build_log_public(uuid)` to `VendorPage.tsx` exposes those six original IDs and
+recorded dates; directory links carry either an exact case-insensitive supplier text or an explicit
+unrecorded selector. Punctuation-distinct names do not collapse through a lossy slug. Legacy
+substring links remain supported. No supplier text is promoted to a canonical organization key.
+
+Entity: vehicle; grain: one currently permitted non-superseded work observation, grouped by recorded
+month or directly readable shipment. The existing RPC vehicle selector and original observation ID
+are the bridges and replay/deduplication keys, with directly readable copies preferred. Writer remains
+`ingest-observation`; page load recomputes this current reader. Recorded work/observation dates are
+event dates; masked rows expose no ingest clock, source URL, part number, amount or organization key.
+No historical as-of fold, new writer, schedule, testimony or permission change is introduced. Direct
+kind slices retain their existing bounds; errors or filled bounds expose incomplete coverage.
+
+Same frozen-source local assay at 390px: zero -> six rows, 6/6 original IDs, identical source
+fingerprint, zero visible amounts, withheld-detail links or page overflow. Thirteen focused reader
+contracts cover exact/unresolved selection, owner overlap, replay, zero amounts, unknown dates,
+punctuation collisions, legacy links, empty sources and failed reads. The enforced typecheck/build/
+guardrail gate passes. These are preparation stages; the private completion receipt records the
+checked head, PR, deployment and same-source production verification. C22 remains partial for
+PartPage and for canonical supplier relationships unavailable in this contract.
+
+
 **C17 follow-up — 2026-10-04 UTC, bounded read-only trace.** The October 2 intake receipt records observation
 `6c3ca7fa-0147-4542-8785-9f8ffe724ed2` and an exact replay returning `duplicate: true`. The current check finds its
 single derived witness `f25d069e-3a1b-49a9-852e-8681f105ee4b`, the enabled insert trigger and the same IDs in

@@ -39,10 +39,10 @@ describe('permitted supplier directory', () => {
     expect(fixture.rpc).toHaveBeenCalledWith('vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle' });
     const row = container.querySelector('[data-vendor-group="synthetic supplier"]')!;
     expect(row).not.toBeNull();
-    expect(row.tagName).toBe('DIV');
+    expect(row.tagName).toBe('A');
     expect(row.textContent).toContain('2025-02-03');
     expect(row.textContent).toContain('View permitted work');
-    expect(container.querySelector('a[href*="/vendor/"]')).toBeNull();
+    expect(row.getAttribute('href')).toContain('supplier=Synthetic%20supplier');
     expect(container.textContent).not.toContain('$');
     expect(container.querySelector('a[href$="/table"]')).not.toBeNull();
     expect(container.textContent).toContain('not verified organizations');
@@ -87,15 +87,16 @@ describe('permitted supplier directory', () => {
     expect(container.textContent).not.toContain('Loading vendors');
     expect(container.textContent).not.toContain('Synthetic transport failure');
   });
-  it('retains work with unrecorded suppliers without claiming an organization or a detail link', async () => {
+  it('retains unresolved work and links to its explicit supplier selector', async () => {
     fixture.publicRows = [{ observation_id: 'unknown-one', done_on: '2025-02-03', supplier: null }, { observation_id: 'unknown-two', done_on: '2025-02-04' }];
     await renderPage();
     const row = container.querySelector('[data-vendor-group="__unrecorded__"]')!;
     expect(row.children[1].textContent).toBe('2');
     expect(row.textContent).toContain('Supplier unrecorded');
-    expect(row.tagName).toBe('DIV');
+    expect(row.tagName).toBe('A');
     expect(row.textContent).toContain('2025-02-03');
     expect(row.textContent).toContain('2025-02-04');
+    expect(row.getAttribute('href')).toContain('unrecorded=1');
   });
   it('keeps an empty source empty without inventing a supplier', async () => {
     fixture.publicRows = [];
