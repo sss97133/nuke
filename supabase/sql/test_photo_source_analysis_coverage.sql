@@ -22,7 +22,6 @@ CREATE TABLE public.vehicle_images (
   source text, file_hash text, is_duplicate boolean, superseded_at timestamptz, is_sensitive boolean,
   created_at timestamptz, taken_at timestamptz, ai_scan_metadata jsonb
 );
-CREATE TABLE public.vehicle_suggestions (user_id uuid,status text);
 CREATE TABLE public.image_analysis_records (
   image_id uuid, superseded_at timestamptz, citation_count int,
   analyzed_by_model text, analyzed_at timestamptz, overall_confidence numeric
@@ -69,6 +68,8 @@ DO $$ BEGIN
   EXCEPTION WHEN undefined_table THEN NULL; END;
 END $$;
 \ir ../migrations/20261005021008_photo_library_source_analysis_coverage.sql
+-- Match the live atlas: there is no legacy vehicle_suggestions table.
+\ir ../migrations/20261005025602_remove_absent_photo_suggestions_reader.sql
 SET ROLE anon;
 DO $$ BEGIN
   BEGIN PERFORM public.get_photo_library_stats('10000000-0000-0000-0000-000000000001');
@@ -87,6 +88,9 @@ END $$;
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',false);
 DO $$ DECLARE s jsonb; c jsonb; BEGIN
   s:=public.get_photo_library_stats(auth.uid())::jsonb; c:=s->'source_analysis';
+  IF s->'ai_suggestions_count'<>'null'::jsonb OR s->>'ai_suggestions_state'<>'unavailable' THEN
+    RAISE EXCEPTION 'Absent suggestion substrate became zero or blocked coverage: %',s;
+  END IF;
   IF s->>'total_photos'<>'4' OR s->>'unorganized_photos'<>'3' OR s->>'organized_photos'<>'3'
      OR s->>'total_file_size'<>'100' OR s#>>'{ai_status_breakdown,complete}'<>'2' THEN
     RAISE EXCEPTION 'Legacy inbox grain changed: %',s;
