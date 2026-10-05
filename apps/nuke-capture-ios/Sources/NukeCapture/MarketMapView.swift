@@ -1018,7 +1018,8 @@ struct ZIPActivityView: View {
                     }
                 }
                 Text("\(selectedMake ?? "All makes") · historical location cohort").font(.subheadline).foregroundStyle(.secondary)
-                Text(window == .all ? "All time · undated evidence retained" : "\(window.label) · auction closes, UTC").font(.subheadline.weight(.medium))
+                Text(window == .all ? "Time filter: All time" : "\(window.label) · auction closes, UTC").font(.subheadline.weight(.medium))
+                Text("Captured records · historical coverage incomplete").font(.caption).foregroundStyle(.secondary)
                 Text(auctionSpan).font(.caption).foregroundStyle(.secondary)
                 if !complete { Text("Area loading · counts are provisional").font(.caption).foregroundStyle(.secondary) }
                 HStack(spacing: 0) {
@@ -1230,9 +1231,12 @@ struct ZIPActivityView: View {
             NSLog("NukeCapture ZIP %@: %d source listings, %d seller groups, %d public business links",
                   group.id, calculated.listingCount, calculated.sellers.count, publicBusinessLinks.count)
             #if DEBUG
-            if ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"] == "1", debugVehicleId == nil,
-               let listing = calculated.sellers.first?.listings.first {
-                debugVehicleId = listing.vehicle_id
+            if let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"], debugVehicleId == nil {
+                if let id = UUID(uuidString: target), group.vehicles.contains(where: { $0.id == id }) {
+                    debugVehicleId = id
+                } else if target == "1", let listing = calculated.sellers.first?.listings.first {
+                    debugVehicleId = listing.vehicle_id
+                }
             }
             #endif
         } catch {
@@ -1297,6 +1301,7 @@ struct MapVehicleContext {
     let firstDate: Date?
     let latestDate: Date?
     let latestAuctionClose: Date?
+    let sourceURLs: [String]
     let seller: String?
     init(group: CountyZIPGroup, evidence: CountyVehicleEvidence, seller: String? = nil) {
         vehicleTitle = evidence.vehicle.title
@@ -1312,6 +1317,8 @@ struct MapVehicleContext {
         firstDate = evidence.observations.compactMap(\.observedDate).min()
         latestDate = evidence.observations.compactMap(\.observedDate).max()
         latestAuctionClose = evidence.observations.compactMap { $0.auctionClock.date }.max()
+        sourceURLs = Set(evidence.observations.filter { $0.source_type == "listing" }
+            .compactMap(\.source_url).filter { AuctionLocationClock.sourceKey($0) != nil }).sorted()
         self.seller = seller
     }
 }

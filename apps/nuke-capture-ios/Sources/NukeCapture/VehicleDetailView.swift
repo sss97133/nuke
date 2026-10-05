@@ -66,6 +66,47 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let image_category: String?  // vision: exterior_body / interior / documentation / engine_mechanical…
     let created_at: String?      // upload time — recency fallback when EXIF taken_at is null
     let vision_gate_agent_reasoning: String?  // names the medium → photo vs rendering/receipt (hero pick)
+    var source: String? = nil
+    var photo_imported_at: String? = nil
+    var photo_listing_url: String? = nil
+
+    // Legacy importers copied the import clock into taken_at. It is not a
+    // camera date, even though the column's name suggests one.
+    var isImported: Bool {
+        photo_imported_at != nil || source?.lowercased().contains("import") == true
+    }
+    var galleryGroup: String {
+        if isImported { return "Listing photos" }
+        return taken_at.map { String($0.prefix(10)) } ?? "undated"
+    }
+}
+
+private struct MapSourceAuction: Decodable, Identifiable {
+    let id: UUID
+    let vehicle_id: UUID
+    let source_url: String?
+    let auction_end_date: String?
+    let seller_name: String?
+    let outcome: String?
+    let total_bids: Int?
+}
+
+private struct MapAuctionParent: Decodable {
+    let id: UUID
+    let status: String?
+    let deleted_at: String?
+    let auction_events: [MapSourceAuction]
+}
+
+private struct MapSourceComment: Decodable, Identifiable {
+    let id: UUID
+    let vehicle_id: UUID
+    let source_url: String?
+    let posted_at: String?
+    let author_username: String?
+    let comment_type: String?
+    let comment_text: String?
+    let bid_amount: Double?
 }
 
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
@@ -251,6 +292,11 @@ struct VehicleDetailView: View {
     // load · retry", never as a silently-absent (empty) section (Worklight).
     @State private var specsError = false
     @State private var galleryError = false
+    @State private var mapAuctions: [MapSourceAuction] = []
+    @State private var mapComments: [MapSourceComment] = []
+    @State private var mapEvidenceLoading = false
+    @State private var mapEvidenceError = false
+    @State private var mapDiscussionError = false
     @State private var valuationError = false
     @State private var daysError = false
     // ENGAGEMENT — the unified interaction grammar (record_interaction /
@@ -323,6 +369,7 @@ struct VehicleDetailView: View {
         }
         .task(id: vehicleId) { await load() }
         .task(id: vehicleId) { if mapContext == nil { await loadHero() } }
+        .task(id: vehicleId) { if mapContext != nil { await loadMapEvidence() } }
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { if mapContext == nil { await loadValuation() } }
         .task(id: vehicleId) { if mapContext == nil { await loadVehicleDays() } }
@@ -404,7 +451,7 @@ struct VehicleDetailView: View {
             url: img.image_url,
             thumb: img.thumbnail_url ?? img.image_url,
             vehicle_id: UUID(uuidString: vehicleId),
-            taken_at: img.taken_at,
+            taken_at: img.isImported ? nil : img.taken_at,
             file_name: nil,
             scene: facet("scene:"),
             phase: facet("phase:"),
@@ -433,22 +480,98 @@ struct VehicleDetailView: View {
 
     @ViewBuilder private var mapContextSection: some View {
         if let context = mapContext {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Exploring \(context.zip)", systemImage: "map").font(.headline)
-                LabeledContent("Selected area cohort", value: "\(context.cohortVehicleCount) vehicles")
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Listed in \(context.zip)", systemImage: "map").font(.subheadline.weight(.semibold))
                 if let make = context.make {
-                    LabeledContent("\(make) in this cohort", value: "\(context.makeVehicleCount) vehicles")
+                    Text("\(context.makeVehicleCount) of \(context.cohortVehicleCount) captured vehicles here are \(make).")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                if let seller = context.seller { LabeledContent("Source seller", value: seller) }
-                if !context.sources.isEmpty { LabeledContent("Location sources", value: context.sources.joined(separator: ", ")) }
-                LabeledContent("Latest auction close · UTC", value: context.latestAuctionClose.map(AuctionLocationClock.label) ?? "Unknown")
-                if let date = context.latestDate {
-                    LabeledContent("Latest location record", value: date.formatted(date: .abbreviated, time: .omitted))
-                }
-                Text("\(context.observationCount) location \(context.observationCount == 1 ? "observation connects" : "observations connect") this vehicle to your area cohort. This does not establish current presence or the seller's business address.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }.font(.subheadline).nukeCard()
+            }.nukeCard()
         }
+    }
+
+    @ViewBuilder private var mapSourceSection: some View {
+        if let context = mapContext {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("The auction behind this map point").font(.headline)
+                if mapEvidenceLoading { ProgressView("Reading auction and discussion") }
+                if mapEvidenceError {
+                    sectionError("source auction") { Task { await loadMapEvidence() } }
+                } else if !mapEvidenceLoading && mapAuctions.isEmpty {
+                    Text("Auction details haven't been connected to this listing yet.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                ForEach(mapAuctions) { auction in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let seller = auction.seller_name, !seller.isEmpty {
+                            LabeledContent("Seller") {
+                                if let url = auction.source_url.flatMap(URL.init(string:)),
+                                   url.host?.replacingOccurrences(of: "www.", with: "") == "bringatrailer.com",
+                                   let escaped = seller.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+                                   let profile = URL(string: "https://bringatrailer.com/member/\(escaped)/") {
+                                    Link(seller, destination: profile)
+                                } else { Text(seller) }
+                            }
+                        }
+                        if let raw = auction.auction_end_date, let date = AuctionLocationClock.day(raw) {
+                            LabeledContent("Auction ended · UTC", value: AuctionLocationClock.label(date))
+                        }
+                        if let outcome = auction.outcome {
+                            LabeledContent("Reported result", value: outcome.replacingOccurrences(of: "_", with: " ").capitalized)
+                        }
+                        if let bids = auction.total_bids, bids >= 0 {
+                            LabeledContent("Bids", value: bids.formatted())
+                        }
+                    }.font(.subheadline)
+                }
+                ForEach(context.sourceURLs, id: \.self) { raw in
+                    if let url = URL(string: raw) {
+                        Link("\(sourceName(url)) listing", destination: url)
+                            .font(.subheadline)
+                    }
+                }
+                Text("The listing places the vehicle here at that time. Current location and the participants' locations are unknown.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.nukeCard()
+            if !mapComments.isEmpty || mapDiscussionError {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Around this auction").font(.headline)
+                    if mapDiscussionError {
+                        sectionError("auction discussion") { Task { await loadMapEvidence() } }
+                    } else {
+                        let discussion = mapComments.filter { $0.comment_type != "bid" }
+                        Text("\(discussion.count) comment records · \(sourceHandleCount) source handles in this sample")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(Array(discussion.filter { !($0.comment_text ?? "").isEmpty }.prefix(3))) { comment in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(comment.author_username ?? "Source participant").font(.caption.weight(.semibold))
+                                Text(comment.comment_text ?? "").font(.subheadline).lineLimit(4)
+                            }
+                        }
+                        Text("Latest \(mapComments.count) captured interactions for these listings, including bids. Read the source for the full discussion.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }.nukeCard()
+            }
+        }
+    }
+
+    private func sourceName(_ url: URL) -> String {
+        switch url.host?.lowercased().replacingOccurrences(of: "www.", with: "") {
+        case "bringatrailer.com": "Bring a Trailer"
+        case "carsandbids.com": "Cars & Bids"
+        default: url.host ?? "Source"
+        }
+    }
+
+    private var sourceHandleCount: Int {
+        Set(mapComments.compactMap { row -> String? in
+            guard let handle = row.author_username?.trimmingCharacters(in: .whitespacesAndNewlines), !handle.isEmpty,
+                  let key = AuctionLocationClock.sourceKey(row.source_url) else { return nil }
+            // A handle identifies an account on one source, not a person across
+            // platforms or someone resident in the vehicle's ZIP.
+            return String(key.prefix { $0 != "/" }) + "|" + handle.lowercased()
+        }).count
     }
 
     private var content: some View {
@@ -464,7 +587,6 @@ struct VehicleDetailView: View {
                     .frame(height: 0)
                     if mapContext != nil {
                         Color.clear.frame(height: condensedBarHeight)
-                        mapContextSection
                         loadState
                         if let raw = vehicle?.primary_image_url, !raw.isEmpty {
                             CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
@@ -474,6 +596,8 @@ struct VehicleDetailView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .padding(.horizontal, 16)
                         }
+                        mapContextSection
+                        mapSourceSection
                         photoStrip
                         NavigationLink {
                             VehicleDetailView(vehicleId: vehicleId, embedInNavigationStack: false)
@@ -565,7 +689,7 @@ struct VehicleDetailView: View {
             imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
-            takenAt: heroImage?.taken_at,
+            takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
             loaded: loaded,
             onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
             onDrillCohort: cohortDrillAction()
@@ -624,7 +748,7 @@ struct VehicleDetailView: View {
         do {
             heroCandidates = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .eq("image_category", value: "exterior_body")
                 .in("ai_processing_status", values: ["completed", "analyzed"])
@@ -1266,7 +1390,7 @@ struct VehicleDetailView: View {
                         }
                     } header: {
                         HStack {
-                            Text(prettyDay(group.day)).font(.subheadline.weight(.semibold))
+                            Text(group.day == "Listing photos" ? group.day : prettyDay(group.day)).font(.subheadline.weight(.semibold))
                             Spacer()
                             Text("\(group.photos.count)")
                                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
@@ -1291,7 +1415,7 @@ struct VehicleDetailView: View {
     private var photoDays: [(day: String, photos: [VehicleGalleryImage])] {
         var order: [String] = []; var map: [String: [VehicleGalleryImage]] = [:]
         for img in images {
-            let d = img.taken_at.map { String($0.prefix(10)) } ?? "undated"
+            let d = img.galleryGroup
             if map[d] == nil { order.append(d) }
             map[d, default: []].append(img)
         }
@@ -1486,6 +1610,68 @@ struct VehicleDetailView: View {
 
     private static let galleryPageSize = 60
 
+    private func loadMapEvidence() async {
+        guard let context = mapContext, !mapEvidenceLoading else { return }
+        mapEvidenceLoading = true; mapEvidenceError = false; mapDiscussionError = false
+        defer { mapEvidenceLoading = false }
+        let sourceKeys = Set(context.sourceURLs.compactMap(AuctionLocationClock.sourceKey))
+        guard !sourceKeys.isEmpty else { return }
+        do {
+            let parents: [MapAuctionParent] = try await SupabaseService.client.from("vehicles")
+                .select("id,status,deleted_at,auction_events(id,vehicle_id,source_url,auction_end_date,seller_name,outcome,total_bids)")
+                .eq("id", value: vehicleId).eq("is_public", value: true)
+                .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item")
+                .limit(1).execute().value
+            try Task.checkCancellation()
+            guard let parent = parents.first, parents.count == 1,
+                  parent.id.uuidString.lowercased() == vehicleId.lowercased(), parent.deleted_at == nil,
+                  !["deleted", "merged", "rejected", "duplicate"].contains(parent.status ?? ""),
+                  parent.auction_events.count < 1_000 else { throw URLError(.cannotParseResponse) }
+            let matched = parent.auction_events.filter {
+                $0.vehicle_id == parent.id && AuctionLocationClock.sourceKey($0.source_url).map(sourceKeys.contains) == true
+            }
+            let grouped = Dictionary(grouping: matched) { AuctionLocationClock.sourceKey($0.source_url)! }
+            // Aliased captures of one episode cannot become two auctions. Do
+            // not choose a result arbitrarily when their recorded claims disagree.
+            guard grouped.values.allSatisfy({ rows in
+                Set(rows.compactMap(\.seller_name)).count <= 1 && Set(rows.compactMap(\.outcome)).count <= 1
+                    && Set(rows.compactMap(\.total_bids)).count <= 1
+                    && Set(rows.compactMap { $0.auction_end_date.flatMap(AuctionLocationClock.day) }).count <= 1
+            }) else { throw URLError(.cannotParseResponse) }
+            mapAuctions = grouped.values.compactMap { rows in rows.sorted { $0.id.uuidString < $1.id.uuidString }.first }
+                .sorted { ($0.auction_end_date ?? "") > ($1.auction_end_date ?? "") }
+        } catch {
+            guard !Task.isCancelled else { return }
+            mapEvidenceError = true
+            NSLog("NukeCapture map source auction load failed: %@", String(describing: error))
+            return
+        }
+        do {
+            let aliases = Set((context.sourceURLs + mapAuctions.compactMap(\.source_url)).flatMap { raw -> [String] in
+                let withoutSlash = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+                return [raw, withoutSlash, withoutSlash + "/"]
+            }).sorted()
+            // Parent eligibility is repeated in the child read. The sample is
+            // exact-source and bounded; it is neither regional mood nor a census.
+            let comments: [MapSourceComment] = try await SupabaseService.client.from("auction_comments")
+                .select("id,vehicle_id,source_url,posted_at,author_username,comment_type,comment_text,bid_amount,vehicles!inner(id,status,deleted_at)")
+                .eq("vehicle_id", value: vehicleId).in("source_url", values: aliases)
+                .eq("vehicles.is_public", value: true)
+                .is("vehicles.deleted_at", value: nil)
+                .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
+                .order("posted_at", ascending: false).limit(100).execute().value
+            try Task.checkCancellation()
+            mapComments = comments.filter {
+                $0.vehicle_id.uuidString.lowercased() == vehicleId.lowercased()
+                    && AuctionLocationClock.sourceKey($0.source_url).map(sourceKeys.contains) == true
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            mapDiscussionError = true
+            NSLog("NukeCapture map source discussion load failed: %@", String(describing: error))
+        }
+    }
+
     /// One page of the gallery, appended to `images`. Continuous scroll: the grid
     /// triggers the next page when its tail appears, so there's no cap and no
     /// "view all" dead-end.
@@ -1517,17 +1703,20 @@ struct VehicleDetailView: View {
         let from = reset ? 0 : images.count
         let to = from + Self.galleryPageSize - 1
         do {
-            let page: [VehicleGalleryImage] = try await SupabaseService.client
+            var request = SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .in("ai_processing_status", values: ["completed", "analyzed"])
-                .not("taken_at", operator: .is, value: "null")
                 .not("is_superseded", operator: .is, value: "true")   // keep null/false, drop superseded dupes
-                .order("taken_at", ascending: false)
-                .range(from: from, to: to)
-                .execute()
-                .value
+            if mapContext == nil {
+                request = request.not("taken_at", operator: .is, value: "null")
+            }
+            // A source listing's gallery includes photos whose camera dates are
+            // unknown. created_at is only an indexed paging order, never a label.
+            let page: [VehicleGalleryImage] = try await request
+                .order(mapContext == nil ? "taken_at" : "created_at", ascending: false)
+                .order("id", ascending: false).range(from: from, to: to).execute().value
             if reset { images = page; reachedEnd = false } else { images.append(contentsOf: page) }
             if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
@@ -1717,7 +1906,7 @@ struct VehicleDetailView: View {
         do {
             let rows: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("id", value: id.uuidString.lowercased())
                 .limit(1).execute().value
             return rows.first
@@ -1894,7 +2083,7 @@ private struct DayDrillSheet: View {
         do {
             photos = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .gte("taken_at", value: day.day)
                 .lt("taken_at", value: f.string(from: next))
@@ -1965,7 +2154,12 @@ private struct FullScreenGalleryView: View {
                     }
                     .padding(.horizontal, 16).padding(.top, 8)
                     Spacer()
-                    if let at = current?.taken_at, !at.isEmpty {
+                    if let image = current, image.isImported {
+                        Text("Listing photo · capture date unknown").font(.footnote.weight(.medium)).foregroundStyle(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(.black.opacity(0.4), in: Capsule())
+                            .padding(.bottom, 6)
+                    } else if let at = current?.taken_at, !at.isEmpty {
                         Text(prettyDate(at)).font(.footnote.weight(.medium)).foregroundStyle(.white)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(.black.opacity(0.4), in: Capsule())
