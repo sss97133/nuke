@@ -22,10 +22,19 @@ interface Comment {
   source?: 'nzero' | 'auction' | 'bat' | 'facebook' | 'instagram' | 'sbx' | 'pcar' | 'cars_and_bids'; // All comment sources
   auction_platform?: string | null; // Platform name: 'bat', 'cars_and_bids', 'pcarmarket', 'sbx', 'facebook', 'instagram', etc.
   external_identity_id?: string; // For linking to profiles
+  author_attribution?: 'source_conflict' | 'profile_conflict' | 'source_unknown' | 'ambiguous' | 'unavailable';
   source_category?: string; // Native IDs belong to separate source collections
   media_urls?: string[]; // For Instagram images, Facebook photos, etc.
   comment_url?: string; // Direct link to original comment
 }
+
+const authorAttributionMessages = {
+  source_conflict: { label: 'Author attribution conflict', explanation: "The comment and its auction disagree about the source platform. The author link is withheld; the original comment remains available." },
+  profile_conflict: { label: 'Author attribution conflict', explanation: "The comment's source and linked author profile are on different platforms. The author link is withheld; the original comment remains available." },
+  source_unknown: { label: 'Author source unconfirmed', explanation: 'The source platform is not established. A matching username alone does not identify the author.' },
+  ambiguous: { label: 'Author profile ambiguous', explanation: 'Multiple profiles match this username on the source platform. No author profile has been selected.' },
+  unavailable: { label: 'Author profile unavailable', explanation: 'A source-qualified author profile could not be resolved from this read. This does not establish that the author has no profile.' },
+};
 
 interface VehicleCommentsCardProps {
   vehicleId: string;
@@ -128,12 +137,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       }
 
       // A source-qualified native identity key takes precedence over mutable handles.
-      const identityPlatform = (c: any): string | null => {
+      const identityPlatforms = (c: any): Set<string> => {
         const platforms = [normalizeExternalPlatform(c.platform),
           normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))),
           c.source_category === 'observation' ? normalizeExternalPlatform(c.source_slug) : null]
           .filter((p): p is string => !!p && ['bat', 'cars_and_bids', 'pcarmarket', 'sbx', 'facebook', 'instagram'].includes(p));
-        return new Set(platforms).size === 1 ? platforms[0] : null;
+        return new Set(platforms);
+      };
+      const identityPlatform = (c: any): string | null => {
+        const platforms = identityPlatforms(c);
+        return platforms.size === 1 ? [...platforms][0] : null;
       };
       const externalIdentityById = new Map<string, any>();
       const nativeIds = [...new Set(allRows.filter(c => c.source_category !== 'user' && c.external_identity_id != null)
@@ -213,6 +226,12 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             ? externalIdentityById.get(c.external_identity_id)
             : (platform && c.author_username ? externalIdentityByKey.get(`${platform}:${c.author_username}`) : null);
           const identity = platform && candidate && normalizeExternalPlatform(candidate.platform) === platform ? candidate : null;
+          const authorAttribution: Comment['author_attribution'] = identity ? undefined
+            : identityPlatforms(c).size > 1 ? 'source_conflict'
+            : !platform ? 'source_unknown'
+            : candidate?.platform && normalizeExternalPlatform(candidate.platform) !== platform ? 'profile_conflict'
+            : c.external_identity_id == null && c.author_username && externalIdentityByKey.has(`${platform}:${c.author_username}`) && candidate === null ? 'ambiguous'
+            : 'unavailable';
 
           let bidAmount: number | undefined;
           if (c.bid_amount != null) {
@@ -243,6 +262,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             source: commentSource,
             auction_platform: resolvedPlatform,
             external_identity_id: identity?.id,
+            author_attribution: authorAttribution,
             media_urls: Array.isArray(c.media_urls) ? c.media_urls : undefined,
             comment_url: c.comment_url || undefined
           });
@@ -508,6 +528,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           type="button"
                           onClick={() => handleUsernameClick(comment)}
                           disabled={!comment.user_id && !comment.external_identity_id}
+                          aria-describedby={comment.author_attribution ? `${comment.source_category}-${comment.id}-author-attribution` : undefined}
                           style={{
                             fontSize: '11px',
                             fontWeight: 600,
@@ -617,6 +638,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           >
                             Edit
                           </button>
+                        )}
+                        {comment.author_attribution && (
+                          <details data-author-attribution={comment.author_attribution} style={{ flexBasis: '100%', fontSize: '9px', color: 'var(--text-secondary)' }}>
+                            <summary id={`${comment.source_category}-${comment.id}-author-attribution`} style={{ cursor: 'pointer' }}>
+                              {authorAttributionMessages[comment.author_attribution].label}
+                            </summary>
+                            <p style={{ margin: '4px 0', fontSize: '11px', lineHeight: 1.4 }}>
+                              {authorAttributionMessages[comment.author_attribution].explanation}
+                            </p>
+                          </details>
                         )}
                       </div>
                       <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
