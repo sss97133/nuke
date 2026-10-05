@@ -34,7 +34,7 @@ import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { ingestBatLive } from "./batLive.ts";
-import { RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
+import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let retainedSourceId: string | null = null;
-    if (input.mode === RETAINED_INTERIOR_MODE) {
+    if (input.mode === RETAINED_INTERIOR_MODE || input.mode === RETAINED_EXTERIOR_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
       const writer = await authenticateWriter(req);
@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
       const vehicle = await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle();
       const source = await supabase.from("observation_sources").select("id,slug").eq("id", row.source_id).maybeSingle();
       if (vehicle.error || source.error) throw new Error("Retained source qualification unavailable");
-      const derived = deriveRetainedInterior(row, vehicle.data, source.data);
+      const derived = deriveRetainedInterior(row, vehicle.data, source.data, input.mode);
       if (!derived) return new Response(JSON.stringify({ error: "Retained source ineligible" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       input = derived;
@@ -442,7 +442,7 @@ Deno.serve(async (req) => {
     let propertyRow = null;
     if (input.property_key !== undefined) {
       if (!isSupportedImagePropertyKey(input.property_key) &&
-          !(retainedSourceId && input.property_key === "interior_color")) {
+          !(retainedSourceId && ["interior_color", "exterior_color"].includes(input.property_key))) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
