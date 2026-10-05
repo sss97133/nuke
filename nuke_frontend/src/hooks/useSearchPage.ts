@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
+import { parseQuery } from '../lib/search/queryParser';
 
 /* ─── URL detection ─── */
 const URL_RE = /^https?:\/\//i;
@@ -151,6 +152,7 @@ export function useSearchPage() {
   const urlPriceMin = searchParams.get('priceMin') || '';
   const urlPriceMax = searchParams.get('priceMax') || '';
   const urlColor = searchParams.get('color') || '';
+  const parsedQuery = useMemo(() => parseQuery(query), [query]);
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searchSummary, setSearchSummary] = useState('');
@@ -166,9 +168,18 @@ export function useSearchPage() {
     make: urlMake,
     yearMin: urlYearMin,
     yearMax: urlYearMax,
-    priceMin: urlPriceMin,
-    priceMax: urlPriceMax,
+    priceMin: urlPriceMin || (parsedQuery.priceMin == null ? '' : String(parsedQuery.priceMin)),
+    priceMax: urlPriceMax || (parsedQuery.priceMax == null ? '' : String(parsedQuery.priceMax)),
   }));
+
+  // Direct /search links and subsequent queries must use the existing parser,
+  // just as the intent router does. A prior query's budget must not linger.
+  useEffect(() => {
+    setFilters(previous => ({ ...previous,
+      priceMin: urlPriceMin || (parsedQuery.priceMin == null ? '' : String(parsedQuery.priceMin)),
+      priceMax: urlPriceMax || (parsedQuery.priceMax == null ? '' : String(parsedQuery.priceMax)),
+    }));
+  }, [urlPriceMin, urlPriceMax, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Browse stats for context (fetched alongside results)
   const [browseStats, setBrowseStats] = useState<BrowseStats | null>(null);
@@ -281,7 +292,7 @@ export function useSearchPage() {
     // (2026-06-10); awaiting it in Promise.all held the entire results page
     // hostage on every make query. Stats now fill in whenever they arrive.
     const searchPromise = supabase.functions.invoke('universal-search', {
-      body: { query: q, limit: 100 },
+      body: { query: q, limit: 100, ...(parsedQuery.priceMin != null || parsedQuery.priceMax != null ? { includeAI: false } : {}) },
     });
 
     setBrowseStats(null);
@@ -293,6 +304,7 @@ export function useSearchPage() {
     }
 
     searchPromise.then((searchRes) => {
+      if (lastQueryRef.current !== q) return;
       const { data, error } = searchRes;
 
       if (error || !data) {
@@ -315,7 +327,7 @@ export function useSearchPage() {
 
       setLoading(false);
     });
-  }, [query, navigate, detectedMake]);
+  }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Load more results
   const handleLoadMore = useCallback(async () => {
@@ -324,7 +336,8 @@ export function useSearchPage() {
 
     try {
       const { data, error } = await supabase.functions.invoke('universal-search', {
-        body: { query: query.trim(), limit: 100, offset: searchMeta.offset + searchMeta.limit },
+        body: { query: query.trim(), limit: 100, offset: searchMeta.offset + searchMeta.limit,
+          ...(parsedQuery.priceMin != null || parsedQuery.priceMax != null ? { includeAI: false } : {}) },
       });
 
       if (!error && data?.results) {
@@ -341,7 +354,7 @@ export function useSearchPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [searchMeta, loadingMore, query, results]);
+  }, [searchMeta, loadingMore, query, results, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Apply vehicle filters to results
   const displayResults = useMemo(() => {
@@ -357,8 +370,12 @@ export function useSearchPage() {
       const m = r.metadata as any;
 
       if (filters.make && !String(m.make || '').toLowerCase().includes(filters.make.trim().toLowerCase())) return false;
-      if (filters.priceMin) { const v = parseInt(filters.priceMin, 10); if (!isNaN(v) && (m.sale_price == null || m.sale_price < v)) return false; }
-      if (filters.priceMax) { const v = parseInt(filters.priceMax, 10); if (!isNaN(v) && m.sale_price != null && m.sale_price > v) return false; }
+      // Match the card's recorded price precedence. Unknown or invalid amounts
+      // cannot pass a budget by falling through a missing sale_price.
+      const rawPrice = m.sale_price || m.current_value || m.asking_price;
+      const price = rawPrice == null || String(rawPrice).trim() === '' ? NaN : Number(rawPrice);
+      if (filters.priceMin) { const v = Number(filters.priceMin); if (Number.isFinite(v) && (!Number.isFinite(price) || price <= 0 || price < v)) return false; }
+      if (filters.priceMax) { const v = Number(filters.priceMax); if (Number.isFinite(v) && (!Number.isFinite(price) || price <= 0 || price > v)) return false; }
       if (filters.yearMin) { const v = parseInt(filters.yearMin, 10); if (!isNaN(v) && (m.year == null || m.year < v)) return false; }
       if (filters.yearMax) { const v = parseInt(filters.yearMax, 10); if (!isNaN(v) && m.year != null && m.year > v) return false; }
       if (filters.mileageMax) { const v = parseInt(filters.mileageMax, 10); if (!isNaN(v) && m.mileage != null && m.mileage > v) return false; }

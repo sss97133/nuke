@@ -34,6 +34,11 @@ describe('parseQuery', () => {
     expect(r.make).toBe('Porsche');
     expect(r.priceMax).toBe(50000);
   });
+  it('recognizes explicit budget requests through the same price constraint parser', () => {
+    for (const query of ['cool cars under $30,000', 'cool cars with a $30,000 budget', 'Jeep Cherokee budget 30k', '$30,000 to spend', 'Jeep up to $30k']) {
+      expect(parseQuery(query).priceMax).toBe(30000);
+    }
+  });
 
   it('parses price over', () => {
     const r = parseQuery('ferrari over $100,000');
