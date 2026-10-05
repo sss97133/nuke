@@ -189,3 +189,16 @@ Deno.test("an in-flight invocation is aborted at the ten-second limit", async ()
     assert(result.errors[0] === "landing_timeout" && result.failed_comments === 1 && f.progress.size === 0, "Timeout remains retryable");
   } finally { globalThis.setTimeout = original; }
 });
+
+Deno.test("local credential is explicit without changing paid default and refuses billed local claims", async () => {
+  const local = fake();
+  const result = await landCommentClaims(local.client, { ...input(), credential: "local_ollama", costCents: 0 });
+  assert(result.derived[0]?.credential === "local_ollama", "Local receipt must identify actual execution");
+  assert(local.bodies[0].structured_data.derivation_credential === "local_ollama" && local.bodies[0].agent_cost_cents === 0, "Local is unbilled and attributed");
+  const paid = fake();
+  const paidResult = await landCommentClaims(paid.client, input());
+  assert(paidResult.derived[0]?.credential === "system_api_key", "Paid default preserved");
+  const invalid = fake();
+  const refused = await landCommentClaims(invalid.client, { ...input(), credential: "local_ollama" });
+  assert(refused.errors[0] === "invalid_landing_batch" && invalid.bodies.length === 0, "Billed local claims rejected before writes");
+});

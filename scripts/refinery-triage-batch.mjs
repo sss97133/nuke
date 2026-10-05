@@ -19,8 +19,11 @@ const args = process.argv.slice(2);
 const getArg = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 const maxVehicles = parseInt(getArg('--max-vehicles') || '100', 10);
 const doExtract = args.includes('--extract');
+if (doExtract) throw new Error('Automatic extraction removed: prepare an exact private manifest and review the local refinery invocation first.');
+if (!Number.isSafeInteger(maxVehicles) || maxVehicles < 1 || maxVehicles > 100) throw new Error('max-vehicles must be 1..100');
 
 async function main() {
+  const deadline = Date.now() + 120000;
   console.log(`\n📊 Comment Refinery — Batch Triage`);
   console.log(`   Max vehicles: ${maxVehicles}\n`);
 
@@ -58,6 +61,7 @@ async function main() {
   let totalTriaged = 0, totalPassed = 0;
 
   for (let i = 0; i < topVehicles.length; i++) {
+    if (Date.now() >= deadline) throw new Error('triage time budget exceeded');
     const v = topVehicles[i];
     const label = `${v.year || '?'} ${v.make || '?'} ${v.model || '?'}`;
 
@@ -67,6 +71,7 @@ async function main() {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(Math.min(45000, Math.max(1, deadline-Date.now()))),
       body: JSON.stringify({
         mode: 'claim_triage',
         vehicle_id: v.vehicle_id,
@@ -85,20 +90,6 @@ async function main() {
 
   console.log(`\n✅ Triage complete: ${totalTriaged} comments triaged, ${totalPassed} passed filter (${totalTriaged > 0 ? Math.round(totalPassed / totalTriaged * 100) : 0}%)`);
 
-  // Show how many are ready for extraction
-  const { count } = await supabase
-    .from('comment_claims_progress')
-    .select('id', { count: 'exact', head: true })
-    .eq('llm_processed', false)
-    .gte('claim_density_score', 0.3);
-
-  console.log(`📬 ${count || 0} comments ready for LLM extraction\n`);
-
-  if (doExtract && count > 0) {
-    console.log('🚀 Starting local Ollama extraction...\n');
-    const { execSync } = await import('child_process');
-    execSync('dotenvx run -- node scripts/refinery-extract-claims.mjs --all --max-vehicles 500 --model qwen2.5:7b', { stdio: 'inherit' });
-  }
 }
 
-main().catch(e => { console.error('Fatal:', e); process.exit(1); });
+main().catch(() => { console.error('Triage failed'); process.exit(1); });
