@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import type { PhotoSourceAnalysis } from '../../services/personalPhotoLibraryService';
 
 type Section = 'vehicles' | 'account' | 'books';
 
@@ -51,6 +52,8 @@ interface ReconRow {
 interface Props {
   userId: string;
   isOwnProfile: boolean;
+  sourceAnalysis?: PhotoSourceAnalysis | null;
+  sourceError?: string | null;
 }
 
 const SECTIONS: Section[] = ['vehicles', 'account', 'books'];
@@ -184,7 +187,54 @@ const Row: React.FC<{ row: ReconRow; unit?: string; step?: number }> = ({ row, u
   );
 };
 
-const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
+const PhotoCoverage: React.FC<{ data: PhotoSourceAnalysis }> = ({ data }) => (
+  <section aria-label="Photo source and analysis coverage" style={{ marginTop: '10px', fontSize: '10px' }}>
+    <div style={LABEL}>PHOTO SOURCE → RETAINED OUTPUT · COMPUTED {fmtWhen(data.computed_at)}</div>
+    <p>
+      {fmtN(data.records)} captured image records · {fmtN(data.distinct_hashed_files)} distinct hashed files · {fmtN(data.without_hash)} without a hash.
+      {' '}Current device-library coverage: unknown.
+    </p>
+    <p>
+      Detailed analysis records cover {fmtN(data.images_with_analysis_records)} images
+      {' '}({fmtN(data.images_with_current_analysis)} with current records).
+      {' '}Work extractions cover {fmtN(data.images_with_work_extractions)}; observation witnesses cover {fmtN(data.images_with_witnesses)}.
+      {' '}These populations overlap and represent different kinds of retained output.
+    </p>
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', textAlign: 'left', fontSize: '9px' }}>
+        <caption style={{ textAlign: 'left', ...LABEL }}>CAPTURE SOURCE · IMAGE COUNTS</caption>
+        <thead><tr><th scope="col">Source</th><th scope="col">Captured</th><th scope="col">Analysis records</th><th scope="col">Work</th><th scope="col">Witnesses</th></tr></thead>
+        <tbody>{data.sources.map((source) => (
+          <tr key={source.source}><th scope="row">{source.source}</th><td>{fmtN(source.records)}</td>
+            <td>{fmtN(source.with_analysis_records)}</td><td>{fmtN(source.with_work_extractions)}</td><td>{fmtN(source.with_witnesses)}</td></tr>
+        ))}</tbody>
+      </table>
+    </div>
+    <p>
+      Newest {fmtN(data.recent.sample_size)} captured records: {fmtN(data.recent.failed)} marked failed,
+      {' '}{fmtN(data.recent.pending)} pending, {fmtN(data.recent.classifier_failed)} report a classifier failure;
+      {' '}{fmtN(data.recent.with_analysis_records)} have detailed analysis records,
+      {' '}{fmtN(data.recent.with_work_extractions)} have work extractions, {fmtN(data.recent.with_witnesses)} have witnesses.
+    </p>
+    <div style={{ ...LABEL, letterSpacing: '0.02em' }}>
+      LAST CAPTURE {fmtWhen(data.latest_recorded_capture_at) || 'unknown'} · LAST INGEST {fmtWhen(data.latest_ingested_at) || 'unknown'}
+      {' '}· LAST DETAILED ANALYSIS {fmtWhen(data.latest_analysis_record_at) || 'unknown'}
+    </div>
+    <p>
+      Quality: accuracy unknown. {fmtN(data.cited_analysis_records)} of {fmtN(data.analysis_records)} detailed analysis records have citations;
+      {' '}{fmtN(data.analysis_records_missing_method)} lack a model, analysis time, or confidence.
+      {' '}{fmtN(data.reviewed_classifications.verified)} verified categories in a selected subset of {fmtN(data.reviewed_classifications.items)} sync items:
+      {' '}{fmtN(data.reviewed_classifications.agrees)} agree, {fmtN(data.reviewed_classifications.differs)} differ.
+      {' '}This selected review subset does not measure whole-library accuracy.
+    </p>
+    <div style={{ ...LABEL, letterSpacing: '0.02em' }}>
+      {fmtN(data.marked_complete)} marked complete · {fmtN(data.marked_failed)} marked failed · {fmtN(data.marked_duplicates)} marked duplicates
+      {' '}· Processing labels do not establish retained output or accuracy.
+    </div>
+  </section>
+);
+
+const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile, sourceAnalysis, sourceError }) => {
   const [rows, setRows] = useState<ReconRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [computedAt, setComputedAt] = useState<string | null>(null);
@@ -196,6 +246,9 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
     // Owner-only: never even fetch for visitors.
     if (!userId || !isOwnProfile) return;
     let cancelled = false;
+    setRows([]);
+    setFailed([]);
+    setLoaded(false);
     // Each section shows as soon as it answers (measured 2026-09-29 06:14Z: account 0.3 s, books 0.6 s,
     // vehicles 10.1 s while the BaT loader runs), instead of waiting for the slowest.
     setPending(SECTIONS);
@@ -230,8 +283,8 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
       {text}
     </div>
   );
-  if (!loaded) return note('Reconciliation · computing from your records…');
-  if (rows.length === 0) {
+  if (!loaded && !sourceAnalysis && !sourceError) return note('Reconciliation · computing from your records…');
+  if (loaded && rows.length === 0 && !sourceAnalysis && !sourceError) {
     if (pending.length) return note(`Reconciliation · computing from your records… (${pending.join(', ')})`);
     return failed.length ? note(`Reconciliation · could not load (${failed.join(', ')}) · reload to retry`) : null;
   }
@@ -262,6 +315,10 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
         <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em' }}>RECONCILIATION</span>
         <span style={LABEL}>OWNER ONLY · COMPUTED {fmtWhen(computedAt)}{pending.length ? ` · STILL COMPUTING: ${pending.join(', ').toUpperCase()}` : ''}{failed.length ? ` · DID NOT LOAD: ${failed.join(', ').toUpperCase()}` : ''}</span>
       </div>
+
+      {sourceAnalysis && <PhotoCoverage data={sourceAnalysis} />}
+      {sourceError && <p role="status" style={{ fontSize: '10px' }}>{sourceError} Coverage is unknown.</p>}
+      {!loaded && <p style={{ fontSize: '9px' }}>Vehicle, account, and books reconciliation is still loading.</p>}
 
       {breaks.length > 0 && (
         <div style={{ marginTop: '8px' }}>

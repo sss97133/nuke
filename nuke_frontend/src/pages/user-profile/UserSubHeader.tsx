@@ -17,15 +17,6 @@ const UserSubHeader: React.FC = () => {
     profile.verification_level === 'fully_verified' ||
     profile.is_verified === true;
 
-  // Expertise badges from metadata (if any)
-  const expertise: string[] = [];
-  if ((profile as any).metadata?.expertise) {
-    const raw = (profile as any).metadata.expertise;
-    if (Array.isArray(raw)) {
-      expertise.push(...raw.map(String));
-    }
-  }
-
   // Type badge: only meaningful, content-bearing roles (PROFESSIONAL / DEALER)
   // earn a badge. The default 'user' and the 'admin' moderation role are NOT
   // part of the public record — founder teardown called the "ADMIN" badge
@@ -55,12 +46,11 @@ const UserSubHeader: React.FC = () => {
           - SINCE {year} badge: the header meta line already says "SINCE 2025"
             once. "you already mentioned since 2025 earlier" — duplicate killed. */}
 
-      {/* Expertise badges */}
-      {expertise.map((tag) => (
-        <span key={tag} className="up-badge" data-expertise={tag}>
-          {tag.toUpperCase()}
+      {profile.profession && (
+        <span className="up-badge" title="Profession listed in this profile">
+          {profile.profession.replace(/_/g, ' ').toUpperCase()}
         </span>
-      ))}
+      )}
 
       {/* Text size control — right end */}
       <TextScaleControl variant="compact" />

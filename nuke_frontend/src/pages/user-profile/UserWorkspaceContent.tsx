@@ -54,6 +54,8 @@ const UserWorkspaceContent: React.FC = () => {
     userId,
     profile,
     isOwnProfile,
+    photoLibraryStats,
+    photoLibraryError,
   } = useUserProfile();
 
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
@@ -90,7 +92,8 @@ const UserWorkspaceContent: React.FC = () => {
           {/* Reconciliation — owner-only inside the component (visitors: null, no fetch) */}
           {userId && (
             <React.Suspense fallback={null}>
-              <UserReconciliationPanel userId={userId} isOwnProfile={isOwnProfile} />
+              <UserReconciliationPanel userId={userId} isOwnProfile={isOwnProfile}
+                sourceAnalysis={photoLibraryStats?.source_analysis} sourceError={photoLibraryError} />
             </React.Suspense>
           )}
 
