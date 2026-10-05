@@ -993,8 +993,12 @@ struct ZIPActivityView: View {
     @State private var businesses: [ZIPBusinessRow] = []
     @State private var loading = true
     @State private var failed = false
+    @State private var loadedObservationIDs: [UUID]?
     #if DEBUG
     @State private var debugVehicleId: UUID?
+    @State private var debugVehicleRouteConsumed = false
+    @State private var debugSellerHandle: String?
+    @State private var debugSellerRouteConsumed = false
     #endif
 
     var body: some View {
@@ -1054,18 +1058,11 @@ struct ZIPActivityView: View {
                         .frame(height: CGFloat(min(fold.sellers.count, 5)) * 32 + 8)
                     }
                     if !fold.sellers.isEmpty {
-                      NavigationLink("Explore all \(fold.sellers.count) sellers and their vehicles") {
+                      NavigationLink("Seller activity and profiles") {
                         List {
                             ForEach(fold.sellers) { seller in
-                                DisclosureGroup {
-                                    ForEach(seller.listings) { listing in
-                                        if let evidence = group.vehicles.first(where: { $0.id == listing.vehicle_id }) {
-                                            NavigationLink {
-                                                VehicleDetailView(vehicleId: evidence.id.uuidString.lowercased(), embedInNavigationStack: false,
-                                                                  mapContext: MapVehicleContext(group: group, evidence: evidence, seller: seller.name))
-                                            } label: { Text(evidence.vehicle.title.isEmpty ? "Vehicle record" : evidence.vehicle.title) }
-                                        }
-                                    }
+                                NavigationLink {
+                                    MarketSellerView(handle: seller.name, area: group.id, areaListings: seller.listings.count)
                                 } label: {
                                     LabeledContent(seller.name, value: seller.listings.count.formatted())
                                 }
@@ -1132,7 +1129,9 @@ struct ZIPActivityView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Area activity").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        .task(id: group.vehicles.flatMap { $0.observations.map(\.id) }) { await load() }
+        .task(id: observationIDs) {
+            if loadedObservationIDs != observationIDs { await load() }
+        }
         #if DEBUG
         .navigationDestination(item: $debugVehicleId) { id in
             if let evidence = group.vehicles.first(where: { $0.id == id }) {
@@ -1140,6 +1139,10 @@ struct ZIPActivityView: View {
                               mapContext: MapVehicleContext(group: group, evidence: evidence,
                                                             seller: fold?.sellers.first?.name))
             }
+        }
+        .navigationDestination(item: $debugSellerHandle) { handle in
+            MarketSellerView(handle: handle, area: group.id,
+                             areaListings: fold?.sellers.first(where: { $0.name == handle })?.listings.count)
         }
         #endif
     }
@@ -1153,6 +1156,8 @@ struct ZIPActivityView: View {
         return span + "\n\(coverage.datedVehicles) of \(group.vehicles.count) vehicles have matched auction dates"
             + (coverage.undatedVehicles > 0 ? " · \(coverage.undatedVehicles) undated" : "")
     }
+
+    private var observationIDs: [UUID] { group.vehicles.flatMap { $0.observations.map(\.id) }.sorted { $0.uuidString < $1.uuidString } }
 
     // Reuse the selected map geometry, including islands and holes. A small
     // vector silhouette needs neither another map renderer nor another fetch.
@@ -1228,10 +1233,17 @@ struct ZIPActivityView: View {
             let calculated = await Task.detached { ZIPActivityFold(group: group, listings: sourceListings) }.value
             try Task.checkCancellation()
             listings = sourceListings; businesses = result.2; fold = calculated
+            loadedObservationIDs = observationIDs
             NSLog("NukeCapture ZIP %@: %d source listings, %d seller groups, %d public business links",
                   group.id, calculated.listingCount, calculated.sellers.count, publicBusinessLinks.count)
             #if DEBUG
-            if let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"], debugVehicleId == nil {
+            if let handle = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_SELLER"],
+               !debugSellerRouteConsumed, calculated.sellers.contains(where: { $0.name == handle }) {
+                debugSellerRouteConsumed = true
+                debugSellerHandle = handle
+            }
+            if let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"], !debugVehicleRouteConsumed {
+                debugVehicleRouteConsumed = true
                 if let id = UUID(uuidString: target), group.vehicles.contains(where: { $0.id == id }) {
                     debugVehicleId = id
                 } else if target == "1", let listing = calculated.sellers.first?.listings.first {
@@ -1287,6 +1299,244 @@ struct ZIPActivityView: View {
             }
         }
         return result
+    }
+}
+
+private struct MarketSellerAuction: Decodable, Identifiable {
+    struct Vehicle: Decodable {
+        let id: UUID
+        let status: String?
+        let deleted_at: String?
+        let is_public: Bool
+        let year: Int?
+        let make: String?
+        let model: String?
+        let sale_status: String?
+        let listing_url: String?
+        let listing_kind: String?
+    }
+    let id: UUID
+    let vehicle_id: UUID
+    let source_url: String?
+    let auction_end_date: String?
+    let outcome: String?
+    let total_bids: Int?
+    let scraped_at: String?
+    let vehicles: Vehicle
+
+    var eligible: Bool {
+        guard let url = source_url.flatMap(URL.init(string:)),
+              url.pathComponents.count == 3, url.pathComponents[1] == "listing" else { return false }
+        return vehicles.id == vehicle_id && vehicles.is_public && vehicles.deleted_at == nil
+            && !["deleted", "merged", "rejected", "duplicate"].contains(vehicles.status ?? "")
+            && vehicles.listing_kind != "non_vehicle_item"
+            && url.host?.lowercased().replacingOccurrences(of: "www.", with: "") == "bringatrailer.com"
+    }
+    var ends: Date? {
+        guard let raw = auction_end_date else { return nil }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return parser.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    }
+    var isCapturedLive: Bool {
+        guard let ends, ends > Date(), vehicles.sale_status == "auction_live",
+              let current = AuctionLocationClock.sourceKey(vehicles.listing_url),
+              current == AuctionLocationClock.sourceKey(source_url) else { return false }
+        return !["sold", "no_sale", "reserve_not_met"].contains(outcome ?? "")
+    }
+    var title: String {
+        [vehicles.year.map(String.init), vehicles.make, vehicles.model].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+/// A source account's captured activity remains inside the market navigation.
+/// This is an evidence summary, not a dealer performance grade or a residence.
+struct MarketSellerView: View {
+    let handle: String
+    var area: String? = nil
+    var areaListings: Int? = nil
+    @State private var auctions: [MarketSellerAuction] = []
+    @State private var loading = true
+    @State private var failed = false
+    @State private var conflicts = 0
+    @State private var unkeyed = 0
+    @State private var roles: [String] = []
+    @State private var participationFailed = false
+    @State private var loadedHandle: String?
+
+    private var closed: [MarketSellerAuction] {
+        auctions.filter {
+            $0.ends.map { $0 <= Date() }
+                ?? ["sold", "no_sale", "reserve_not_met"].contains($0.outcome ?? "")
+        }
+    }
+    private var sold: Int { closed.filter { $0.outcome == "sold" }.count }
+    private var noSale: Int { closed.filter { ["no_sale", "reserve_not_met"].contains($0.outcome ?? "") }.count }
+    private var live: [MarketSellerAuction] { auctions.filter(\.isCapturedLive) }
+    private var makes: [(name: String, count: Int)] {
+        let vehicles = Dictionary(grouping: auctions, by: \.vehicle_id).values.compactMap(\.first)
+        return Dictionary(grouping: vehicles, by: { $0.vehicles.make ?? "Unclassified" })
+            .map { (name: $0.key, count: $0.value.count) }
+            .sorted { $0.count == $1.count ? $0.name < $1.name : $0.count > $1.count }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Text(handle).font(.title.bold())
+                Text("Bring a Trailer account").foregroundStyle(.secondary)
+                if let area, let areaListings {
+                    Text("\(areaListings) captured listings connect this account to ZIP \(area). The account's full captured history is shown below.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if loading { ProgressView("Reading captured seller history") }
+            if failed { Button("Seller history couldn't load · Retry") { Task { await load() } } }
+            if !loading && !failed {
+                Section("Participation") {
+                    Text(((auctions.isEmpty ? [] : ["Seller"]) + roles).joined(separator: " · ")).font(.headline)
+                    if participationFailed {
+                        Button("Participation evidence couldn't load · Retry") { Task { await load() } }
+                    }
+                    Text("Roles observed in captured public source records. An unobserved role is unknown, not absent.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Selling activity") {
+                    LabeledContent("Captured auctions", value: auctions.count.formatted())
+                    LabeledContent("Reported sold results", value: sold.formatted())
+                    LabeledContent("Reported no-sale results", value: noSale.formatted())
+                    LabeledContent("Closed results unresolved", value: (closed.count - sold - noSale).formatted())
+                    LabeledContent("Auction dates unknown", value: auctions.filter { $0.ends == nil }.count.formatted())
+                    if let first = closed.compactMap(\.ends).min(), let last = closed.compactMap(\.ends).max() {
+                        Text("\(AuctionLocationClock.label(first)) – \(AuctionLocationClock.label(last)) · UTC")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Section("Captured live auctions") {
+                    if live.isEmpty {
+                        Text("No currently live auction is confirmed by these captures. This does not establish that the seller has none on the source.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    ForEach(live) { auction in
+                        NavigationLink {
+                            VehicleDetailView(vehicleId: auction.vehicle_id.uuidString.lowercased(), embedInNavigationStack: false)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(auction.title)
+                                if let ends = auction.ends {
+                                    Text("Ends \(ends.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                                }
+                                if let raw = auction.scraped_at, let day = AuctionLocationClock.day(raw) {
+                                    Text("Source checked \(AuctionLocationClock.label(day))").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                Section("Recorded vehicle mix") {
+                    Chart(makes, id: \.name) { item in
+                        BarMark(x: .value("Vehicles", item.count), y: .value("Make", item.name))
+                            .annotation(position: .trailing) { Text(item.count.formatted()).font(.caption) }
+                    }.frame(height: CGFloat(makes.count) * 28 + 16)
+                    Text("Distinct captured vehicles, using their current recorded make. This is specialization evidence, not a price or performance benchmark.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                DisclosureGroup("Inspect captured auctions") {
+                    ForEach(auctions) { auction in
+                        NavigationLink(auction.title) {
+                            VehicleDetailView(vehicleId: auction.vehicle_id.uuidString.lowercased(), embedInNavigationStack: false)
+                        }
+                    }
+                }
+                DisclosureGroup("Source evidence") {
+                    if let escaped = handle.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+                       let url = URL(string: "https://bringatrailer.com/member/\(escaped)/") {
+                        Link("Open publisher profile", destination: url)
+                    }
+                }
+                Text("Captured public history · All time. Source coverage is incomplete. \(conflicts) conflicting episodes and \(unkeyed) unkeyed rows are withheld. Relative ZIP, county and national performance has not been established.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(handle).navigationBarTitleDisplayMode(.inline)
+        .task(id: handle) { if loadedHandle != handle { await load() } }
+    }
+
+    private func load() async {
+        loading = true; failed = false; auctions = []; roles = []; conflicts = 0; unkeyed = 0
+        participationFailed = false
+        defer { loading = false }
+        do {
+            var rows: [MarketSellerAuction] = []; var cursor: String?
+            while true {
+                try Task.checkCancellation()
+                var request = SupabaseService.client.from("auction_events")
+                    .select("id,vehicle_id,source_url,auction_end_date,outcome,total_bids,scraped_at,vehicles!inner(id,status,deleted_at,is_public,year,make,model,sale_status,listing_url,listing_kind)")
+                    .eq("source", value: "bat").eq("seller_name", value: handle)
+                    .eq("vehicles.is_public", value: true).is("vehicles.deleted_at", value: nil)
+                    .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
+                if let cursor { request = request.gt("id", value: cursor) }
+                let page: [MarketSellerAuction] = try await request.order("id", ascending: true).limit(500).execute().value
+                guard let last = page.last else { break }
+                let next = last.id.uuidString.lowercased()
+                guard cursor == nil || next > cursor! else { throw URLError(.cannotParseResponse) }
+                rows.append(contentsOf: page.filter(\.eligible)); cursor = next
+            }
+            try Task.checkCancellation()
+            unkeyed = rows.filter { AuctionLocationClock.sourceKey($0.source_url) == nil }.count
+            let keyed = rows.filter { AuctionLocationClock.sourceKey($0.source_url) != nil }
+            let groups = Dictionary(grouping: keyed) { AuctionLocationClock.sourceKey($0.source_url)! }
+            let consistent = groups.values.filter {
+                Set($0.map(\.vehicle_id)).count == 1 && Set($0.compactMap(\.outcome)).count <= 1
+                    && Set($0.compactMap(\.ends)).count <= 1
+            }
+            conflicts = groups.count - consistent.count
+            auctions = consistent.compactMap { group in
+                group.sorted {
+                    let lhs = ($0.ends == nil ? 0 : 1) + ($0.outcome == nil ? 0 : 1)
+                    let rhs = ($1.ends == nil ? 0 : 1) + ($1.outcome == nil ? 0 : 1)
+                    return lhs == rhs ? $0.id.uuidString < $1.id.uuidString : lhs > rhs
+                }.first
+            }
+                .sorted { ($0.auction_end_date ?? "") > ($1.auction_end_date ?? "") }
+            loadedHandle = handle
+        } catch {
+            guard !Task.isCancelled else { return }
+            failed = true
+            NSLog("NukeCapture native seller history failed: %@", String(describing: error))
+        }
+        do {
+            async let bidding = hasPublicActivity(table: "auction_comments", actor: "author_username", kind: "bid")
+            async let discussion = hasPublicActivity(table: "auction_comments", actor: "author_username", kind: "discussion")
+            async let buying = hasPublicActivity(table: "bat_listings", actor: "buyer_username", kind: "sold")
+            let activity = try await (bidding, discussion, buying)
+            try Task.checkCancellation()
+            roles = [(activity.0, "Bidder"), (activity.1, "Commentator"), (activity.2, "Published winning buyer")]
+                .filter(\.0).map(\.1)
+        } catch {
+            guard !Task.isCancelled else { return }
+            participationFailed = true
+        }
+    }
+
+    private func hasPublicActivity(table: String, actor: String, kind: String) async throws -> Bool {
+        struct Row: Decodable { let id: UUID }
+        var request = SupabaseService.client.from(table)
+            .select("id,vehicles!inner(id)").eq(actor, value: handle)
+            .eq("vehicles.is_public", value: true).is("vehicles.deleted_at", value: nil)
+            .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
+        if table == "auction_comments" {
+            request = request.eq("platform", value: "bat")
+                .like("source_url", pattern: "https://bringatrailer.com/listing/%")
+            request = kind == "bid" ? request.eq("comment_type", value: "bid") : request.neq("comment_type", value: "bid")
+        } else {
+            request = request.eq("listing_status", value: "sold")
+                .like("bat_listing_url", pattern: "https://bringatrailer.com/listing/%")
+        }
+        let rows: [Row] = try await request.limit(1).execute().value
+        return !rows.isEmpty
     }
 }
 
