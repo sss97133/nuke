@@ -4,7 +4,7 @@ import PrefetchLink from '../../components/PrefetchLink';
 import { useVehicleProfile } from './VehicleProfileContext';
 import FieldEvidencePopup from './FieldEvidencePopup';
 import { useVehicleImageEvidence, hasImageAnalysis, hasImageZone, relatedFieldImages } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
@@ -36,6 +36,7 @@ const VehicleEvidenceView: React.FC = () => {
   const zoned = images.filter(hasImageZone).length;
   const captureDated = images.filter(image => image.taken_at).length;
   const citations = citedFieldImages(provenance.data, images);
+  const citationsUnavailable = provenanceCoverageUnavailable(provenance.data);
   const related = relatedFieldImages(images, field);
   const visible = filter === 'unanalyzed' ? images.filter(image => !hasImageAnalysis(image))
     : filter === 'related' ? related : filter === 'cited' ? citations : images;
@@ -90,10 +91,10 @@ const VehicleEvidenceView: React.FC = () => {
       {inventory.data && <section className="ev-library" aria-label="Image evidence library">
         <div className="ev-section-heading"><h2>Inspect the material</h2><span className="ev-label">{inventory.data.total ?? images.length} VISIBLE IMAGE RECORDS</span></div>
         <div className="ev-library-controls">
-          {([['all', 'All material', images.length], ['unanalyzed', 'Processing incomplete', images.length - analyzed], ['cited', `Cited for ${label.toLowerCase()}`, citations.length], ['related', 'Related area', related.length]] as const).map(([key, title, count]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>{title} <span>{key === 'cited' && provenance.isLoading ? '…' : count}</span></button>)}
+          {([['all', 'All material', images.length], ['unanalyzed', 'Processing incomplete', images.length - analyzed], ['cited', `Cited for ${label.toLowerCase()}`, citations.length], ['related', 'Related area', related.length]] as const).map(([key, title, count]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>{title} <span>{key === 'cited' && provenance.isLoading ? '…' : key === 'cited' && citationsUnavailable ? '?' : count}</span></button>)}
           <span className="ev-footnote">Labels describe database records. Unclassified material may include photos or documents.</span>
         </div>
-        {visible.length === 0 ? <p className="ev-empty">{provenance.error ? 'Field citations could not be read.' : filter === 'cited' ? `No validated image citation returned for ${label.toLowerCase()}.` : 'No matching records in this inventory.'}</p> : <div className="ev-library-grid">{visible.map((image, i) => <button type="button" key={image.id} data-image-id={image.id} aria-pressed={lead?.id === image.id} onClick={() => { setSelectedId(image.id); document.querySelector('.ev-hero')?.scrollIntoView({ behavior: 'instant', block: 'center' }); }}><img src={image.thumbnail_url || optimizeImageUrl(image.image_url, 'small') || image.image_url} width={300} height={200} alt={`Source image ${i + 1}; ${image.vehicle_zone || 'area unknown'}`} loading="lazy" /><span className="ev-label">{String(i + 1).padStart(2, '0')} · {image.is_document === true ? 'DOCUMENT FLAG' : hasImageZone(image) ? image.vehicle_zone!.replace(/_/g, ' ') : 'UNCLASSIFIED'}</span><span>{image.source?.replace(/_/g, ' ') || 'Source unknown'}</span></button>)}</div>}
+        {visible.length === 0 ? <p className="ev-empty">{provenance.error ? 'Field citations could not be read.' : filter === 'cited' && citationsUnavailable ? 'Field citations are unavailable. Coverage is unknown.' : filter === 'cited' ? `No validated image citation returned for ${label.toLowerCase()}.` : 'No matching records in this inventory.'}</p> : <div className="ev-library-grid">{visible.map((image, i) => <button type="button" key={image.id} data-image-id={image.id} aria-pressed={lead?.id === image.id} onClick={() => { setSelectedId(image.id); document.querySelector('.ev-hero')?.scrollIntoView({ behavior: 'instant', block: 'center' }); }}><img src={image.thumbnail_url || optimizeImageUrl(image.image_url, 'small') || image.image_url} width={300} height={200} alt={`Source image ${i + 1}; ${image.vehicle_zone || 'area unknown'}`} loading="lazy" /><span className="ev-label">{String(i + 1).padStart(2, '0')} · {image.is_document === true ? 'DOCUMENT FLAG' : hasImageZone(image) ? image.vehicle_zone!.replace(/_/g, ' ') : 'UNCLASSIFIED'}</span><span>{image.source?.replace(/_/g, ' ') || 'Source unknown'}</span></button>)}</div>}
       </section>}
       {observationCount > 0 && <section className="ev-history"><button type="button" onClick={() => setShowHistory(!showHistory)} aria-expanded={showHistory}><h2>Observation history</h2><span>{observationCount} in the record · {showHistory ? 'Close −' : 'Inspect +'}</span></button>{showHistory && <React.Suspense fallback={null}><ObservationTimeline /></React.Suspense>}</section>}
       <footer className="ev-footer"><span>Read-only evidence view · same vehicle record</span><span>Image metadata read {inventory.data ? new Date(inventory.data.readAt).toLocaleTimeString() : 'pending'}</span></footer>

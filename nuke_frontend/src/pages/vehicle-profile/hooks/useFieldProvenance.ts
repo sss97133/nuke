@@ -37,6 +37,13 @@ export interface FieldProvenance {
   source_image_url: string | null;
   evidence: ProvenanceCitation[];
   image_observations?: ImageObservation[];
+  coverage?: {
+    contract: 'field_provenance_aggregate_cap_v1';
+    status: 'complete_current_reader' | 'refused_input_limit';
+    collectionRowLimit: number;
+    scanRowsBounded: false;
+    responseBytesBounded: false;
+  };
   observations: {
     id: string; value: string | null; source_slug: string | null; source_url: string | null; observed_at: string | null;
     // Optional until the extended reader deployment has been verified.
@@ -45,10 +52,14 @@ export interface FieldProvenance {
   }[];
 }
 
+export function provenanceCoverageUnavailable(provenance: FieldProvenance | null | undefined) {
+  return !!provenance?.coverage && provenance.coverage.status !== 'complete_current_reader';
+}
+
 export function citedFieldImages(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {
-  if (!provenance) return [];
-  // The legacy RPC has no visibility filters and source_image_id has no live image FK.
-  // Only join citations to this vehicle's access/visibility-filtered image inventory.
+  if (!provenance || provenanceCoverageUnavailable(provenance)) return [];
+  // Recheck returned citations against this vehicle's independently filtered
+  // image inventory; an arbitrary source URL is not a joined image reference.
   const ids = new Set(provenance.evidence
     .filter(e => e.source !== 'field_evidence' || e.verified === true)
     .map(e => e.image_id).filter(Boolean));

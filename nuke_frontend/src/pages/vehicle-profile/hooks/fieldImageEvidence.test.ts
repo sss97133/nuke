@@ -52,4 +52,12 @@ describe('field image evidence boundaries', () => {
     const citation = { source: 'field_evidence', value: 'Silver Pearl', source_type: 'vision', confidence: 80, verified: true, image_id: allowed.id, at: null };
     expect(citedFieldImages(provenance({ evidence: [citation, citation] }), [allowed])).toEqual([allowed]);
   });
+  it('withholds citation counts when the reader refuses incomplete coverage', () => {
+    const allowed = image('allowed');
+    const p = provenance({
+      evidence: [{ source: 'field_evidence', value: 'claim', source_type: 'vision', confidence: 80, verified: true, image_id: allowed.id, at: null }],
+      coverage: { contract: 'field_provenance_aggregate_cap_v1', status: 'refused_input_limit', collectionRowLimit: 1000, scanRowsBounded: false, responseBytesBounded: false },
+    });
+    expect(citedFieldImages(p, [allowed])).toEqual([]);
+  });
 });
