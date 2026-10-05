@@ -195,6 +195,8 @@ jobs:
         run: node --test scripts/check-auction-reconciliation.test.mjs
       - name: Verify late recovery watermarks and raw comment cache authorization
         run: node --test scripts/check-structure-review-closeout.test.mjs
+      - name: Verify retained source account admission and conflict preservation
+        run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest
