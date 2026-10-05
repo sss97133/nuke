@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, runCommentLineage, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -274,4 +274,178 @@ test('lineage CLI keeps a private immutable manifest/assay receipt and a distinc
   assert.match(rows.at(-1).manifestSha256,/^[a-f0-9]{64}$/); assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
   assert.equal(body.includes('PRIVATE CLAIM'),false); assert.equal(body.includes('PRIVATE SOURCE BODY'),false); assert.equal((await stat(out)).mode&0o777,0o600);
   assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),1);
+});
+
+const comment = (n, extra = {}) => ({ id: id(100 + n), vehicle_id: id(1), auction_event_id: id(10),
+  posted_at: '2026-10-01T10:00:00.123456+00:00', platform: 'bat', external_identity_id: id(20),
+  author_external_identity_id: null, comment_type: 'comment', is_seller: false, ...extra });
+function commentClient(extra = {}) {
+  const calls = [], ok = value => ({ ok: true, status: 200, durationMs: 1, value });
+  return { calls, get requests() { return calls.length; },
+    async subjects(ids) { calls.push({ reader: 'vehicles', ids }); return ok(extra.parents ?? [parent(1)]); },
+    async commentHeaders(vehicleId, cursor) {
+      calls.push({ reader: 'auction_comments', vehicleId, cursor });
+      const rows = [...(extra.headers ?? [comment(1)])].sort((a,b)=>b.id.localeCompare(a.id));
+      return extra.headerResponse ?? ok(rows.filter(c=>!cursor || c.id < cursor.id).slice(0,extra.serverPageSize ?? 200));
+    },
+    async sourceAuctions(vehicleId, ids) { calls.push({ reader: 'auction_events', vehicleId, ids }); return extra.auctionResponse ?? ok(extra.auctions ?? [{ id: id(10), vehicle_id: vehicleId, source: 'bat' }]); },
+    async sourceIdentities(ids) { calls.push({ reader: 'external_identities', ids }); return extra.identityResponse ?? ok(extra.identities ?? [{ id: id(20), platform: 'bat' }]); },
+  };
+}
+
+test('comment family requires an explicit manifest and rejects a price cursor', () => {
+  assert.equal(options(['--out','private','--family','comments','--subjects','manifest']).scope,'explicit_manifest');
+  for (const extra of [[], ['--subjects','manifest','--scope','all'], ['--subjects','manifest','--after',id(1)], ['--subjects','manifest','--page-size','20']])
+    assert.throws(() => options(['--out','private','--family','comments',...extra]));
+});
+
+test('comment transport selects only bounded non-bid headers and parent-scoped source metadata', async () => {
+  const routes = [], c = publicClient(anonymousConfiguration(env('anon')), async (url, init) => {
+    routes.push([new URL(url),init]); return new Response('[]',{status:200});
+  });
+  await c.commentHeaders(id(1)); await c.sourceAuctions(id(1),[id(10)]); await c.sourceIdentities([id(20)]);
+  assert.equal(routes[0][0].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.equal(routes[0][0].searchParams.get('bid_amount'),'is.null'); assert.equal(routes[0][0].searchParams.get('limit'),'200');
+  assert.equal(routes[0][0].searchParams.get('order'),'posted_at.desc,id.desc');
+  assert.equal(routes[1][0].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.equal(routes[2][0].searchParams.get('select'),'id,platform');
+  for (const [url, init] of routes) {
+    assert.equal(init.method,undefined);
+    for (const unsafe of ['comment_text','author_username','handle','metadata','raw_data','*']) assert.equal(url.searchParams.get('select').includes(unsafe),false);
+  }
+  assert.throws(()=>c.sourceAuctions(undefined,[id(10)])); assert.throws(()=>c.sourceIdentities([id(20),id(20)]));
+  assert.throws(()=>c.sourceIdentities(Array.from({length:201},(_,i)=>id(i)))); assert.throws(()=>c.commentHeaders('private;drop'));
+  await c.commentHeaders(id(1),{id:id(101),postedAt:'2026-10-01T10:00:00.123456+00:00'});
+  assert.equal(routes[3][0].searchParams.get('and'),`(or(comment_type.is.null,comment_type.neq.bid),or(posted_at.lt."2026-10-01T10:00:00.123456+00:00",and(posted_at.eq."2026-10-01T10:00:00.123456+00:00",id.lt.${id(101)})))`);
+  assert.throws(()=>c.commentHeaders(id(1),{id:id(101),postedAt:'2026-10-01),or(id.neq.null)'}));
+});
+
+test('comment header scope checks precede cap refusal and prevent unsafe child reads', () => {
+  assert.equal(inspectCommentHeaders(id(1),[comment(1)]).safe,true);
+  for (const rows of [[comment(1),comment(1)],[comment(1,{vehicle_id:id(2)})],[comment(1,{comment_type:'bid'})],
+    [comment(1,{external_identity_id:'a handle'})],[comment(1,{author_external_identity_id:undefined})],[comment(1,{is_seller:'true'})]])
+    assert.equal(inspectCommentHeaders(id(1),rows).safe,false);
+  const capped=Array.from({length:1001},(_,i)=>comment(i));
+  const result=inspectCommentHeaders(id(1),capped);assert.equal(result.safe,true);assert.equal(result.complete,false);
+  assert.equal(result.gaps.comment_header_cap_unmeasured,1);assert.deepEqual(result.headers,[]);assert.deepEqual(result.identityIds,[]);
+  capped[1000]=comment(1000,{vehicle_id:id(99)});assert.equal(inspectCommentHeaders(id(1),capped).safe,false);
+});
+
+test('author keys preserve absence, one-column projection gaps and conflicts without choosing a winner', () => {
+  const rows=[comment(1),comment(2,{external_identity_id:null}),comment(3,{external_identity_id:null,author_external_identity_id:id(20)}),
+    comment(4,{author_external_identity_id:id(20)}),comment(5,{author_external_identity_id:id(21)})];
+  const result=inspectCommentLineage(rows,[{id:id(10),vehicle_id:id(1),source:'bat'}],[{id:id(20),platform:'bat'},{id:id(21),platform:'cars-and-bids'}]);
+  assert.deepEqual(result.identityStates,{absent:1,legacyOnly:1,canonicalOnly:1,agreeing:1,conflicting:1});
+  assert.equal(result.gaps.indexed_author_key_absent_with_legacy_identity,1);assert.equal(result.gaps.retained_author_identity_keys_differ,1);
+  assert.equal(result.gaps.recorded_identity_namespace_differs_unassayed_alias,1);assert.equal(result.matchingRecordedNamespaces,4);
+  assert.equal(result.matchedAuctionParents,5);assert.equal(result.gaps.comment_author_identity_unestablished,1);
+});
+
+test('source namespace aliases, missing public context and uninterpretable clocks remain unknown', () => {
+  const result=inspectCommentLineage([comment(1,{posted_at:'infinity'}),comment(2,{auction_event_id:null,external_identity_id:id(22)})],
+    [{id:id(10),vehicle_id:id(1),source:'bringatrailer'}],[{id:id(20),platform:'bringatrailer'}]);
+  assert.equal(result.gaps.source_post_clock_not_interpretable,1);assert.equal(result.gaps.recorded_auction_source_label_differs_unassayed_alias,1);
+  assert.equal(result.gaps.recorded_identity_namespace_differs_unassayed_alias,1);assert.equal(result.gaps.reported_identity_context_unavailable,1);
+  assert.equal(result.gaps.source_auction_parent_unavailable_or_unlinked,1);assert.equal(result.matchingRecordedNamespaces,0);
+});
+
+test('comment lineage denies private subjects before children and omits raw testimony and handles', async () => {
+  const c=commentClient({headers:[comment(1,{comment_text:'PRIVATE QUOTE',author_username:'PRIVATE HANDLE'})]}),events=[];
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.gatedParents,2);assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.completedParents,1);
+  assert.equal(r.measuredCommentHeaders,1);assert.equal(r.identityStates.legacyOnly,1);assert.equal(r.matchingRecordedNamespaces,1);
+  assert.equal(c.calls.filter(x=>x.reader!=='vehicles').length,4);assert.equal(r.status,'passed_current_comment_header_lineage_in_manifest');
+  for (const text of ['PRIVATE QUOTE','PRIVATE HANDLE',id(2)]) assert.equal(JSON.stringify(events).includes(text),false);
+  assert.equal(r.databaseWrites,0);assert.equal(r.recordRepairs,0);assert.equal(r.modelCalls,0);
+});
+
+test('foreign and duplicated child contexts fail without retaining their IDs', async () => {
+  for (const extra of [{auctions:[{id:id(10),vehicle_id:id(99),source:'bat'}]},
+    {identities:[{id:id(99),platform:'bat'}]}, {identities:[{id:id(20),platform:'bat'},{id:id(20),platform:'bat'}]}]) {
+    const c=commentClient(extra),events=[];
+    const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.failures.comment_context_scope_or_shape_invalid,1);assert.equal(r.completedParents,0);
+    assert.equal(JSON.stringify(events).includes(id(99)),false);assert.equal(r.status,'failed');
+  }
+});
+
+test('native header overflow refuses totals and skips source context, rather than inspecting a sample', async () => {
+  const c=commentClient({headers:Array.from({length:1001},(_,i)=>comment(i))}),events=[];
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+  assert.equal(c.requests,7);assert.equal(r.completedParents,0);assert.equal(r.measuredCommentHeaders,0);assert.equal(r.exitCode,2);
+  assert.equal(r.gaps.comment_header_cap_unmeasured,1);assert.equal(events.find(x=>x.type==='comment_parent_unmeasured').atLeast,1001);
+  assert.equal(c.calls.some(x=>x.reader==='auction_events'||x.reader==='external_identities'),false);
+});
+
+test('two similar comment-reader failures stop even when successful gate or header reads intervene', async () => {
+  const c=commentClient({parents:[parent(1),parent(2),parent(3)],identityResponse:{ok:false,status:403,code:'42501'}});
+  c.commentHeaders=async (vehicleId,cursor)=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:cursor?[]:[comment(1,{vehicle_id:vehicleId})]};};
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])));
+  assert.equal(r.inspectedParents,2);assert.equal(r.completedParents,0);assert.equal(r.gaps.comment_context_parent_unmeasured,2);
+  assert.equal(r.stopReason,'repeated_comment_reader_failure_inspect_cause');assert.equal(r.measuredCommentHeaders,0);assert.equal(r.status,'failed');
+});
+
+test('empty native comments are a measured empty header collection, not zero mood or missing model work', async () => {
+  const c=commentClient({headers:[]}),r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.completedParents,1);assert.equal(c.requests,2);assert.equal(r.measuredCommentHeaders,0);assert.deepEqual(r.gaps,{});
+  for (const absent of ['mood','processedComments','independentSources','verifiedPeople']) assert.equal(absent in r,false);
+});
+
+test('comment CLI records its distinct readonly family and private source hash', async t => {
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-comment-assay-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  assert.equal(await main(['--out',out,'--family','comments','--subjects',input],{env:env('anon'),client:commentClient(),print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows[0].readers,['vehicles','auction_comments','auction_events','external_identities']);assert.equal(rows.at(-1).identityStates.legacyOnly,1);
+  assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);assert.equal((await stat(out)).mode&0o777,0o600);
+});
+
+test('short comment pages seek until empty and count every header once', async () => {
+  const c=commentClient({headers:[comment(1),comment(2),comment(3)],serverPageSize:1});
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.measuredCommentHeaders,3);assert.equal(r.completedParents,1);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='auction_comments').map(x=>x.cursor?.id),[undefined,id(103),id(102),id(101)]);
+  assert.equal(r.stopReason,'manifest_exhausted');assert.equal(r.exitCode,0);
+});
+
+test('comment seek retains PostgreSQL microseconds, timezone equivalence and UUID tie order', async () => {
+  const c=commentClient(),pages=[
+    [comment(3,{posted_at:'2026-10-01T10:00:00.123456+00:00'})],
+    [comment(2,{posted_at:'2026-10-01T03:00:00.123456-07:00'})],
+    [comment(4,{posted_at:'2026-10-01T10:00:00.123455+00:00'})],[],
+  ];
+  c.commentHeaders=async (vehicleId,cursor)=>{c.calls.push({reader:'auction_comments',vehicleId,cursor});return {ok:true,value:pages.shift()};};
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.measuredCommentHeaders,3);assert.deepEqual(r.failures,{});
+  assert.equal(c.calls[2].cursor.postedAt,'2026-10-01T10:00:00.123456+00:00');
+  assert.equal(c.calls[3].cursor.postedAt,'2026-10-01T03:00:00.123456-07:00');
+});
+
+test('repeated or out-of-order comment pages refuse the whole collection before context reads', async () => {
+  for (const pages of [[[comment(1)],[comment(1)]],[[comment(1)],[comment(2)]],
+    [[comment(1,{posted_at:'2026-10-01T10:00:00.123455+00:00'})],[comment(2)]]]) {
+    const c=commentClient(),events=[];
+    c.commentHeaders=async vehicleId=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:pages.shift()};};
+    const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.failures.comment_header_order_or_repeated_id,1);assert.equal(r.measuredCommentHeaders,0);
+    assert.equal(r.completedParents,0);assert.equal(r.status,'failed');
+    assert.equal(c.calls.some(x=>x.reader==='auction_events'||x.reader==='external_identities'),false);
+    assert.equal(events.some(x=>x.type==='comment_parent'),false);
+  }
+});
+
+test('uninterpretable cursor, collection page budget and elapsed clock remain unmeasured', async () => {
+  const subjects=lineageSubjects(manifest([id(1)]));
+  const bad=await runCommentLineage(commentClient({headers:[comment(1,{posted_at:'uninterpretable'})]}),scope(),subjects);
+  assert.equal(bad.gaps.comment_clock_cursor_unmeasured,1);assert.equal(bad.completedParents,0);assert.equal(bad.exitCode,2);
+  const c=commentClient();let index=100;
+  c.commentHeaders=async vehicleId=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:[comment(index--)]};};
+  const paged=await runCommentLineage(c,scope(),subjects);
+  assert.equal(paged.gaps.comment_collection_page_budget_unmeasured,1);assert.equal(paged.measuredCommentHeaders,0);
+  assert.equal(paged.completedParents,0);assert.equal(paged.exitCode,2);assert.equal(c.requests,101);
+  const timed=commentClient();let clock=0;
+  timed.commentHeaders=async vehicleId=>{timed.calls.push({reader:'auction_comments',vehicleId});clock=10;return {ok:true,value:[comment(1)]};};
+  const ended=await runCommentLineage(timed,scope({until:5}),subjects,{now:()=>clock});
+  assert.equal(ended.stopReason,'time_budget_reached');assert.equal(ended.gaps.comment_collection_time_unmeasured,1);
+  assert.equal(ended.completedParents,0);assert.equal(ended.measuredCommentHeaders,0);assert.equal(ended.exitCode,2);
 });
