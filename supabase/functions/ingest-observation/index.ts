@@ -442,7 +442,7 @@ Deno.serve(async (req) => {
     let propertyRow = null;
     if (input.property_key !== undefined) {
       if (!isSupportedImagePropertyKey(input.property_key) &&
-          !(retainedSourceId && input.property_key === "interior_color")) {
+          !(retainedSourceId && ["interior_color", "exterior_color"].includes(input.property_key))) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

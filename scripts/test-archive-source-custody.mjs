@@ -58,6 +58,10 @@ function fixture(options = {}) {
   const actualSnapshot = { ...snapshot, ...(options.snapshot ?? {}) };
   const actualParent = { ...parent, ...(options.parent ?? {}) };
   const actualEpisode = {...episode,...options.episode};
+  const retainedParent={id:snapshotId,vehicle_id:vehicleId,kind:'listing',is_superseded:false,property_id:null,
+    subject_type:'vehicle',subject_id:null,source_id:'00000000-0000-4000-8000-000000000004',source_url:sourceUrl,
+    observed_at:null,ingested_at:'2026-10-05T00:20:05.123456Z',extraction_method:'html_match',confidence_score:0.85,
+    structured_data:{color:'Signal Red',interior_color:'Black Vinyl'}};
   const bytes = options.bytes ?? Buffer.from(html);
   async function http(raw,init) {
     const request = raw instanceof Request ? raw : new Request(raw,init);
@@ -66,11 +70,13 @@ function fixture(options = {}) {
       load('intake');return handlers.get('intake')(request);
     }
     if(u.pathname==='/rest/v1/observation_sources') {
+      if(options.retained){assert.equal(request.method,'GET');return Response.json({id:retainedParent.source_id,slug:'bat',base_trust_score:0.85,supported_observations:['listing','specification']});}
       assert.equal(request.method,'GET');assert.equal(u.searchParams.get('slug'),'eq.bat');
       return Response.json({id:'00000000-0000-4000-8000-000000000004',base_trust_score:0.85,supported_observations:['sale_result']});
     }
     if(u.pathname==='/rest/v1/vehicle_observations') {
       if(request.method==='GET') {
+        if(options.retained && u.searchParams.get('id')==='eq.'+snapshotId)return Response.json(retainedParent);
         if(options.typedReplayReadError&&u.searchParams.get('select')?.includes('source_vehicle_event_id'))return Response.json({code:'42703',message:'typed column unavailable'},{status:400});
         return Response.json(observations.find(o=>['content_hash','source_id','source_identifier','kind'].every(key=>
           !u.searchParams.has(key)||u.searchParams.get(key)==='eq.'+o[key]))??null);
@@ -79,18 +85,25 @@ function fixture(options = {}) {
       const row=await request.json();assert(!('ingested_at'in row),'Database owns ingestion time');
       assert(row.extractor_id == null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.extractor_id),
         'Production extractor_id is nullable UUID, not a method string');
-      assert.equal(row.kind,'sale_result');
+      if(options.retained){assert.equal(row.kind,'specification');assert.equal(row.source_observation_id,snapshotId);
+        assert.equal(row.extraction_method,'retained_listing_property_projection_v1');}
+      else assert.equal(row.kind,'sale_result');
       if(options.allowGenericWrite){
         assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed capture key');
         assert(!('source_vehicle_event_id'in row),'Generic intake ignores caller typed episode key');
       }
-      else{assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
+      else if(!options.retained){assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
       if(row.source_vehicle_event_id&&options.guardRefusal)return Response.json({code:'23514',message:'pinned source headers changed'},{status:409});
       const keys=['source_id','source_identifier','kind','content_hash'];
       if(keys.every(k=>row[k]!=null)&&observations.some(o=>keys.every(k=>o[k]===row[k])))return Response.json({code:'23505',message:'unique_observation'},{status:409});
       const saved={is_superseded:false,extractor_id:null,source_vehicle_event_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
       if(options.jsonbOrder)saved.extraction_metadata=jsonb(saved.extraction_metadata);
       observations.push(saved);writes.push(row);return Response.json(saved);
+    }
+    if(options.retained && u.pathname==='/rest/v1/observation_properties'){
+      assert.equal(request.method,'GET');const key=u.searchParams.get('property_key')?.slice(3);
+      assert(['exterior_color','interior_color'].includes(key));
+      return Response.json({id:'efcb8c61-1ff5-4790-890e-2e09118e87e3',property_key:key,namespace:'core',deprecated_at:null,applies_to_kinds:['specification']});
     }
     if(u.pathname==='/rest/v1/rpc/vehicle_price_facts') {
       assert.deepEqual(await request.json(),{p_vehicle_ids:[vehicleId]});
@@ -190,6 +203,20 @@ function fixture(options = {}) {
       return {status:response.status,body:await response.json()};
     }};
 }
+
+for(const property of ['exterior','interior'])test(`actual retained ${property} selector reaches canonical insert and replays`,async()=>{
+ const f=fixture({retained:true,allowObservationWrite:true});
+ const body={mode:`retained_listing_${property}_color_v1`,source_observation_id:snapshotId,vehicle_id:undefined};
+ const first=await f.intake(body);assert.equal(first.status,200,JSON.stringify(first));assert.equal(f.writes.length,1);
+ const row=f.writes[0];assert.equal(row.structured_data[`${property}_color`],property==='exterior'?'Signal Red':'Black Vinyl');
+ assert.equal(row.structured_data.source_field,property==='exterior'?'color':'interior_color');
+ assert.equal(row.observed_at,'2026-10-05T00:20:05.123456Z');assert.equal(row.structured_data.source_observed_at,null);
+ assert.equal(row.structured_data.claim_role,'listing_claim');assert.equal(row.source_observation_id,snapshotId);
+ if(property==='exterior')assert(row.content_text.includes('not established verbatim seller text'));
+ const replay=await f.intake(body);assert.equal(replay.status,200);assert.equal(f.writes.length,1);
+ const forged=await f.intake({...body,structured_data:{exterior_color:'Invented'}});assert.equal(forged.status,400);assert.equal(f.writes.length,1);
+ const anonymous=await f.intake(body,'');assert.equal(anonymous.status,401);assert.equal(f.writes.length,1);
+});
 
 test('pinned private object verifies original bytes and returns separate capture/ingest/parse clocks',async()=>{
   const f=fixture(),r=await f.read();assert.equal(r.ok,true);assert.equal(r.html,html);
