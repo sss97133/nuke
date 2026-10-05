@@ -64,15 +64,19 @@ function itemTitle(i: AuctionItem): string {
 const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const { items, open, close } = auction;
   const recordedEnd = hasRecordedAuctionEnd(auction);
+  const retainedBids = items.filter(i => i.kind === 'bid' && i.amount != null);
 
   const geom = useMemo(() => {
     const times = items.map(i => new Date(i.at).getTime());
     const openT = open ? new Date(open.at).getTime() : (times.length ? Math.min(...times) : null);
     const closeT = close ? new Date(close.at).getTime() : null;
     if (openT == null) return null;
-    const lastT = times.length ? Math.max(...times) : openT;
+    const bidTimes = items.filter(i => i.kind === 'bid' && i.amount != null).map(i => new Date(i.at).getTime());
+    // Later commentary stays retained; it need not compress the bidding into a few pixels.
+    const lastT = !showAllActivity && bidTimes.length ? Math.max(...bidTimes) : (times.length ? Math.max(...times) : openT);
     const t0 = Math.min(openT, ...(times.length ? [times[0]] : []));
     let t1 = Math.max(lastT, closeT ?? lastT);
     if (t1 - t0 < 3600e3) t1 = t0 + 24 * 3600e3;
@@ -86,14 +90,16 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
       s = n.getTime();
     }
     return { t0, t1, openT, closeT, days };
-  }, [items, open, close]);
+  }, [items, open, close, showAllActivity]);
 
   if (!geom) return null;
 
   const H = 96, padL = 8, padR = 8;
   const laneBidTop = 22, laneBidBottom = 54, laneCmtTop = 60, laneCmtBottom = 72, axisY = 76;
   const x = (t: number) => padL + ((t - geom.t0) / (geom.t1 - geom.t0)) * Math.max(width - padL - padR, 1);
-  const bids = items.filter(i => i.kind === 'bid' && i.amount != null);
+  const visibleItems = items.filter(i => new Date(i.at).getTime() <= geom.t1);
+  const bids = visibleItems.filter(i => i.kind === 'bid' && i.amount != null);
+  const outsideWindow = items.length - visibleItems.length;
   const maxBid = bids.reduce((m, b) => Math.max(m, b.amount as number), 0);
   const yBid = (amount: number) => laneBidBottom - (maxBid > 0 ? (amount / maxBid) * (laneBidBottom - laneBidTop) : 0);
   // running high bid as a step path
@@ -144,19 +150,34 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
         {auction.outcomeConflict && <span className="auction-band__basis">recorded outcomes disagree; result unclassified</span>}
         {auction.activityExtracted ? (
           <span style={mono}>
-            {bids.length} bids · {items.length - bids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
+            {retainedBids.length} bids · {items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
           </span>
         ) : (
-          <span className="auction-band__basis">bids and comments not extracted yet</span>
+          <span className="auction-band__basis">no timed bid or comment entries in this read</span>
         )}
         {auction.photos.publishedWithListing > 0 && (
           <span style={mono}>{auction.photos.publishedWithListing} photos published with the listing (no capture time{auction.photos.attributionUncertain ? '; some carry no listing path and sit on the latest listing' : ''})</span>
         )}
       </div>
 
+      {retainedBids.length > 0 && (
+        <div className="auction-band__facts">
+          {(['Bidding window', 'All activity'] as const).map((label, index) => (
+            <button key={label} type="button" aria-pressed={showAllActivity === (index === 1)}
+              onClick={() => setShowAllActivity(index === 1)}
+              style={{ fontFamily: 'Arial, sans-serif', fontSize: 9, textTransform: 'uppercase', border: '2px solid var(--vp-ink, #1a1a1a)', borderRadius: 0, padding: '3px 6px', background: showAllActivity === (index === 1) ? 'var(--vp-ink, #1a1a1a)' : 'var(--vp-surface, #fff)', color: showAllActivity === (index === 1) ? 'var(--vp-surface, #fff)' : 'var(--vp-ink, #1a1a1a)' }}>
+              {label}
+            </button>
+          ))}
+          <span className="auction-band__basis">
+            {visibleItems.length.toLocaleString()} of {items.length.toLocaleString()} timed interactions shown{outsideWindow > 0 ? ` · ${outsideWindow.toLocaleString()} later interaction${outsideWindow === 1 ? '' : 's'} in All activity` : ''}
+          </span>
+        </div>
+      )}
+
       {width > 0 && (
         <svg className="auction-band__svg" width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
-             aria-label={`auction sequence: ${bids.length} bids, ${items.length - bids.length} comments`}>
+             aria-label={`auction sequence: ${bids.length} bids, ${visibleItems.length - bids.length} comments shown`}>
           {/* days: click targets, active highlight, boundaries, labels */}
           {geom.days.map(d => {
             const x0 = Math.max(padL, x(d.start)), x1 = Math.min(width - padR, x(d.end));
@@ -200,7 +221,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
           })}
 
           {/* comments: a tick each; the seller's are solid bars */}
-          {items.filter(i => i.kind !== 'bid').map(c => {
+          {visibleItems.filter(i => i.kind !== 'bid').map(c => {
             const cx = x(new Date(c.at).getTime());
             return (
               <a key={c.id} href={c.url} target="_blank" rel="noreferrer">

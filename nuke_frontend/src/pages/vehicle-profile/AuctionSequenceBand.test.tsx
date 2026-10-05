@@ -2,10 +2,10 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ auction: null as any, rpc: vi.fn(), timelineEvents: [{ id: 'synthetic-profile-created', event_type: 'vehicle_added', event_date: '2025-01-01', title: 'Synthetic profile created' }], setGalleryFilter: vi.fn() }));
+const fixture = vi.hoisted(() => ({ auction: null as any, activityUnavailable: false, hasUnpositionedActivity: false, rpc: vi.fn(), timelineEvents: [{ id: 'synthetic-profile-created', event_type: 'vehicle_added', event_date: '2025-01-01', title: 'Synthetic profile created' }], setGalleryFilter: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: { id: 'synthetic-vehicle', year: 2025 }, vehicleId: 'synthetic-vehicle', timelineEvents: fixture.timelineEvents, setGalleryFilter: fixture.setGalleryFilter }) }));
-vi.mock('./useAuctionSequence', () => ({ useAuctionSequence: () => ({ auctions: [fixture.auction], importStampedDays: [], loading: false }) }));
+vi.mock('./useAuctionSequence', () => ({ useAuctionSequence: () => ({ auctions: fixture.auction ? [fixture.auction] : [], importStampedDays: [], loading: false, activityUnavailable: fixture.activityUnavailable, hasUnpositionedActivity: fixture.hasUnpositionedActivity }) }));
 vi.mock('./VehiclePhotoLightbox', () => ({ VEHICLE_DAY_OPEN_EVENT: 'synthetic-day-open' }));
 import AuctionSequenceBand from './AuctionSequenceBand';
 import BarcodeTimeline from './BarcodeTimeline';
@@ -25,6 +25,7 @@ function sequence(end: string | null, sale: string | null = null, status = 'sold
 }
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
+  fixture.activityUnavailable = false; fixture.hasUnpositionedActivity = false; fixture.auction = null;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.rpc.mockReset(); fixture.rpc.mockResolvedValue({ data: [], error: null });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
@@ -95,4 +96,45 @@ describe('visible auction clock and outcome qualification', () => {
     if (expected !== 'Auction Opened') expect(titles).not.toContain('Auction Opened');
     if (start?.includes('T00:00:00')) expect(container.querySelector('.hm-c[data-date="2025-01-08"]')!.getAttribute('title')).toContain(expected);
   });
+});
+
+it('shows a failed native read as unavailable activity, without zero totals or an unextracted claim', async()=>{
+  fixture.activityUnavailable=true;
+  await act(async()=>root.render(<BarcodeTimeline />));
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('Auction activity could not be fully read');
+  expect(container.textContent).toContain('Timeline activity counts are unavailable');
+  expect(container.textContent).not.toContain('0 bids');
+  expect(container.textContent).not.toContain('bids and comments not extracted yet');
+});
+
+it('distinguishes retained unclocked testimony from missing extraction', async()=>{
+  fixture.hasUnpositionedActivity=true;
+  fixture.auction={...sequence('2025-01-10T20:30:00Z',null,'sold',null,'2025-01-01T12:00:00Z'),items:[],days:[],lastObservedBid:null,activityExtracted:false};
+  await act(async()=>root.render(<BarcodeTimeline />));
+  expect(container.textContent).toContain('lack usable posting times');
+  expect(container.textContent).toContain('no timed bid or comment entries in this read');
+  expect(container.textContent).not.toContain('bids and comments not extracted yet');
+});
+
+it('keeps the bidding week readable while retaining later commentary with its source link', async () => {
+  const auction = sequence('2025-01-10T20:30:00Z', null, 'sold', null, '2025-01-03T12:00:00Z');
+  const later = { ...auction.items[1], id: 'synthetic-later-comment', at: '2028-01-10T20:00:00Z', url: `${LOT}#comment-103` };
+  auction.items = [...auction.items, later];
+  await band(auction);
+  const bid = container.querySelector('svg circle')!;
+  expect(Number(bid.getAttribute('cx'))).toBeGreaterThan(700);
+  expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
+  expect(container.textContent).toContain('2 of 3 timed interactions shown · 1 later interaction in All activity');
+  const all = [...container.querySelectorAll('button')].find(button => button.textContent === 'All activity')!;
+  all.focus();
+  expect(document.activeElement).toBe(all);
+  await act(async () => all.click());
+  expect(all.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('svg a[href$="#comment-103"]')).not.toBeNull();
+  expect(container.textContent).toContain('3 of 3 timed interactions shown');
+  expect(Number(container.querySelector('svg circle')!.getAttribute('cx'))).toBeLessThan(20);
+  const bidding = [...container.querySelectorAll('button')].find(button => button.textContent === 'Bidding window')!;
+  await act(async () => bidding.click());
+  expect(bidding.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
 });
