@@ -1,9 +1,11 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
 import { useAuctionSequence } from './useAuctionSequence';
 import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auctionSequence';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { BidsPopup } from '../../components/popups/BidsPopup';
 
 interface BarcodeTimelineProps {}
 
@@ -292,6 +294,7 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+  const popup = useContext(PopupStackContext);
 
   // A BaT lot's real sequence — bids and comments at their times, the open and the
   // close — from auction_comments / auction_events / vehicle_events, one per listing
@@ -917,7 +920,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
           {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
           {auctions.filter(a => a.activityExtracted || a.open || a.close).map(a => (
             <React.Suspense key={a.key} fallback={null}>
-              <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay} />
+              <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay}
+                onOpenBidReports={popup && vehicleId ? () => popup.push(<BidsPopup vehicleId={vehicleId} listingUrl={a.lotUrl} />, 'Recorded vehicle bid amounts', 420) : undefined} />
             </React.Suspense>
           ))}
 

@@ -10,6 +10,7 @@ vi.mock('./VehiclePhotoLightbox', () => ({ VEHICLE_DAY_OPEN_EVENT: 'synthetic-da
 import AuctionSequenceBand from './AuctionSequenceBand';
 import BarcodeTimeline from './BarcodeTimeline';
 import { buildAuctionSequence, type AuctionSequence } from './auctionSequence';
+import { PopupStackContext } from '../../components/popups/PopupStack';
 
 const LOT = 'https://bringatrailer.com/listing/synthetic-cohort-lot/';
 function sequence(end: string | null, sale: string | null = null, status = 'sold', outcome: string | null = null, start: string | null = null): AuctionSequence {
@@ -137,4 +138,17 @@ it('keeps the bidding week readable while retaining later commentary with its so
   await act(async () => bidding.click());
   expect(bidding.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
+});
+
+it('connects the visible source band to the existing vehicle bid drill', async () => {
+  fixture.auction = sequence('2025-01-10T20:30:00Z');
+  const push = vi.fn();
+  await act(async () => root.render(<PopupStackContext.Provider value={{ push } as any}><BarcodeTimeline /></PopupStackContext.Provider>));
+  const button = container.querySelector<HTMLButtonElement>('.auction-band button[aria-label="Open recorded vehicle bid amounts"]')!;
+  expect(button).not.toBeNull();
+  expect(button.type).toBe('button');
+  await act(async () => button.click());
+  expect(push).toHaveBeenCalledOnce();
+  expect(push.mock.calls[0][0].props.vehicleId).toBe('synthetic-vehicle');
+  expect(push.mock.calls[0][1]).toBe('Recorded vehicle bid amounts');
 });
