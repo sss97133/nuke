@@ -160,22 +160,9 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
   const { vehicle } = useVehicleProfile();
   const liveTitleStatus = String((vehicle as any)?.title_status || '').toLowerCase();
 
-  // Filter red flags against live vehicle data:
-  // - TMU flags are invalid when the vehicle now has a clean title
-  // - 4x4 conversion is a positive signal when documented (show under mods, not flags)
-  const rawFlags = (di.red_flags || []).slice(0, 5);
-  const flags = rawFlags.filter((rf) => {
-    const text = String(rf.f || '').toLowerCase();
-    // TMU red flag — suppress if vehicle's live title_status is 'clean'
-    if (text.includes('tmu') || text.includes('true mileage unknown')) {
-      if (liveTitleStatus === 'clean') return false;
-    }
-    // 4x4 conversion — suppress as red flag (it's a documented mod, not a concern)
-    if (text.includes('4x4 conversion') || text.includes('4×4 conversion')) {
-      return false;
-    }
-    return true;
-  });
+  // Preserve reported claims. Title status does not resolve mileage, and a conversion
+  // name does not establish build quality. Only an attributed resolution can supersede them.
+  const flags = (di.red_flags || []).slice(0, 5);
   const mods = di.mods || [];
   const docs = di.documentation || [];
 
@@ -184,47 +171,46 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
   // Only a number is a count and only a string is a title; anything else is skipped.
   const ownerCount = typeof di.owner_count === 'number' ? di.owner_count : null;
   const docTitleStatus = typeof di.title_status === 'string' ? di.title_status : null;
+  const titleDiffers = liveTitleStatus && docTitleStatus && liveTitleStatus !== docTitleStatus.toLowerCase();
 
   const hasContent = di.condition_note || docTitleStatus || di.matching_numbers != null ||
     di.condition || ownerCount != null || flags.length > 0 || mods.length > 0 || docs.length > 0;
   if (!hasContent) return null;
 
   return (
-    <CollapsibleWidget variant="profile" title="Vehicle Intelligence" defaultCollapsed={false}>
+    <CollapsibleWidget variant="profile" title="Description extraction" defaultCollapsed={false}>
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
-        {/* Condition Note — suppress stale TMU references when title is clean */}
+        <p style={{ margin: '0 0 8px', color: 'var(--vp-pencil)' }}>
+          Stored interpretation · source sample, method and analysis time unavailable.
+        </p>
+        {/* Retain the reported wording, including uncertainty. */}
         {di.condition_note && (
           <div style={{ marginBottom: '8px' }}>
-            {truncate(
-              liveTitleStatus === 'clean'
-                ? di.condition_note.replace(/\.\s*Odometer shows approximately \d[\d,]* TMU\.?/i, '.').replace(/\s*TMU\.?/g, '').trim()
-                : di.condition_note,
-              200,
-            )}
+            {truncate(di.condition_note, 200)}
           </div>
         )}
 
         {/* Quick Badges */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
-          {(liveTitleStatus || docTitleStatus) && (
-            <span style={BADGE}>{liveTitleStatus ? liveTitleStatus.toUpperCase() : docTitleStatus}</span>
-          )}
+          {liveTitleStatus && <span style={BADGE}>RECORDED TITLE: {liveTitleStatus}</span>}
+          {docTitleStatus && (!liveTitleStatus || titleDiffers) && <span style={BADGE}>EXTRACTED TITLE: {docTitleStatus}</span>}
           {di.matching_numbers != null && (
-            <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : 'var(--vp-danger)' }}>
-              {di.matching_numbers ? 'MATCHING #S' : 'NON-MATCHING'}
+            <span style={BADGE}>
+              {di.matching_numbers ? 'REPORTED MATCHING #S' : 'REPORTED NON-MATCHING'}
             </span>
           )}
-          {di.condition && <span style={BADGE}>{di.condition}</span>}
-          {ownerCount != null && <span style={BADGE}>{ownerCount} OWNER{ownerCount !== 1 ? 'S' : ''}</span>}
+          {di.condition && <span style={BADGE}>CONDITION LABEL: {di.condition}</span>}
+          {ownerCount != null && <span style={BADGE}>{ownerCount} OWNER{ownerCount !== 1 ? 'S' : ''} REPORTED</span>}
         </div>
+        {titleDiffers && <p style={{ margin: '0 0 8px' }}>Title values differ · resolution unverified.</p>}
 
         {/* Red Flags */}
         {flags.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>RED FLAGS</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED FLAGS</div>
             {flags.map((rf, i) => (
-              <div key={i} style={{ color: 'var(--vp-danger)', marginBottom: '2px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
-                <span style={{ ...BADGE, color: 'var(--vp-danger)', borderColor: 'var(--vp-danger)', flexShrink: 0 }}>{rf.sev}</span>
+              <div key={i} style={{ marginBottom: '2px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                <span style={{ ...BADGE, flexShrink: 0 }}>{rf.sev}</span>
                 <span>{truncate(rf.f, 100)}</span>
               </div>
             ))}
@@ -234,7 +220,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         {/* Modifications */}
         {mods.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>MODIFICATIONS ({mods.length})</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>EXTRACTED MODIFICATIONS ({mods.length})</div>
             <div style={MONO}>{mods.slice(0, 5).join(' / ')}</div>
           </div>
         )}
@@ -242,7 +228,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         {/* Documentation */}
         {docs.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>DOCUMENTATION</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED DOCUMENTATION</div>
             <div style={MONO}>{docs.slice(0, 4).join(' / ')}</div>
           </div>
         )}
