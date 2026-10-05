@@ -196,6 +196,12 @@ the same subject boundary to supersession and related-record links. A valid
 foreign key or two individually visible records cannot establish the relationship
 shown by the page.
 
+An image can have recorded witness links to observations on several vehicles.
+Each link must use the observation's own vehicle ID. The stored bridge grain is
+observation × image × witness role; different roles can refer to the same
+observation. Independent support requires separate qualification. Local fixtures
+cannot verify live witness coverage when the installed reader restricts access.
+
 When either route ID changes, withhold the previous subject's evidence immediately
 and cancel its outstanding reads. Missing, denied and failed reads must remain
 explicitly unavailable; they cannot become an empty evidence set or a zero score.
