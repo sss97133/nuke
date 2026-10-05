@@ -2313,12 +2313,12 @@ const ImageGallery = ({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, email')
+        .select('id, username, full_name')
         .in('id', ids);
       if (error) return;
       const byId: Record<string, string> = {};
       (data || []).forEach((p: any) => {
-        byId[p.id] = p.username || (p.email ? p.email.split('@')[0] : 'user');
+        byId[p.id] = p.username || p.full_name || 'user';
       });
       setImageUploaderNames(prev => ({ ...prev, ...byId }));
     } catch (e) {

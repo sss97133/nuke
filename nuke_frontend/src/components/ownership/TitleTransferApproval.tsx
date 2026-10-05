@@ -21,7 +21,7 @@ interface TitleTransfer {
   };
   buyer?: {
     full_name: string;
-    email: string;
+    username: string;
   };
 }
 
@@ -57,7 +57,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
         .select(`
           *,
           vehicle:vehicles(id, year, make, model, vin),
-          buyer:profiles!ownership_transfers_to_user_id_fkey(id, full_name, email)
+          buyer:profiles!ownership_transfers_to_user_id_fkey(id, full_name, username)
         `)
         .eq('from_user_id', userId)
         .eq('status', 'pending')
@@ -335,4 +335,3 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
 };
 
 export default TitleTransferApproval;
-

@@ -1,5 +1,6 @@
 // Profile Service - Comprehensive profile data management
 import { supabase } from '../lib/supabase';
+import { PUBLIC_PROFILE_FIELDS } from '../types/profile';
 import { AIInsightsService, type ImageInsightResult, type ImageInsightRequest } from './aiInsightsService';
 import type {
   Profile,
@@ -15,6 +16,16 @@ import type {
 } from '../types/profile';
 
 export class ProfileService {
+
+  static async getProfileRecord(userId: string) {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) return { data: null, error: sessionError };
+    if (session?.user.id === userId) {
+      const { data, error } = await supabase.rpc('get_user_profile_fast', { p_user_id: userId });
+      return { data: data?.profile ?? null, error };
+    }
+    return supabase.from('profiles').select(PUBLIC_PROFILE_FIELDS).eq('id', userId).single();
+  }
 
   // Per-day contribution aggregates for the profile timeline.
   // Replaces the three wide row-level selects in getProfileData (each silently
@@ -36,7 +47,7 @@ export class ProfileService {
   static async getProfileData(userId: string): Promise<ProfileData | null> {
     try {
       // Get profile first
-      const profileResult = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const profileResult = await ProfileService.getProfileRecord(userId);
       
       if (profileResult.error && profileResult.error.code !== 'PGRST116') {
         throw profileResult.error;
@@ -547,7 +558,7 @@ export class ProfileService {
           ...profileData,
           updated_at: new Date().toISOString()
         })
-        .select()
+        .select(PUBLIC_PROFILE_FIELDS)
         .single();
 
       if (error) throw error;
@@ -778,7 +789,7 @@ export class ProfileService {
       // Only get data for public profiles
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PUBLIC_PROFILE_FIELDS)
         .eq('id', userId)
         .eq('is_public', true)
         .single();

@@ -9,7 +9,7 @@ interface PendingApproval {
   id: string;
   vehicle_id: string;
   user_id: string;
-  user_email: string;
+  user_name: string;
   requested_role: string;
   role_justification: string;
   created_at: string;
@@ -76,7 +76,7 @@ const AdminDashboard: React.FC = () => {
         .select(`
           *,
           vehicles(year, make, model),
-          profiles(email),
+          profiles(username, full_name),
           shops(name)
         `)
         .eq('status', 'pending')
@@ -89,7 +89,7 @@ const AdminDashboard: React.FC = () => {
         id: item.id,
         vehicle_id: item.vehicle_id,
         user_id: item.user_id,
-        user_email: item.profiles?.email || 'Unknown',
+        user_name: item.profiles?.full_name || item.profiles?.username || 'Unknown',
         requested_role: item.requested_role,
         role_justification: item.role_justification,
         created_at: item.created_at,
@@ -249,7 +249,7 @@ const AdminDashboard: React.FC = () => {
                       {approval.year} {approval.make} {approval.model}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {approval.user_email} • {approval.requested_role.replace(/_/g, ' ')}
+                      {approval.user_name} • {approval.requested_role.replace(/_/g, ' ')}
                       {approval.shop_name && (
                         <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
                           via {approval.shop_name}

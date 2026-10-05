@@ -165,6 +165,10 @@ jobs:
         run: createdb dm_refinement_bat_profile
       - name: Verify the actual profile migration and replay contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+      - name: Create disposable profile privacy database
+        run: createdb dm_refinement_profile_privacy_ci
+      - name: Verify private column protection and owner-only profile RPC
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_privacy_ci -f supabase/sql/test_profile_column_privacy.sql
       - name: Setup Deno for native auction fixtures
         uses: denoland/setup-deno@v2
         with:

@@ -36,7 +36,7 @@ interface ImageData {
 
 interface UserData {
   id: string;
-  email?: string;
+  username?: string;
   full_name?: string;
   created_at?: string;
 }
@@ -140,7 +140,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
       if (actualType === 'auto' || actualType === 'user') {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, full_name, created_at')
+          .select('id, username, full_name, created_at')
           .eq('id', id)
           .maybeSingle();
 
@@ -345,7 +345,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
               )}
 
               {/* User Card */}
-              {detectedType === 'user' && 'email' in data && (
+              {detectedType === 'user' && 'username' in data && (
                 <>
                   <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     User
@@ -353,9 +353,9 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
                   <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
                     <strong>ID:</strong> {data.id.substring(0, 8)}...
                   </div>
-                  {data.email && (
+                  {data.username && (
                     <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)' }}>
-                      <strong>Email:</strong> {data.email}
+                      <strong>Username:</strong> {data.username}
                     </div>
                   )}
                   {data.full_name && (
@@ -413,4 +413,3 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
     </>
   );
 };
-
