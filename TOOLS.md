@@ -31,7 +31,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Import Facebook Saved vehicles | MCP `import_facebook_saved` tool or `scripts/fb-saved-extractor.js` | Two-step: extract (returns browser JS) → submit (POSTs to ingest). Runs client-side in user's browser on facebook.com/saved. |
 | Extract Bonhams auction | `extract-bonhams` | |
 | Extract RM Sotheby's | `extract-rmsothebys` | |
-| Extract Mecum | `extract-mecum` | |
+| Extract Mecum | `extract-mecum` | Service-only `action: source_result_preview` with one explicit `snapshot_id` reads/hash-verifies that retained capture and returns private unqualified result/run-day claims and gaps. No source fetching, intake, metadata/profile/queue writes or inference; `dry_run: false` and extraction options refuse. Scheduled run day is not sale/settlement time. Parent custody, currency and fee basis remain unestablished. |
 | Extract Gooding & Co | `extract-gooding` | |
 | Extract Barrett-Jackson | `extract-barrett-jackson` | |
 | Extract Collecting Cars | `extract-collecting-cars-core` | |

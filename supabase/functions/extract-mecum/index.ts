@@ -18,6 +18,8 @@
  *   POST { "url": "..." }                            — Extract single URL
  *   POST { "action": "batch_from_queue", "limit": 10 }  — Process queue items
  *   POST { "action": "re_enrich", "limit": 50 }     — Re-enrich existing vehicles
+ *   POST { "action": "source_result_preview", "snapshot_id": "UUID" }
+ *      — Service-only, hash-verified retained-source preview; never writes
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,9 +27,142 @@ import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
+export const MECUM_SOURCE_RESULT_PARSER_VERSION = "extract-mecum:2.0.0:source_result_candidate_v2";
+
+type MecumTaxonomyClaim = { index: number; name: string | null; slug: string | null; incomplete: boolean };
+type MecumTaxonomyEvidence = {
+  path: string;
+  state: "missing" | "null" | "invalid" | "edges_missing" | "edges_null" | "empty" | "present";
+  claims: MecumTaxonomyClaim[];
+};
+export interface MecumSourceResultCandidate {
+  parser: typeof MECUM_SOURCE_RESULT_PARSER_VERSION;
+  status: "candidate" | "refused";
+  qualified: false;
+  publicShareable: false;
+  nextDataScriptCount: number;
+  reportedAmount: number | null;
+  amountPath: "props.pageProps.post.hammerPrice";
+  visibility: { price: "hidden" | "not_hidden" | "unknown"; result: "hidden" | "not_hidden" | "unknown" };
+  saleResult: "sold" | "not_sold" | "bid_goes_on" | "upcoming" | "unknown" | "conflicting";
+  saleResults: MecumTaxonomyEvidence;
+  scheduledRunDay: string | null;
+  scheduledRunDayBasis: "source_runDates_schedule";
+  runDates: MecumTaxonomyEvidence;
+  auctionSchedule: { path: string; value: string | null; explicitZone: boolean | null };
+  sourceLocators: { uri: string | null; databaseId: number | null; lotNumber: string | null };
+  currency: null;
+  priceBasis: null;
+  saleEventDay: null;
+  refusalReasons: string[];
+}
+
+/** Private evidence-assay contract, not sale admission or a publication filter.
+ * The observed source supplies a nominal hammerPrice field, result taxonomy and
+ * scheduled run day. It does not establish currency, fee basis or transfer time.
+ * Preserve disagreements/missing claims; never promote a native price or status.
+ * Default extraction, fetch and writer behavior below remains unchanged.
+ */
+export function parseMecumSourceResultCandidate(html: string): MecumSourceResultCandidate {
+  const qualificationGaps = ["currency_unestablished", "price_basis_unestablished", "sale_event_clock_unestablished", "parent_custody_not_evaluated"];
+  const taxonomy = (key: string, post?: Record<string, any>): MecumTaxonomyEvidence => {
+    const path = `props.pageProps.post.${key}`;
+    if (!post || !Object.hasOwn(post, key)) return { path, state: "missing", claims: [] };
+    const value = post[key];
+    if (value === null) return { path, state: "null", claims: [] };
+    if (typeof value !== "object" || Array.isArray(value)) return { path, state: "invalid", claims: [] };
+    if (!Object.hasOwn(value, "edges")) return { path, state: "edges_missing", claims: [] };
+    if (value.edges === null) return { path, state: "edges_null", claims: [] };
+    if (!Array.isArray(value.edges)) return { path, state: "invalid", claims: [] };
+    const claims = value.edges.map((edge: any, index: number) => {
+      const node = edge?.node;
+      const name = typeof node?.name === "string" && node.name.trim() ? node.name : null;
+      const slug = typeof node?.slug === "string" && node.slug.trim() ? node.slug : null;
+      return { index, name, slug, incomplete: name === null || slug === null };
+    });
+    return { path, state: claims.length ? "present" : "empty", claims };
+  };
+  const out: MecumSourceResultCandidate = {
+    parser: MECUM_SOURCE_RESULT_PARSER_VERSION, status: "refused", qualified: false, publicShareable: false,
+    nextDataScriptCount: 0, reportedAmount: null, amountPath: "props.pageProps.post.hammerPrice",
+    visibility: { price: "unknown", result: "unknown" },
+    saleResult: "unknown", saleResults: taxonomy("saleResults"), scheduledRunDay: null,
+    scheduledRunDayBasis: "source_runDates_schedule", runDates: taxonomy("runDates"),
+    auctionSchedule: { path: "props.pageProps.post.auctionDayStart", value: null, explicitZone: null },
+    sourceLocators: { uri: null, databaseId: null, lotNumber: null },
+    currency: null, priceBasis: null, saleEventDay: null,
+    refusalReasons: [...qualificationGaps],
+  };
+  const refuse = (reason: string) => { out.refusalReasons.push(reason); return out; };
+  if (typeof html !== "string" || new TextEncoder().encode(html).byteLength > 2097152) return refuse("source_body_invalid_or_over_limit");
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(m => /(?:^|\s)id\s*=\s*(["'])__NEXT_DATA__\1/i.test(m[1]));
+  out.nextDataScriptCount = scripts.length;
+  if (scripts.length !== 1) return refuse(scripts.length ? "source_presentations_ambiguous" : "next_data_missing");
+  let parsed: any;
+  try { parsed = JSON.parse(scripts[0][2]); } catch { return refuse("next_data_malformed"); }
+  const post = parsed?.props?.pageProps?.post;
+  if (!post || typeof post !== "object" || Array.isArray(post)) return refuse("source_post_missing_or_invalid");
+  out.saleResults = taxonomy("saleResults", post);
+  out.runDates = taxonomy("runDates", post);
+  out.sourceLocators = {
+    uri: typeof post.uri === "string" ? post.uri : null,
+    databaseId: Number.isSafeInteger(post.databaseId) ? post.databaseId : null,
+    lotNumber: typeof post.lotNumber === "string" ? post.lotNumber : null,
+  };
+  out.auctionSchedule.value = typeof post.auctionDayStart === "string" ? post.auctionDayStart : null;
+  out.auctionSchedule.explicitZone = out.auctionSchedule.value === null ? null
+    : /[T ][0-9]{2}:[0-9]{2}.*(?:Z|[+-][0-9]{2}:?[0-9]{2})$/.test(out.auctionSchedule.value);
+  const visibility = (value: unknown): "hidden" | "not_hidden" | "unknown" =>
+    value === true || value === 1 || value === "1" || value === "true" ? "hidden"
+    : value === false || value === 0 || value === "0" || value === "" ? "not_hidden" : "unknown";
+  out.visibility = { price: visibility(post.hideHammerPrice), result: visibility(post.hideSaleResult) };
+  if (out.visibility.price === "hidden") out.refusalReasons.push("source_price_hidden");
+  else if (out.visibility.price === "unknown") out.refusalReasons.push("source_price_visibility_unestablished");
+  else if ((typeof post.hammerPrice === "string" && /^[0-9]+$/.test(post.hammerPrice)) || typeof post.hammerPrice === "number") {
+    const amount = Number(post.hammerPrice);
+    if (Number.isSafeInteger(amount) && amount > 0) out.reportedAmount = amount;
+  }
+  if (out.reportedAmount === null && !out.refusalReasons.includes("source_price_hidden")) out.refusalReasons.push("source_amount_missing_or_unsupported");
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[ _]+/g, "-");
+  const resultValues = out.saleResults.claims.flatMap(c => [c.name, c.slug].filter((v): v is string => v !== null).map(normalize));
+  if (out.saleResults.state !== "present" || out.saleResults.claims.some(c => c.incomplete)) out.refusalReasons.push("sale_result_claims_incomplete");
+  else if (new Set(resultValues).size !== 1) { out.saleResult = "conflicting"; out.refusalReasons.push("sale_result_claims_conflict"); }
+  else {
+    const results = { sold: "sold", "not-sold": "not_sold", "bid-goes-on": "bid_goes_on", upcoming: "upcoming" } as const;
+    out.saleResult = Object.hasOwn(results, resultValues[0]) ? results[resultValues[0] as keyof typeof results] : "unknown";
+    if (out.saleResult === "unknown") out.refusalReasons.push("sale_result_unsupported");
+  }
+  if (out.visibility.result !== "not_hidden") {
+    out.saleResult = "unknown";
+    out.refusalReasons.push(out.visibility.result === "hidden" ? "source_result_hidden" : "source_result_visibility_unestablished");
+  }
+  const validDay = (s: string) => /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)
+    && Number.isFinite(Date.parse(s + "T00:00:00Z")) && new Date(s + "T00:00:00Z").toISOString().slice(0, 10) === s;
+  // The retained WordPress taxonomy uses midnight name/slug serializations.
+  // They label a civil scheduled run day, not midnight in an inferred timezone.
+  // Accept only the evidenced forms; arbitrary timestamp prefixes stay unknown.
+  const civilDay = (raw: string, field: "name" | "slug") => {
+    const syntax = field === "name" ? /^[0-9]{4}-[0-9]{2}-[0-9]{2}(?: 00:00:00)?$/
+      : /^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-000000)?$/;
+    const day = raw.slice(0, 10);
+    return syntax.test(raw) && validDay(day) ? day : null;
+  };
+  const dayValues = out.runDates.claims.flatMap(c => [
+    c.name === null ? null : civilDay(c.name, "name"),
+    c.slug === null ? null : civilDay(c.slug, "slug"),
+  ]);
+  if (out.runDates.state !== "present" || out.runDates.claims.some(c => c.incomplete)) out.refusalReasons.push("scheduled_run_claims_incomplete");
+  else if (dayValues.some(d => d === null)) out.refusalReasons.push("scheduled_run_day_unsupported");
+  else if (new Set(dayValues).size !== 1) out.refusalReasons.push("scheduled_run_days_conflict");
+  else out.scheduledRunDay = dayValues[0];
+  if (out.refusalReasons.every(r => qualificationGaps.includes(r))) out.status = "candidate";
+  if (out.saleResult !== "sold") out.refusalReasons.push("source_result_is_not_confirmed_sold");
+  return out;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +175,61 @@ function okJson(data: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+/** Existing extractor's private source reader. Admission/identity correction is
+ * deliberately separate: a verified raw capture alone does not bind a vehicle,
+ * establish currency/fees or supply a sale/settlement clock.
+ */
+async function previewMecumSourceResult(req: Request, supabase: any, body: any): Promise<Response> {
+  const envelope = { action: "source_result_preview", stage: "private_retained_source_preview",
+    writes: 0, model_calls: 0, qualified: false, publicShareable: false };
+  const refuse = (reason: string, status = 200) => okJson({ ...envelope, success: false, reason }, status);
+  const verdict = await authenticateWriter(req);
+  if (!verdict.ok || verdict.caller.kind !== "service_role") return refuse("service_role_required", 403);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof body.snapshot_id !== "string" || !uuid.test(body.snapshot_id)
+    || (body.dry_run !== undefined && body.dry_run !== true)
+    || Object.keys(body).some(key => !["action", "snapshot_id", "dry_run"].includes(key))) {
+    return refuse("provide_one_snapshot_uuid_for_read_only_preview", 400);
+  }
+  try {
+    const id = body.snapshot_id.toLowerCase();
+    const { data: snapshot, error } = await supabase.from("listing_page_snapshots")
+      .select("id,platform,listing_url,success,http_status,html_sha256,fetched_at,created_at")
+      .eq("id", id).maybeSingle();
+    if (error) return refuse("source_header_read_failed", 503);
+    if (!snapshot) return refuse("source_capture_missing");
+    let source: URL;
+    try { source = new URL(snapshot.listing_url); } catch { return refuse("source_capture_locator_unsupported"); }
+    if (snapshot.id !== id || snapshot.platform !== "mecum" || snapshot.success !== true || snapshot.http_status !== 200) {
+      return refuse("source_capture_not_successful_mecum");
+    }
+    if (!["https:", "http:"].includes(source.protocol) || source.username || source.password || source.port
+      || !["mecum.com", "www.mecum.com"].includes(source.hostname)
+      || !/^\/lots\/[^/%\s]+\/[^/%\s]+\/?$/.test(source.pathname)) {
+      return refuse("source_capture_locator_unsupported");
+    }
+    if (typeof snapshot.html_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(snapshot.html_sha256)) {
+      return refuse("source_hash_unestablished");
+    }
+    // Exact capture and original URL, with no alias/latest/fetch fallback. Skip
+    // unrelated markdown. Raw body, storage path and metadata never enter output.
+    const archived = await readArchivedPage(snapshot.listing_url, { platform: "mecum", snapshotId: id, htmlOnly: true });
+    if (archived.snapshotId !== id || archived.fetchedAt !== snapshot.fetched_at) return refuse("source_capture_changed_or_unavailable");
+    if (typeof archived.html !== "string" || !archived.html) return refuse("source_body_unavailable");
+    const bytes = new TextEncoder().encode(archived.html);
+    if (bytes.byteLength > 2097152) return refuse("source_body_over_limit");
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const hash = [...digest].map(value => value.toString(16).padStart(2, "0")).join("");
+    if (hash !== snapshot.html_sha256) return refuse("source_hash_conflict");
+    return okJson({ ...envelope, success: true,
+      snapshot: { id, sourceUrl: snapshot.listing_url, sourceSha256: hash,
+        sourceCapturedAt: snapshot.fetched_at, sourceRecordedAt: snapshot.created_at, byteLength: bytes.byteLength },
+      parentBinding: "not_evaluated", result: parseMecumSourceResultCandidate(archived.html) });
+  } catch {
+    return refuse("retained_source_read_failed", 503);
+  }
 }
 
 interface MecumVehicle {
@@ -834,6 +1024,8 @@ Deno.serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const action = body.action || "extract";
     const url = body.url as string | undefined;
+
+    if (action === "source_result_preview") return await previewMecumSourceResult(req, supabase, body);
 
     // ── Single URL extraction ─────────────────────────────────────────
     if (action === "extract" && url) {

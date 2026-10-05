@@ -376,10 +376,12 @@ export async function archiveFetch(
 /**
  * Read a previously archived page from listing_page_snapshots.
  * Use this when you need to re-extract from stored content without re-fetching.
+ * snapshotId pins one exact capture in addition to URL/platform; htmlOnly avoids
+ * reading unrelated markdown. Neither option attests parent custody.
  */
 export async function readArchivedPage(
   url: string,
-  options?: { platform?: string; maxAgeSec?: number },
+  options?: { platform?: string; maxAgeSec?: number; snapshotId?: string; htmlOnly?: boolean },
 ): Promise<{ html: string | null; markdown: string | null; snapshotId: string | null; fetchedAt: string | null }> {
   const supabase = getSupabase();
 
@@ -392,6 +394,7 @@ export async function readArchivedPage(
     .limit(1);
 
   if (options?.platform) query.eq("platform", options.platform);
+  if (options?.snapshotId) query.eq("id", options.snapshotId);
   if (options?.maxAgeSec) {
     const cutoff = new Date(Date.now() - options.maxAgeSec * 1000).toISOString();
     query.gte("fetched_at", cutoff);
@@ -401,7 +404,7 @@ export async function readArchivedPage(
   if (!data) return { html: null, markdown: null, snapshotId: null, fetchedAt: null };
 
   let html = data.html ?? null;
-  let markdown = data.markdown ?? null;
+  let markdown = options?.htmlOnly ? null : data.markdown ?? null;
 
   // Fetch from storage if content was migrated out of postgres
   if (!html && data.html_storage_path) {
@@ -412,7 +415,7 @@ export async function readArchivedPage(
       if (blob) html = await blob.text();
     } catch (_) { /* storage read failed, return null */ }
   }
-  if (!markdown && data.markdown_storage_path) {
+  if (!options?.htmlOnly && !markdown && data.markdown_storage_path) {
     try {
       const { data: blob } = await supabase.storage
         .from("listing-snapshots")
