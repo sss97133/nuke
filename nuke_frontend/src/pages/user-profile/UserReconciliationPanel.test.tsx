@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderToString } from 'react-dom/server';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: vi.fn() } }));
 import UserReconciliationPanel from './UserReconciliationPanel';
@@ -15,10 +15,10 @@ const coverage = {
   marked_complete: 18000, marked_failed: 8000, marked_duplicates: 2200,
 } as PhotoSourceAnalysis;
 it('never exposes even populated owner coverage to visitors', () => {
-  expect(renderToString(<UserReconciliationPanel userId="owner" isOwnProfile={false} sourceAnalysis={coverage} />)).toBe('');
+  expect(renderToStaticMarkup(<UserReconciliationPanel userId="owner" isOwnProfile={false} sourceAnalysis={coverage} />)).toBe('');
 });
 it('shows source and output gaps before slower reconciliation resolves, without claiming accuracy', () => {
-  const html = renderToString(<UserReconciliationPanel userId="owner" isOwnProfile sourceAnalysis={coverage} />).replace(/<!--.*?-->/g, '');
+  const html = renderToStaticMarkup(<UserReconciliationPanel userId="owner" isOwnProfile sourceAnalysis={coverage} />);
   expect(html).toContain('28,000 captured image records');
   expect(html).toContain('82 marked failed');
   expect(html).toContain('accuracy unknown');
@@ -26,6 +26,6 @@ it('shows source and output gaps before slower reconciliation resolves, without 
   expect(html).toContain('does not measure whole-library accuracy');
 });
 it('reports failed coverage as unknown rather than an empty library', () => {
-  const html = renderToString(<UserReconciliationPanel userId="owner" isOwnProfile sourceError="Reader failed" />);
+  const html = renderToStaticMarkup(<UserReconciliationPanel userId="owner" isOwnProfile sourceError="Reader failed" />);
   expect(html).toContain('Reader failed'); expect(html).toContain('Coverage is unknown');
 });
