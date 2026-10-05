@@ -10,9 +10,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 
-/** Track vehicles already backfilled this session to avoid repeat RPC calls */
-const backfilledVehicles = new Set<string>();
-
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -252,32 +249,9 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     throw queryError;
   }
 
-  let rows = data ?? [];
-
-  if (rows.length < 3) {
-    // Sparse or no evidence — trigger on-demand backfill
-    if (!backfilledVehicles.has(vehicleId)) {
-      backfilledVehicles.add(vehicleId);
-      try {
-        const { data: inserted } = await supabase.rpc('ensure_field_evidence', { p_vehicle_id: vehicleId });
-        if (inserted && inserted > 0) {
-          // Re-fetch after backfill populated new rows
-          const { data: refreshed } = await supabase
-            .from('field_evidence')
-            .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
-            .eq('vehicle_id', vehicleId)
-            .order('source_confidence', { ascending: false });
-          if (refreshed && refreshed.length > 0) {
-            rows = refreshed;
-          }
-        }
-      } catch (backfillErr) {
-        console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
-      }
-    }
-    // NOTE: do not early-return on empty field_evidence — a vehicle may have agent-write
-    // claims (projection_event) even with no field_evidence rows; those are merged below.
-  }
+  const rows = data ?? [];
+  // Sparse evidence stays sparse. Existing agent claims are read below;
+  // displaying a profile must not request a testimony backfill.
 
   // Map DB columns to UI interface
   const mapped: FieldEvidenceRow[] = (rows as any[]).map((r) => ({
