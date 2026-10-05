@@ -4,6 +4,12 @@ import { useNavigate } from 'react-router-dom';
 
 const estimate = (value: number | null) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `≈${value.toLocaleString()}` : 'Unmeasured';
 const measuredCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : 'Unmeasured';
+const validPulsePoint = (point: any) => point?.status === 'exact'
+  ? Number.isSafeInteger(point.n) && point.n >= 0 && point.n <= 10000 && point.lower_bound === null
+  : point?.status === 'capped' ? point.n === null && point.lower_bound === 10001
+  : point?.status === 'unavailable' && point.n === null && point.lower_bound === null;
+const pulseCount = (point: any) => !validPulsePoint(point) ? 'Unmeasured'
+  : point.status === 'capped' ? `≥${point.lower_bound.toLocaleString()}` : measuredCount(point.n);
 
 type ExpandedSection = 'tier1' | 'catalog' | 'vehicles' | 'auctions' | null;
 
@@ -247,9 +253,10 @@ export default function SystemStatus() {
           <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
             PIPELINE PULSE — NEW ROWS / DAY (LAST {pulse.days}D)
           </div>
-          {pulse.degraded?.length > 0 && <p role="status" style={{ fontSize: '11px' }}>Some pipeline measurements are unavailable.</p>}
+          {pulse.degraded?.length > 0 && <p role="status" style={{ fontSize: '11px' }}>Some pipeline measurements are capped or unavailable.</p>}
           <p style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Recorded arrivals measure flow, not data quality. Reading: {pulse.generated_at ? new Date(pulse.generated_at).toLocaleString() : 'time unmeasured'}.</p>
           {(() => {
+            const cappedPulse = pulse.coverage?.contract === 'pipeline_pulse_capped_v1';
             const dayKeys: string[] = [];
             for (let i = pulse.days - 1; i >= 0; i--) {
               const d = new Date(pulse.generated_at || Date.now()); d.setUTCDate(d.getUTCDate() - i);
@@ -271,20 +278,22 @@ export default function SystemStatus() {
                   </thead>
                   <tbody>
                     {Object.entries(organLabels).map(([key, label]) => {
-                      const series: Record<string, number> = {};
+                      const series: Record<string, any> = {};
                       const available = Array.isArray(pulse.organs[key]) && pulse.organs[key].every((p: any) =>
                         p && typeof p.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.d)
                         && Number.isFinite(Date.parse(p.d)) && new Date(p.d).toISOString().slice(0, 10) === p.d
-                        && Number.isSafeInteger(p.n) && p.n >= 0)
+                        && (cappedPulse ? validPulsePoint(p) : Number.isSafeInteger(p.n) && p.n >= 0))
                         && new Set(pulse.organs[key].map((p: any) => p.d)).size === pulse.organs[key].length
-                        && !(pulse.degraded || []).some((message: unknown) =>
-                        typeof message === 'string' && message.startsWith((key === 'auction_comments' ? 'comments' : key) + ':'));
-                      if (available) pulse.organs[key].forEach((p: any) => { series[p.d] = p.n; });
+                        && (cappedPulse || !(pulse.degraded || []).some((message: unknown) =>
+                        typeof message === 'string' && message.startsWith((key === 'auction_comments' ? 'comments' : key) + ':')));
+                      if (available) pulse.organs[key].forEach((p: any) => { series[p.d] = p; });
                       return (
                         <tr key={key}>
                           <td style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em', paddingRight: 10, whiteSpace: 'nowrap' }}>{label}</td>
                           {dayKeys.map((d) => {
-                            const n = available ? (series[d] ?? 0) : null;
+                            const point = available ? series[d] : null;
+                            const n = cappedPulse ? (point?.status === 'exact' ? point.n : null)
+                              : available ? (point?.n ?? 0) : null;
                             return (
                               <td key={d} style={{
                                 padding: '2px 4px', textAlign: 'right', border: '1px solid var(--border)',
@@ -292,7 +301,7 @@ export default function SystemStatus() {
                                 background: n === 0 ? 'var(--error, #a00)' : 'transparent',
                                 fontWeight: n === 0 ? 700 : 400,
                               }}>
-                                {measuredCount(n)}
+                                {cappedPulse ? pulseCount(point) : measuredCount(n)}
                               </td>
                             );
                           })}
@@ -303,10 +312,10 @@ export default function SystemStatus() {
                 </table>
                 {pulse.backlogs && (
                   <div style={{ marginTop: 8, fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
-                    BACKLOGS — import_queue pending: {measuredCount(pulse.backlogs.import_queue_pending)}
-                    {' · '}images analysis pending: {typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_pending_capped >= pulse.backlogs.cap
+                    BACKLOGS — import_queue pending: {cappedPulse ? pulseCount(pulse.coverage.backlogs?.import_queue_pending) : measuredCount(pulse.backlogs.import_queue_pending)}
+                    {' · '}images analysis pending: {cappedPulse ? pulseCount(pulse.coverage.backlogs?.images_analysis_pending_capped) : typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_pending_capped >= pulse.backlogs.cap
                       ? `${(pulse.backlogs.cap - 1).toLocaleString()}+` : measuredCount(pulse.backlogs.images_analysis_pending_capped)}
-                    {' · '}failed: {typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_failed_capped >= pulse.backlogs.cap
+                    {' · '}failed: {cappedPulse ? pulseCount(pulse.coverage.backlogs?.images_analysis_failed_capped) : typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_failed_capped >= pulse.backlogs.cap
                       ? `${(pulse.backlogs.cap - 1).toLocaleString()}+` : measuredCount(pulse.backlogs.images_analysis_failed_capped)}
                   </div>
                 )}
