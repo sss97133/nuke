@@ -841,3 +841,34 @@ payload reduction alone does not establish an instant answer. These execute the 
 SELECT, not an installed RPC or public UI. The production function change is prepared for review;
 it is not merged/deployed. Source fact corrections, historical admission, qualified cross-venue
 prices, sale-time configuration matching, ranking, public display and latency closure remain open.
+
+### Retained Mecum source preview prepared, 2026-10-05 UTC
+
+PR [#600](https://github.com/sss97133/nuke/pull/600) delivered the preceding additive reader after
+specific owner approval. Supabase deployment and anonymous Corvette/Mustang/BMW reads were
+verified. Initial concurrent Corvette/Mustang requests timed out; subsequent serial and one warm
+concurrent repeat passed. Cold/p95 reliability and source-fact admission remain open.
+
+The next bounded repair extends **`extract-mecum`**, reusing its unpublished source-result helper
+from `20209e9d11cf`, rather than creating another venue parser. Parser revision
+`source_result_candidate_v2` accepts the retained `runDates` midnight name and slug forms as a
+**civil scheduled run day**. Original taxonomy claims, missing siblings and disagreements survive.
+Nonmidnight values, zones, arbitrary timestamp prefixes and invalid civil dates remain unsupported.
+A run day is not an actual closing or settlement instant, and does not establish currency or fees.
+
+Service-only `action: source_result_preview` requires one explicit snapshot UUID. It uses the
+existing archive owner with an additional capture-ID pin, verifies the retained raw hash and returns
+an allowlisted private result with distinct source capture/recording clocks. It has no URL/latest
+fallback, source fetch, inference, queue claim, testimony admission or metadata/profile write.
+Anonymous and user callers cannot read the preview. Raw HTML, unrelated markdown, protected
+metadata and storage locators stay out of the response. Vehicle/event custody is explicitly
+**not evaluated**; source identifiers retain their separate namespaces.
+
+The predeployment live request returned HTTP400 (unsupported action). Local replay of the exact
+retained lot173892 capture through the actual handler/archive/auth code now recovers **2014-01-24**
+and its unqualified reported sold amount. The source hash matches; no source was fetched or
+production record changed. **128 focused tests pass**, including that private replay and existing
+BaT archive/intake custody regressions; public CI runs127 synthetic tests. The enforced checkout
+gate and write guard pass. Publication/deployment stages belong to this repair's PR receipt; this
+is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
+binding, episode configuration semantics and qualified cross-venue prices remain held/open.
