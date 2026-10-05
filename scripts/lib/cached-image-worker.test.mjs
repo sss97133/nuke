@@ -66,7 +66,8 @@ function fixture(count = 1) {
           if (table === 'get_field_provenance') {
             if (controls.readerThrows) throw Error('private raw failure');
             return { data: { vehicle_id: rpcArgs.p_vehicle_id, field: rpcArgs.p_field,
-              image_observations: controls.emptyReader ? [] : rows.vehicle_observations
+              ...(controls.refusedReader ? { coverage: { status: 'refused_input_limit' } } : {}),
+              image_observations: controls.emptyReader || controls.refusedReader ? [] : rows.vehicle_observations
                 .filter(row => row.source_id === source && row.structured_data[rpcArgs.p_field])
                 .map(row => ({ observation_id: row.id, image_id: row.structured_data.image_id,
                   witness_id: controls.missingReaderWitness ? null : witness,
@@ -121,6 +122,24 @@ test('healthy cached source lands only canonical missing properties and verifies
   assert.equal(result.checkpoint.completed_cycles, 1);
   assert.equal(result.checkpoint.current_vehicle_id, null);
   assert.equal(result.remaining_unknown, true);
+});
+
+test('reader collection refusal preserves progress and cannot count as verified apply', async () => {
+  const f = fixture();
+  await runCachedImageProjection(f.sb, f.options);
+  f.saved.length = 0; f.writes.length = 0;
+  f.controls.refusedReader = true;
+  const result = await runCachedImageProjection(f.sb, f.options);
+  assert.equal(result.status, 'incomplete');
+  assert.equal(result.reason, 'reader_input_limit');
+  assert.equal(result.confirmed_reader_visible_claims, 0);
+  assert.equal(result.checkpoint.image_cursor, null);
+  assert.equal(result.checkpoint.completed_cycles, 0);
+  assert.equal(f.writes.length, 0);
+  assert.equal(cachedWorkerExitCode(result), 1);
+  const assay = await runCachedImageProjection(f.sb, { ...f.options, verifyOnly: true, apply: false, vehicleId: vehicle });
+  assert.equal(assay.reason, 'reader_input_limit');
+  assert.equal(cachedWorkerExitCode(assay), 2);
 });
 
 test('next run advances beyond the first source budget instead of reprocessing the same20', async () => {

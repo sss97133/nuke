@@ -66,7 +66,8 @@ if [ ! -s "$OUT" ]; then
   # Fallback: some runs echo the JSON to stdout instead of writing the file.
   grep -oE '\{"image_id".*\}' "$DIR/claude.log" > "$OUT" 2>/dev/null || true
 fi
-LINES=$(grep -c '{' "$OUT" 2>/dev/null || echo 0)
+LINES=0
+if [ -f "$OUT" ]; then LINES=$(grep -c '{' "$OUT" || true); fi
 if [ "${LINES:-0}" -eq 0 ]; then log "no classifications produced — abort ingest"; exit 1; fi
 log "got $LINES classifications; ingesting"
 
