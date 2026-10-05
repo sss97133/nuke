@@ -69,6 +69,14 @@ function fixture(options = {}) {
     if(u.pathname==='/functions/v1/ingest-observation') {
       load('intake');return handlers.get('intake')(request);
     }
+    if(u.pathname==='/rest/v1/rpc/link_ksl_listing_observations') {
+      assert.equal(request.method,'POST');assert.equal(options.listingRelations,true);
+      assert.deepEqual(await request.json(),{p_observation_ids:[snapshotId]});
+      assert(request.signal,'RPC has a finite abort signal');
+      if(request.signal.aborted)throw new Error('synthetic RPC deadline');
+      if(options.listingRpcError)return Response.json({message:'private database refusal'},{status:409});
+      return Response.json({success:true,linked:1,existing:0,relations:[{observation_id:snapshotId,vehicle_event_id:eventId}]});
+    }
     if(u.pathname==='/rest/v1/observation_sources') {
       if(options.retained){assert.equal(request.method,'GET');return Response.json({id:retainedParent.source_id,slug:'bat',base_trust_score:0.85,supported_observations:['listing','specification']});}
       assert.equal(request.method,'GET');assert.equal(u.searchParams.get('slug'),'eq.bat');
@@ -153,7 +161,9 @@ function fixture(options = {}) {
   function load(name) {
     if(modules.has(name))return modules.get(name);
     const exports={};modules.set(name,exports);
-    runInNewContext(sources.get(name),{exports,URL,Request,Response,Headers,TextEncoder,TextDecoder,Uint8Array,Date,crypto:webcrypto,AbortSignal,atob,btoa,fetch:http,
+    runInNewContext(sources.get(name),{exports,URL,Request,Response,Headers,TextEncoder,TextDecoder,Uint8Array,Date,crypto:webcrypto,
+      AbortSignal:options.listingRelations?{timeout:ms=>{assert.equal(ms,8000);return options.listingRpcTimeout?AbortSignal.abort():AbortSignal.timeout(ms);}}:AbortSignal,
+      atob,btoa,fetch:http,
       console:{log(){},warn(){},error(){}},Deno:{env:{get:key=>env[key]},serve:callback=>{handlers.set(name,callback);}},
       require:specifier=>{
         if(specifier.startsWith('https://esm.sh/@supabase/supabase-js@'))return {createClient:()=>supabase};
@@ -394,6 +404,40 @@ test('actual generic intake ignores caller-provided typed capture and episode ke
   assert.equal(r.status,200);assert.equal(f.observations.length,1);
   assert(!('source_snapshot_id'in f.writes[0]));assert(!('source_vehicle_event_id'in f.writes[0]));
   assert.equal(f.observations[0].source_vehicle_event_id,null,'Database default carries no caller ancestry');
+});
+test('actual KSL source listing handler admits only existing UUID selectors through bounded RPC',async()=>{
+  const f=fixture({listingRelations:true});
+  const r=await f.intake({mode:'ksl_listing_relation_v1',vehicle_id:undefined,observation_ids:[snapshotId]});
+  assert.equal(r.status,200);assert.equal(r.body.linked,1);
+  assert.deepEqual(r.body.relations,[{observation_id:snapshotId,vehicle_event_id:eventId}]);
+  assert.deepEqual(f.requests.map(q=>q.path),['/rest/v1/rpc/link_ksl_listing_observations']);
+  assert.equal(f.writes.length,0);assert.equal(f.observations.length,0);
+});
+test('actual KSL source listing handler refuses forged fields and malformed/unbounded selectors before RPC',async()=>{
+  for(const patch of [{observation_ids:[]},{observation_ids:Array(101).fill(snapshotId)},
+    {observation_ids:['not-a-uuid']},{source_url:sourceUrl},{vehicle_id:vehicleId},{kind:'sale_result'}]){
+    const f=fixture({listingRelations:true});
+    const r=await f.intake({mode:'ksl_listing_relation_v1',vehicle_id:undefined,observation_ids:[snapshotId],...patch});
+    assert.equal(r.status,400);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+  }
+});
+test('actual KSL source listing handler requires service role, refusing missing/forged/user auth',async()=>{
+  const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+  const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
+  const signing=`${header}.${payload}`,user=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+  for(const token of ['', 'forged-token',user]){
+    const f=fixture({listingRelations:true});
+    const r=await f.intake({mode:'ksl_listing_relation_v1',vehicle_id:undefined,observation_ids:[snapshotId]},token);
+    assert([401,403].includes(r.status));assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+  }
+});
+test('actual KSL source listing handler refuses RPC/deadline errors without leaking database detail',async()=>{
+  for(const option of [{listingRpcError:true},{listingRpcTimeout:true}]){
+    const f=fixture({listingRelations:true,...option});
+    const r=await f.intake({mode:'ksl_listing_relation_v1',vehicle_id:undefined,observation_ids:[snapshotId]});
+    assert.equal(r.status,409);assert.equal(r.body.error,'Source listing relation admission refused');
+    assert.equal(f.writes.length,0);assert.equal(f.observations.length,0);
+  }
 });
 test('actual current v1 protected intake refuses an unestablished caller episode key',async()=>{
   const f=fixture({allowObservationWrite:true});
