@@ -183,3 +183,43 @@ test('a capture for another parent and an impossible recorded date cannot establ
   assert.equal(plan.counts.missingDateEpisodesWithStoredBodyPointer, 0);
   assert.deepEqual(plan.episodes[0].sourceCaptureRefs, []);
 });
+
+test('live subject mode reuses the bounded SELECT and sanctioned reader once', async t => {
+  const f = await files(t), calls = [], subject = '11111111-1111-1111-1111-111111111111';
+  assert.equal(await main(['--subject', subject, '--out', f.output], { print: () => {}, readQuery: async sql => {
+    calls.push(sql);
+    assert(sql.includes(`public.cohort_members('${subject}'::uuid)`));
+    assert(sql.includes('LIMIT 10001'));
+    assert(sql.includes('5000::integer'));
+    assert(sql.includes('v.is_public IS TRUE'));
+    assert(!/\$[1-5]\b/.test(sql));
+    return JSON.stringify([{ receipt: nativeInput().receipt }]);
+  } }), 0);
+  const report = JSON.parse(await readFile(f.output, 'utf8'));
+  assert.equal(calls.length, 1);
+  assert.equal(report.liveRead.queryTool, 'scripts/data/q.sh');
+  assert.equal(report.networkCalls, 1);
+  assert.equal(report.databaseWrites + report.modelCalls, 0);
+  assert.equal(report.repairPlan.counts.identifiedEpisodes, 1);
+  assert.equal(report.result.counts.qualifiedEpisodes, 0);
+});
+
+test('live mode rejects injection, ambiguous modes and existing output without a query', async t => {
+  const f = await files(t); let calls = 0;
+  const deps = { print: () => {}, readQuery: () => { calls++; throw new Error('must not query'); } };
+  assert.equal(await main(['--subject', "'; SELECT secret; --", '--out', f.output], deps), 1);
+  assert.equal(await main(['--subject', '11111111-1111-1111-1111-111111111111', '--input', f.source, '--out', f.output], deps), 1);
+  await writeFile(f.output, 'existing');
+  assert.equal(await main(['--subject', '11111111-1111-1111-1111-111111111111', '--out', f.output], deps), 1);
+  assert.equal(calls, 0);
+  assert.equal(await readFile(f.output, 'utf8'), 'existing');
+});
+
+test('live read failures stay explicit without leaking tool errors or creating an empty receipt', async t => {
+  const f = await files(t), printed = [];
+  assert.equal(await main(['--subject', '11111111-1111-1111-1111-111111111111', '--out', f.output], {
+    print: x => printed.push(JSON.parse(x)), readQuery: () => { throw new Error('synthetic-private-error'); },
+  }), 1);
+  assert.deepEqual(printed, [{ success: false, error: 'sanctioned_read_failed' }]);
+  await assert.rejects(stat(f.output), { code: 'ENOENT' });
+});

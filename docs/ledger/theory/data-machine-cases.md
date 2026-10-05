@@ -754,8 +754,19 @@ multiple parent pointers, unresolved native refs and exact candidate capture ref
 counts are unknown on header overflow; native overflow refuses totals. The native format rejects
 qualified claims, duplicate/missing presentations and foreign source tables. It admits no testimony,
 does not fetch bodies and retains the original saved-population format. Output stays private, mode
-0600 and no-overwrite. Twelve focused contracts pass; the five new boundary/queue cases failed on
+0600 and no-overwrite. Fifteen focused contracts pass; the five new boundary/queue cases failed on
 the prior implementation. Existing PR CI runs this same test file.
+
+The same tool can retrieve an existing registered subject in one command:
+`node scripts/assay-sale-population.mjs --subject COHORT_UUID --out PRIVATE_JSON`. It executes the
+existing SELECT through sanctioned `scripts/data/q.sh` once, retains the exact private native receipt,
+and returns the repair plan. UUID validation, read-only SELECT checks and a 10,001-parent sentinel
+protect the bounded request; the two native selectors and header selector retain their independent
+5,000-row limits. Unknown/oversized subjects refuse rather than presenting a sampled market. This
+mode supplies no comparison subject or feature policy and never promotes candidate prices. Existing
+outputs refuse before the query, failed reads create no empty receipt, and source/tool errors are
+redacted. The offline saved-input mode remains available for replay. Both are developer diagnostics;
+the anonymous valuation route remains unchanged.
 
 **Performance boundary:** first management reads were 7.241/5.703/1.312 s for Corvette/Mustang/BMW;
 one warm EXPLAIN per request measured 3,428/3,096/565 ms database execution, with no sequential

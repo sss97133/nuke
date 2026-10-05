@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 /**
  * Audit saved sale-event reader inputs with the existing deal-read selector.
- * No network, source intake, database writes, inference or profile-price updates.
+ * Offline mode has no network; both modes avoid source intake, database writes,
+ * inference and profile-price updates.
  * Input: { schemaVersion: 'sale_event_population_v1', rows, options }.
  * Or: { schemaVersion: 'sale_event_candidate_assay_v1', receipt, options },
  * with the unchanged private sale-event-candidates.sql receipt. This adds an
  * episode repair queue; it does not qualify native claims or fetch source bodies.
  * Run: node scripts/assay-sale-population.mjs --input /private/input.json --out /private/receipt.json
+ * Live current context: --subject EXISTING_COHORT_UUID --out /private/receipt.json
+ * The live mode uses sanctioned q.sh once, never source fetching or testimony intake.
  * Requires Node 22.18+ for the project's erasable TypeScript module.
  */
-import { open, realpath } from 'node:fs/promises';
+import { open, realpath, readFile, lstat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const execute = promisify(execFile);
 const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 const PRICE_BASES = new Set(['published_bid_excluding_fees', 'buyer_total', null]);
 const DIMENSIONS = new Set(['make', 'model', 'comparison_group', 'model_year', 'engine', 'transmission', 'body_style', 'condition', 'region', 'provenance']);
@@ -35,12 +41,15 @@ export function parseArgs(args) {
   const options = {};
   for (let index = 0; index < args.length; index++) {
     const flag = args[index];
-    if (!['--input', '--out'].includes(flag) || options[flag.slice(2)] || !args[index + 1] || args[index + 1].startsWith('--')) {
+    if (!['--input', '--subject', '--out'].includes(flag) || options[flag.slice(2)] || !args[index + 1] || args[index + 1].startsWith('--')) {
       throw new AssayError('invalid_arguments');
     }
     options[flag.slice(2)] = args[++index];
   }
-  if (!options.input || !options.out) throw new AssayError('input_and_out_required');
+  if ((!options.input && !options.subject) || (options.input && options.subject) || !options.out) throw new AssayError('one_input_mode_and_out_required');
+  if (options.subject && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.subject)) {
+    throw new AssayError('invalid_subject_uuid');
+  }
   return options;
 }
 
@@ -164,6 +173,41 @@ async function readInput(file) {
   } finally { await handle?.close(); }
 }
 
+async function readSubject(subject, deps) {
+  const sql = await readFile(path.join(REPO_ROOT, 'scripts/discovery/sale-event-candidates.sql'), 'utf8');
+  const parents = `(SELECT ARRAY(SELECT v.id FROM public.cohort_members('${subject.toLowerCase()}'::uuid) m
+    JOIN public.vehicles v ON v.id=m.vehicle_id WHERE v.is_public IS TRUE AND v.deleted_at IS NULL
+    AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item' ORDER BY v.id LIMIT 10001))`;
+  const query = sql.replace(/^[ \t]*--.*$/gm, '').replaceAll('$1::uuid[]', parents).replaceAll('$2::timestamptz', 'NULL::timestamptz')
+    .replaceAll('$3::timestamptz', 'NULL::timestamptz').replaceAll('$4::integer', '5000::integer').replaceAll('$5::integer', '5000::integer');
+  if (/\$[1-5]\b/.test(query) || !query.trimStart().startsWith('WITH request AS MATERIALIZED')
+    || /\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|CALL|DO)\b/i.test(query)) throw new AssayError('candidate_query_contract_changed');
+  let bytes, receipt;
+  const started = Date.now();
+  try {
+    const read = deps.readQuery ?? (async query => (await execute('bash', [path.join(REPO_ROOT, 'scripts/data/q.sh'), query],
+      { cwd: REPO_ROOT, timeout: 65000, maxBuffer: 32 * 1024 * 1024 })).stdout);
+    bytes = await read(query);
+    const result = JSON.parse(bytes);
+    if (!Array.isArray(result) || result.length !== 1 || !record(result[0].receipt)) throw new Error('invalid_query_response');
+    receipt = result[0].receipt;
+  } catch { throw new AssayError('sanctioned_read_failed'); }
+  const computedAt = new Date().toISOString();
+  const options = {
+    population: { key: subject.toLowerCase(), label: 'Registered subject current public parent page',
+      basis: 'cohort_members_current_public_undeleted_real_parent_page', complete: false },
+    subject: { sourcePlatform: null, sourceEpisodeKey: null, vehicleId: null, currency: null, priceBasis: null, relevance: [] },
+    policy: { key: '', basis: '', requiredDimensions: [] }, eventFrom: '1900-01-01T00:00:00Z',
+    eventBefore: computedAt, evidenceAsOf: computedAt, computedAt, knowledgeMode: 'retrospective', minimumMatchedSales: 10,
+  };
+  return { input: validateInput({ schemaVersion: 'sale_event_candidate_assay_v1', receipt, options }),
+    sha256: createHash('sha256').update(bytes).digest('hex'), liveRead: {
+      subjectId: subject.toLowerCase(), queryTool: 'scripts/data/q.sh',
+      querySha256: createHash('sha256').update(query).digest('hex'), readCompletedAt: computedAt,
+      requestElapsedMs: Date.now() - started, nativeRowsPerTableLimit: 5000, captureHeaderLimit: 5000,
+    } };
+}
+
 async function outputPath(file) {
   const parent = await realpath(path.dirname(path.resolve(file)));
   const relative = path.relative(REPO_ROOT, parent);
@@ -178,26 +222,33 @@ export async function main(args = process.argv.slice(2), deps = {}) {
   let output;
   try {
     const argsParsed = parseArgs(args);
-    const { input, sha256 } = await readInput(argsParsed.input);
+    const target = await outputPath(argsParsed.out);
+    // An existing file or symlink refuses before a privileged query. The final
+    // exclusive open also protects against a file arriving during the read.
+    try { await lstat(target); throw new AssayError('output_exists_or_unwritable'); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const { input, sha256, liveRead } = argsParsed.subject
+      ? await readSubject(argsParsed.subject, deps) : await readInput(argsParsed.input);
     const select = deps.select ?? (await import('../nuke_frontend/src/lib/dealRead/batComps.ts')).selectSourceSalePopulation;
     const nativeReceipt = input.schemaVersion === 'sale_event_candidate_assay_v1' ? input.receipt : null;
     const result = select(input.rows, nativeReceipt && !nativeReceipt.coverage.complete
       ? { ...input.options, population: { ...input.options.population, complete: false } } : input.options);
     const repairPlan = nativeReceipt ? candidateRepairPlan(nativeReceipt) : null;
-    const target = await outputPath(argsParsed.out);
     try { output = await open(target, 'wx', 0o600); } catch { throw new AssayError('output_exists_or_unwritable'); }
     const report = {
       stage: 'local_read_only_sale_population_assay',
       source: { inputSha256: sha256, schemaVersion: input.schemaVersion },
-      boundary: 'Saved reader inputs are audited; this run admits no source evidence and installs no production reader.',
-      databaseWrites: 0, modelCalls: 0, networkCalls: 0,
+      boundary: `${liveRead ? 'Current registered-subject reader inputs' : 'Saved reader inputs'} are audited; this run admits no source evidence and installs no production reader.`,
+      databaseWrites: 0, modelCalls: 0, networkCalls: liveRead ? 1 : 0,
+      ...(liveRead ? { liveRead } : {}),
+      ...(liveRead ? { nativeEvidence: nativeReceipt } : {}),
       result,
       ...(repairPlan ? { repairPlan } : {}),
     };
     await output.writeFile(JSON.stringify(report, null, 2) + '\n');
     print(JSON.stringify({ stage: report.stage, inputSha256: sha256, counts: result.counts, reasons: result.reasons,
       repeatSalePairs: result.repeatSales.length, ...(repairPlan ? { repairCounts: repairPlan.counts } : {}),
-      databaseWrites: 0, modelCalls: 0, networkCalls: 0 }));
+      databaseWrites: 0, modelCalls: 0, networkCalls: report.networkCalls }));
     return 0;
   } catch (error) {
     print(JSON.stringify({ success: false, error: error instanceof AssayError ? error.code : 'assay_failed' }));
