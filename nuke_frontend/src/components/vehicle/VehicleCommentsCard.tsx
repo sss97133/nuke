@@ -48,8 +48,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   containerStyle,
 }) => {
   const navigate = useNavigate();
-  const { data: rawRows, isLoading: rawLoading, refetch } = useVehicleCommentsUnified(vehicleId);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const { data: rawRows, isLoading: rawLoading, isError: readError, refetch } = useVehicleCommentsUnified(vehicleId);
+  const [processed, setProcessed] = useState<{ vehicleId: string; comments: Comment[] } | null>(null);
+  const [processingFailure, setProcessingFailure] = useState<string | null>(null);
+  const processingError = processingFailure === vehicleId;
+  const comments = !readError && !processingError && processed?.vehicleId === vehicleId ? processed.comments : [];
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(!collapsed);
   const [newComment, setNewComment] = useState('');
@@ -82,13 +85,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
   // Process raw rows into Comment objects when data changes
   useEffect(() => {
-    if (!rawRows) return;
-    processRows(rawRows);
-  }, [rawRows]);
+    let current = true;
+    if (rawRows && !readError) processRows(rawRows, () => current);
+    return () => { current = false; };
+  }, [rawRows, vehicleId, readError]);
 
-  const processRows = async (allRows: any[]) => {
+  const processRows = async (allRows: any[], isCurrent: () => boolean) => {
     try {
       setLoading(true);
+      setProcessingFailure(null);
 
       const normalizeExternalPlatform = (raw: any): string | null => {
         if (!raw) return null;
@@ -218,12 +223,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         }
       }
 
-      setComments(allComments);
-    } catch (err) {
-      console.warn('Failed to load comments:', err);
-      setComments([]);
+      if (isCurrent()) setProcessed({ vehicleId, comments: allComments });
+    } catch {
+      if (isCurrent()) setProcessingFailure(vehicleId);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -468,7 +472,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           flexShrink: 0,
         }}
       >
-        <div>Comments &amp; Bids ({comments.length})</div>
+        <div>Comments &amp; Bids {readError || processingError || rawLoading || loading || processed?.vehicleId !== vehicleId ? '(—)' : `(${comments.length})`}</div>
         {hasMore && !expanded && (
           <button
             className="btn-utility"
@@ -488,7 +492,12 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           overflowX: 'hidden',
         }}
       >
-        {loading ? (
+        {readError || processingError ? (
+          <div role="status" style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '12px' }}>
+            Comments could not be loaded completely. Their absence has not been established.
+            {' '}<button type="button" className="btn-utility" onClick={() => refetch()}>Retry comments</button>
+          </div>
+        ) : rawLoading || loading || processed?.vehicleId !== vehicleId ? (
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
             Loading comments...
           </div>
@@ -840,4 +849,3 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 };
 
 export default VehicleCommentsCard;
-
