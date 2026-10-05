@@ -64,6 +64,12 @@ changes unread state and calls the old URL-only edge processor. Preparing that t
 verifying its exact account, readonly scope, durable pagination and failure handling precede
 any activation. The paused cloud cron remains paused.
 
+The owner also authorized Gmail organization on 2026-10-04. Native Gmail filters now archive
+and mark recognized KSL, BaT and Cars & Bids listing alerts read. The acquisition cursor must
+therefore use message IDs/history or dated sender searches across the mailbox: **never require
+`is:unread` or `in:inbox`**. Read state is the owner's presentation preference, not an intake
+receipt. Only the verified observation receipt/checkpoint establishes successful acquisition.
+
 The local assay covers 30 cached KSL messages (30 matches, 79 recommendations) plus current
 KSL, BaT and Cars & Bids MIME samples. It checks per-card boundaries and replay/failure behavior;
 it does not establish every historical template or fleet completion. Source/template coverage
