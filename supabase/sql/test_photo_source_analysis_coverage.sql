@@ -70,6 +70,7 @@ END $$;
 \ir ../migrations/20261005021008_photo_library_source_analysis_coverage.sql
 -- Match the live atlas: there is no legacy vehicle_suggestions table.
 \ir ../migrations/20261005025602_remove_absent_photo_suggestions_reader.sql
+\ir ../migrations/20261005031512_bound_photo_recent_output_probe.sql
 SET ROLE anon;
 DO $$ BEGIN
   BEGIN PERFORM public.get_photo_library_stats('10000000-0000-0000-0000-000000000001');
@@ -77,6 +78,7 @@ DO $$ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
+
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claims','{"role":"authenticated"}',false);
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',false);
@@ -129,6 +131,26 @@ SELECT set_config('request.jwt.claims','{"role":"service_role"}',false);
 DO $$ BEGIN
   IF public.get_photo_library_stats('10000000-0000-0000-0000-000000000001')::jsonb#>>'{source_analysis,records}'<>'6' THEN
     RAISE EXCEPTION 'Service read failed';
+  END IF;
+END $$;
+RESET ROLE;
+
+-- The recent population remains exactly the newest 100 before metadata and
+-- output probes, even when the source population is larger and outputs overlap.
+INSERT INTO public.vehicle_images(id,user_id,ai_processing_status,source,created_at,ai_scan_metadata)
+SELECT ('90000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,
+ '10000000-0000-0000-0000-000000000001'::uuid,'pending','new-fixture',
+ '2026-03-01'::timestamptz+n*interval '1 minute','{}'::jsonb
+FROM generate_series(1,110)n;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',false);
+SELECT set_config('request.jwt.claims','{"role":"authenticated"}',false);
+DO $$ DECLARE c jsonb; BEGIN
+  c:=public.get_photo_library_stats(auth.uid())::jsonb->'source_analysis';
+  IF c->>'records'<>'116' OR c#>>'{recent,sample_size}'<>'100' OR c#>>'{recent,pending}'<>'100'
+     OR c#>>'{recent,failed}'<>'0' OR c#>>'{recent,with_analysis_records}'<>'0'
+     OR c#>>'{recent,with_work_extractions}'<>'0' OR c#>>'{recent,with_witnesses}'<>'0' THEN
+    RAISE EXCEPTION 'Newest-100 probe lost its source boundary: %',c;
   END IF;
 END $$;
 RESET ROLE;
