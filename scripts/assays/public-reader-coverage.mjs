@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Current public parent -> existing sale/price fold coverage assay.
+ * Current public parent -> existing price/specification/comment/bid reader assay.
  * Keyset pages, anonymous credentials, bounded requests, append-only PRIVATE receipt.
  * No counts over the store, raw testimony reconstruction, intake, writes or inference.
  * Example: bash scripts/check-ingestion-health.sh --public-readers --env /private/env
@@ -32,19 +32,22 @@ export function options(args, now = Date.now()) {
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i];
-    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects', '--comment-limit'].includes(name) ||
+    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects', '--comment-limit', '--bid-limit'].includes(name) ||
       seen.has(name) || !args[i + 1] || args[i + 1].startsWith('--')) throw new AssayError('invalid_arguments');
     seen.add(name);
     const v = args[i + 1];
     if (name === '--page-size') o.pageSize = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--comment-limit') o.commentLimit = /^\d+$/.test(v) ? Number(v) : NaN;
+    else if (name === '--bid-limit') o.bidLimit = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--max-pages') o.maxPages = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
-  if (!o.out || !['price', 'specifications', 'comments'].includes(o.family) ||
+  if (!o.out || !['price', 'specifications', 'comments', 'bids'].includes(o.family) ||
     (seen.has('--comment-limit') && o.family !== 'comments') ||
     (o.commentLimit !== undefined && (!Number.isInteger(o.commentLimit) || o.commentLimit < 1000 || o.commentLimit > 10000)) ||
+    (seen.has('--bid-limit') && o.family !== 'bids') ||
+    (o.bidLimit !== undefined && (!Number.isInteger(o.bidLimit) || o.bidLimit < 1000 || o.bidLimit > 10000)) ||
     (o.family !== 'price') !== Boolean(o.subjects) ||
     !['sold', 'all'].includes(o.scope) || !UUID.test(o.after) ||
     !Number.isInteger(o.pageSize) || o.pageSize < 20 || o.pageSize > 1000 ||
@@ -52,6 +55,7 @@ export function options(args, now = Date.now()) {
     !Number.isFinite(o.until) || o.until <= now || o.until > now + 14 * 60 * 60_000) throw new AssayError('invalid_scope');
   o.after = o.after.toLowerCase();
   if (o.family === 'comments') o.commentLimit ??= 1000;
+  if (o.family === 'bids') o.bidLimit ??= 1000;
   if (o.family !== 'price') {
     if (['--scope', '--after', '--page-size'].some(key => seen.has(key))) throw new AssayError('manifest_scope_has_no_price_cursor');
     o.scope = 'explicit_manifest';
@@ -136,6 +140,23 @@ export function publicClient(config, fetcher = fetch) {
       if (cursor) q.set('and', `(or(comment_type.is.null,comment_type.neq.bid),or(posted_at.lt."${cursor.postedAt}",and(posted_at.eq."${cursor.postedAt}",id.lt.${cursor.id})))`);
       else q.set('or', '(comment_type.is.null,comment_type.neq.bid)');
       return request(`auction_comments?${q}`);
+    },
+    bidHeaders(id, after) {
+      if (!UUID.test(id) || after !== undefined && !UUID.test(after)) throw new AssayError('invalid_reader_scope');
+      const q = new URLSearchParams({
+        select: 'comment_id,vehicle_id,observed_at,comment_type,platform,external_identity_id,auction_event_id,source_category,source_slug',
+        vehicle_id: `eq.${id}`, bid_amount: 'gt.0', order: 'comment_id.asc', limit: '200',
+      });
+      if (after) q.set('comment_id', `gt.${after}`);
+      return request(`vehicle_comments_unified?${q}`);
+    },
+    bidOrigins(id, ids) {
+      if (!UUID.test(id ?? '')) throw new AssayError('invalid_reader_scope');
+      return contexts('auction_comments', 'id,vehicle_id,posted_at,comment_type,platform,external_identity_id,author_external_identity_id,auction_event_id', ids, id);
+    },
+    bidObservationOrigins(id, ids) {
+      if (!UUID.test(id ?? '')) throw new AssayError('invalid_reader_scope');
+      return contexts('vehicle_observations', 'id,vehicle_id,observed_at,kind,source_comment_id,confidence_score,is_superseded,extraction_method', ids, id);
     },
     sourceAuctions(id, ids) {
       if (!UUID.test(id ?? '')) throw new AssayError('invalid_reader_scope');
@@ -395,6 +416,188 @@ export function inspectCommentLineage(headers, auctions, identities) {
   return result;
 }
 
+const nullableUuid = x => x === null || typeof x === 'string' && UUID.test(x);
+const nullableString = x => x === null || typeof x === 'string';
+const sameClock = (a, b) => a === b || instant(a) !== null && instant(b) !== null && instant(a) === instant(b);
+
+export function inspectBidHeaders(id, value) {
+  const seen = new Set();
+  return Array.isArray(value) && value.length <= 200 && value.every(x => {
+    if (!object(x) || !UUID.test(x.comment_id ?? '') || seen.has(x.comment_id) || x.vehicle_id !== id ||
+      !['auction', 'observation'].includes(x.source_category) ||
+      !['external_identity_id', 'auction_event_id'].every(key => nullableUuid(x[key])) ||
+      !['observed_at', 'comment_type', 'platform'].every(key => nullableString(x[key])) ||
+      typeof x.source_slug !== 'string') return false;
+    seen.add(x.comment_id); return true;
+  });
+}
+
+function validBidOrigins(rows, ids, parent, observation = false) {
+  return Array.isArray(rows) && rows.length <= ids.length && new Set(rows.map(x => x?.id)).size === rows.length &&
+    rows.every(x => object(x) && ids.includes(x.id) && x.vehicle_id === parent && (observation
+      ? nullableString(x.observed_at) && ['comment', 'bid'].includes(x.kind) && nullableUuid(x.source_comment_id) &&
+        (x.confidence_score === null || number(x.confidence_score) !== null) &&
+        (x.is_superseded === null || typeof x.is_superseded === 'boolean') && nullableString(x.extraction_method)
+      : ['posted_at', 'comment_type', 'platform'].every(key => nullableString(x[key])) &&
+        ['auction_event_id', 'external_identity_id', 'author_external_identity_id'].every(key => nullableUuid(x[key]))));
+}
+
+export function inspectBidLineage(headers, origins, observations, sourceComments, auctions, identities) {
+  const native = new Map(origins.map(x => [x.id, x])), derived = new Map(observations.map(x => [x.id, x]));
+  const sources = new Map(sourceComments.map(x => [x.id, x]));
+  const result = { bidHeaders: headers.length, nativeHeaders: 0, observationHeaders: 0,
+    nativeOriginsFound: 0, matchingNativeProjections: 0, finiteNativePostClocks: 0,
+    observationOriginsFound: 0, matchingObservationClocks: 0, linkedObservationSourceComments: 0,
+    failures: {}, gaps: {}, samples: {} };
+  const add = (group, key, id) => { group[key] = (group[key] ?? 0) + 1; result.samples[key] ??= [];
+    if (result.samples[key].length < 10 && !result.samples[key].includes(id)) result.samples[key].push(id); };
+  for (const h of headers) {
+    const id = h.comment_id;
+    if (h.source_category === 'auction') {
+      result.nativeHeaders++;
+      const source = native.get(id);
+      if (!source) { add(result.gaps, 'native_bid_source_unavailable_in_current_read', id); continue; }
+      result.nativeOriginsFound++;
+      let matching = true;
+      for (const key of ['comment_type', 'platform', 'external_identity_id', 'auction_event_id']) if (h[key] !== source[key]) {
+        matching = false; add(result.failures, `native_bid_projection_${key}_mismatch`, id);
+      }
+      if (!sameClock(h.observed_at, source.posted_at)) { matching = false; add(result.failures, 'native_bid_post_clock_projection_mismatch', id); }
+      if (matching) result.matchingNativeProjections++;
+      if (instant(source.posted_at) !== null) result.finiteNativePostClocks++;
+      else add(result.gaps, 'native_bid_post_clock_unmeasured', id);
+      if (source.comment_type !== 'bid') add(result.gaps, 'positive_bid_number_without_bid_type_label', id);
+      if (source.platform === null && h.source_slug === 'bat') add(result.gaps, 'source_slug_defaults_bat_without_retained_platform', id);
+    } else {
+      result.observationHeaders++;
+      add(result.gaps, 'observation_bid_source_role_and_episode_unqualified', id);
+      const source = derived.get(id);
+      if (!source) { add(result.gaps, 'bid_observation_source_unavailable_in_current_read', id); continue; }
+      result.observationOriginsFound++;
+      if (sameClock(h.observed_at, source.observed_at)) result.matchingObservationClocks++;
+      else add(result.failures, 'bid_observation_clock_projection_mismatch', id);
+      if (source.is_superseded === true) add(result.gaps, 'superseded_observation_exposed_as_positive_bid', id);
+      if (source.source_comment_id && sources.has(source.source_comment_id)) result.linkedObservationSourceComments++;
+      else add(result.gaps, 'observation_bid_native_comment_parent_link_unavailable', id);
+    }
+  }
+  // Native source rows keep both author keys. The public view currently projects
+  // only the legacy key; matching that projection is not canonical person proof.
+  const lineage = inspectCommentLineage(origins, auctions, identities);
+  result.nativeAuthorStates = lineage.identityStates;
+  result.matchingAuctionParents = lineage.matchedAuctionParents;
+  result.matchingRecordedIdentityNamespaces = lineage.matchingRecordedNamespaces;
+  for (const [key, count] of Object.entries(lineage.gaps)) result.gaps[key] = (result.gaps[key] ?? 0) + count;
+  Object.assign(result.samples, lineage.samples);
+  return result;
+}
+
+async function bidCollection(client, id, o, now, emit) {
+  const rows = [], hashes = [], seen = new Set(); let after;
+  for (let page = 0; page < 100; page++) {
+    if (now() >= o.until) return { ok: true, complete: false, gaps: { bid_collection_time_unmeasured: 1 }, stopReason: 'time_budget_reached' };
+    const r = await client.bidHeaders(id, after);
+    if (!r.ok) return r;
+    if (!inspectBidHeaders(id, r.value)) return { ok: true, safe: false, failures: { bid_header_scope_or_shape_invalid: 1 } };
+    for (const h of r.value) {
+      if (seen.has(h.comment_id) || after && h.comment_id <= after) return { ok: true, safe: false, failures: { bid_header_order_or_repeated_id: 1 } };
+      seen.add(h.comment_id); rows.push(h); after = h.comment_id;
+    }
+    hashes.push(hash(r.value));
+    await emit({ type: 'bid_source_page', vehicleId: id, returned: r.value.length, responseSha256: hashes.at(-1), durationMs: r.durationMs });
+    if (rows.length > (o.bidLimit ?? 1000)) return { ok: true, complete: false, atLeast: rows.length, gaps: { bid_collection_cap_unmeasured: 1 } };
+    if (!r.value.length) return { ok: true, complete: true, value: rows, responseSha256: hash(hashes) };
+  }
+  return { ok: true, complete: false, gaps: { bid_collection_page_budget_unmeasured: 1 } };
+}
+
+export async function runBidLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
+  const counters = ['bidHeaders', 'nativeHeaders', 'observationHeaders', 'nativeOriginsFound', 'matchingNativeProjections',
+    'finiteNativePostClocks', 'observationOriginsFound', 'matchingObservationClocks', 'linkedObservationSourceComments',
+    'matchingAuctionParents', 'matchingRecordedIdentityNamespaces'];
+  const summary = { stage: 'read_only_public_positive_bid_header_lineage_assay', startedAt: new Date(now()).toISOString(),
+    requestedParents: subjects.ids.length, manifestSha256: subjects.sha256, population: subjects.population,
+    gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
+    measured: Object.fromEntries(counters.map(key => [key, 0])),
+    nativeAuthorStates: { absent: 0, legacyOnly: 0, canonicalOnly: 0, agreeing: 0, conflicting: 0 },
+    failures: {}, gaps: {}, bidLimit: o.bidLimit ?? 1000, databaseWrites: 0, recordRepairs: 0, modelCalls: 0,
+    boundary: 'Explicit current public-parent manifest, existing vehicle_comments_unified rows filtered by recorded bid_amount>0. This reader is not all retained bid history: native presence suppresses the observation branch for a vehicle. UUID pages seek to empty, bounded by the recorded bidLimit, 100 pages and deadline. Completed-collection counters only; separate current reads are not an immutable snapshot. Native posting clocks remain separate from observation clocks. Source/author/auction metadata only: no amounts, quotes, usernames, handles, currency attestation, independent bidders, historical velocity, cohort/condition matching or outcome prediction. Matching projections do not prove an observation is a native bid or an identity is the same person.' };
+  const merge = value => { for (const group of ['gaps', 'failures']) for (const [key, count] of Object.entries(value[group] ?? {})) summary[group][key] = (summary[group][key] ?? 0) + count; };
+  const readerFailures = {};
+  const fail = reader => { readerFailures[reader] = (readerFailures[reader] ?? 0) + 1;
+    if (readerFailures[reader] >= 2) summary.stopReason = 'repeated_bid_reader_failure_inspect_cause'; };
+  async function context(reader, ids, vehicleId, fetcher, validate) {
+    const found = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; return null; }
+      const wanted = ids.slice(i, i + 200), r = await fetcher(wanted);
+      if (!r.ok) {
+        fail(reader); merge({ failures: { bid_context_reader_failed: 1 } });
+        await emit({ type: 'bid_reader_failure', reader, vehicleId, status: r.status, code: r.code, durationMs: r.durationMs });
+        return null;
+      }
+      if (!validate(r.value, wanted)) { merge({ failures: { bid_context_scope_or_shape_invalid: 1 } }); summary.stopReason = 'unsafe_bid_context'; return null; }
+      found.push(...r.value);
+      await emit({ type: 'bid_context', reader, vehicleId, requested: wanted.length, returned: r.value.length, responseSha256: hash(r.value), durationMs: r.durationMs });
+    }
+    return found;
+  }
+  outer: for (let offset = 0, pages = 0; offset < subjects.ids.length; offset += 200, pages++) {
+    if (now() >= o.until || pages >= o.maxPages) { summary.stopReason = now() >= o.until ? 'time_budget_reached' : 'page_budget_reached'; break; }
+    const ids = subjects.ids.slice(offset, offset + 200), gate = await client.subjects(ids);
+    if (!gate.ok || !Array.isArray(gate.value)) { merge({ failures: { bid_parent_reader_failed: 1 } }); summary.stopReason = 'bid_parent_reader_failed'; break; }
+    const eligible = new Set();
+    for (const p of gate.value) {
+      if (!object(p) || !ids.includes(p.id) || eligible.has(p.id) || p.is_public !== true || p.deleted_at !== null || p.listing_kind === 'non_vehicle_item') {
+        merge({ failures: { bid_parent_gate_invalid: 1 } }); summary.stopReason = 'bid_parent_gate_invalid'; break outer;
+      }
+      eligible.add(p.id);
+    }
+    summary.gatedParents += ids.length; summary.eligibleParents += eligible.size; summary.absentOrIneligibleParents += ids.length - eligible.size;
+    await emit({ type: 'bid_gate', requested: ids.length, eligible: eligible.size, absentOrIneligible: ids.length - eligible.size, responseSha256: hash(gate.value), durationMs: gate.durationMs });
+    for (const id of ids.filter(id => eligible.has(id))) {
+      if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
+      const collected = await bidCollection(client, id, o, now, emit); summary.inspectedParents++;
+      if (!collected.ok) {
+        fail('vehicle_comments_unified'); merge({ failures: { bid_header_reader_failed: 1 }, gaps: { bid_header_parent_unmeasured: 1 } });
+        await emit({ type: 'bid_reader_failure', reader: 'vehicle_comments_unified', vehicleId: id, status: collected.status, code: collected.code, durationMs: collected.durationMs });
+      } else {
+        merge(collected);
+        if (collected.safe === false) { summary.stopReason = 'unsafe_bid_headers'; break outer; }
+        if (!collected.complete) {
+          await emit({ type: 'bid_parent_unmeasured', vehicleId: id, atLeast: collected.atLeast, gaps: collected.gaps });
+          if (collected.stopReason) summary.stopReason = collected.stopReason;
+        } else {
+          const headers = collected.value, nativeIds = headers.filter(x => x.source_category === 'auction').map(x => x.comment_id);
+          const observationIds = headers.filter(x => x.source_category === 'observation').map(x => x.comment_id);
+          const native = await context('auction_comments', nativeIds, id, ids => client.bidOrigins(id, ids), (rows, ids) => validBidOrigins(rows, ids, id));
+          const obs = native && await context('vehicle_observations', observationIds, id, ids => client.bidObservationOrigins(id, ids), (rows, ids) => validBidOrigins(rows, ids, id, true));
+          const quoteIds = obs && [...new Set(obs.map(x => x.source_comment_id).filter(Boolean))];
+          const source = quoteIds && await context('auction_comments', quoteIds, id, ids => client.bidOrigins(id, ids), (rows, ids) => validBidOrigins(rows, ids, id));
+          const auctionIds = native && [...new Set(native.map(x => x.auction_event_id).filter(Boolean))];
+          const identityIds = native && [...new Set(native.flatMap(x => [x.external_identity_id, x.author_external_identity_id]).filter(Boolean))];
+          const auctions = source && await context('auction_events', auctionIds, id, ids => client.sourceAuctions(id, ids), (rows, ids) => validContexts(rows, ids, id));
+          const identities = auctions && await context('external_identities', identityIds, id, ids => client.sourceIdentities(ids), (rows, ids) => validContexts(rows, ids));
+          if (!identities) merge({ gaps: { bid_context_parent_unmeasured: 1 } });
+          else {
+            const measured = inspectBidLineage(headers, native, obs, source, auctions, identities); merge(measured);
+            summary.completedParents++;
+            for (const key of counters) summary.measured[key] += measured[key];
+            for (const [key, count] of Object.entries(measured.nativeAuthorStates)) summary.nativeAuthorStates[key] += count;
+            await emit({ type: 'bid_parent', vehicleId: id, measuredAt: new Date(now()).toISOString(), responseSha256: collected.responseSha256, ...measured });
+          }
+        }
+      }
+      if (summary.stopReason) break outer;
+      if (summary.inspectedParents % 25 === 0) progress({ inspectedParents: summary.inspectedParents, measured: summary.measured, failures: summary.failures });
+    }
+  }
+  summary.stopReason ??= 'manifest_exhausted'; summary.finishedAt = new Date(now()).toISOString(); summary.networkRequests = client.requests;
+  summary.status = Object.keys(summary.failures).length ? 'failed' : summary.stopReason === 'manifest_exhausted' && summary.completedParents > 0 && summary.completedParents === summary.eligibleParents ? 'passed_current_bid_reader_lineage_in_manifest' : 'incomplete';
+  summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'incomplete' ? 2 : 0;
+  await emit({ type: 'summary', ...summary }); return summary;
+}
+
 export async function runCommentLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
   const commentLimit = o.commentLimit ?? 1000;
   const summary = { stage: 'read_only_public_comment_header_lineage_assay', startedAt: new Date(now()).toISOString(),
@@ -617,17 +820,20 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     await emit({ type: 'manifest', schemaVersion: 'public_reader_coverage_v2',
       assaySourceSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex'),
       options: { ...o, env: undefined, out: undefined, subjects: undefined },
-      anonymous: true, readers: o.family === 'comments' ? ['vehicles', 'auction_comments', 'auction_events', 'external_identities']
+      anonymous: true, readers: o.family === 'bids' ? ['vehicles', 'vehicle_comments_unified', 'auction_comments', 'vehicle_observations', 'auction_events', 'external_identities']
+        : o.family === 'comments' ? ['vehicles', 'auction_comments', 'auction_events', 'external_identities']
         : subjects ? ['vehicles', 'get_vehicle_specs', 'get_field_provenance'] : ['vehicles', 'vehicle_price_facts'],
       parentFields: subjects ? 'id,is_public,deleted_at,listing_kind' : PARENT_FIELDS,
       outputContains: 'response/page hashes, scope, clocks, counts and bounded public failure UUIDs; no raw source/comment bodies or credentials' });
-    const report = o.family === 'comments' ? await runCommentLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+    const report = o.family === 'bids' ? await runBidLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+      : o.family === 'comments' ? await runCommentLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : subjects ? await runSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : await runCoverage(client, o, { ...deps, emit, progress: value => print(JSON.stringify(value)) });
     print(JSON.stringify({ status: report.status, stopReason: report.stopReason, inspectedRecords: report.inspectedRecords,
       measuredFoldRecords: report.measuredFoldRecords, recordsPerSecond: report.recordsPerSecond, failures: report.failures,
       inspectedParents: report.inspectedParents, selectedReports: report.selectedReports, matchingReports: report.matchingReports,
       measuredCommentHeaders: report.measuredCommentHeaders, identityStates: report.identityStates,
+      measured: report.measured, nativeAuthorStates: report.nativeAuthorStates,
       diagnostics: report.diagnostics, gaps: report.gaps, recordRepairs: 0, verifiedRepairs: 0, databaseWrites: 0, modelCalls: 0 }));
     return report.exitCode;
   } catch (e) { print(JSON.stringify({ status: 'failed', error: e instanceof AssayError ? e.code : 'assay_initialization_or_output_failed' })); return 1; }
