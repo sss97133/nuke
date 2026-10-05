@@ -619,7 +619,8 @@ struct CountyZIPDrill: View {
         .sheet(isPresented: $showDates) { MapDateWindowPicker(window: $period, earliest: earliest, latest: latest, undatedRecords: observations.filter { $0.auctionClock.date == nil }.count) }
         .sheet(isPresented: $showReport) {
             if let group = selectedGroup {
-                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete && !loading && !failed, selectedMake: make) }
+                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete && !loading && !failed, selectedMake: make,
+                    outline: areas.filter { ($0 as? MKShape)?.title == group.id }) }
             }
         }
         .sheet(isPresented: $showInfo) {
@@ -692,7 +693,9 @@ struct CountyZIPDrill: View {
         }
         searchIssue = nil
         requestedZIP = zip
-        if county?.fips == fips, areas.contains(where: { ($0 as? MKShape)?.title == zip }) { selectedZIP = zip; requestedZIP = nil }
+        if county?.fips == fips, let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
+            focus = area.boundingMapRect; selectedZIP = zip; requestedZIP = nil
+        }
         else { selectCounty(fips) }
     }
 
@@ -737,7 +740,9 @@ struct CountyZIPDrill: View {
             try Task.checkCancellation()
             guard self.county?.fips == fips else { return }
             areas = result.overlays; areaLabels = result.labels
-            if let zip = requestedZIP, areas.contains(where: { ($0 as? MKShape)?.title == zip }) { selectedZIP = zip; requestedZIP = nil }
+            if let zip = requestedZIP, let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
+                focus = area.boundingMapRect; selectedZIP = zip; requestedZIP = nil
+            }
             #if DEBUG
             if let zip = ProcessInfo.processInfo.environment["NUKE_DEBUG_ZIP"],
                areas.contains(where: { ($0 as? MKShape)?.title == zip }) { selectedZIP = zip }
@@ -981,6 +986,7 @@ struct ZIPActivityView: View {
     let window: MapObservationWindow
     let complete: Bool
     var selectedMake: String? = nil
+    var outline: [MKOverlay] = []
     @Environment(\.dismiss) private var dismiss
     @State private var fold: ZIPActivityFold?
     @State private var listings: [ZIPListingRow] = []
@@ -995,7 +1001,22 @@ struct ZIPActivityView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("ZIP \(group.id)").font(.largeTitle.bold())
+                HStack(spacing: 12) {
+                    Text("ZIP \(group.id)").font(.largeTitle.bold())
+                    Spacer(minLength: 0)
+                    if !outline.isEmpty {
+                        VStack(spacing: 4) {
+                            GeometryReader { proxy in
+                                let path = outlinePath(in: proxy.size)
+                                path.fill(.blue.opacity(0.12), style: FillStyle(eoFill: true))
+                                    .overlay { path.stroke(.blue, lineWidth: 1.5) }
+                            }.frame(width: 80, height: 64)
+                            Text("ZIP area").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Census 2020 ZIP area outline for \(group.id)")
+                    }
+                }
                 Text("\(selectedMake ?? "All makes") · historical location cohort").font(.subheadline).foregroundStyle(.secondary)
                 Text(window == .all ? "All time · undated evidence retained" : "\(window.label) · auction closes, UTC").font(.subheadline.weight(.medium))
                 Text(auctionSpan).font(.caption).foregroundStyle(.secondary)
@@ -1130,6 +1151,35 @@ struct ZIPActivityView: View {
         } else { span = "Auction close dates unknown" }
         return span + "\n\(coverage.datedVehicles) of \(group.vehicles.count) vehicles have matched auction dates"
             + (coverage.undatedVehicles > 0 ? " · \(coverage.undatedVehicles) undated" : "")
+    }
+
+    // Reuse the selected map geometry, including islands and holes. A small
+    // vector silhouette needs neither another map renderer nor another fetch.
+    private func outlinePath(in size: CGSize) -> Path {
+        let polygons = outline.flatMap { area -> [MKPolygon] in
+            if let polygon = area as? MKPolygon { return [polygon] }
+            return (area as? MKMultiPolygon)?.polygons ?? []
+        }
+        let bounds = polygons.reduce(MKMapRect.null) { $0.union($1.boundingMapRect) }
+        guard !bounds.isNull, bounds.width > 0, bounds.height > 0 else { return Path() }
+        let scale = min((Double(size.width) - 6) / bounds.width, (Double(size.height) - 6) / bounds.height)
+        guard scale > 0 else { return Path() }
+        let x = (Double(size.width) - bounds.width * scale) / 2
+        let y = (Double(size.height) - bounds.height * scale) / 2
+        return Path { path in
+            func append(_ polygon: MKPolygon) {
+                guard polygon.pointCount >= 3 else { return }
+                let points = polygon.points()
+                for index in 0..<polygon.pointCount {
+                    let point = CGPoint(x: x + (points[index].x - bounds.minX) * scale,
+                                        y: y + (points[index].y - bounds.minY) * scale)
+                    if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                }
+                path.closeSubpath()
+                for hole in polygon.interiorPolygons ?? [] { append(hole) }
+            }
+            for polygon in polygons { append(polygon) }
+        }
     }
 
     private func platformName(_ source: String) -> String {
@@ -1513,14 +1563,10 @@ struct CountyChoropleth: UIViewRepresentable {
             if selected != appliedHighlight || selectionOverlay?.polygons.first !== area.flatMap({ polygons($0).first }) {
                 if let previous = selectionOverlay { map.removeOverlay(previous) }
                 selectionOverlay = nil
-                let changedSelection = selected != appliedHighlight
                 appliedHighlight = selected
                 if let area, selected != nil {
                     let outline = MKMultiPolygon(polygons(area)); outline.title = "selection"
                     selectionOverlay = outline; map.addOverlay(outline)
-                    if changedSelection {
-                        map.setVisibleMapRect(area.boundingMapRect, edgePadding: UIEdgeInsets(top: 140, left: 25, bottom: 140, right: 25), animated: true)
-                    }
                 }
             }
         }
@@ -1605,7 +1651,6 @@ struct CountyChoropleth: UIViewRepresentable {
             // on this same canvas, without an intermediate county page.
             if let county = countyHitAreas.first(where: { Self.contains($0, mapPoint) }),
                let fips = (county as? MKShape)?.title {
-                map.setVisibleMapRect(county.boundingMapRect, edgePadding: UIEdgeInsets(top: 130, left: 20, bottom: 130, right: 20), animated: true)
                 parent.onCountyFocus?(fips)
             }
         }
