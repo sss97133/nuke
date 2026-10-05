@@ -195,6 +195,8 @@ jobs:
         run: node --test scripts/check-auction-reconciliation.test.mjs
       - name: Verify late recovery watermarks and raw comment cache authorization
         run: node --test scripts/check-structure-review-closeout.test.mjs
+      - name: Verify strict comment parser and canonical local credential landing
+        run: deno test --no-check supabase/functions/_shared/commentRefinery.test.ts supabase/functions/batch-comment-discovery/claimLanding.test.ts
       - name: Verify retained source account admission and conflict preservation
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
 
@@ -300,6 +302,11 @@ jobs:
 
       - name: Verify preserved description input and sanctioned intake
         run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs
+        env:
+          NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
+
+      - name: Verify bounded local comment refinery (offline)
+        run: node --test scripts/test-refinery-local.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 

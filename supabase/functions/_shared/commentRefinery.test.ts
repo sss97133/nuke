@@ -326,3 +326,18 @@ Deno.test('model refusals or unknown error contents never leak into diagnostics 
   equal(parsed.commentErrors['source-1'], ['model_deferred_comment']);
   assert(!JSON.stringify(parsed.parseErrors).includes('private source text'));
 });
+
+Deno.test('prompt kind grammar matches strict parser and preserves exact punctuation', () => {
+  const prompt = buildClaimExtractionPrompt({ vehicle_id: 'fixture', year: 1970, make: 'Datsun', model: '240Z', vin: null, sale_price: null }, [source()], []);
+  assert(prompt.includes('sighting|ownership|provenance|work_record|comment|null'));
+  assert(prompt.includes('buyer_question or seller_response => comment'));
+  assert(prompt.includes('including paint_identity, condition and general_spec'), 'Ordinary assertions must not become sightings');
+  assert(prompt.includes('Copy capitalization, quotes and punctuation verbatim'));
+  for (const [kind, category, observationKind] of [['mechanical_condition','B',null],['buyer_question','Q','comment'],['general_spec','E',null]]) {
+    const text = kind === 'buyer_question' ? 'Is OEM "Nissan" glass available ?' : 'The engine runs well.';
+    const parsed = parseClaimResponse(response([claim({ claim_type:kind, category, field_name:null, quote:text,
+      observation_kind:observationKind, epistemic_status:kind === 'buyer_question' ? 'unknown' : 'asserted', action_status:'not_applicable' })]), [source('fixture',text)]);
+    equal(parsed.claims.length,1);
+    equal(parsed.claims[0].subject_scope,category === 'E' ? 'model' : 'vehicle');
+  }
+});
