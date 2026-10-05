@@ -124,3 +124,37 @@ it('reports a transport failure instead of leaving an endless loading message', 
   await tick(60_000);
   expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
 });
+
+it('keeps exact capped and unavailable days separate within one degraded organ', async () => {
+  fixture.pulse.days = 3;
+  fixture.pulse.coverage = { contract: 'pipeline_pulse_capped_v1', timezone: 'UTC', backlogs: {} };
+  fixture.pulse.degraded = ['vehicles: unavailable'];
+  fixture.pulse.organs.vehicles = [
+    { d: '2026-10-03', n: 0, status: 'exact', lower_bound: null },
+    { d: '2026-10-04', n: null, status: 'capped', lower_bound: 10001 },
+    { d: '2026-10-05', n: null, status: 'unavailable', lower_bound: null },
+  ];
+  await render();
+  expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
+    .toEqual(['0', '≥10,001', 'Unmeasured']);
+});
+
+it('requires explicit day and backlog coverage under the capped contract', async () => {
+  fixture.pulse.coverage = { contract: 'pipeline_pulse_capped_v1', timezone: 'UTC', backlogs: {
+    import_queue_pending: { status: 'capped', n: null, lower_bound: 10001 },
+  } };
+  fixture.pulse.organs.vehicles = [{ d: '2026-10-05', n: 4, status: 'exact', lower_bound: null }];
+  await render();
+  expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
+    .toEqual(['Unmeasured', '4']);
+  expect(container.textContent).toContain('import_queue pending: ≥10,001');
+  expect(container.textContent).toContain('images analysis pending: Unmeasured');
+});
+
+it('rejects a capped sentinel mislabeled as an exact number', async () => {
+  fixture.pulse.coverage = { contract: 'pipeline_pulse_capped_v1', timezone: 'UTC', backlogs: {} };
+  fixture.pulse.organs.vehicles = [{ d: '2026-10-05', n: 10001, status: 'exact', lower_bound: null }];
+  await render();
+  expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
+    .toEqual(['Unmeasured', 'Unmeasured']);
+});
