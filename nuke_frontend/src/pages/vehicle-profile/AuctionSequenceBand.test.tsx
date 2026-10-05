@@ -115,3 +115,26 @@ it('distinguishes retained unclocked testimony from missing extraction', async()
   expect(container.textContent).toContain('no timed bid or comment entries in this read');
   expect(container.textContent).not.toContain('bids and comments not extracted yet');
 });
+
+it('keeps the bidding week readable while retaining later commentary with its source link', async () => {
+  const auction = sequence('2025-01-10T20:30:00Z', null, 'sold', null, '2025-01-03T12:00:00Z');
+  const later = { ...auction.items[1], id: 'synthetic-later-comment', at: '2028-01-10T20:00:00Z', url: `${LOT}#comment-103` };
+  auction.items = [...auction.items, later];
+  await band(auction);
+  const bid = container.querySelector('svg circle')!;
+  expect(Number(bid.getAttribute('cx'))).toBeGreaterThan(700);
+  expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
+  expect(container.textContent).toContain('2 of 3 timed interactions shown · 1 later interaction in All activity');
+  const all = [...container.querySelectorAll('button')].find(button => button.textContent === 'All activity')!;
+  all.focus();
+  expect(document.activeElement).toBe(all);
+  await act(async () => all.click());
+  expect(all.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('svg a[href$="#comment-103"]')).not.toBeNull();
+  expect(container.textContent).toContain('3 of 3 timed interactions shown');
+  expect(Number(container.querySelector('svg circle')!.getAttribute('cx'))).toBeLessThan(20);
+  const bidding = [...container.querySelectorAll('button')].find(button => button.textContent === 'Bidding window')!;
+  await act(async () => bidding.click());
+  expect(bidding.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
+});
