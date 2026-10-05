@@ -193,6 +193,34 @@ These are local preparation stages; the publication receipt records the subseque
 merge, deployment and production assay. C22 remains partial for the other three readers, and the
 masked contract supplies no part number for a public part-specific join.
 
+**C22 supplier directory — 2026-10-05 UTC, bounded consumer repair.** Table and Lifecycle
+readers were delivered by [PR564](https://github.com/sss97133/nuke/pull/564) and
+[PR584](https://github.com/sss97133/nuke/pull/584); their dated opening assays above remain historical.
+The next useful question is which supplier is recorded for work on a vehicle, including work whose
+supplier relationship is unresolved. At 02:53:40Z the same public vehicle's anonymous vendor directory
+shows no groups, despite six permitted `vehicle_build_log_public` rows. All six supplier fields are
+unknown; this assay does not prove a named supplier or canonical organization relationship.
+
+Entity: vehicle; source grain: one permitted non-superseded work observation; consumer grain: one
+case-insensitive supplier-text group or an explicit unrecorded-supplier group. The existing
+`vehicle_observations.vehicle_id` FK selects the entity, and original observation ID deduplicates
+masked/direct copies with the directly readable row preferred. Text grouping is not a canonical
+organization bridge. Recorded transaction/observation date remains event time; the public contract
+has no ingestion time. Canonical writer remains `ingest-observation`; the existing RPC and consumer
+recompute on page load, with no new stored measure, writer or cadence. Current reader only; no
+historical reconstruction or complete spend is claimed.
+
+`VendorsPage.tsx` now connects the existing masked RPC, retains unnamed work explicitly, and labels
+visible totals as excluding masked amounts. Public groups link onward through the existing work-table
+evidence reader rather than offering inaccessible vendor-detail drills. The seven focused
+`VendorsPage.test.tsx` contracts cover the source connection, owner/public ID deduplication, event
+dates, unknown suppliers/dates, punctuation collisions, masked fields, empty sources and failures.
+The source-connection test fails on the previous reader. At 02:56:30Z the local anonymous 390px
+reader retains the same six source IDs in one explicitly unrecorded group, with count 6 and recorded
+date 2026-02-25; its table link reaches all six original observations, with no inaccessible vendor
+links, amounts or page overflow. Enforced typecheck, build and guardrails pass. Production deployment
+and the same frozen six-source runtime assay remain pending publication; C22 stays partial for VendorPage and PartPage.
+
 **C17 follow-up — 2026-10-04 UTC, bounded read-only trace.** The October 2 intake receipt records observation
 `6c3ca7fa-0147-4542-8785-9f8ffe724ed2` and an exact replay returning `duplicate: true`. The current check finds its
 single derived witness `f25d069e-3a1b-49a9-852e-8681f105ee4b`, the enabled insert trigger and the same IDs in
