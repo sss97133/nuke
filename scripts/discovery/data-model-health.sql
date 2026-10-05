@@ -1,7 +1,8 @@
 -- Operator-only metadata reading for the existing ingestion-health monitor.
 -- Run in a READ ONLY transaction with a bounded statement_timeout. This installs
--- no database object, worker, schedule or write authority; v_schema_atlas and
--- v_job_health remain the owners. Their existing aggregation/assay bounds apply.
+-- no database object, worker, schedule or write authority. This statement reads
+-- atlas metadata and tiny cron configuration only; execution/output health is
+-- independently read in data-model-job-health.sql so its timeout loses no metadata.
 -- The named tables/jobs are the complete requested scope, not a fleet sample.
 -- Descriptions, declared owners, successful exits and validated constraints do
 -- not establish source truth or source-to-reader correctness. Missing receipts
@@ -72,24 +73,19 @@ WITH table_scope(table_name, ordinal) AS (
     'execution', jsonb_build_object(
       'state', CASE WHEN j.jobid IS NULL THEN 'missing'
                     WHEN j.active IS FALSE THEN 'paused'
-                    WHEN j.last_status = 'succeeded' THEN 'succeeded'
-                    WHEN j.last_status = 'failed' THEN 'failed'
-                    WHEN j.last_status IN ('starting', 'running', 'connecting', 'sending') THEN 'in_progress'
                     ELSE 'unmeasured' END,
-      'last_status', j.last_status, 'last_run_at', j.last_run_at,
-      'runs_24h', j.runs_24h, 'failed_24h', j.failed_24h,
-      'consecutive_failures', j.consecutive_failures),
+      'last_status', NULL, 'last_run_at', NULL,
+      'runs_24h', NULL, 'failed_24h', NULL, 'consecutive_failures', NULL),
     'assay', jsonb_build_object(
-      'state', CASE WHEN j.assay_status IN ('passed', 'failed', 'partial', 'idle', 'unavailable')
-                    THEN j.assay_status ELSE 'unmeasured' END,
-      'reported_status', j.assay_status),
-    'reported_health_status', j.health_status
+      'state', 'unmeasured', 'reported_status', NULL),
+    'reported_health_status', NULL
   ) AS reading
   FROM job_scope s
-  LEFT JOIN public.v_job_health j ON j.jobname = s.job_name
+  LEFT JOIN cron.job j ON j.jobname = s.job_name
 )
 SELECT jsonb_build_object(
   'version', 'data_model_health_v1',
+  'section', 'metadata',
   'measured_at', statement_timestamp(),
   'scope', jsonb_build_object(
     'tables', (SELECT jsonb_agg(table_name ORDER BY ordinal) FROM table_scope),
@@ -103,7 +99,7 @@ SELECT jsonb_build_object(
     'A missing write receipt does not establish inactivity; receipt coverage is incomplete.',
     'Constraint validation concerns declared constraints, not every intended relationship or source truth.',
     'Job execution, reported health and output assay are separate; a successful exit without an assay is unmeasured output.',
-    'Assay statuses retain the existing job-specific sample, timing and eligibility limits.',
+    'This metadata statement does not read job history or execute output assays; those have an independent timeout and clock.',
     'Agent work and source-to-reader acceptance require separate evidence.'
   )
 ) AS health;
