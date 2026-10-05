@@ -26,19 +26,13 @@ END $$;
 -- in a rolled-back offline scenario, never testimony writes.
 BEGIN;
 UPDATE public.vehicles SET sale_status='not_sold';
-UPDATE public.vehicle_events SET ended_at=now()-interval '10 minutes';
+-- A fresh offline HTML-read clock is required by the existing stale-read guard.
+-- Moving only the cache deadline is ignored; the captured fixture ages beyond 24h.
+UPDATE public.vehicle_events SET ended_at=now()-interval '10 minutes',
+  metadata=jsonb_set(metadata,'{source_read}',jsonb_build_object('at',now()));
 DELETE FROM public.monitored_auctions;
 DO $$ DECLARE reading jsonb; BEGIN
   reading:=public.bat_live_pull_run(3);
-  RAISE NOTICE 'offline recovery scheduler: %; source eligibility: %', reading,
-    (SELECT jsonb_agg(jsonb_build_object(
-      'event_type',e.event_type,'event_platform',e.source_platform,'vehicle_platform',v.platform_source,
-      'source_origin',v.origin_metadata->>'source','native_post',v.origin_metadata->>'external_id',
-      'source_matches',rtrim(v.listing_url,'/')=rtrim(e.source_url,'/'),
-      'recent_end',e.ended_at>now()-interval '24 hours','closing_end',e.ended_at<=now()+interval '15 minutes',
-      'terminal_outcome',EXISTS(SELECT 1 FROM auction_events a WHERE a.vehicle_id=e.vehicle_id
-        AND rtrim(a.source_url,'/')=rtrim(e.source_url,'/') AND a.outcome IN ('sold','reserve_not_met','cancelled'))))
-      FROM vehicle_events e JOIN vehicles v ON v.id=e.vehicle_id);
   ASSERT (reading->>'stream_lots')::integer=1,
     'known unresolved source enters the existing stream independently of board status';
   ASSERT (SELECT count(*)=1 AND bool_and(is_live) FROM public.monitored_auctions),
