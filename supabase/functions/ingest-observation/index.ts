@@ -35,6 +35,7 @@ import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
+import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -266,6 +267,30 @@ Deno.serve(async (req) => {
       }
       return new Response(JSON.stringify(await ingestBatLive(supabase, input)),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (input.mode === RETAINED_IDENTITY_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained source-account admission requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const sourceId = retainedIdentitySelector(input as unknown as Record<string, unknown>);
+      if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        return new Response(JSON.stringify(await ingestRetainedIdentity(retainedIdentityStore(supabase), sourceId)),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        if (!(error instanceof RetainedIdentityConflict)) throw error;
+        return new Response(JSON.stringify({ error: error.message }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    } else if (input.extraction_method === RETAINED_IDENTITY_MODE ||
+        input.structured_data?.analysis_kind === "retained_bat_source_account_attribution") {
+      return new Response(JSON.stringify({ error: "Retained account attribution requires its source selector" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let retainedSourceId: string | null = null;
     if (input.mode === RETAINED_INTERIOR_MODE || input.mode === RETAINED_EXTERIOR_MODE) {
