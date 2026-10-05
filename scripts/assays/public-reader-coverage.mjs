@@ -41,14 +41,14 @@ export function options(args, now = Date.now()) {
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
-  if (!o.out || !['price', 'specifications'].includes(o.family) ||
-    (o.family === 'specifications') !== Boolean(o.subjects) ||
+  if (!o.out || !['price', 'specifications', 'comments'].includes(o.family) ||
+    (o.family !== 'price') !== Boolean(o.subjects) ||
     !['sold', 'all'].includes(o.scope) || !UUID.test(o.after) ||
     !Number.isInteger(o.pageSize) || o.pageSize < 20 || o.pageSize > 1000 ||
     !Number.isInteger(o.maxPages) || o.maxPages < 1 || o.maxPages > 10000 ||
     !Number.isFinite(o.until) || o.until <= now || o.until > now + 14 * 60 * 60_000) throw new AssayError('invalid_scope');
   o.after = o.after.toLowerCase();
-  if (o.family === 'specifications') {
+  if (o.family !== 'price') {
     if (['--scope', '--after', '--page-size'].some(key => seen.has(key))) throw new AssayError('manifest_scope_has_no_price_cursor');
     o.scope = 'explicit_manifest';
   }
@@ -98,6 +98,14 @@ export function publicClient(config, fetcher = fetch) {
       return { ...meta, ok: true, value };
     } catch { return { ok: false, code: 'reader_transport_or_json_failure', durationMs: Date.now() - start }; }
   }
+  function contexts(table, select, ids, vehicleId) {
+    if (!Array.isArray(ids) || ids.length < 1 || ids.length > 200 ||
+      !ids.every(id => UUID.test(id)) || new Set(ids).size !== ids.length ||
+      vehicleId !== undefined && !UUID.test(vehicleId)) throw new AssayError('invalid_reader_scope');
+    const q = new URLSearchParams({ select, id: `in.(${ids.join(',')})`, order: 'id.asc', limit: String(ids.length) });
+    if (vehicleId !== undefined) q.set('vehicle_id', `eq.${vehicleId}`);
+    return request(`${table}?${q}`);
+  }
   return {
     get requests() { return requests; },
     parents(after, size, scope) {
@@ -113,6 +121,23 @@ export function publicClient(config, fetcher = fetch) {
         or: '(listing_kind.is.null,listing_kind.neq.non_vehicle_item)', id: `in.(${ids.join(',')})`, order: 'id.asc', limit: String(ids.length) });
       return request(`vehicles?${q}`);
     },
+    commentHeaders(id, cursor) {
+      if (!UUID.test(id)) throw new AssayError('invalid_reader_scope');
+      if (cursor !== undefined && (!object(cursor) || !UUID.test(cursor.id ?? '') || !commentClock(cursor.postedAt))) throw new AssayError('invalid_reader_scope');
+      const q = new URLSearchParams({
+        select: 'id,vehicle_id,auction_event_id,posted_at,platform,external_identity_id,author_external_identity_id,comment_type,is_seller',
+        vehicle_id: `eq.${id}`, bid_amount: 'is.null', posted_at: 'not.is.null',
+        order: 'posted_at.desc,id.desc', limit: '200',
+      });
+      if (cursor) q.set('and', `(or(comment_type.is.null,comment_type.neq.bid),or(posted_at.lt."${cursor.postedAt}",and(posted_at.eq."${cursor.postedAt}",id.lt.${cursor.id})))`);
+      else q.set('or', '(comment_type.is.null,comment_type.neq.bid)');
+      return request(`auction_comments?${q}`);
+    },
+    sourceAuctions(id, ids) {
+      if (!UUID.test(id ?? '')) throw new AssayError('invalid_reader_scope');
+      return contexts('auction_events', 'id,vehicle_id,source', ids, id);
+    },
+    sourceIdentities(ids) { return contexts('external_identities', 'id,platform', ids); },
     rpc(name, args) {
       if (!READERS.has(name)) throw new AssayError('reader_not_allowed');
       if (name === 'vehicle_price_facts' && (!Array.isArray(args?.p_vehicle_ids) || args.p_vehicle_ids.length < 1 ||
@@ -266,6 +291,191 @@ export function inspectProvenance(id, report, value) {
   return result;
 }
 
+export function inspectCommentHeaders(id, value) {
+  const result = { safe: true, complete: true, failures: {}, gaps: {}, headers: [], auctionIds: [], identityIds: [] };
+  const ids = new Set(), nullableId = x => x === null || typeof x === 'string' && UUID.test(x);
+  if (!Array.isArray(value) || value.length > 1001) result.safe = false;
+  else for (const c of value) {
+    if (!object(c) || !UUID.test(c.id ?? '') || ids.has(c.id) || c.vehicle_id !== id ||
+      !['auction_event_id', 'external_identity_id', 'author_external_identity_id'].every(key => nullableId(c[key])) ||
+      typeof c.posted_at !== 'string' || c.comment_type === 'bid' ||
+      !(c.comment_type === null || typeof c.comment_type === 'string') ||
+      !(c.platform === null || typeof c.platform === 'string') ||
+      !(c.is_seller === null || typeof c.is_seller === 'boolean')) { result.safe = false; break; }
+    ids.add(c.id);
+  }
+  if (!result.safe) { result.failures.comment_header_scope_or_shape_invalid = 1; result.complete = false; return result; }
+  if (value.length > 1000) { result.complete = false; result.gaps.comment_header_cap_unmeasured = 1; return result; }
+  result.headers = value;
+  result.auctionIds = [...new Set(value.map(c => c.auction_event_id).filter(Boolean))];
+  result.identityIds = [...new Set(value.flatMap(c => [c.external_identity_id, c.author_external_identity_id]).filter(Boolean))];
+  return result;
+}
+
+function commentClock(value) {
+  if (/^infinity$/i.test(value)) return { extreme: 1 };
+  if (/^-infinity$/i.test(value)) return { extreme: -1 };
+  const micros = instant(value);
+  return micros === null ? null : { extreme: 0, micros };
+}
+
+function commentFollows(previous, current) {
+  const a = commentClock(previous.posted_at), b = commentClock(current.posted_at);
+  if (!a || !b) return false;
+  if (a.extreme !== b.extreme) return a.extreme > b.extreme;
+  if (a.extreme === 0 && a.micros !== b.micros) return a.micros > b.micros;
+  return previous.id.toLowerCase() > current.id.toLowerCase();
+}
+
+async function commentCollection(client, id, until, now, emit) {
+  const rows = [], ids = new Set(), hashes = []; let previous;
+  for (let page = 0; page < 100; page++) {
+    if (now() >= until) return { ok: true, complete: false, gaps: { comment_collection_time_unmeasured: 1 }, stopReason: 'time_budget_reached' };
+    const response = await client.commentHeaders(id, previous && { id: previous.id, postedAt: previous.posted_at });
+    if (!response.ok) return response;
+    const checked = inspectCommentHeaders(id, response.value);
+    if (!checked.safe || response.value.length > 200) return { ok: true, safe: false, failures: { comment_header_scope_or_shape_invalid: 1 } };
+    for (const c of checked.headers) {
+      if (!commentClock(c.posted_at)) return { ok: true, complete: false, gaps: { comment_clock_cursor_unmeasured: 1 } };
+      if (ids.has(c.id) || previous && !commentFollows(previous, c)) return { ok: true, safe: false, failures: { comment_header_order_or_repeated_id: 1 } };
+      ids.add(c.id); rows.push(c); previous = c;
+    }
+    hashes.push(hash(response.value));
+    await emit({ type: 'comment_source_page', vehicleId: id, returned: response.value.length, responseSha256: hashes.at(-1), durationMs: response.durationMs });
+    if (rows.length > 1000) return { ok: true, safe: true, complete: false, atLeast: rows.length, gaps: { comment_header_cap_unmeasured: 1 }, responseSha256: hash(hashes) };
+    // Even a short server-capped page is not proof of exhaustion. The exact
+    // PostgreSQL microsecond clock and UUID seek continue until an empty page.
+    if (!response.value.length) return { ok: true, safe: true, complete: true, value: rows, responseSha256: hash(hashes) };
+  }
+  return { ok: true, complete: false, gaps: { comment_collection_page_budget_unmeasured: 1 } };
+}
+
+function validContexts(value, ids, parent) {
+  return Array.isArray(value) && value.length <= ids.length && new Set(value.map(x => x?.id)).size === value.length &&
+    value.every(x => object(x) && ids.includes(x.id) &&
+      (parent === undefined ? x.platform === null || typeof x.platform === 'string' : x.vehicle_id === parent && (x.source === null || typeof x.source === 'string')));
+}
+
+export function inspectCommentLineage(headers, auctions, identities) {
+  const events = new Map(auctions.map(x => [x.id, x])), actors = new Map(identities.map(x => [x.id, x]));
+  const result = { commentHeaders: headers.length, matchedAuctionParents: 0, matchingRecordedNamespaces: 0,
+    identityStates: { absent: 0, legacyOnly: 0, canonicalOnly: 0, agreeing: 0, conflicting: 0 }, gaps: {}, samples: {} };
+  const gap = (key, c) => { result.gaps[key] = (result.gaps[key] ?? 0) + 1;
+    result.samples[key] ??= []; if (result.samples[key].length < 10 && !result.samples[key].includes(c.id)) result.samples[key].push(c.id); };
+  for (const c of headers) {
+    const a = c.external_identity_id, b = c.author_external_identity_id;
+    const state = !a && !b ? 'absent' : a && !b ? 'legacyOnly' : !a && b ? 'canonicalOnly' : a === b ? 'agreeing' : 'conflicting';
+    result.identityStates[state]++;
+    if (state === 'legacyOnly') gap('indexed_author_key_absent_with_legacy_identity', c);
+    if (state === 'absent') gap('comment_author_identity_unestablished', c);
+    if (state === 'conflicting') gap('retained_author_identity_keys_differ', c);
+    if (!Number.isFinite(Date.parse(c.posted_at))) gap('source_post_clock_not_interpretable', c);
+    const event = events.get(c.auction_event_id);
+    if (event) {
+      result.matchedAuctionParents++;
+      if (!present(c.platform) || !present(event.source)) gap('auction_source_namespace_unestablished', c);
+      else if (c.platform !== event.source) gap('recorded_auction_source_label_differs_unassayed_alias', c);
+    } else gap('source_auction_parent_unavailable_or_unlinked', c);
+    // Both retained keys are inspected. A conflict has no automatically chosen
+    // winner. Exact namespace agreement is not person identity or source truth.
+    let matching = false;
+    for (const key of new Set([a, b].filter(Boolean))) {
+      const identity = actors.get(key);
+      if (!identity) gap('reported_identity_context_unavailable', c);
+      else if (!present(identity.platform) || !present(c.platform)) gap('identity_source_namespace_unestablished', c);
+      else if (identity.platform === c.platform) matching = true;
+      else gap('recorded_identity_namespace_differs_unassayed_alias', c);
+    }
+    if (matching) result.matchingRecordedNamespaces++;
+  }
+  return result;
+}
+
+export async function runCommentLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
+  const summary = { stage: 'read_only_public_comment_header_lineage_assay', startedAt: new Date(now()).toISOString(),
+    requestedParents: subjects.ids.length, manifestSha256: subjects.sha256, population: subjects.population,
+    gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
+    measuredCommentHeaders: 0, matchedAuctionParents: 0, matchingRecordedNamespaces: 0,
+    identityStates: { absent: 0, legacyOnly: 0, canonicalOnly: 0, agreeing: 0, conflicting: 0 },
+    failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
+    boundary: 'Explicit manifest, current anonymous public-parent gate. 200-row microsecond/UUID keyset pages continue until empty, at most 100 pages/1000 posted non-bid headers per parent; overflow refuses that collection. Separate current reads are not an immutable snapshot. Header and identity counters cover completed collections only. Metadata only, not quotes, inferred atoms, mood, expertise, independent sources, source publication or historical identity replay. Namespace label differences preserve unresolved aliases. Missing child context is unknown, never zero activity.' };
+  let consecutiveFailures = 0;
+  const readerFailures = {};
+  const failed = reader => {
+    readerFailures[reader] = (readerFailures[reader] ?? 0) + 1;
+    if (readerFailures[reader] >= 2) summary.stopReason = 'repeated_comment_reader_failure_inspect_cause';
+  };
+  const merge = part => { for (const group of ['failures', 'gaps']) for (const [key, count] of Object.entries(part[group] ?? {})) summary[group][key] = (summary[group][key] ?? 0) + count; };
+  outer: for (let offset = 0, pages = 0; offset < subjects.ids.length; offset += 200, pages++) {
+    if (now() >= o.until || pages >= o.maxPages) { summary.stopReason = now() >= o.until ? 'time_budget_reached' : 'page_budget_reached'; break; }
+    const batch = subjects.ids.slice(offset, offset + 200), gate = await client.subjects(batch);
+    if (!gate.ok || !Array.isArray(gate.value)) { merge({ failures: { comment_parent_reader_failed: 1 } }); summary.stopReason = 'comment_parent_reader_failed'; break; }
+    const eligible = new Set();
+    for (const p of gate.value) {
+      if (!object(p) || !batch.includes(p.id) || eligible.has(p.id) || p.is_public !== true || p.deleted_at !== null || p.listing_kind === 'non_vehicle_item') {
+        merge({ failures: { comment_parent_gate_invalid: 1 } }); summary.stopReason = 'comment_parent_gate_invalid'; break outer;
+      }
+      eligible.add(p.id);
+    }
+    summary.gatedParents += batch.length; summary.eligibleParents += eligible.size; summary.absentOrIneligibleParents += batch.length - eligible.size;
+    await emit({ type: 'comment_gate', requested: batch.length, eligible: eligible.size, absentOrIneligible: batch.length - eligible.size, responseSha256: hash(gate.value), durationMs: gate.durationMs });
+    for (const id of batch.filter(id => eligible.has(id))) {
+      if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
+      const source = await commentCollection(client, id, o.until, now, emit); summary.inspectedParents++;
+      if (!source.ok) {
+        merge({ failures: { comment_header_reader_failed: 1 }, gaps: { comment_header_parent_unmeasured: 1 } }); consecutiveFailures++;
+        failed('auction_comments');
+        await emit({ type: 'comment_reader_failure', reader: 'auction_comments', vehicleId: id, status: source.status, code: source.code, durationMs: source.durationMs });
+      } else {
+        consecutiveFailures = 0;
+        merge(source);
+        if (source.safe === false) { summary.stopReason = 'unsafe_comment_headers'; break outer; }
+        if (!source.complete) {
+          await emit({ type: 'comment_parent_unmeasured', vehicleId: id, atLeast: source.atLeast, gaps: source.gaps, responseSha256: source.responseSha256 });
+          if (source.stopReason) { summary.stopReason = source.stopReason; break outer; }
+          continue;
+        }
+        const inspected = inspectCommentHeaders(id, source.value);
+        const auctions = [], identities = []; let complete = true;
+        for (const [reader, ids, target] of [['auction_events', inspected.auctionIds, auctions], ['external_identities', inspected.identityIds, identities]]) {
+          for (let i = 0; i < ids.length; i += 200) {
+            if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; complete = false; break; }
+            const wanted = ids.slice(i, i + 200), response = reader === 'auction_events' ? await client.sourceAuctions(id, wanted) : await client.sourceIdentities(wanted);
+            if (!response.ok) {
+              complete = false; consecutiveFailures++;
+              failed(reader);
+              merge({ failures: { comment_context_reader_failed: 1 }, gaps: { comment_context_parent_unmeasured: 1 } });
+              await emit({ type: 'comment_reader_failure', reader, vehicleId: id, status: response.status, code: response.code, durationMs: response.durationMs });
+            } else {
+              consecutiveFailures = 0;
+              if (!validContexts(response.value, wanted, reader === 'auction_events' ? id : undefined)) {
+                merge({ failures: { comment_context_scope_or_shape_invalid: 1 } }); summary.stopReason = 'unsafe_comment_context'; complete = false; break;
+              }
+              target.push(...response.value);
+              await emit({ type: 'comment_context', reader, vehicleId: id, requested: wanted.length, returned: response.value.length, responseSha256: hash(response.value), durationMs: response.durationMs });
+            }
+            if (summary.stopReason || consecutiveFailures >= 2) { summary.stopReason ??= 'two_consecutive_comment_reader_failures_inspect_cause'; complete = false; break; }
+          }
+          if (summary.stopReason) break;
+        }
+        if (summary.stopReason) break outer;
+        if (!complete) continue; // Missing reads do not become missing relations.
+        const measured = inspectCommentLineage(inspected.headers, auctions, identities); merge(measured);
+        summary.completedParents++; summary.measuredCommentHeaders += measured.commentHeaders;
+        summary.matchedAuctionParents += measured.matchedAuctionParents; summary.matchingRecordedNamespaces += measured.matchingRecordedNamespaces;
+        for (const [key, count] of Object.entries(measured.identityStates)) summary.identityStates[key] += count;
+        await emit({ type: 'comment_parent', vehicleId: id, measuredAt: new Date(now()).toISOString(), responseSha256: source.responseSha256, ...measured });
+      }
+      if (summary.stopReason || consecutiveFailures >= 2) { summary.stopReason ??= 'two_consecutive_comment_reader_failures_inspect_cause'; break outer; }
+      if (summary.inspectedParents % 25 === 0) progress({ inspectedParents: summary.inspectedParents, measuredCommentHeaders: summary.measuredCommentHeaders, identityStates: summary.identityStates, failures: summary.failures });
+    }
+  }
+  summary.stopReason ??= 'manifest_exhausted'; summary.finishedAt = new Date(now()).toISOString(); summary.networkRequests = client.requests;
+  summary.status = Object.keys(summary.failures).length ? 'failed' : summary.stopReason === 'manifest_exhausted' && summary.completedParents > 0 && summary.completedParents === summary.eligibleParents ? 'passed_current_comment_header_lineage_in_manifest' : 'incomplete';
+  summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'incomplete' ? 2 : 0;
+  await emit({ type: 'summary', ...summary }); return summary;
+}
+
 export async function runSpecificationLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
   const summary = { stage: 'read_only_public_specification_provenance_lineage_assay', startedAt: new Date(now()).toISOString(),
     requestedParents: subjects.ids.length, manifestSha256: subjects.sha256, population: subjects.population,
@@ -396,20 +606,23 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     if (o.env) { const require = createRequire(path.join(ROOT, 'nuke_frontend/package.json')); require('dotenv').config({ path: o.env, quiet: true }); }
     const config = anonymousConfiguration(deps.env ?? process.env);
     const client = deps.client ?? publicClient(config);
-    const subjects = o.family === 'specifications' ? lineageSubjects(JSON.parse(await readFile(o.subjects, 'utf8'))) : null;
+    const subjects = o.family !== 'price' ? lineageSubjects(JSON.parse(await readFile(o.subjects, 'utf8'))) : null;
     file = await privateOutput(o.out);
     const emit = value => file.writeFile(JSON.stringify(value) + '\n');
     await emit({ type: 'manifest', schemaVersion: 'public_reader_coverage_v2',
       assaySourceSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex'),
       options: { ...o, env: undefined, out: undefined, subjects: undefined },
-      anonymous: true, readers: subjects ? ['vehicles', 'get_vehicle_specs', 'get_field_provenance'] : ['vehicles', 'vehicle_price_facts'],
+      anonymous: true, readers: o.family === 'comments' ? ['vehicles', 'auction_comments', 'auction_events', 'external_identities']
+        : subjects ? ['vehicles', 'get_vehicle_specs', 'get_field_provenance'] : ['vehicles', 'vehicle_price_facts'],
       parentFields: subjects ? 'id,is_public,deleted_at,listing_kind' : PARENT_FIELDS,
       outputContains: 'response/page hashes, scope, clocks, counts and bounded public failure UUIDs; no raw source/comment bodies or credentials' });
-    const report = subjects ? await runSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+    const report = o.family === 'comments' ? await runCommentLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+      : subjects ? await runSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : await runCoverage(client, o, { ...deps, emit, progress: value => print(JSON.stringify(value)) });
     print(JSON.stringify({ status: report.status, stopReason: report.stopReason, inspectedRecords: report.inspectedRecords,
       measuredFoldRecords: report.measuredFoldRecords, recordsPerSecond: report.recordsPerSecond, failures: report.failures,
       inspectedParents: report.inspectedParents, selectedReports: report.selectedReports, matchingReports: report.matchingReports,
+      measuredCommentHeaders: report.measuredCommentHeaders, identityStates: report.identityStates,
       diagnostics: report.diagnostics, gaps: report.gaps, recordRepairs: 0, verifiedRepairs: 0, databaseWrites: 0, modelCalls: 0 }));
     return report.exitCode;
   } catch (e) { print(JSON.stringify({ status: 'failed', error: e instanceof AssayError ? e.code : 'assay_initialization_or_output_failed' })); return 1; }
