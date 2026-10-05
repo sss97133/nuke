@@ -150,14 +150,12 @@ function generateHeadline(
     return { text: highFlags[0].f, severity: 'warning' };
   }
 
-  // Priority 2: Community concerns — only headline when overall sentiment is NOT positive
-  // (minor concerns in an otherwise positive discussion aren't the top-line story)
+  // Priority 2: Reported concerns. The stored summary does not verify source membership
+  // or establish that a positive overall label resolves an individual concern.
   const concerns = intel?.comment_intel?.community_concerns;
-  const overallSentiment = (intel?.comment_intel?.overall_sentiment || '').toLowerCase();
-  const sentimentIsPositive = overallSentiment.includes('positive') || overallSentiment.includes('enthusiastic');
-  if (concerns && concerns.length > 0 && !sentimentIsPositive) {
+  if (concerns && concerns.length > 0) {
     const concern = typeof concerns[0] === 'string' ? concerns[0] : (concerns[0] as any).concern || '';
-    if (concern) return { text: concern, severity: 'warning' };
+    if (concern) return { text: `Reported comment concern (source unverified): ${concern}`, severity: 'info' };
   }
 
   // Priority 3: Market position (estimate vs asking)
@@ -181,22 +179,13 @@ function generateHeadline(
     }
   }
 
-  // Priority 4: Community sentiment (positive or negative — both are signal)
+  // Priority 4: A reported interpretation; retrieved count is not prompt inclusion proof.
   const sentiment = intel?.comment_intel;
-  if (sentiment?.overall_sentiment && sentiment.comment_count && sentiment.comment_count > 10) {
-    const s = sentiment.overall_sentiment.toLowerCase();
-    if (s.includes('positive') || s.includes('enthusiastic')) {
-      return {
-        text: `${sentiment.comment_count} comments analyzed — community sentiment is ${sentiment.overall_sentiment.toLowerCase()}`,
-        severity: 'ok',
-      };
-    }
-    if (s.includes('negative') || s.includes('critical')) {
-      return {
-        text: `${sentiment.comment_count} comments analyzed — community sentiment is ${sentiment.overall_sentiment.toLowerCase()}`,
-        severity: 'warning',
-      };
-    }
+  if (sentiment?.overall_sentiment) {
+    return {
+      text: `Reported comment summary: ${sentiment.overall_sentiment.toLowerCase()} · input sample, method and analysis time unavailable`,
+      severity: 'info',
+    };
   }
 
   // Priority 5: Lower-severity red flags (informational, not alarming)
@@ -352,11 +341,8 @@ const VehicleBriefing: React.FC = () => {
     pills.push({ label: 'HEAT', value: String(scores.heat_score) });
   }
 
-  if (sentiment?.comment_count && sentiment.comment_count > 0) {
-    const sentLabel = sentiment.sentiment_score != null
-      ? `${sentiment.sentiment_score > 0.6 ? '+' : ''}${(sentiment.sentiment_score * 100).toFixed(0)}%`
-      : String(sentiment.comment_count);
-    pills.push({ label: 'COMMUNITY', value: `${sentiment.comment_count} comments` });
+  if (sentiment?.comment_count != null) {
+    pills.push({ label: 'SUMMARY COUNT', value: `${sentiment.comment_count} reported` });
   }
 
   if (apparitions && apparitions.length > 1) {
