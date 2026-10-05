@@ -287,12 +287,10 @@ const VendorsPage: React.FC = () => {
             <span style={{ textAlign: 'right' }}>Last</span>
           </div>
           {vendors.map((v, i) => {
-            // The old detail reader cannot read masked work; don't offer an empty drill.
-            const Row = v.maskedCount ? 'div' : Link;
-            return <Row
+            return <Link
               key={v.groupKey}
               data-vendor-group={v.groupKey}
-              {...(v.maskedCount ? {} : { to: `/vehicle/${vehicleId}/vendor/${v.slug}` })}
+              to={`/vehicle/${vehicleId}/vendor/${v.slug || 'supplier'}?${v.groupKey === '__unrecorded__' ? 'unrecorded=1' : `supplier=${encodeURIComponent(v.name)}`}`}
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'minmax(150px, 1fr) 40px 80px 80px 80px',
@@ -309,7 +307,7 @@ const VendorsPage: React.FC = () => {
             >
               <span style={{ fontWeight: 700, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                 {v.name}
-                {v.maskedCount > 0 && <small style={{ display: 'block', fontSize: 8 }}>View permitted work in the table</small>}
+                {v.maskedCount > 0 && <small style={{ display: 'block', fontSize: 8 }}>View permitted work</small>}
                 {v.hasParts && (
                   <span
                     style={{
@@ -351,7 +349,7 @@ const VendorsPage: React.FC = () => {
               >
                 {v.lastSeen ? v.lastSeen.slice(0, 10) : '—'}
               </span>
-            </Row>;
+            </Link>;
           })}
         </div>
       )}
