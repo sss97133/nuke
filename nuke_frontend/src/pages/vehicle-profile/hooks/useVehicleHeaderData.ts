@@ -294,46 +294,64 @@ export function usePriceData(
   initialPriceSignal: any,
   initialValuation: any
 ) {
-  const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
-  const [valuation, setValuation] = useState<any | null>(initialValuation || null);
+  const [signalState, setSignalState] = useState<{ vehicleId?: string; data: any }>({ vehicleId, data: initialPriceSignal ?? null });
+  const [valuationState, setValuationState] = useState<{ vehicleId?: string; data: any; failed?: boolean }>({ vehicleId, data: initialValuation ?? null });
 
   useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      controller.abort();
+      if (!cancelled) setSignalState({ vehicleId, data: null });
+    }, 10000);
     if (initialPriceSignal) {
-      setRpcSignal(initialPriceSignal);
-      return;
-    }
-    (async () => {
+      setSignalState({ vehicleId, data: initialPriceSignal });
+      clearTimeout(timeout);
+    } else (async () => {
       try {
-        if (!vehicleId) { setRpcSignal(null); return; }
-        const { data, error } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicleId] });
-        if (!error && Array.isArray(data) && data.length > 0) {
-          setRpcSignal(data[0]);
-        } else {
-          setRpcSignal(null);
-        }
+        if (!vehicleId) return;
+        const { data, error } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicleId] })
+          .abortSignal(controller.signal);
+        if (!cancelled && !controller.signal.aborted) setSignalState({ vehicleId,
+          data: !error && Array.isArray(data) && data[0]?.vehicle_id === vehicleId ? data[0] : null });
       } catch {
-        setRpcSignal(null);
+        if (!cancelled) setSignalState({ vehicleId, data: null });
+      } finally {
+        clearTimeout(timeout);
       }
     })();
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
   }, [vehicleId, initialPriceSignal]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      controller.abort();
+      if (!cancelled) setValuationState({ vehicleId, data: null, failed: true });
+    }, 10000);
     if (initialValuation) {
-      setValuation(initialValuation);
-      return;
-    }
-    (async () => {
+      setValuationState({ vehicleId, data: initialValuation });
+      clearTimeout(timeout);
+    } else (async () => {
       try {
-        if (!vehicleId) { setValuation(null); return; }
-        const v = await VehicleValuationService.getValuation(vehicleId);
-        setValuation(v);
+        if (!vehicleId) return;
+        const v = await VehicleValuationService.getValuation(vehicleId, controller.signal);
+        if (!cancelled && !controller.signal.aborted) setValuationState({ vehicleId, data: v });
       } catch {
-        setValuation(null);
+        if (!cancelled) setValuationState({ vehicleId, data: null, failed: true });
+      } finally {
+        clearTimeout(timeout);
       }
     })();
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
   }, [vehicleId, initialValuation]);
 
-  return { rpcSignal, valuation };
+  return {
+    rpcSignal: vehicleId && signalState.vehicleId === vehicleId ? signalState.data ?? null : null,
+    valuation: vehicleId && valuationState.vehicleId === vehicleId ? valuationState.data ?? null : null,
+    valuationUnavailable: !!vehicleId && valuationState.vehicleId === vehicleId && !!valuationState.failed,
+  };
 }
 
 // ---- Price sources hook ----
