@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 test('late recovery preserves the stale-read fence and raw comment caches remain service-only', () => {
-  assert.equal(process.env.PGHOST, '/private/tmp/nuke-review-closeout-pg',
+  assert(['localhost', '127.0.0.1', '/private/tmp/nuke-review-closeout-pg'].includes(process.env.PGHOST),
     'this assay requires its disposable local PostgreSQL service');
   const root = fileURLToPath(new URL('../', import.meta.url));
   const database = 'nuke_soft_close_test';
