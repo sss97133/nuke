@@ -67,6 +67,9 @@ The owner made this an all-vehicle repair requirement on 2026-10-04. Before chan
 comparable, market or opportunity reader, read **C27 / §11** in
 [`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md#11-whole-market-evidence-and-immediate-vehicle-questions)
 and the existing [`market reader contract`](docs/market/MARKET_MEASUREMENT_UI_CONTRACT.md).
+For the delivered reader repairs, remaining evidence relationships, acceptance cases and private
+receipt locations, use the [`retained evidence repair guide`](docs/market/RETAINED_EVIDENCE_REPAIR_GUIDE.md).
+Its dated findings are a starting point; verify the affected owner before a new repair.
 
 For ongoing database repair, follow the **schema-aware repair loop** in `data-machine.md`:
 recognize relationships from retained evidence, find the existing owner, implement an authorized
