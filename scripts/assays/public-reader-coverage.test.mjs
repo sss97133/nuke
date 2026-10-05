@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -159,4 +159,119 @@ test('private append-only receipt records page evidence, omits raw amounts and s
   await writeFile(path.join(dir,'original'),'original');await symlink(path.join(dir,'original'),path.join(dir,'link'));
   assert.equal(await main(['--out',path.join(dir,'link')],{env:env('anon'),client:clientFor([]),print:()=>{}}),1);
   assert.equal(await readFile(path.join(dir,'original'),'utf8'),'original');
+});
+
+const manifest = ids => ({ schemaVersion: 'public_reader_lineage_subjects_v1', population: { key: 'offline-selected-reports', basis: 'Synthetic offline regression manifest, not representative production coverage.', complete: false }, vehicleIds: ids });
+const spec = extra => ({ field: 'transmission', value: null, reported_value: 'SYNTHETIC PRIVATE CLAIM', source_observation_id: id(100),
+  reported_observed_at: '2026-01-01T00:00:00.123456Z', reported_ingested_at: '2026-01-02T00:00:00Z', as_of_at: '2026-01-03T00:00:00Z',
+  reported_method: 'synthetic-offline', reported_confidence: 0, reported_source: 'synthetic-offline', reported_conflict: false, ...extra });
+const provenance = (n, s = spec()) => ({ vehicle_id: id(n), field: s.field, observations: [{ id: s.source_observation_id, value: s.reported_value,
+  observed_at: s.reported_observed_at, ingested_at: s.reported_ingested_at, extraction_method: s.reported_method, confidence: s.reported_confidence, source_slug: s.reported_source,
+  content: 'SYNTHETIC PRIVATE SOURCE BODY' }] });
+function lineageClient({ parents = [parent(1)], specs = [spec()], drills } = {}) {
+  const calls = [];
+  return { calls, get requests() { return calls.length; }, async subjects(ids) { calls.push({ reader: 'vehicles', ids }); return { ok: true, status: 200, value: parents }; },
+    async rpc(reader, args) { calls.push({ reader, args });
+      return drills?.shift() ?? { ok: true, status: 200, value: reader === 'get_vehicle_specs' ? specs : provenance(Number(args.p_vehicle_id.slice(-12)), specs.find(s => s.field === args.p_field)) }; } };
+}
+
+test('lineage requires an explicit unique bounded manifest and cannot disguise price scope', () => {
+  assert.deepEqual(lineageSubjects(manifest([id(2), id(1)])).ids, [id(1), id(2)]);
+  for (const input of [manifest([]), manifest([id(1), id(1).toUpperCase()]), manifest(['not-a-uuid']), { ...manifest([id(1)]), schemaVersion: 'other' }, manifest(Array(10001).fill(id(1)))]) assert.throws(() => lineageSubjects(input));
+  const args = ['--out', '/private/output', '--family', 'specifications', '--subjects', '/private/manifest'];
+  assert.equal(options(args).scope, 'explicit_manifest');
+  for (const extra of [['--scope','all'],['--after',id(1)],['--page-size','20']]) assert.throws(() => options([...args,...extra]));
+  assert.throws(() => options(['--out','/private/output','--family','specifications']));
+  assert.throws(() => options(['--out','/private/output','--subjects','/private/manifest']));
+});
+
+test('explicit subjects use the public parent gate and core-field-only RPC contracts', async () => {
+  const calls = [], c = publicClient(anonymousConfiguration(env('anon')), async (url, init) => { calls.push({url,init}); return new Response('[]'); });
+  await c.subjects([id(1),id(2)]);
+  const u = new URL(calls[0].url);
+  assert.equal(u.searchParams.get('id'), `in.(${id(1)},${id(2)})`); assert.equal(u.searchParams.get('deleted_at'),'is.null');
+  assert.equal(u.searchParams.get('is_public'),'eq.true'); assert.equal(u.searchParams.get('limit'),'2');
+  assert.throws(() => c.subjects(Array(201).fill(id(1))));
+  assert.throws(() => c.rpc('get_vehicle_specs',{p_vehicle_id:'bad'}));
+  assert.throws(() => c.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'unreviewed_other_field'}));
+  assert.throws(() => c.rpc('popup_vehicle_intel',{}));
+});
+
+test('chunked provenance bytes are refused during consumption, without raw body or zero evidence', async () => {
+  let cancelled = false, sent = 0;
+  const stream = new ReadableStream({ pull(controller) { sent++; controller.enqueue(new Uint8Array(1200000)); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  const c = publicClient(anonymousConfiguration(env('anon')), async () => new Response(stream));
+  const result = await c.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'transmission'});
+  assert.equal(result.ok,false); assert.equal(result.code,'response_byte_limit'); assert.equal(result.value,undefined);
+  assert.equal(cancelled,true); assert.equal(sent,2); assert.equal(result.status,200);
+});
+
+test('microsecond fold boundaries and zero confidence retain their actual meanings', () => {
+  const r = inspectSpecification([spec({ reported_observed_at: '2026-01-03T00:00:00.000001Z' })]);
+  assert.equal(r.failures.selected_report_after_fold_cutoff,1); assert.equal(r.gaps.selected_report_confidence_unknown,undefined);
+  const offset = inspectSpecification([spec({ reported_observed_at: '2026-01-02T16:00:00-08:00' })]);
+  assert.deepEqual(offset.failures,{}); assert.equal(offset.canonicalUnknownWithReport,1); assert.equal(offset.gaps.selected_report_sale_episode_binding_unmeasured,1);
+});
+
+test('rooted canonical evidence can coexist with a conflicting selected report', () => {
+  const r = inspectSpecification([spec({ value:'OTHER CANONICAL VALUE', reported_value:null, reported_conflict:true, rooted:true }),
+    { field:'mileage', value:'123', rooted:false, source_observation_id:null }, { field:'description',value:'SYNTHETIC PRIVATE PROSE' }]);
+  assert.equal(r.conflicts,1); assert.equal(r.canonicalWithoutSelectedReport,1); assert.equal(r.unrecognizedFields,1); assert.deepEqual(r.failures,{});
+  assert.equal(r.reports[0].reported_conflict,true); assert.equal(inspectSpecification([spec({source_observation_id:null})]).failures.reported_value_without_source_observation,1);
+  assert.equal(inspectSpecification([spec(),spec()]).safe,false);
+});
+
+test('selected observation identity, value and all known lineage attributes must reach the drill', () => {
+  const s = spec(), p = provenance(1,s);
+  assert.equal(inspectProvenance(id(1),s,p).lineageMatches,true);
+  for (const [field,value,issue] of [['confidence',0.5,'confidence'],['source_slug','foreign-source','source_slug'],['extraction_method','other','method'],['observed_at','2026-02-01Z','event_clock'],['ingested_at','2026-02-01Z','ingest_clock'],['value','OTHER CLAIM','reported_value']]) {
+    const bad = structuredClone(p); bad.observations[0][field]=value;
+    assert.equal(inspectProvenance(id(1),s,bad).failures[`selected_observation_${issue}_mismatch`],1);
+  }
+  assert.equal(inspectProvenance(id(2),s,p).failures.provenance_shape_or_subject_invalid,1);
+  assert.equal(inspectProvenance(id(1),s,{...p,observations:[]}).failures.selected_observation_missing_from_current_drill,1);
+  assert.equal(inspectProvenance(id(1),s,{...p,observations:[...p.observations,...p.observations]}).failures.selected_observation_duplicated_in_drill,1);
+});
+
+test('denied subjects never trigger child reads, and raw testimony is omitted from lineage receipts', async () => {
+  const c = lineageClient(), events = [];
+  const r = await runSpecificationLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])),{emit:x=>events.push(x)});
+  assert.equal(r.requestedParents,3); assert.equal(r.eligibleParents,1); assert.equal(r.absentOrIneligibleParents,2);
+  assert.equal(r.completedParents,1); assert.equal(r.matchingReports,1); assert.equal(r.status,'passed_selected_current_lineage_in_manifest');
+  assert.equal(c.calls.filter(x=>x.reader!=='vehicles').length,2); assert.equal(r.conditionAtSale,'unmeasured');
+  const text=JSON.stringify(events); for(const privateValue of ['PRIVATE CLAIM','PRIVATE SOURCE BODY',id(2),id(3)]) assert.equal(text.includes(privateValue),false);
+  assert.equal(r.databaseWrites,0); assert.equal(r.modelCalls,0); assert.equal(r.recordRepairs,0);
+});
+
+test('a malformed or foreign gate fails before source readers and does not retain foreign IDs', async () => {
+  const c=lineageClient({parents:[parent(99)]}),events=[];
+  const r=await runSpecificationLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+  assert.equal(r.failures.lineage_parent_gate_invalid,1); assert.equal(c.requests,1); assert.equal(JSON.stringify(events).includes(id(99)),false);
+});
+
+test('two failed specification reads stop for diagnosis and remain unmeasured', async () => {
+  const c=lineageClient({parents:[parent(1),parent(2),parent(3)],drills:[{ok:false,status:500,code:'57014'},{ok:false,status:500,code:'57014'}]});
+  const r=await runSpecificationLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])));
+  assert.equal(r.inspectedParents,2); assert.equal(r.completedParents,0); assert.equal(r.gaps.specification_parents_unmeasured,2);
+  assert.equal(r.stopReason,'two_consecutive_lineage_reader_failures_inspect_cause'); assert.equal(r.status,'failed'); assert.equal(c.requests,3);
+});
+
+test('provenance refusal and a time cap do not become successful lineage coverage', async () => {
+  const c=lineageClient({specs:[spec(),spec({field:'engine_type'})],drills:[{ok:true,status:200,value:[spec(),spec({field:'engine_type'})]},{ok:false,status:200,code:'response_byte_limit'},{ok:false,status:500,code:'57014'}]});
+  const r=await runSpecificationLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.selectedReports,2); assert.equal(r.drilledReports,0); assert.equal(r.gaps.selected_report_drill_unmeasured,2); assert.equal(r.status,'failed');
+  let clock=0;const timed=lineageClient();const rpc=timed.rpc;timed.rpc=async(...args)=>{const value=await rpc(...args);clock=10;return value;};
+  const ended=await runSpecificationLineage(timed,scope({until:5}),lineageSubjects(manifest([id(1)])),{now:()=>clock});
+  assert.equal(ended.completedParents,0); assert.equal(ended.stopReason,'time_budget_reached'); assert.equal(ended.status,'incomplete'); assert.equal(timed.requests,2);
+});
+
+test('lineage CLI keeps a private immutable manifest/assay receipt and a distinct reader family', async t => {
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-lineage-assay-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),0);
+  const body=await readFile(out,'utf8'),rows=body.trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows[0].readers,['vehicles','get_vehicle_specs','get_field_provenance']); assert.equal(rows[0].options.scope,'explicit_manifest');
+  assert.match(rows.at(-1).manifestSha256,/^[a-f0-9]{64}$/); assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
+  assert.equal(body.includes('PRIVATE CLAIM'),false); assert.equal(body.includes('PRIVATE SOURCE BODY'),false); assert.equal((await stat(out)).mode&0o777,0o600);
+  assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),1);
 });
