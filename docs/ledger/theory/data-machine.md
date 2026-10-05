@@ -244,3 +244,12 @@ lead holds them.)
 - **Not abandoning a fold:** an owner in `pipeline_registry`, a scheduled writer, an assay in `v_job_health`, a
   described output keyed to the trunk, and a reader. A fold with no reader is dead on arrival.
 - **Anon rule:** anon may write testimony only as proposals into quarantine, never truth (P0.5, #488).
+
+## Construction evidence, 2026-10-05: unresolved relationships reach readers
+
+A missing supplier key or name must not make otherwise permitted work disappear from a supplier
+reader. C22's bounded consumer case retains six existing work observations under an explicitly
+unrecorded supplier, using original observation IDs and recorded dates. Supplier-text groups are
+presentation groups, not organization entities or verified bridges; current masked work supplies no
+ingest clock or complete monetary outcome. The case ledger records executable acceptance and exact
+delivery boundaries. This extends the useful answer without inventing the missing relationship.

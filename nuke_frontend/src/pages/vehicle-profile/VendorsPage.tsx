@@ -20,6 +20,8 @@ interface VendorRollup {
   firstSeen: string | null;
   lastSeen: string | null;
   hasParts: boolean;
+  maskedCount: number;
+  groupKey: string;
 }
 
 interface VehicleSummary {
@@ -35,6 +37,7 @@ const VendorsPage: React.FC = () => {
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
   const [vendors, setVendors] = useState<VendorRollup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,10 +45,12 @@ const VendorsPage: React.FC = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setHistoryUnavailable(false);
+    setVendors([]);
 
     (async () => {
       // Same anti-cap pattern as VendorPage: query kinds separately.
-      const [vehRes, workRes, specRes, commentRes] = await Promise.all([
+      const [vehRes, workRes, specRes, commentRes, publicWorkRes] = await Promise.all([
         supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
@@ -53,7 +58,7 @@ const VendorsPage: React.FC = () => {
           .maybeSingle(),
         supabase
           .from('vehicle_observations')
-          .select('observed_at, kind, structured_data')
+          .select('id, observed_at, kind, structured_data')
           .eq('vehicle_id', vehicleId)
           .eq('is_superseded', false)
           .eq('kind', 'work_record')
@@ -61,7 +66,7 @@ const VendorsPage: React.FC = () => {
           .limit(1000),
         supabase
           .from('vehicle_observations')
-          .select('observed_at, kind, structured_data')
+          .select('id, observed_at, kind, structured_data')
           .eq('vehicle_id', vehicleId)
           .eq('is_superseded', false)
           .eq('kind', 'specification')
@@ -70,12 +75,13 @@ const VendorsPage: React.FC = () => {
           .limit(1000),
         supabase
           .from('vehicle_observations')
-          .select('observed_at, kind, structured_data')
+          .select('id, observed_at, kind, structured_data')
           .eq('vehicle_id', vehicleId)
           .eq('is_superseded', false)
           .eq('kind', 'comment')
           .order('observed_at', { ascending: false })
           .limit(500),
+        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId }),
       ]);
 
       if (cancelled) return;
@@ -87,11 +93,21 @@ const VendorsPage: React.FC = () => {
       }
       setVehicle(vehRes.data as VehicleSummary | null);
 
-      const obsList = [
+      setHistoryUnavailable([workRes, specRes, commentRes, publicWorkRes].some(r => !!r.error));
+      const obsList: any[] = [
         ...((workRes.data as any[] | null) || []),
         ...((specRes.data as any[] | null) || []),
         ...((commentRes.data as any[] | null) || []),
       ];
+
+      // Canonical observation ID prevents the masked copy doubling owner rows.
+      const seen = new Set(obsList.map(r => r.id));
+      for (const r of (publicWorkRes.error ? [] : publicWorkRes.data || [])) {
+        if (!r.observation_id || seen.has(r.observation_id)) continue;
+        seen.add(r.observation_id);
+        obsList.push({ id: r.observation_id, kind: 'work_record', observed_at: r.done_on ?? null,
+          structured_data: { supplier: r.supplier ?? null }, public_copy: true });
+      }
 
       const map = new Map<string, VendorRollup>();
       for (const r of obsList) {
@@ -99,33 +115,40 @@ const VendorsPage: React.FC = () => {
         const raw =
           (typeof sd.vendor === 'string' && sd.vendor) ||
           (typeof sd.merchant === 'string' && sd.merchant) ||
+          (typeof sd.supplier === 'string' && sd.supplier) ||
           null;
-        if (!raw) continue;
-        const cleaned = raw.trim();
-        if (cleaned.length < 2) continue;
+        // Unnamed work is evidence too; keep it explicitly unresolved.
+        const unknownSupplier = !raw?.trim();
+        if (unknownSupplier && r.kind !== 'work_record') continue;
+        const cleaned = unknownSupplier ? 'Supplier unrecorded' : raw!.trim();
         const slug = cleaned
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '');
-        if (!slug) continue;
 
-        let row = map.get(slug);
+        // Presentation grouping only; this is not an organization identity.
+        const groupKey = unknownSupplier ? '__unrecorded__' : cleaned.toLowerCase();
+        let row = map.get(groupKey);
         if (!row) {
           row = {
             name: cleaned,
+            groupKey,
             slug,
             count: 0,
             totalUsd: 0,
             firstSeen: null,
             lastSeen: null,
             hasParts: false,
+            maskedCount: 0,
           };
-          map.set(slug, row);
+          map.set(groupKey, row);
         }
         row.count += 1;
+        if (r.public_copy || unknownSupplier || !slug) row.maskedCount += 1;
         const total = sd.total_price ?? sd.total;
         if (typeof total === 'number' && !isNaN(total)) row.totalUsd += total;
-        const oa: string | null = r.observed_at;
+        const oa: string | null = r.kind === 'work_record' && typeof sd.transaction_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(sd.transaction_date)
+          ? sd.transaction_date.slice(0, 10) : r.observed_at;
         if (oa) {
           if (!row.firstSeen || oa < row.firstSeen) row.firstSeen = oa;
           if (!row.lastSeen || oa > row.lastSeen) row.lastSeen = oa;
@@ -136,7 +159,11 @@ const VendorsPage: React.FC = () => {
       const list = Array.from(map.values()).sort((a, b) => b.count - a.count);
       setVendors(list);
       setLoading(false);
-    })();
+    })().catch(() => {
+      if (cancelled) return;
+      setError('Vendor history could not be loaded.');
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;
@@ -200,8 +227,17 @@ const VendorsPage: React.FC = () => {
           fontFamily: 'Courier New, monospace',
         }}
       >
-        {vendors.length} VENDORS{totalSpend > 0 && ` · ROLLED-UP $${totalSpend.toLocaleString()}`}
+        {vendors.length} SUPPLIER GROUPS{totalSpend > 0 && ` · VISIBLE $${totalSpend.toLocaleString()}`}
       </div>
+
+      <p style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 12 }}>
+        Supplier names group readable observations, not verified organizations. Dates are recorded work or observation dates;
+        ingestion times are unavailable for public work. Visible totals exclude masked amounts.
+        {' '}<Link to={`/vehicle/${vehicleId}/table`}>View work evidence</Link>
+      </p>
+      {historyUnavailable && <div role="status" style={{ fontSize: 10, marginBottom: 12 }}>
+        Some vendor history could not be loaded; counts and dates may be incomplete.
+      </div>}
 
       {loading && vendors.length === 0 && (
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading vendors…</div>
@@ -227,11 +263,12 @@ const VendorsPage: React.FC = () => {
       )}
 
       {vendors.length > 0 && (
-        <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
+        <div style={{ border: '2px solid var(--text, #1a1a1a)', overflowX: 'auto' }}>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 60px 110px 100px 100px',
+              gridTemplateColumns: 'minmax(150px, 1fr) 40px 80px 80px 80px',
+              minWidth: 470,
               gap: 10,
               padding: '6px 8px',
               fontFamily: 'Arial, sans-serif',
@@ -245,17 +282,21 @@ const VendorsPage: React.FC = () => {
           >
             <span>Vendor</span>
             <span style={{ textAlign: 'right' }}>Obs</span>
-            <span style={{ textAlign: 'right' }}>Total</span>
+            <span style={{ textAlign: 'right' }}>Visible total</span>
             <span style={{ textAlign: 'right' }}>First</span>
             <span style={{ textAlign: 'right' }}>Last</span>
           </div>
-          {vendors.map((v, i) => (
-            <Link
-              key={v.slug}
-              to={`/vehicle/${vehicleId}/vendor/${v.slug}`}
+          {vendors.map((v, i) => {
+            // The old detail reader cannot read masked work; don't offer an empty drill.
+            const Row = v.maskedCount ? 'div' : Link;
+            return <Row
+              key={v.groupKey}
+              data-vendor-group={v.groupKey}
+              {...(v.maskedCount ? {} : { to: `/vehicle/${vehicleId}/vendor/${v.slug}` })}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 60px 110px 100px 100px',
+                gridTemplateColumns: 'minmax(150px, 1fr) 40px 80px 80px 80px',
+                minWidth: 470,
                 gap: 10,
                 padding: '6px 8px',
                 fontFamily: 'Arial, sans-serif',
@@ -268,6 +309,7 @@ const VendorsPage: React.FC = () => {
             >
               <span style={{ fontWeight: 700, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                 {v.name}
+                {v.maskedCount > 0 && <small style={{ display: 'block', fontSize: 8 }}>View permitted work in the table</small>}
                 {v.hasParts && (
                   <span
                     style={{
@@ -287,7 +329,7 @@ const VendorsPage: React.FC = () => {
               </span>
               <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>{v.count}</span>
               <span style={{ fontFamily: 'Courier New, monospace', textAlign: 'right' }}>
-                {v.totalUsd > 0 ? `$${v.totalUsd.toLocaleString()}` : ''}
+                {v.totalUsd > 0 ? `$${v.totalUsd.toLocaleString()}` : '—'}
               </span>
               <span
                 style={{
@@ -297,7 +339,7 @@ const VendorsPage: React.FC = () => {
                   color: 'var(--text-secondary)',
                 }}
               >
-                {v.firstSeen ? v.firstSeen.slice(0, 10) : ''}
+                {v.firstSeen ? v.firstSeen.slice(0, 10) : '—'}
               </span>
               <span
                 style={{
@@ -307,10 +349,10 @@ const VendorsPage: React.FC = () => {
                   color: 'var(--text-secondary)',
                 }}
               >
-                {v.lastSeen ? v.lastSeen.slice(0, 10) : ''}
+                {v.lastSeen ? v.lastSeen.slice(0, 10) : '—'}
               </span>
-            </Link>
-          ))}
+            </Row>;
+          })}
         </div>
       )}
     </div>
