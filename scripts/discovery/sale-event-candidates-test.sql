@@ -15,7 +15,8 @@ CREATE INDEX source_alias_raw_value ON source_alias_mapping(raw_value);
 CREATE TABLE vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid,source_platform text,source_url text,
  source_listing_id text,event_status text,final_price numeric,sold_at timestamptz,ended_at timestamptz,
  created_at timestamptz DEFAULT '2026-01-01Z',updated_at timestamptz DEFAULT '2026-02-01Z',
- extracted_at timestamptz DEFAULT '2026-01-01Z',metadata jsonb DEFAULT '{}');
+ extracted_at timestamptz DEFAULT '2026-01-01Z',metadata jsonb DEFAULT '{}',
+ extraction_method text,extractor_version text,extraction_source text);
 CREATE INDEX idx_vehicle_events_vehicle ON vehicle_events(vehicle_id);
 CREATE UNIQUE INDEX idx_vehicle_events_dedup ON vehicle_events(vehicle_id,source_platform,source_listing_id)
  WHERE source_listing_id IS NOT NULL;
@@ -270,3 +271,57 @@ SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j#>'{sourceCont
  AND s->>'reportedSoldEpisodes'='0' AND s->>'reportedNotSoldEpisodes'='0'),
  'opposing outcomes under a known alias remain a conflict rather than a sold episode')
  FROM (SELECT pg_temp.candidates(ARRAY['90000000-0000-0000-0000-000000000004'::uuid]) j) q;
+
+-- Row-construction labels distinguish inspection targets without establishing
+-- independent source testimony or changing any existing candidate decision.
+CREATE TEMP TABLE extraction_before AS SELECT pg_temp.candidates(ARRAY[
+ '90000000-0000-0000-0000-000000000004'::uuid,
+ '10000000-0000-0000-0000-000000000001'::uuid]) j;
+UPDATE vehicle_events SET extraction_method='orphan-backfill-v1',
+ extractor_version=NULL,extraction_source='SYNTHETIC PRIVATE PAYLOAD',
+ metadata='{"independent":true,"currency":"USD","qualified":true}'
+ WHERE id='93000000-0000-0000-0000-000000000001';
+UPDATE vehicle_events SET extraction_method=' retained synthetic method ',
+ extractor_version='synthetic-v2'
+ WHERE id='93000000-0000-0000-0000-000000000002';
+CREATE TEMP TABLE extraction_after AS SELECT pg_temp.candidates(ARRAY[
+ '90000000-0000-0000-0000-000000000004'::uuid,
+ '10000000-0000-0000-0000-000000000001'::uuid]) j;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{capture,id}'='93000000-0000-0000-0000-000000000001'
+ AND c#>>'{nativeRow,extractionMethod}'='orphan-backfill-v1'
+ AND c#>'{nativeRow,extractorVersion}'='null'::jsonb
+ AND c#>>'{nativeRow,extractionMetadataBasis}'='vehicle_events.extraction_method_and_extractor_version'),
+ 'retained backfill label is exposed without inventing a version') FROM extraction_after;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{capture,id}'='93000000-0000-0000-0000-000000000002'
+ AND c#>>'{nativeRow,extractionMethod}'=' retained synthetic method '
+ AND c#>>'{nativeRow,extractorVersion}'='synthetic-v2'),
+ 'method and version preserve exact retained attribution') FROM extraction_after;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{capture,table}'='bat_listings'
+ AND c#>'{nativeRow,extractionMethod}'='null'::jsonb
+ AND c#>'{nativeRow,extractorVersion}'='null'::jsonb
+ AND c#>>'{nativeRow,extractionMetadataBasis}'='not_retained_in_bat_listing_columns'),
+ 'listing scrape clock does not invent extraction provenance') FROM extraction_after;
+SELECT pg_temp.assert_ok(EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{capture,id}'='20000000-0000-0000-0000-000000000001'
+ AND c#>'{nativeRow,extractionMethod}'='null'::jsonb
+ AND c#>>'{nativeRow,extractionMetadataBasis}'='vehicle_events.extraction_method_and_extractor_version'),
+ 'missing event extraction method stays explicitly unknown') FROM extraction_after;
+SELECT pg_temp.assert_ok(NOT EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c#>>'{nativeRow,sourceIndependence}'<>'unestablished'
+ OR c->'knownAt'<>'null'::jsonb OR c->'currency'<>'null'::jsonb
+ OR c#>>'{qualification,status}'<>'candidate'),
+ 'native extraction labels and arbitrary metadata do not qualify sources or prices') FROM extraction_after;
+SELECT pg_temp.assert_ok(position('SYNTHETIC PRIVATE PAYLOAD' in j::text)=0
+ AND NOT EXISTS(SELECT FROM jsonb_array_elements(j->'candidates') c
+ WHERE c->'nativeRow' ? 'extractionSource' OR c->'nativeRow' ? 'metadata'),
+ 'raw extraction payload and arbitrary metadata are not projected') FROM extraction_after;
+SELECT pg_temp.assert_ok((SELECT j-'candidates' FROM extraction_before)=j-'candidates'
+ AND (SELECT jsonb_agg(c||jsonb_build_object('nativeRow',(c->'nativeRow')-'extractionMethod'-'extractorVersion')
+ ORDER BY c#>>'{capture,table}',c#>>'{capture,id}') FROM jsonb_array_elements(j->'candidates') c)
+ = (SELECT jsonb_agg(c||jsonb_build_object('nativeRow',(c->'nativeRow')-'extractionMethod'-'extractorVersion')
+ ORDER BY c#>>'{capture,table}',c#>>'{capture,id}') FROM extraction_before b,
+ jsonb_array_elements(b.j->'candidates') c),
+ 'extraction metadata changes preserve every candidate decision, clock, capture and count') FROM extraction_after;

@@ -11,6 +11,9 @@
 -- Current exact source_alias_mapping rows connect recorded platform spellings;
 -- raw labels remain in the receipt. No fuzzy, domain or slug fallback establishes
 -- an alias. Ambiguous mappings stay raw; this is not historical registry replay.
+-- Extraction labels are retained operator context, not evidence that an event
+-- was independently observed, that a label matches its URL, or that a header
+-- clock establishes immutable source availability. No raw extraction payload.
 WITH request AS MATERIALIZED (
   SELECT $1::uuid[] AS parent_ids,$2::timestamptz AS event_before,
     $3::timestamptz AS evidence_as_of,$4::integer AS native_limit,$5::integer AS capture_limit,
@@ -32,7 +35,9 @@ WITH request AS MATERIALIZED (
     CASE WHEN e.sold_at IS NOT NULL THEN 'vehicle_events.sold_at'
       WHEN e.ended_at IS NOT NULL THEN 'vehicle_events.ended_at_recorded_outcome_day' END AS event_basis,
     e.created_at,e.updated_at,e.extracted_at AS source_read_at,
-    'vehicle_events.extracted_at'::text AS read_clock_basis
+    'vehicle_events.extracted_at'::text AS read_clock_basis,
+    e.extraction_method AS extraction_method,e.extractor_version AS extractor_version,
+    'vehicle_events.extraction_method_and_extractor_version'::text AS extraction_metadata_basis
   FROM parents p JOIN public.vehicle_events e ON e.vehicle_id=p.id
   ORDER BY e.id LIMIT (SELECT CASE WHEN valid THEN native_limit+1 ELSE 0 END FROM request)
 ), native_listings AS MATERIALIZED (
@@ -44,7 +49,9 @@ WITH request AS MATERIALIZED (
     CASE WHEN l.sale_date IS NOT NULL THEN 'bat_listings.sale_date'
       WHEN l.auction_end_date IS NOT NULL THEN 'bat_listings.auction_end_date_recorded_outcome_day' END AS event_basis,
     l.created_at,l.updated_at,l.scraped_at AS source_read_at,
-    'bat_listings.scraped_at'::text AS read_clock_basis
+    'bat_listings.scraped_at'::text AS read_clock_basis,
+    NULL::text AS extraction_method,NULL::text AS extractor_version,
+    'not_retained_in_bat_listing_columns'::text AS extraction_metadata_basis
   FROM parents p JOIN public.bat_listings l ON l.vehicle_id=p.id
   ORDER BY l.id LIMIT (SELECT CASE WHEN valid THEN native_limit+1 ELSE 0 END FROM request)
 ), boundary AS MATERIALIZED (
@@ -217,6 +224,8 @@ SELECT jsonb_build_object(
     'publicSourceStatus','unestablished','relevance','[]'::jsonb,
     'nativeRow',jsonb_build_object('recordedAmount',p.amount::text,'createdAt',p.created_at,'updatedAt',p.updated_at,
       'sourceReadAt',p.source_read_at,'readClockBasis',p.read_clock_basis,
+      'extractionMethod',p.extraction_method,'extractorVersion',p.extractor_version,
+      'extractionMetadataBasis',p.extraction_metadata_basis,'sourceIndependence','unestablished',
       'clockMeaning','mutable_row_headers_not_immutable_claim_knownAt'),
     'flags',jsonb_build_object('identityConflict',p.identity_conflict,
       'unresolvedEpisode',p.episode_key IS NULL,'pricePositiveFinite',p.amount>0 AND p.amount::text NOT IN ('NaN','Infinity','-Infinity'),
