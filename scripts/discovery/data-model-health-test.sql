@@ -51,15 +51,22 @@ VALUES
   (2, 'derivation-queue-drain', '*/10 * * * *', true, 'succeeded', now(), 144, 0, 0, NULL, 'passed'),
   (3, 'derive-vehicle-image-attribution', '*/5 * * * *', false, 'failed', now(), 2, 1, 1, NULL, 'paused'),
   (4, 'bat-live-pull', '* * * * *', true, 'succeeded', now(), 1440, 0, 0, 'idle', 'idle');
-CREATE TEMP TABLE query_text(line text);
-\copy query_text FROM 'scripts/discovery/data-model-health.sql' WITH (FORMAT csv, DELIMITER E'\x01', QUOTE E'\x02', ESCAPE E'\x02')
-CREATE FUNCTION pg_temp.measure() RETURNS jsonb LANGUAGE plpgsql AS $$
+CREATE SCHEMA cron;
+CREATE TABLE cron.job AS SELECT jobid, jobname, schedule, active FROM public.v_job_health;
+CREATE TEMP TABLE query_text(line text, section text DEFAULT 'metadata');
+\copy query_text(line) FROM 'scripts/discovery/data-model-health.sql' WITH (FORMAT csv, DELIMITER E'\x01', QUOTE E'\x02', ESCAPE E'\x02')
+ALTER TABLE query_text ALTER COLUMN section SET DEFAULT 'jobHealth';
+\copy query_text(line) FROM 'scripts/discovery/data-model-job-health.sql' WITH (FORMAT csv, DELIMITER E'\x01', QUOTE E'\x02', ESCAPE E'\x02')
+CREATE FUNCTION pg_temp.measure(wanted_section text) RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE result jsonb; sql text;
 BEGIN
-  SELECT string_agg(line, E'\n' ORDER BY ctid) INTO sql FROM query_text;
+  SELECT string_agg(line, E'\n' ORDER BY ctid) INTO sql FROM query_text WHERE section = wanted_section;
   EXECUTE sql INTO result;
   RETURN result;
 END $$;
+CREATE FUNCTION pg_temp.measure() RETURNS jsonb LANGUAGE sql AS $$
+  SELECT pg_temp.measure('metadata') || jsonb_build_object('jobs', pg_temp.measure('jobHealth')->'jobs')
+$$;
 CREATE TEMP TABLE reading AS SELECT pg_temp.measure() AS health;
 CREATE FUNCTION pg_temp.table_reading(k text) RETURNS jsonb LANGUAGE sql AS $$
   SELECT item FROM reading CROSS JOIN LATERAL jsonb_array_elements(health->'tables') item
@@ -128,6 +135,18 @@ SELECT pg_temp.check(pg_temp.job_reading('bat-live-pull')->'assay'->>'state' = '
   'no eligible assay sample is not a pass');
 SELECT pg_temp.check((SELECT health::text NOT LIKE '%PRIVATE_%'
   AND NOT (health ? 'status') FROM reading), 'no private command error assay payload or blanket healthy flag');
+SELECT pg_temp.check(pg_temp.measure('metadata')->'scope' = pg_temp.measure('jobHealth')->'scope',
+  'independent queries retain identical declared table and job scope');
+ALTER TABLE public.v_job_health RENAME TO unavailable_job_health;
+SELECT pg_temp.check(jsonb_array_length(pg_temp.measure('metadata')->'tables') = 7
+  AND jsonb_array_length(pg_temp.measure('metadata')->'jobs') = 5
+  AND pg_temp.measure('metadata')->'jobs'->0->'execution'->>'state' = 'unmeasured',
+  'metadata and configured jobs remain readable when job-health owner is unavailable');
+ALTER TABLE public.unavailable_job_health RENAME TO v_job_health;
+ALTER TABLE public.v_schema_atlas RENAME TO unavailable_atlas;
+SELECT pg_temp.check(pg_temp.measure('jobHealth')->'jobs'->0->'assay'->>'state' = 'failed',
+  'job-health failure remains readable when atlas metadata is unavailable');
+ALTER TABLE public.unavailable_atlas RENAME TO v_schema_atlas;
 -- A valid new row does not validate the older row; only a successful explicit
 -- catalog validation after repairing this synthetic fixture changes its status.
 INSERT INTO public.vehicles VALUES (99);
