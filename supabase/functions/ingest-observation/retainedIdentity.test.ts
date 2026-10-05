@@ -37,6 +37,8 @@ Deno.test("canonical account preserves source with explicitly untyped citation a
   assert(r.source_citation.source_recorded_at === original.created_at && r.source_citation.source_event_at === original.posted_at);
   assert(!("observation_input" in r) && r.person_identity === "unknown");
   assert(f.rows[0].metadata.retained_bat_source_account.source_hash === original.content_hash);
+  assert(f.rows[0].metadata.retained_bat_source_account.source_event_at_basis === "retained_posted_at");
+  assert(r.source_citation.source_event_clock_origin === "unknown_legacy_fallback_possible");
   const replay = await ingestRetainedIdentity(f.store, sourceId);
   assert(replay.identity_id === r.identity_id && f.counts().writes === 1 && replay.insert_attempted === false);
 });

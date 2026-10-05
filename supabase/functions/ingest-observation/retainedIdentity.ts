@@ -78,6 +78,7 @@ export async function ingestRetainedIdentity(store: RetainedIdentityStore,
         retained_bat_source_account: { method: RETAINED_IDENTITY_MODE, source_comment_id: source.id,
           publisher_author_id: publisherId, source_url: source.source_url, source_hash: source.content_hash,
           source_event_at: source.posted_at, source_recorded_at: source.created_at,
+          source_event_at_basis: "retained_posted_at", source_event_clock_origin: "unknown_legacy_fallback_possible",
           claim_role: "published_source_account", source_lineage: "untyped_metadata_citation",
           source_platform: "bat", source_handle: source.author_username, person_identity: "unknown" },
       } })));
@@ -99,7 +100,8 @@ export async function ingestRetainedIdentity(store: RetainedIdentityStore,
     source_lineage: "untyped_metadata_citation",
     source_citation: { source_comment_id: source.id, source_hash: source.content_hash,
       source_url: source.source_url, source_platform: "bat", source_handle: source.author_username,
-      publisher_author_id: publisherId, source_event_at: source.posted_at, source_recorded_at: source.created_at },
+      publisher_author_id: publisherId, source_event_at: source.posted_at, source_recorded_at: source.created_at,
+      source_event_at_basis: "retained_posted_at", source_event_clock_origin: "unknown_legacy_fallback_possible" },
   };
 }
 
