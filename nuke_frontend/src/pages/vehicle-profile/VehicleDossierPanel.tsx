@@ -392,17 +392,24 @@ const FieldRow: React.FC<{
         </span>
 
         {/* Expand icon */}
-        <span style={{
+        <button type="button" aria-label={`${isOpen ? 'Hide' : 'Show'} ${label} source claims`}
+          aria-expanded={isOpen} aria-controls={`provenance-drawer-${field}`}
+          disabled={!group || group.sources.length === 0}
+          onClick={e => { e.stopPropagation(); onToggle(); }} style={{
           fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           color: 'var(--text-disabled)',
+          padding: 0,
+          border: 0,
+          background: 'transparent',
+          cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           textAlign: 'center',
           userSelect: 'none',
           transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
           transform: isOpen ? 'rotate(90deg)' : 'none',
         }}>
           {group && group.sources.length > 0 ? '\u25B6' : ''}
-        </span>
+        </button>
       </div>
 
       {/* Provenance drawer */}

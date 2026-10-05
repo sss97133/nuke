@@ -1282,9 +1282,6 @@
     font-size: 13px !important;
   }
   .dossier-evidence-row {
-    grid-template-columns: 40px 1fr 36px 80px !important;
-  }
-  .dossier-evidence-context {
-    display: none !important;
+    grid-template-columns: 60px minmax(0, 1fr) !important;
   }
 }

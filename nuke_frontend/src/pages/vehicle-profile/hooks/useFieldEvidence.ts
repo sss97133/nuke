@@ -24,6 +24,10 @@ export interface FieldEvidenceRow {
   source_type: string;
   /** 0-1 float — converted from DB source_confidence (0-100 int) */
   confidence: number;
+  /** Original nullable score; the ranking fallback is not a stored score. */
+  source_confidence?: number | null;
+  /** Identifies which existing reader supplied the row, not source verification. */
+  evidence_origin?: 'field_evidence' | 'vehicle_wiki';
   extraction_context: string | null;
   extracted_at: string | null;
   status: string | null;
@@ -224,6 +228,7 @@ async function fetchAgentConsensus(vehicleId: string): Promise<FieldEvidenceRow[
         field_value: value,
         source_type: `agent_${evidenceClass}`,
         confidence,
+        evidence_origin: 'vehicle_wiki',
         extraction_context: `Agent consensus · ${f?.corroboration ?? 1} contributor(s)${f?.conflict ? ' · CONFLICT' : ''}`,
         extracted_at: null,
         status: null,
@@ -261,6 +266,8 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     field_value: r.proposed_value ?? '',
     source_type: r.source_type,
     confidence: (r.source_confidence ?? 0) / 100, // 0-100 int -> 0-1 float
+    source_confidence: r.source_confidence ?? null,
+    evidence_origin: 'field_evidence',
     extraction_context: r.extraction_context ?? null,
     extracted_at: r.extracted_at ?? null,
     status: r.status ?? null,

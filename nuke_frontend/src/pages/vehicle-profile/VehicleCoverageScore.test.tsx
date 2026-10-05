@@ -51,6 +51,16 @@ beforeEach(() => {
     totalSources: 3, hasConflict: true, conflictType: 'genuine' } };
 });
 
+it('provides a named keyboard control with the actual field drawer and expanded state', () => {
+  const dom = new JSDOM(renderToStaticMarkup(<VehicleDossierPanel />));
+  const control = dom.window.document.querySelector('[data-field="mileage"] button[aria-controls]');
+  expect(control?.getAttribute('type')).toBe('button');
+  expect(control?.getAttribute('aria-label')).toBe('Show MILEAGE source claims');
+  expect(control?.getAttribute('aria-expanded')).toBe('false');
+  expect(control?.hasAttribute('disabled')).toBe(false);
+  expect(dom.window.document.getElementById(control!.getAttribute('aria-controls')!)).not.toBeNull();
+});
+
 const surfaces = [
   ['dossier', () => <VehicleDossierPanel />],
   ['basic info', () => <VehicleBasicInfo vehicle={fixture.vehicle} session={null} permissions={{ canEdit: false } as any} />],

@@ -36,6 +36,17 @@ beforeEach(() => {
 });
 
 describe('evidence reads preserve sparse source state', () => {
+  it.each([75, 0, null])('preserves raw native confidence %s for display without changing rank or either clock', async score => {
+    fixture.rows = [{ id: 'offline-score', vehicle_id: 'offline-subject', field_name: 'color', proposed_value: 'Blue',
+      source_type: 'source-report', source_confidence: score, status: 'pending',
+      extracted_at: null, created_at: '2026-01-02T00:00:00Z' }];
+    const before = JSON.stringify(fixture.rows);
+    useFieldEvidence('offline-subject'); const data = await fixture.queryFn!();
+    expect(data.color.primary).toMatchObject({ source_confidence: score, evidence_origin: 'field_evidence',
+      confidence: (score ?? 0) / 100, extracted_at: null, created_at: fixture.rows[0].created_at });
+    expect(JSON.stringify(fixture.rows)).toBe(before);
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith('vehicle_wiki', { p_vehicle_id: 'offline-subject' });
+  });
   it.each([0, 1, 2])('reads %s retained rows without requesting a backfill or changing testimony', async count => {
     const subject = `offline-sparse-${count}`;
     fixture.rows = Array.from({ length: count }, (_, i) => ({ id: `offline-evidence-${i}`, vehicle_id: subject,
@@ -59,6 +70,8 @@ describe('evidence reads preserve sparse source state', () => {
     useFieldEvidence('offline-agent-only'); const data = await fixture.queryFn!();
     expect(data.horsepower.primary.field_value).toBe('300');
     expect(data.horsepower.primary.source_type).toBe('agent_agent');
+    expect(data.horsepower.primary.evidence_origin).toBe('vehicle_wiki');
+    expect(data.horsepower.primary.source_confidence).toBeUndefined();
     expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith('vehicle_wiki', { p_vehicle_id: 'offline-agent-only' });
   });
 
