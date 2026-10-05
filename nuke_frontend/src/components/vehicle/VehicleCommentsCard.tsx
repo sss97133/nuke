@@ -45,6 +45,7 @@ interface VehicleCommentsCardProps {
   containerId?: string;
   containerClassName?: string;
   containerStyle?: React.CSSProperties;
+  hideWhenEmpty?: boolean;
 }
 
 export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
@@ -56,6 +57,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   containerId,
   containerClassName,
   containerStyle,
+  hideWhenEmpty = false,
 }) => {
   const navigate = useNavigate();
   const { data: rawRows, isLoading: rawLoading, isError: readError, refetch } = useVehicleCommentsUnified(vehicleId);
@@ -435,6 +437,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
   const visibleComments = expanded ? comments : comments.slice(0, maxVisible);
   const hasMore = comments.length > maxVisible;
+
+  // Only a successful current-subject collection establishes an empty widget.
+  // Keep loading/failure states and the signed-in comment composer available.
+  if (hideWhenEmpty && !session?.user?.id && !readError && !processingError &&
+      !rawLoading && !loading && processed?.vehicleId === vehicleId && comments.length === 0) return null;
 
   return (
     <div
