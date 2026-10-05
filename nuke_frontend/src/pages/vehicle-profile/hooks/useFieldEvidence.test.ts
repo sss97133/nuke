@@ -3,6 +3,8 @@ import type { FieldEvidenceMap } from './useFieldEvidence';
 
 const fixture = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
+  queryError: null as any,
+  agentFields: [] as any[],
   queryFn: null as null | (() => Promise<FieldEvidenceMap>),
 }));
 vi.mock('@tanstack/react-query', () => ({
@@ -15,19 +17,69 @@ vi.mock('../../../lib/supabase', () => {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
-    order: vi.fn(async () => ({ data: fixture.rows, error: null })),
+    order: vi.fn(async () => ({ data: fixture.rows, error: fixture.queryError })),
   };
   return { supabase: {
     from: vi.fn(() => query),
     rpc: vi.fn(async (name: string) => {
       if (name !== 'vehicle_wiki') throw new Error('Unexpected writer/backfill call in classification test');
-      return { data: { cited_fields: [] }, error: null };
+      return { data: { cited_fields: fixture.agentFields }, error: null };
     }),
   } };
 });
 import { useFieldEvidence } from './useFieldEvidence';
+import { supabase } from '../../../lib/supabase';
 
-beforeEach(() => { fixture.rows = []; fixture.queryFn = null; vi.clearAllMocks(); });
+beforeEach(() => {
+  fixture.rows = []; fixture.queryFn = null; fixture.queryError = null; fixture.agentFields = [];
+  vi.restoreAllMocks(); vi.clearAllMocks();
+});
+
+describe('evidence reads preserve sparse source state', () => {
+  it.each([0, 1, 2])('reads %s retained rows without requesting a backfill or changing testimony', async count => {
+    const subject = `offline-sparse-${count}`;
+    fixture.rows = Array.from({ length: count }, (_, i) => ({ id: `offline-evidence-${i}`, vehicle_id: subject,
+      field_name: `field-${i}`, proposed_value: `reported-${i}`, source_type: 'source-report', source_confidence: 75,
+      status: 'pending', extracted_at: '2026-01-01T00:00:00Z', created_at: '2026-01-02T00:00:00Z' }));
+    const before = JSON.stringify(fixture.rows);
+    useFieldEvidence(subject); const data = await fixture.queryFn!();
+    expect(Object.keys(data)).toHaveLength(count);
+    fixture.rows.forEach((row, i) => expect(data[`field-${i}`].primary).toMatchObject({
+      id: row.id, field_value: row.proposed_value, source_type: row.source_type,
+      status: row.status, extracted_at: row.extracted_at, created_at: row.created_at,
+    }));
+    expect(JSON.stringify(fixture.rows)).toBe(before);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect((supabase.from as any).mock.results[0].value.eq).toHaveBeenCalledWith('vehicle_id', subject);
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith('vehicle_wiki', { p_vehicle_id: subject });
+  });
+
+  it('keeps the existing agent reader when native evidence is empty', async () => {
+    fixture.agentFields = [{ attribute: 'vehicle.horsepower', consensus: 300, total_support: 1, consensus_support: 1 }];
+    useFieldEvidence('offline-agent-only'); const data = await fixture.queryFn!();
+    expect(data.horsepower.primary.field_value).toBe('300');
+    expect(data.horsepower.primary.source_type).toBe('agent_agent');
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith('vehicle_wiki', { p_vehicle_id: 'offline-agent-only' });
+  });
+
+  it('does not turn a failed native read into empty evidence or a writer request', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fixture.queryError = { code: 'offline-read-error', message: 'Offline reader unavailable' };
+    useFieldEvidence('offline-reader-error');
+    await expect(fixture.queryFn!()).rejects.toBe(fixture.queryError);
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('keeps rejected and superseded rows out of current evidence without altering their history', async () => {
+    fixture.rows = ['rejected', 'superseded'].map((status, i) => ({ id: `offline-history-${i}`,
+      vehicle_id: 'offline-history', field_name: 'color', proposed_value: 'Reported color', status,
+      source_type: 'source-report', source_confidence: 75, created_at: '2026-01-01T00:00:00Z' }));
+    const before = JSON.stringify(fixture.rows);
+    useFieldEvidence('offline-history'); expect(await fixture.queryFn!()).toEqual({});
+    expect(JSON.stringify(fixture.rows)).toBe(before);
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith('vehicle_wiki', { p_vehicle_id: 'offline-history' });
+  });
+});
 
 async function group(field: string, primary: string, alternatives: string[]) {
   fixture.rows = [primary, ...alternatives, primary].map((value, index) => ({
@@ -42,7 +94,6 @@ async function group(field: string, primary: string, alternatives: string[]) {
     status: index === 0 ? 'pending' : 'accepted',
     created_at: '2026-04-06T05:00:28.054492Z',
   }));
-  // Three or more native rows avoid the existing sparse-evidence backfill path.
   useFieldEvidence('local-public-vehicle');
   const result = await fixture.queryFn!();
   return result[field];
