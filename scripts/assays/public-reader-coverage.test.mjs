@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -615,4 +615,128 @@ test('bid CLI retains its reader family and finite private source-hash receipt',
   assert.equal(rows[0].readers.includes('vehicle_comments_unified'),true);assert.equal(rows[0].readers.includes('bat_bids'),false);
   assert.equal(rows[0].options.bidLimit,1000);assert.equal(rows.at(-1).measured.matchingNativeProjections,1);
   assert.equal((await stat(out)).mode&0o777,0o600);assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
+});
+
+const measurement = (n, extra = {}) => comment(n, {
+  sentiment_score: null, analyzed_at: null, community_stance_score: null, condition_polarity: null,
+  stance_scored_at: null, stance_model: null, rubric_version: null, ...extra,
+});
+
+test('measurement scope is explicitly opted into only for the comments family', () => {
+  const args = ['--out','private','--family','comments','--subjects','manifest'];
+  assert.equal(options([...args,'--comment-measurements','true']).commentMeasurements,true);
+  assert.equal(options(args).commentMeasurements,undefined);
+  for (const bad of ['false','1','unbounded']) assert.throws(()=>options([...args,'--comment-measurements',bad]));
+  for (const family of ['price','specifications','bids']) assert.throws(()=>options(['--out','private','--family',family,'--subjects','manifest','--comment-measurements','true']));
+});
+
+test('optional measurement transport selects provenance fields without source text or handles', async () => {
+  const urls = [], c=publicClient(anonymousConfiguration(env('anon')),async url=>{urls.push(new URL(url));return new Response('[]');});
+  await c.commentHeaders(id(1)); await c.commentHeaders(id(1),undefined,true);
+  assert.equal(urls[0].searchParams.get('select').includes('sentiment_score'),false);
+  for (const field of ['sentiment_score','analyzed_at','community_stance_score','condition_polarity','stance_scored_at','stance_model','rubric_version']) assert.equal(urls[1].searchParams.get('select').split(',').includes(field),true);
+  for (const field of ['comment_text','author_username','extracted_claims','bid_amount']) assert.equal(urls[1].searchParams.get('select').split(',').includes(field),false);
+  assert.equal(urls[1].searchParams.get('limit'),'200');assert.equal(urls[1].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.throws(()=>c.commentHeaders(id(1),undefined,'true'));
+});
+
+test('zero scores are retained, and a stance rubric cannot qualify sentiment provenance', () => {
+  const r=inspectCommentMeasurements([measurement(1,{sentiment_score:0,community_stance_score:0,condition_polarity:'0',
+    analyzed_at:'2026-10-02T10:00:00Z',stance_scored_at:'2026-10-02T10:00:00Z',stance_model:'offline-model',rubric_version:2})]);
+  for (const axis of Object.values(r.axes)) {assert.equal(axis.validStoredScore,1);assert.equal(axis.zeroStoredScore,1);assert.equal(axis.unscored,0);assert.equal(axis.invalidStoredScore,0);}
+  assert.equal(r.axes.stance.versionedMetadata,1);assert.equal(r.axes.condition.versionedMetadata,1);
+  assert.equal(r.axes.sentiment.versionedMetadata,0);assert.equal(r.axes.sentiment.methodUnestablished,1);assert.equal(r.axes.sentiment.rubricUnestablished,1);
+  assert.deepEqual(r.failures,{});assert.equal(Object.hasOwn(r,'mean'),false);
+});
+
+test('NULL scores, unavailable columns and invalid booleans have separate denominators', () => {
+  const r=inspectCommentMeasurements([measurement(1),comment(2),measurement(3,{community_stance_score:false})]);
+  assert.equal(r.axes.stance.unscored,1);assert.equal(r.axes.stance.unavailable,1);assert.equal(r.axes.stance.invalidStoredScore,1);
+  assert.equal(r.axes.stance.validStoredScore,0);assert.equal(r.failures.stance_stored_score_outside_reader_scale,1);
+  assert.equal(r.gaps.stance_measurement_column_unavailable,1);
+});
+
+test('a stance-only comment remains measurable with NULL sentiment and condition', () => {
+  const r=inspectCommentMeasurements([measurement(1,{community_stance_score:-0.5})]);
+  assert.equal(r.axes.stance.validStoredScore,1);assert.equal(r.axes.sentiment.unscored,1);assert.equal(r.axes.condition.unscored,1);
+  assert.equal(r.axes.stance.methodUnestablished,1);assert.equal(r.axes.stance.rubricUnestablished,1);
+});
+
+test('invalid scales and non-finite numeric strings never count as valid measurements', () => {
+  for (const score of [2,-2,'Infinity','NaN','',true,{},[]]) {
+    const r=inspectCommentMeasurements([measurement(1,{community_stance_score:score})]);
+    assert.equal(r.axes.stance.invalidStoredScore,1);assert.equal(r.axes.stance.validStoredScore,0);
+  }
+  const r=inspectCommentMeasurements([measurement(1,{sentiment_score:101,condition_polarity:-1.01})]);
+  assert.equal(r.axes.sentiment.invalidStoredScore,1);assert.equal(r.axes.condition.invalidStoredScore,1);
+  assert.equal(inspectCommentMeasurements([measurement(1,{sentiment_score:'-100',community_stance_score:'1'})]).axes.stance.validStoredScore,1);
+});
+
+test('source-post and scoring clocks stay distinct; missing, day-only and infinite clocks are unqualified', () => {
+  const r=inspectCommentMeasurements([measurement(1,{posted_at:'infinity',sentiment_score:1,community_stance_score:0.5,
+    analyzed_at:'2026-10-02',stance_scored_at:null,stance_model:'offline-model',rubric_version:2})]);
+  assert.equal(r.axes.stance.sourceClockMissing,1);assert.equal(r.axes.stance.analysisClockMissing,1);assert.equal(r.axes.stance.versionedMetadata,0);
+  assert.equal(r.axes.sentiment.sourceClockMissing,1);assert.equal(r.axes.sentiment.analysisClockMissing,1);
+});
+
+test('rubric versions and model hashes are kept in separate bounded strata', () => {
+  const base={community_stance_score:0.5,condition_polarity:-0.5,stance_scored_at:'2026-10-02T10:00:00Z'};
+  const r=inspectCommentMeasurements([measurement(1,{...base,rubric_version:1,stance_model:'model-a'}),
+    measurement(2,{...base,rubric_version:2,stance_model:'model-a'}),measurement(3,{...base,rubric_version:2,stance_model:'model-b'})]);
+  assert.equal(Object.keys(r.axes.stance.strata).length,3);assert.equal(r.axes.stance.versionedMetadata,3);
+  assert.equal(JSON.stringify(r).includes('model-a'),false);assert.equal(JSON.stringify(r).includes('model-b'),false);
+  for (const rubric of [0,-1,1.5,'2',32768]) assert.equal(inspectCommentMeasurements([measurement(1,{...base,rubric_version:rubric,stance_model:'model-a'})]).axes.stance.rubricUnestablished,1);
+});
+
+test('stratum budget preserves coverage counts and reports unretained headers explicitly', () => {
+  const rows=Array.from({length:70},(_,i)=>measurement(i,{community_stance_score:0.5,stance_model:`offline-${i}`,rubric_version:2}));
+  const r=inspectCommentMeasurements(rows);
+  assert.equal(r.axes.stance.validStoredScore,70);assert.equal(Object.keys(r.axes.stance.strata).length,64);assert.equal(r.axes.stance.strataUnretained,6);
+  assert.equal(r.gaps.stance_measurement_strata_budget_unmeasured,6);
+});
+
+test('measurement receipts contain only completed public collections and omit score payloads', async () => {
+  const c=commentClient({headers:[measurement(1,{sentiment_score:0.314159265359,community_stance_score:0,
+    comment_text:'PRIVATE QUOTE',author_username:'PRIVATE HANDLE',stance_model:'PRIVATE MODEL VALUE',rubric_version:2})]}),events=[];
+  const r=await runCommentLineage(c,scope({commentMeasurements:true}),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.commentMeasurements.headers,1);assert.equal(r.commentMeasurements.axes.sentiment.validStoredScore,1);assert.equal(r.commentMeasurements.axes.stance.validStoredScore,1);
+  assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);
+  for (const text of ['PRIVATE QUOTE','PRIVATE HANDLE','PRIVATE MODEL VALUE','0.314159265359',id(2)]) assert.equal(JSON.stringify(events).includes(text),false);
+  const old=await runCommentLineage(commentClient(),scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(Object.hasOwn(old,'commentMeasurements'),false);
+});
+
+test('overflow and failed context cannot establish measurement totals from a partial collection', async () => {
+  for (const extra of [{headers:Array.from({length:1001},(_,i)=>measurement(i,{community_stance_score:0.5}))},
+    {headers:[measurement(1,{community_stance_score:0.5})],auctionResponse:{ok:false,status:500,code:'reader_http_failure'}}]) {
+    const r=await runCommentLineage(commentClient(extra),scope({commentMeasurements:true}),lineageSubjects(manifest([id(1)])));
+    assert.equal(r.commentMeasurements.headers,0);assert.equal(r.commentMeasurements.axes.stance.validStoredScore,0);assert.equal(r.completedParents,0);
+    assert.notEqual(r.exitCode,0);
+  }
+});
+
+test('measurement scope survives CLI receipts with restrictive output permissions', async t=>{
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-comment-measurements-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  const c=commentClient({headers:[measurement(1,{community_stance_score:0})]});
+  assert.equal(await main(['--out',out,'--family','comments','--subjects',input,'--comment-measurements','true'],{env:env('anon'),client:c,print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(rows[0].options.commentMeasurements,true);assert.equal(rows.at(-1).commentMeasurements.axes.stance.validStoredScore,1);
+  assert.equal((await stat(out)).mode&0o777,0o600);
+});
+
+test('the manifest summary bounds combined strata across complete parents without losing coverage', async () => {
+  const ok=value=>({ok:true,value});
+  const calls=[],c={get requests(){return calls.length;},
+    async subjects(){calls.push('gate');return ok([parent(1),parent(2)]);},
+    async commentHeaders(vehicleId,cursor){calls.push('headers');const offset=vehicleId===id(1)?0:40;
+      return ok(cursor?[]:Array.from({length:40},(_,i)=>measurement(offset+i,{vehicle_id:vehicleId,
+        auction_event_id:null,external_identity_id:null,author_external_identity_id:null,
+        community_stance_score:0,stance_model:`offline-${offset+i}`,rubric_version:2})).reverse());},
+  };
+  const r=await runCommentLineage(c,scope({commentMeasurements:true}),lineageSubjects(manifest([id(1),id(2)])));
+  const m=r.commentMeasurements;
+  assert.equal(r.completedParents,2);assert.equal(m.headers,80);assert.equal(m.axes.stance.validStoredScore,80);
+  assert.equal(Object.keys(m.axes.stance.strata).length,64);assert.equal(m.axes.stance.strataUnretained,16);
+  assert.equal(m.gaps.stance_measurement_strata_budget_unmeasured,16);assert.equal(r.exitCode,0);
 });
