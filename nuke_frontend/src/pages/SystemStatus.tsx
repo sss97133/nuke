@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+
+const estimate = (value: number | null) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `≈${value.toLocaleString()}` : 'Unmeasured';
+const measuredCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : 'Unmeasured';
 
 type ExpandedSection = 'tier1' | 'catalog' | 'vehicles' | 'auctions' | null;
 
@@ -14,21 +17,31 @@ export default function SystemStatus() {
   const [listData, setListData] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [pulse, setPulse] = useState<any>(null);
+  const [pulseError, setPulseError] = useState(false);
+  const [statsError, setStatsError] = useState(false);
+  const statsLoading = useRef(false);
+  const pulseLoading = useRef(false);
 
   useEffect(() => {
     loadStats();
-    const interval = setInterval(loadStats, 2000); // Fast refresh
+    const interval = setInterval(loadStats, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Pipeline pulse: throughput per organ per day. Exit codes lie (workflows
-  // reported green while ingestion flatlined Jun 3-10); rows/day does not.
+  // Row arrivals measure throughput; neither throughput nor job exits verify data quality.
   useEffect(() => {
     const loadPulse = async () => {
+      if (pulseLoading.current) return;
+      pulseLoading.current = true;
       try {
-        const { data } = await supabase.rpc('get_pipeline_pulse', { p_days: 14 });
-        if (data && !data.error) setPulse(data);
-      } catch { /* pulse is supplementary */ }
+        const { data, error } = await supabase.rpc('get_pipeline_pulse', { p_days: 14 }).abortSignal(AbortSignal.timeout(10_000));
+        if (error || !data || data.error || !data.organs || !Number.isInteger(data.days) || data.days < 1 || data.days > 31
+          || !Number.isFinite(Date.parse(data.generated_at))
+          || (data.degraded != null && (!Array.isArray(data.degraded) || !data.degraded.every((item: unknown) => typeof item === 'string')))) throw new Error('pulse unavailable');
+        setPulse(data);
+        setPulseError(false);
+      } catch { setPulseError(true); }
+      finally { pulseLoading.current = false; }
     };
     loadPulse();
     const t = setInterval(loadPulse, 60_000);
@@ -84,121 +97,133 @@ export default function SystemStatus() {
   };
 
   async function loadStats() {
+    if (statsLoading.current) return;
+    statsLoading.current = true;
+    const readSignal = AbortSignal.timeout(8_000);
     try {
       // Get image counts
-      const { count: totalImages } = await supabase
+      const { count: totalImages, error: totalImagesError } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal);
 
-      const { count: analyzedImages } = await supabase
+      const { count: analyzedImages, error: analyzedImagesError } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('ai_processing_status', 'completed');
 
-      const { count: pendingImages } = await supabase
+      const { count: pendingImages, error: pendingImagesError } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('ai_processing_status', 'pending');
 
-      const { count: failedImages } = await supabase
+      const { count: failedImages, error: failedImagesError } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('ai_processing_status', 'failed');
 
       // Get catalog counts
-      const { count: totalParts } = await supabase
+      const { count: totalParts, error: totalPartsError } = await supabase
         .from('catalog_parts')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal);
 
-      const { count: chunksDone } = await supabase
+      const { count: chunksDone, error: chunksDoneError } = await supabase
         .from('catalog_text_chunks')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('status', 'completed');
 
-      const { count: chunksPending } = await supabase
+      const { count: chunksPending, error: chunksPendingError } = await supabase
         .from('catalog_text_chunks')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('status', 'pending');
 
       // Get vehicle counts
-      const { count: totalVehicles } = await supabase
+      const { count: totalVehicles, error: totalVehiclesError } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal);
 
-      const { count: activeVehicles } = await supabase
+      const { count: activeVehicles, error: activeVehiclesError } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('status', 'active');
 
-      const { count: pendingVehicles } = await supabase
+      const { count: pendingVehicles, error: pendingVehiclesError } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal)
         .eq('status', 'pending');
 
+      // Get auction stats
+      const { count: totalAuctions, error: totalAuctionsError } = await supabase
+        .from('auction_events')
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal);
+
+      const { count: totalComments, error: totalCommentsError } = await supabase
+        .from('auction_comments')
+        .select('id', { count: 'planned', head: true }).limit(0).abortSignal(readSignal);
+
+      setStats({
+        images: { 
+          total: totalImagesError ? null : totalImages,
+          analyzed: analyzedImagesError ? null : analyzedImages,
+          pending: pendingImagesError ? null : pendingImages,
+          failed: failedImagesError ? null : failedImages
+        },
+        catalog: {
+          total_parts: totalPartsError ? null : totalParts,
+          chunks_done: chunksDoneError ? null : chunksDone,
+          chunks_pending: chunksPendingError ? null : chunksPending
+        },
+        vehicles: {
+          total: totalVehiclesError ? null : totalVehicles,
+          active: activeVehiclesError ? null : activeVehicles,
+          pending: pendingVehiclesError ? null : pendingVehicles
+        },
+        auctions: {
+          total: totalAuctionsError ? null : totalAuctions,
+          comments: totalCommentsError ? null : totalComments
+        },
+        incomplete: [
+          totalImagesError || totalImages === null, analyzedImagesError || analyzedImages === null,
+          pendingImagesError || pendingImages === null, failedImagesError || failedImages === null,
+          totalPartsError || totalParts === null, chunksDoneError || chunksDone === null, chunksPendingError || chunksPending === null,
+          totalVehiclesError || totalVehicles === null, activeVehiclesError || activeVehicles === null, pendingVehiclesError || pendingVehicles === null,
+          totalAuctionsError || totalAuctions === null, totalCommentsError || totalComments === null,
+        ].some(Boolean),
+        lastUpdate: new Date().toLocaleTimeString()
+      });
+      
       // Get recent analyzed images
       const { data: recent } = await supabase
         .from('vehicle_images')
         .select('id, ai_processing_completed_at, ai_scan_metadata')
         .eq('ai_processing_status', 'completed')
         .order('ai_processing_completed_at', { ascending: false })
-        .limit(10);
+        .limit(10).abortSignal(readSignal);
 
       // Get recent catalog parts
       const { data: recentCatalog } = await supabase
         .from('catalog_parts')
         .select('part_number, name, price_current, created_at')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(5).abortSignal(readSignal);
 
-      // Get auction stats
-      const { count: totalAuctions } = await supabase
-        .from('auction_events')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: totalComments } = await supabase
-        .from('auction_comments')
-        .select('*', { count: 'exact', head: true });
-
-      setStats({
-        images: { 
-          total: totalImages || 0, 
-          analyzed: analyzedImages || 0, 
-          pending: pendingImages || 0, 
-          failed: failedImages || 0 
-        },
-        catalog: { 
-          total_parts: totalParts || 0, 
-          chunks_done: chunksDone || 0, 
-          chunks_pending: chunksPending || 0 
-        },
-        vehicles: { 
-          total: totalVehicles || 0, 
-          active: activeVehicles || 0, 
-          pending: pendingVehicles || 0 
-        },
-        auctions: {
-          total: totalAuctions || 0,
-          comments: totalComments || 0
-        },
-        lastUpdate: new Date().toLocaleTimeString()
-      });
-      
       setRecentImages(recent || []);
       setRecentParts(recentCatalog || []);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
+      setStatsError(false);
+    } catch {
+      setStatsError(true);
+    } finally { statsLoading.current = false; }
   }
 
   if (!stats) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-disabled)' }}>
-        Loading system status...
+      <div role="status" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-disabled)' }}>
+        {statsError ? 'System totals unavailable. Retrying each minute.' : 'Loading system status...'}
       </div>
     );
   }
 
-  const imagePercent = (stats.images.analyzed / stats.images.total * 100) || 0;
+  const imagePercent = typeof stats.images.analyzed === 'number' && stats.images.total > 0 && stats.images.analyzed <= stats.images.total
+    ? stats.images.analyzed / stats.images.total * 100 : null;
 
   return (
     <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
@@ -209,20 +234,25 @@ export default function SystemStatus() {
           ADMIN SYSTEM STATUS
         </h1>
         <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-          Updates every 2s • Last: {stats.lastUpdate}
+          Estimated totals • Refreshes every minute • Last: {stats.lastUpdate}
         </p>
       </div>
 
-      {/* Pipeline Pulse — rows landing per organ per day (red day = dead organ) */}
+      {stats.incomplete && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Some totals are unmeasured. Missing readings do not mean zero.</p>}
+      {statsError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>System totals unavailable. Showing the last received estimates.</p>}
+      {pulseError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Pipeline measurements unavailable.{pulse ? ' Showing the last received reading.' : ''}</p>}
+      {/* Pipeline Pulse — measured arrivals, with explicit partial coverage */}
       {pulse?.organs && (
         <div style={{ border: '2px solid var(--text)', padding: '12px', marginBottom: '16px', background: 'var(--bg)' }}>
           <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
             PIPELINE PULSE — NEW ROWS / DAY (LAST {pulse.days}D)
           </div>
+          {pulse.degraded?.length > 0 && <p role="status" style={{ fontSize: '11px' }}>Some pipeline measurements are unavailable.</p>}
+          <p style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Recorded arrivals measure flow, not data quality. Reading: {pulse.generated_at ? new Date(pulse.generated_at).toLocaleString() : 'time unmeasured'}.</p>
           {(() => {
             const dayKeys: string[] = [];
             for (let i = pulse.days - 1; i >= 0; i--) {
-              const d = new Date(); d.setDate(d.getDate() - i);
+              const d = new Date(pulse.generated_at || Date.now()); d.setUTCDate(d.getUTCDate() - i);
               dayKeys.push(d.toISOString().slice(0, 10));
             }
             const organLabels: Record<string, string> = {
@@ -242,12 +272,19 @@ export default function SystemStatus() {
                   <tbody>
                     {Object.entries(organLabels).map(([key, label]) => {
                       const series: Record<string, number> = {};
-                      (pulse.organs[key] || []).forEach((p: any) => { series[p.d] = p.n; });
+                      const available = Array.isArray(pulse.organs[key]) && pulse.organs[key].every((p: any) =>
+                        p && typeof p.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.d)
+                        && Number.isFinite(Date.parse(p.d)) && new Date(p.d).toISOString().slice(0, 10) === p.d
+                        && Number.isSafeInteger(p.n) && p.n >= 0)
+                        && new Set(pulse.organs[key].map((p: any) => p.d)).size === pulse.organs[key].length
+                        && !(pulse.degraded || []).some((message: unknown) =>
+                        typeof message === 'string' && message.startsWith((key === 'auction_comments' ? 'comments' : key) + ':'));
+                      if (available) pulse.organs[key].forEach((p: any) => { series[p.d] = p.n; });
                       return (
                         <tr key={key}>
                           <td style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em', paddingRight: 10, whiteSpace: 'nowrap' }}>{label}</td>
                           {dayKeys.map((d) => {
-                            const n = series[d] ?? 0;
+                            const n = available ? (series[d] ?? 0) : null;
                             return (
                               <td key={d} style={{
                                 padding: '2px 4px', textAlign: 'right', border: '1px solid var(--border)',
@@ -255,7 +292,7 @@ export default function SystemStatus() {
                                 background: n === 0 ? 'var(--error, #a00)' : 'transparent',
                                 fontWeight: n === 0 ? 700 : 400,
                               }}>
-                                {n.toLocaleString()}
+                                {measuredCount(n)}
                               </td>
                             );
                           })}
@@ -266,9 +303,11 @@ export default function SystemStatus() {
                 </table>
                 {pulse.backlogs && (
                   <div style={{ marginTop: 8, fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
-                    BACKLOGS — import_queue pending: {Number(pulse.backlogs.import_queue_pending ?? 0).toLocaleString()}
-                    {' · '}images analysis pending: {Number(pulse.backlogs.images_analysis_pending ?? 0).toLocaleString()}
-                    {' · '}failed: {Number(pulse.backlogs.images_analysis_failed ?? 0).toLocaleString()}
+                    BACKLOGS — import_queue pending: {measuredCount(pulse.backlogs.import_queue_pending)}
+                    {' · '}images analysis pending: {typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_pending_capped >= pulse.backlogs.cap
+                      ? `${(pulse.backlogs.cap - 1).toLocaleString()}+` : measuredCount(pulse.backlogs.images_analysis_pending_capped)}
+                    {' · '}failed: {typeof pulse.backlogs.cap === 'number' && pulse.backlogs.images_analysis_failed_capped >= pulse.backlogs.cap
+                      ? `${(pulse.backlogs.cap - 1).toLocaleString()}+` : measuredCount(pulse.backlogs.images_analysis_failed_capped)}
                   </div>
                 )}
               </div>
@@ -278,7 +317,7 @@ export default function SystemStatus() {
       )}
 
       {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         
         {/* Tier 1 Analysis */}
         <div 
@@ -294,28 +333,28 @@ export default function SystemStatus() {
             TIER 1 ANALYSIS {expandedSection === 'tier1' ? '▼' : '▶'}
           </div>
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
-            {stats.images.analyzed.toLocaleString()}
+            {estimate(stats.images.analyzed)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            of {stats.images.total.toLocaleString()} images
+            of {estimate(stats.images.total)} images
           </div>
           <div style={{ height: '8px', background: 'var(--border)', border: '1px solid var(--text)', overflow: 'hidden', marginBottom: '8px' }}>
             <div style={{
-              width: `${imagePercent}%`,
+              width: `${imagePercent ?? 0}%`,
               height: '100%',
               background: 'var(--text)',
               transition: 'width 0.5s ease'
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-            <span style={{ fontWeight: 700 }}>{imagePercent.toFixed(1)}%</span>
+            <span style={{ fontWeight: 700 }}>{imagePercent === null ? 'Unmeasured' : `≈${imagePercent.toFixed(1)}%`}</span>
             <span style={{ color: 'var(--text-secondary)' }}>
-              {stats.images.pending.toLocaleString()} pending
+              {estimate(stats.images.pending)} pending
             </span>
           </div>
           {stats.images.failed > 0 && (
             <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--error)' }}>
-              {stats.images.failed} failed
+              {estimate(stats.images.failed)} failed
             </div>
           )}
         </div>
@@ -334,7 +373,7 @@ export default function SystemStatus() {
             LMC CATALOG {expandedSection === 'catalog' ? '▼' : '▶'}
           </div>
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
-            {stats.catalog.total_parts.toLocaleString()}
+            {estimate(stats.catalog.total_parts)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             parts indexed
@@ -342,11 +381,11 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px', marginBottom: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Chunks done:</span>
-              <span style={{ fontWeight: 700 }}>{stats.catalog.chunks_done}</span>
+              <span style={{ fontWeight: 700 }}>{estimate(stats.catalog.chunks_done)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Chunks pending:</span>
-              <span style={{ fontWeight: 700 }}>{stats.catalog.chunks_pending}</span>
+              <span style={{ fontWeight: 700 }}>{estimate(stats.catalog.chunks_pending)}</span>
             </div>
           </div>
         </div>
@@ -365,7 +404,7 @@ export default function SystemStatus() {
             VEHICLES {expandedSection === 'vehicles' ? '▼' : '▶'}
           </div>
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
-            {stats.vehicles.active.toLocaleString()}
+            {estimate(stats.vehicles.active)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             active vehicles
@@ -373,11 +412,11 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
-              <span style={{ fontWeight: 700 }}>{stats.vehicles.total.toLocaleString()}</span>
+              <span style={{ fontWeight: 700 }}>{estimate(stats.vehicles.total)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Pending:</span>
-              <span style={{ fontWeight: 700 }}>{stats.vehicles.pending.toLocaleString()}</span>
+              <span style={{ fontWeight: 700 }}>{estimate(stats.vehicles.pending)}</span>
             </div>
           </div>
         </div>
@@ -396,7 +435,7 @@ export default function SystemStatus() {
             AUCTION DATA {expandedSection === 'auctions' ? '▼' : '▶'}
           </div>
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
-            {stats.auctions.comments.toLocaleString()}
+            {estimate(stats.auctions.comments)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             comments analyzed
@@ -404,7 +443,7 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Auctions:</span>
-              <span style={{ fontWeight: 700 }}>{stats.auctions.total.toLocaleString()}</span>
+              <span style={{ fontWeight: 700 }}>{estimate(stats.auctions.total)}</span>
             </div>
           </div>
         </div>
@@ -741,4 +780,3 @@ export default function SystemStatus() {
     </div>
   );
 }
-
