@@ -1364,7 +1364,12 @@ struct MarketSellerView: View {
     @State private var participationFailed = false
     @State private var loadedHandle: String?
 
-    private var closed: [MarketSellerAuction] { auctions.filter { $0.ends.map { $0 <= Date() } == true } }
+    private var closed: [MarketSellerAuction] {
+        auctions.filter {
+            $0.ends.map { $0 <= Date() }
+                ?? ["sold", "no_sale", "reserve_not_met"].contains($0.outcome ?? "")
+        }
+    }
     private var sold: Int { closed.filter { $0.outcome == "sold" }.count }
     private var noSale: Int { closed.filter { ["no_sale", "reserve_not_met"].contains($0.outcome ?? "") }.count }
     private var live: [MarketSellerAuction] { auctions.filter(\.isCapturedLive) }
