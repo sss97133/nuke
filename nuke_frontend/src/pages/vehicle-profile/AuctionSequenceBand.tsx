@@ -16,6 +16,7 @@ interface Props {
   auction: AuctionSequence;
   activeDay: string | null;
   onOpenDay: (date: string) => void;
+  onOpenBidReports?: () => void;
 }
 
 function useWidth<T extends HTMLElement>(ref: React.RefObject<T | null>): number {
@@ -61,7 +62,7 @@ function itemTitle(i: AuctionItem): string {
   return `${i.author}${i.kind === 'seller' ? ' (seller)' : ''} · ${when}${text ? ` · ${text}` : ''}`;
 }
 
-const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay }) => {
+const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, onOpenBidReports }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -150,7 +151,8 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
         {auction.outcomeConflict && <span className="auction-band__basis">recorded outcomes disagree; result unclassified</span>}
         {auction.activityExtracted ? (
           <span style={mono}>
-            {retainedBids.length} bids · {items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
+            {onOpenBidReports && retainedBids.length > 0 ? <button type="button" aria-label="Open recorded vehicle bid amounts" onClick={onOpenBidReports}
+              style={{ ...mono, fontSize: 'inherit', color: 'inherit', background: 'transparent', border: '2px solid var(--vp-ghost, #ddd)', padding: '1px 3px', cursor: 'pointer' }}>{retainedBids.length} bid reports</button> : `${retainedBids.length} bid reports`} · {items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
           </span>
         ) : (
           <span className="auction-band__basis">no timed bid or comment entries in this read</span>
