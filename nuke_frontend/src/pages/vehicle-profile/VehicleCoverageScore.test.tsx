@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any }));
+const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any, loading: false, error: null as string | null }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({
   vehicle: fixture.vehicle, vehicleId: fixture.vehicle.id, canEdit: false,
   isVerifiedOwner: false, isMobile: true, setGalleryFilter: vi.fn(), auctionPulse: null,
 }) }));
-vi.mock('./hooks/useFieldEvidence', () => ({ useFieldEvidence: () => ({ evidence: fixture.evidence, loading: false }) }));
+vi.mock('./hooks/useFieldEvidence', () => ({ useFieldEvidence: () => ({ evidence: fixture.evidence, loading: fixture.loading, error: fixture.error }) }));
 vi.mock('./hooks/useVehiclePriceFacts', () => ({
   useVehiclePriceFacts: () => ({ priceFacts: null }), priceKindLabel: () => 'PRICE',
 }));
@@ -36,6 +36,8 @@ import { supabase } from '../../lib/supabase';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fixture.loading = false;
+  fixture.error = null;
   fixture.vehicle = {
     id: 'local-public-profile', year: 1966, make: 'Ford', model: 'Mustang', mileage: 87,
     data_quality_score: 100, confidence_score: 100, updated_at: '2026-09-27T16:47:45.300576Z',
@@ -95,4 +97,66 @@ it('preserves the engagement badge when a coverage score is unknown', () => {
   const html = renderToStaticMarkup(<VehicleBadgeBar />);
   expect(html).toContain('BIDS 4');
   expect(html).not.toContain('data-coverage-score');
+});
+
+describe('dossier claim coverage does not assert verification', () => {
+  function panel() {
+    return new JSDOM(renderToStaticMarkup(<VehicleDossierPanel />)).window.document;
+  }
+
+  it('retains repeated matching and differing claims without counting source types as independent support', () => {
+    const a = { ...fixture.evidence.mileage.primary, id: 'offline-color-a', field_name: 'color', field_value: 'Blue', source_type: 'bat_listing' };
+    const b = { ...a, id: 'offline-color-b', source_type: 'ai_extraction' };
+    const c = { ...a, id: 'offline-color-c', field_value: 'Red' };
+    fixture.vehicle.color = 'Blue';
+    fixture.evidence.color = { primary: a, sources: [a, b, c], agreementCount: 2, totalSources: 3, hasConflict: true, conflictType: 'genuine' };
+    const before = JSON.stringify(fixture.evidence);
+    const doc = panel();
+    const coverage = doc.querySelector('[data-testid="source-claim-coverage"]')!;
+    expect(coverage.textContent).toContain('2 of 16 core fields have claim records');
+    expect(coverage.textContent).toContain('2 have differing reported values');
+    expect(coverage.textContent).toContain('Claim record counts do not establish independent support or verification');
+    const field = doc.querySelector('[data-field="color"]')!;
+    expect(field.getAttribute('title')).toContain('3 retained claim records');
+    expect(field.getAttribute('title')).toContain('Reported values differ');
+    expect(field.outerHTML).not.toContain('Consensus:');
+    expect(field.textContent).toContain('Blue');
+    expect(field.textContent).toContain('Red');
+    expect(JSON.stringify(fixture.evidence)).toBe(before);
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(['dyno', 'inspection_report', 'photo_verified', 'vin_plate_photo'])('does not infer physical verification from a %s source label', source_type => {
+    fixture.evidence.mileage.sources = [{ ...fixture.evidence.mileage.primary, source_type }];
+    fixture.evidence.mileage.primary = fixture.evidence.mileage.sources[0];
+    fixture.evidence.mileage.hasConflict = false;
+    const doc = panel();
+    expect(doc.querySelector('[data-field="mileage"]')?.getAttribute('title')).toContain('verification unknown');
+    expect(doc.body.innerHTML).not.toMatch(/scientifically tested|physically inspected|multi-source consensus|\d+ BEDROCK|\d+ INSPECTED|\d+ CONSENSUS|data-verification=/);
+  });
+
+  it('names the fixed core-field denominator and does not count extended fields as core coverage', () => {
+    const row = { ...fixture.evidence.mileage.primary, field_name: 'horsepower', field_value: '300' };
+    fixture.evidence = { horsepower: { primary: row, sources: [row], hasConflict: false } };
+    expect(panel().querySelector('[data-testid="source-claim-coverage"]')?.textContent).toContain('0 of 16 core fields have claim records');
+  });
+
+  it('keeps loading separate from a successfully empty read', () => {
+    fixture.evidence = {}; fixture.loading = true;
+    const coverage = panel().querySelector('[data-testid="source-claim-coverage"]')!;
+    expect(coverage.textContent).toContain('Loading source claim coverage');
+    expect(coverage.textContent).not.toContain('0 of 16');
+    fixture.loading = false;
+    expect(panel().querySelector('[data-testid="source-claim-coverage"]')?.textContent).toContain('0 of 16 core fields have claim records');
+  });
+
+  it('keeps a failed read unavailable while preserving any retained claims for inspection', () => {
+    fixture.error = 'Offline reader unavailable';
+    const doc = panel();
+    const coverage = doc.querySelector('[data-testid="source-claim-coverage"]')!;
+    expect(coverage.textContent).toContain('Source claim coverage unavailable');
+    expect(coverage.textContent).not.toContain('of 16 core fields');
+    expect(doc.querySelector('[data-field="mileage"]')?.textContent).toContain('87000');
+  });
 });
