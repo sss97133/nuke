@@ -779,3 +779,37 @@ broad context to the shared public reader separately from price admission. Keep 
 historical-intake and production holds. Publication/merge stages belong in the checked PR receipt;
 the live assay proves current diagnostics, with zero production schema/data/access changes and
 zero inference calls. C27 remains partial.
+
+### Shared reader repair prepared, 2026-10-05 UTC
+
+The repair is **evidence reconciliation** and **reader repair**: preserve source claims and their
+unresolved relationships, then make the existing reader expose permitted market evidence separately
+from qualified sale prices. `20261005011200_valuation_public_native_source_context.sql` adds
+`source_context` to the existing `valuation_by_ymm` response. It retains recognized public auction
+URL groups from existing anonymously readable native tables, including recorded outcomes/days and
+platform, locator, date and multiple-parent disagreements. Exact contributing native IDs and source
+links permit reconciliation. Current public/undeleted/vehicle gates apply to totals and drill. No
+native amount, private source kind, raw capture or historical-availability claim is projected.
+
+The original price-reader body is unchanged outside the additive context CTE/JSON field. Context
+survives a price-capture refusal, but its own 10,000-row-per-table overflow withholds totals and
+examples. Explicit evidence cutoffs/known-at requests withhold current native context. Complete
+source totals have a separately declared limit of 20 evidence examples per venue, prioritized by
+mapping gaps and then recorded day; those examples are not a price sample. The migration guards
+the reviewed original/new body fingerprint and preserves the existing signature, owner and ACL.
+
+Local replay executes the actual migrations: **189 PG17 assertions pass**, including old price,
+custody, replay, anonymous privacy, overflow, cross-vehicle and context-with-price-refusal cases.
+Read-only production component probes over the same three registered current public cohorts return
+Corvette **1,389 presentations / 942 public auction URL groups**, Mustang **1,745 / 1,096**, and
+BMW **382 / 210**. These URL groups are not confirmed unique sales. They differ from the private
+candidate assay through public venue URL scope and explicit attribution of conflicting platform
+labels to their recorded URL host. Corvette includes 372 Mecum groups, 109 without a native day,
+and 85 Barrett-Jackson groups, 14 undated and eight with contradictory native platform labels.
+
+Bounded evidence reduces the three component response payloads from 806/940/192 kB to 76/67/27 kB
+while preserving complete source totals. Management request probes remain 4.805/5.906/1.565 s;
+payload reduction alone does not establish an instant answer. These execute the proposed context
+SELECT, not an installed RPC or public UI. The production function change is prepared for review;
+it is not merged/deployed. Source fact corrections, historical admission, qualified cross-venue
+prices, sale-time configuration matching, ranking, public display and latency closure remain open.

@@ -42,7 +42,7 @@ CREATE TABLE public.vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid REFERENCE
   source_platform text,source_url text,source_listing_id text,event_type text,event_status text,final_price numeric,
   sold_at timestamptz,ended_at timestamptz,created_at timestamptz,updated_at timestamptz,extracted_at timestamptz);
 CREATE INDEX ON public.vehicle_events(vehicle_id);
-CREATE TABLE public.bat_listings(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,bat_listing_url text);
+CREATE TABLE public.bat_listings(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,bat_listing_url text,listing_status text,sale_date date,auction_end_date date);
 CREATE INDEX ON public.bat_listings(vehicle_id);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles,source_id uuid REFERENCES public.observation_sources,
   kind text,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,
@@ -74,6 +74,8 @@ ALTER TABLE public.vehicle_observations ADD COLUMN extraction_metadata jsonb;
 CREATE TEMP TABLE previous_episode_reader_permissions AS SELECT proacl,proconfig,prosecdef,proowner FROM pg_proc
 WHERE oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure;
 \ir ../../supabase/migrations/20261004201917_valuation_earlier_source_sale_episodes.sql
+
+\ir ../../supabase/migrations/20261005011200_valuation_public_native_source_context.sql
 
 CREATE FUNCTION pg_temp.seed(n integer,d jsonb DEFAULT '{}'::jsonb) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE vid uuid:=md5('vehicle-'||n)::uuid; sid uuid:=md5('snapshot-'||n)::uuid;
@@ -747,8 +749,145 @@ SELECT pg_temp.ok('native episode extension preserves original owner/security mo
   EXISTS(SELECT 1 FROM previous_episode_reader_permissions old JOIN pg_proc p
     ON p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure
     WHERE old.proacl=p.proacl AND old.proconfig=p.proconfig AND old.prosecdef=p.prosecdef AND old.proowner=p.proowner));
-\ir ../../supabase/migrations/20261004201917_valuation_earlier_source_sale_episodes.sql
+\ir ../../supabase/migrations/20261005011200_valuation_public_native_source_context.sql
 SELECT pg_temp.ok('reader migration is repeatable with identical body/ACL/config and no new signature',
   EXISTS(SELECT 1 FROM final_reader_contract old JOIN pg_proc p ON p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure
     WHERE old.proacl=p.proacl AND old.proconfig=p.proconfig AND old.body_md5=md5(p.prosrc))
   AND (SELECT count(*) FROM pg_proc WHERE proname='valuation_by_ymm')=1);
+
+-- Public source context preserves native testimony independently of sale-price
+-- eligibility. Execute the actual same anonymous function, never a test-only DTO.
+CREATE FUNCTION pg_temp.current_read() RETURNS jsonb LANGUAGE sql AS $$
+  SELECT public.valuation_by_ymm(1970,'Synthetic','Coupe','2026-01-01T00:00:00Z',
+    '2024-01-01T00:00:00Z',NULL,'USD',5000,NULL,'retrospective')
+$$;
+SELECT pg_temp.base();
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status,final_price,sold_at)
+VALUES
+  (md5('context-1')::uuid,md5('vehicle-1')::uuid,'mecum','https://www.mecum.com/lots/10001/synthetic-coupe/','sold',100000,'2014-01-24'),
+  (md5('context-2')::uuid,md5('vehicle-1')::uuid,'mecum','https://www.mecum.com/lots/10002/synthetic-coupe/','sold',120000,NULL),
+  (md5('context-3')::uuid,md5('vehicle-2')::uuid,'barrettjackson','https://barrett-jackson.com/events/synthetic-coupe/','unknown',NULL,'2025-01-01'),
+  (md5('context-4')::uuid,md5('vehicle-3')::uuid,'mecum','https://bringatrailer.com/listing/native-context/','sold',150000,'2025-02-01');
+INSERT INTO public.bat_listings(id,vehicle_id,bat_listing_url,listing_status,sale_date)
+VALUES(md5('context-listing')::uuid,md5('vehicle-3')::uuid,
+  'http://www.bringatrailer.com/listing/native-context/?utm_source=test','sold','2025-02-01');
+DO $$ DECLARE r jsonb; c jsonb; BEGIN
+  r:=pg_temp.current_read(); c:=r#>'{source_context}';
+  PERFORM pg_temp.ok('multi-venue source context reaches the existing reader',
+    c->>'status'='complete' AND c->>'presentation_count'='5' AND c->>'recorded_url_group_count'='4'
+    AND jsonb_array_length(c->'sources')=3);
+  PERFORM pg_temp.ok('native evidence never enters the verified price distribution',
+    r#>>'{stats,sold_count}'='10' AND r#>>'{receipt,coverage,qualified_sales}'='10'
+    AND c->>'amounts_included'='false' AND c->>'price_qualified'='false'
+    AND c::text NOT LIKE '%100000%' AND c::text NOT LIKE '%120000%' AND c::text NOT LIKE '%150000%');
+  PERFORM pg_temp.ok('an old native day stays inspectable outside the price window',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(c->'records') x WHERE x->>'recorded_day'='2014-01-24')
+    AND c->>'event_window_applied'='false');
+  PERFORM pg_temp.ok('same parent with two source appearances remains two groups',
+    (SELECT count(*) FROM jsonb_array_elements(c->'records') x WHERE x->>'platform'='mecum')=2);
+  PERFORM pg_temp.ok('supported BaT aliases collapse while contributor IDs remain',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(c->'records') x WHERE x->>'platform'='bat'
+      AND x->>'presentation_count'='2' AND jsonb_array_length(x->'presentations')=2));
+  PERFORM pg_temp.ok('platform disagreement survives as an explicit repair gap',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(c->'records') x WHERE x->>'platform'='bat'
+      AND x->>'conflicting_platform'='true'));
+  PERFORM pg_temp.ok('missing native day is counted without inventing a sale date',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(c->'sources') x WHERE x->>'platform'='mecum' AND x->>'missing_day'='1'));
+  PERFORM pg_temp.ok('unknown outcome remains recorded activity',
+    EXISTS(SELECT 1 FROM jsonb_array_elements(c->'sources') x WHERE x->>'platform'='barrettjackson' AND x->>'unknown_outcome'='1'));
+  PERFORM pg_temp.ok('native source headers contain no protected capture body or source clock',
+    c::text NOT LIKE '%PRIVATE RAW HTML%' AND c::text NOT LIKE '%html_sha256%'
+    AND c->>'knowledge_basis'='current_native_claims_not_source_verified_or_historical_availability');
+END $$;
+
+-- Conflicting testimony and public parent aliases cannot imply a settled sale.
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status,sold_at,source_listing_id)
+VALUES(md5('context-conflict')::uuid,md5('vehicle-4')::uuid,'mecum',
+  'https://www.mecum.com/lots/10001/synthetic-coupe/','no_sale','2015-01-24',
+  'https://www.mecum.com/lots/99999/another-coupe/');
+DO $$ DECLARE c jsonb:=pg_temp.current_read()#>'{source_context}'; g jsonb; BEGIN
+  SELECT x INTO g FROM jsonb_array_elements(c->'records') x WHERE x->>'source_key'='https://www.mecum.com/lots/10001/synthetic-coupe/';
+  PERFORM pg_temp.ok('contradictory outcome and days remain inspectable',
+    g->>'reported_outcome'='conflicting' AND g->>'conflicting_day'='true' AND g->'recorded_day'='null'::jsonb
+    AND jsonb_array_length(g->'presentations')=2);
+  PERFORM pg_temp.ok('multiple parent pointers and contradictory locator are not silently merged',
+    g->>'multiple_parent_pointers'='true' AND g->>'conflicting_locator'='true');
+END $$;
+
+SELECT pg_temp.seed(20,'{"public":false}');
+SELECT pg_temp.seed(21,'{"deleted_at":"2025-01-01"}');
+SELECT pg_temp.seed(22,'{"listing_kind":"non_vehicle_item"}');
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status)
+SELECT md5('context-denied-'||n)::uuid,md5('vehicle-'||n)::uuid,'mecum',
+  'https://mecum.com/lots/'||n||'/context-denied/','sold' FROM generate_series(20,22) n;
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status)
+VALUES
+ (md5('context-private')::uuid,md5('vehicle-1')::uuid,'facebook-saved','https://facebook.com/marketplace/item/private/','sold'),
+ (md5('context-userinfo')::uuid,md5('vehicle-1')::uuid,'mecum','https://secret@mecum.com/lots/99999/private/','sold'),
+ (md5('context-port')::uuid,md5('vehicle-1')::uuid,'mecum','https://mecum.com:444/lots/99999/private/','sold'),
+ (md5('context-lookalike')::uuid,md5('vehicle-1')::uuid,'mecum','https://mecum.com.evil.example/lots/99999/private/','sold');
+SET ROLE anon;
+SELECT pg_temp.ok('anonymous aggregate and drill exclude private deleted and nonvehicle parents',
+  pg_temp.current_read()#>>'{source_context,presentation_count}'='6'
+  AND (pg_temp.current_read()#>'{source_context}')::text NOT LIKE '%context-denied%');
+SELECT pg_temp.ok('private source kinds credential URLs ports and lookalike hosts do not contribute',
+  (pg_temp.current_read()#>'{source_context}')::text NOT LIKE '%private%'
+  AND pg_temp.current_read()#>>'{source_context,presentation_count}'='6');
+SELECT pg_temp.ok('explicit historical evidence cutoff withholds current native testimony',
+  pg_temp.read()#>>'{source_context,status}'='unavailable'
+  AND pg_temp.read()#>'{source_context,presentation_count}'='null'::jsonb
+  AND pg_temp.read()#>'{source_context,records}'='[]'::jsonb);
+SELECT pg_temp.ok('known-at read preserves qualified source prices without native history claims',
+  pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{stats,sold_count}'='10'
+  AND pg_temp.read('{"mode":"known_at","known":"2026-01-01T00:00:00Z"}')#>>'{source_context,refusal}'='native_historical_availability_unestablished');
+RESET ROLE;
+
+-- Path/query distinctions remain separate for venues without established aliases.
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status)
+VALUES(md5('context-query')::uuid,md5('vehicle-1')::uuid,'mecum',
+  'https://www.mecum.com/lots/10001/synthetic-coupe/?episode=other','sold');
+SELECT pg_temp.ok('non-BaT query distinctions preserve unresolved source identity',
+  pg_temp.current_read()#>>'{source_context,recorded_url_group_count}'='5');
+
+-- Exercise a non-Corvette cohort with the same reader mechanism.
+UPDATE public.vehicles SET year=1980,make='Other',model='Sedan';
+SELECT pg_temp.ok('another vehicle cohort retains the same native mechanism',
+  public.valuation_by_ymm(1980,'Other','Sedan','2026-01-01','2024-01-01')#>>'{source_context,presentation_count}'='7');
+UPDATE public.vehicles SET year=1970,make='Synthetic',model='Coupe';
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status)
+SELECT md5('context-cap-'||n)::uuid,md5('vehicle-1')::uuid,'mecum',
+  'https://mecum.com/lots/'||n||'/context-cap/','sold' FROM generate_series(1,10001) n;
+ANALYZE public.vehicle_events;
+DO $$ DECLARE r jsonb:=pg_temp.current_read(); c jsonb:=r#>'{source_context}'; BEGIN
+  PERFORM pg_temp.ok('context overflow withholds all totals and contributors without sampling',
+    c->>'status'='incomplete' AND c->>'refusal'='native_presentation_cap_no_sample'
+    AND c->'presentation_count'='null'::jsonb AND c->'recorded_url_group_count'='null'::jsonb
+    AND c->'records'='[]'::jsonb AND c->'sources'='[]'::jsonb);
+  PERFORM pg_temp.ok('context cap preserves the independent qualified price result',r#>>'{stats,sold_count}'='10');
+END $$;
+
+SELECT pg_temp.base(); SELECT pg_temp.episode(1,101);
+INSERT INTO public.listing_page_snapshots(id,platform,listing_url,success,http_status,html,fetched_at,created_at,metadata)
+SELECT md5('context-header-cap-'||n)::uuid,'bat','https://bringatrailer.com/listing/synthetic-episode-101/',true,200,NULL,
+  '2025-06-16','2025-06-16',jsonb_build_object('vehicle_matched',true,'vehicle_id',md5('vehicle-1')::uuid,'parsed_at','2025-06-16T12:00:00Z')
+FROM generate_series(1,10000) n;
+ANALYZE public.listing_page_snapshots;
+DO $$ DECLARE r jsonb:=pg_temp.current_read(); BEGIN
+  PERFORM pg_temp.ok('a capture-price refusal still retains independently complete native context',
+    r#>>'{coverage,complete}'='false' AND r->'stats'='null'::jsonb
+    AND r#>>'{source_context,status}'='complete' AND r#>>'{source_context,presentation_count}'='1');
+  PERFORM pg_temp.ok('price refusal context retains its exact source contributor',
+    r#>>'{source_context,records,0,presentations,0,id}'=(SELECT id::text FROM public.vehicle_events LIMIT 1));
+END $$;
+
+SELECT pg_temp.base();
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,event_status)
+SELECT md5('context-drill-bound-'||n)::uuid,md5('vehicle-1')::uuid,'mecum',
+  'https://mecum.com/lots/'||n||'/context-drill-bound/','sold' FROM generate_series(1,25) n;
+DO $$ DECLARE r jsonb:=pg_temp.current_read(); c jsonb:=r#>'{source_context}'; BEGIN
+  PERFORM pg_temp.ok('evidence display bound never samples complete source counts',
+    c->>'presentation_count'='25' AND c->>'recorded_url_group_count'='25'
+    AND c->>'status'='complete' AND c->>'records_complete'='false'
+    AND c->>'record_limit_per_source'='20' AND jsonb_array_length(c->'records')=20
+    AND c#>>'{sources,0,recorded_url_groups}'='25' AND c#>>'{sources,0,evidence_records_returned}'='20');
+END $$;
