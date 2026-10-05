@@ -145,6 +145,7 @@ WITH request AS MATERIALIZED (
    CASE c.data_type WHEN 'numeric' THEN jsonb_typeof(c.value)='number'
      WHEN 'integer' THEN jsonb_typeof(c.value)='number' AND c.value::text ~ '^-?[0-9]+$'
      WHEN 'string' THEN jsonb_typeof(c.value)='string'
+     WHEN 'enum' THEN jsonb_typeof(c.value)='string'
      WHEN 'boolean' THEN jsonb_typeof(c.value)='boolean'
      WHEN 'jsonb' THEN c.value IS NOT NULL AND c.value<>'null'::jsonb
      ELSE false END AS value_shape_valid,
@@ -211,6 +212,9 @@ WITH request AS MATERIALIZED (
      'recordedAt',d.ingested_at,'recordingClockEligible',d.knowledge_eligible,
      'observedAt',d.observed_at,'observedClockBasis','writer_defined_not_sale_time',
      'valueShape',jsonb_typeof(d.value),'valueShapeValid',coalesce(d.value_shape_valid,false),
+     'valueShapeValidationBasis',CASE WHEN d.data_type='enum' THEN 'string_shape_only_enum_membership_not_checked' ELSE 'declared_type_JSON_shape_only' END,
+     'valueSemanticValidation','unmeasured_canonical_owner_required',
+     'enumMembershipValidated',CASE WHEN d.data_type='enum' THEN false END,
      'rawValueSha256',CASE WHEN d.testimony_eligible AND d.knowledge_eligible AND d.value IS NOT NULL
        THEN encode(sha256(convert_to(d.value::text,'UTF8')),'hex') END,
      'distinctRawClaimValues',d.distinct_raw_values,'normalizedValue',NULL,
@@ -228,8 +232,8 @@ WITH request AS MATERIALIZED (
      'suppliedHeaders',d.supplied_header_count,'unresolvedSuppliedIds',d.unresolved_supplied_ids,'currentCatalogOnly',true,'historicalAvailabilityEstablished',false,'possibleModelBodies',d.model_bodies,'unresolvedOrBroadModelBodies',d.unresolved_model_bodies,
      'matchingBasis','existing_typed_reference_edges_or_explicit_candidate_IDs_no_text_inference',
      'installedEquipmentProved',false),
-   'readinessBasis','current_catalog_schema_not_historical_or_installed_proof',
-   'classStructureReady',d.testimony_eligible AND d.knowledge_eligible AND d.registry_active
+   'readinessBasis','current_descriptor_FK_kind_and_JSON_shape_only_not_owner_semantics_or_admission',
+   'descriptorStructureReady',d.testimony_eligible AND d.knowledge_eligible AND d.registry_active
      AND d.property_linked IS TRUE AND d.kind_allowed AND d.value_shape_valid IS TRUE,
    'pricingConfigurationQualified',false,'publicConfigurationValue',NULL,
    'gaps',to_jsonb(d.gaps),

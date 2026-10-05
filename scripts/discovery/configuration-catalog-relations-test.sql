@@ -13,7 +13,7 @@ END $$;
 CREATE TYPE observation_kind AS ENUM ('specification','sale_result','condition','listing','comment','bid','media','splice');
 CREATE TABLE vehicles(id uuid PRIMARY KEY,is_public boolean,deleted_at timestamptz,listing_kind text);
 CREATE TABLE observation_properties(id uuid PRIMARY KEY,property_key text UNIQUE,data_type text,unit text,
- namespace text,deprecated_at timestamptz,cardinality text,verification_scope text,
+ namespace text,deprecated_at timestamptz,cardinality text,verification_scope text CHECK(verification_scope IN ('class','instance','both')),
  applies_to_kinds observation_kind[],parent_property_id uuid REFERENCES observation_properties(id));
 CREATE TABLE vehicle_events(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES vehicles,
  source_url text,source_platform text);
@@ -27,7 +27,10 @@ CREATE TABLE vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES
 CREATE TABLE canonical_models(id uuid PRIMARY KEY,body_styles text[]);
 CREATE TABLE canonical_body_styles(canonical_name text PRIMARY KEY,is_active boolean,aliases text[]);
 CREATE TABLE make_model_profiles(subject_id uuid PRIMARY KEY,canonical_model_id uuid REFERENCES canonical_models,
- comparison_scope_status text);
+ comparison_scope_status text CHECK(comparison_scope_status IN ('supported','context_only')),
+ grain text,year_start int,year_end int,comparison_scope_basis text,
+ CHECK(comparison_scope_status<>'supported' OR (grain='generation' AND year_start IS NOT NULL AND year_end IS NOT NULL
+ AND year_start<=year_end AND nullif(btrim(comparison_scope_basis),'') IS NOT NULL)));
 CREATE TABLE reference_libraries(id uuid PRIMARY KEY,oem_spec_id uuid);
 CREATE TABLE oem_vehicle_specs(id uuid PRIMARY KEY,source_library_id uuid REFERENCES reference_libraries,
  body_style text,engine_displacement_liters numeric,engine_displacement_cid int,engine_config text);
@@ -53,8 +56,8 @@ INSERT INTO observation_properties VALUES
 INSERT INTO canonical_body_styles VALUES('COUPE',true,'{coupe}'),('FASTBACK',true,'{fastback}'),('CONVERTIBLE',true,'{cabriolet}'),('RETIRED',false,'{}');
 INSERT INTO canonical_models VALUES(pg_temp.id('modelA'),'{coupe,fastback,cabriolet}'),
  (pg_temp.id('modelB'),'{convertible,sports car}');
-INSERT INTO make_model_profiles VALUES(pg_temp.id('profileA'),pg_temp.id('modelA'),'proven'),
- (pg_temp.id('profileB'),pg_temp.id('modelB'),'context_only');
+INSERT INTO make_model_profiles VALUES(pg_temp.id('profileA'),pg_temp.id('modelA'),'supported','generation',2000,2005,'synthetic supported scope basis'),
+ (pg_temp.id('profileB'),pg_temp.id('modelB'),'context_only','model',1990,1999,NULL);
 INSERT INTO reference_libraries VALUES(pg_temp.id('libraryA'),NULL),(pg_temp.id('libraryB'),NULL);
 INSERT INTO oem_vehicle_specs VALUES(pg_temp.id('specV8'),pg_temp.id('libraryA'),'COUPE',5.0,302,'V8'),
  (pg_temp.id('specI6'),pg_temp.id('libraryA'),'FASTBACK',2.8,170,'I6'),
@@ -103,6 +106,9 @@ UPDATE vehicle_observations SET ingested_at=NULL WHERE id=pg_temp.id('unknownClo
 SELECT pg_temp.obs('futureClock','architecture','specification','{"engine_configuration":"V8"}');
 UPDATE vehicle_observations SET ingested_at='2027-01-01Z' WHERE id=pg_temp.id('futureClock');
 SELECT pg_temp.obs('wrongAncestry',NULL,'sale_result','{"engine_size":"V8"}','alpha','wrongParent','capture1');
+SELECT pg_temp.obs('instanceEnum','image','condition','{"image_visible_rust_severity":"surface"}');
+SELECT pg_temp.obs('unknownEnum','image','condition','{"image_visible_rust_severity":"synthetic_unknown_member"}');
+SELECT pg_temp.obs('wrongEnumShape','image','condition','{"image_visible_rust_severity":4}');
 SELECT pg_temp.obs('wrongProperty','code','specification','{"engine_configuration":"V8"}');
 -- Load the actual artifact while preserving binds and regex bytes.
 CREATE TEMP TABLE query_source(n bigint GENERATED ALWAYS AS IDENTITY,line text);
@@ -129,12 +135,19 @@ CREATE TEMP TABLE result AS SELECT pg_temp.assay(jsonb_build_array(
  pg_temp.claim('nonvehicleObs','engine_configuration'),pg_temp.claim('privateNames','engine_configuration','engine_size'),
  pg_temp.claim('superseded','engine_configuration'),pg_temp.claim('unknownClock','engine_configuration'),
  pg_temp.claim('futureClock','engine_configuration'),pg_temp.claim('wrongAncestry','engine_configuration','engine_size'),
- pg_temp.claim('wrongProperty','engine_configuration'),pg_temp.claim('missing','new_arbitrary_property'))) AS j;
+ pg_temp.claim('wrongProperty','engine_configuration'),pg_temp.claim('missing','new_arbitrary_property'),
+ pg_temp.claim('instanceEnum','image_visible_rust_severity'),pg_temp.claim('unknownEnum','image_visible_rust_severity'),
+ pg_temp.claim('wrongEnumShape','image_visible_rust_severity'))) AS j;
 CREATE FUNCTION pg_temp.r(k text) RETURNS jsonb LANGUAGE sql AS $$
  SELECT x FROM result CROSS JOIN LATERAL jsonb_array_elements(j->'claims') x
  WHERE x#>>'{originalEvidence,id}'=pg_temp.id(k)::text $$;
-SELECT pg_temp.assert_ok(j#>>'{boundary,complete}'='true' AND jsonb_array_length(j->'claims')=22,'bounded manifest retains every supplied original evidence request') FROM result;
-SELECT pg_temp.assert_ok(pg_temp.r('classV8')->>'classStructureReady'='true' AND pg_temp.r('classOther')->>'classStructureReady'='true','cross-model exact property FK and value types discover ready class structure');
+SELECT pg_temp.assert_ok(j#>>'{boundary,complete}'='true' AND jsonb_array_length(j->'claims')=25,'bounded manifest retains every supplied original evidence request') FROM result;
+SELECT pg_temp.assert_ok(pg_temp.r('classV8')->>'descriptorStructureReady'='true' AND pg_temp.r('classOther')->>'descriptorStructureReady'='true','cross-model exact property FK and value types discover descriptor structure only');
+SELECT pg_temp.assert_ok(pg_temp.r('classV8')#>>'{relations,profileComparisonScopeStatus}'='supported' AND pg_temp.r('classOther')#>>'{relations,profileComparisonScopeStatus}'='context_only','live allowed scope statuses and supported basis preserved');
+SELECT pg_temp.assert_ok(pg_temp.r('instanceEnum')->>'descriptorStructureReady'='true' AND pg_temp.r('instanceEnum')#>>'{descriptor,verificationScope}'='instance' AND NOT pg_temp.r('instanceEnum')->'gaps' ? 'class_descriptor_not_instance_equipment','proper instance descriptor structure never classified as factory-class qualification');
+SELECT pg_temp.assert_ok(pg_temp.r('instanceEnum')#>>'{claim,valueSemanticValidation}'='unmeasured_canonical_owner_required' AND pg_temp.r('instanceEnum')#>>'{claim,enumMembershipValidated}'='false' AND pg_temp.r('instanceEnum')->>'pricingConfigurationQualified'='false','supported-looking enum string is shape-only and never owner-admitted or pricing qualified');
+SELECT pg_temp.assert_ok(pg_temp.r('unknownEnum')#>>'{claim,valueShapeValid}'='true' AND pg_temp.r('unknownEnum')#>>'{claim,enumMembershipValidated}'='false','unsupported enum membership stays explicitly unmeasured despite valid string shape');
+SELECT pg_temp.assert_ok(pg_temp.r('wrongEnumShape')->'gaps' ? 'unknown_or_unsupported_value_shape' AND pg_temp.r('wrongEnumShape')->>'descriptorStructureReady'='false','numeric enum payload fails declared string shape');
 SELECT pg_temp.assert_ok(pg_temp.r('classOther')#>>'{descriptor,unit}'='liters' AND pg_temp.r('classOther')#>>'{relations,descriptorParentId}'=pg_temp.id('architecture')::text,'existing unit and descriptor self-parent edge retained');
 SELECT pg_temp.assert_ok(pg_temp.r('classV8')#>>'{relations,canonicalModelId}'=pg_temp.id('modelA')::text AND pg_temp.r('classOther')#>>'{relations,canonicalModelId}'=pg_temp.id('modelB')::text,'different model/profile typed FK paths without model-specific rules');
 SELECT pg_temp.assert_ok(jsonb_array_length(pg_temp.r('classV8')#>'{factoryContext,possibleModelBodies}')=3 AND jsonb_array_length(pg_temp.r('classOther')#>'{factoryContext,possibleModelBodies}')=1,'coupe fastback convertible remain distinct model catalog options');
@@ -147,7 +160,7 @@ SELECT pg_temp.assert_ok(pg_temp.r('envelope')->'gaps' ? 'unsupported_observatio
 SELECT pg_temp.assert_ok(pg_temp.r('envelope')#>>'{claim,distinctRawClaimValues}'='2' AND pg_temp.r('resale')#>>'{claim,distinctRawClaimValues}'='1','raw disagreement is episode-scoped and earlier resale never collapsed by vehicle');
 SELECT pg_temp.assert_ok(pg_temp.r('resale')#>>'{relations,sourceVehicleEventId}'<>pg_temp.r('envelope')#>>'{relations,sourceVehicleEventId}','two sale episode typed identities preserved');
 SELECT pg_temp.assert_ok(pg_temp.r('envelope')#>'{claim,normalizedValue}'='null'::jsonb AND pg_temp.r('envelope')#>>'{episode,saleStateApplicability}'='unestablished','generic V8 never inferred as 289 and no capture clock becomes engine-at-sale time');
-SELECT pg_temp.assert_ok(pg_temp.r('trim')->>'classStructureReady'='true' AND pg_temp.r('trim')#>>'{descriptor,verificationScope}'='both','existing both-scope trim vocabulary discovered without installed claim');
+SELECT pg_temp.assert_ok(pg_temp.r('trim')->>'descriptorStructureReady'='true' AND pg_temp.r('trim')#>>'{descriptor,verificationScope}'='both','existing both-scope trim vocabulary discovered without installed claim');
 SELECT pg_temp.assert_ok(pg_temp.r('body')->'gaps' ? 'missing_property_vocabulary' AND pg_temp.r('body')#>'{descriptor,active}'='false'::jsonb,'body catalog existence does not invent an observation property descriptor');
 SELECT pg_temp.assert_ok(pg_temp.r('pendingObs')->'gaps' ? 'unratified_or_deprecated_descriptor' AND pg_temp.r('retiredObs')->'gaps' ? 'unratified_or_deprecated_descriptor','pending and deprecated descriptors withheld');
 SELECT pg_temp.assert_ok(pg_temp.r('badUnitShape')->'gaps' ? 'unknown_or_unsupported_value_shape' AND pg_temp.r('nullValue')->'gaps' ? 'unknown_or_unsupported_value_shape','string cubic-inch and null values are not normalized numeric liters');
