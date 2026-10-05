@@ -32,22 +32,26 @@ export function options(args, now = Date.now()) {
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i];
-    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects'].includes(name) ||
+    if (!['--out', '--env', '--scope', '--page-size', '--max-pages', '--after', '--until', '--family', '--subjects', '--comment-limit'].includes(name) ||
       seen.has(name) || !args[i + 1] || args[i + 1].startsWith('--')) throw new AssayError('invalid_arguments');
     seen.add(name);
     const v = args[i + 1];
     if (name === '--page-size') o.pageSize = /^\d+$/.test(v) ? Number(v) : NaN;
+    else if (name === '--comment-limit') o.commentLimit = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--max-pages') o.maxPages = /^\d+$/.test(v) ? Number(v) : NaN;
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
   if (!o.out || !['price', 'specifications', 'comments'].includes(o.family) ||
+    (seen.has('--comment-limit') && o.family !== 'comments') ||
+    (o.commentLimit !== undefined && (!Number.isInteger(o.commentLimit) || o.commentLimit < 1000 || o.commentLimit > 10000)) ||
     (o.family !== 'price') !== Boolean(o.subjects) ||
     !['sold', 'all'].includes(o.scope) || !UUID.test(o.after) ||
     !Number.isInteger(o.pageSize) || o.pageSize < 20 || o.pageSize > 1000 ||
     !Number.isInteger(o.maxPages) || o.maxPages < 1 || o.maxPages > 10000 ||
     !Number.isFinite(o.until) || o.until <= now || o.until > now + 14 * 60 * 60_000) throw new AssayError('invalid_scope');
   o.after = o.after.toLowerCase();
+  if (o.family === 'comments') o.commentLimit ??= 1000;
   if (o.family !== 'price') {
     if (['--scope', '--after', '--page-size'].some(key => seen.has(key))) throw new AssayError('manifest_scope_has_no_price_cursor');
     o.scope = 'explicit_manifest';
@@ -291,10 +295,10 @@ export function inspectProvenance(id, report, value) {
   return result;
 }
 
-export function inspectCommentHeaders(id, value) {
+export function inspectCommentHeaders(id, value, limit = 1000) {
   const result = { safe: true, complete: true, failures: {}, gaps: {}, headers: [], auctionIds: [], identityIds: [] };
   const ids = new Set(), nullableId = x => x === null || typeof x === 'string' && UUID.test(x);
-  if (!Array.isArray(value) || value.length > 1001) result.safe = false;
+  if (!Number.isInteger(limit) || limit < 1000 || limit > 10000 || !Array.isArray(value) || value.length > limit + 1) result.safe = false;
   else for (const c of value) {
     if (!object(c) || !UUID.test(c.id ?? '') || ids.has(c.id) || c.vehicle_id !== id ||
       !['auction_event_id', 'external_identity_id', 'author_external_identity_id'].every(key => nullableId(c[key])) ||
@@ -305,7 +309,7 @@ export function inspectCommentHeaders(id, value) {
     ids.add(c.id);
   }
   if (!result.safe) { result.failures.comment_header_scope_or_shape_invalid = 1; result.complete = false; return result; }
-  if (value.length > 1000) { result.complete = false; result.gaps.comment_header_cap_unmeasured = 1; return result; }
+  if (value.length > limit) { result.complete = false; result.gaps.comment_header_cap_unmeasured = 1; return result; }
   result.headers = value;
   result.auctionIds = [...new Set(value.map(c => c.auction_event_id).filter(Boolean))];
   result.identityIds = [...new Set(value.flatMap(c => [c.external_identity_id, c.author_external_identity_id]).filter(Boolean))];
@@ -327,7 +331,7 @@ function commentFollows(previous, current) {
   return previous.id.toLowerCase() > current.id.toLowerCase();
 }
 
-async function commentCollection(client, id, until, now, emit) {
+async function commentCollection(client, id, until, now, emit, limit) {
   const rows = [], ids = new Set(), hashes = []; let previous;
   for (let page = 0; page < 100; page++) {
     if (now() >= until) return { ok: true, complete: false, gaps: { comment_collection_time_unmeasured: 1 }, stopReason: 'time_budget_reached' };
@@ -342,7 +346,7 @@ async function commentCollection(client, id, until, now, emit) {
     }
     hashes.push(hash(response.value));
     await emit({ type: 'comment_source_page', vehicleId: id, returned: response.value.length, responseSha256: hashes.at(-1), durationMs: response.durationMs });
-    if (rows.length > 1000) return { ok: true, safe: true, complete: false, atLeast: rows.length, gaps: { comment_header_cap_unmeasured: 1 }, responseSha256: hash(hashes) };
+    if (rows.length > limit) return { ok: true, safe: true, complete: false, atLeast: rows.length, gaps: { comment_header_cap_unmeasured: 1 }, responseSha256: hash(hashes) };
     // Even a short server-capped page is not proof of exhaustion. The exact
     // PostgreSQL microsecond clock and UUID seek continue until an empty page.
     if (!response.value.length) return { ok: true, safe: true, complete: true, value: rows, responseSha256: hash(hashes) };
@@ -392,13 +396,14 @@ export function inspectCommentLineage(headers, auctions, identities) {
 }
 
 export async function runCommentLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
+  const commentLimit = o.commentLimit ?? 1000;
   const summary = { stage: 'read_only_public_comment_header_lineage_assay', startedAt: new Date(now()).toISOString(),
     requestedParents: subjects.ids.length, manifestSha256: subjects.sha256, population: subjects.population,
     gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
     measuredCommentHeaders: 0, matchedAuctionParents: 0, matchingRecordedNamespaces: 0,
     identityStates: { absent: 0, legacyOnly: 0, canonicalOnly: 0, agreeing: 0, conflicting: 0 },
-    failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
-    boundary: 'Explicit manifest, current anonymous public-parent gate. 200-row microsecond/UUID keyset pages continue until empty, at most 100 pages/1000 posted non-bid headers per parent; overflow refuses that collection. Separate current reads are not an immutable snapshot. Header and identity counters cover completed collections only. Metadata only, not quotes, inferred atoms, mood, expertise, independent sources, source publication or historical identity replay. Namespace label differences preserve unresolved aliases. Missing child context is unknown, never zero activity.' };
+    failures: {}, gaps: {}, commentLimit, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
+    boundary: `Explicit manifest, current anonymous public-parent gate. 200-row microsecond/UUID keyset pages continue until empty, at most 100 pages/${commentLimit} posted non-bid headers per parent; overflow refuses that collection. This is a resource ceiling, not a record target or evidence of exhaustion. Separate current reads are not an immutable snapshot. Header and identity counters cover completed collections only. Metadata only, not quotes, inferred atoms, mood, expertise, independent sources, source publication or historical identity replay. Namespace label differences preserve unresolved aliases. Missing child context is unknown, never zero activity.` };
   let consecutiveFailures = 0;
   const readerFailures = {};
   const failed = reader => {
@@ -421,7 +426,7 @@ export async function runCommentLineage(client, o, subjects, { now = Date.now, e
     await emit({ type: 'comment_gate', requested: batch.length, eligible: eligible.size, absentOrIneligible: batch.length - eligible.size, responseSha256: hash(gate.value), durationMs: gate.durationMs });
     for (const id of batch.filter(id => eligible.has(id))) {
       if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
-      const source = await commentCollection(client, id, o.until, now, emit); summary.inspectedParents++;
+      const source = await commentCollection(client, id, o.until, now, emit, commentLimit); summary.inspectedParents++;
       if (!source.ok) {
         merge({ failures: { comment_header_reader_failed: 1 }, gaps: { comment_header_parent_unmeasured: 1 } }); consecutiveFailures++;
         failed('auction_comments');
@@ -435,7 +440,7 @@ export async function runCommentLineage(client, o, subjects, { now = Date.now, e
           if (source.stopReason) { summary.stopReason = source.stopReason; break outer; }
           continue;
         }
-        const inspected = inspectCommentHeaders(id, source.value);
+        const inspected = inspectCommentHeaders(id, source.value, commentLimit);
         const auctions = [], identities = []; let complete = true;
         for (const [reader, ids, target] of [['auction_events', inspected.auctionIds, auctions], ['external_identities', inspected.identityIds, identities]]) {
           for (let i = 0; i < ids.length; i += 200) {
