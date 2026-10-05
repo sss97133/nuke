@@ -136,7 +136,7 @@ In addition to the card's list:
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
-| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | open — repair contracts recorded; no repairs delivered by this entry | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
+| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — private context query delivered; repair assay prepared; public integration and source corrections open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
 
 **C22 table connection — 2026-10-04 UTC.** Useful question: what work was recorded on this vehicle,
 by which permitted supplier, and at what build stage? Existing `work_record` testimony is read through
@@ -701,3 +701,81 @@ was 82.82 ms. These two diagnostic requests do not establish public RPC latency,
 coverage or parity with the earlier 1,249-member registered public-reader population. Public reader
 integration, source correction, cohort ranking and market movement remain open. Publication stages
 for this preparation must be taken from its PR receipt rather than inferred from these tests.
+
+### Hypothesis and cross-vehicle assay, owner request 2026-10-04
+
+**Hypothesis:** useful market evidence is retained but lost between source records and the public
+answer. Separating presentation context from price qualification, and reconciling missing source
+fields, should expose more usable evidence across vehicle cohorts. This does not predict a price
+or authorize historical testimony writes. A high position for the specific Corvette remains untested.
+
+**Test:** before the live reads, select three existing registered year/model subjects: 1963 Corvette,
+1966 Mustang and 1972 BMW 2002. For each, use the existing `cohort_members` owner and current
+public/undeleted/real-vehicle gates. Run the unchanged candidate SELECT with at most 10,000 parents,
+5,000 rows per native table and 5,000 capture headers. Check that non-BaT episode identities and
+date gaps recur beyond Corvette. Separately call the deployed `valuation_by_ymm` with the same
+subject, a 2023-10-05 through 2026-10-05 event window and evidence cutoff 2026-10-05 00:00 UTC.
+Native context has no event window or price qualification; subtracting these populations would
+not measure missing eligible sales.
+
+Live reads at **2026-10-05 00:03 UTC**, complete within each supplied parent page:
+
+| Registered subject | Current public parents | Native presentations | Recorded episode keys | Non-BaT keys | Keys without a recorded day | Undated keys with a stored body pointer | Public qualified USD source sales in the separate three-year window |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1963 Chevrolet Corvette | 1,250 | 1,428 | 956 | 511 | 240 | 83 | 21 |
+| 1966 Ford Mustang | 1,732 | 1,827 | 1,144 | 496 | 249 | 85 | 20 |
+| 1972 BMW 2002 | 234 | 382 | 210 | 12 | 46 | 43 | 0 |
+
+The 2,310 recorded platform/episode keys have no overlap across these three receipts. Native
+identity remains unresolved for 62 presentations; 900 current parents have no selected native
+event/listing rows. Other observation/capture evidence for those parents is unassayed. Three Mustang
+episode keys have conflicting recorded days. Multiple parent pointers occur on 29 keys and need
+reconciliation rather than automatic merging. Neither count establishes an error or a unique chassis.
+
+The live valuation definition still selects `vehicle_events.source_platform = 'bat'`. The hypothesis
+about lost broader context is supported in all three measured cohorts. This venue boundary also
+has a source/parser/public-permission contract; removing it alone cannot qualify another venue's
+amounts. Public qualified counts remain 21/20/0; no reader change or extra admitted sale is claimed.
+
+Only 211 of 535 undated keys (39.4%) have a successful stored body pointer under the exact indexed
+header selection. Most missing dates therefore cannot be assumed recoverable from those pointers.
+A nine-capture sample, selected from these queues before fetching bodies, projected at most 512 KiB
+per body and reused `parseQualifiedBaTSale`. Four captures for four recorded episode keys produced
+sale tuples and matched the stored SHA; one body had an ambiguous/missing supported result and four
+exceeded the assay body cap. This is a parser preview. Parent/episode attribution, knowledge clocks,
+units/fee treatment and sanctioned admission still need verification. No native date was overwritten.
+
+**Implemented and locally tested:** extend the existing `scripts/assay-sale-population.mjs` with
+`{ schemaVersion: 'sale_event_candidate_assay_v1', receipt, options }`, where `receipt` is the unchanged
+candidate query output and `options` keeps the existing explicit population/subject/policy/cutoffs.
+The normal `--input PRIVATE_JSON --out PRIVATE_JSON` command now returns a repair plan keyed by
+source episode: missing/conflicting days, unknown/conflicting outcomes, sold claims missing amounts,
+multiple parent pointers, unresolved native refs and exact candidate capture refs. Cached pointer
+counts are unknown on header overflow; native overflow refuses totals. The native format rejects
+qualified claims, duplicate/missing presentations and foreign source tables. It admits no testimony,
+does not fetch bodies and retains the original saved-population format. Output stays private, mode
+0600 and no-overwrite. Fifteen focused contracts pass; the five new boundary/queue cases failed on
+the prior implementation. Existing PR CI runs this same test file.
+
+The same tool can retrieve an existing registered subject in one command:
+`node scripts/assay-sale-population.mjs --subject COHORT_UUID --out PRIVATE_JSON`. It executes the
+existing SELECT through sanctioned `scripts/data/q.sh` once, retains the exact private native receipt,
+and returns the repair plan. UUID validation, read-only SELECT checks and a 10,001-parent sentinel
+protect the bounded request; the two native selectors and header selector retain their independent
+5,000-row limits. Unknown/oversized subjects refuse rather than presenting a sampled market. This
+mode supplies no comparison subject or feature policy and never promotes candidate prices. Existing
+outputs refuse before the query, failed reads create no empty receipt, and source/tool errors are
+redacted. The offline saved-input mode remains available for replay. Both are developer diagnostics;
+the anonymous valuation route remains unchanged.
+
+**Performance boundary:** first management reads were 7.241/5.703/1.312 s for Corvette/Mustang/BMW;
+one warm EXPLAIN per request measured 3,428/3,096/565 ms database execution, with no sequential
+scan of the four target source/parent tables. Full candidate/header receipts differ from the earlier
+metadata-only query. These are individual probes, not p50/p95 or a delivered instant public answer.
+
+**Next owned repairs:** use the exact queues to check retained source bodies first; route absent,
+ambiguous or inconsistent evidence back to the existing venue/capture/identity owners. Add permitted
+broad context to the shared public reader separately from price admission. Keep the existing
+historical-intake and production holds. Publication/merge stages belong in the checked PR receipt;
+the live assay proves current diagnostics, with zero production schema/data/access changes and
+zero inference calls. C27 remains partial.
