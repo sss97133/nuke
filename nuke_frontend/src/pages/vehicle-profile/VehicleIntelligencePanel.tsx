@@ -65,7 +65,7 @@ const BADGE: React.CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
-// Section: Community Intelligence
+// Section: Stored comment summary
 // ---------------------------------------------------------------------------
 
 const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
@@ -77,39 +77,36 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
   const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0 || ms;
   if (!hasContent && !ci.overall_sentiment) return null;
 
-  const sentimentColor = (() => {
-    const s = (ci.overall_sentiment || '').toLowerCase();
-    if (s.includes('positive') || s.includes('enthusiastic')) return 'var(--vp-brg, #004225)';
-    if (s.includes('negative') || s.includes('critical')) return 'var(--vp-danger)';
-    return 'var(--vp-ink)';
-  })();
-
   return (
-    <CollapsibleWidget variant="profile" title="Community Intelligence" defaultCollapsed={false}
+    <CollapsibleWidget variant="profile" title="Comment summary" defaultCollapsed={false}
       badge={
-        <span className="widget__count" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <span className="widget__count" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
           {ci.overall_sentiment && (
-            <span style={{ ...BADGE, color: sentimentColor, borderColor: sentimentColor }}>
-              {truncate(ci.overall_sentiment, 16)}
+            <span style={BADGE}>
+              REPORTED: {truncate(ci.overall_sentiment, 16)}
             </span>
           )}
           {ci.comment_count != null && (
-            <span style={LABEL}>{ci.comment_count} COMMENTS</span>
+            <span style={LABEL}>{ci.comment_count} COMMENTS REPORTED</span>
           )}
         </span>
       }
     >
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
+        {/* The current reader supplies outputs but no input membership or analysis provenance. */}
+        <p style={{ margin: '0 0 8px', color: 'var(--vp-pencil)' }}>
+          Stored interpretation · input sample, method and analysis time unavailable.
+          {' '}Market performance remains unverified.
+        </p>
         {/* Key Quotes */}
         {quotes.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>KEY QUOTES</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED EXCERPTS</div>
             {quotes.map((q, i) => (
               <div key={i} style={{
                 borderLeft: '2px solid var(--vp-ghost, #ddd)',
                 paddingLeft: '8px',
                 marginBottom: '4px',
-                fontStyle: 'italic',
                 color: 'var(--vp-ink)',
               }}>
                 {truncate(q, 120)}
@@ -118,10 +115,10 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
           </div>
         )}
 
-        {/* Expert Insights */}
+        {/* Extraction labels do not verify contributor expertise. */}
         {insights.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>EXPERT INSIGHTS</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>EXTRACTED INSIGHTS</div>
             {insights.map((ins, i) => (
               <div key={i} style={{ marginBottom: '2px' }}>
                 {truncate(ins, 140)}
@@ -133,21 +130,21 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Concerns */}
         {concerns.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>CONCERNS RAISED</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED CONCERNS</div>
             {concerns.map((c, i) => (
-              <div key={i} style={{ color: 'var(--vp-danger)', marginBottom: '2px' }}>
+              <div key={i} style={{ marginBottom: '2px' }}>
                 {truncate(c, 120)}
               </div>
             ))}
           </div>
         )}
 
-        {/* Market Signals */}
+        {/* Stored model labels; no cohort, time window or calibrated market measure supplied. */}
         {ms && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {ms.demand && <span style={BADGE}>DEMAND: {ms.demand}</span>}
-            {ms.rarity && <span style={BADGE}>RARITY: {ms.rarity}</span>}
-            {ms.price_trend && <span style={BADGE}>TREND: {ms.price_trend}</span>}
+            {ms.demand && <span style={BADGE}>DEMAND LABEL: {ms.demand}</span>}
+            {ms.rarity && <span style={BADGE}>RARITY LABEL: {ms.rarity}</span>}
+            {ms.price_trend && <span style={BADGE}>PRICE TREND LABEL: {ms.price_trend}</span>}
           </div>
         )}
       </div>
