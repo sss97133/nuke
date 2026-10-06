@@ -13,7 +13,8 @@
 // clears a stated clock and never overwrites one in place; corrections go through the supersession writer.
 // A row whose clocks were corrected by that writer carries metadata.clock_locked_by_supersession, or a non-empty
 // metadata.episode_supersessions. On such a row the lander also leaves the clock metadata (*_method, *_precision,
-// sold_at_basis) as it is. Metadata is merged into the live row's, never replaced, so other writers' keys survive.
+// sold_at_basis) as it is, keeps the marker, and reports action 'updated_clock_locked'. Metadata is merged into the live
+// row's, never replaced, so other writers' keys survive.
 
 export type VehicleEventRow = Record<string, unknown> & {
   vehicle_id: string | null | undefined;
@@ -23,7 +24,7 @@ export type VehicleEventRow = Record<string, unknown> & {
 };
 
 export type VehicleEventWriteResult =
-  | { action: 'updated' | 'inserted'; id: string | null; clocks_locked: boolean }
+  | { action: 'updated' | 'updated_clock_locked' | 'inserted'; id: string | null }
   | { action: 'skipped'; reason: string }
   | { action: 'error'; error: string; code: string | null };
 
@@ -82,7 +83,7 @@ async function updateLive(supabase: Client, live: LiveRow, row: VehicleEventRow)
   const { patch, locked } = patchForLiveRow(live, row);
   const upd = await supabase.from('vehicle_events').update(patch).eq('id', live.id).select('id').limit(1);
   if (upd.error) return err(upd.error);
-  return { action: 'updated', id: live.id, clocks_locked: locked };
+  return { action: locked ? 'updated_clock_locked' : 'updated', id: live.id };
 }
 
 export async function writeVehicleEventByKey(supabase: Client, row: VehicleEventRow): Promise<VehicleEventWriteResult> {
@@ -97,7 +98,7 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
   const ins = await supabase.from('vehicle_events').insert(row).select('id').limit(1);
   if (!ins.error) {
     const id = Array.isArray(ins.data) && ins.data.length > 0 ? (ins.data[0] as { id?: string }).id ?? null : null;
-    return { action: 'inserted', id, clocks_locked: false };
+    return { action: 'inserted', id };
   }
   if (String(ins.error.code ?? '') === '23505') {
     const again = await readByKey(supabase, row);

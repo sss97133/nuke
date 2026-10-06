@@ -53,7 +53,7 @@ const KEY_FILTERS = [['vehicle_id', 'v-1'], ['source_platform', 'gooding'], ['so
 
 Deno.test('the live row is found on the three key columns and updated by id, with no insert', async () => {
   const { client, calls } = stubClient([{ data: [{ id: 'e-1', metadata: { other_writer: 1 } }] }, { data: [{ id: 'e-1' }] }]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-1', clocks_locked: false });
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-1' });
   equal(calls.map((c) => c.op), ['select', 'update']);
   equal(calls[0].table, 'vehicle_events');
   equal(calls[0].filters, KEY_FILTERS);
@@ -84,7 +84,7 @@ Deno.test('a row carrying clock_locked_by_supersession keeps its sold_at, ended_
     metadata: { clock_locked_by_supersession: true, sold_at_method: 'gooding_page_stated_day', sold_at_basis: 'superseded', keep: 'x' },
   };
   const { client, calls } = stubClient([{ data: [live] }, { data: [{ id: 'e-9' }] }]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-9', clocks_locked: true });
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated_clock_locked', id: 'e-9' });
   const patch = calls[1].row as Record<string, unknown>;
   equal('sold_at' in patch, false);
   equal('ended_at' in patch, false);
@@ -110,7 +110,7 @@ Deno.test('a locked row drops the lander\'s clock metadata keys the live row lac
 
 Deno.test('a new episode is inserted when no live row has the key', async () => {
   const { client, calls } = stubClient([{ data: [] }, { data: [{ id: 'e-2' }] }]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'inserted', id: 'e-2', clocks_locked: false });
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'inserted', id: 'e-2' });
   equal(calls.map((c) => c.op), ['select', 'insert']);
   equal(calls[1].row, ROW);
 });
@@ -122,7 +122,7 @@ Deno.test('an insert that loses a race (23505) reads the other writer\'s row and
     { data: [{ id: 'e-3', metadata: { clock_locked_by_supersession: true } }] },
     { data: [{ id: 'e-3' }] },
   ]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-3', clocks_locked: true });
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated_clock_locked', id: 'e-3' });
   equal(calls.map((c) => c.op), ['select', 'insert', 'select', 'update']);
   equal('sold_at' in (calls[3].row as Record<string, unknown>), false);
 });
