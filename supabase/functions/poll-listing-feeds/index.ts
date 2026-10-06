@@ -33,6 +33,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { captureLedgerFields } from "./captureLedger.ts";
 import {
   ledgerWriteFor,
   planIngests,
@@ -780,6 +781,12 @@ async function pollFirecrawlHtmlFeed(
         now: new Date(),
       });
       if (!write) continue;
+      // Craigslist: post_id, posted_at, updated_at, attributes and capture_landing travel on the ledger row
+      // (captureLedger.ts); empty for every other source.
+      const captureFields = captureLedgerFields(w.ingest);
+      if (Object.keys(captureFields).length > 0) {
+        write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
+      }
       if (write.status === "failed") result.landed_no_data!++;
       w.entry.ledger = write.status;
       const { error: ledgerWriteError } = await supabase
