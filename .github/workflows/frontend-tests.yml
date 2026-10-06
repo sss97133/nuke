@@ -75,6 +75,10 @@ jobs:
         run: createdb dm_refinement_value_retry_ci
       - name: Verify retained failures, bounded drain and concurrent row locking
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_value_retry_ci -f supabase/sql/test_vehicle_value_queue_retry_retention.sql
+      - name: Create disposable canonical input database
+        run: createdb dm_refinement_canonical_inputs_ci
+      - name: Verify actual canonical trigger dependencies without row replay
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_canonical_inputs_ci -f supabase/sql/test_vehicle_canonical_trigger_inputs.sql
 
   image-projection:
     runs-on: ubuntu-latest
