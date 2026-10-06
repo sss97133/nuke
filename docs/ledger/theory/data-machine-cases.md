@@ -24,6 +24,15 @@ commit that closed it and the number that proves it.
 - "the system is a shape ... supposed to work when the life force comes to it, human, agentic or financial."
 - "I want to see all the 1977 K10 fenders in Tennessee."
 - "the next cli agent that spawns on my computer will really need to have this comprehension in its decision making."
+- 2026-10-06: "it's not extracted because the data model isn't shaped out properly. It's OK to have empty data that's not
+  being reported because it's not there, but we still need to shape it out cause there's plenty of signal from each data
+  source to help shape some measure of data ... our product exists in the edges and in the folds of source data; that's
+  our big win, when we do it in the millions and done properly."
+- 2026-10-06: "devise a more efficient way and the terminology on the process we need to run 24/7, the whole data pipeline,
+  ensuring the model grows as data is discovered and needing organization ... point to me where it's defined in our
+  codebase / documentation / agent .md ... data is still in its raw state for the most part. we have millions of points but
+  very little keys, foreign keys, joins, edges, residuals, queries, sql ... we have yet to identify the expertise and what
+  it encapsulates, we just know there's a huge demand and our job is to put name and meaning to it." (§12)
 
 ## 1. Vocabulary (say it this way; the owner is learning these words on purpose)
 
@@ -137,6 +146,7 @@ In addition to the card's list:
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
 | C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — public RPC context and private Mecum capture preview delivered; typed binding, price/configuration qualification, UI and latency open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
+| C28 | The repair loop has no queue in the database and no standing runner | 2026-10-06 20:40Z: 385 live tables, 377 with a model gap (369 describe, 90 key, 66 owner, 3 assay), 8 complete; 2 of 26 active jobs carry an assay; the night-shift plist unloaded since 10-02; the headless Claude form is blocked by the local permission classifier; the queue is PLAN.md and lane memos | open | queue yes; the runner is the owner's call | `scripts/discovery/repair-backlog.sql` ranks the backlog from the atlas; extend `v_residual` into that ranked view; the owner picks the runner form (§12) |
 
 **C22 table connection — 2026-10-04 UTC.** Useful question: what work was recorded on this vehicle,
 by which permitted supplier, and at what build stage? Existing `work_record` testimony is read through
@@ -931,3 +941,90 @@ BaT archive/intake custody regressions; public CI runs127 synthetic tests. The e
 gate and write guard pass. Publication/deployment stages belong to this repair's PR receipt; this
 is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
 binding, episode configuration semantics and qualified cross-venue prices remain held/open.
+
+## 12. The repair loop as a standing process (opened 2026-10-06)
+
+**Owner direction, 2026-10-06.** The owner asked where the 24/7 process is defined, what to call its parts, and for
+a more efficient form: "ensuring the model grows as data is discovered and needing organization ... millions of points
+but very little keys, foreign keys, joins, edges, residuals, queries ... our job is to put name and meaning to it."
+This section is the index he asked for, the process in the card's own words, and the proposal. It installs nothing.
+
+### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
+
+| Question | Where | What it establishes |
+|---|---|---|
+| The model, its invariants, the six lanes, the five-step repair loop | `data-machine.md` | log → state → baselines → features → predictions; every reference a key; the database describes itself; "not abandoning a fold" (owner, writer, assay, described keyed output, reader) |
+| The words | `data-machine.md` vocabulary; §1 and §8 here | entity, event, grain, key, bridge, edge, fold, replay, dimension, residual, blip, chain, assay, vein |
+| What is open and what closes it | §3 (C1–C28) and the dated delivery receipts | a case closes with the commit and the number |
+| How the schema may grow | `lofficiel-concierge/supabase/SCHEMA_LAW.md`; `schema_proposals` (15 approved, 7 open, 4 withdrawn) | search before mint; facts are observations first; one DNA grammar; supersede, never overwrite |
+| Who owns a capability or a computed field | `docs/ledger/CAPABILITY_MAP.md` (2026-07-12, verify live); `pipeline_registry` (175 rows over 51 tables) | extend the owner, never mint a parallel one |
+| What runs, and whether it proves its yield | `v_job_health` (26 active of 126 jobs, 2 with an assay); `v_write_pulse` (declared and undeclared writers, 30 d); `docs/ledger/CRON_LEDGER.md` (2026-09-27 snapshot); the Mac's `~/Library/LaunchAgents/ag.nuke.*` (23 plists, not in the repo); four read-only claude.ai routines at 06:00–09:00Z | the cloud lands and folds; the Mac runs finite batches; nothing agentic stands between shifts |
+| What the model lacks, per table | `v_schema_atlas`; `v_residual` (175 tables); `scripts/discovery/repair-backlog.sql` (this case) | described %, islands, owners, assays, ranked by rows × gaps |
+| Which text columns name an entity, and how many rows would key | the Keys lane's entity-text-field memo (`~/nuke-logs/data-hygiene-20261005/C-ENTITY-TEXT-FIELDS.md`, 2026-10-06; numbers only) | BaT handles resolve 96–99.9% exact on every column; the gaps are unwritten keys, not unmatched text |
+| The hypotheses | `vein_ledger` (11 veins), `vein_runs` (15 runs) | a vein is a query with its pass rule written before any counting |
+| The last standing worker | `~/.claude/audit/night_shift.sh --data-machine` with `data_machine_build.prompt.txt` (Codex; hourly checkpoints 10:00–18:00 PT on 2026-10-05, 45 min cap; last run 22:00Z: 740 identity links, PR #613) | its plist has been unloaded since 2026-10-02; the headless Claude form is blocked by the local permission classifier |
+| How to work here | `AGENTS.md` (the reading table, invariants, writes and deploys) | the only index to the above until this section |
+
+### The process, as verbs
+
+The card names the layers (what the data becomes) and the lanes (who works). The process is what happens to one row,
+and its words are already in §1. Each stage has a clock, a tier that runs it, and one scoreboard query.
+
+| Stage | Does | Clock | Runs on | Scoreboard |
+|---|---|---|---|---|
+| **land** | source → log: one append-only row with its source key, event time and ingest time | the species' physics (§6) | pg_cron; the Mac fleet for auth-walled sources | rows landed per day per log table against expected yield; a flat line is a defect until explained |
+| **key** | every text reference → a foreign key, at insert; existing rows by bounded batch | at insert; batches under launchd | writer code and BEFORE INSERT triggers; `ag.nuke.*` batches | key fill % per reference column over the whole table |
+| **describe** | COMMENT ON: meaning · unit · source · grain · which clock; a purpose per table | per repair | agents (Cartographer) | described %; live tables with no purpose |
+| **shape** | a signal the source emits with no home gets one: a column, an observation kind, a child table, a dimension, through `schema_proposals` and SCHEMA_LAW. The model grows here and only here | per discovered signal | agents; the proposals curator | open proposals and their age; signals seen on a source with no home |
+| **fold** | state, baselines and features from the log: incremental per event, batch per cohort; each with an owner, a writer, an assay and a reader | per event; a declared cadence per fold | pg_cron drains; triggers | queue depth and oldest queued per fold; freshness against cadence |
+| **replay** | after a key or shape change, recompute the past from the log | after each such change | launchd batches | rows re-derived / rows eligible |
+| **assay** | every writer proves its yield against the source; receipts; before and after with a denominator | every run | `v_job_health`, `write_receipts`, the pulse | jobs with an assay / active jobs |
+| **prospect** | a hypothesis as a query on a sample; promote to a feature on signal | weekly | the Prospector lane | veins assayed; veins promoted |
+
+The repair loop in the card is one pass of key → describe → shape → fold → replay → assay on one gap. "Standing" means
+the pass runs between shifts, taking its gap from a queue the database computes.
+
+### What is inefficient today (measured 2026-10-06)
+
+- **The definition was spread** over six documents, five views, one prompt file and a shift folder outside the repo;
+  `AGENTS.md`'s table was the only index. The table above is now the index.
+- **The queue is prose.** The next repair is chosen by a lead reading `PLAN.md` and lane memos each shift. The atlas
+  computes the scoreboard, not the next item. `repair-backlog.sql` at 20:40Z: 385 live non-scratch tables; 369 with a
+  describe gap, 90 with no key in or out, 66 written with no declared owner or by an undeclared writer, 3 fed by a cron
+  with no assay, 8 complete. Top by rows × gaps: `vehicle_images` (52.1M rows, 103 undescribed columns, 26,332 rows
+  today from an undeclared writer), `vehicle_observations` (11.2M, 33 undescribed), `auction_comments` (20.0M,
+  undeclared inserts on 10-05), `field_extraction_log` (3.9M, no owner, no assay), `write_receipts` (1.4M, island, no owner).
+- **One runner per lane.** 23 `ag.nuke.*` plists on the Mac, 10 created on 10-05 and 10-06, each with its own state file,
+  STOP file and log; the shape is reused by copying.
+- **Only the measurement half stands.** `ag.nuke.data-model-pulse` writes the scoreboard and the growth lines hourly;
+  no worker runs a repair pass between shifts.
+- **Intake, 20:23Z (tablesample-scaled, rows per day):** vehicles 1,350; auction_comments 13,000; vehicle_images 43,000;
+  auction_events 320; bat_listings 300; listing_page_snapshots 5,580 (receipts only since 09-27). Flat: `bat_bids`
+  newest row 2026-10-05 06:30Z while bid-type comments kept landing 5,000–6,700 a day. Mechanism: `extract-bat-core`
+  copies a bid into `bat_bids` only when the lot already has a `bat_listings` row, and only `bat-closed-lots-sync-daily`
+  writes that table; the function edge logs show no failed upsert in 24 h, so the copy is not attempted, not failing.
+  `bat_bids` has no `pipeline_registry` owner. The fact is safe in the log; the copy is one of the five bid stores
+  (§2.2) awaiting the owner's consolidation ruling. `receipts`, `work_sessions`: no rows in 14 days.
+
+### The efficient form (proposal; nothing minted here)
+
+1. **The queue lives in the database.** `repair-backlog.sql` ranks every live table by rows × gaps from the atlas.
+   Extend `v_residual` into that ranked view (its `residual_kind` becomes the `gaps` array) rather than adding a second
+   view. The Keys lane's match-rate probe becomes a scheduled job writing its numbers, so the key stage ranks by
+   resolvable rows, not by an island flag.
+2. **One runner.** The K, L and S batch runners share a shape: batch size, state file, STOP file, REST-p50 governor,
+   launchd KeepAlive, idempotent resume. One parameterized script and one plist with a job list replaces the per-lane
+   copies; commit the script before the first run.
+3. **Key at insert, everywhere.** The writers that still store a handle without its key, from the entity-text-field
+   memo: `bat_listings` buyer and seller (96–99% resolvable, 0–4 rows keyed), `auction_events` winning_bidder and
+   seller_name (no key column, 99.9% and 97.9% resolvable), `vehicle_events` buyer (0 rows keyed). Junk words lifted by
+   the buyer parser (be, my, interject) need a stop-word check before any key.
+4. **The standing worker** takes the top unowned backlog row, runs one pass, records the delivery here and in
+   `DONE.md`, and its before and after in the pulse. The Codex night-shift runner is the existing implementation; with
+   the queue in the database its prompt shrinks to the row.
+5. **Owner decision: how the worker runs.** (a) the existing Codex night-shift runner (ran 2026-10-05; 740 links per
+   run; about 93K uncached and 4.0M cached input tokens per run); (b) a permission rule for a bounded headless Claude
+   runner; (c) no agent between shifts: pg_cron lands, keys at insert and folds, and shaping waits for a shift.
+
+**Closure.** C28 closes when the ranked backlog is a view read by the pulse and by the worker, one runner replaces the
+per-lane plists, and a dated delivery row lands here from an unattended pass.

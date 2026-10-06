@@ -119,6 +119,7 @@ VALUES ('auction_comments', 'external_identity_id', 'stale-owner', 'stale regist
 ANALYZE public.auction_comments;
 
 \ir ../migrations/20261006090000_key_auction_comment_authors.sql
+\ir ../migrations/20261006131500_mint_profile_url_bat_slug.sql
 
 -- Migration itself changes no rows.
 SELECT pg_temp.ok('migration keys no row', (SELECT count(*) FROM public.auction_comments WHERE external_identity_id IS NOT NULL) = 1);
@@ -219,9 +220,15 @@ SELECT pg_temp.ok('mint walk mints exactly the missing identifiable bat handles,
   AND (SELECT array_agg(handle ORDER BY handle COLLATE "C") FROM public.external_identities e
        WHERE NOT EXISTS (SELECT 1 FROM identities_before b WHERE b.id = e.id))
       = ARRAY['ALICE', 'Carol Two', 'alice', 'bob_new', 'nobody_yet']);
-SELECT pg_temp.ok('minted identity has the member URL, ingest-clock first_seen_at and labelled source',
-  (SELECT profile_url = 'https://bringatrailer.com/member/Carol%20Two'
-          AND metadata->>'source' = 'auction_comments author'
+SELECT pg_temp.ok('minted plain handles get the existing BaT form: lower case, no trailing slash',
+  (SELECT array_agg(handle || ' ' || profile_url ORDER BY handle COLLATE "C") FROM public.external_identities
+   WHERE handle IN ('ALICE', 'alice', 'bob_new', 'nobody_yet') AND platform = 'bat')
+  = ARRAY['ALICE https://bringatrailer.com/member/alice', 'alice https://bringatrailer.com/member/alice',
+          'bob_new https://bringatrailer.com/member/bob_new', 'nobody_yet https://bringatrailer.com/member/nobody_yet']);
+SELECT pg_temp.ok('minted handle outside [A-Za-z0-9_-] gets no guessed URL',
+  (SELECT profile_url IS NULL FROM public.external_identities WHERE handle = 'Carol Two'));
+SELECT pg_temp.ok('minted identity has ingest-clock first_seen_at and labelled source',
+  (SELECT metadata->>'source' = 'auction_comments author'
           AND metadata->>'writer' = 'key_auction_comment_authors'
           AND metadata ? 'earliest_posted_at_in_minting_batch'
           AND first_seen_at >= created_at - interval '1 second'

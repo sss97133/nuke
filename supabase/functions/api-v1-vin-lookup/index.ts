@@ -7,6 +7,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { decodeOneVin } from "../_shared/nhtsa-vin.ts";
+import { decodeVin as decodeVinLocally } from "../_shared/vin-decoder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +53,51 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "VIN is required. Use GET /api-v1-vin-lookup/{vin}" }, 400);
     }
 
-    // Look up vehicle by VIN
+    // Resolve VIN → id through find_vehicle_by_vin (SQL, STABLE), which
+    // filters on upper(btrim(vin)) and so uses idx_vehicles_vin_norm_trim.
+    // A plain vin = $1 has no usable index (every vin index is partial or an
+    // expression), so both ilike and eq sequential-scanned ~1.1M rows and a
+    // miss hit the 10 s statement_timeout. Measured 2026-10-06, EXPLAIN:
+    // eq → statement timeout; upper(vin) = $1 → Index Scan, 0.5 ms.
+    const { data: vehicleId, error: resolveError } = await supabase
+      .rpc("find_vehicle_by_vin", { p_vin: vin });
+
+    if (resolveError || !vehicleId) {
+      // Nuke holds no record for this VIN. Answer with a cited factory decode
+      // instead of a bare 404: NHTSA vPIC for 17-character VINs, the local
+      // WMI/year-code decoder for pre-1981 VINs or when NHTSA is unreachable.
+      // held:false tells the caller these are reference facts, not testimony.
+      const cleanVin = vin.trim().toUpperCase();
+      if (cleanVin.length === 17) {
+        try {
+          const nhtsa = await decodeOneVin(cleanVin);
+          if (nhtsa) {
+            return jsonResponse({
+              data: null,
+              held: false,
+              vin: cleanVin,
+              decode: nhtsa.fields,
+              source: { ...nhtsa.source, error_code: nhtsa.error_code, error_text: nhtsa.error_text, trust: "T1 reference (manufacturer filing)" },
+            });
+          }
+        } catch (e) {
+          console.warn("[vin-lookup] NHTSA decode failed:", e instanceof Error ? e.message : String(e));
+        }
+      }
+      const local = decodeVinLocally(cleanVin);
+      if (local.year || local.make || local.manufacturer) {
+        const { is_pre_1981, ...fields } = local;
+        return jsonResponse({
+          data: null,
+          held: false,
+          vin: cleanVin,
+          decode: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== "")),
+          source: { name: "Nuke vin-decoder", method: is_pre_1981 ? "pre-1981 WMI/year-code tables" : "WMI/year-code tables", trust: "T3 heuristic" },
+        });
+      }
+      return jsonResponse({ error: "Vehicle not found for VIN", vin }, 404);
+    }
+
     const { data: vehicle, error: vehicleError } = await supabase
       .from("vehicles")
       .select(`
@@ -60,12 +106,7 @@ Deno.serve(async (req) => {
         drivetrain, body_style, sale_price, purchase_price, description,
         is_public, created_at, updated_at, primary_image_url
       `)
-      // VINs are stored upper-case with no whitespace (sampled 10,492 rows,
-      // 0 exceptions, 2026-10-06). eq() on the upper-cased input uses the
-      // vehicles_vin_unique_17char_v2 index; ilike() forced a sequential scan
-      // and a miss took ~19 s to return 404 (measured 2026-10-06).
-      .eq("vin", vin.trim().toUpperCase())
-      .limit(1)
+      .eq("id", vehicleId)
       .maybeSingle();
 
     if (vehicleError || !vehicle) {

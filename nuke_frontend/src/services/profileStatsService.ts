@@ -100,8 +100,10 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   // (was a measured 15.2s sequential leg of awaits).
   // Removed queries on tables that DO NOT EXIST in prod and 404'd silently on
   // every load: auction_bids, auction_listings, bat_comments, success_stories.
-  // auction_comments now filters on author_external_identity_id (the indexed
-  // column); the old external_identity_id filter was unindexed and timed out.
+  // auction_comments filters on external_identity_id, the canonical author key
+  // (99.9% filled after the 2026-10-06 backfill; served by
+  // idx_auction_comments_external_identity). author_external_identity_id is
+  // retired: no writer since 2026-03, NULL on every row landed after that.
   const [listingsRes, batBidsRes, auctionCommentsRes, auctionWinsRes, profileStatsRes] =
     await Promise.all([
       // Native captured listing records. Some sources retain an exact seller
@@ -258,15 +260,15 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .order('ended_at', { ascending: false })
     .limit(100);
 
-  // Read the canonical author relation once. The former BaT and all-platform
-  // queries overlapped, and their legacy identity column has no serving index.
+  // Read the canonical author relation once (external_identity_id: canonical,
+  // indexed, 99.9% filled; the retired twin stays NULL on rows since 2026-03).
   const { data: auctionComments, error: commentsError } = await supabase
     .from('auction_comments')
     .select(`
       *,
       auction:auction_events(*, vehicle:vehicles(*))
     `)
-    .eq('author_external_identity_id', externalIdentity.id)
+    .eq('external_identity_id', externalIdentity.id)
     .is('bid_amount', null)
     .order('posted_at', { ascending: false })
     .limit(100);
@@ -419,22 +421,11 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
           *,
           listing:auction_events(*, vehicle:vehicles(*))
         `)
-        // Filter the AUTHOR column, which is what "this contributor's comments"
-        // actually means — and it is the one that is indexed.
-        // auction_comments is 14.6M rows / 13 GB. external_identity_id has NO
-        // index, so this seq-scanned and died on the statement timeout: measured
-        // 2026-07-26, HTTP 500 after 16.1s on EVERY org profile load, and
-        // getOrganizationProfileData awaits it, so listings/bids/stories/services
-        // all queued behind a query that could never succeed.
-        // idx_auction_comments_author_external_identity_id serves this in 0.22s.
-        // The two columns hold the same value wherever both are set (200,000 of
-        // 200,000 sampled agree); author_external_identity_id is NULL on ~21% of
-        // rows that external_identity_id has, so the un-backfilled tail is not
-        // returned yet. Backfilling that column, or adding
-        //   CREATE INDEX CONCURRENTLY idx_auction_comments_external_identity_id
-        //     ON auction_comments(external_identity_id) WHERE external_identity_id IS NOT NULL;
-        // (a 13 GB build — owner's call) closes it.
-        .in('author_external_identity_id', identityIds)
+        // Filter the canonical author key, external_identity_id: 99.9% filled
+        // after the 2026-10-06 backfill (key_auction_comment_authors) and served
+        // by idx_auction_comments_external_identity (#680). The retired twin
+        // author_external_identity_id is NULL on every row since 2026-03.
+        .in('external_identity_id', identityIds)
         .eq('platform', 'bat')
         .order('posted_at', { ascending: false })
         .limit(100);

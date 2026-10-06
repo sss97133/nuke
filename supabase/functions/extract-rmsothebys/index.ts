@@ -24,6 +24,8 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
+import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -221,7 +223,7 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
   const estimateText = !isSold ? valueText : item.preSaleEstimate || null;
 
   return {
-    url: `https://rmsothebys.com${item.link}`,
+    url: rmLotUrl(item.link), // the API returns absolute links since 2026-10; site-relative ones still get the origin
     title: item.publicName,
     year,
     make,
@@ -366,33 +368,29 @@ async function saveVehicle(
     ? (knownAuctionDate ? new Date(`${knownAuctionDate}T12:00:00Z`).toISOString() : null)
     : null;
 
-  // Create vehicle_events record
-  await supabase
-    .from('vehicle_events')
-    .upsert(
-      {
-        vehicle_id: vehicleId,
-        source_platform: 'rmsothebys',
-        event_type: 'auction',
-        source_url: vehicle.url,
-        source_listing_id: listingUrlKey || vehicle.lot_number,
-        event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
-        final_price: vehicle.sold_price,
-        sold_at: soldAtIso,
-        metadata: {
-          lot_number: vehicle.lot_number,
-          auction_name: vehicle.auction_name,
-          auction_code: vehicle.auction_code,
-          estimate_text: vehicle.estimate_text,
-          currency: vehicle.currency,
-          collection: vehicle.collection,
-          bidding_type: vehicle.bidding_type,
-        },
-      },
-      {
-        onConflict: 'platform,listing_url_key',
-      }
-    );
+  // Create vehicle_events record by its listing key (see _shared/vehicleEventWrite.ts for why not upsert)
+  const episode = await writeVehicleEventByKey(supabase, {
+    vehicle_id: vehicleId,
+    source_platform: 'rmsothebys',
+    event_type: 'auction',
+    source_url: vehicle.url,
+    source_listing_id: listingUrlKey || vehicle.lot_number,
+    event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
+    final_price: vehicle.sold_price,
+    sold_at: soldAtIso,
+    metadata: {
+      lot_number: vehicle.lot_number,
+      auction_name: vehicle.auction_name,
+      auction_code: vehicle.auction_code,
+      estimate_text: vehicle.estimate_text,
+      currency: vehicle.currency,
+      collection: vehicle.collection,
+      bidding_type: vehicle.bidding_type,
+    },
+  });
+  if (episode.action === 'error' || episode.action === 'skipped') {
+    console.error(`[RMS] vehicle_event not written (${episode.action}): ${'error' in episode ? episode.error : episode.reason}`);
+  }
 
   // Create timeline event
   if (vehicle.sold && vehicle.sold_price) {
@@ -729,8 +727,7 @@ Deno.serve(async (req) => {
       const items = await fetchAuctionLots(auctionCode);
 
       // Find the specific lot
-      const targetPath = new URL(url).pathname;
-      const item = items.find((i) => i.link === targetPath || url.includes(i.link));
+      const item = items.find((i) => rmLotLinkMatchesUrl(i.link, url));
 
       if (!item) {
         return okJson({ success: false, error: 'Lot not found in auction data' }, 404);

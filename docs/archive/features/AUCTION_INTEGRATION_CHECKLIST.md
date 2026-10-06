@@ -491,7 +491,7 @@ ORDER BY revenue DESC;
 ## Support Resources
 
 ### Documentation
-- [Full System Docs](./docs/AUCTION_SYSTEM_COMPLETE_v2.md)
+- [Full System Docs](./auction/AUCTION_SYSTEM_COMPLETE_v2.md)
 - [Architecture Diagram](./AUCTION_SYSTEM_ARCHITECTURE.md)
 - [Quick Start](./AUCTION_MARKETPLACE_READY.md)
 

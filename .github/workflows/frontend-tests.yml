@@ -87,6 +87,10 @@ jobs:
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_author_keys_ci -f supabase/sql/test_comment_author_keys.sql
+      - name: Create disposable comment lot key database
+        run: createdb dm_refinement_comment_lot_keys_ci
+      - name: Verify comment lot keys by bounded backfill; one candidate keyed, several or none left NULL
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_lot_keys_ci -f supabase/sql/test_comment_lot_keys.sql
       - name: Create disposable price-history sale clock database
         run: createdb dm_price_history_sale_clock_ci
       - name: Verify sale price points are clocked at the sale date; other price clocks unchanged
@@ -95,6 +99,14 @@ jobs:
         run: createdb dm_sale_provenance_seller_ci
       - name: Verify the sale-provenance writer corrects bat_seller and seller_name with citation, guard and audit
         run: psql -X -v ON_ERROR_STOP=1 -d dm_sale_provenance_seller_ci -f supabase/sql/test_sale_provenance_seller_columns.sql
+      - name: Create disposable merge-writer re-parent database
+        run: createdb dm_merge_writer_reparent_ci
+      - name: Verify the merge writer re-parents observations, comments, bids and events, never deletes a lot row, and refuses a drifted body
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_merge_writer_reparent_ci -f supabase/sql/test_merge_writer_reparent_children.sql
+      - name: Create disposable derived-queue chunks database
+        run: createdb dm_derived_queue_chunks_ci
+      - name: Verify the derived-queue drain gives each queue its time slice, stops on repeated failures, counts completion retries, and refuses a drifted body
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_derived_queue_chunks_ci -f supabase/sql/test_vehicle_derived_queue_chunks.sql
 
   image-projection:
     runs-on: ubuntu-latest
@@ -219,6 +231,8 @@ jobs:
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
+      - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
+        run: deno test supabase/functions/_shared/batChassis.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest
