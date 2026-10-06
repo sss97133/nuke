@@ -1,6 +1,6 @@
 // Run: deno test supabase/functions/_shared/vehicleEventWrite.test.ts
 // The writer is tested through a stub PostgREST client that records each call and answers from a script.
-import { writeVehicleEventByKey } from './vehicleEventWrite.ts';
+import { clocksLocked, writeVehicleEventByKey } from './vehicleEventWrite.ts';
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -9,7 +9,7 @@ function equal(actual: unknown, expected: unknown) {
 }
 
 type Answer = { data?: unknown; error?: { message: string; code?: string } | null };
-type Call = { table: string; op: 'update' | 'insert'; row: unknown; filters: Array<[string, unknown]> };
+type Call = { table: string; op: 'select' | 'update' | 'insert'; row: unknown; filters: Array<[string, unknown]> };
 
 function stubClient(answers: Answer[]) {
   const calls: Call[] = [];
@@ -18,24 +18,20 @@ function stubClient(answers: Answer[]) {
     if (!a) throw new Error('stub: no scripted answer left');
     return { data: a.data ?? null, error: a.error ?? null };
   };
+  const chainFor = (call: Call) => {
+    const chain = {
+      eq(col: string, val: unknown) { call.filters.push([col, val]); return chain; },
+      select() { return chain; },
+      limit() { return Promise.resolve(next()); },
+    };
+    return chain;
+  };
   const client = {
     from(table: string) {
       return {
-        update(row: unknown) {
-          const call: Call = { table, op: 'update', row, filters: [] };
-          calls.push(call);
-          const chain = {
-            eq(col: string, val: unknown) { call.filters.push([col, val]); return chain; },
-            select() { return chain; },
-            limit() { return Promise.resolve(next()); },
-          };
-          return chain;
-        },
-        insert(row: unknown) {
-          calls.push({ table, op: 'insert', row, filters: [] });
-          const chain = { select() { return chain; }, limit() { return Promise.resolve(next()); } };
-          return chain;
-        },
+        select() { const c: Call = { table, op: 'select', row: null, filters: [] }; calls.push(c); return chainFor(c); },
+        update(row: unknown) { const c: Call = { table, op: 'update', row, filters: [] }; calls.push(c); return chainFor(c); },
+        insert(row: unknown) { const c: Call = { table, op: 'insert', row, filters: [] }; calls.push(c); return chainFor(c); },
       };
     },
   };
@@ -48,31 +44,87 @@ const ROW = {
   source_listing_id: 'goodingco.com/lot/1914-stutz-model-4e-bearcat',
   source_url: 'https://www.goodingco.com/lot/1914-stutz-model-4e-bearcat',
   event_status: 'sold',
+  sold_at: '2026-08-14T00:00:00.000Z',
+  ended_at: '2026-08-14T00:00:00.000Z',
+  final_price: 500000,
+  metadata: { source: 'extract-gooding', sold_at_basis: 'single_auction_session', lot_number: 7 },
 };
+const KEY_FILTERS = [['vehicle_id', 'v-1'], ['source_platform', 'gooding'], ['source_listing_id', ROW.source_listing_id]];
 
-Deno.test('an existing episode is updated on the three key columns, with no insert', async () => {
-  const { client, calls } = stubClient([{ data: [{ id: 'e-1' }] }]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-1' });
-  equal(calls.map((c) => c.op), ['update']);
+Deno.test('the live row is found on the three key columns and updated by id, with no insert', async () => {
+  const { client, calls } = stubClient([{ data: [{ id: 'e-1', metadata: { other_writer: 1 } }] }, { data: [{ id: 'e-1' }] }]);
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-1', clocks_locked: false });
+  equal(calls.map((c) => c.op), ['select', 'update']);
   equal(calls[0].table, 'vehicle_events');
-  equal(calls[0].filters, [['vehicle_id', 'v-1'], ['source_platform', 'gooding'], ['source_listing_id', ROW.source_listing_id]]);
+  equal(calls[0].filters, KEY_FILTERS);
+  equal(calls[1].filters, [['id', 'e-1']]);
+  const patch = calls[1].row as Record<string, unknown>;
+  equal(patch.sold_at, ROW.sold_at);
+  equal(patch.metadata, { other_writer: 1, ...ROW.metadata });  // merged, not replaced
 });
 
-Deno.test('a new episode is inserted when the update matched no row', async () => {
+Deno.test('on an unlocked live row a clock is filled when NULL, never cleared, never overwritten', async () => {
+  const cases: Array<[Record<string, unknown>, Record<string, unknown>, boolean]> = [
+    [{ sold_at: null }, { sold_at: '2026-08-14T00:00:00.000Z' }, true],               // fill
+    [{ sold_at: '2008-08-01T00:00:00.000Z' }, { sold_at: null }, false],               // never clear
+    [{ sold_at: '2008-08-01T00:00:00.000Z' }, { sold_at: '2026-08-14T00:00:00.000Z' }, false], // never overwrite
+  ];
+  for (const [live, incoming, written] of cases) {
+    const { client, calls } = stubClient([{ data: [{ id: 'e-5', metadata: {}, ...live }] }, { data: [{ id: 'e-5' }] }]);
+    await writeVehicleEventByKey(client, { ...ROW, ended_at: null, ...incoming });
+    const patch = calls[1].row as Record<string, unknown>;
+    equal('sold_at' in patch, written);
+    equal('ended_at' in patch, false);
+  }
+});
+
+Deno.test('a row carrying clock_locked_by_supersession keeps its sold_at, ended_at and clock metadata', async () => {
+  const live = {
+    id: 'e-9',
+    metadata: { clock_locked_by_supersession: true, sold_at_method: 'gooding_page_stated_day', sold_at_basis: 'superseded', keep: 'x' },
+  };
+  const { client, calls } = stubClient([{ data: [live] }, { data: [{ id: 'e-9' }] }]);
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-9', clocks_locked: true });
+  const patch = calls[1].row as Record<string, unknown>;
+  equal('sold_at' in patch, false);
+  equal('ended_at' in patch, false);
+  equal(patch.final_price, 500000);  // non-clock fields still refresh
+  equal(patch.metadata, {
+    clock_locked_by_supersession: true, sold_at_method: 'gooding_page_stated_day', sold_at_basis: 'superseded', keep: 'x',
+    source: 'extract-gooding', lot_number: 7,
+  });
+});
+
+Deno.test('a non-empty episode_supersessions also locks the clocks; an empty one does not', () => {
+  equal(clocksLocked({ episode_supersessions: [{ supersedes_event_id: 'e-0' }] }), true);
+  equal(clocksLocked({ episode_supersessions: [] }), false);
+  equal(clocksLocked({ clock_locked_by_supersession: false }), false);
+  equal(clocksLocked(null), false);
+});
+
+Deno.test('a locked row drops the lander\'s clock metadata keys the live row lacks', async () => {
+  const { client, calls } = stubClient([{ data: [{ id: 'e-8', metadata: { clock_locked_by_supersession: true } }] }, { data: [{ id: 'e-8' }] }]);
+  await writeVehicleEventByKey(client, ROW);
+  equal('sold_at_basis' in ((calls[1].row as { metadata: Record<string, unknown> }).metadata), false);
+});
+
+Deno.test('a new episode is inserted when no live row has the key', async () => {
   const { client, calls } = stubClient([{ data: [] }, { data: [{ id: 'e-2' }] }]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'inserted', id: 'e-2' });
-  equal(calls.map((c) => c.op), ['update', 'insert']);
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'inserted', id: 'e-2', clocks_locked: false });
+  equal(calls.map((c) => c.op), ['select', 'insert']);
   equal(calls[1].row, ROW);
 });
 
-Deno.test('an insert that loses a race (23505) updates the row the other writer made', async () => {
+Deno.test('an insert that loses a race (23505) reads the other writer\'s row and updates it, respecting its lock', async () => {
   const { client, calls } = stubClient([
     { data: [] },
     { error: { message: 'duplicate key value violates unique constraint "idx_vehicle_events_dedup"', code: '23505' } },
+    { data: [{ id: 'e-3', metadata: { clock_locked_by_supersession: true } }] },
     { data: [{ id: 'e-3' }] },
   ]);
-  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-3' });
-  equal(calls.map((c) => c.op), ['update', 'insert', 'update']);
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'updated', id: 'e-3', clocks_locked: true });
+  equal(calls.map((c) => c.op), ['select', 'insert', 'select', 'update']);
+  equal('sold_at' in (calls[3].row as Record<string, unknown>), false);
 });
 
 Deno.test('any other insert error is returned, not swallowed', async () => {
@@ -80,10 +132,15 @@ Deno.test('any other insert error is returned, not swallowed', async () => {
   equal(await writeVehicleEventByKey(client, ROW), { action: 'error', error: 'new row violates check constraint', code: '23514' });
 });
 
-Deno.test('an update error stops the write before any insert', async () => {
+Deno.test('a read error stops the write before any update or insert', async () => {
   const { client, calls } = stubClient([{ error: { message: 'canceling statement due to statement timeout', code: '57014' } }]);
   equal(await writeVehicleEventByKey(client, ROW), { action: 'error', error: 'canceling statement due to statement timeout', code: '57014' });
-  equal(calls.map((c) => c.op), ['update']);
+  equal(calls.map((c) => c.op), ['select']);
+});
+
+Deno.test('an update error is returned', async () => {
+  const { client } = stubClient([{ data: [{ id: 'e-4', metadata: null }] }, { error: { message: 'permission denied', code: '42501' } }]);
+  equal(await writeVehicleEventByKey(client, ROW), { action: 'error', error: 'permission denied', code: '42501' });
 });
 
 Deno.test('a row without its full key is skipped with the reason and touches nothing', async () => {

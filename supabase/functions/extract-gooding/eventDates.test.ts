@@ -2,6 +2,7 @@
 // Session shapes are the ones lane S classified on 2026-10-05 (S-gooding-page-classification.json, 2,062 pages) and the
 // live page-data of goodingco.com/lot/1914-stutz-model-4e-bearcat (Pebble Beach 2026), fetched 2026-10-06.
 import { goodingEventDates } from './eventDates.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -55,4 +56,28 @@ Deno.test('no auction session, a missing list or an unparseable date leaves both
   for (const events of [[], null, undefined, [VIEWING], [{ __typename: 'ContentfulSubEventAuction' }], [auction('TBD')]]) {
     equal(goodingEventDates(events as never, true), { ended_at: null, sold_at: null, basis: 'no_auction_session', session_days: [] });
   }
+});
+
+Deno.test('a sold lot on a placeholder page never carries a sold_at or ended_at, insert or update', async () => {
+  // Pebble Beach 2005 as lane S classified it: one session at 09:00 +02:00, no viewings, sale price on the page.
+  const dates = goodingEventDates([auction('2005-08-05T09:00+02:00')], true);
+  const row = {
+    vehicle_id: 'v-1', source_platform: 'gooding', source_listing_id: 'goodingco.com/lot/x', event_status: 'sold',
+    final_price: 41800, ended_at: dates.ended_at, sold_at: dates.sold_at, metadata: { sold_at_basis: dates.basis },
+  };
+  const written: Record<string, unknown>[] = [];
+  const stub = (live: unknown[]) => ({
+    from: () => ({
+      select: () => ({ eq() { return this; }, limit: () => Promise.resolve({ data: live, error: null }) }),
+      insert: (r: Record<string, unknown>) => { written.push(r); return { select: () => ({ limit: () => Promise.resolve({ data: [{ id: 'n' }], error: null }) }) }; },
+      update: (r: Record<string, unknown>) => { written.push(r); return { eq() { return this; }, select() { return this; }, limit: () => Promise.resolve({ data: [{ id: 'l' }], error: null }) }; },
+    }),
+  });
+  await writeVehicleEventByKey(stub([]), row);                                   // insert path
+  await writeVehicleEventByKey(stub([{ id: 'l', metadata: {} }]), row);          // update path
+  equal(written.length, 2);
+  // Insert: the clocks are written as NULL. Update: a NULL clock is not sent at all, so a live value is never cleared.
+  equal([written[0].sold_at, written[0].ended_at], [null, null]);
+  equal(['sold_at' in written[1], 'ended_at' in written[1]], [false, false]);
+  for (const w of written) equal((w.metadata as Record<string, unknown>).sold_at_basis, 'placeholder_session');
 });
