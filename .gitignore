@@ -12,6 +12,9 @@ nastyz28-rpo-codes*.json
 
 # Untracked directories (local-only)
 archive/
+# docs/archive holds moved, tracked documentation about retired features (2026-10-06); it is not a backup dump
+!docs/archive/
+!docs/archive/**
 screenshots/
 agents/
 data/
