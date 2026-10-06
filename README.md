@@ -7,15 +7,15 @@ Pre-launch. Production is the test environment. The repository is public; secret
 ## The numbers
 
 <!-- stats:start -->
-Measured 2026-10-06 05:49 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
+Measured 2026-10-06 06:51 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
 
 | | Rows | Coverage (sampled) |
 |---|---|---|
-| Auction comments (the auction log) | 18.4M | 75% author keyed to an identity · 10% sentiment-scored (n=39,974) |
+| Auction comments (the auction log) | 18.4M | 76% author keyed to an identity · 12% sentiment-scored (n=38,787) |
 | Bids | 4.27M |  |
 | Observations (the fact log) | 10.1M |  |
-| Images | 52.1M | 0.8% zone-classified · 0.6% vision-analyzed · 11% AI-processed (n=52,490) |
-| Vehicles | 1.00M | 44% active · 36% with a VIN · 68% public (n=19,958) |
+| Images | 52.1M | 0.7% zone-classified · 0.5% vision-analyzed · 11% AI-processed (n=53,004) |
+| Vehicles | 1.00M | 46% active · 36% with a VIN · 68% public (n=20,255) |
 | Listings (BaT) | 157K |  |
 | External identities | 617K |  |
 | Organizations | 5.73K |  |
