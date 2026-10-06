@@ -231,6 +231,8 @@ jobs:
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
+      - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
+        run: deno test --allow-read=supabase/functions/extract-craigslist/fixtures supabase/functions/extract-craigslist/ supabase/functions/extract-vehicle-data-ai/normalize.test.ts supabase/functions/ingest/craigslistCapture.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest

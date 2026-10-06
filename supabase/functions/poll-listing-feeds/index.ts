@@ -33,6 +33,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { captureLedgerFields } from "./captureLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -787,6 +788,8 @@ async function pollFirecrawlHtmlFeed(
                 ingested_via: "poll_firecrawl_html",
                 ingest_status: status,
                 ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
+                // Craigslist: post_id, posted_at, updated_at, attributes and capture_landing (see captureLedger.ts).
+                ...captureLedgerFields(ingest),
               },
             },
             { onConflict: "listing_url" }
