@@ -1029,3 +1029,47 @@ the pass runs between shifts, taking its gap from a queue the database computes.
 
 **Closure.** C28 closes when the ranked backlog is a view read by the pulse and by the worker, one runner replaces the
 per-lane plists, and a dated delivery row lands here from an unattended pass.
+
+## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
+
+**Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
+through ALL the data we have and making more with it. Analysing data. Those analyses become data shapes that grow ...
+sold Mustang coupes within 500 miles of x, in the last 6 months, that are red, that were spoken positively about on BaT
+... geographic boundaries: which counties perform the best for a model, for flipping, to move to and work at ... all the
+data has to be there in order to make the queries true on evidence." The twenty below are the lead's answer, kept here so
+every session starts from them. Each is a stack of derived tables, and each names the layer that is missing today; the
+missing layers are the backlog, ranked ahead of rows x gaps when they unblock several stacks at once.
+
+**The five substrates every stack sits on.** Keys to identities, lots and places; an event clock on every episode;
+cohort dimensions built from evidence (generation, body, engine, color, options); the text fold (comments and
+descriptions into attributed claims); the image fold (EXIF truth, angle and zone, per-zone condition claims). The
+2026-10-06 shifts repaired the key layer (comment authors, comment lots, lot winners and sellers) and part of the clock
+layer (3,483 episodes corrected by supersession). The place entity, the text fold and the dimensions are next.
+
+| # | Stack | Chain of derived tables | Missing layer today |
+|---|---|---|---|
+| 1 | County performance surface per model | lot rows -> seller location -> geocode -> county FIPS -> sale residual vs cohort baseline as of sale date -> per county: median residual, sell-through, days-to-sale, confidence by count | a place entity (seller_location is text; 69% matches a city-state lookup) |
+| 2 | Flip ledger and arbitrage corridors | one physical vehicle across platforms and time (VIN or chassis chain, lot entity) -> buy event, sell event, hold days, spread, fees -> corridors by model and season (bought in county A on platform P, sold in county B on platform Q) | cross-platform identity for short chassis numbers; ownership_transfers keyed to lots |
+| 3 | Bidder record as of a date (the card's feature) | per identity: lots bid, win rate, max bid vs hammer, lateness relative to close, cohorts chased, counties bought from -> live-lot feature: probability the reserve is met given who is bidding now | bid frames tied to identities at second precision (the bat_bids copy stopped 2026-10-05) |
+| 4 | Seller trust and its price | seller identity -> prior lots: sell-through, reserve-not-met rate, relist rate, post-sale disputes in comments -> trust score as of date -> realized premium or discount | comment sentiment per lot (queue with no reader); relist detection through the lot entity |
+| 5 | Crowd disclosure gap | comments -> topic and stance per comment -> per lot at close: what the crowd flagged that the seller did not state -> price residual explanation; per seller: how often caught | the text fold (analysis queue stuck) |
+| 6 | Cohort-relative condition from photos | images -> EXIF truth -> angle and zone -> per-zone condition claims -> position on the cohort's distribution -> price effect per zone; effect of photo coverage itself | a zone dimension keyed from image appearances; vision gate producing claims |
+| 7 | Hidden-defect prior | model failure modes by age and mileage (dimension from recalls, forums, receipts) x this vehicle's repair evidence -> latent-failure probability -> priced pre-purchase inspection list | receipts and work keyed to a parts and labor taxonomy (receipts intake landed 0 rows in 14 days) |
+| 8 | Odometer honesty | every mileage observation with observed_at across sources -> monotonicity violations, rollovers, TMU statements -> trust downgrade per observation and seller | odometer as a uniform observation kind with a clock on every source |
+| 9 | Shill and ring detection | bidder graph (who bids against whom, increments, timing, repeat under-bidders on one seller's lots, account age) -> anomaly score per lot -> integrity feature on every price | identity graph edges (bidder, lot, seller); account age from profile reads |
+| 10 | Liquidity surface | per cohort and county: listings -> outcomes -> survival curve of days-to-sale by price-to-estimate ratio, platform, season -> list at X to sell in N days with p% | dense event clocks on every episode |
+| 11 | Buyer migration maps | winners' locations vs sellers' locations per cohort -> where the money for a model lives and how far it travels -> which platform reaches which region | identity location (328 identities carry a city; infer from comments, shipping, purchases) |
+| 12 | Dimensions as evidence, not lists | generation, body style, engine, paint code and color family from VIN decodes, text and images with sources -> the owner's example query becomes four keyed filters and a clock, with a denominator | color normalization (paint codes), body-style and option keys |
+| 13 | Where to set up shop | supply density by cohort and county x demand (bids, watchers, app searches) x realized flip margin (2) x buyer proximity (11) x shop and storage cost -> relocation score per county | demand signals keyed to episodes; a cost-of-operating dimension; non-BaT intake re-enabled (102 of 126 jobs paused) |
+| 14 | Option and color premiums | decoded options (RPO, build sheets) and normalized color -> hedonic regression per cohort as of date -> premium per option with confidence -> what to spec on a build | options as a keyed dimension |
+| 15 | Build ROI | the owner's parts carts, receipts and labor sessions keyed to the vehicle and a parts taxonomy -> cost basis over time vs the cohort surface and (14) -> ROI per decision | receipts and work_sessions intake; a modifications dimension |
+| 16 | Provenance depth and exposure history | transfers, title and registration observations, auction history -> chain length and gaps, collection provenance from text, state history -> rust-belt exposure prior, provenance premium | transfers keyed to lots and identities; a state-history dimension from dated locations |
+| 17 | Shop and dealer performance | organizations -> vehicles they touched -> outcomes afterwards (residual, later defect reports) -> which restorations hold value, inventory turn, consignment realization | organization keys on events and receipts (two FK columns point at tables archived 2026-01-29) |
+| 18 | Seasonality and macro per cohort | dated residuals -> seasonal decomposition, auction-calendar effects, rate and macro covariates -> monthly forecast index per cohort | dense dated sales; market_index_values beyond BaT live bids |
+| 19 | Claims ledger from text | every description and comment sentence -> attributed claim with the author's trust -> per-vehicle fact table with two-layer confidence -> "seller claimed numbers-matching and a trusted commenter disputed it" | a claims table (shape decision); the text fold |
+| 20 | The machine's own health as data | every writer's yield, fold freshness and key fill as time series -> which pipeline rots next; repair ranked by downstream readers and features | snapshots of v_job_health and v_residual over time; a reader-dependency graph |
+
+**How this changes the queue.** `v_residual` ranks by rows x gaps (section 12). A missing layer that unblocks several
+stacks outranks a large table with a describe gap: the place entity (1, 11, 13, 16), the text fold (4, 5, 19), the
+dimensions (12, 14), the clocks (10, 18), the image zone dimension (6). Each shift picks its first item from this table,
+then from the view.
