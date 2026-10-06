@@ -42,8 +42,8 @@ beforeEach(() => {
   fixture.commentError = null; fixture.listingError = null; fixture.listings = []; fixture.reads = [];
   fixture.comments = [
     { id: 'first', platform: 'bat', author_external_identity_id: 'source-account', external_identity_id: 'source-account', bid_amount: null, auction: parent },
-    { id: 'second', platform: 'bat', author_external_identity_id: 'source-account', external_identity_id: null, bid_amount: null, auction: parent },
-    { id: 'different-author', platform: 'bat', author_external_identity_id: 'someone-else', external_identity_id: 'source-account', bid_amount: null, auction: parent },
+    { id: 'second', platform: 'bat', author_external_identity_id: null, external_identity_id: 'source-account', bid_amount: null, auction: parent },
+    { id: 'different-author', platform: 'bat', author_external_identity_id: 'source-account', external_identity_id: 'someone-else', bid_amount: null, auction: parent },
     { id: 'bid', platform: 'bat', author_external_identity_id: 'source-account', external_identity_id: 'source-account', bid_amount: 100, auction: parent },
   ];
 });
