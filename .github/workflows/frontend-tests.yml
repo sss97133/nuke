@@ -61,12 +61,16 @@ jobs:
         run: createdb dm_model_health_monitor_ci
       - name: Verify metadata gaps and execution versus output evidence
         run: psql -X -v ON_ERROR_STOP=1 -d dm_model_health_monitor_ci -f scripts/discovery/data-model-health-test.sql
+      - name: Create disposable bounded pipeline pulse database
+        run: createdb dm_pulse_bounded_ci
+      - name: Verify exact capped and unavailable pulse readings
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_pulse_bounded_ci -f supabase/sql/test_bounded_pipeline_pulse.sql
       - name: Setup Node.js for operator monitor contracts
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Verify agent declarations and source-reader monitoring boundaries
-        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs
+        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs scripts/assays/model-snapshot-comparison.test.mjs
       - name: Create disposable value-queue retry database
         run: createdb dm_refinement_value_retry_ci
       - name: Verify retained failures, bounded drain and concurrent row locking
@@ -105,6 +109,16 @@ jobs:
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_ancestry -f supabase/sql/test_cached_image_source_ancestry.sql
+      - name: Verify retained listing property source, clocks and public consumers
+        env:
+          RETAINED_PROPERTY_TEST_CI: '1'
+        run: |
+          node scripts/discovery/retained-listing-property-test.mjs
+          RETAINED_PROPERTY_TEST_EXTERIOR=1 node scripts/discovery/retained-listing-property-test.mjs
+      - name: Create disposable bounded provenance database
+        run: createdb dm_refinement_bounded_provenance_ci
+      - name: Verify provenance collection limits and preserved source visibility
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bounded_provenance_ci -f supabase/sql/test_bounded_field_provenance.sql
       - name: Verify bounded cached-image coverage and forbidden reader output
         env:
           IMAGE_ANCESTRY_DATABASE: dm_refinement_image_ancestry
@@ -169,6 +183,14 @@ jobs:
         run: createdb dm_refinement_bat_profile
       - name: Verify the actual profile migration and replay contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_profile -f supabase/sql/test_bat_profile_comment_fold.sql
+      - name: Create disposable profile privacy database
+        run: createdb dm_refinement_profile_privacy_ci
+      - name: Verify private column protection and owner-only profile RPC
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_privacy_ci -f supabase/sql/test_profile_column_privacy.sql
+      - name: Create disposable photo coverage database
+        run: createdb dm_refinement_photo_coverage_ci
+      - name: Verify owner source coverage, output fanout and empty-search-path repair
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_photo_coverage_ci -f supabase/sql/test_photo_source_analysis_coverage.sql
       - name: Setup Deno for native auction fixtures
         uses: denoland/setup-deno@v2
         with:
@@ -177,6 +199,8 @@ jobs:
         run: node --test scripts/check-auction-reconciliation.test.mjs
       - name: Verify late recovery watermarks and raw comment cache authorization
         run: node --test scripts/check-structure-review-closeout.test.mjs
+      - name: Verify retained source account admission and conflict preservation
+        run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest
@@ -285,6 +309,11 @@ jobs:
 
       - name: Verify pinned archive custody and deterministic producer (offline)
         run: node --test scripts/test-archive-source-custody.mjs
+        env:
+          NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
+
+      - name: Verify retained Mecum source preview without intake or network
+        run: node --test scripts/test-mecum-source-result.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 

@@ -8,6 +8,15 @@ const comment = (over: Partial<AuctionCommentRow> & { id: string; posted_at: str
   bat_comment_id: 1, source_url: LOT, sequence_number: null, comment_likes: 0, ...over,
 });
 
+it.each(['sold', 'observation', 'question', null])('retains an amount-bearing %s report without inventing a bid event', comment_type => {
+  const sequence = buildAuctionSequence({ comments: [comment({ id: 'synthetic-amount-report', posted_at: '2025-01-01T10:00:00Z', comment_type, bid_amount: 4000 })], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT })!;
+  expect(sequence.items).toHaveLength(1);
+  expect(sequence.items[0]).toMatchObject({ id: 'synthetic-amount-report', kind: 'comment', at: '2025-01-01T10:00:00.000Z', url: `${LOT}#comment-1` });
+  expect(sequence.lastObservedBid).toBeNull();
+  expect(sequence.days[0].bids).toBe(0);
+  expect(sequence.outcome).toBe('unknown');
+});
+
 describe('buildAuctionSequence — one listing', () => {
   const comments: AuctionCommentRow[] = [
     comment({ id: 'b1', posted_at: '2024-02-15T22:09:15Z', comment_type: 'bid', bid_amount: 1985, author_username: 'Jdimora', bat_comment_id: 13676223, sequence_number: 1 }),

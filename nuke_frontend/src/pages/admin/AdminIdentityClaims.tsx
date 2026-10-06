@@ -17,7 +17,7 @@ interface Claim {
     profile_url: string | null;
   };
   requester: {
-    email: string;
+    username: string;
   };
 }
 
@@ -75,7 +75,7 @@ export default function AdminIdentityClaims() {
             profile_url
           ),
           requester:profiles!requested_by_user_id (
-            email
+            username
           )
         `)
         .order('created_at', { ascending: false })
@@ -222,7 +222,7 @@ export default function AdminIdentityClaims() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '12px', fontWeight: 600 }}>{identity?.handle}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {requester?.email || claim.requested_by_user_id.slice(0, 8)}
+                  {requester?.username || claim.requested_by_user_id.slice(0, 8)}
                 </div>
               </div>
 

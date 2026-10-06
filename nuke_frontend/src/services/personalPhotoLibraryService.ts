@@ -82,13 +82,46 @@ export interface VehicleSuggestion {
   reviewed_at?: string;
 }
 
+export interface PhotoSourceAnalysis {
+  grain: 'owner_image_rows';
+  computed_at: string;
+  device_library_coverage: null;
+  accuracy: null;
+  records: number;
+  distinct_hashed_files: number;
+  without_hash: number;
+  marked_duplicates: number;
+  superseded: number;
+  sensitive: number;
+  marked_complete: number;
+  marked_failed: number;
+  images_with_analysis_records: number;
+  images_with_current_analysis: number;
+  analysis_records: number;
+  current_analysis_records: number;
+  cited_analysis_records: number;
+  analysis_records_missing_method: number;
+  images_with_work_extractions: number;
+  images_with_witnesses: number;
+  witness_records: number;
+  latest_ingested_at: string | null;
+  latest_recorded_capture_at: string | null;
+  latest_analysis_record_at: string | null;
+  reviewed_classifications: { items: number; verified: number; agrees: number; differs: number; missing_review_actor_or_clock: number };
+  recent: { sample_size: number; failed: number; pending: number; classifier_failed: number; with_analysis_records: number; with_work_extractions: number; with_witnesses: number };
+  sources: Array<{ source: string; records: number; with_analysis_records: number; with_work_extractions: number; with_witnesses: number; marked_complete: number; marked_failed: number; latest_ingested_at: string | null; latest_analysis_record_at: string | null }>;
+  limits: string;
+}
+
 export interface LibraryStats {
   total_photos: number;
   unorganized_photos: number;
   organized_photos: number;
   pending_ai_processing: number;
-  ai_suggestions_count: number;
+  ai_suggestions_count: number | null;
+  ai_suggestions_state?: 'unavailable';
   total_file_size: number;
+  source_analysis?: PhotoSourceAnalysis;
 }
 
 export class PersonalPhotoLibraryService {
@@ -252,7 +285,8 @@ export class PersonalPhotoLibraryService {
 
     const userId = session.session.user.id;
 
-    // Try optimized RPC function first
+    // This owner-only aggregate has no row-limit fallback: capped rows cannot
+    // establish complete library counts or storage totals.
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'get_photo_library_stats',
       { p_user_id: userId }
@@ -264,56 +298,17 @@ export class PersonalPhotoLibraryService {
         unorganized_photos: rpcData.unorganized_photos || 0,
         organized_photos: rpcData.organized_photos || 0,
         pending_ai_processing: rpcData.pending_ai_processing || 0,
-        ai_suggestions_count: rpcData.ai_suggestions_count || 0,
+        ai_suggestions_count: rpcData.ai_suggestions_count ?? null,
+        ai_suggestions_state: rpcData.ai_suggestions_state,
         total_file_size: rpcData.total_file_size || 0,
         ai_status_breakdown: rpcData.ai_status_breakdown,
         angle_breakdown: rpcData.angle_breakdown,
-        vehicle_detection: rpcData.vehicle_detection
+        vehicle_detection: rpcData.vehicle_detection,
+        source_analysis: rpcData.source_analysis,
       };
     }
 
-    // Fallback to separate queries if RPC doesn't exist
-    console.warn('[PhotoLibrary] RPC stats function not available, using fallback queries');
-    
-    // Get counts
-    const [unorganizedResult, organizedResult, aiPendingResult, suggestionsResult] = await Promise.all([
-      supabase.from('vehicle_images')
-        .select('id, file_size', { count: 'exact', head: false })
-        .eq('user_id', userId)
-        .is('vehicle_id', null)
-        // Include rows where organization_status is NULL as unorganized
-        .or('organization_status.eq.unorganized,organization_status.is.null'),
-      
-      supabase.from('vehicle_images')
-        .select('id, file_size', { count: 'exact', head: false })
-        .eq('user_id', userId)
-        .eq('organization_status', 'organized'),
-      
-      supabase.from('vehicle_images')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .in('ai_processing_status', ['pending', 'processing']),
-      
-      supabase.from('vehicle_suggestions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'pending')
-    ]);
-
-    const unorganizedPhotos = unorganizedResult.data || [];
-    const organizedPhotos = organizedResult.data || [];
-    
-    const totalFileSize = [...unorganizedPhotos, ...organizedPhotos]
-      .reduce((sum, img: any) => sum + (img.file_size || 0), 0);
-
-    return {
-      total_photos: unorganizedPhotos.length + organizedPhotos.length,
-      unorganized_photos: unorganizedPhotos.length,
-      organized_photos: organizedPhotos.length,
-      pending_ai_processing: aiPendingResult.count || 0,
-      ai_suggestions_count: suggestionsResult.count || 0,
-      total_file_size: totalFileSize
-    };
+    throw rpcError || new Error('Photo library statistics returned no data');
   }
 
   /**
@@ -770,4 +765,3 @@ export class PersonalPhotoLibraryService {
       .sort((a, b) => b.month.localeCompare(a.month));
   }
 }
-

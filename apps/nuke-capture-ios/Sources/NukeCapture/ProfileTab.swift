@@ -886,7 +886,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,city,role")
+                .select("id,username,full_name,avatar_url,bio,location,role")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()

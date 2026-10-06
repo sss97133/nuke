@@ -105,8 +105,6 @@ private struct MapSourceComment: Decodable, Identifiable {
     let posted_at: String?
     let author_username: String?
     let comment_type: String?
-    let comment_text: String?
-    let bid_amount: Double?
 }
 
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
@@ -506,10 +504,10 @@ struct VehicleDetailView: View {
                         if let seller = auction.seller_name, !seller.isEmpty {
                             LabeledContent("Seller") {
                                 if let url = auction.source_url.flatMap(URL.init(string:)),
-                                   url.host?.replacingOccurrences(of: "www.", with: "") == "bringatrailer.com",
-                                   let escaped = seller.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
-                                   let profile = URL(string: "https://bringatrailer.com/member/\(escaped)/") {
-                                    Link(seller, destination: profile)
+                                   url.host?.lowercased().replacingOccurrences(of: "www.", with: "") == "bringatrailer.com" {
+                                    NavigationLink(seller) {
+                                        MarketSellerView(handle: seller)
+                                    }
                                 } else { Text(seller) }
                             }
                         }
@@ -542,12 +540,6 @@ struct VehicleDetailView: View {
                         let discussion = mapComments.filter { $0.comment_type != "bid" }
                         Text("\(discussion.count) comment records · \(sourceHandleCount) source handles in this sample")
                             .font(.caption).foregroundStyle(.secondary)
-                        ForEach(Array(discussion.filter { !($0.comment_text ?? "").isEmpty }.prefix(3))) { comment in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(comment.author_username ?? "Source participant").font(.caption.weight(.semibold))
-                                Text(comment.comment_text ?? "").font(.subheadline).lineLimit(4)
-                            }
-                        }
                         Text("Latest \(mapComments.count) captured interactions for these listings, including bids. Read the source for the full discussion.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -1654,7 +1646,7 @@ struct VehicleDetailView: View {
             // Parent eligibility is repeated in the child read. The sample is
             // exact-source and bounded; it is neither regional mood nor a census.
             let comments: [MapSourceComment] = try await SupabaseService.client.from("auction_comments")
-                .select("id,vehicle_id,source_url,posted_at,author_username,comment_type,comment_text,bid_amount,vehicles!inner(id,status,deleted_at)")
+                .select("id,vehicle_id,source_url,posted_at,author_username,comment_type,vehicles!inner(id,status,deleted_at)")
                 .eq("vehicle_id", value: vehicleId).in("source_url", values: aliases)
                 .eq("vehicles.is_public", value: true)
                 .is("vehicles.deleted_at", value: nil)

@@ -27,6 +27,9 @@ jobs:
       - name: Raw-fetch guard regression tests
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
 
+      - name: Email intake evidence contracts
+        run: python3 scripts/email-alerts/test_intake.py
+
       - name: Type check
         working-directory: ./nuke_frontend
         run: npm run type-check || npx tsc --noEmit --skipLibCheck

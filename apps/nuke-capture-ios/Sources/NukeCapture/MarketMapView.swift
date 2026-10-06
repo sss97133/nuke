@@ -3,7 +3,7 @@
 // evidence is not a claim of present inventory, seller residence or a sale.
 
 import SwiftUI
-import MapKit
+@preconcurrency import MapKit
 import Charts
 
 struct CountySelection: Identifiable {
@@ -25,6 +25,7 @@ struct CountyLocationRow: Decodable, Identifiable {
     let source_platform: String?
     let source_url: String?
     let postal_code: String?
+    let county_fips: String?
     let city: String?
     let precision: String?
     let confidence: Double?
@@ -35,7 +36,7 @@ struct CountyLocationRow: Decodable, Identifiable {
     let observedDate: Date?
     var auctionClock = AuctionLocationClock.pending
     enum CodingKeys: String, CodingKey {
-        case id, observed_at, source_type, source_platform, source_url, postal_code, city, precision, confidence, vehicles
+        case id, observed_at, source_type, source_platform, source_url, postal_code, county_fips, city, precision, confidence, vehicles
     }
     private enum EligibilityKeys: String, CodingKey { case status, deleted_at }
     init(from decoder: Decoder) throws {
@@ -46,6 +47,7 @@ struct CountyLocationRow: Decodable, Identifiable {
         source_platform = try c.decodeIfPresent(String.self, forKey: .source_platform)
         source_url = try c.decodeIfPresent(String.self, forKey: .source_url)
         postal_code = try c.decodeIfPresent(String.self, forKey: .postal_code)
+        county_fips = try c.decodeIfPresent(String.self, forKey: .county_fips)
         city = try c.decodeIfPresent(String.self, forKey: .city)
         precision = try c.decodeIfPresent(String.self, forKey: .precision)
         confidence = try c.decodeIfPresent(Double.self, forKey: .confidence)
@@ -237,7 +239,8 @@ struct CountyEvidenceSummary {
         return mapping
     }()
 
-    init(rows: [CountyLocationRow], fips: String, make: String?, crosswalk: [String: String]) {
+    init(rows: [CountyLocationRow], fips: String, make: String?, crosswalk: [String: String],
+         countyZIPs: [String: Set<String>] = [:]) {
         var buckets: [String: [CountyLocationRow]] = [:]
         var allVehicles = Set<UUID>(); var zipVehicles = Set<UUID>()
         for row in rows {
@@ -245,7 +248,10 @@ struct CountyEvidenceSummary {
             allVehicles.insert(row.vehicles.id)
             let key: String
             if let zip = CountyLocationRow.zip(row.postal_code), let county = crosswalk[zip] {
-                if county == fips { key = zip; zipVehicles.insert(row.vehicles.id) }
+                // A ZCTA can span counties. Prefer the actual intersecting area
+                // membership over the single-county postal crosswalk.
+                let partition = row.county_fips ?? fips
+                if countyZIPs[partition]?.contains(zip) ?? (county == partition) { key = zip; zipVehicles.insert(row.vehicles.id) }
                 else { key = "conflict" }
             } else if row.postal_code?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
                 key = "missing"
@@ -316,7 +322,7 @@ private enum ZIPLocationReader {
     // Nonisolated network/decode work; only page publication returns to the UI.
     static func fetch(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
         var request = SupabaseService.client.from("vehicle_location_observations")
-            .select("id,observed_at,source_type,source_platform,source_url,postal_code,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
+            .select("id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
             .eq("county_fips", value: fips).gte("confidence", value: 0.5)
         // Keep the access-controlled inner join on the server. Apply the same
         // deleted/status membership rule locally: filtering the embedded join
@@ -467,21 +473,153 @@ actor ZIPMapReadCache {
     }
 }
 
+struct ZIPMapViewport {
+    let counties: [String]
+    let selectedCounties: [String]
+    let bounds: MKMapRect
+    var key: String { counties.sorted().joined(separator: ",") }
+}
+
+// Each indexed partition owns its cursor and completion boundary. Moving the
+// camera cancels unwanted work, not successful pages or neighboring evidence.
+@MainActor final class ZIPViewportReader: ObservableObject {
+    struct Partition {
+        var rows: [CountyLocationRow] = []
+        var cursor: String?
+        var complete = false
+        var loading = false
+        var clockLoading = false
+        var failed = false
+        var areas: [MKOverlay] = []
+        var labels: [ZIPAreaLabel] = []
+        var geometryComplete = false
+        var geometryLoading = false
+        var geometryFailed = false
+    }
+    @Published private(set) var partitions: [String: Partition] = [:]
+    @Published private(set) var revision = 0
+    private var activeRead: Task<Void, Never>?
+    private var generation = 0
+
+    private func change(_ fips: String, reproject: Bool = false, _ update: (inout Partition) -> Void) {
+        var value = partitions[fips] ?? Partition()
+        update(&value); partitions[fips] = value
+        if reproject { revision += 1 }
+    }
+
+    func read(_ counties: [String]) async {
+        generation += 1
+        let current = generation
+        activeRead?.cancel()
+        await activeRead?.value
+        guard !Task.isCancelled, current == generation else { return }
+        let task = Task { await readCounties(counties) }
+        activeRead = task
+        await withTaskCancellationHandler(operation: { await task.value }, onCancel: { task.cancel() })
+    }
+
+    private func readCounties(_ counties: [String]) async {
+        // This is a concurrency bound, never a county or observation limit.
+        await withTaskGroup(of: Void.self) { group in
+            var next = 0
+            func enqueue() {
+                let fips = counties[next]; next += 1
+                group.addTask { await self.readPartition(fips) }
+            }
+            for _ in 0..<min(2, counties.count) { enqueue() }
+            while await group.next() != nil {
+                if Task.isCancelled { group.cancelAll(); break }
+                if next < counties.count { enqueue() }
+            }
+        }
+        // Keep current screen partitions, however many it contains. Completed
+        // offscreen reads also have the existing ten-minute session cache.
+        if !Task.isCancelled {
+            let wanted = Set(counties)
+            partitions = partitions.filter { wanted.contains($0.key) }
+        }
+    }
+
+    private func readPartition(_ fips: String) async {
+        guard !Task.isCancelled else { return }
+        async let records: Void = readRecords(fips)
+        async let boundaries: Void = readGeometry(fips)
+        _ = await (records, boundaries)
+    }
+
+    private func readRecords(_ fips: String) async {
+        guard partitions[fips]?.complete != true, partitions[fips]?.loading != true else { return }
+        change(fips) { $0.loading = true; $0.failed = false }
+        defer { change(fips) { $0.loading = false; $0.clockLoading = false } }
+        do {
+            if partitions[fips]?.cursor == nil, let cached = await ZIPMapReadCache.shared.get(fips) {
+                try Task.checkCancellation()
+                change(fips, reproject: true) { $0.rows = cached; $0.complete = true }
+                NSLog("NukeCapture county %@: reused %d cached observations", fips, cached.count)
+                return
+            }
+            let start = Date()
+            try await CountyEvidenceBatch.readAll(after: partitions[fips]?.cursor, fetch: { after, size in
+                try await ZIPLocationReader.fetch(fips: fips, after: after, size: size)
+            }, publish: { batch in
+                try Task.checkCancellation()
+                self.change(fips, reproject: !batch.rows.isEmpty) { $0.rows.append(contentsOf: batch.rows); $0.cursor = batch.cursor }
+                NSLog("NukeCapture county %@: %d observations, page tail=%d, read=%.3f seconds", fips,
+                      self.partitions[fips]?.rows.count ?? 0, batch.complete ? 1 : 0, Date().timeIntervalSince(start))
+            })
+            change(fips) { $0.clockLoading = true }
+            let rows = partitions[fips]?.rows ?? []
+            let parents = try await ZIPLocationReader.readClocks(rows: rows)
+            try Task.checkCancellation()
+            let enriched = await Task.detached(priority: .userInitiated) {
+                rows.map { original -> CountyLocationRow in
+                    var row = original; row.auctionClock = AuctionLocationClock.resolve(row, parent: parents[row.vehicles.id]); return row
+                }
+            }.value
+            try Task.checkCancellation()
+            change(fips, reproject: true) { $0.rows = enriched; $0.complete = true }
+            await ZIPMapReadCache.shared.put(fips, enriched)
+            NSLog("NukeCapture county %@: complete %d observations with source clocks, %.3f seconds", fips,
+                  enriched.count, Date().timeIntervalSince(start))
+        } catch {
+            if !Task.isCancelled { change(fips) { $0.failed = true } }
+        }
+    }
+
+    private func readGeometry(_ fips: String) async {
+        guard partitions[fips]?.geometryComplete != true, partitions[fips]?.geometryLoading != true else { return }
+        change(fips) { $0.geometryLoading = true; $0.geometryFailed = false }
+        defer { change(fips) { $0.geometryLoading = false } }
+        do {
+            let cached = await ZIPMapReadCache.shared.getGeometry(fips)
+            let boundary: CountyZIPGeometry
+            if let cached { boundary = cached.0 }
+            else { boundary = try await Task.detached(priority: .userInitiated) { try CountyZIPGeometry.county(fips) }.value }
+            let result: (overlays: [MKOverlay], labels: [ZIPAreaLabel])
+            if let cached { result = (cached.1, cached.2) }
+            else {
+                result = try await boundary.areas()
+                await ZIPMapReadCache.shared.putGeometry(fips, boundary, result.overlays, result.labels)
+            }
+            try Task.checkCancellation()
+            change(fips, reproject: true) { $0.areas = result.overlays; $0.labels = result.labels; $0.geometryComplete = true }
+            NSLog("NukeCapture county %@: %d ZIP shapes loaded", fips, result.overlays.count)
+        } catch {
+            if !Task.isCancelled { change(fips) { $0.geometryFailed = true } }
+        }
+    }
+}
+
 struct CountyZIPDrill: View {
     @State private var county: CountySelection?
+    @StateObject private var reader = ZIPViewportReader()
+    @State private var viewport: ZIPMapViewport?
+    @State private var retryRevision = 0
     @State private var observations: [CountyLocationRow] = []
-    @State private var cursor: String?
-    @State private var complete = false
-    @State private var clockLoading = false
-    @State private var clockRevision = 0
-    @State private var loading = false
-    @State private var failed = false
     @Binding var query: String
     @State private var searchIssue: String?
     @State private var areas: [MKOverlay] = []
     @State private var areaLabels: [ZIPAreaLabel] = []
-    @State private var geometryLoading = false
-    @State private var geometryFailed = false
     @State private var selectedZIP: String?
     @State private var showInfo = false
     @State private var showGaps = false
@@ -499,6 +637,31 @@ struct CountyZIPDrill: View {
     @State private var requestedZIP: String?
     @State private var projectionBusy = false
     @State private var availableMakes: [ZIPActivityFold.Count] = []
+    @State private var visibleZIPs = Set<String>()
+
+    private var readCounties: [String] {
+        var keys = viewport?.counties ?? []
+        for fips in viewport?.selectedCounties ?? [] where !keys.contains(fips) { keys.append(fips) }
+        // Searches can seed a distant partition before the camera arrives.
+        if let county, (viewport == nil || requestedZIP != nil), !keys.contains(county.fips) { keys.insert(county.fips, at: 0) }
+        if let zip = selectedZIP, let fips = CountyEvidenceSummary.zipCounties[zip], !keys.contains(fips) { keys.append(fips) }
+        return keys
+    }
+    private var readKey: String { readCounties.sorted().joined(separator: ",") }
+    private var loading: Bool { readCounties.contains { reader.partitions[$0]?.complete != true && reader.partitions[$0]?.failed != true } }
+    private var clockLoading: Bool { readCounties.contains { reader.partitions[$0]?.clockLoading == true } }
+    private var failed: Bool { readCounties.contains { reader.partitions[$0]?.failed == true } }
+    private var geometryLoading: Bool { readCounties.contains { reader.partitions[$0]?.geometryComplete != true && reader.partitions[$0]?.geometryFailed != true } }
+    private var geometryFailed: Bool { readCounties.contains { reader.partitions[$0]?.geometryFailed == true } }
+    private var complete: Bool { !readCounties.isEmpty && !loading && !failed }
+
+    private func selectedZIPComplete(_ zip: String) -> Bool {
+        guard !geometryLoading, !geometryFailed else { return false }
+        let members = readCounties.filter { fips in
+            reader.partitions[fips]?.areas.contains { ($0 as? MKShape)?.title == zip } == true || CountyEvidenceSummary.zipCounties[zip] == fips
+        }
+        return !members.isEmpty && members.allSatisfy { reader.partitions[$0]?.complete == true }
+    }
 
     init(query: Binding<String>) {
         _query = query
@@ -517,6 +680,7 @@ struct CountyZIPDrill: View {
                              areaLabels: scale.needsPreciseEvidence ? [] : areaLabels,
                              drawsAreas: !scale.needsPreciseEvidence,
                              onScaleChange: { if scale != $0 { scale = $0 } },
+                             onViewportChange: { viewport = $0 },
                              onCountyFocus: { fips in selectCounty(fips) }) { selectedZIP = $0 }
                 .ignoresSafeArea(edges: .bottom)
             VStack(alignment: .leading, spacing: 8) {
@@ -531,7 +695,7 @@ struct CountyZIPDrill: View {
                         .accessibilityLabel("Map sources and coverage")
                 }
                 .font(.subheadline.weight(.medium))
-                if county == nil {
+                if readCounties.isEmpty {
                     Text("Zoom into an area or search a ZIP").font(.caption).foregroundStyle(.secondary)
                 } else if loading || geometryLoading || projectionBusy {
                     HStack(spacing: 6) {
@@ -542,7 +706,7 @@ struct CountyZIPDrill: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("\(summary.zipVehicleCount.formatted()) vehicles with ZIP evidence · historical")
+                    Text("\(Set(summary.groups.filter { $0.isZIP && (visibleZIPs.contains($0.id)) }.flatMap { $0.vehicles.map(\.id) }).count.formatted()) vehicles in visible ZIPs · captured history")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if period != .all { Text("\(period.label) · auction close dates, UTC").font(.caption2).foregroundStyle(.secondary) }
@@ -577,7 +741,7 @@ struct CountyZIPDrill: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("ZIP \(zip)").font(.headline)
                             Text(selectedGroup.map { "\($0.vehicles.count.formatted()) vehicles · explore sources and vehicle mix" }
-                                 ?? (complete ? "No matching location evidence" : "Reading this area's evidence"))
+                                 ?? (selectedZIPComplete(zip) ? "No matching location evidence" : "Reading this area's evidence"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -588,7 +752,7 @@ struct CountyZIPDrill: View {
                         Button { selectedZIP = nil } label: { Image(systemName: "xmark.circle.fill") }
                             .tint(.secondary).accessibilityLabel("Clear ZIP selection")
                     }
-                } else if county != nil {
+                } else if !readCounties.isEmpty {
                     HStack {
                         Text("Tap a ZIP to explore its activity").font(.subheadline)
                         Spacer()
@@ -600,15 +764,11 @@ struct CountyZIPDrill: View {
                         Text(geometryFailed ? "ZIP boundaries couldn't load." : "Evidence loading stopped; dates may be incomplete. Your map is retained.")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Retry") { Task {
-                            guard let county else { return }
-                            if geometryFailed { await loadGeometry(county) }
-                            if failed { await loadAll(county) }
-                        } }.disabled(loading || geometryLoading)
+                        Button("Retry") { retryRevision += 1 }
                     }
                 }
             }
-            .padding(.horizontal, 14).padding(.vertical, county == nil ? 0 : 10)
+            .padding(.horizontal, 14).padding(.vertical, readCounties.isEmpty ? 0 : 10)
             .background(.ultraThinMaterial)
         }
         .onSubmit(of: .search) { searchZIP() }
@@ -619,7 +779,7 @@ struct CountyZIPDrill: View {
         .sheet(isPresented: $showDates) { MapDateWindowPicker(window: $period, earliest: earliest, latest: latest, undatedRecords: observations.filter { $0.auctionClock.date == nil }.count) }
         .sheet(isPresented: $showReport) {
             if let group = selectedGroup {
-                NavigationStack { ZIPActivityView(group: group, window: period, complete: complete && !loading && !failed, selectedMake: make,
+                NavigationStack { ZIPActivityView(group: group, window: period, complete: selectedZIPComplete(group.id), selectedMake: make,
                     outline: areas.filter { ($0 as? MKShape)?.title == group.id }) }
             }
         }
@@ -630,7 +790,7 @@ struct CountyZIPDrill: View {
                     if let latest { Text("Latest matched auction close: \(AuctionLocationClock.label(latest)) · UTC.") }
                     Text("\(observations.filter { $0.auctionClock.date == nil }.count.formatted()) location records lack a supported auction close date; they remain in All time and are excluded from date ranges.")
                     Text("Color shows distinct vehicles with source ZIP evidence in fixed bands: 1–4, 5–19, 20–99 and 100 or more. Unshaded areas have no matching mapped evidence in this loaded region; that does not establish an inactive market. These are not completed sales, current availability or bid counts. The date window uses the matching source auction's close date, as a UTC calendar day. End dates do not establish a completed sale. Conflicting or absent dates remain undated; intake dates never substitute for auction dates.")
-                Text("County keys partition the indexed database reads as you move around the map. The active partition is \(county?.fips ?? "not selected"). This is not a national census of every vehicle.")
+                Text("\(viewport?.counties.count ?? 0) counties intersect this screen. Captured ZIP history is read across their borders. This is not a census of every vehicle or every auction.")
                 Text("Completed region reads are reused for up to 10 minutes during this map session. Auction event dates and location intake dates are separate. This is a current read of recorded evidence, not an immutable historical snapshot.")
                     Text("ZIP areas are Census 2020 ZIP Code Tabulation Areas. Some postal ZIPs have no area, and ZIPs can cross county boundaries. County conflicts and missing source ZIPs remain available under Coverage.")
                     Text("Street, building and parking-space scales require precise, dated presence evidence. Historical ZIP observations cannot answer whether a car is still there.")
@@ -657,28 +817,46 @@ struct CountyZIPDrill: View {
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showGaps = false } } }
             }
         }
-        .task(id: county?.fips) {
-            guard let county else { return }
-            loading = false; geometryLoading = false
-            observations = []; cursor = nil; complete = false; failed = false; clockLoading = false; clockRevision += 1
-            selectedZIP = nil; latest = nil; earliest = nil
-            async let records: Void = loadAll(county)
-            async let boundaries: Void = loadGeometry(county)
-            _ = await (records, boundaries)
+        .task {
             #if DEBUG
-            if ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_REPORT"] == "1" {
+            if focus == nil, let fips = ProcessInfo.processInfo.environment["NUKE_DEBUG_COUNTY"],
+               let boundary = try? await Task.detached(priority: .userInitiated, operation: { try CountyZIPGeometry.county(fips) }).value {
+                focus = boundary.bounds
+            }
+            #endif
+        }
+        .task(id: "\(readKey):\(retryRevision)") {
+            do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            await reader.read(readCounties)
+            #if DEBUG
+            if !Task.isCancelled, ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_REPORT"] == "1" {
                 await project()
                 if selectedZIP != nil { showReport = true }
             }
             #endif
         }
-        .task(id: ProjectionKey(fips: county?.fips, count: observations.count, clockRevision: clockRevision, make: make, window: period)) {
+        .task(id: ProjectionKey(partitions: readKey, revision: reader.revision, make: make, window: period,
+                                x: viewport?.bounds.origin.x, y: viewport?.bounds.origin.y,
+                                width: viewport?.bounds.width, height: viewport?.bounds.height)) {
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
             await project()
         }
     }
 
     private struct ProjectionKey: Hashable {
-        let fips: String?; let count: Int; let clockRevision: Int; let make: String?; let window: MapObservationWindow
+        let partitions: String; let revision: Int; let make: String?; let window: MapObservationWindow
+        let x: Double?; let y: Double?; let width: Double?; let height: Double?
+    }
+
+    // Geometry and labels have immutable coordinates/titles before publication;
+    // this snapshot contains no map view, renderer or mutable UI state.
+    private struct Projection: @unchecked Sendable {
+        let summary: CountyEvidenceSummary
+        let makes: [ZIPActivityFold.Count]
+        let rows: [CountyLocationRow]
+        let areas: [MKOverlay]
+        let labels: [ZIPAreaLabel]
+        let visible: Set<String>
     }
 
     private func selectCounty(_ fips: String) {
@@ -692,113 +870,56 @@ struct CountyZIPDrill: View {
             searchIssue = "No geographic crosswalk recorded for ZIP \(zip)"; return
         }
         searchIssue = nil
-        requestedZIP = zip
-        if county?.fips == fips, let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
+        requestedZIP = zip; selectCounty(fips)
+        if let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
             focus = area.boundingMapRect; selectedZIP = zip; requestedZIP = nil
         }
-        else { selectCounty(fips) }
     }
 
     private func project() async {
-        let rows = observations; let fips = county?.fips ?? ""; let selectedMake = make; let window = period
+        let keys = readCounties; let partitions = reader.partitions; let bounds = viewport?.bounds
+        let selectedMake = make; let window = period
         projectionBusy = true
         let task = Task.detached(priority: .userInitiated) {
             let start = Date()
+            var seenRows = Set<UUID>(); var seenZIPs = Set<String>()
+            var rows: [CountyLocationRow] = []; var shapes: [MKOverlay] = []; var labels: [ZIPAreaLabel] = []
+            var membership: [String: Set<String>] = [:]; var visible = Set<String>()
+            for key in keys.sorted() {
+                guard let partition = partitions[key] else { continue }
+                rows.append(contentsOf: partition.rows.filter { seenRows.insert($0.id).inserted })
+                let zips = Set(partition.areas.compactMap { ($0 as? MKShape)?.title })
+                if partition.geometryComplete { membership[key] = zips }
+                let newZIPs = zips.subtracting(seenZIPs)
+                shapes.append(contentsOf: partition.areas.filter { newZIPs.contains(($0 as? MKShape)?.title ?? "") })
+                labels.append(contentsOf: partition.labels.filter { newZIPs.contains($0.zip) })
+                seenZIPs.formUnion(zips)
+            }
+            for shape in shapes where bounds == nil || CountyChoropleth.Coordinator.intersects(shape, bounds!) {
+                if let zip = (shape as? MKShape)?.title { visible.insert(zip) }
+            }
             let filtered = rows.filter { window.includes($0) }
-            let result = CountyEvidenceSummary(rows: filtered, fips: fips,
-                                               make: selectedMake, crosswalk: CountyEvidenceSummary.zipCounties)
-            let makes = ZIPActivityFold.makeCounts(filtered)
-            NSLog("NukeCapture ZIP fold: %d records, %.3f seconds", rows.count, Date().timeIntervalSince(start))
-            return (result, makes)
+            let result = CountyEvidenceSummary(rows: filtered, fips: "", make: selectedMake,
+                                               crosswalk: CountyEvidenceSummary.zipCounties, countyZIPs: membership)
+            let makes = ZIPActivityFold.makeCounts(filtered.filter { visible.contains(CountyLocationRow.zip($0.postal_code) ?? "") })
+            NSLog("NukeCapture viewport fold: %d counties, %d records, %.3f seconds", keys.count, rows.count, Date().timeIntervalSince(start))
+            return Projection(summary: result, makes: makes, rows: rows, areas: shapes, labels: labels, visible: visible)
         }
         let result = await withTaskCancellationHandler(operation: { await task.value }, onCancel: { task.cancel() })
         guard !Task.isCancelled else { return }
-        summary = result.0; availableMakes = result.1
-        counts = Dictionary(uniqueKeysWithValues: result.0.groups.filter(\.isZIP).map { ($0.id, $0.vehicles.count) })
+        summary = result.summary; availableMakes = result.makes; observations = result.rows
+        areas = result.areas; areaLabels = result.labels; visibleZIPs = result.visible
+        counts = Dictionary(uniqueKeysWithValues: result.summary.groups.filter(\.isZIP).map { ($0.id, $0.vehicles.count) })
+        earliest = observations.compactMap { $0.auctionClock.date }.min()
+        latest = observations.compactMap { $0.auctionClock.date }.max()
+        if let zip = requestedZIP, let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
+            focus = area.boundingMapRect; selectedZIP = zip; requestedZIP = nil
+        }
+        #if DEBUG
+        if let zip = ProcessInfo.processInfo.environment["NUKE_DEBUG_ZIP"],
+           areas.contains(where: { ($0 as? MKShape)?.title == zip }) { selectedZIP = zip }
+        #endif
         projectionBusy = false
-    }
-
-    private func loadGeometry(_ county: CountySelection) async {
-        geometryLoading = true; geometryFailed = false
-        defer { if self.county?.fips == county.fips { geometryLoading = false } }
-        do {
-            let fips = county.fips
-            let cached = await ZIPMapReadCache.shared.getGeometry(fips)
-            let boundary: CountyZIPGeometry
-            if let cached { boundary = cached.0 }
-            else { boundary = try await Task.detached(priority: .userInitiated) { try CountyZIPGeometry.county(fips) }.value }
-            try Task.checkCancellation()
-            #if DEBUG
-            if focus == nil, ProcessInfo.processInfo.environment["NUKE_DEBUG_COUNTY"] == fips { focus = boundary.bounds }
-            #endif
-            let result: (overlays: [MKOverlay], labels: [ZIPAreaLabel])
-            if let cached { result = (cached.1, cached.2) }
-            else {
-                result = try await boundary.areas()
-                await ZIPMapReadCache.shared.putGeometry(fips, boundary, result.overlays, result.labels)
-            }
-            try Task.checkCancellation()
-            guard self.county?.fips == fips else { return }
-            areas = result.overlays; areaLabels = result.labels
-            if let zip = requestedZIP, let area = areas.first(where: { ($0 as? MKShape)?.title == zip }) {
-                focus = area.boundingMapRect; selectedZIP = zip; requestedZIP = nil
-            }
-            #if DEBUG
-            if let zip = ProcessInfo.processInfo.environment["NUKE_DEBUG_ZIP"],
-               areas.contains(where: { ($0 as? MKShape)?.title == zip }) { selectedZIP = zip }
-            #endif
-            NSLog("NukeCapture county %@: %d ZIP area shapes loaded", fips, areas.count)
-        } catch {
-            guard !Task.isCancelled, self.county?.fips == county.fips else { return }
-            geometryFailed = true
-        }
-    }
-
-    private func loadAll(_ county: CountySelection) async {
-        guard !loading, !complete || failed else { return }
-        loading = true; failed = false
-        defer { if self.county?.fips == county.fips { loading = false; clockLoading = false } }
-        if cursor == nil, let cached = await ZIPMapReadCache.shared.get(county.fips) {
-            guard !Task.isCancelled, self.county?.fips == county.fips else { return }
-            observations = cached; complete = true
-            latest = cached.compactMap { $0.auctionClock.date }.max(); earliest = cached.compactMap { $0.auctionClock.date }.min()
-            return
-        }
-        do {
-            let start = Date()
-            // Publish each successful transport page and continue automatically
-            // until an empty page. Interaction never waits for the complete read.
-            try await CountyEvidenceBatch.readAll(after: cursor, fetch: { after, size in
-                try await ZIPLocationReader.fetch(fips: county.fips, after: after, size: size)
-            }, publish: { batch in
-                try Task.checkCancellation()
-                guard self.county?.fips == county.fips else { throw CancellationError() }
-                observations.append(contentsOf: batch.rows); cursor = batch.cursor; complete = batch.complete
-                NSLog("NukeCapture county %@: %d observations, complete=%d, read=%.3f seconds", county.fips,
-                      observations.count, complete ? 1 : 0, Date().timeIntervalSince(start))
-            })
-            clockLoading = true
-            let parents = try await ZIPLocationReader.readClocks(rows: observations)
-            try Task.checkCancellation()
-            guard self.county?.fips == county.fips else { return }
-            let sourceRows = observations
-            let enriched = await Task.detached(priority: .userInitiated) {
-                sourceRows.map { original -> CountyLocationRow in
-                    var row = original; row.auctionClock = AuctionLocationClock.resolve(row, parent: parents[row.vehicles.id]); return row
-                }
-            }.value
-            try Task.checkCancellation()
-            guard self.county?.fips == county.fips else { return }
-            observations = enriched; clockRevision += 1
-            let coverage = AuctionClockCoverage(rows: enriched)
-            earliest = coverage.first; latest = coverage.last
-            NSLog("NukeCapture county %@: auction dates matched for %d vehicles, %d undated, total read %.3f seconds",
-                  county.fips, coverage.datedVehicles, coverage.undatedVehicles, Date().timeIntervalSince(start))
-            await ZIPMapReadCache.shared.put(county.fips, enriched)
-        } catch {
-            guard !Task.isCancelled, self.county?.fips == county.fips else { return }
-            failed = true
-        }
     }
 }
 
@@ -993,8 +1114,12 @@ struct ZIPActivityView: View {
     @State private var businesses: [ZIPBusinessRow] = []
     @State private var loading = true
     @State private var failed = false
+    @State private var loadedObservationIDs: [UUID]?
     #if DEBUG
     @State private var debugVehicleId: UUID?
+    @State private var debugVehicleRouteConsumed = false
+    @State private var debugSellerHandle: String?
+    @State private var debugSellerRouteConsumed = false
     #endif
 
     var body: some View {
@@ -1054,18 +1179,11 @@ struct ZIPActivityView: View {
                         .frame(height: CGFloat(min(fold.sellers.count, 5)) * 32 + 8)
                     }
                     if !fold.sellers.isEmpty {
-                      NavigationLink("Explore all \(fold.sellers.count) sellers and their vehicles") {
+                      NavigationLink("Seller activity and profiles") {
                         List {
                             ForEach(fold.sellers) { seller in
-                                DisclosureGroup {
-                                    ForEach(seller.listings) { listing in
-                                        if let evidence = group.vehicles.first(where: { $0.id == listing.vehicle_id }) {
-                                            NavigationLink {
-                                                VehicleDetailView(vehicleId: evidence.id.uuidString.lowercased(), embedInNavigationStack: false,
-                                                                  mapContext: MapVehicleContext(group: group, evidence: evidence, seller: seller.name))
-                                            } label: { Text(evidence.vehicle.title.isEmpty ? "Vehicle record" : evidence.vehicle.title) }
-                                        }
-                                    }
+                                NavigationLink {
+                                    MarketSellerView(handle: seller.name, area: group.id, areaListings: seller.listings.count)
                                 } label: {
                                     LabeledContent(seller.name, value: seller.listings.count.formatted())
                                 }
@@ -1132,7 +1250,9 @@ struct ZIPActivityView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Area activity").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        .task(id: group.vehicles.flatMap { $0.observations.map(\.id) }) { await load() }
+        .task(id: observationIDs) {
+            if loadedObservationIDs != observationIDs { await load() }
+        }
         #if DEBUG
         .navigationDestination(item: $debugVehicleId) { id in
             if let evidence = group.vehicles.first(where: { $0.id == id }) {
@@ -1140,6 +1260,10 @@ struct ZIPActivityView: View {
                               mapContext: MapVehicleContext(group: group, evidence: evidence,
                                                             seller: fold?.sellers.first?.name))
             }
+        }
+        .navigationDestination(item: $debugSellerHandle) { handle in
+            MarketSellerView(handle: handle, area: group.id,
+                             areaListings: fold?.sellers.first(where: { $0.name == handle })?.listings.count)
         }
         #endif
     }
@@ -1153,6 +1277,8 @@ struct ZIPActivityView: View {
         return span + "\n\(coverage.datedVehicles) of \(group.vehicles.count) vehicles have matched auction dates"
             + (coverage.undatedVehicles > 0 ? " · \(coverage.undatedVehicles) undated" : "")
     }
+
+    private var observationIDs: [UUID] { group.vehicles.flatMap { $0.observations.map(\.id) }.sorted { $0.uuidString < $1.uuidString } }
 
     // Reuse the selected map geometry, including islands and holes. A small
     // vector silhouette needs neither another map renderer nor another fetch.
@@ -1228,10 +1354,17 @@ struct ZIPActivityView: View {
             let calculated = await Task.detached { ZIPActivityFold(group: group, listings: sourceListings) }.value
             try Task.checkCancellation()
             listings = sourceListings; businesses = result.2; fold = calculated
+            loadedObservationIDs = observationIDs
             NSLog("NukeCapture ZIP %@: %d source listings, %d seller groups, %d public business links",
                   group.id, calculated.listingCount, calculated.sellers.count, publicBusinessLinks.count)
             #if DEBUG
-            if let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"], debugVehicleId == nil {
+            if let handle = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_SELLER"],
+               !debugSellerRouteConsumed, calculated.sellers.contains(where: { $0.name == handle }) {
+                debugSellerRouteConsumed = true
+                debugSellerHandle = handle
+            }
+            if let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_MAP_PROFILE"], !debugVehicleRouteConsumed {
+                debugVehicleRouteConsumed = true
                 if let id = UUID(uuidString: target), group.vehicles.contains(where: { $0.id == id }) {
                     debugVehicleId = id
                 } else if target == "1", let listing = calculated.sellers.first?.listings.first {
@@ -1287,6 +1420,244 @@ struct ZIPActivityView: View {
             }
         }
         return result
+    }
+}
+
+private struct MarketSellerAuction: Decodable, Identifiable {
+    struct Vehicle: Decodable {
+        let id: UUID
+        let status: String?
+        let deleted_at: String?
+        let is_public: Bool
+        let year: Int?
+        let make: String?
+        let model: String?
+        let sale_status: String?
+        let listing_url: String?
+        let listing_kind: String?
+    }
+    let id: UUID
+    let vehicle_id: UUID
+    let source_url: String?
+    let auction_end_date: String?
+    let outcome: String?
+    let total_bids: Int?
+    let scraped_at: String?
+    let vehicles: Vehicle
+
+    var eligible: Bool {
+        guard let url = source_url.flatMap(URL.init(string:)),
+              url.pathComponents.count == 3, url.pathComponents[1] == "listing" else { return false }
+        return vehicles.id == vehicle_id && vehicles.is_public && vehicles.deleted_at == nil
+            && !["deleted", "merged", "rejected", "duplicate"].contains(vehicles.status ?? "")
+            && vehicles.listing_kind != "non_vehicle_item"
+            && url.host?.lowercased().replacingOccurrences(of: "www.", with: "") == "bringatrailer.com"
+    }
+    var ends: Date? {
+        guard let raw = auction_end_date else { return nil }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return parser.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    }
+    var isCapturedLive: Bool {
+        guard let ends, ends > Date(), vehicles.sale_status == "auction_live",
+              let current = AuctionLocationClock.sourceKey(vehicles.listing_url),
+              current == AuctionLocationClock.sourceKey(source_url) else { return false }
+        return !["sold", "no_sale", "reserve_not_met"].contains(outcome ?? "")
+    }
+    var title: String {
+        [vehicles.year.map(String.init), vehicles.make, vehicles.model].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+/// A source account's captured activity remains inside the market navigation.
+/// This is an evidence summary, not a dealer performance grade or a residence.
+struct MarketSellerView: View {
+    let handle: String
+    var area: String? = nil
+    var areaListings: Int? = nil
+    @State private var auctions: [MarketSellerAuction] = []
+    @State private var loading = true
+    @State private var failed = false
+    @State private var conflicts = 0
+    @State private var unkeyed = 0
+    @State private var roles: [String] = []
+    @State private var participationFailed = false
+    @State private var loadedHandle: String?
+
+    private var closed: [MarketSellerAuction] {
+        auctions.filter {
+            $0.ends.map { $0 <= Date() }
+                ?? ["sold", "no_sale", "reserve_not_met"].contains($0.outcome ?? "")
+        }
+    }
+    private var sold: Int { closed.filter { $0.outcome == "sold" }.count }
+    private var noSale: Int { closed.filter { ["no_sale", "reserve_not_met"].contains($0.outcome ?? "") }.count }
+    private var live: [MarketSellerAuction] { auctions.filter(\.isCapturedLive) }
+    private var makes: [(name: String, count: Int)] {
+        let vehicles = Dictionary(grouping: auctions, by: \.vehicle_id).values.compactMap(\.first)
+        return Dictionary(grouping: vehicles, by: { $0.vehicles.make ?? "Unclassified" })
+            .map { (name: $0.key, count: $0.value.count) }
+            .sorted { $0.count == $1.count ? $0.name < $1.name : $0.count > $1.count }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Text(handle).font(.title.bold())
+                Text("Bring a Trailer account").foregroundStyle(.secondary)
+                if let area, let areaListings {
+                    Text("\(areaListings) captured listings connect this account to ZIP \(area). The account's full captured history is shown below.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if loading { ProgressView("Reading captured seller history") }
+            if failed { Button("Seller history couldn't load · Retry") { Task { await load() } } }
+            if !loading && !failed {
+                Section("Participation") {
+                    Text(((auctions.isEmpty ? [] : ["Seller"]) + roles).joined(separator: " · ")).font(.headline)
+                    if participationFailed {
+                        Button("Participation evidence couldn't load · Retry") { Task { await load() } }
+                    }
+                    Text("Roles observed in captured public source records. An unobserved role is unknown, not absent.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Selling activity") {
+                    LabeledContent("Captured auctions", value: auctions.count.formatted())
+                    LabeledContent("Reported sold results", value: sold.formatted())
+                    LabeledContent("Reported no-sale results", value: noSale.formatted())
+                    LabeledContent("Closed results unresolved", value: (closed.count - sold - noSale).formatted())
+                    LabeledContent("Auction dates unknown", value: auctions.filter { $0.ends == nil }.count.formatted())
+                    if let first = closed.compactMap(\.ends).min(), let last = closed.compactMap(\.ends).max() {
+                        Text("\(AuctionLocationClock.label(first)) – \(AuctionLocationClock.label(last)) · UTC")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Section("Captured live auctions") {
+                    if live.isEmpty {
+                        Text("No currently live auction is confirmed by these captures. This does not establish that the seller has none on the source.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    ForEach(live) { auction in
+                        NavigationLink {
+                            VehicleDetailView(vehicleId: auction.vehicle_id.uuidString.lowercased(), embedInNavigationStack: false)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(auction.title)
+                                if let ends = auction.ends {
+                                    Text("Ends \(ends.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                                }
+                                if let raw = auction.scraped_at, let day = AuctionLocationClock.day(raw) {
+                                    Text("Source checked \(AuctionLocationClock.label(day))").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                Section("Recorded vehicle mix") {
+                    Chart(makes, id: \.name) { item in
+                        BarMark(x: .value("Vehicles", item.count), y: .value("Make", item.name))
+                            .annotation(position: .trailing) { Text(item.count.formatted()).font(.caption) }
+                    }.frame(height: CGFloat(makes.count) * 28 + 16)
+                    Text("Distinct captured vehicles, using their current recorded make. This is specialization evidence, not a price or performance benchmark.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                DisclosureGroup("Inspect captured auctions") {
+                    ForEach(auctions) { auction in
+                        NavigationLink(auction.title) {
+                            VehicleDetailView(vehicleId: auction.vehicle_id.uuidString.lowercased(), embedInNavigationStack: false)
+                        }
+                    }
+                }
+                DisclosureGroup("Source evidence") {
+                    if let escaped = handle.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+                       let url = URL(string: "https://bringatrailer.com/member/\(escaped)/") {
+                        Link("Open publisher profile", destination: url)
+                    }
+                }
+                Text("Captured public history · All time. Source coverage is incomplete. \(conflicts) conflicting episodes and \(unkeyed) unkeyed rows are withheld. Relative ZIP, county and national performance has not been established.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(handle).navigationBarTitleDisplayMode(.inline)
+        .task(id: handle) { if loadedHandle != handle { await load() } }
+    }
+
+    private func load() async {
+        loading = true; failed = false; auctions = []; roles = []; conflicts = 0; unkeyed = 0
+        participationFailed = false
+        defer { loading = false }
+        do {
+            var rows: [MarketSellerAuction] = []; var cursor: String?
+            while true {
+                try Task.checkCancellation()
+                var request = SupabaseService.client.from("auction_events")
+                    .select("id,vehicle_id,source_url,auction_end_date,outcome,total_bids,scraped_at,vehicles!inner(id,status,deleted_at,is_public,year,make,model,sale_status,listing_url,listing_kind)")
+                    .eq("source", value: "bat").eq("seller_name", value: handle)
+                    .eq("vehicles.is_public", value: true).is("vehicles.deleted_at", value: nil)
+                    .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
+                if let cursor { request = request.gt("id", value: cursor) }
+                let page: [MarketSellerAuction] = try await request.order("id", ascending: true).limit(500).execute().value
+                guard let last = page.last else { break }
+                let next = last.id.uuidString.lowercased()
+                guard cursor == nil || next > cursor! else { throw URLError(.cannotParseResponse) }
+                rows.append(contentsOf: page.filter(\.eligible)); cursor = next
+            }
+            try Task.checkCancellation()
+            unkeyed = rows.filter { AuctionLocationClock.sourceKey($0.source_url) == nil }.count
+            let keyed = rows.filter { AuctionLocationClock.sourceKey($0.source_url) != nil }
+            let groups = Dictionary(grouping: keyed) { AuctionLocationClock.sourceKey($0.source_url)! }
+            let consistent = groups.values.filter {
+                Set($0.map(\.vehicle_id)).count == 1 && Set($0.compactMap(\.outcome)).count <= 1
+                    && Set($0.compactMap(\.ends)).count <= 1
+            }
+            conflicts = groups.count - consistent.count
+            auctions = consistent.compactMap { group in
+                group.sorted {
+                    let lhs = ($0.ends == nil ? 0 : 1) + ($0.outcome == nil ? 0 : 1)
+                    let rhs = ($1.ends == nil ? 0 : 1) + ($1.outcome == nil ? 0 : 1)
+                    return lhs == rhs ? $0.id.uuidString < $1.id.uuidString : lhs > rhs
+                }.first
+            }
+                .sorted { ($0.auction_end_date ?? "") > ($1.auction_end_date ?? "") }
+            loadedHandle = handle
+        } catch {
+            guard !Task.isCancelled else { return }
+            failed = true
+            NSLog("NukeCapture native seller history failed: %@", String(describing: error))
+        }
+        do {
+            async let bidding = hasPublicActivity(table: "auction_comments", actor: "author_username", kind: "bid")
+            async let discussion = hasPublicActivity(table: "auction_comments", actor: "author_username", kind: "discussion")
+            async let buying = hasPublicActivity(table: "bat_listings", actor: "buyer_username", kind: "sold")
+            let activity = try await (bidding, discussion, buying)
+            try Task.checkCancellation()
+            roles = [(activity.0, "Bidder"), (activity.1, "Commentator"), (activity.2, "Published winning buyer")]
+                .filter(\.0).map(\.1)
+        } catch {
+            guard !Task.isCancelled else { return }
+            participationFailed = true
+        }
+    }
+
+    private func hasPublicActivity(table: String, actor: String, kind: String) async throws -> Bool {
+        struct Row: Decodable { let id: UUID }
+        var request = SupabaseService.client.from(table)
+            .select("id,vehicles!inner(id)").eq(actor, value: handle)
+            .eq("vehicles.is_public", value: true).is("vehicles.deleted_at", value: nil)
+            .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
+        if table == "auction_comments" {
+            request = request.eq("platform", value: "bat")
+                .like("source_url", pattern: "https://bringatrailer.com/listing/%")
+            request = kind == "bid" ? request.eq("comment_type", value: "bid") : request.neq("comment_type", value: "bid")
+        } else {
+            request = request.eq("listing_status", value: "sold")
+                .like("bat_listing_url", pattern: "https://bringatrailer.com/listing/%")
+        }
+        let rows: [Row] = try await request.limit(1).execute().value
+        return !rows.isEmpty
     }
 }
 
@@ -1430,6 +1801,7 @@ struct CountyChoropleth: UIViewRepresentable {
     var areaLabels: [ZIPAreaLabel] = []
     var drawsAreas = true
     var onScaleChange: ((GeographicScale) -> Void)? = nil
+    var onViewportChange: ((ZIPMapViewport) -> Void)? = nil
     var onCountyFocus: ((String) -> Void)? = nil
     let onTap: (String) -> Void
 
@@ -1471,6 +1843,9 @@ struct CountyChoropleth: UIViewRepresentable {
         private var bandMembers: [Int: [ObjectIdentifier]] = [:]
         private var selectionOverlay: MKMultiPolygon?
         private var countyHitAreas: [MKOverlay] = []
+        private var countyContext: MKMultiPolygon?
+        private var countyContextIDs: [ObjectIdentifier] = []
+        private var reportedViewport: String?
         private var appliedFocus: MKMapRect?
         init(_ parent: CountyChoropleth) { self.parent = parent }
 
@@ -1575,6 +1950,7 @@ struct CountyChoropleth: UIViewRepresentable {
                     let outline = MKMultiPolygon(polygons(area)); outline.title = "selection"
                     selectionOverlay = outline; map.addOverlay(outline)
                 }
+                reportRegion(map)
             }
         }
 
@@ -1583,8 +1959,11 @@ struct CountyChoropleth: UIViewRepresentable {
             let bin = title.hasPrefix("band:") ? Int(title.dropFirst(5)) : nil
             if let r = renderer as? MKOverlayPathRenderer {
                 r.fillColor = bin.map { ZIPMapPalette.color(bin: $0) } ?? .clear
-                r.strokeColor = title == "selection" ? .systemBlue : UIColor.systemBlue.withAlphaComponent(0.20)
-                r.lineWidth = title == "selection" ? 0.8 : 0.25
+                r.strokeColor = title == "selection" ? .systemBlue
+                    : title == "county-context" ? UIColor.secondaryLabel.withAlphaComponent(0.45)
+                    : UIColor.systemBlue.withAlphaComponent(0.20)
+                r.lineWidth = title == "selection" ? 0.8 : title == "county-context" ? 0.6 : 0.25
+                if title == "county-context" { r.lineDashPattern = [3, 4] }
             }
         }
 
@@ -1629,12 +2008,40 @@ struct CountyChoropleth: UIViewRepresentable {
 
         private func reportRegion(_ mapView: MKMapView) {
             let scale = GeographicScale.forSpan(mapView.region.span.longitudeDelta)
+            let bounds = mapView.visibleMapRect
             let center = MKMapPoint(mapView.region.center)
-            let fips = mapView.region.span.longitudeDelta < 4 && parent.highlighted == nil
-                ? countyHitAreas.first(where: { Self.contains($0, center) }).flatMap { ($0 as? MKShape)?.title } : nil
+            let visible = mapView.region.span.longitudeDelta < 4
+                ? countyHitAreas.filter { Self.intersects($0, bounds) }.sorted {
+                    let a = $0.boundingMapRect; let b = $1.boundingMapRect
+                    return hypot(a.midX - center.x, a.midY - center.y) < hypot(b.midX - center.x, b.midY - center.y)
+                } : []
+            let ids = visible.map { ObjectIdentifier($0 as AnyObject) }
+            if ids != countyContextIDs {
+                if let previous = countyContext { mapView.removeOverlay(previous) }
+                countyContextIDs = ids; countyContext = nil
+                let parts = visible.flatMap { polygons($0) }
+                if !parts.isEmpty {
+                    let outline = MKMultiPolygon(parts); outline.title = "county-context"
+                    countyContext = outline; mapView.addOverlay(outline, level: .aboveRoads)
+                }
+            }
+            var seen = Set<String>()
+            let counties = visible.compactMap { ($0 as? MKShape)?.title }.filter { seen.insert($0).inserted }
+            // Inspecting a ZIP needs its whole captured cohort even when its
+            // polygon extends into a county beyond the current screen.
+            let selectedArea = overlays.first { ($0 as? MKShape)?.title == parent.highlighted }
+            let selectedCounties = selectedArea.map { area in
+                countyHitAreas.filter { Self.intersects($0, area.boundingMapRect) }
+                    .compactMap { ($0 as? MKShape)?.title }
+            } ?? []
+            let viewport = ZIPMapViewport(counties: counties, selectedCounties: selectedCounties, bounds: bounds)
+            let signature = "\(viewport.key):\(selectedCounties.sorted()):\(bounds.origin.x):\(bounds.origin.y):\(bounds.width):\(bounds.height)"
+            guard signature != reportedViewport else { return }
+            reportedViewport = signature
+            NSLog("NukeCapture viewport: %@, selected ZIP partitions %@", viewport.key, selectedCounties.joined(separator: ","))
             DispatchQueue.main.async { [weak self] in
                 self?.parent.onScaleChange?(scale)
-                if let fips { self?.parent.onCountyFocus?(fips) }
+                self?.parent.onViewportChange?(viewport)
             }
         }
 
@@ -1662,14 +2069,48 @@ struct CountyChoropleth: UIViewRepresentable {
             }
         }
 
-        private static func contains(_ overlay: MKOverlay, _ point: MKMapPoint) -> Bool {
+        nonisolated private static func contains(_ overlay: MKOverlay, _ point: MKMapPoint) -> Bool {
             guard overlay.boundingMapRect.contains(point) else { return false }
             if let polygon = overlay as? MKPolygon { return contains(polygon, point) }
             if let polygons = overlay as? MKMultiPolygon { return polygons.polygons.contains { contains($0, point) } }
             return false
         }
 
-        private static func contains(_ poly: MKPolygon, _ mp: MKMapPoint) -> Bool {
+        // A county's bounding box may cover a neighboring county. Admit actual
+        // polygon intersections, including edges crossing the screen with no
+        // polygon vertex or screen corner inside the other shape.
+        nonisolated static func intersects(_ overlay: MKOverlay, _ rect: MKMapRect) -> Bool {
+            guard overlay.boundingMapRect.intersects(rect) else { return false }
+            let polygons = (overlay as? MKPolygon).map { [$0] } ?? (overlay as? MKMultiPolygon)?.polygons ?? []
+            let corners = [MKMapPoint(x: rect.minX, y: rect.minY), MKMapPoint(x: rect.maxX, y: rect.minY),
+                           MKMapPoint(x: rect.maxX, y: rect.maxY), MKMapPoint(x: rect.minX, y: rect.maxY)]
+            for polygon in polygons where polygon.boundingMapRect.intersects(rect) {
+                if corners.contains(where: { contains(polygon, $0) }) { return true }
+                let points = polygon.points(); let count = polygon.pointCount
+                guard count > 0 else { continue }
+                for i in 0..<count {
+                    let a = points[i]; let b = points[(i + 1) % count]
+                    if rect.contains(a) { return true }
+                    var lower = 0.0; var upper = 1.0
+                    let dx = b.x - a.x; let dy = b.y - a.y
+                    let edges = [(-dx, a.x - rect.minX), (dx, rect.maxX - a.x),
+                                 (-dy, a.y - rect.minY), (dy, rect.maxY - a.y)]
+                    var crosses = true
+                    for (direction, distance) in edges {
+                        if direction == 0 { if distance < 0 { crosses = false; break } }
+                        else {
+                            let t = distance / direction
+                            if direction < 0 { lower = max(lower, t) } else { upper = min(upper, t) }
+                            if lower > upper { crosses = false; break }
+                        }
+                    }
+                    if crosses { return true }
+                }
+            }
+            return false
+        }
+
+        nonisolated private static func contains(_ poly: MKPolygon, _ mp: MKMapPoint) -> Bool {
             let r = MKPolygonRenderer(polygon: poly)
             r.createPath()
             return r.path?.contains(r.point(for: mp), using: .evenOdd) ?? false

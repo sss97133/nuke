@@ -61,4 +61,13 @@ describe('canonical value -> attributed observation', () => {
     fixture.provenance.error = new Error('local simulated failure');
     expect(render()).toContain('could not be read. Its absence has not been established');
   });
+  it('renders refused coverage without treating withheld arrays as empty evidence', () => {
+    fixture.provenance.data.coverage = { status: 'refused_input_limit' };
+    const html = render({ sources: [{ source_type: 'bat', field_value: 'SUPPLIED-CLAIM' }] } as unknown as FieldEvidenceGroup);
+    expect(html).toContain('Source evidence could not be loaded completely');
+    expect(html).toContain('Coverage is unknown');
+    expect(html).not.toContain('SOURCE-VIN');
+    expect(html).not.toContain('SUPPLIED-CLAIM');
+    expect(html).not.toContain('canonical value is unknown');
+  });
 });

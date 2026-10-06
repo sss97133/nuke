@@ -57,7 +57,9 @@ export class VehicleValuationService {
    * - Documentation quality
    * - Condition assessment from AI tags
    */
-  static async getValuation(vehicleId: string): Promise<VehicleValuation> {
+  static async getValuation(vehicleId: string, signal?: AbortSignal): Promise<VehicleValuation> {
+    const readSignal = signal ?? AbortSignal.timeout(10000);
+    readSignal.throwIfAborted();
     // Check cache
     const cached = this.cache.get(vehicleId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
@@ -74,7 +76,9 @@ export class VehicleValuationService {
         .eq('vehicle_id', vehicleId)
         .order('valuation_date', { ascending: false })
         .limit(1)
+        .abortSignal(readSignal)
         .maybeSingle();
+      readSignal.throwIfAborted();
 
       if (expertValuation && expertValuation.estimated_value) {
         // Use expert valuation as primary source
@@ -104,6 +108,18 @@ export class VehicleValuationService {
         return valuation;
       }
 
+      // The cost-based fallback requires an answered investment reader. A failed
+      // or malformed read cannot be interpreted as zero and replaced with projections.
+      const { data: totalInvestedData, error: investedError } = await supabase
+        .rpc('get_vehicle_total_invested', { p_vehicle_id: vehicleId })
+        .abortSignal(readSignal);
+      readSignal.throwIfAborted();
+      if (investedError || !totalInvestedData ||
+          typeof totalInvestedData.total_invested !== 'number' ||
+          !Number.isFinite(totalInvestedData.total_invested) || totalInvestedData.total_invested < 0) {
+        throw new Error('Investment evidence unavailable');
+      }
+
       // Initialize valuation object (fallback to receipts/labor)
       const valuation: VehicleValuation = {
         totalInvested: 0,
@@ -127,7 +143,8 @@ export class VehicleValuationService {
         .from('receipts')
         .select('id, total, created_at')
         .eq('scope_type', 'vehicle')
-        .eq('scope_id', vehicleId);
+        .eq('scope_id', vehicleId)
+        .abortSignal(readSignal);
 
       if (receipts && receipts.length > 0) {
         const receiptsTotal = receipts.reduce((sum: number, r: any) => sum + (r.total || 0), 0);
@@ -143,7 +160,8 @@ export class VehicleValuationService {
           const { data: receiptItems } = await supabase
             .from('receipt_items')
             .select('receipt_id, description, line_total, category')
-            .in('receipt_id', receiptIds);
+            .in('receipt_id', receiptIds)
+            .abortSignal(readSignal);
 
           if (receiptItems && receiptItems.length > 0) {
             // Aggregate by description to form parts list
@@ -175,7 +193,8 @@ export class VehicleValuationService {
                   )
                 `)
                 .eq('vehicle_images.vehicle_id', vehicleId)
-                .or(orClause);
+                .or(orClause)
+                .abortSignal(readSignal);
 
               imagesByPart = new Map<string, any[]>();
               tagRows?.forEach((tag: any) => {
@@ -228,6 +247,7 @@ export class VehicleValuationService {
         .from('vehicle_builds')
         .select('id, total_spent, total_budget')
         .eq('vehicle_id', vehicleId)
+        .abortSignal(readSignal)
         .maybeSingle();
 
       if (buildData) {
@@ -245,7 +265,8 @@ export class VehicleValuationService {
           const { data: lineItems } = await supabase
             .from('build_line_items')
             .select('name, total_price, status, days_to_install')
-            .eq('build_id', buildData.id);
+            .eq('build_id', buildData.id)
+            .abortSignal(readSignal);
 
           if (lineItems) {
             // Calculate parts investment
@@ -285,7 +306,8 @@ export class VehicleValuationService {
                   )
                 `)
                 .eq('vehicle_images.vehicle_id', vehicleId)
-                .or(partNames.map(name => `tag_name.ilike.%${name}%`).join(','));
+                .or(partNames.map(name => `tag_name.ilike.%${name}%`).join(','))
+                .abortSignal(readSignal);
 
               // Group tags by part name for efficient lookup
               const tagsByPart = new Map<string, any[]>();
@@ -328,6 +350,7 @@ export class VehicleValuationService {
         .from('vehicles')
         .select('make, model, year, vin, current_value, purchase_price, msrp')
         .eq('id', vehicleId)
+        .abortSignal(readSignal)
         .single();
 
       let marketBase = 0;
@@ -338,7 +361,8 @@ export class VehicleValuationService {
           .select('*')
           .eq('vehicle_id', vehicleId)
           .in('source', ['marketcheck', 'marketcheck_history', 'marketcheck_trends'])
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .abortSignal(readSignal);
 
         let marketCheckValue = 0;
         let marketCheckConfidence = 0;
@@ -375,7 +399,8 @@ export class VehicleValuationService {
           .select('sale_price')
           .eq('make', vehicle.make)
           .eq('year', vehicle.year)
-          .limit(5);
+          .limit(5)
+          .abortSignal(readSignal);
 
         let comparablesValue = 0;
         if (comparables && comparables.length > 0) {
@@ -425,7 +450,8 @@ export class VehicleValuationService {
       const { data: images } = await supabase
         .from('vehicle_images')
         .select('id, image_url')
-        .eq('vehicle_id', vehicleId);
+        .eq('vehicle_id', vehicleId)
+        .abortSignal(readSignal);
 
       // 3a. Get AI analysis results for quality assessment
       const { data: profileInsights } = await supabase
@@ -434,6 +460,7 @@ export class VehicleValuationService {
         .eq('vehicle_id', vehicleId)
         .order('summary_date', { ascending: false })
         .limit(1)
+        .abortSignal(readSignal)
         .maybeSingle();
 
       // Use AI insights to detect build quality
@@ -487,7 +514,8 @@ export class VehicleValuationService {
           const result = await supabase
             .from('vehicle_documents')
             .select('document_type, title, amount, vendor_name, description')
-            .eq('vehicle_id', vehicleId);
+            .eq('vehicle_id', vehicleId)
+            .abortSignal(readSignal);
           allDocs = result.data;
           docsError = result.error;
         } catch (err: any) {
@@ -551,7 +579,8 @@ export class VehicleValuationService {
         `)
         .eq('vehicle_images.vehicle_id', vehicleId)
         .in('tag_type', ['part', 'modification', 'component'])
-        .not('metadata', 'is', null);
+        .not('metadata', 'is', null)
+        .abortSignal(readSignal);
       
       // Extract prices from AI analysis
       let aiExtractedValue = 0;
@@ -579,50 +608,42 @@ export class VehicleValuationService {
       }
 
       // 4. Include ALL documented work from work orders (parts, labor, materials, overhead)
-      try {
-        const { data: totalInvestedData, error: investedError } = await supabase
-          .rpc('get_vehicle_total_invested', { p_vehicle_id: vehicleId });
-        
-        if (!investedError && totalInvestedData) {
-          const totalInvested = totalInvestedData.total_invested || 0;
-          const breakdown = totalInvestedData.breakdown || {};
-          
-          if (totalInvested > 0) {
-            // Add to total invested
-            valuation.totalInvested = Math.max(valuation.totalInvested, totalInvested);
-            
-            // Update parts investment
-            if (breakdown.parts) {
-              valuation.partsInvestment = Math.max(valuation.partsInvestment, breakdown.parts);
-            }
-            
-            // Update labor hours (calculate from labor cost if available)
-            if (breakdown.labor) {
-              const avgLaborRate = 120; // Default rate
-              const estimatedHours = breakdown.labor / avgLaborRate;
-              valuation.laborHours = Math.max(valuation.laborHours, estimatedHours);
-            }
-            
-            // Add data source
-            if (!valuation.dataSources.includes('Work Orders')) {
-              valuation.dataSources.push('Work Orders');
-            }
-            
-            // Increase confidence based on comprehensive work data
-            if (totalInvestedData.components_count?.events_with_work > 0) {
-              valuation.confidence = Math.min(valuation.confidence + 10, 95);
-            }
-          }
+      const totalInvested = totalInvestedData.total_invested;
+      const breakdown = totalInvestedData.breakdown || {};
+
+      if (totalInvested > 0) {
+        // Add to total invested
+        valuation.totalInvested = Math.max(valuation.totalInvested, totalInvested);
+
+        // Update parts investment
+        if (breakdown.parts) {
+          valuation.partsInvestment = Math.max(valuation.partsInvestment, breakdown.parts);
         }
-      } catch (err) {
-        console.warn('Error fetching total invested:', err);
+
+        // Update labor hours (calculate from labor cost if available)
+        if (breakdown.labor) {
+          const avgLaborRate = 120; // Default rate
+          const estimatedHours = breakdown.labor / avgLaborRate;
+          valuation.laborHours = Math.max(valuation.laborHours, estimatedHours);
+        }
+
+        // Add data source
+        if (!valuation.dataSources.includes('Work Orders')) {
+          valuation.dataSources.push('Work Orders');
+        }
+
+        // Increase confidence based on comprehensive work data
+        if (totalInvestedData.components_count?.events_with_work > 0) {
+          valuation.confidence = Math.min(valuation.confidence + 10, 95);
+        }
       }
-      
+
       // Fallback: Include documented labor from work sessions at $75/hr (if no work order data)
       if (valuation.totalInvested === 0) {
         try {
           const { data: workSessions } = await supabase
-            .rpc('get_vehicle_work_sessions', { p_vehicle_id: vehicleId });
+            .rpc('get_vehicle_work_sessions', { p_vehicle_id: vehicleId })
+            .abortSignal(readSignal);
           const hours = (workSessions || []).reduce((sum: number, s: any) => sum + (s.labor_hours || 0), 0);
           if (hours > 0) {
             valuation.laborHours = Math.max(valuation.laborHours, hours);
@@ -677,6 +698,7 @@ export class VehicleValuationService {
           .eq('vehicle_id', vehicleId)
           .order('summary_date', { ascending: false })
           .limit(1)
+          .abortSignal(readSignal)
           .maybeSingle();
 
         if (latestInsight) {
@@ -733,6 +755,7 @@ export class VehicleValuationService {
       if ((images?.length || 0) > 100) finalConfidence += 5;
       valuation.confidence = Math.min(finalConfidence, 95);
 
+      readSignal.throwIfAborted();
       // Cache the result
       this.cache.set(vehicleId, {
         data: valuation,
@@ -740,26 +763,10 @@ export class VehicleValuationService {
       });
 
       return valuation;
-    } catch (error) {
-      console.error('Valuation error:', error);
-      
-      // Return empty valuation on error
-      return {
-        totalInvested: 0,
-        buildBudget: 0,
-        estimatedValue: 0,
-        marketLow: 0,
-        marketHigh: 0,
-        confidence: 0,
-        dataSources: [],
-        partsInvestment: 0,
-        laborHours: 0,
-        installedParts: 0,
-        pendingParts: 0,
-        topParts: [],
-        lastUpdated: new Date().toISOString(),
-        hasRealData: false
-      };
+    } catch {
+      // Consumers already handle rejection. Do not publish or cache a zero-valued
+      // assessment, or expose database/financial error details to the browser.
+      throw new Error('Unable to load valuation evidence.');
     }
   }
 

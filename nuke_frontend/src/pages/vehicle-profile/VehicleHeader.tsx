@@ -103,7 +103,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const claimHasId = !!userOwnershipClaim?.drivers_license_url && userOwnershipClaim?.drivers_license_url !== 'pending';
   const claimNeedsId = hasClaim && !claimHasId;
   // --- Extracted data-fetching hooks ---
-  const { rpcSignal, valuation } = usePriceData(vehicle?.id, initialPriceSignal, initialValuation);
   const { trendPct, trendPriceType, trendBaselineValue, trendBaselineAsOf, trendBaselineSource, trendOutlierCount, trendPeriod, toggleTrendPeriod } = useTrendData(vehicle);
   const ownerGuess = useOwnerGuess(vehicle, auctionPulse);
   const locationDisplay = useLocationDisplay(vehicle);
@@ -169,6 +168,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showVinValidation, setShowVinValidation] = useState(false);
   const [showUpdateSalePriceModal, setShowUpdateSalePriceModal] = useState(false);
   const [showFollowAuctionCard, setShowFollowAuctionCard] = useState(false);
+  // This legacy header stays mounted for context but is hidden on the current
+  // profile. Read pricing only when its estimate, evidence menu or trade view is requested.
+  const needsLegacyPricing = displayMode === 'estimate' || priceMenuOpen || showProvenancePopup || showTrade;
+  const { rpcSignal, valuation, valuationUnavailable } = usePriceData(
+    needsLegacyPricing ? vehicle?.id : undefined, initialPriceSignal, initialValuation
+  );
   const [showOrgInvestmentCard, setShowOrgInvestmentCard] = useState<string | null>(null);
   const [orgCardAnchor, setOrgCardAnchor] = useState<HTMLElement | null>(null);
   const titleRef = useRef<HTMLDivElement>(null);
@@ -255,6 +260,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return getAutoDisplay();
     }
     if (mode === 'estimate') {
+      if (valuationUnavailable) return { amount: null, label: 'Estimate unavailable' };
       // Prefer unified valuation service (these are computed estimates, always show)
       if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
         return { amount: valuation.estimatedValue, label: 'Estimated Value' };
@@ -839,7 +845,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
     const estimatedValue = valuation && typeof valuation.estimatedValue === 'number'
       ? valuation.estimatedValue
-      : (vehicle.current_value || null);
+      : null;
     pushEntry({
       id: 'estimate',
       label: 'Estimated Value',

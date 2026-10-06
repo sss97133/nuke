@@ -136,7 +136,7 @@ In addition to the card's list:
 | C24 | `bat_listings` coverage collapsed in Aug 2026 | 1 of 3,802 Aug lots; `vehicle_id` NULL on every row ending May–Sep | open | yes | find the loader that stopped; key `bat_listings` by URL and vehicle |
 | C25 | Vein ledger, residual view, Prospector lane | none exist | **closed** ee23d384d (table, Opus session) + b8a9d584f (20261001000500): `v_residual` over `v_schema_atlas` (no key in or out, 0 described, tagged island_written / island_idle); veins V010-V013 (soft-close chain, quarterly chain signal, consequential bidder, live-lot activity at h) registered with pass rules and their 09-30 discovery runs (counts = false). Live 10-01: 184 residual tables (14 still written); 4 veins, 3 discovery runs after edd92d8fd (20261001000600; V011 has none: its 09-30 sample size was not kept, so no number was invented). Fold freshness against cadence is unknown: `pipeline_registry` has no cadence column | yes | the Prospector lane: a scheduled assay per vein (`confirmation` runs on held-out lots) |
 | C26 | Buy-and-recondition decision: "to what condition do I bring it to lock in a profit" | §10 | open | yes | land the `lx450_condition_v0` observations; run `run_vein_lx450_condition('confirmation')`; make the rubric a scheduled fold over listing text |
-| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — private context query delivered; repair assay prepared; public integration and source corrections open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
+| C27 | Stored market evidence cannot reach an immediate vehicle/opportunity answer | 2026-10-04 Corvette conversation; bounded DB and public-reader probes, §11 | partial — public RPC context and private Mecum capture preview delivered; typed binding, price/configuration qualification, UI and latency open | yes, within each lane's existing authorization | Reconcile stored source fields and event identities; extend the shared reader to retain broad market context, nested cohorts, unresolved evidence and measurable arrival performance |
 
 **C22 table connection — 2026-10-04 UTC.** Useful question: what work was recorded on this vehicle,
 by which permitted supplier, and at what build stage? Existing `work_record` testimony is read through
@@ -192,6 +192,60 @@ reader failure, empty results and transport rejection. Final enforced typecheck/
 These are local preparation stages; the publication receipt records the subsequently checked head,
 merge, deployment and production assay. C22 remains partial for the other three readers, and the
 masked contract supplies no part number for a public part-specific join.
+
+**C22 supplier directory — 2026-10-05 UTC, bounded consumer repair.** Table and Lifecycle
+readers were delivered by [PR564](https://github.com/sss97133/nuke/pull/564) and
+[PR584](https://github.com/sss97133/nuke/pull/584); their dated opening assays above remain historical.
+The next useful question is which supplier is recorded for work on a vehicle, including work whose
+supplier relationship is unresolved. At 02:53:40Z the same public vehicle's anonymous vendor directory
+shows no groups, despite six permitted `vehicle_build_log_public` rows. All six supplier fields are
+unknown; this assay does not prove a named supplier or canonical organization relationship.
+
+Entity: vehicle; source grain: one permitted non-superseded work observation; consumer grain: one
+case-insensitive supplier-text group or an explicit unrecorded-supplier group. The existing
+`vehicle_observations.vehicle_id` FK selects the entity, and original observation ID deduplicates
+masked/direct copies with the directly readable row preferred. Text grouping is not a canonical
+organization bridge. Recorded transaction/observation date remains event time; the public contract
+has no ingestion time. Canonical writer remains `ingest-observation`; the existing RPC and consumer
+recompute on page load, with no new stored measure, writer or cadence. Current reader only; no
+historical reconstruction or complete spend is claimed.
+
+`VendorsPage.tsx` now connects the existing masked RPC, retains unnamed work explicitly, and labels
+visible totals as excluding masked amounts. Public groups link onward through the existing work-table
+evidence reader rather than offering inaccessible vendor-detail drills. The seven focused
+`VendorsPage.test.tsx` contracts cover the source connection, owner/public ID deduplication, event
+dates, unknown suppliers/dates, punctuation collisions, masked fields, empty sources and failures.
+The source-connection test fails on the previous reader. At 02:56:30Z the local anonymous 390px
+reader retains the same six source IDs in one explicitly unrecorded group, with count 6 and recorded
+date 2026-02-25; its table link reaches all six original observations, with no inaccessible vendor
+links, amounts or page overflow. Enforced typecheck, build and guardrails pass. Production deployment
+and the same frozen six-source runtime assay remain pending publication; C22 stays partial for VendorPage and PartPage.
+
+**C22 supplier detail — 2026-10-05 UTC, bounded construction evidence.** The directory delivery
+above is recorded by [PR615](https://github.com/sss97133/nuke/pull/615). The next question is which
+permitted work observations belong to a supplier group, including an unresolved supplier. At 07:42Z,
+the anonymous detail reader returned zero observations for the same six retained public work rows.
+Connecting `vehicle_build_log_public(uuid)` to `VendorPage.tsx` exposes those six original IDs and
+recorded dates; directory links carry either an exact case-insensitive supplier text or an explicit
+unrecorded selector. Punctuation-distinct names do not collapse through a lossy slug. Legacy
+substring links remain supported. No supplier text is promoted to a canonical organization key.
+
+Entity: vehicle; grain: one currently permitted non-superseded work observation, grouped by recorded
+month or directly readable shipment. The existing RPC vehicle selector and original observation ID
+are the bridges and replay/deduplication keys, with directly readable copies preferred. Writer remains
+`ingest-observation`; page load recomputes this current reader. Recorded work/observation dates are
+event dates; masked rows expose no ingest clock, source URL, part number, amount or organization key.
+No historical as-of fold, new writer, schedule, testimony or permission change is introduced. Direct
+kind slices retain their existing bounds; errors or filled bounds expose incomplete coverage.
+
+Same frozen-source local assay at 390px: zero -> six rows, 6/6 original IDs, identical source
+fingerprint, zero visible amounts, withheld-detail links or page overflow. Thirteen focused reader
+contracts cover exact/unresolved selection, owner overlap, replay, zero amounts, unknown dates,
+punctuation collisions, legacy links, empty sources and failed reads. The enforced typecheck/build/
+guardrail gate passes. These are preparation stages; the private completion receipt records the
+checked head, PR, deployment and same-source production verification. C22 remains partial for
+PartPage and for canonical supplier relationships unavailable in this contract.
+
 
 **C17 follow-up — 2026-10-04 UTC, bounded read-only trace.** The October 2 intake receipt records observation
 `6c3ca7fa-0147-4542-8785-9f8ffe724ed2` and an exact replay returning `duplicate: true`. The current check finds its
@@ -522,6 +576,39 @@ owner asks for repairs that make the existing evidence better and immediately qu
 vehicles**. More individual appraisals do not close this case. Extend C9, C10, C14, C15, C17 and C26
 through their existing owners; this case connects their consequences to one useful answer.
 
+### Continuation brief for future agents
+
+The [retained evidence repair guide](../../market/RETAINED_EVIDENCE_REPAIR_GUIDE.md) records the
+remaining relationships, existing owners, disagreement cases and receipt locations. Start there
+after the theory card. The preparation entries below preserve their dated stages; the following
+delivery receipt establishes what this implementation batch subsequently completed.
+
+**Delivery receipt, 2026-10-05 UTC.** PR [#600](https://github.com/sss97133/nuke/pull/600), checked
+`c2ea13304d90`, merged as `02c34847e322`; full commit references are in the linked PR and private
+completion receipt. Supabase run
+[37251537436](https://github.com/sss97133/nuke/actions/runs/37251537436) succeeded.
+Its additive `valuation_by_ymm.source_context` was anonymous-runtime-verified for Corvette,
+Mustang and BMW after 189 local PostgreSQL assertions and all 21 applicable PR checks passed.
+Corvette returned 942 recorded auction URL groups, including 372 Mecum and 85 Barrett-Jackson,
+alongside 21 separately qualified prices. These are different grains and eligibility populations;
+the URL groups are not verified unique sales or newly qualified price comparisons.
+
+PR [#624](https://github.com/sss97133/nuke/pull/624), checked
+`163888b2c62e`, merged as `2eb495d61956`; full commit references are in the linked PR and private
+completion receipt. Supabase run
+[37275853026](https://github.com/sss97133/nuke/actions/runs/37275853026) succeeded.
+All 21 applicable PR checks passed; local verification included 127 synthetic tests and one
+private retained-capture replay. The same service-only preview changed HTTP400 → HTTP200 in
+1.427 seconds and recovered lot173892's civil scheduled run day, 2014-01-24, with a verified raw
+hash. Anonymous access returned HTTP401. Currency, fee basis, actual sale clock and parent/event
+binding remain unestablished; the result is unqualified. Neither repair changed the public UI.
+
+**No persisted evidence-model repair was applied:** no tables, columns, constraints, typed
+relationships or canonical historical testimony changed. PR600 replaced an existing SQL reader
+through its specifically approved migration; PR624 changed read-only edge code. Historical intake
+and production source corrections remain held. Initial concurrent valuation timeouts remain an
+open reliability concern despite subsequent successful warm probes. C27 is still partial.
+
 The owner's latest correction is central: other Corvettes support market volume and movement even
 when they are not close price comparables. A 1963/427 configuration is a thin slice inside the
 Corvette cohort. Its proposed high position within that market is a hypothesis to measure, with
@@ -813,3 +900,34 @@ payload reduction alone does not establish an instant answer. These execute the 
 SELECT, not an installed RPC or public UI. The production function change is prepared for review;
 it is not merged/deployed. Source fact corrections, historical admission, qualified cross-venue
 prices, sale-time configuration matching, ranking, public display and latency closure remain open.
+
+### Retained Mecum source preview prepared, 2026-10-05 UTC
+
+PR [#600](https://github.com/sss97133/nuke/pull/600) delivered the preceding additive reader after
+specific owner approval. Supabase deployment and anonymous Corvette/Mustang/BMW reads were
+verified. Initial concurrent Corvette/Mustang requests timed out; subsequent serial and one warm
+concurrent repeat passed. Cold/p95 reliability and source-fact admission remain open.
+
+The next bounded repair extends **`extract-mecum`**, reusing its unpublished source-result helper
+from `20209e9d11cf`, rather than creating another venue parser. Parser revision
+`source_result_candidate_v2` accepts the retained `runDates` midnight name and slug forms as a
+**civil scheduled run day**. Original taxonomy claims, missing siblings and disagreements survive.
+Nonmidnight values, zones, arbitrary timestamp prefixes and invalid civil dates remain unsupported.
+A run day is not an actual closing or settlement instant, and does not establish currency or fees.
+
+Service-only `action: source_result_preview` requires one explicit snapshot UUID. It uses the
+existing archive owner with an additional capture-ID pin, verifies the retained raw hash and returns
+an allowlisted private result with distinct source capture/recording clocks. It has no URL/latest
+fallback, source fetch, inference, queue claim, testimony admission or metadata/profile write.
+Anonymous and user callers cannot read the preview. Raw HTML, unrelated markdown, protected
+metadata and storage locators stay out of the response. Vehicle/event custody is explicitly
+**not evaluated**; source identifiers retain their separate namespaces.
+
+The predeployment live request returned HTTP400 (unsupported action). Local replay of the exact
+retained lot173892 capture through the actual handler/archive/auth code now recovers **2014-01-24**
+and its unqualified reported sold amount. The source hash matches; no source was fetched or
+production record changed. **128 focused tests pass**, including that private replay and existing
+BaT archive/intake custody regressions; public CI runs127 synthetic tests. The enforced checkout
+gate and write guard pass. Publication/deployment stages belong to this repair's PR receipt; this
+is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
+binding, episode configuration semantics and qualified cross-venue prices remain held/open.

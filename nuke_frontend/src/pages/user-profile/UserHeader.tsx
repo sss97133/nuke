@@ -26,7 +26,7 @@ const UserHeader: React.FC = () => {
   } = useUserProfile();
 
   // EXPAND-DON'T-NAVIGATE (founder law: "everything is a button, everything
-  // expands"). The header stats are doors: clicking WORKED ON / LISTINGS /
+  // expands"). The header stats are doors: clicking VEHICLES / LISTINGS /
   // COMMENTS reveals its detail inline, right under the header, and clicking
   // again (or the ✕) closes it — reversible depth (C10), no page jump.
   const [openDoor, setOpenDoor] = useState<null | 'worked' | 'listings' | 'comments'>(null);
@@ -46,10 +46,10 @@ const UserHeader: React.FC = () => {
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
   // Stats — every headline carries an honest denominator (number doctrine).
-  // VEHICLES uses vehicles_count = "worked on" (distinct vehicles with timeline
-  // activity), NOT total_vehicles (record-authorship over a 4-col union, ~half
-  // scraped Craigslist listings — never a public headline). Labeled WORKED ON.
-  const workedOnVehicles = stats?.vehicles_count ?? null;
+  // vehicles_count is a stored profile vehicle count. Personal work history
+  // requires separate evidence. total_vehicles counts record authorship across
+  // sources and remains unsuitable for this personal headline.
+  const recordedVehicles = stats?.vehicles_count ?? null;
   const totalListings = stats?.total_listings ?? 0;
   const totalComments = stats?.total_comments ?? 0;
   // BIDS is structurally blind (the bids table doesn't exist; only completed
@@ -109,18 +109,18 @@ const UserHeader: React.FC = () => {
 
       {/* Center: Stat DOORS — each is a button that expands its detail inline
           (founder law). Only render a count when it's real and non-zero
-          (No Empty Shells). The count and its drilled list always come from the
-          same source, so they can't disagree (C0). */}
+          (No Empty Shells). Listing/comment counts share their loaded source.
+          The stored vehicle count discloses its snapshot/subset boundary. */}
       <div className="up-header__center">
-        {workedOnVehicles != null && workedOnVehicles > 0 && (
+        {recordedVehicles != null && recordedVehicles > 0 && (
           <button
             type="button"
             className={`up-stat-pill up-stat-pill--door${openDoor === 'worked' ? ' up-stat-pill--open' : ''}`}
             aria-expanded={openDoor === 'worked'}
             onClick={() => toggleDoor('worked')}
           >
-            <span className="up-stat-pill__label">WORKED ON</span>
-            {workedOnVehicles}
+            <span className="up-stat-pill__label">RECORDED VEHICLES</span>
+            {recordedVehicles}
           </button>
         )}
         {totalListings > 0 && (
@@ -130,7 +130,7 @@ const UserHeader: React.FC = () => {
             aria-expanded={openDoor === 'listings'}
             onClick={() => toggleDoor('listings')}
           >
-            <span className="up-stat-pill__label">LISTINGS</span>
+            <span className="up-stat-pill__label">BAT LISTING RECORDS</span>
             {totalListings}
           </button>
         )}
@@ -172,7 +172,7 @@ const UserHeader: React.FC = () => {
       {openDoor && (
         <StatDoorPanel
           door={openDoor}
-          workedOn={workedOnVehicles}
+          recordedVehicles={recordedVehicles}
           listings={comprehensiveData?.listings || []}
           comments={comprehensiveData?.comments || []}
           onClose={() => setOpenDoor(null)}
@@ -194,14 +194,14 @@ const vehLabel = (v: any): string =>
 
 const StatDoorPanel: React.FC<{
   door: 'worked' | 'listings' | 'comments';
-  workedOn: number | null;
+  recordedVehicles: number | null;
   listings: any[];
   comments: any[];
   onClose: () => void;
-}> = ({ door, workedOn, listings, comments, onClose }) => {
+}> = ({ door, recordedVehicles, listings, comments, onClose }) => {
   const title =
-    door === 'worked' ? `WORKED ON · ${workedOn ?? 0}`
-      : door === 'listings' ? `LISTINGS · ${listings.length}`
+    door === 'worked' ? `RECORDED VEHICLES · ${recordedVehicles ?? 0}`
+      : door === 'listings' ? `BAT LISTING RECORDS · ${listings.length} LOADED`
         : `COMMENTS · ${comments.length}`;
 
   return (
@@ -215,17 +215,19 @@ const StatDoorPanel: React.FC<{
 
       {door === 'worked' && (
         <div className="up-stat-door__body">
-          {/* The 88 worked-on list is not loaded client-side; per C0 we don't
-              fabricate it. The door points at the built/owned garage rendered
-              below (the vehicles he actually owns), the trustworthy subset. */}
+          <div className="up-stat-door__empty">
+            Stored profile vehicle count. Personal work history is unverified.
+            The collection below can show a subset.
+          </div>
           <a href="#vehicle-collection" className="up-stat-door__cta" onClick={onClose}>
-            View the {workedOn ?? 0} vehicles worked on →
+            View vehicle collection →
           </a>
         </div>
       )}
 
       {door === 'listings' && (
         <div className="up-stat-door__body">
+          <div className="up-stat-door__empty">Captured BaT records for linked source handles. Total consignment history is unknown.</div>
           {listings.length === 0 ? (
             <div className="up-stat-door__empty">No listings.</div>
           ) : (
@@ -235,7 +237,7 @@ const StatDoorPanel: React.FC<{
                 href={l.vehicle?.id ? `/vehicle/${l.vehicle.id}` : (l.source_url || '#')}
                 className="up-stat-door__row"
               >
-                <span className="up-stat-door__row-main">{vehLabel(l.vehicle)}</span>
+                <span className="up-stat-door__row-main">{l.vehicle ? vehLabel(l.vehicle) : l.bat_listing_title || 'BAT LISTING'}</span>
                 <span className="up-stat-door__row-meta">
                   {l.event_status ? String(l.event_status).toUpperCase() : 'LISTED'}
                   {l.sale_price ? ` · $${Number(l.sale_price).toLocaleString()}` : ''}

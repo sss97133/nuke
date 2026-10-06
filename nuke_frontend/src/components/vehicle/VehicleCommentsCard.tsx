@@ -22,9 +22,19 @@ interface Comment {
   source?: 'nzero' | 'auction' | 'bat' | 'facebook' | 'instagram' | 'sbx' | 'pcar' | 'cars_and_bids'; // All comment sources
   auction_platform?: string | null; // Platform name: 'bat', 'cars_and_bids', 'pcarmarket', 'sbx', 'facebook', 'instagram', etc.
   external_identity_id?: string; // For linking to profiles
+  author_attribution?: 'source_conflict' | 'profile_conflict' | 'source_unknown' | 'ambiguous' | 'unavailable';
+  source_category?: string; // Native IDs belong to separate source collections
   media_urls?: string[]; // For Instagram images, Facebook photos, etc.
   comment_url?: string; // Direct link to original comment
 }
+
+const authorAttributionMessages = {
+  source_conflict: { label: 'Author attribution conflict', explanation: "The comment and its auction disagree about the source platform. The author link is withheld; the original comment remains available." },
+  profile_conflict: { label: 'Author attribution conflict', explanation: "The comment's source and linked author profile are on different platforms. The author link is withheld; the original comment remains available." },
+  source_unknown: { label: 'Author source unconfirmed', explanation: 'The source platform is not established. A matching username alone does not identify the author.' },
+  ambiguous: { label: 'Author profile ambiguous', explanation: 'Multiple profiles match this username on the source platform. No author profile has been selected.' },
+  unavailable: { label: 'Author profile unavailable', explanation: 'A source-qualified author profile could not be resolved from this read. This does not establish that the author has no profile.' },
+};
 
 interface VehicleCommentsCardProps {
   vehicleId: string;
@@ -35,6 +45,7 @@ interface VehicleCommentsCardProps {
   containerId?: string;
   containerClassName?: string;
   containerStyle?: React.CSSProperties;
+  hideWhenEmpty?: boolean;
 }
 
 export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
@@ -46,10 +57,14 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   containerId,
   containerClassName,
   containerStyle,
+  hideWhenEmpty = false,
 }) => {
   const navigate = useNavigate();
-  const { data: rawRows, isLoading: rawLoading, refetch } = useVehicleCommentsUnified(vehicleId);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const { data: rawRows, isLoading: rawLoading, isError: readError, refetch } = useVehicleCommentsUnified(vehicleId);
+  const [processed, setProcessed] = useState<{ vehicleId: string; comments: Comment[] } | null>(null);
+  const [processingFailure, setProcessingFailure] = useState<string | null>(null);
+  const processingError = processingFailure === vehicleId;
+  const comments = !readError && !processingError && processed?.vehicleId === vehicleId ? processed.comments : [];
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(!collapsed);
   const [newComment, setNewComment] = useState('');
@@ -82,13 +97,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
   // Process raw rows into Comment objects when data changes
   useEffect(() => {
-    if (!rawRows) return;
-    processRows(rawRows);
-  }, [rawRows]);
+    let current = true;
+    if (rawRows && !readError) processRows(rawRows, () => current);
+    return () => { current = false; };
+  }, [rawRows, vehicleId, readError]);
 
-  const processRows = async (allRows: any[]) => {
+  const processRows = async (allRows: any[], isCurrent: () => boolean) => {
     try {
       setLoading(true);
+      setProcessingFailure(null);
 
       const normalizeExternalPlatform = (raw: any): string | null => {
         if (!raw) return null;
@@ -121,12 +138,34 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         } catch { /* ignore */ }
       }
 
-      // Resolve external identities for auction usernames
+      // A source-qualified native identity key takes precedence over mutable handles.
+      const identityPlatforms = (c: any): Set<string> => {
+        const platforms = [normalizeExternalPlatform(c.platform),
+          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))),
+          c.source_category === 'observation' ? normalizeExternalPlatform(c.source_slug) : null]
+          .filter((p): p is string => !!p && ['bat', 'cars_and_bids', 'pcarmarket', 'sbx', 'facebook', 'instagram'].includes(p));
+        return new Set(platforms);
+      };
+      const identityPlatform = (c: any): string | null => {
+        const platforms = identityPlatforms(c);
+        return platforms.size === 1 ? [...platforms][0] : null;
+      };
+      const externalIdentityById = new Map<string, any>();
+      const nativeIds = [...new Set(allRows.filter(c => c.source_category !== 'user' && c.external_identity_id != null)
+        .map(c => c.external_identity_id))];
+      for (let start = 0; start < nativeIds.length; start += 100) {
+        const ids = nativeIds.slice(start, start + 100);
+        const { data } = await supabase.from('external_identities')
+          .select('id, platform, handle, claimed_by_user_id').in('id', ids);
+        (data || []).forEach((e: any) => { if (ids.includes(e?.id)) externalIdentityById.set(e.id, e); });
+      }
+
+      // Historical NULL-key fallback requires an established platform and one match.
       const platformHandles = new Map<string, Set<string>>();
       for (const c of allRows) {
-        if (c.source_category === 'user' || !c.author_username) continue;
-        const p = normalizeExternalPlatform(c.platform || c.source_slug) ||
-          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) || 'bat';
+        if (c.source_category === 'user' || c.external_identity_id != null || !c.author_username) continue;
+        const p = identityPlatform(c);
+        if (!p) continue;
         const set = platformHandles.get(p) || new Set<string>();
         set.add(c.author_username);
         platformHandles.set(p, set);
@@ -138,11 +177,14 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         if (handles.length === 0) continue;
         const { data: externalIds } = await supabase
           .from('external_identities')
-          .select('id, handle, claimed_by_user_id, profile_url')
+          .select('id, platform, handle, claimed_by_user_id')
           .eq('platform', platform)
           .in('handle', handles);
         (externalIds || []).forEach((e: any) => {
-          if (e?.handle) externalIdentityByKey.set(`${platform}:${e.handle}`, e);
+          if (e?.id && handlesSet.has(e.handle) && normalizeExternalPlatform(e.platform) === platform) {
+            const key = `${platform}:${e.handle}`;
+            externalIdentityByKey.set(key, externalIdentityByKey.has(key) ? null : e);
+          }
         });
       }
 
@@ -158,8 +200,9 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       const allComments: Comment[] = [];
 
       for (const c of allRows) {
-        const resolvedPlatform = normalizeExternalPlatform(c.platform || c.source_slug) ||
-          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) || null;
+        const resolvedPlatform = normalizeExternalPlatform(c.platform) ||
+          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) ||
+          (c.source_category === 'observation' ? normalizeExternalPlatform(c.source_slug) : null);
 
         // Filter garbage C&B comments
         if (resolvedPlatform === 'cars_and_bids' && isGarbageCarsAndBidsComment(c.comment_text)) continue;
@@ -169,6 +212,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           const profile = c.user_id ? profilesMap.get(c.user_id) : null;
           allComments.push({
             id: c.comment_id,
+            source_category: c.source_category,
             user_id: c.user_id,
             comment_text: c.comment_text,
             created_at: c.observed_at,
@@ -179,9 +223,17 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           });
         } else {
           // Auction / observation comment
-          const identity = c.author_username
-            ? (externalIdentityByKey.get(`${resolvedPlatform || 'bat'}:${c.author_username}`) || null)
-            : null;
+          const platform = identityPlatform(c);
+          const candidate = c.external_identity_id != null
+            ? externalIdentityById.get(c.external_identity_id)
+            : (platform && c.author_username ? externalIdentityByKey.get(`${platform}:${c.author_username}`) : null);
+          const identity = platform && candidate && normalizeExternalPlatform(candidate.platform) === platform ? candidate : null;
+          const authorAttribution: Comment['author_attribution'] = identity ? undefined
+            : identityPlatforms(c).size > 1 ? 'source_conflict'
+            : !platform ? 'source_unknown'
+            : candidate?.platform && normalizeExternalPlatform(candidate.platform) !== platform ? 'profile_conflict'
+            : c.external_identity_id == null && c.author_username && externalIdentityByKey.has(`${platform}:${c.author_username}`) && candidate === null ? 'ambiguous'
+            : 'unavailable';
 
           let bidAmount: number | undefined;
           if (c.bid_amount != null) {
@@ -199,6 +251,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
           allComments.push({
             id: c.comment_id,
+            source_category: c.source_category,
             user_id: identity?.claimed_by_user_id || null,
             author_username: c.author_username,
             comment_text: c.comment_text,
@@ -210,20 +263,19 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             is_seller: c.is_seller,
             source: commentSource,
             auction_platform: resolvedPlatform,
-            external_identity_id: identity?.id || c.external_identity_id,
-            user_avatar: identity?.profile_url || undefined,
+            external_identity_id: identity?.id,
+            author_attribution: authorAttribution,
             media_urls: Array.isArray(c.media_urls) ? c.media_urls : undefined,
             comment_url: c.comment_url || undefined
           });
         }
       }
 
-      setComments(allComments);
-    } catch (err) {
-      console.warn('Failed to load comments:', err);
-      setComments([]);
+      if (isCurrent()) setProcessed({ vehicleId, comments: allComments });
+    } catch {
+      if (isCurrent()) setProcessingFailure(vehicleId);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -374,78 +426,22 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     return parts.length > 0 ? parts : safeText;
   };
 
-  const handleUsernameClick = async (comment: Comment) => {
-    // If user_id exists (Nuke user or claimed BaT user), go to their profile
+  const handleUsernameClick = (comment: Comment) => {
+    // External claim/profile links have already been resolved by the qualified key.
     if (comment.user_id) {
       navigate(`/profile/${comment.user_id}`);
-      return;
-    }
-    
-    // For external auction identities, route through external_identities.
-    if ((comment.source === 'auction' || comment.source === 'bat') && (comment.author_username || comment.external_identity_id)) {
-      let identity = null;
-      
-      // Try to get identity by external_identity_id first (faster)
-      if (comment.external_identity_id) {
-        const { data } = await supabase
-          .from('external_identities')
-          .select('id, claimed_by_user_id, profile_url, handle')
-          .eq('id', comment.external_identity_id)
-          .maybeSingle();
-        identity = data;
-      }
-      
-      // Fallback: get by username
-      if (!identity && comment.author_username) {
-        const platform =
-          (comment.source === 'auction' ? (comment.auction_platform || null) : 'bat') ||
-          'bat';
-        const { data } = await supabase
-          .from('external_identities')
-          .select('id, claimed_by_user_id, profile_url, handle')
-          .eq('platform', platform)
-          .eq('handle', comment.author_username)
-          .maybeSingle();
-        identity = data;
-      }
-      
-      if (identity?.claimed_by_user_id) {
-        // They have a claimed Nuke profile, navigate there
-        navigate(`/profile/${identity.claimed_by_user_id}`);
-      } else if (identity?.id) {
-        // No claimed profile but we have external identity - show public profile
-        navigate(`/profile/external/${identity.id}`);
-      } else if (comment.external_identity_id) {
-        // Use the external_identity_id from comment
-        navigate(`/profile/external/${comment.external_identity_id}`);
-      } else if (comment.author_username) {
-        // Try to find external identity to show public profile
-        const platform =
-          (comment.source === 'auction' ? (comment.auction_platform || null) : 'bat') ||
-          'bat';
-        const { data: extIdentity } = await supabase
-          .from('external_identities')
-          .select('id, handle, profile_url')
-          .eq('platform', platform)
-          .eq('handle', comment.author_username)
-          .maybeSingle();
-        
-        if (extIdentity?.id) {
-          // Show public profile by external identity
-          navigate(`/profile/external/${extIdentity.id}`);
-        } else if (extIdentity?.profile_url) {
-          // Fallback: open BaT profile
-          window.open(extIdentity.profile_url, '_blank');
-        } else {
-          // Last resort: open claim identity page
-          navigate(`/claim-identity?platform=${encodeURIComponent(platform)}&handle=${encodeURIComponent(comment.author_username)}`);
-        }
-      }
+    } else if (comment.external_identity_id) {
+      navigate(`/profile/external/${comment.external_identity_id}`);
     }
   };
 
   const visibleComments = expanded ? comments : comments.slice(0, maxVisible);
   const hasMore = comments.length > maxVisible;
+
+  // Only a successful current-subject collection establishes an empty widget.
+  // Keep loading/failure states and the signed-in comment composer available.
+  if (hideWhenEmpty && !session?.user?.id && !readError && !processingError &&
+      !rawLoading && !loading && processed?.vehicleId === vehicleId && comments.length === 0) return null;
 
   return (
     <div
@@ -468,7 +464,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           flexShrink: 0,
         }}
       >
-        <div>Comments &amp; Bids ({comments.length})</div>
+        <div>Comments &amp; Bids {readError || processingError || rawLoading || loading || processed?.vehicleId !== vehicleId ? '(—)' : `(${comments.length})`}</div>
         {hasMore && !expanded && (
           <button
             className="btn-utility"
@@ -488,7 +484,12 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           overflowX: 'hidden',
         }}
       >
-        {loading ? (
+        {readError || processingError ? (
+          <div role="status" style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '12px' }}>
+            Comments could not be loaded completely. Their absence has not been established.
+            {' '}<button type="button" className="btn-utility" onClick={() => refetch()}>Retry comments</button>
+          </div>
+        ) : rawLoading || loading || processed?.vehicleId !== vehicleId ? (
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
             Loading comments...
           </div>
@@ -514,7 +515,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
               const amount = hasBidAmount ? (typeof comment.bid_amount === 'number' ? comment.bid_amount : Number(comment.bid_amount)) : null;
               
               return (
-                <div key={comment.id} style={{ 
+                <div key={`${comment.source_category}:${comment.id}`} style={{
                   paddingBottom: '12px', 
                   borderBottom: '1px solid var(--border)',
                   paddingLeft: isBaT ? '8px' : '0',
@@ -531,19 +532,22 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <button
+                          type="button"
                           onClick={() => handleUsernameClick(comment)}
+                          disabled={!comment.user_id && !comment.external_identity_id}
+                          aria-describedby={comment.author_attribution ? `${comment.source_category}-${comment.id}-author-attribution` : undefined}
                           style={{
                             fontSize: '11px',
                             fontWeight: 600,
                             background: 'none',
                             border: 'none',
                             padding: 0,
-                            cursor: 'pointer',
+                            cursor: comment.user_id || comment.external_identity_id ? 'pointer' : 'default',
                             color: 'var(--text)',
-                            textDecoration: 'underline'
+                            textDecoration: comment.user_id || comment.external_identity_id ? 'underline' : 'none'
                           }}
                         >
-                          {comment.user_name || comment.author_username}
+                          {comment.user_name || comment.author_username || 'Unknown author'}
                         </button>
                         {/* Platform badges for all external sources */}
                         {comment.source === 'bat' && (
@@ -641,6 +645,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           >
                             Edit
                           </button>
+                        )}
+                        {comment.author_attribution && (
+                          <details data-author-attribution={comment.author_attribution} style={{ flexBasis: '100%', fontSize: '9px', color: 'var(--text-secondary)' }}>
+                            <summary id={`${comment.source_category}-${comment.id}-author-attribution`} style={{ cursor: 'pointer' }}>
+                              {authorAttributionMessages[comment.author_attribution].label}
+                            </summary>
+                            <p style={{ margin: '4px 0', fontSize: '11px', lineHeight: 1.4 }}>
+                              {authorAttributionMessages[comment.author_attribution].explanation}
+                            </p>
+                          </details>
                         )}
                       </div>
                       <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
@@ -840,4 +854,3 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 };
 
 export default VehicleCommentsCard;
-

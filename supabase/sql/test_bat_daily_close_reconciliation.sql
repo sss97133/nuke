@@ -26,7 +26,10 @@ END $$;
 -- in a rolled-back offline scenario, never testimony writes.
 BEGIN;
 UPDATE public.vehicles SET sale_status='not_sold';
-UPDATE public.vehicle_events SET ended_at=now()-interval '10 minutes';
+-- A fresh offline HTML-read clock is required by the existing stale-read guard.
+-- Moving only the cache deadline is ignored; the captured fixture ages beyond 24h.
+UPDATE public.vehicle_events SET ended_at=now()-interval '10 minutes',
+  metadata=jsonb_set(metadata,'{source_read}',jsonb_build_object('at',now()));
 DELETE FROM public.monitored_auctions;
 DO $$ DECLARE reading jsonb; BEGIN
   reading:=public.bat_live_pull_run(3);

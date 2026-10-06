@@ -15,6 +15,10 @@ const mocks = [
   "sleep(){ :; }",
   "dotenvx(){",
   "  shift 2",
+  "  if [ \"${2:-}\" = scripts/classify-image-subjects.mjs ] && [ \"${3:-}\" = prepare ]; then",
+  "    echo '{\"frames\":[{\"image_id\":\"22222222-2222-4222-8222-222222222222\"}],\"candidates\":[{\"n\":1,\"label\":\"Synthetic\"}]}'",
+  "    return 0",
+  "  fi",
   "  if [ \"$1\" = python3 ]; then return 0; fi",
   "  case \"${3:-}\" in",
   "    resolve)",
@@ -119,6 +123,14 @@ test('cloud stops after three failing batches, not hundreds, and exits failed', 
   const r = run('byok-cloud-drain.sh', {}, '1', ['45']);
   assert.equal(r.status, 1); assert.equal(r.attempts, 3);
   assert.match(r.output, /outcome=failed batches=0 failures=3 attempts=3 remaining=1/);
+});
+
+test('empty subject classification aborts once without malformed count or ingest', () => {
+  const r = run('subject-classify-batch.sh', { FAKE_CLAUDE_EXIT: '1' });
+  assert.equal(r.status, 1);
+  assert.match(r.output, /no classifications produced — abort ingest/);
+  assert.doesNotMatch(r.output, /integer expression expected|classifications; ingesting/);
+  assert.equal(r.ingested, false);
 });
 test('unexpected nonzero batch exit cannot count as successful work', () => {
   const r = run('byok-cloud-drain.sh', {}, '137', ['45']);

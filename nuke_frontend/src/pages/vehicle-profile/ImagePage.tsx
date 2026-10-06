@@ -50,6 +50,7 @@ interface DeviceAttribution {
 
 interface WitnessedObservation {
   id: string;
+  vehicle_id: string;
   kind: string;
   observed_at: string | null;
   content_text: string | null;
@@ -61,6 +62,7 @@ interface WitnessedObservation {
 type Row = Record<string, unknown>;
 
 interface SubstrateBundle {
+  unavailableRelations: string[];
   vehicle_images: Row[];
   observation_witnesses: Row[];
   vehicle_observations: Row[];
@@ -72,151 +74,194 @@ interface SubstrateBundle {
 const ImagePage: React.FC = () => {
   const { vehicleId, imageId } = useParams<{ vehicleId: string; imageId: string }>();
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-  const [image, setImage] = useState<ImageRow | null>(null);
+  const [imageRow, setImage] = useState<ImageRow | null>(null);
+  const [loadedSubject, setLoadedSubject] = useState<string | null>(null);
   const [witnessed, setWitnessed] = useState<WitnessedObservation[]>([]);
   const [attribution, setAttribution] = useState<DeviceAttribution | null>(null);
+  const [attributionUnavailable, setAttributionUnavailable] = useState(false);
   const [substrate, setSubstrate] = useState<SubstrateBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const image = loadedSubject === `${vehicleId}:${imageId}` ? imageRow : null;
 
   useEffect(() => {
     if (!vehicleId || !imageId) return;
     let cancelled = false;
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 10_000);
     setLoading(true);
     setError(null);
+    setLoadedSubject(null);
+    setVehicle(null);
+    setImage(null);
+    setWitnessed([]);
+    setAttribution(null);
+    setAttributionUnavailable(false);
+    setSubstrate(null);
 
     (async () => {
-      const [vehRes, imgRes, witRes, attribRes] = await Promise.all([
-        supabase
+      try {
+        const vehRes = await supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
           .eq('id', vehicleId)
-          .maybeSingle(),
-        supabase
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (cancelled) return;
+        if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
+        if (!vehRes.data || vehRes.data.id !== vehicleId) throw new Error('Vehicle unavailable.');
+        setVehicle(vehRes.data as VehicleSummary);
+
+        const imgRes = await supabase
           .from('vehicle_images')
           .select(`
-            id, vehicle_id, image_url, thumbnail_url, medium_url,
-            created_at, taken_at, source,
-            vision_gate_status, vision_gate_agent_reasoning,
-            caption, file_name, is_primary
-          `)
+              id, vehicle_id, image_url, thumbnail_url, medium_url,
+              created_at, taken_at, source,
+              vision_gate_status, vision_gate_agent_reasoning,
+              caption, file_name, is_primary
+            `)
           .eq('id', imageId)
-          .maybeSingle(),
-        supabase
-          .from('observation_witnesses')
-          .select(`
-            witness_role,
-            observation:vehicle_observations!observation_id(
-              id, kind, observed_at, content_text, structured_data, is_superseded
-            )
-          `)
-          .eq('image_id', imageId)
-          .limit(100),
-        supabase
-          .from('device_attributions')
-          .select(`
-            camera_make, camera_model, software, device_fingerprint,
-            attribution_source, extraction_method, confidence_score,
-            datetime_original, latitude, longitude, camera_serial
-          `)
-          .eq('image_id', imageId)
-          .maybeSingle(),
-      ]);
-      if (!cancelled && attribRes?.data) setAttribution(attribRes.data as DeviceAttribution);
+          .eq('vehicle_id', vehicleId)
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (cancelled) return;
+        if (imgRes.error) throw new Error('Unable to load this image. Try again.');
+        if (!imgRes.data || imgRes.data.id !== imageId || imgRes.data.vehicle_id !== vehicleId) {
+          throw new Error('Image unavailable for this vehicle.');
+        }
+        setImage(imgRes.data as ImageRow);
+        setLoadedSubject(`${vehicleId}:${imageId}`);
 
-      if (cancelled) return;
+        // Dependent reads only follow a visible, correctly bound image.
+        const [witRes, attribRes] = await Promise.all([
+          supabase
+            .from('observation_witnesses')
+            .select(`
+              witness_role,
+              observation:vehicle_observations!observation_id(
+                id, vehicle_id, kind, observed_at, content_text, structured_data, is_superseded
+              )
+            `)
+            .eq('image_id', imageId)
+            .abortSignal(controller.signal)
+            .limit(100),
+          supabase
+            .from('device_attributions')
+            .select(`
+              camera_make, camera_model, software, device_fingerprint,
+              attribution_source, extraction_method, confidence_score,
+              datetime_original, latitude, longitude, camera_serial
+            `)
+            .eq('image_id', imageId)
+            .abortSignal(controller.signal)
+            .maybeSingle(),
+        ]);
+        if (!cancelled && attribRes?.data) setAttribution(attribRes.data as DeviceAttribution);
 
-      if (vehRes.error) {
-        setError(`Vehicle load failed: ${vehRes.error.message}`);
-        setLoading(false);
-        return;
-      }
-      setVehicle(vehRes.data as VehicleSummary | null);
+        if (cancelled) return;
+        setAttributionUnavailable(!!attribRes.error);
 
-      if (imgRes.error || !imgRes.data) {
-        setError(`Image not found: ${imgRes.error?.message || 'no row'}`);
-        setLoading(false);
-        return;
-      }
-      setImage(imgRes.data as ImageRow);
+        if (!witRes.error && witRes.data) {
+          const rows: WitnessedObservation[] = [];
+          for (const w of witRes.data as any[]) {
+            const obs = w.observation;
+            if (!obs || obs.is_superseded || !obs.vehicle_id) continue;
+            const sd = obs.structured_data || {};
+            rows.push({
+              id: obs.id,
+              vehicle_id: obs.vehicle_id,
+              kind: obs.kind,
+              observed_at: obs.observed_at,
+              content_text: obs.content_text,
+              part_number: sd.part_number ?? null,
+              vendor: sd.vendor ?? sd.merchant ?? null,
+              witness_role: w.witness_role,
+            });
+          }
+          rows.sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || ''));
+          setWitnessed(rows);
+        }
 
-      if (!witRes.error && witRes.data) {
-        const rows: WitnessedObservation[] = [];
-        for (const w of witRes.data as any[]) {
-          const obs = w.observation;
-          if (!obs || obs.is_superseded) continue;
-          const sd = obs.structured_data || {};
-          rows.push({
-            id: obs.id,
-            kind: obs.kind,
-            observed_at: obs.observed_at,
-            content_text: obs.content_text,
-            part_number: sd.part_number ?? null,
-            vendor: sd.vendor ?? sd.merchant ?? null,
-            witness_role: w.witness_role,
+        // --- Substrate inspector: fetch every row in every relation that touches
+        // this image, return raw DB shape (no curation). The point is to expose
+        // the substrate as it actually exists, not as a rendered summary.
+        const [
+          imgFullRes,
+          vehFullRes,
+          witFullRes,
+        ] = await Promise.all([
+          supabase.from('vehicle_images').select('*').eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
+          supabase.from('vehicles').select('*').eq('id', vehicleId).limit(1).abortSignal(controller.signal),
+          supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200).abortSignal(controller.signal),
+        ]);
+
+        if (cancelled) return;
+        const witnessRows = ((witFullRes.data || []) as Row[]).filter(row => row.image_id === imageId);
+        const unavailableRelations = [
+          ['vehicle_images', imgFullRes], ['vehicles', vehFullRes], ['observation_witnesses', witFullRes],
+        ].filter(([, result]) => (result as { error?: unknown }).error).map(([name]) => name as string);
+        const obsIds = Array.from(new Set(witnessRows.map((r) => r.observation_id).filter(Boolean))) as string[];
+
+        let obsRows: Row[] = [];
+        let discoveryRows: Row[] = [];
+        let sourceRows: Row[] = [];
+        if (obsIds.length > 0) {
+          const obsRes = await supabase.from('vehicle_observations').select('*').in('id', obsIds).limit(200).abortSignal(controller.signal);
+          if (obsRes.error) unavailableRelations.push('vehicle_observations');
+          obsRows = (obsRes.data || []) as Row[];
+
+          const sourceIds = Array.from(new Set(obsRows.map((r) => r.source_id).filter(Boolean))) as string[];
+          if (sourceIds.length > 0) {
+            const srcRes = await supabase.from('observation_sources').select('*').in('id', sourceIds).limit(50).abortSignal(controller.signal);
+            if (srcRes.error) unavailableRelations.push('observation_sources');
+            sourceRows = (srcRes.data || []) as Row[];
+          }
+
+          const discRes = await supabase
+            .from('observation_discoveries')
+            .select('*')
+            .in('observation_id', obsIds)
+            .abortSignal(controller.signal)
+            .limit(200);
+          if (!discRes.error) discoveryRows = (discRes.data || []) as Row[];
+          else unavailableRelations.push('observation_discoveries');
+        }
+
+        if (!cancelled) {
+          setSubstrate({
+            unavailableRelations,
+            vehicle_images: ((imgFullRes.data || []) as Row[]).filter(row => row.id === imageId && row.vehicle_id === vehicleId),
+            observation_witnesses: witnessRows,
+            vehicle_observations: obsRows,
+            observation_discoveries: discoveryRows,
+            observation_sources: sourceRows,
+            vehicles: (vehFullRes.data || []) as Row[],
           });
         }
-        rows.sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || ''));
-        setWitnessed(rows);
-      }
 
-      // --- Substrate inspector: fetch every row in every relation that touches
-      // this image, return raw DB shape (no curation). The point is to expose
-      // the substrate as it actually exists, not as a rendered summary.
-      const [
-        imgFullRes,
-        vehFullRes,
-        witFullRes,
-      ] = await Promise.all([
-        supabase.from('vehicle_images').select('*').eq('id', imageId).limit(1),
-        supabase.from('vehicles').select('*').eq('id', vehicleId).limit(1),
-        supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200),
-      ]);
-
-      const witnessRows = (witFullRes.data || []) as Row[];
-      const obsIds = Array.from(new Set(witnessRows.map((r) => r.observation_id).filter(Boolean))) as string[];
-
-      let obsRows: Row[] = [];
-      let discoveryRows: Row[] = [];
-      let sourceRows: Row[] = [];
-      if (obsIds.length > 0) {
-        const obsRes = await supabase.from('vehicle_observations').select('*').in('id', obsIds).limit(200);
-        obsRows = (obsRes.data || []) as Row[];
-
-        const sourceIds = Array.from(new Set(obsRows.map((r) => r.source_id).filter(Boolean))) as string[];
-        if (sourceIds.length > 0) {
-          const srcRes = await supabase.from('observation_sources').select('*').in('id', sourceIds).limit(50);
-          sourceRows = (srcRes.data || []) as Row[];
+      } catch (failure) {
+        if (!cancelled) {
+          setImage(null);
+          setLoadedSubject(null);
+          const messages = ['Vehicle unavailable.', 'Unable to load this vehicle. Try again.',
+            'Image unavailable for this vehicle.', 'Unable to load this image. Try again.'];
+          const message = failure instanceof Error ? failure.message : '';
+          setError(messages.includes(message) ? message : 'Unable to load this image. Try again.');
         }
-
-        const discRes = await supabase
-          .from('observation_discoveries')
-          .select('*')
-          .in('observation_id', obsIds)
-          .limit(200);
-        if (!discRes.error) discoveryRows = (discRes.data || []) as Row[];
+      } finally {
+        window.clearTimeout(deadline);
+        if (!cancelled) setLoading(false);
       }
-
-      if (!cancelled) {
-        setSubstrate({
-          vehicle_images: (imgFullRes.data || []) as Row[],
-          observation_witnesses: witnessRows,
-          vehicle_observations: obsRows,
-          observation_discoveries: discoveryRows,
-          observation_sources: sourceRows,
-          vehicles: (vehFullRes.data || []) as Row[],
-        });
-      }
-
-      setLoading(false);
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(deadline);
     };
   }, [vehicleId, imageId]);
 
-  const vehLabel = vehicle
+  const vehLabel = vehicle?.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 
@@ -271,11 +316,11 @@ const ImagePage: React.FC = () => {
       </nav>
 
       {loading && !image && (
-        <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
+        <div role="status" style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
       )}
 
       {error && (
-        <div style={{ fontSize: 10, color: 'var(--error, #c00)', padding: 12, border: '2px solid var(--error, #c00)' }}>
+        <div role="alert" style={{ fontSize: 10, color: 'var(--error, #c00)', padding: 12, border: '2px solid var(--error, #c00)' }}>
           {error}
         </div>
       )}
@@ -336,8 +381,9 @@ const ImagePage: React.FC = () => {
             {/* Chain of Custody — sourced from device_attributions */}
             <div style={{ border: '2px solid var(--text, #1a1a1a)', padding: '6px 8px' }}>
               <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Arial, sans-serif', borderBottom: '2px solid var(--text, #1a1a1a)', paddingBottom: 2, marginBottom: 4 }}>
-                Chain of Custody
+                Device metadata
               </div>
+              {attributionUnavailable && <div style={{ fontSize: 9 }}>Device metadata unavailable.</div>}
               {attribution ? (
                 <div style={{ fontSize: 9, fontFamily: 'Courier New, monospace', lineHeight: 1.5, color: 'var(--text, #1a1a1a)' }}>
                   {(attribution.camera_make || attribution.camera_model) && (
@@ -383,13 +429,14 @@ const ImagePage: React.FC = () => {
                   fontFamily: 'Arial, sans-serif',
                 }}
               >
-                Observations this image witnesses · {witnessed.length}
+                Recorded vehicle observation links · {witnessed.length}
               </h2>
+              <div style={{ fontSize: 9, marginBottom: 4 }}>One observation can have several source roles. Independent support remains unassessed.</div>
               <div style={{ border: '2px solid var(--text, #1a1a1a)' }}>
                 {witnessed.map((w, i) => (
                   <Link
-                    key={w.id}
-                    to={`/vehicle/${vehicleId}/observation/${w.id}`}
+                    key={`${w.id}:${w.witness_role}`}
+                    to={`/vehicle/${w.vehicle_id}/observation/${w.id}`}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '92px 80px 110px 1fr 80px',
@@ -458,14 +505,12 @@ const ImagePage: React.FC = () => {
                   margin: '4px 0 12px',
                 }}
               >
-                no curation. every row in every relation that joins to this image_id, in native shape.
+                Visible rows returned by bounded reads, in native shape. Read limits and permissions can restrict this view; it does not establish complete evidence coverage.
               </div>
-              <SubstrateTable name="vehicle_images" rows={substrate.vehicle_images} />
-              <SubstrateTable name="observation_witnesses" rows={substrate.observation_witnesses} />
-              <SubstrateTable name="vehicle_observations" rows={substrate.vehicle_observations} />
-              <SubstrateTable name="observation_discoveries" rows={substrate.observation_discoveries} />
-              <SubstrateTable name="observation_sources" rows={substrate.observation_sources} />
-              <SubstrateTable name="vehicles" rows={substrate.vehicles} />
+              {(['vehicle_images', 'observation_witnesses', 'vehicle_observations',
+                'observation_discoveries', 'observation_sources', 'vehicles'] as const).map(name => (
+                <SubstrateTable key={name} name={name} rows={substrate[name]} unavailable={substrate.unavailableRelations.includes(name)} />
+              ))}
             </section>
           )}
           </div>
@@ -480,8 +525,8 @@ const ImagePage: React.FC = () => {
 // in-cell so the structure is visible without click ceremony. The goal is
 // not aesthetic — it's *transparency*. The shape on the screen should match
 // the shape in postgres.
-const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[] }> = ({ name, rows }) => {
-  if (!rows || rows.length === 0) {
+const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; unavailable?: boolean }> = ({ name, rows, unavailable }) => {
+  if (unavailable || !rows || rows.length === 0) {
     return (
       <div
         style={{
@@ -494,7 +539,7 @@ const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[] }
         }}
       >
         <div style={{ fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>{name}</div>
-        <div>0 rows</div>
+        <div>{unavailable ? 'Read unavailable' : '0 rows returned'}</div>
       </div>
     );
   }

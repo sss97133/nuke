@@ -17,6 +17,9 @@ const receipt = () => ({ schemaVersion: 'intake_reader_reconciliation_v1', statu
   requestedItems: 1, items: [{ key: 'claim', stage: 'exposed',
     reader: { specsValueCurrent: true, provenanceMeasurement: 'unmeasured_unbounded_owner' },
     requestedRelations: { status: 'failed' } }] });
+const metadataSection = () => ({ ...metadata(), section: 'metadata' });
+const healthSection = () => ({ ...metadata(), section: 'jobHealth', measured_at: '2026-10-05T00:00:03Z' });
+const isJobRead = sql => sql.includes('LEFT JOIN public.v_job_health');
 
 test('successful job and active agent never substitute for an output assay', () => {
   const result = assess(metadata(), null, agents());
@@ -109,6 +112,70 @@ test('operator receipt is exclusive/private, retains unavailable evidence, and h
   } finally { rmSync(dir, { recursive: true }); }
 });
 
+test('job timeout preserves table/config metadata and independent source failures', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'nuke-monitor-partial-'));
+  try {
+    const input = join(dir, 'cases.json');
+    writeFileSync(input, JSON.stringify({ asOf: '2026-10-05T00:00:00Z', requests: [{ key: 'claim', field: 'engine_size' }] }));
+    const result = runMonitor(['--out', join(dir, 'out.json'), '--cases', input], {
+      query: (sql, column) => {
+        if (column === 'receipt') return receipt();
+        if (isJobRead(sql)) return readQuery(sql, column, () => '{"code":"57014","message":"Bearer private error body"}');
+        const reading = metadataSection();
+        reading.jobs[0].execution = { state: 'unmeasured', last_status: null };
+        return reading;
+      }, inspect: agents,
+    });
+    assert.equal(result.report.database.tables.length, 1);
+    assert.equal(result.report.database.jobs[0].present, true);
+    assert.equal(result.report.database.jobs[0].execution.state, 'unmeasured');
+    assert.equal(result.report.database.sections.metadata.status, 'measured');
+    assert.equal(result.report.database.sections.jobHealth.status, 'unavailable');
+    assert.equal(result.report.evidence.sections.jobHealth.sqlstate, '57014');
+    assert.equal(result.report.evidence.caseContract.version, 'source_case_contract_v1');
+    assert.equal(result.report.evidence.caseContract.members[0].key, 'claim');
+    assert.ok(result.report.assessment.failures.includes('requested_relations:claim'));
+    assert.ok(result.report.assessment.unmeasured.includes('job_output:fold'));
+    assert.ok(result.report.assessment.unmeasured.includes('job_health_measurement_unavailable'));
+    assert.equal(result.exitCode, 1);
+    assert.equal(readFileSync(join(dir, 'out.json'), 'utf8').includes('Bearer private'), false);
+  } finally { rmSync(dir, { recursive: true }); }
+});
+
+test('metadata failure preserves independently measured job failures and clocks', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'nuke-monitor-job-evidence-'));
+  try {
+    const result = runMonitor(['--out', join(dir, 'out.json')], {
+      query: sql => {
+        if (!isJobRead(sql)) throw Object.assign(new Error('secret'), { sqlstate: '57014' });
+        const health = healthSection(); health.jobs[0].assay.reported_status = 'failed'; return health;
+      }, inspect: agents,
+    });
+    assert.deepEqual(result.report.database.tables, []);
+    assert.ok(result.report.assessment.failures.includes('job_output:fold'));
+    assert.ok(result.report.assessment.unmeasured.includes('table_metadata:vehicles'));
+    assert.ok(result.report.assessment.unmeasured.includes('database_metadata_unavailable'));
+    assert.equal(result.report.database.sections.metadata.measured_at, null);
+    assert.equal(result.report.database.sections.jobHealth.measured_at, '2026-10-05T00:00:03Z');
+    assert.equal(result.report.evidence.sections.metadata.sqlstate, undefined);
+    assert.equal(result.report.evidence.sections.jobHealth.sqlSha256.length, 64);
+    assert.equal(result.exitCode, 1);
+  } finally { rmSync(dir, { recursive: true }); }
+});
+
+test('independent successes retain both statement clocks and SQL identities', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'nuke-monitor-clocks-'));
+  try {
+    const result = runMonitor(['--out', join(dir, 'out.json')], {
+      query: sql => isJobRead(sql) ? healthSection() : metadataSection(), inspect: agents,
+    });
+    assert.equal(result.report.database.sections.metadata.measured_at, '2026-10-05T00:00:00Z');
+    assert.equal(result.report.database.sections.jobHealth.measured_at, '2026-10-05T00:00:03Z');
+    assert.notEqual(result.report.evidence.healthSQLSha256, result.report.evidence.jobHealthSQLSha256);
+    assert.equal(result.report.assessment.status, 'incomplete');
+  } finally { rmSync(dir, { recursive: true }); }
+});
+
 test('case values are quoted as data without dollar replacement expansion', () => {
   const dir = mkdtempSync(join(tmpdir(), 'nuke-model-cases-'));
   try {
@@ -116,8 +183,8 @@ test('case values are quoted as data without dollar replacement expansion', () =
     writeFileSync(path, JSON.stringify({ asOf: '2026-10-05T00:00:00Z', requests: [{ key: "value'$&" }] }));
     let calls = 0;
     runMonitor(['--out', join(dir, 'out.json'), '--cases', path], {
-      query: (sql, column) => { calls++; if (column === 'health') return metadata();
+      query: (sql, column) => { calls++; if (column === 'health') return isJobRead(sql) ? healthSection() : metadataSection();
         assert.ok(sql.includes("value''$&")); return receipt(); }, inspect: agents });
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
   } finally { rmSync(dir, { recursive: true }); }
 });

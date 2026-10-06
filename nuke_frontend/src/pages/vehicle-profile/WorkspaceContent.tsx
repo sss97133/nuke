@@ -116,7 +116,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     vehicleImages,
     fallbackListingImageUrls,
     leadImageUrl,
-    totalCommentCount,
     observationCount,
     isPublic,
     galleryFilter,
@@ -267,15 +266,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           />
 
           {/* Comments & Bids — right after description for natural reading flow */}
-          {totalCommentCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
-              badge={<span className="widget__count">{totalCommentCount}</span>}
-            >
-              <React.Suspense fallback={null}>
-                <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} />
-              </React.Suspense>
-            </CollapsibleWidget>
-          )}
+          {/* The legacy profile count covers a different collection. Let the
+              subject-gated comment reader establish presence, absence or failure. */}
+          <React.Suspense fallback={null}>
+            <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} hideWhenEmpty />
+          </React.Suspense>
 
           {/* Buyer Questions — what buyers will ask about this vehicle (hidden post-sale) */}
           {!(vehicle.sale_price && (vehicle as any).sale_status === 'sold') && (

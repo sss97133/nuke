@@ -25,21 +25,23 @@ const { example, related } = vi.hoisted(() => ({
     is_superseded: false, superseded_by: null, property_id: null,
     observation_sources: null,
   },
-  related: { id: 'related-example', kind: 'condition', observed_at: '2026-04-02T12:00:00Z', content_text: 'Morgan Example paid.', structured_data: {} },
+  related: { id: 'related-example', vehicle_id: 'vehicle-example', kind: 'condition', observed_at: '2026-04-02T12:00:00Z', content_text: 'Morgan Example paid.', structured_data: {} },
 }));
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from(table: string) {
+      let dayRead = false;
       const query: any = {
         select: () => query, eq: () => query, neq: () => query,
-        filter: () => query, gte: () => query, lte: () => query, order: () => query,
-        maybeSingle: () => Promise.resolve({ data: table === 'vehicles' ? { year: 1983, make: 'GMC', model: 'K2500' } : example }),
-        limit: () => Promise.resolve({ data: [example, related] }),
+        filter: () => query, gte: () => { dayRead = true; return query; }, lte: () => query, lt: () => query, order: () => query, abortSignal: () => query,
+        maybeSingle: () => Promise.resolve({ data: table === 'vehicles' ? { id: 'vehicle-example', year: 1983, make: 'GMC', model: 'K2500' } : example }),
+        limit: () => query,
+        then: (resolve: any) => Promise.resolve({ data: dayRead ? [example] : [example, related] }).then(resolve),
       };
       return query;
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: () => ({ abortSignal: () => Promise.resolve({ data: null, error: null }) }),
   },
 }));
 vi.mock('react-router-dom', async (original) => ({

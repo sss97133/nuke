@@ -5,9 +5,11 @@ import { constants, openSync, closeSync, fstatSync, readSync, readFileSync, real
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectAgentWork } from './agent-work-coverage.mjs';
+import { buildCaseContract, compareModelSnapshots } from './model-snapshot-comparison.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HASH = text => createHash('sha256').update(text).digest('hex');
+const TRUSTED_SQLSTATE = Symbol('structured_database_error_code');
 const STAGES = new Set(['retained_only', 'retention_locator_only', 'retention_unestablished',
   'parsed_unadmitted', 'privacy_withheld', 'superseded_retained', 'clock_withheld',
   'conflict_withheld', 'extracted_unresolved', 'linked', 'folded', 'exposed']);
@@ -16,21 +18,25 @@ export function options(args) {
   const parsed = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
-    if (!['--out', '--cases', '--lanes', '--worker-state'].includes(key) || !args[i + 1]
+    if (!['--out', '--cases', '--lanes', '--worker-state', '--before', '--after'].includes(key) || !args[i + 1]
       || args[i + 1].startsWith('--') || parsed[key]) throw new Error('invalid_arguments');
     parsed[key] = resolve(args[i + 1]);
   }
   if (!parsed['--out']) throw new Error('private_output_required');
+  if ((parsed['--before'] || parsed['--after']) && (!parsed['--before'] || !parsed['--after']
+    || ['--cases', '--lanes', '--worker-state'].some(key => parsed[key]))) throw new Error('invalid_comparison_arguments');
   return parsed;
 }
 
-export function boundedDocument(path) {
-  let fd, doc;
+function boundedJSON(path, limit, rejectParentLinks = false) {
+  let fd;
   try {
+    // Reject links in both the leaf and its parent path before opening it.
+    if (rejectParentLinks && realpathSync(path) !== resolve(path)) throw new Error('symlink_input');
     fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const before = fstatSync(fd);
-    if (!before.isFile() || before.size > 65536) throw new Error('invalid_cases_file');
-    const buffer = Buffer.alloc(65537);
+    if (!before.isFile() || before.size > limit) throw new Error('invalid_input_file');
+    const buffer = Buffer.alloc(limit + 1);
     let length = 0;
     while (length < buffer.length) {
       const n = readSync(fd, buffer, length, buffer.length - length, null);
@@ -38,10 +44,14 @@ export function boundedDocument(path) {
       length += n;
     }
     const after = fstatSync(fd);
-    if (length > 65536 || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
-      throw new Error('invalid_cases_file');
-    doc = JSON.parse(buffer.subarray(0, length).toString('utf8'));
+    if (length > limit || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+      throw new Error('invalid_input_file');
+    return JSON.parse(buffer.subarray(0, length).toString('utf8'));
   } finally { if (fd !== undefined) closeSync(fd); }
+}
+
+export function boundedDocument(path) {
+  const doc = boundedJSON(path, 65536);
   if (!Array.isArray(doc?.requests) || doc.requests.length < 1 || doc.requests.length > 50
     || !Number.isFinite(Date.parse(doc.asOf))) throw new Error('invalid_cases_scope');
   return doc;
@@ -56,8 +66,36 @@ export function readQuery(sql, column, run = execFileSync) {
     { cwd: ROOT, encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   const rows = JSON.parse(output);
   if (!Array.isArray(rows) || rows.length !== 1 || !rows[0]?.[column]
-    || typeof rows[0][column] !== 'object') throw new Error('invalid_database_response');
+    || typeof rows[0][column] !== 'object') {
+    const error = new Error('invalid_database_response');
+    // Never extract codes from SQLERRM/body text, shell errors or credentials.
+    const code = !Array.isArray(rows) && (rows?.sqlstate ?? rows?.code);
+    if (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code)) error[TRUSTED_SQLSTATE] = code;
+    throw error;
+  }
   return rows[0][column];
+}
+
+export function combineDatabaseSections(metadata, jobHealth) {
+  if (!metadata && !jobHealth) return null;
+  const scope = metadata?.scope ?? jobHealth.scope;
+  return { version: 'data_model_health_v1',
+    measured_at: metadata?.measured_at ?? jobHealth.measured_at,
+    scope, tables: metadata?.tables ?? [],
+    jobs: scope.jobs.map(name => jobHealth?.jobs.find(row => row?.job_name === name)
+      ?? metadata?.jobs.find(row => row?.job_name === name)).filter(Boolean),
+    sections: Object.fromEntries(Object.entries({ metadata, jobHealth }).map(([name, value]) =>
+      [name, { status: value ? 'measured' : 'unavailable', measured_at: value?.measured_at ?? null }])),
+    measurement_basis: 'Independent statements and clocks; not one database snapshot.',
+    limits: [...(metadata?.limits ?? []), ...(jobHealth?.limits ?? [])] };
+}
+
+function validSection(value, section) {
+  return value?.version === 'data_model_health_v1' && value.section === section
+    && Number.isFinite(Date.parse(value.measured_at))
+    && Array.isArray(value.scope?.tables) && value.scope.tables.length > 0
+    && Array.isArray(value.scope?.jobs) && value.scope.jobs.length > 0
+    && Array.isArray(value.jobs) && (section !== 'metadata' || Array.isArray(value.tables));
 }
 
 export function assess(database, reconciliation, agents) {
@@ -122,29 +160,64 @@ export function assess(database, reconciliation, agents) {
 
 export function runMonitor(args, dependencies = {}) {
   const opts = options(args);
+  if (opts['--before']) {
+    const inputs = {}, unavailable = [];
+    for (const side of ['before', 'after']) {
+      try { inputs[side] = boundedJSON(opts[`--${side}`], 2 * 1024 * 1024, true); }
+      catch { unavailable.push(`${side}_receipt_unavailable`); }
+    }
+    const report = compareModelSnapshots(inputs.before, inputs.after);
+    report.reasons.push(...unavailable);
+    writeFileSync(opts['--out'], JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    return { report, exitCode: report.status === 'regressed' ? 1 : report.status === 'uncomparable' ? 2 : 0 };
+  }
   const query = dependencies.query ?? readQuery;
   const inspect = dependencies.inspect ?? inspectAgentWork;
   const healthSQL = readFileSync(resolve(ROOT, 'scripts/discovery/data-model-health.sql'), 'utf8');
+  const jobHealthSQL = readFileSync(resolve(ROOT, 'scripts/discovery/data-model-job-health.sql'), 'utf8');
   const report = { version: 'data_model_coverage_v1', measuredAt: new Date().toISOString(),
     database: null, sourceToReader: null, agentWork: null,
-    evidence: { healthSQLSha256: HASH(healthSQL) },
+    evidence: { healthSQLSha256: HASH(healthSQL), jobHealthSQLSha256: HASH(jobHealthSQL), sections: {} },
     limits: ['Seven named tables and five named jobs; no fleet completeness or source truth claim.',
       'Constraint validation and descriptions do not establish semantic correctness.',
       'Source cases are explicit operator inventory, not a representative population.',
-      'Agent declarations, process existence and reported stages are not independent verification.'] };
+      'Agent declarations, process existence and reported stages are not independent verification.',
+      'Metadata, job health and source cases have independent statement clocks; partial evidence survives other read failures.'] };
   const errors = [];
-  try { report.database = query(healthSQL, 'health'); }
-  catch { errors.push('database_measurement_unavailable'); }
-  if (opts['--cases']) {
+  const sections = { metadata: null, jobHealth: null };
+  for (const [section, sql] of [['metadata', healthSQL], ['jobHealth', jobHealthSQL]]) {
+    const evidence = { sqlSha256: HASH(sql), startedAt: new Date().toISOString(), status: 'unavailable', measuredAt: null };
+    report.evidence.sections[section] = evidence;
     try {
-      const doc = boundedDocument(opts['--cases']);
+      const reading = query(sql, 'health');
+      if (!validSection(reading, section)) throw new Error('invalid_section_contract');
+      sections[section] = reading;
+      Object.assign(evidence, { status: 'measured', measuredAt: reading.measured_at });
+    } catch (error) {
+      errors.push(section === 'metadata' ? 'database_metadata_unavailable' : 'job_health_measurement_unavailable');
+      if (error?.[TRUSTED_SQLSTATE]) evidence.sqlstate = error[TRUSTED_SQLSTATE];
+    } finally { evidence.completedAt = new Date().toISOString(); }
+  }
+  report.database = combineDatabaseSections(sections.metadata, sections.jobHealth);
+  if (!report.database) errors.push('database_measurement_unavailable');
+  if (opts['--cases']) {
+    const evidence = { startedAt: new Date().toISOString(), status: 'unavailable' };
+    report.evidence.sections.sourceToReader = evidence;
+    try {
       const sql = readFileSync(resolve(ROOT, 'scripts/discovery/intake-reader-reconciliation.sql'), 'utf8');
+      report.evidence.reconciliationSQLSha256 = evidence.sqlSha256 = HASH(sql);
+      const doc = boundedDocument(opts['--cases']);
+      report.evidence.casesSha256 = evidence.casesSha256 = HASH(JSON.stringify(doc));
+      report.evidence.caseContract = buildCaseContract(doc);
+      evidence.cutoffAt = doc.asOf;
       const literal = `'${JSON.stringify(doc).replaceAll("'", "''")}'`;
       // Function replacement preserves literal dollar sequences inside source input.
       report.sourceToReader = query(sql.replace(/\$1\b/g, () => literal), 'receipt');
-      report.evidence.reconciliationSQLSha256 = HASH(sql);
-      report.evidence.casesSha256 = HASH(JSON.stringify(doc));
-    } catch { errors.push('source_to_reader_measurement_unavailable'); }
+      evidence.status = 'returned';
+    } catch (error) {
+      errors.push('source_to_reader_measurement_unavailable');
+      if (error?.[TRUSTED_SQLSTATE]) evidence.sqlstate = error[TRUSTED_SQLSTATE];
+    } finally { evidence.completedAt = new Date().toISOString(); }
   }
   try { report.agentWork = inspect({ lanesDirectory: opts['--lanes'], workerStateDirectory: opts['--worker-state'] }); }
   catch { errors.push('agent_measurement_unavailable'); }
@@ -158,12 +231,14 @@ export function runMonitor(args, dependencies = {}) {
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--help')) {
-    console.log('check-ingestion-health.sh --data-model --out /private/new.json [--cases /private/requests.json] [--lanes /path/to/.claude/agents/active] [--worker-state /path/to/night-shift]\nRead-only. Exit 1: observed failure; 2: incomplete coverage/unavailable. No whole-model pass.');
+    console.log('check-ingestion-health.sh --data-model --out /private/new.json [--cases /private/requests.json] [--lanes /path/to/.claude/agents/active] [--worker-state /path/to/night-shift]\nRead-only. Exit 1: observed failure; 2: incomplete coverage/unavailable. No whole-model pass.\nOffline comparison: --data-model --before /private/before.json --after /private/after.json --out /private/new-comparison.json\nComparison exits: 0 improved/unchanged retained cases, 1 regressed, 2 uncomparable; no agent causation or delivery verification.');
   } else {
     try {
       const { report, exitCode } = runMonitor(process.argv.slice(2));
-      console.log(JSON.stringify({ status: report.assessment.status, failures: report.assessment.failures.length,
-        unmeasured: report.assessment.unmeasured.length, followups: report.assessment.followups.length }));
+      console.log(JSON.stringify(report.version === 'model_snapshot_comparison_v1'
+        ? { version: report.version, scope: report.scope, status: report.status, counts: report.counts }
+        : { status: report.assessment.status, failures: report.assessment.failures.length,
+          unmeasured: report.assessment.unmeasured.length, followups: report.assessment.followups.length }));
       process.exitCode = exitCode;
     } catch { console.error('data-model monitor could not record a private receipt; check arguments/output path'); process.exitCode = 2; }
   }

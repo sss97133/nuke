@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { PUBLIC_PROFILE_FIELDS } from '../types/profile';
 
 export interface ProfileStats {
   total_listings: number;
@@ -71,7 +72,7 @@ export interface OrganizationProfileData {
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
   // Profile + claimed identities are independent — fetch in parallel.
   const [profileRes, identitiesRes] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase.from('profiles').select(PUBLIC_PROFILE_FIELDS).eq('id', userId).single(),
     supabase
       .from('external_identities')
       .select('id, platform, handle')
@@ -79,8 +80,14 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   ]);
 
   if (profileRes.error) throw profileRes.error;
+  if (identitiesRes.error) throw identitiesRes.error;
   const profile = profileRes.data;
   const identityIds = identitiesRes.data?.map(ei => ei.id) || [];
+  const batIdentities = (identitiesRes.data || []).filter(ei => ei.platform === 'bat');
+  const sellerFilters = [
+    ...batIdentities.filter(ei => ei.handle).map(ei => `seller_username.eq.${JSON.stringify(ei.handle)}`),
+    ...(batIdentities.length ? [`seller_external_identity_id.in.(${batIdentities.map(ei => ei.id).join(',')})`] : []),
+  ];
 
   // If no claimed identities, return empty arrays but still return profile
   // This allows users to see their profile even if they haven't claimed identities yet
@@ -97,14 +104,14 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   // column); the old external_identity_id filter was unindexed and timed out.
   const [listingsRes, batBidsRes, auctionCommentsRes, auctionWinsRes, profileStatsRes] =
     await Promise.all([
-      // Listings (vehicle_events where user is seller, BaT platform)
-      identityIds.length > 0
+      // Native captured listing records. Some sources retain an exact seller
+      // handle but no event or identity FK; reuse the track-record match.
+      sellerFilters.length > 0
         ? supabase
-            .from('vehicle_events')
-            .select(`*, ${VEHICLE_EMBED}`)
-            .in('seller_external_identity_id', identityIds)
-            .eq('source_platform', 'bat')
-            .order('ended_at', { ascending: false })
+            .from('bat_listings')
+            .select(`id, vehicle_id, bat_listing_url, bat_listing_title, listing_status, sale_price, sale_date, auction_end_date, created_at, ${VEHICLE_EMBED}`, { count: 'exact' })
+            .or(sellerFilters.join(','))
+            .order('auction_end_date', { ascending: false, nullsFirst: false })
             .limit(100)
         : EMPTY,
       // Bids (BaT listings where user is buyer)
@@ -150,7 +157,11 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
         .maybeSingle(),
     ]);
 
-  const listings = listingsRes.data;
+  if ('error' in listingsRes && listingsRes.error) throw listingsRes.error;
+  const listings = (listingsRes.data || []).map((listing: any) => ({
+    ...listing, source_url: listing.bat_listing_url, event_status: listing.listing_status,
+    ended_at: listing.sale_date || listing.auction_end_date,
+  }));
   const batBids = batBidsRes.data;
   // Platform comments from user_comments. Normalize the shape so the existing
   // header COMMENTS door (reads c.comment_text, c.posted_at, c.auction?.vehicle)
@@ -169,7 +180,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   // (all 0 in prod) and the old `profile.total_X || computed` let stale zeros
   // and live values mask each other.
   const stats: ProfileStats = {
-    total_listings: listings?.length ?? 0,
+    total_listings: ('count' in listingsRes ? listingsRes.count as number | null : null) ?? listings.length,
     total_bids: batBids?.length ?? 0,
     total_comments: platformComments.length,
     total_auction_wins: auctionWins?.length ?? 0,
@@ -731,4 +742,3 @@ export async function updateOrganizationProfileStats(orgId: string): Promise<voi
   });
   if (error) throw error;
 }
-

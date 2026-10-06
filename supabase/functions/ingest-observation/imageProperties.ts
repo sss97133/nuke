@@ -43,12 +43,14 @@ export function isSupportedImagePropertyKey(value: unknown): value is keyof type
 export function validateObservationProperty(
   input: ObservationPropertyInput,
   property: ObservationPropertyRegistryRow | null,
+  retainedPropertyVerified = false,
 ): ObservationPropertyValidation {
   if (input.property_key === undefined) return { ok: true, propertyId: null };
   if (typeof input.property_key !== "string" || !input.property_key.trim()) {
     return invalid("property_key must be a nonempty string");
   }
-  if (!isSupportedImagePropertyKey(input.property_key)) {
+  if (!isSupportedImagePropertyKey(input.property_key) &&
+      !(retainedPropertyVerified && ["interior_color", "exterior_color"].includes(input.property_key))) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
   if (!property || property.namespace !== "core" || property.deprecated_at != null) {
@@ -67,6 +69,10 @@ export function validateObservationProperty(
   const value = fields[input.property_key];
   if (value === undefined || value === null) {
     return invalid("Unknown property values must be omitted, not defaulted");
+  }
+  if (["interior_color", "exterior_color"].includes(input.property_key) &&
+      (input.kind !== "specification" || typeof value !== "string" || !value.trim())) {
+    return invalid("Retained interior color requires exact nonempty specification text");
   }
   if (Object.prototype.hasOwnProperty.call(IMAGE_PROPERTY_VALUES, input.property_key)) {
     if (input.kind !== "condition" || input.agent_inferred !== true) {

@@ -269,6 +269,9 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
               for (const propertyKey of new Set(claims.map(claim => claim.property_key))) {
                 const reader = await query(() => sb.rpc('get_field_provenance', { p_vehicle_id: vehicleId, p_field: propertyKey }), { object: true });
                 if (reader.vehicle_id !== vehicleId || reader.field !== propertyKey || !Array.isArray(reader.image_observations)) fail('reader_evidence_unverified');
+                // A refused collection supplies no evidence. Keep the checkpoint
+                // stationary and distinguish this explicit boundary from lost citations.
+                if (reader.coverage?.status === 'refused_input_limit') fail('reader_input_limit');
                 const visible = new Map(reader.image_observations.map(item => [item.observation_id, item]));
                 for (const claim of claims.filter(claim => claim.property_key === propertyKey)) {
                   const row = rowsByIdentity.get(claim.source_identifier), item = visible.get(row.id);
@@ -298,13 +301,16 @@ export async function runCachedImageProjection(sb, { checkpoint = initialCheckpo
     if (result.reason === 'not_started') { result.status = 'incomplete'; result.reason = 'work_budget_reached'; }
   } catch (error) {
     result.reason = error instanceof WorkerError ? error.code : 'cached_worker_failed';
-    result.status = verifyOnly && ['query_budget_exhausted', 'run_budget_exhausted'].includes(result.reason) ? 'incomplete' : 'failed';
+    result.status = result.reason === 'reader_input_limit' ||
+      (verifyOnly && ['query_budget_exhausted', 'run_budget_exhausted'].includes(result.reason)) ? 'incomplete' : 'failed';
   }
   result.elapsed_ms = Math.max(0, now() - started);
   return { ...result, checkpoint: cursor ?? null };
 }
 
 export function cachedWorkerExitCode(result) {
+  // Scheduled apply must stay red until its consumer can prove these claims.
+  if (result?.reason === 'reader_input_limit' && result.mode !== 'cached_assay') return 1;
   if (result?.mode === 'cached_assay') {
     if (result.consumer !== CACHE_WORKER_VERSION || result.status === 'failed') return 1;
     return result.status === 'complete' && result.eligible_claims > 0 &&

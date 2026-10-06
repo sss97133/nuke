@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -274,4 +274,469 @@ test('lineage CLI keeps a private immutable manifest/assay receipt and a distinc
   assert.match(rows.at(-1).manifestSha256,/^[a-f0-9]{64}$/); assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
   assert.equal(body.includes('PRIVATE CLAIM'),false); assert.equal(body.includes('PRIVATE SOURCE BODY'),false); assert.equal((await stat(out)).mode&0o777,0o600);
   assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),1);
+});
+
+const comment = (n, extra = {}) => ({ id: id(100 + n), vehicle_id: id(1), auction_event_id: id(10),
+  posted_at: '2026-10-01T10:00:00.123456+00:00', platform: 'bat', external_identity_id: id(20),
+  author_external_identity_id: null, comment_type: 'comment', is_seller: false, ...extra });
+function commentClient(extra = {}) {
+  const calls = [], ok = value => ({ ok: true, status: 200, durationMs: 1, value });
+  return { calls, get requests() { return calls.length; },
+    async subjects(ids) { calls.push({ reader: 'vehicles', ids }); return ok(extra.parents ?? [parent(1)]); },
+    async commentHeaders(vehicleId, cursor) {
+      calls.push({ reader: 'auction_comments', vehicleId, cursor });
+      const rows = [...(extra.headers ?? [comment(1)])].sort((a,b)=>b.id.localeCompare(a.id));
+      return extra.headerResponse ?? ok(rows.filter(c=>!cursor || c.id < cursor.id).slice(0,extra.serverPageSize ?? 200));
+    },
+    async sourceAuctions(vehicleId, ids) { calls.push({ reader: 'auction_events', vehicleId, ids }); return extra.auctionResponse ?? ok(extra.auctions ?? [{ id: id(10), vehicle_id: vehicleId, source: 'bat' }]); },
+    async sourceIdentities(ids) { calls.push({ reader: 'external_identities', ids }); return extra.identityResponse ?? ok(extra.identities ?? [{ id: id(20), platform: 'bat' }]); },
+  };
+}
+
+test('comment family requires an explicit manifest and rejects a price cursor', () => {
+  const defaults=options(['--out','private','--family','comments','--subjects','manifest']);
+  assert.equal(defaults.scope,'explicit_manifest');assert.equal(defaults.commentLimit,1000);
+  for (const extra of [[], ['--subjects','manifest','--scope','all'], ['--subjects','manifest','--after',id(1)], ['--subjects','manifest','--page-size','20']])
+    assert.throws(() => options(['--out','private','--family','comments',...extra]));
+});
+
+test('comment collection ceiling is explicit, finite and isolated from other reader families', () => {
+  const args=['--out','private','--family','comments','--subjects','manifest','--comment-limit'];
+  assert.equal(options([...args,'10000']).commentLimit,10000);
+  for (const bad of ['0','999','10001','1.5','Infinity','no-limit']) assert.throws(()=>options([...args,bad]));
+  assert.throws(()=>options(['--out','private','--comment-limit','10000']));
+  assert.throws(()=>options(['--out','private','--family','specifications','--subjects','manifest','--comment-limit','10000']));
+});
+
+test('comment transport selects only bounded non-bid headers and parent-scoped source metadata', async () => {
+  const routes = [], c = publicClient(anonymousConfiguration(env('anon')), async (url, init) => {
+    routes.push([new URL(url),init]); return new Response('[]',{status:200});
+  });
+  await c.commentHeaders(id(1)); await c.sourceAuctions(id(1),[id(10)]); await c.sourceIdentities([id(20)]);
+  assert.equal(routes[0][0].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.equal(routes[0][0].searchParams.get('bid_amount'),'is.null'); assert.equal(routes[0][0].searchParams.get('limit'),'200');
+  assert.equal(routes[0][0].searchParams.get('order'),'posted_at.desc,id.desc');
+  assert.equal(routes[1][0].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.equal(routes[2][0].searchParams.get('select'),'id,platform');
+  for (const [url, init] of routes) {
+    assert.equal(init.method,undefined);
+    for (const unsafe of ['comment_text','author_username','handle','metadata','raw_data','*']) assert.equal(url.searchParams.get('select').includes(unsafe),false);
+  }
+  assert.throws(()=>c.sourceAuctions(undefined,[id(10)])); assert.throws(()=>c.sourceIdentities([id(20),id(20)]));
+  assert.throws(()=>c.sourceIdentities(Array.from({length:201},(_,i)=>id(i)))); assert.throws(()=>c.commentHeaders('private;drop'));
+  await c.commentHeaders(id(1),{id:id(101),postedAt:'2026-10-01T10:00:00.123456+00:00'});
+  assert.equal(routes[3][0].searchParams.get('and'),`(or(comment_type.is.null,comment_type.neq.bid),or(posted_at.lt."2026-10-01T10:00:00.123456+00:00",and(posted_at.eq."2026-10-01T10:00:00.123456+00:00",id.lt.${id(101)})))`);
+  assert.throws(()=>c.commentHeaders(id(1),{id:id(101),postedAt:'2026-10-01),or(id.neq.null)'}));
+});
+
+test('comment header scope checks precede cap refusal and prevent unsafe child reads', () => {
+  assert.equal(inspectCommentHeaders(id(1),[comment(1)]).safe,true);
+  for (const rows of [[comment(1),comment(1)],[comment(1,{vehicle_id:id(2)})],[comment(1,{comment_type:'bid'})],
+    [comment(1,{external_identity_id:'a handle'})],[comment(1,{author_external_identity_id:undefined})],[comment(1,{is_seller:'true'})]])
+    assert.equal(inspectCommentHeaders(id(1),rows).safe,false);
+  const capped=Array.from({length:1001},(_,i)=>comment(i));
+  const result=inspectCommentHeaders(id(1),capped);assert.equal(result.safe,true);assert.equal(result.complete,false);
+  assert.equal(result.gaps.comment_header_cap_unmeasured,1);assert.deepEqual(result.headers,[]);assert.deepEqual(result.identityIds,[]);
+  capped[1000]=comment(1000,{vehicle_id:id(99)});assert.equal(inspectCommentHeaders(id(1),capped).safe,false);
+});
+
+test('author keys preserve absence, one-column projection gaps and conflicts without choosing a winner', () => {
+  const rows=[comment(1),comment(2,{external_identity_id:null}),comment(3,{external_identity_id:null,author_external_identity_id:id(20)}),
+    comment(4,{author_external_identity_id:id(20)}),comment(5,{author_external_identity_id:id(21)})];
+  const result=inspectCommentLineage(rows,[{id:id(10),vehicle_id:id(1),source:'bat'}],[{id:id(20),platform:'bat'},{id:id(21),platform:'cars-and-bids'}]);
+  assert.deepEqual(result.identityStates,{absent:1,legacyOnly:1,canonicalOnly:1,agreeing:1,conflicting:1});
+  assert.equal(result.gaps.indexed_author_key_absent_with_legacy_identity,1);assert.equal(result.gaps.retained_author_identity_keys_differ,1);
+  assert.equal(result.gaps.recorded_identity_namespace_differs_unassayed_alias,1);assert.equal(result.matchingRecordedNamespaces,4);
+  assert.equal(result.matchedAuctionParents,5);assert.equal(result.gaps.comment_author_identity_unestablished,1);
+});
+
+test('source namespace aliases, missing public context and uninterpretable clocks remain unknown', () => {
+  const result=inspectCommentLineage([comment(1,{posted_at:'infinity'}),comment(2,{auction_event_id:null,external_identity_id:id(22)})],
+    [{id:id(10),vehicle_id:id(1),source:'bringatrailer'}],[{id:id(20),platform:'bringatrailer'}]);
+  assert.equal(result.gaps.source_post_clock_not_interpretable,1);assert.equal(result.gaps.recorded_auction_source_label_differs_unassayed_alias,1);
+  assert.equal(result.gaps.recorded_identity_namespace_differs_unassayed_alias,1);assert.equal(result.gaps.reported_identity_context_unavailable,1);
+  assert.equal(result.gaps.source_auction_parent_unavailable_or_unlinked,1);assert.equal(result.matchingRecordedNamespaces,0);
+});
+
+test('comment lineage denies private subjects before children and omits raw testimony and handles', async () => {
+  const c=commentClient({headers:[comment(1,{comment_text:'PRIVATE QUOTE',author_username:'PRIVATE HANDLE'})]}),events=[];
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.gatedParents,2);assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.completedParents,1);
+  assert.equal(r.measuredCommentHeaders,1);assert.equal(r.identityStates.legacyOnly,1);assert.equal(r.matchingRecordedNamespaces,1);
+  assert.equal(c.calls.filter(x=>x.reader!=='vehicles').length,4);assert.equal(r.status,'passed_current_comment_header_lineage_in_manifest');
+  for (const text of ['PRIVATE QUOTE','PRIVATE HANDLE',id(2)]) assert.equal(JSON.stringify(events).includes(text),false);
+  assert.equal(r.databaseWrites,0);assert.equal(r.recordRepairs,0);assert.equal(r.modelCalls,0);
+});
+
+test('foreign and duplicated child contexts fail without retaining their IDs', async () => {
+  for (const extra of [{auctions:[{id:id(10),vehicle_id:id(99),source:'bat'}]},
+    {identities:[{id:id(99),platform:'bat'}]}, {identities:[{id:id(20),platform:'bat'},{id:id(20),platform:'bat'}]}]) {
+    const c=commentClient(extra),events=[];
+    const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.failures.comment_context_scope_or_shape_invalid,1);assert.equal(r.completedParents,0);
+    assert.equal(JSON.stringify(events).includes(id(99)),false);assert.equal(r.status,'failed');
+  }
+});
+
+test('native header overflow refuses totals and skips source context, rather than inspecting a sample', async () => {
+  const c=commentClient({headers:Array.from({length:1001},(_,i)=>comment(i))}),events=[];
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+  assert.equal(c.requests,7);assert.equal(r.completedParents,0);assert.equal(r.measuredCommentHeaders,0);assert.equal(r.exitCode,2);
+  assert.equal(r.gaps.comment_header_cap_unmeasured,1);assert.equal(events.find(x=>x.type==='comment_parent_unmeasured').atLeast,1001);
+  assert.equal(c.calls.some(x=>x.reader==='auction_events'||x.reader==='external_identities'),false);
+});
+
+test('explicit larger ceiling completes a high-volume collection only after an empty keyed page', async () => {
+  const headers=Array.from({length:1001},(_,i)=>comment(i));
+  const checked=inspectCommentHeaders(id(1),headers,10000);
+  assert.equal(checked.complete,true);assert.equal(checked.headers.length,1001);
+  assert.equal(inspectCommentHeaders(id(1),headers,Infinity).safe,false);
+  const c=commentClient({headers}),events=[];
+  const r=await runCommentLineage(c,scope({commentLimit:10000}),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+  assert.equal(r.commentLimit,10000);assert.equal(r.measuredCommentHeaders,1001);assert.equal(r.completedParents,1);
+  assert.equal(r.identityStates.legacyOnly,1001);assert.equal(r.exitCode,0);assert.deepEqual(r.failures,{});
+  assert.equal(events.filter(x=>x.type==='comment_source_page').at(-1).returned,0);
+  assert.equal(c.calls.filter(x=>x.reader==='auction_comments').length,7);
+  assert.match(r.boundary,/10000/);assert.match(r.boundary,/resource ceiling/);
+});
+
+test('two similar comment-reader failures stop even when successful gate or header reads intervene', async () => {
+  const c=commentClient({parents:[parent(1),parent(2),parent(3)],identityResponse:{ok:false,status:403,code:'42501'}});
+  c.commentHeaders=async (vehicleId,cursor)=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:cursor?[]:[comment(1,{vehicle_id:vehicleId})]};};
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])));
+  assert.equal(r.inspectedParents,2);assert.equal(r.completedParents,0);assert.equal(r.gaps.comment_context_parent_unmeasured,2);
+  assert.equal(r.stopReason,'repeated_comment_reader_failure_inspect_cause');assert.equal(r.measuredCommentHeaders,0);assert.equal(r.status,'failed');
+});
+
+test('empty native comments are a measured empty header collection, not zero mood or missing model work', async () => {
+  const c=commentClient({headers:[]}),r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.completedParents,1);assert.equal(c.requests,2);assert.equal(r.measuredCommentHeaders,0);assert.deepEqual(r.gaps,{});
+  for (const absent of ['mood','processedComments','independentSources','verifiedPeople']) assert.equal(absent in r,false);
+});
+
+test('comment CLI records its distinct readonly family and private source hash', async t => {
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-comment-assay-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  assert.equal(await main(['--out',out,'--family','comments','--subjects',input],{env:env('anon'),client:commentClient(),print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows[0].readers,['vehicles','auction_comments','auction_events','external_identities']);assert.equal(rows.at(-1).identityStates.legacyOnly,1);
+  assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);assert.equal((await stat(out)).mode&0o777,0o600);
+});
+
+test('short comment pages seek until empty and count every header once', async () => {
+  const c=commentClient({headers:[comment(1),comment(2),comment(3)],serverPageSize:1});
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.measuredCommentHeaders,3);assert.equal(r.completedParents,1);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='auction_comments').map(x=>x.cursor?.id),[undefined,id(103),id(102),id(101)]);
+  assert.equal(r.stopReason,'manifest_exhausted');assert.equal(r.exitCode,0);
+});
+
+test('comment seek retains PostgreSQL microseconds, timezone equivalence and UUID tie order', async () => {
+  const c=commentClient(),pages=[
+    [comment(3,{posted_at:'2026-10-01T10:00:00.123456+00:00'})],
+    [comment(2,{posted_at:'2026-10-01T03:00:00.123456-07:00'})],
+    [comment(4,{posted_at:'2026-10-01T10:00:00.123455+00:00'})],[],
+  ];
+  c.commentHeaders=async (vehicleId,cursor)=>{c.calls.push({reader:'auction_comments',vehicleId,cursor});return {ok:true,value:pages.shift()};};
+  const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.measuredCommentHeaders,3);assert.deepEqual(r.failures,{});
+  assert.equal(c.calls[2].cursor.postedAt,'2026-10-01T10:00:00.123456+00:00');
+  assert.equal(c.calls[3].cursor.postedAt,'2026-10-01T03:00:00.123456-07:00');
+});
+
+test('repeated or out-of-order comment pages refuse the whole collection before context reads', async () => {
+  for (const pages of [[[comment(1)],[comment(1)]],[[comment(1)],[comment(2)]],
+    [[comment(1,{posted_at:'2026-10-01T10:00:00.123455+00:00'})],[comment(2)]]]) {
+    const c=commentClient(),events=[];
+    c.commentHeaders=async vehicleId=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:pages.shift()};};
+    const r=await runCommentLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.failures.comment_header_order_or_repeated_id,1);assert.equal(r.measuredCommentHeaders,0);
+    assert.equal(r.completedParents,0);assert.equal(r.status,'failed');
+    assert.equal(c.calls.some(x=>x.reader==='auction_events'||x.reader==='external_identities'),false);
+    assert.equal(events.some(x=>x.type==='comment_parent'),false);
+  }
+});
+
+test('uninterpretable cursor, collection page budget and elapsed clock remain unmeasured', async () => {
+  const subjects=lineageSubjects(manifest([id(1)]));
+  const bad=await runCommentLineage(commentClient({headers:[comment(1,{posted_at:'uninterpretable'})]}),scope(),subjects);
+  assert.equal(bad.gaps.comment_clock_cursor_unmeasured,1);assert.equal(bad.completedParents,0);assert.equal(bad.exitCode,2);
+  const c=commentClient();let index=100;
+  c.commentHeaders=async vehicleId=>{c.calls.push({reader:'auction_comments',vehicleId});return {ok:true,value:[comment(index--)]};};
+  const paged=await runCommentLineage(c,scope(),subjects);
+  assert.equal(paged.gaps.comment_collection_page_budget_unmeasured,1);assert.equal(paged.measuredCommentHeaders,0);
+  assert.equal(paged.completedParents,0);assert.equal(paged.exitCode,2);assert.equal(c.requests,101);
+  const timed=commentClient();let clock=0;
+  timed.commentHeaders=async vehicleId=>{timed.calls.push({reader:'auction_comments',vehicleId});clock=10;return {ok:true,value:[comment(1)]};};
+  const ended=await runCommentLineage(timed,scope({until:5}),subjects,{now:()=>clock});
+  assert.equal(ended.stopReason,'time_budget_reached');assert.equal(ended.gaps.comment_collection_time_unmeasured,1);
+  assert.equal(ended.completedParents,0);assert.equal(ended.measuredCommentHeaders,0);assert.equal(ended.exitCode,2);
+});
+
+const bid = (n, extra={}) => ({comment_id:id(100+n),vehicle_id:id(1),observed_at:'2026-10-01T10:00:00.123456+00:00',
+  comment_type:'bid',platform:'bat',external_identity_id:id(20),auction_event_id:id(10),source_category:'auction',source_slug:'bat',...extra});
+const bidSource = (n, extra={}) => comment(n,{comment_type:'bid',...extra});
+function bidClient(extra={}) {
+  const c=commentClient(extra),ok=value=>({ok:true,status:200,durationMs:1,value});
+  c.bidHeaders=async (vehicleId,after)=>{
+    c.calls.push({reader:'vehicle_comments_unified',vehicleId,after});
+    const rows=[...(extra.bids??[bid(1)])].sort((a,b)=>a.comment_id.localeCompare(b.comment_id));
+    return extra.bidResponse??ok(rows.filter(x=>!after||x.comment_id>after).slice(0,extra.serverPageSize??200));
+  };
+  c.bidOrigins=async (vehicleId,ids)=>{c.calls.push({reader:'auction_comments',vehicleId,ids});
+    return extra.nativeResponse??ok((extra.origins??[bidSource(1)]).filter(x=>ids.includes(x.id)));};
+  c.bidObservationOrigins=async (vehicleId,ids)=>{c.calls.push({reader:'vehicle_observations',vehicleId,ids});
+    return extra.observationResponse??ok((extra.observations??[]).filter(x=>ids.includes(x.id)));};
+  return c;
+}
+
+test('positive bid family uses explicit subjects and its own finite collection ceiling',()=>{
+  const args=['--out','private','--family','bids','--subjects','manifest'];
+  assert.equal(options(args).bidLimit,1000);assert.equal(options([...args,'--bid-limit','10000']).bidLimit,10000);
+  for(const value of ['999','10001','Infinity','1.5'])assert.throws(()=>options([...args,'--bid-limit',value]));
+  assert.throws(()=>options(['--out','private','--family','bids']));
+  assert.throws(()=>options([...args,'--comment-limit','10000']));
+  assert.throws(()=>options(['--out','private','--family','comments','--subjects','manifest','--bid-limit','10000']));
+});
+
+test('positive bid transport is metadata-only, parent-scoped and never reads restricted bat_bids',async()=>{
+  const urls=[],c=publicClient(anonymousConfiguration(env('anon')),async url=>{urls.push(new URL(url));return new Response('[]',{status:200});});
+  await c.bidHeaders(id(1),id(101));await c.bidOrigins(id(1),[id(101)]);await c.bidObservationOrigins(id(1),[id(102)]);
+  assert.equal(urls[0].pathname,'/rest/v1/vehicle_comments_unified');assert.equal(urls[0].searchParams.get('bid_amount'),'gt.0');
+  assert.equal(urls[0].searchParams.get('comment_id'),`gt.${id(101)}`);assert.equal(urls[0].searchParams.get('order'),'comment_id.asc');
+  for(const u of urls){assert.equal(u.searchParams.get('vehicle_id'),`eq.${id(1)}`);assert.equal(u.pathname.includes('bat_bids'),false);
+    for(const field of ['bid_amount','comment_text','author_username','structured_data','metadata','*'])assert.equal(u.searchParams.get('select').includes(field),false);}
+  assert.throws(()=>c.bidHeaders(id(1),'a handle'));assert.throws(()=>c.bidOrigins(undefined,[id(101)]));
+  assert.throws(()=>c.bidObservationOrigins(undefined,[id(102)]));assert.throws(()=>c.bidOrigins(id(1),[id(101),id(101)]));
+});
+
+test('bid header validator rejects foreign, duplicate, unsupported-source and malformed identities',()=>{
+  assert.equal(inspectBidHeaders(id(1),[bid(1)]),true);
+  assert.equal(inspectBidHeaders(id(1),[bid(1,{observed_at:null})]),true);
+  for(const rows of [[bid(1),bid(1)],[bid(1,{vehicle_id:id(9)})],[bid(1,{source_category:'user'})],
+    [bid(1,{external_identity_id:'a handle'})],[bid(1,{auction_event_id:undefined})],[bid(1,{source_slug:null})]])
+    assert.equal(inspectBidHeaders(id(1),rows),false);
+});
+
+test('native bid projection keeps source microseconds and exposes fields that fail to reach the view',()=>{
+  const source=[bidSource(1,{author_external_identity_id:id(20)})],auctions=[{id:id(10),vehicle_id:id(1),source:'bat'}],identities=[{id:id(20),platform:'bat'}];
+  const equal=inspectBidLineage([bid(1,{observed_at:'2026-10-01T03:00:00.123456-07:00'})],source,[],[],auctions,identities);
+  assert.equal(equal.matchingNativeProjections,1);assert.equal(equal.finiteNativePostClocks,1);assert.equal(equal.nativeAuthorStates.agreeing,1);
+  assert.deepEqual(equal.failures,{});assert.equal(equal.matchingAuctionParents,1);
+  const mismatch=inspectBidLineage([bid(1,{observed_at:'2026-10-01T10:00:00.123455+00:00',external_identity_id:id(21)})],source,[],[],auctions,identities);
+  assert.equal(mismatch.matchingNativeProjections,0);assert.equal(mismatch.failures.native_bid_post_clock_projection_mismatch,1);
+  assert.equal(mismatch.failures.native_bid_projection_external_identity_id_mismatch,1);
+});
+
+test('unknown native clock/platform and source-slug default cannot imply timed BaT bidding',()=>{
+  const r=inspectBidLineage([bid(1,{observed_at:null,platform:null})],[bidSource(1,{posted_at:null,platform:null})],[],[],[],[]);
+  assert.equal(r.matchingNativeProjections,1);assert.equal(r.finiteNativePostClocks,0);
+  assert.equal(r.gaps.native_bid_post_clock_unmeasured,1);assert.equal(r.gaps.source_slug_defaults_bat_without_retained_platform,1);
+  assert.equal(r.matchingRecordedIdentityNamespaces,0);assert.equal(r.gaps.source_auction_parent_unavailable_or_unlinked,1);
+});
+
+test('observation bid role, supersession and native source pointer remain distinct from native bid events',()=>{
+  const h=bid(2,{source_category:'observation',platform:null,external_identity_id:null,auction_event_id:null,source_slug:'unknown'});
+  const obs={id:id(102),vehicle_id:id(1),observed_at:h.observed_at,kind:'comment',source_comment_id:id(103),confidence_score:0.6,is_superseded:true,extraction_method:'offline-model'};
+  const r=inspectBidLineage([h],[],[obs],[bidSource(3)],[],[]);
+  assert.equal(r.observationHeaders,1);assert.equal(r.nativeHeaders,0);assert.equal(r.matchingObservationClocks,1);
+  assert.equal(r.linkedObservationSourceComments,1);assert.equal(r.gaps.observation_bid_source_role_and_episode_unqualified,1);
+  assert.equal(r.gaps.superseded_observation_exposed_as_positive_bid,1);assert.equal(r.nativeAuthorStates.absent,0);
+});
+
+test('bid runner gates private parents, follows short pages to empty and omits all payloads',async()=>{
+  const c=bidClient({bids:[bid(1,{comment_text:'PRIVATE QUOTE',bid_amount:999999}),bid(2)],
+    origins:[bidSource(1,{author_username:'PRIVATE HANDLE'}),bidSource(2)],serverPageSize:1}),events=[];
+  const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.completedParents,1);assert.equal(r.measured.bidHeaders,2);
+  assert.equal(r.measured.matchingNativeProjections,2);assert.equal(r.nativeAuthorStates.legacyOnly,2);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='vehicle_comments_unified').map(x=>x.after),[undefined,id(101),id(102)]);
+  for(const text of ['PRIVATE QUOTE','PRIVATE HANDLE','999999',id(2)])assert.equal(JSON.stringify(events).includes(text),false);
+  assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);assert.equal(r.exitCode,0);
+});
+
+test('unsafe bid gate/headers/origin context stop without exposing foreign identifiers',async()=>{
+  for(const extra of [{parents:[parent(9)]},{bids:[bid(1,{vehicle_id:id(9)})]},
+    {nativeResponse:{ok:true,value:[bidSource(1,{vehicle_id:id(9)})]}},
+    {nativeResponse:{ok:true,value:[bidSource(1),bidSource(1)]}}]){
+    const c=bidClient(extra),events=[],r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])),{emit:x=>events.push(x)});
+    assert.equal(r.status,'failed');assert.equal(r.completedParents,0);assert.equal(JSON.stringify(events).includes(id(9)),false);
+  }
+});
+
+test('bid observation context follows only its exact typed public source pointer and retains unknown role',async()=>{
+  const h=bid(2,{source_category:'observation',platform:null,external_identity_id:null,auction_event_id:null,source_slug:'unknown'});
+  const obs={id:id(102),vehicle_id:id(1),observed_at:h.observed_at,kind:'comment',source_comment_id:id(103),confidence_score:0.6,is_superseded:true,extraction_method:'offline-model'};
+  const c=bidClient({bids:[h],observations:[obs],origins:[bidSource(3)]});
+  const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(r.completedParents,1);assert.equal(r.measured.observationHeaders,1);assert.equal(r.measured.nativeHeaders,0);
+  assert.equal(r.measured.linkedObservationSourceComments,1);assert.equal(r.measured.matchingObservationClocks,1);
+  assert.equal(r.gaps.observation_bid_source_role_and_episode_unqualified,1);assert.equal(r.gaps.superseded_observation_exposed_as_positive_bid,1);
+  assert.deepEqual(c.calls.find(x=>x.reader==='auction_comments').ids,[id(103)]);assert.equal(r.exitCode,0);
+});
+
+test('repeated or out-of-order bid UUID pages refuse source/context claims',async()=>{
+  for(const pages of [[[bid(2)],[bid(1)]],[[bid(1)],[bid(1)]],[[bid(2),bid(1)]]]){
+    const c=bidClient();c.bidHeaders=async vehicleId=>{c.calls.push({reader:'vehicle_comments_unified',vehicleId});return {ok:true,value:pages.shift()};};
+    const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+    assert.equal(r.failures.bid_header_order_or_repeated_id,1);assert.equal(r.measured.bidHeaders,0);assert.equal(r.exitCode,1);
+    assert.equal(c.calls.some(x=>x.reader==='auction_comments'),false);
+  }
+});
+
+test('bid reader/context failures stop after two similar failures and never become zero relationships',async()=>{
+  for(const extra of [{bidResponse:{ok:false,status:503,code:'57014'}},{nativeResponse:{ok:false,status:403,code:'42501'}}]){
+    const c=bidClient({...extra,parents:[parent(1),parent(2),parent(3)]});
+    if(!extra.bidResponse)c.bidHeaders=async (vehicleId,after)=>{c.calls.push({reader:'vehicle_comments_unified',vehicleId,after});return {ok:true,value:after?[]:[bid(1,{vehicle_id:vehicleId})]};};
+    const r=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1),id(2),id(3)])));
+    assert.equal(r.inspectedParents,2);assert.equal(r.stopReason,'repeated_bid_reader_failure_inspect_cause');
+    assert.equal(r.completedParents,0);assert.equal(r.measured.bidHeaders,0);assert.equal(r.exitCode,1);
+  }
+});
+
+test('bid collection caps/time/refused projection shape stay unmeasured',async()=>{
+  const bids=Array.from({length:1001},(_,i)=>bid(i)),origins=Array.from({length:1001},(_,i)=>bidSource(i));
+  const c=bidClient({bids,origins}),cap=await runBidLineage(c,scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(cap.completedParents,0);assert.equal(cap.measured.bidHeaders,0);assert.equal(cap.gaps.bid_collection_cap_unmeasured,1);assert.equal(cap.exitCode,2);
+  assert.equal(c.calls.some(x=>x.reader==='auction_comments'),false);
+  const large=await runBidLineage(bidClient({bids,origins}),scope({bidLimit:10000}),lineageSubjects(manifest([id(1)])));
+  assert.equal(large.completedParents,1);assert.equal(large.measured.bidHeaders,1001);assert.equal(large.exitCode,0);
+  const timed=bidClient();let clock=0;
+  timed.bidHeaders=async vehicleId=>{timed.calls.push({reader:'vehicle_comments_unified',vehicleId});clock=10;return {ok:true,value:[bid(1)]};};
+  const end=await runBidLineage(timed,scope({until:5}),lineageSubjects(manifest([id(1)])),{now:()=>clock});
+  assert.equal(end.stopReason,'time_budget_reached');assert.equal(end.completedParents,0);assert.equal(end.exitCode,2);
+});
+
+test('bid CLI retains its reader family and finite private source-hash receipt',async t=>{
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-bid-assay-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  assert.equal(await main(['--out',out,'--family','bids','--subjects',input],{env:env('anon'),client:bidClient(),print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(rows[0].readers.includes('vehicle_comments_unified'),true);assert.equal(rows[0].readers.includes('bat_bids'),false);
+  assert.equal(rows[0].options.bidLimit,1000);assert.equal(rows.at(-1).measured.matchingNativeProjections,1);
+  assert.equal((await stat(out)).mode&0o777,0o600);assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
+});
+
+const measurement = (n, extra = {}) => comment(n, {
+  sentiment_score: null, analyzed_at: null, community_stance_score: null, condition_polarity: null,
+  stance_scored_at: null, stance_model: null, rubric_version: null, ...extra,
+});
+
+test('measurement scope is explicitly opted into only for the comments family', () => {
+  const args = ['--out','private','--family','comments','--subjects','manifest'];
+  assert.equal(options([...args,'--comment-measurements','true']).commentMeasurements,true);
+  assert.equal(options(args).commentMeasurements,undefined);
+  for (const bad of ['false','1','unbounded']) assert.throws(()=>options([...args,'--comment-measurements',bad]));
+  for (const family of ['price','specifications','bids']) assert.throws(()=>options(['--out','private','--family',family,'--subjects','manifest','--comment-measurements','true']));
+});
+
+test('optional measurement transport selects provenance fields without source text or handles', async () => {
+  const urls = [], c=publicClient(anonymousConfiguration(env('anon')),async url=>{urls.push(new URL(url));return new Response('[]');});
+  await c.commentHeaders(id(1)); await c.commentHeaders(id(1),undefined,true);
+  assert.equal(urls[0].searchParams.get('select').includes('sentiment_score'),false);
+  for (const field of ['sentiment_score','analyzed_at','community_stance_score','condition_polarity','stance_scored_at','stance_model','rubric_version']) assert.equal(urls[1].searchParams.get('select').split(',').includes(field),true);
+  for (const field of ['comment_text','author_username','extracted_claims','bid_amount']) assert.equal(urls[1].searchParams.get('select').split(',').includes(field),false);
+  assert.equal(urls[1].searchParams.get('limit'),'200');assert.equal(urls[1].searchParams.get('vehicle_id'),`eq.${id(1)}`);
+  assert.throws(()=>c.commentHeaders(id(1),undefined,'true'));
+});
+
+test('zero scores are retained, and a stance rubric cannot qualify sentiment provenance', () => {
+  const r=inspectCommentMeasurements([measurement(1,{sentiment_score:0,community_stance_score:0,condition_polarity:'0',
+    analyzed_at:'2026-10-02T10:00:00Z',stance_scored_at:'2026-10-02T10:00:00Z',stance_model:'offline-model',rubric_version:2})]);
+  for (const axis of Object.values(r.axes)) {assert.equal(axis.validStoredScore,1);assert.equal(axis.zeroStoredScore,1);assert.equal(axis.unscored,0);assert.equal(axis.invalidStoredScore,0);}
+  assert.equal(r.axes.stance.versionedMetadata,1);assert.equal(r.axes.condition.versionedMetadata,1);
+  assert.equal(r.axes.sentiment.versionedMetadata,0);assert.equal(r.axes.sentiment.methodUnestablished,1);assert.equal(r.axes.sentiment.rubricUnestablished,1);
+  assert.deepEqual(r.failures,{});assert.equal(Object.hasOwn(r,'mean'),false);
+});
+
+test('NULL scores, unavailable columns and invalid booleans have separate denominators', () => {
+  const r=inspectCommentMeasurements([measurement(1),comment(2),measurement(3,{community_stance_score:false})]);
+  assert.equal(r.axes.stance.unscored,1);assert.equal(r.axes.stance.unavailable,1);assert.equal(r.axes.stance.invalidStoredScore,1);
+  assert.equal(r.axes.stance.validStoredScore,0);assert.equal(r.failures.stance_stored_score_outside_reader_scale,1);
+  assert.equal(r.gaps.stance_measurement_column_unavailable,1);
+});
+
+test('a stance-only comment remains measurable with NULL sentiment and condition', () => {
+  const r=inspectCommentMeasurements([measurement(1,{community_stance_score:-0.5})]);
+  assert.equal(r.axes.stance.validStoredScore,1);assert.equal(r.axes.sentiment.unscored,1);assert.equal(r.axes.condition.unscored,1);
+  assert.equal(r.axes.stance.methodUnestablished,1);assert.equal(r.axes.stance.rubricUnestablished,1);
+});
+
+test('invalid scales and non-finite numeric strings never count as valid measurements', () => {
+  for (const score of [2,-2,'Infinity','NaN','',true,{},[]]) {
+    const r=inspectCommentMeasurements([measurement(1,{community_stance_score:score})]);
+    assert.equal(r.axes.stance.invalidStoredScore,1);assert.equal(r.axes.stance.validStoredScore,0);
+  }
+  const r=inspectCommentMeasurements([measurement(1,{sentiment_score:101,condition_polarity:-1.01})]);
+  assert.equal(r.axes.sentiment.invalidStoredScore,1);assert.equal(r.axes.condition.invalidStoredScore,1);
+  assert.equal(inspectCommentMeasurements([measurement(1,{sentiment_score:'-100',community_stance_score:'1'})]).axes.stance.validStoredScore,1);
+});
+
+test('source-post and scoring clocks stay distinct; missing, day-only and infinite clocks are unqualified', () => {
+  const r=inspectCommentMeasurements([measurement(1,{posted_at:'infinity',sentiment_score:1,community_stance_score:0.5,
+    analyzed_at:'2026-10-02',stance_scored_at:null,stance_model:'offline-model',rubric_version:2})]);
+  assert.equal(r.axes.stance.sourceClockMissing,1);assert.equal(r.axes.stance.analysisClockMissing,1);assert.equal(r.axes.stance.versionedMetadata,0);
+  assert.equal(r.axes.sentiment.sourceClockMissing,1);assert.equal(r.axes.sentiment.analysisClockMissing,1);
+});
+
+test('rubric versions and model hashes are kept in separate bounded strata', () => {
+  const base={community_stance_score:0.5,condition_polarity:-0.5,stance_scored_at:'2026-10-02T10:00:00Z'};
+  const r=inspectCommentMeasurements([measurement(1,{...base,rubric_version:1,stance_model:'model-a'}),
+    measurement(2,{...base,rubric_version:2,stance_model:'model-a'}),measurement(3,{...base,rubric_version:2,stance_model:'model-b'})]);
+  assert.equal(Object.keys(r.axes.stance.strata).length,3);assert.equal(r.axes.stance.versionedMetadata,3);
+  assert.equal(JSON.stringify(r).includes('model-a'),false);assert.equal(JSON.stringify(r).includes('model-b'),false);
+  for (const rubric of [0,-1,1.5,'2',32768]) assert.equal(inspectCommentMeasurements([measurement(1,{...base,rubric_version:rubric,stance_model:'model-a'})]).axes.stance.rubricUnestablished,1);
+});
+
+test('stratum budget preserves coverage counts and reports unretained headers explicitly', () => {
+  const rows=Array.from({length:70},(_,i)=>measurement(i,{community_stance_score:0.5,stance_model:`offline-${i}`,rubric_version:2}));
+  const r=inspectCommentMeasurements(rows);
+  assert.equal(r.axes.stance.validStoredScore,70);assert.equal(Object.keys(r.axes.stance.strata).length,64);assert.equal(r.axes.stance.strataUnretained,6);
+  assert.equal(r.gaps.stance_measurement_strata_budget_unmeasured,6);
+});
+
+test('measurement receipts contain only completed public collections and omit score payloads', async () => {
+  const c=commentClient({headers:[measurement(1,{sentiment_score:0.314159265359,community_stance_score:0,
+    comment_text:'PRIVATE QUOTE',author_username:'PRIVATE HANDLE',stance_model:'PRIVATE MODEL VALUE',rubric_version:2})]}),events=[];
+  const r=await runCommentLineage(c,scope({commentMeasurements:true}),lineageSubjects(manifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.commentMeasurements.headers,1);assert.equal(r.commentMeasurements.axes.sentiment.validStoredScore,1);assert.equal(r.commentMeasurements.axes.stance.validStoredScore,1);
+  assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);
+  for (const text of ['PRIVATE QUOTE','PRIVATE HANDLE','PRIVATE MODEL VALUE','0.314159265359',id(2)]) assert.equal(JSON.stringify(events).includes(text),false);
+  const old=await runCommentLineage(commentClient(),scope(),lineageSubjects(manifest([id(1)])));
+  assert.equal(Object.hasOwn(old,'commentMeasurements'),false);
+});
+
+test('overflow and failed context cannot establish measurement totals from a partial collection', async () => {
+  for (const extra of [{headers:Array.from({length:1001},(_,i)=>measurement(i,{community_stance_score:0.5}))},
+    {headers:[measurement(1,{community_stance_score:0.5})],auctionResponse:{ok:false,status:500,code:'reader_http_failure'}}]) {
+    const r=await runCommentLineage(commentClient(extra),scope({commentMeasurements:true}),lineageSubjects(manifest([id(1)])));
+    assert.equal(r.commentMeasurements.headers,0);assert.equal(r.commentMeasurements.axes.stance.validStoredScore,0);assert.equal(r.completedParents,0);
+    assert.notEqual(r.exitCode,0);
+  }
+});
+
+test('measurement scope survives CLI receipts with restrictive output permissions', async t=>{
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-comment-measurements-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(manifest([id(1)])));
+  const c=commentClient({headers:[measurement(1,{community_stance_score:0})]});
+  assert.equal(await main(['--out',out,'--family','comments','--subjects',input,'--comment-measurements','true'],{env:env('anon'),client:c,print:()=>{}}),0);
+  const rows=(await readFile(out,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(rows[0].options.commentMeasurements,true);assert.equal(rows.at(-1).commentMeasurements.axes.stance.validStoredScore,1);
+  assert.equal((await stat(out)).mode&0o777,0o600);
+});
+
+test('the manifest summary bounds combined strata across complete parents without losing coverage', async () => {
+  const ok=value=>({ok:true,value});
+  const calls=[],c={get requests(){return calls.length;},
+    async subjects(){calls.push('gate');return ok([parent(1),parent(2)]);},
+    async commentHeaders(vehicleId,cursor){calls.push('headers');const offset=vehicleId===id(1)?0:40;
+      return ok(cursor?[]:Array.from({length:40},(_,i)=>measurement(offset+i,{vehicle_id:vehicleId,
+        auction_event_id:null,external_identity_id:null,author_external_identity_id:null,
+        community_stance_score:0,stance_model:`offline-${offset+i}`,rubric_version:2})).reverse());},
+  };
+  const r=await runCommentLineage(c,scope({commentMeasurements:true}),lineageSubjects(manifest([id(1),id(2)])));
+  const m=r.commentMeasurements;
+  assert.equal(r.completedParents,2);assert.equal(m.headers,80);assert.equal(m.axes.stance.validStoredScore,80);
+  assert.equal(Object.keys(m.axes.stance.strata).length,64);assert.equal(m.axes.stance.strataUnretained,16);
+  assert.equal(m.gaps.stance_measurement_strata_budget_unmeasured,16);assert.equal(r.exitCode,0);
 });

@@ -1,3 +1,4 @@
+import { ProfileService } from '../../services/profileService';
 /**
  * Vehicle Inquiry Modal
  * Quick inquiry form for vehicles listed by organizations
@@ -43,11 +44,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
     setCurrentUserId(user.id);
     setEmail(user.email || '');
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username, phone')
-      .eq('id', user.id)
-      .single();
+    const { data: profile } = await ProfileService.getProfileRecord(user.id);
 
     if (profile) {
       setName(profile.username || '');

@@ -10,9 +10,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 
-/** Track vehicles already backfilled this session to avoid repeat RPC calls */
-const backfilledVehicles = new Set<string>();
-
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -27,6 +24,10 @@ export interface FieldEvidenceRow {
   source_type: string;
   /** 0-1 float — converted from DB source_confidence (0-100 int) */
   confidence: number;
+  /** Original nullable score; the ranking fallback is not a stored score. */
+  source_confidence?: number | null;
+  /** Identifies which existing reader supplied the row, not source verification. */
+  evidence_origin?: 'field_evidence' | 'vehicle_wiki';
   extraction_context: string | null;
   extracted_at: string | null;
   status: string | null;
@@ -227,6 +228,7 @@ async function fetchAgentConsensus(vehicleId: string): Promise<FieldEvidenceRow[
         field_value: value,
         source_type: `agent_${evidenceClass}`,
         confidence,
+        evidence_origin: 'vehicle_wiki',
         extraction_context: `Agent consensus · ${f?.corroboration ?? 1} contributor(s)${f?.conflict ? ' · CONFLICT' : ''}`,
         extracted_at: null,
         status: null,
@@ -252,32 +254,9 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     throw queryError;
   }
 
-  let rows = data ?? [];
-
-  if (rows.length < 3) {
-    // Sparse or no evidence — trigger on-demand backfill
-    if (!backfilledVehicles.has(vehicleId)) {
-      backfilledVehicles.add(vehicleId);
-      try {
-        const { data: inserted } = await supabase.rpc('ensure_field_evidence', { p_vehicle_id: vehicleId });
-        if (inserted && inserted > 0) {
-          // Re-fetch after backfill populated new rows
-          const { data: refreshed } = await supabase
-            .from('field_evidence')
-            .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
-            .eq('vehicle_id', vehicleId)
-            .order('source_confidence', { ascending: false });
-          if (refreshed && refreshed.length > 0) {
-            rows = refreshed;
-          }
-        }
-      } catch (backfillErr) {
-        console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
-      }
-    }
-    // NOTE: do not early-return on empty field_evidence — a vehicle may have agent-write
-    // claims (projection_event) even with no field_evidence rows; those are merged below.
-  }
+  const rows = data ?? [];
+  // Sparse evidence stays sparse. Existing agent claims are read below;
+  // displaying a profile must not request a testimony backfill.
 
   // Map DB columns to UI interface
   const mapped: FieldEvidenceRow[] = (rows as any[]).map((r) => ({
@@ -287,6 +266,8 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     field_value: r.proposed_value ?? '',
     source_type: r.source_type,
     confidence: (r.source_confidence ?? 0) / 100, // 0-100 int -> 0-1 float
+    source_confidence: r.source_confidence ?? null,
+    evidence_origin: 'field_evidence',
     extraction_context: r.extraction_context ?? null,
     extracted_at: r.extracted_at ?? null,
     status: r.status ?? null,

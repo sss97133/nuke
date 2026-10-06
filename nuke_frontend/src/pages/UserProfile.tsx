@@ -16,7 +16,7 @@ const UserWorkspaceContent = React.lazy(() => import('./user-profile/UserWorkspa
 const UserSettingsDrawer = React.lazy(() => import('./user-profile/UserSettingsDrawer'));
 
 const UserProfileInner: React.FC = () => {
-  const { loading, profile } = useUserProfile();
+  const { loading, profile, isOwnProfile } = useUserProfile();
 
   if (loading) {
     return <div style={{ height: '100vh', background: 'var(--bg)' }} />;
@@ -57,9 +57,11 @@ const UserProfileInner: React.FC = () => {
       </React.Suspense>
 
       {/* Settings Drawer — opens via up:open-settings event */}
-      <React.Suspense fallback={null}>
-        <UserSettingsDrawer />
-      </React.Suspense>
+      {isOwnProfile && (
+        <React.Suspense fallback={null}>
+          <UserSettingsDrawer />
+        </React.Suspense>
+      )}
     </div>
   );
 };

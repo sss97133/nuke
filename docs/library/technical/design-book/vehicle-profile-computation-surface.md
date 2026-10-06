@@ -187,6 +187,28 @@ function BuildProgress({ vehicleId }) {
 
 ## The Profile as Data Attractor
 
+### Evidence routes must preserve the subject
+
+A route containing a vehicle ID and an observation ID does not establish that
+the observation belongs to that vehicle. Read the visible parent first, bind the
+child query to both IDs, and check the returned binding before rendering. Apply
+the same subject boundary to supersession and related-record links. A valid
+foreign key or two individually visible records cannot establish the relationship
+shown by the page.
+
+An image can have recorded witness links to observations on several vehicles.
+Each link must use the observation's own vehicle ID. The stored bridge grain is
+observation × image × witness role; different roles can refer to the same
+observation. Independent support requires separate qualification. Local fixtures
+cannot verify live witness coverage when the installed reader restricts access.
+
+When either route ID changes, withhold the previous subject's evidence immediately
+and cancel its outstanding reads. Missing, denied and failed reads must remain
+explicitly unavailable; they cannot become an empty evidence set or a zero score.
+Keep source posting, observation and ingestion clocks distinct. These reader
+checks preserve attribution without changing testimony, access policies or the
+existing privacy projection.
+
 The vehicle profile attracts data. As more observations arrive from more sources, the profile gets richer. Every new piece of data makes the computation more accurate.
 
 Data arrives from many directions:

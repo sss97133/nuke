@@ -336,7 +336,7 @@ export function listingForPhoto(im: ImageStampRow, sequences: AuctionSequence[])
 function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void {
   const at = isoOrNull(c.posted_at);
   if (!at) return;
-  const isBid = c.comment_type === 'bid' || c.bid_amount != null;
+  const isBid = c.comment_type === 'bid';
   const isSeller = c.is_seller === true || c.comment_type === 'seller_response';
   list.push({
     id: c.id,

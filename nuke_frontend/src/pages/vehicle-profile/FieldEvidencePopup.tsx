@@ -10,7 +10,7 @@ import React from 'react';
 import PrefetchLink from '../../components/PrefetchLink';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, evidenceRelationLabel } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
@@ -76,6 +76,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
 
   if (!provenance.isLoading && provenance.data === null && !provenance.error) {
     return <p role="status">Field evidence is unavailable or this record is private.</p>;
+  }
+  if (provenanceCoverageUnavailable(provenance.data)) {
+    return <p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>;
   }
 
   return (

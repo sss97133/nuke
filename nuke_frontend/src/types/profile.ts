@@ -1,5 +1,9 @@
 // Enhanced Profile Types for comprehensive profile system
 
+// Must match the profiles column grants. Private fields are owner-RPC only;
+// never widen this projection to "*" when loading a public person.
+export const PUBLIC_PROFILE_FIELDS = 'id, full_name, avatar_url, bio, location, website, created_at, updated_at, user_type, phone_verified, id_verification_status, verification_level, verified_at, website_url, github_url, linkedin_url, is_public, is_verified, username, username_lower, payment_verified, role, moderator_level, tool_inventory_public, profession, expertise_areas, business_name, member_since, total_listings, total_bids, total_comments, total_auction_wins, total_success_stories';
+
 export interface Profile {
   id: string;
   email: string | null;

@@ -28,6 +28,7 @@ interface DayPageVehicle {
 
 interface DayObservation {
   id: string;
+  vehicle_id: string;
   kind: string;
   observed_at: string | null;
   ingested_at: string;
@@ -42,13 +43,14 @@ interface DayObservation {
 
 const formatDateLong = (iso: string): string => {
   try {
-    const d = new Date(iso + 'T12:00:00');
+    const d = new Date(iso + 'T12:00:00Z');
     if (isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: 'UTC',
     });
   } catch {
     return iso;
@@ -58,83 +60,119 @@ const formatDateLong = (iso: string): string => {
 const DayPage: React.FC = () => {
   const { vehicleId, date } = useParams<{ vehicleId: string; date: string }>();
   const [vehicle, setVehicle] = useState<DayPageVehicle | null>(null);
-  const [detail, setDetail] = useState<DailyReceipt | null>(null);
-  const [observations, setObservations] = useState<DayObservation[]>([]);
+  const [detailRow, setDetail] = useState<DailyReceipt | null>(null);
+  const [observationRows, setObservations] = useState<DayObservation[]>([]);
+  const [loadedSubject, setLoadedSubject] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState(false);
+  const [observationsError, setObservationsError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [readError, setError] = useState<string | null>(null);
+  const subject = `${vehicleId}:${date}`;
+  const current = loadedSubject === subject;
+  const detail = current ? detailRow : null;
+  const observations = current ? observationRows : [];
+  const error = current ? readError : null;
 
   useEffect(() => {
     if (!vehicleId || !date) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setLoadedSubject(null);
+    setVehicle(null);
+    setDetail(null);
+    setObservations([]);
+    setDetailError(false);
+    setObservationsError(false);
 
-    // Day boundary in UTC; observed_at is stored as timestamptz.
+    // A half-open UTC interval includes Postgres sub-millisecond timestamps.
     const dayStart = `${date}T00:00:00Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
+    const start = Date.parse(dayStart);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(start) || new Date(start).toISOString().slice(0, 10) !== date) {
+      setError('Invalid calendar date.');
+      setLoadedSubject(subject);
+      setLoading(false);
+      return;
+    }
+    const dayEnd = new Date(start + 86_400_000).toISOString();
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 10_000);
 
     (async () => {
-      const [vehRes, dayRes, obsRes] = await Promise.all([
-        supabase
+      try {
+        const vehRes = await supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
           .eq('id', vehicleId)
-          .maybeSingle(),
-        supabase.rpc('get_daily_work_receipt', {
-          p_vehicle_id: vehicleId,
-          p_date: date,
-        }),
-        supabase
-          .from('vehicle_observations')
-          .select(`
-            id, kind, observed_at, ingested_at,
-            confidence, confidence_score, structured_data,
-            observation_sources!left(display_name, slug)
-          `)
-          .eq('vehicle_id', vehicleId)
-          .eq('is_superseded', false)
-          .gte('observed_at', dayStart)
-          .lte('observed_at', dayEnd)
-          .order('observed_at', { ascending: true })
-          .limit(500),
-      ]);
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (cancelled) return;
+        if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
+        if (!vehRes.data || vehRes.data.id !== vehicleId) throw new Error('Vehicle unavailable.');
+        setVehicle(vehRes.data as DayPageVehicle);
 
-      if (cancelled) return;
+        // This ordering is a consumer boundary, not authorization for the RPC.
+        const [dayRes, obsRes] = await Promise.allSettled([
+          supabase.rpc('get_daily_work_receipt', {
+            p_vehicle_id: vehicleId,
+            p_date: date,
+          }).abortSignal(controller.signal),
+          supabase
+            .from('vehicle_observations')
+            .select(`
+              id, vehicle_id, kind, observed_at, ingested_at,
+              confidence, confidence_score, structured_data,
+              observation_sources!left(display_name, slug)
+            `)
+            .eq('vehicle_id', vehicleId)
+            .eq('is_superseded', false)
+            .gte('observed_at', dayStart)
+            .lt('observed_at', dayEnd)
+            .order('observed_at', { ascending: true })
+            .limit(500)
+            .abortSignal(controller.signal),
+        ]);
+        if (cancelled) return;
+        if (dayRes.status === 'rejected' || dayRes.value.error || dayRes.value.data?.error) {
+          setDetailError(true);
+        } else if (dayRes.value.data) {
+          const row = dayRes.value.data as DailyReceipt;
+          if (row.vehicle?.id === vehicleId && row.receipt_date === date) setDetail(row);
+          else setDetailError(true);
+        }
 
-      if (vehRes.error) {
-        setError(`Vehicle load failed: ${vehRes.error.message}`);
-        setLoading(false);
-        return;
+        if (obsRes.status === 'rejected' || obsRes.value.error || !Array.isArray(obsRes.value.data)) {
+          setObservationsError(true);
+        } else {
+          const rows = obsRes.value.data as (DayObservation & { observation_sources?: { slug?: string; display_name?: string } })[];
+          if (rows.some(row => {
+            const observed = row.observed_at ? Date.parse(row.observed_at) : NaN;
+            return row.vehicle_id !== vehicleId || !Number.isFinite(observed) || observed < start || observed >= start + 86_400_000;
+          })) {
+            setObservationsError(true);
+          } else setObservations(rows.map(row => ({ ...row,
+            source_slug: row.observation_sources?.slug ?? null,
+            source_name: row.observation_sources?.display_name ?? null,
+          })));
+        }
+      } catch (failure) {
+        if (!cancelled) {
+          const message = failure instanceof Error ? failure.message : '';
+          setError(message === 'Vehicle unavailable.' ? message : 'Unable to load this vehicle. Try again.');
+        }
+      } finally {
+        window.clearTimeout(deadline);
+        if (!cancelled) {
+          setLoadedSubject(subject);
+          setLoading(false);
+        }
       }
-      setVehicle(vehRes.data as DayPageVehicle | null);
-
-      if (!dayRes.error && dayRes.data) {
-        setDetail(dayRes.data as DailyReceipt);
-      }
-
-      if (!obsRes.error && obsRes.data) {
-        setObservations(
-          (obsRes.data as any[]).map((r) => ({
-            id: r.id,
-            kind: r.kind,
-            observed_at: r.observed_at,
-            ingested_at: r.ingested_at,
-            source_url: r.source_url,
-            confidence: r.confidence,
-            confidence_score: r.confidence_score,
-            content_text: r.content_text,
-            structured_data: r.structured_data,
-            source_slug: r.observation_sources?.slug ?? null,
-            source_name: r.observation_sources?.display_name ?? null,
-          })),
-        );
-      }
-
-      setLoading(false);
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(deadline);
     };
   }, [vehicleId, date]);
 
@@ -158,7 +196,7 @@ const DayPage: React.FC = () => {
     status: sessionInfo?.status || 'complete',
   };
 
-  const vehLabel = vehicle
+  const vehLabel = vehicle?.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 
@@ -213,24 +251,27 @@ const DayPage: React.FC = () => {
           fontFamily: 'Courier New, monospace',
         }}
       >
-        {detail?.photo_count ?? 0} PHOTOS · {detail?.parts_count ?? 0} RECEIPTS · {detail?.component_events?.length ?? 0} EVENTS · {detail?.line_items?.length ?? 0} LINE ITEMS · {observations.length} OBSERVATIONS
+        UTC observation day · {date}
+        {detail && <> · {detail.photo_count} PHOTOS · {detail.parts_count} PART ITEMS · {detail.component_events?.length ?? 0} EVENTS · {detail.line_items?.length ?? 0} LINE ITEMS</>}
+        {current && !error && !observationsError && <> · {observations.length} OBSERVATIONS RETURNED{observations.length === 500 ? ' · READ LIMIT 500; MORE MAY EXIST' : ''}</>}
       </div>
 
-      {loading && !detail && (
-        <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading day…</div>
+      {(loading || !current) && (
+        <div role="status" style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading day…</div>
       )}
 
       {error && (
-        <div style={{ fontSize: 10, color: 'var(--error, #c00)', padding: 12, border: '2px solid var(--error, #c00)' }}>
+        <div role="alert" style={{ fontSize: 10, color: 'var(--error, #c00)', padding: 12, border: '2px solid var(--error, #c00)' }}>
           {error}
         </div>
       )}
 
-      {!loading && !error && !detail && (
+      {current && !error && detailError && <p role="alert" style={{ fontSize: 10 }}>Build-log details unavailable. Try again.</p>}
+      {current && !error && observationsError && <p role="alert" style={{ fontSize: 10 }}>Observations unavailable. Try again.</p>}
+
+      {!loading && current && !error && !detailError && !detail && (
         <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12, border: '2px solid var(--text-disabled, #ccc)' }}>
-          No build-log data on file for this date. The cell on the heatmap may correspond to a
-          receipt or photo that lives in a different table — drill into the source via the
-          vehicle profile timeline.
+          No build-log details returned for this date. This read does not establish complete source coverage.
         </div>
       )}
 
@@ -263,9 +304,9 @@ const DayPage: React.FC = () => {
               fontFamily: 'Arial, sans-serif',
             }}
           >
-            Observations on this day · {observations.length}
+            Observations on this UTC day · {observations.length} returned
           </h2>
-          <ObservationsList observations={observations} vehicleId={vehicleId} />
+          <ObservationsList key={subject} observations={observations} vehicleId={vehicleId} />
         </section>
       )}
     </div>
@@ -288,7 +329,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
         const visibleData = publicObservationData(obs.structured_data);
         const isOpen = !!expanded[obs.id];
         const time = obs.observed_at
-          ? new Date(obs.observed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+          ? new Date(obs.observed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })
           : '—';
         const conf = obs.confidence_score !== null
           ? `${Math.round((obs.confidence_score || 0) * 100)}%`
@@ -313,11 +354,12 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
             <button
               type="button"
               onClick={() => toggle(obs.id)}
+              aria-expanded={isOpen}
               style={{
                 width: '100%',
                 display: 'grid',
-                gridTemplateColumns: '52px 16px 86px 1fr 90px 48px',
-                gap: 8,
+                gridTemplateColumns: '46px 10px 70px minmax(0, 1fr) 56px 34px',
+                gap: 4,
                 alignItems: 'center',
                 padding: '6px 8px',
                 background: 'transparent',
@@ -367,7 +409,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
               >
                 {obs.kind.replace(/_/g, ' ')} observation
               </span>
-              <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary, #666)' }}>
+              <span title={obs.source_slug || obs.source_name || undefined} style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary, #666)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {obs.source_slug || obs.source_name || '—'}
               </span>
               <span
@@ -509,7 +551,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
                     </pre>
                   </div>
                 )}
-                <div style={{ marginTop: 6, fontSize: 8, color: 'var(--text-secondary, #666)', fontFamily: 'Courier New, monospace', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ marginTop: 6, fontSize: 8, color: 'var(--text-secondary, #666)', fontFamily: 'Courier New, monospace', display: 'flex', flexWrap: 'wrap', overflowWrap: 'anywhere', alignItems: 'center', gap: 8 }}>
                   <span>observation_id: {obs.id}</span>
                   <span>·</span>
                   <span>ingested: {new Date(obs.ingested_at).toISOString().slice(0, 19)}</span>

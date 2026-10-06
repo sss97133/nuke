@@ -78,123 +78,163 @@ const labelCase = (key: string): string =>
 const ObservationPage: React.FC = () => {
   const { vehicleId, obsId } = useParams<{ vehicleId: string; obsId: string }>();
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-  const [obs, setObs] = useState<ObservationRow | null>(null);
+  const [observation, setObs] = useState<ObservationRow | null>(null);
+  const [loadedSubject, setLoadedSubject] = useState<string | null>(null);
   const [related, setRelated] = useState<RelatedObservation[]>([]);
   const [supersededBy, setSupersededBy] = useState<ObservationRow | null>(null);
   const [supersedes, setSupersedes] = useState<ObservationRow | null>(null);
   const [witnessImageUrl, setWitnessImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const subject = `${vehicleId}:${obsId}`;
+  const obs = loadedSubject === subject ? observation : null;
 
   useEffect(() => {
     if (!vehicleId || !obsId) return;
     let cancelled = false;
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 10_000);
     setLoading(true);
     setError(null);
+    setLoadedSubject(null);
+    setObs(null);
+    setVehicle(null);
+    setRelated([]);
+    setSupersededBy(null);
+    setSupersedes(null);
 
     (async () => {
-      const [vehRes, obsRes] = await Promise.all([
-        supabase
+      try {
+        // The URL supplies two IDs; both must describe the same visible entity.
+        const vehRes = await supabase
           .from('vehicles')
           .select('id, year, make, model, trim')
           .eq('id', vehicleId)
-          .maybeSingle(),
-        supabase
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (cancelled) return;
+        if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
+        if (!vehRes.data || vehRes.data.id !== vehicleId) {
+          throw new Error('Vehicle unavailable.');
+        }
+        setVehicle(vehRes.data as VehicleSummary);
+
+        const obsRes = await supabase
           .from('vehicle_observations')
           .select(`
-            id, vehicle_id, kind, observed_at, ingested_at, source_id,
-            confidence, confidence_score, structured_data, property_id,
-            is_superseded, superseded_by,
-            observation_sources!left(display_name, slug)
-          `)
+              id, vehicle_id, kind, observed_at, ingested_at, source_id,
+              confidence, confidence_score, structured_data, property_id,
+              is_superseded, superseded_by,
+              observation_sources!left(display_name, slug)
+            `)
           .eq('id', obsId)
-          .maybeSingle(),
-      ]);
+          .eq('vehicle_id', vehicleId)
+          .abortSignal(controller.signal)
+          .maybeSingle();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (obsRes.error || !obsRes.data) {
-        setError(`Observation not found: ${obsRes.error?.message || 'no row'}`);
-        setLoading(false);
-        return;
+        if (obsRes.error) throw new Error('Unable to load this observation. Try again.');
+        if (!obsRes.data || obsRes.data.id !== obsId || obsRes.data.vehicle_id !== vehicleId) {
+          throw new Error('Observation unavailable for this vehicle.');
+        }
+
+        const rawObs = obsRes.data as any;
+        const observation: ObservationRow = {
+          ...rawObs,
+          source_slug: rawObs.observation_sources?.slug ?? null,
+          source_name: rawObs.observation_sources?.display_name ?? null,
+        };
+        setObs(observation);
+        setLoadedSubject(`${vehicleId}:${obsId}`);
+
+        // Lineage walks — best-effort, non-blocking
+        const lineageQueries: Promise<void>[] = [];
+        if (observation.superseded_by) {
+          lineageQueries.push(
+            supabase
+              .from('vehicle_observations')
+              .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
+                confidence, confidence_score, structured_data, property_id,
+                is_superseded, superseded_by`)
+              .eq('id', observation.superseded_by)
+              .eq('vehicle_id', vehicleId)
+              .abortSignal(controller.signal)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (!cancelled && data?.vehicle_id === vehicleId && data.id === observation.superseded_by) setSupersededBy(data as ObservationRow);
+              }) as unknown as Promise<void>,
+          );
+        }
+        const originalId = (observation.structured_data as any)?.supersedes_original_id;
+        if (originalId) {
+          lineageQueries.push(
+            supabase
+              .from('vehicle_observations')
+              .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
+                confidence, confidence_score, structured_data, property_id,
+                is_superseded, superseded_by`)
+              .eq('id', originalId)
+              .eq('vehicle_id', vehicleId)
+              .abortSignal(controller.signal)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (!cancelled && data?.vehicle_id === vehicleId && data.id === originalId) setSupersedes(data as ObservationRow);
+              }) as unknown as Promise<void>,
+          );
+        }
+
+        // Related: same merchant on this vehicle (cap at 10, excluding self).
+        const merchant = (observation.structured_data as any)?.merchant;
+        if (merchant && typeof merchant === 'string') {
+          lineageQueries.push(
+            supabase
+              .from('vehicle_observations')
+              .select('id, vehicle_id, kind, observed_at')
+              .eq('vehicle_id', vehicleId)
+              .eq('is_superseded', false)
+              .neq('id', obsId)
+              .filter('structured_data->>merchant', 'eq', merchant)
+              .order('observed_at', { ascending: false })
+              .limit(10)
+              .abortSignal(controller.signal)
+              .then(({ data }) => {
+                if (!cancelled && data) {
+                  setRelated(
+                    (data as any[]).filter(r => r.vehicle_id === vehicleId && r.id !== obsId).map((r) => ({
+                      id: r.id,
+                      kind: r.kind,
+                      observed_at: r.observed_at,
+                      content_text: r.content_text,
+                      merchant: r.structured_data?.merchant ?? null,
+                    })),
+                  );
+                }
+              }) as unknown as Promise<void>,
+          );
+        }
+
+        await Promise.allSettled(lineageQueries);
+      } catch (failure) {
+        if (!cancelled) {
+          setObs(null);
+          setLoadedSubject(null);
+          // Reader errors can contain internal SQL and source payloads.
+          const messages = ['Vehicle unavailable.', 'Unable to load this vehicle. Try again.',
+            'Observation unavailable for this vehicle.', 'Unable to load this observation. Try again.'];
+          const message = failure instanceof Error ? failure.message : '';
+          setError(messages.includes(message) ? message : 'Unable to load this observation. Try again.');
+        }
+      } finally {
+        window.clearTimeout(deadline);
+        if (!cancelled) setLoading(false);
       }
-
-      const rawObs = obsRes.data as any;
-      const observation: ObservationRow = {
-        ...rawObs,
-        source_slug: rawObs.observation_sources?.slug ?? null,
-        source_name: rawObs.observation_sources?.display_name ?? null,
-      };
-      setObs(observation);
-      setVehicle(vehRes.data as VehicleSummary | null);
-
-      // Lineage walks — best-effort, non-blocking
-      const lineageQueries: Promise<void>[] = [];
-      if (observation.superseded_by) {
-        lineageQueries.push(
-          supabase
-            .from('vehicle_observations')
-            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
-              confidence, confidence_score, structured_data, property_id,
-              is_superseded, superseded_by`)
-            .eq('id', observation.superseded_by)
-            .maybeSingle()
-            .then(({ data }) => {
-              if (!cancelled && data) setSupersededBy(data as ObservationRow);
-            }) as unknown as Promise<void>,
-        );
-      }
-      const originalId = (observation.structured_data as any)?.supersedes_original_id;
-      if (originalId) {
-        lineageQueries.push(
-          supabase
-            .from('vehicle_observations')
-            .select(`id, vehicle_id, kind, observed_at, ingested_at, source_id,
-              confidence, confidence_score, structured_data, property_id,
-              is_superseded, superseded_by`)
-            .eq('id', originalId)
-            .maybeSingle()
-            .then(({ data }) => {
-              if (!cancelled && data) setSupersedes(data as ObservationRow);
-            }) as unknown as Promise<void>,
-        );
-      }
-
-      // Related: same merchant on this vehicle (cap at 10, excluding self).
-      const merchant = (observation.structured_data as any)?.merchant;
-      if (merchant && typeof merchant === 'string') {
-        lineageQueries.push(
-          supabase
-            .from('vehicle_observations')
-            .select('id, kind, observed_at')
-            .eq('vehicle_id', vehicleId)
-            .eq('is_superseded', false)
-            .neq('id', obsId)
-            .filter('structured_data->>merchant', 'eq', merchant)
-            .order('observed_at', { ascending: false })
-            .limit(10)
-            .then(({ data }) => {
-              if (!cancelled && data) {
-                setRelated(
-                  (data as any[]).map((r) => ({
-                    id: r.id,
-                    kind: r.kind,
-                    observed_at: r.observed_at,
-                    content_text: r.content_text,
-                    merchant: r.structured_data?.merchant ?? null,
-                  })),
-                );
-              }
-            }) as unknown as Promise<void>,
-        );
-      }
-
-      await Promise.all(lineageQueries);
-      if (!cancelled) setLoading(false);
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(deadline);
     };
   }, [vehicleId, obsId]);
 
@@ -202,7 +242,7 @@ const ObservationPage: React.FC = () => {
   const sourceArtifact = publicObservationArtifact();
   const visibleData = useMemo(() => publicObservationData(obs?.structured_data ?? null), [obs]);
 
-  const vehLabel = vehicle
+  const vehLabel = vehicle?.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 
@@ -252,11 +292,12 @@ const ObservationPage: React.FC = () => {
       </nav>
 
       {loading && !obs && (
-        <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading observation…</div>
+        <div role="status" style={{ fontSize: 10, color: 'var(--text-secondary)', padding: 12 }}>Loading observation…</div>
       )}
 
       {error && (
         <div
+          role="alert"
           style={{
             fontSize: 10,
             color: 'var(--error, #c00)',
