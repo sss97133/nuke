@@ -1,165 +1,325 @@
 {
-  "note": "Response shapes follow IngestResult in supabase/functions/ingest/index.ts. The error strings are the extractors' own text as logged on 2026-10-06, shortened. The husk row has the column values measured on husk rows created 2026-09-25 to 2026-10-06. Vehicle ids, listing ids and URLs are synthetic.",
+  "note": "Response shapes follow IngestResult in supabase/functions/ingest/index.ts. The error strings are the extractors' own text as logged on 2026-10-06, shortened. The husk row has the column values measured on husk rows created 2026-09-25 to 2026-10-06. Vehicle ids, listing ids and URLs are synthetic. A null vehicle means the batched read-back failed.",
   "husk": {
-    "asking_price": null, "price": null, "sale_price": null, "sold_price": null, "high_bid": null, "winning_bid": null,
-    "description": null, "primary_image_url": null, "image_count": 0
+    "asking_price": null,
+    "price": null,
+    "sale_price": null,
+    "sold_price": null,
+    "high_bid": null,
+    "winning_bid": null,
+    "description": null,
+    "primary_image_url": null,
+    "image_count": 0
   },
   "cases": [
     {
-      "name": "classiccars: the AI extractor hit a 429, ingest created the vehicle from the URL slug, the row holds nothing",
+      "name": "classiccars: the AI extractor answered 429 \"no credits remaining\", ingest created the vehicle from the URL slug, the row holds nothing",
       "url": "https://classiccars.com/listings/view/0000001/1970-chevrolet-chevelle-for-sale-in-anytown-xx-00000",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000001", "is_new_vehicle": true,
-        "source": "classiccars", "external_id": "0000001", "quality_score": 0.55,
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000001",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "external_id": "0000001",
+        "quality_score": 0.55,
         "enrichment_error": "extract-vehicle-data-ai HTTP 500: {\"success\":false,\"error\":\"OpenAI API error: 429 - {\\n \\\"error\\\": {\\n \\\"message\\\": \\\"You have no credits remaining. Add credits to continue using the API"
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "rate_limited" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "billing"
+      }
     },
     {
       "name": "hagerty: the extractor was blocked by the site, the row holds nothing",
       "url": "https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/00000000-0000-4000-8000-0000000000aa",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000002", "is_new_vehicle": true,
-        "source": "hagerty", "quality_score": 0.55,
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000002",
+        "is_new_vehicle": true,
+        "source": "hagerty",
+        "quality_score": 0.55,
         "enrichment_error": "extract-hagerty-listing HTTP 500: {\"success\":false,\"error\":\"Fetch failed: Blocked by site\"}"
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "blocked" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "blocked"
+      }
     },
     {
       "name": "cars-and-bids: the extractor timed out, the row holds nothing",
       "url": "https://carsandbids.com/auctions/AbCd1234/2000-example-model",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000003", "is_new_vehicle": true,
-        "source": "cars_and_bids", "quality_score": 0.55,
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000003",
+        "is_new_vehicle": true,
+        "source": "cars_and_bids",
+        "quality_score": 0.55,
         "enrichment_error": "extract-cars-and-bids-core: Signal timed out."
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "timeout" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "timeout"
+      }
     },
     {
       "name": "mecum: the extractor found no identity on the page, the row holds nothing",
       "url": "https://www.mecum.com/lots/0000001/1970-example-model",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000004", "is_new_vehicle": true,
-        "source": "mecum", "quality_score": 0.55,
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000004",
+        "is_new_vehicle": true,
+        "source": "mecum",
+        "quality_score": 0.55,
         "enrichment_error": "extract-vehicle-data-ai returned no identity fields (year/make/vin)"
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "extraction_failed" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "extraction_failed"
+      }
     },
     {
       "name": "the extractor reported no error but the row still holds nothing: failed with the generic reason",
       "url": "https://classiccars.com/listings/view/0000002/1971-example-model-for-sale-in-anytown-xx-00000",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000005", "is_new_vehicle": true,
-        "source": "classiccars", "quality_score": 0.9
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000005",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "extraction_failed", "error_message_includes": "no price, images or description landed" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "extraction_failed",
+        "error_message_includes": "no price, images or description landed"
+      }
     },
     {
       "name": "a description alone is data",
       "url": "https://classiccars.com/listings/view/0000003/1972-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000006", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "description": "Two owners, numbers matching, recent service.", "image_count": 0 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000006",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "description": "Two owners, numbers matching, recent service.",
+        "image_count": 0
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
       "name": "an asking price alone is data",
       "url": "https://classiccars.com/listings/view/0000004/1973-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000007", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "asking_price": 18500, "price": 18500, "image_count": 0 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000007",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "asking_price": 18500,
+        "price": 18500,
+        "image_count": 0
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
       "name": "a price that PostgREST returns as a string is still a price",
       "url": "https://classiccars.com/listings/view/0000005/1974-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000008", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "asking_price": "18500.00", "image_count": 0 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000008",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "asking_price": "18500.00",
+        "image_count": 0
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
       "name": "a gallery alone is data",
       "url": "https://classiccars.com/listings/view/0000006/1975-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000009", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "image_count": 24 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000009",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "image_count": 24
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
       "name": "a primary image alone is data",
       "url": "https://classiccars.com/listings/view/0000007/1976-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-00000000000a", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "primary_image_url": "https://images.example.test/listing/0000007/1.jpg", "image_count": 0 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000a",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "primary_image_url": "https://images.example.test/listing/0000007/1.jpg",
+        "image_count": 0
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
       "name": "a zero price, a blank description and no images are not data",
       "url": "https://classiccars.com/listings/view/0000008/1977-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-00000000000b", "is_new_vehicle": true, "source": "classiccars", "quality_score": 0.9 },
-      "vehicle": { "asking_price": 0, "price": 0, "description": "   ", "primary_image_url": "", "image_count": 0 },
-      "expect": { "status": "failed", "failure_category": "extraction_failed" }
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000b",
+        "is_new_vehicle": true,
+        "source": "classiccars",
+        "quality_score": 0.9
+      },
+      "vehicle": {
+        "asking_price": 0,
+        "price": 0,
+        "description": "   ",
+        "primary_image_url": "",
+        "image_count": 0
+      },
+      "expect": {
+        "status": "failed",
+        "failure_category": "extraction_failed"
+      }
     },
     {
       "name": "matched to a vehicle that already holds data: a failed re-extraction does not make it a husk",
       "url": "https://www.hagerty.com/marketplace/auction/1966-Ford-Mustang/00000000-0000-4000-8000-0000000000bb",
       "ingest": {
-        "status": "matched", "vehicle_id": "00000000-0000-4000-8000-00000000000c", "is_new_vehicle": false,
-        "source": "hagerty", "quality_score": 0.6,
+        "status": "matched",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000c",
+        "is_new_vehicle": false,
+        "source": "hagerty",
+        "quality_score": 0.6,
         "enrichment_error": "extract-hagerty-listing HTTP 500: {\"success\":false,\"error\":\"Fetch failed: Blocked by site\"}"
       },
-      "vehicle": { "asking_price": 42000, "description": "Matching numbers.", "image_count": 31 },
-      "expect": { "status": "complete" }
+      "vehicle": {
+        "asking_price": 42000,
+        "description": "Matching numbers.",
+        "image_count": 31
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
-      "name": "matched to a vehicle that is itself a husk: failed",
+      "name": "matched to a vehicle that is itself a husk, extractor answered 429 \"no credits remaining\": failed as billing",
       "url": "https://www.mecum.com/lots/0000002/1971-example-model",
       "ingest": {
-        "status": "matched", "vehicle_id": "00000000-0000-4000-8000-00000000000d", "is_new_vehicle": false,
-        "source": "mecum", "quality_score": 0.6,
+        "status": "matched",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000d",
+        "is_new_vehicle": false,
+        "source": "mecum",
+        "quality_score": 0.6,
         "enrichment_error": "extract-vehicle-data-ai HTTP 500: {\"success\":false,\"error\":\"OpenAI API error: 429 - no credits remaining"
       },
       "vehicle": "husk",
-      "expect": { "status": "failed", "failure_category": "rate_limited" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "billing"
+      }
     },
     {
       "name": "duplicate of a vehicle that holds data",
       "url": "https://classiccars.com/listings/view/0000009/1978-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "duplicate", "vehicle_id": "00000000-0000-4000-8000-00000000000e", "is_new_vehicle": false, "source": "classiccars" },
-      "vehicle": { "asking_price": 9900, "image_count": 12 },
-      "expect": { "status": "complete" }
+      "ingest": {
+        "status": "duplicate",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000e",
+        "is_new_vehicle": false,
+        "source": "classiccars"
+      },
+      "vehicle": {
+        "asking_price": 9900,
+        "image_count": 12
+      },
+      "expect": {
+        "status": "complete"
+      }
     },
     {
-      "name": "the vehicle row could not be read and ingest reported an extractor error: failed",
+      "name": "the read-back failed and ingest also reported an extractor error: failed as readback_error, both reasons kept",
       "url": "https://classiccars.com/listings/view/0000010/1979-example-model-for-sale-in-anytown-xx-00000",
       "ingest": {
-        "status": "created", "vehicle_id": "00000000-0000-4000-8000-00000000000f", "is_new_vehicle": true, "source": "classiccars",
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-00000000000f",
+        "is_new_vehicle": true,
+        "source": "classiccars",
         "enrichment_error": "extract-vehicle-data-ai: Signal timed out."
       },
       "vehicle": null,
-      "expect": { "status": "failed", "failure_category": "timeout" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "readback_error",
+        "error_message_includes": "Signal timed out"
+      }
     },
     {
-      "name": "the vehicle row could not be read and ingest reported no error: complete, as before",
+      "name": "the read-back failed and ingest reported no error: failed, never complete (a transient read error must not turn a husk complete)",
       "url": "https://classiccars.com/listings/view/0000011/1980-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "created", "vehicle_id": "00000000-0000-4000-8000-000000000010", "is_new_vehicle": true, "source": "classiccars" },
+      "ingest": {
+        "status": "created",
+        "vehicle_id": "00000000-0000-4000-8000-000000000010",
+        "is_new_vehicle": true,
+        "source": "classiccars"
+      },
       "vehicle": null,
-      "expect": { "status": "complete" }
+      "expect": {
+        "status": "failed",
+        "failure_category": "readback_error"
+      }
     },
     {
       "name": "a rejection is not ledgered by this function",
       "url": "https://classiccars.com/listings/view/0000012/1981-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "rejected", "reason": "insufficient identity: year=? make=? model=? — need all three", "source": "classiccars" },
+      "ingest": {
+        "status": "rejected",
+        "reason": "insufficient identity: year=? make=? model=? \u2014 need all three",
+        "source": "classiccars"
+      },
       "vehicle": null,
-      "expect": { "status": null }
+      "expect": {
+        "status": null
+      }
     },
     {
       "name": "an ingest error is not ledgered, so the next poll retries it",
       "url": "https://classiccars.com/listings/view/0000013/1982-example-model-for-sale-in-anytown-xx-00000",
-      "ingest": { "status": "error", "error": "Failed to create vehicle: example" },
+      "ingest": {
+        "status": "error",
+        "error": "Failed to create vehicle: example"
+      },
       "vehicle": null,
-      "expect": { "status": null }
+      "expect": {
+        "status": null
+      }
     }
   ]
 }
