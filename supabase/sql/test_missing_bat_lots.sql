@@ -124,11 +124,12 @@ CREATE TEMP TABLE v(name text PRIMARY KEY, id uuid);
 INSERT INTO v SELECT n, gen_random_uuid() FROM unnest(ARRAY[
   'sold','bidto','exists_other','exists_case','holder','gone','merged','twin_a','twin_b','live','cheap','noresult',
   'endedsale','disagree','slash','versions','future','nobl','filler',
-  'bl_sold','bl_slash','bl_owned','bl_twin_a','bl_twin_b','bl_cheap','bl_exists','bl_endedsale']) n;
+  'bl_sold','bl_slash','bl_owned','bl_twin_a','bl_twin_b','bl_cheap','bl_exists','bl_endedsale',
+  'cv1','cv2a','cv2b','cv3','cv6','gone2']) n;
 INSERT INTO public.vehicles (id, status, merged_into_vehicle_id)
 SELECT id, CASE WHEN name = 'merged' THEN 'merged' ELSE 'active' END,
        CASE WHEN name = 'merged' THEN (SELECT id FROM v WHERE name = 'holder') END
-FROM v WHERE name <> 'gone';
+FROM v WHERE name NOT IN ('gone', 'gone2');
 CREATE FUNCTION pg_temp.vid(n text) RETURNS uuid LANGUAGE sql AS $$ SELECT id FROM v WHERE name = n $$;
 CREATE FUNCTION pg_temp.u(s text) RETURNS text LANGUAGE sql AS $$ SELECT 'https://bringatrailer.com/listing/' || s $$;
 
@@ -197,13 +198,29 @@ VALUES
   (pg_temp.vid('bl_twin_b'), pg_temp.u('lot-bl-twin'), 'sold', 15000, 15000, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}'),
   (pg_temp.vid('bl_cheap'),  pg_temp.u('lot-bl-cheap') || '/', 'sold', 50, 50, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}'),
   (pg_temp.vid('bl_exists'), pg_temp.u('lot-blx') || '/', 'sold', 9000, 9000, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}'),
-  (pg_temp.vid('bl_endedsale'), pg_temp.u('lot-bl-endedsale') || '/', 'ended', 7000, 7000, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}');
+  (pg_temp.vid('bl_endedsale'), pg_temp.u('lot-bl-endedsale') || '/', 'ended', 7000, 7000, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}'),
+  -- feed rows (no vehicle) for the comment-vehicle pass
+  (NULL, pg_temp.u('lot-cv-sold') || '/', 'sold', 22000, 22000, '2026-01-02', '2026-01-02', NULL, NULL, NULL, 0, 0,
+     '{"sync":"bat-closed-lots-sync:1.2.0","id":777,"timestamp_end":1767380700,"sold_text":"Sold for USD $22,000"}'),
+  (NULL, pg_temp.u('lot-cv-dissent') || '/', 'ended', NULL, 6000, '2026-01-03', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
+  (NULL, pg_temp.u('lot-cv-novehicle') || '/', 'ended', NULL, 7000, '2026-01-04', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
+  (NULL, pg_temp.u('lot-cv-gone') || '/', 'sold', 9000, 9000, '2026-01-05', '2026-01-05', NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
+  (NULL, pg_temp.u('lot-cv-cheap') || '/', 'sold', 50, 50, '2026-01-06', '2026-01-06', NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
+  (NULL, pg_temp.u('lot-noresult') || '/', 'ended', NULL, 5000, '2026-01-07', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}');
 
 -- Comments waiting on their lot row (comment URLs carry the trailing slash, as extract-auction-comments wrote them).
 INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, comment_text)
 SELECT pg_temp.vid(n), 'bat', pg_temp.u(s) || '/', n || g, 'c'
 FROM (VALUES ('sold', 'lot-sold'), ('bidto', 'lot-bidto'), ('bl_sold', 'lot-bl-sold'), ('gone', 'lot-gone'), ('cheap', 'lot-cheap')) x(n, s),
      generate_series(1, 5) g;
+-- Comments on feed-only lots: lot-cv-sold unanimous (cv1 x4); lot-cv-dissent two vehicles; lot-cv-novehicle one comment
+-- with no vehicle; lot-cv-gone unanimous on a vehicle that no longer exists; lot-cv-cheap unanimous, price $50.
+INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, comment_text)
+SELECT CASE WHEN n = 'none' THEN NULL ELSE pg_temp.vid(n) END, 'bat', pg_temp.u(s) || '/', n || s || g, 'c'
+FROM (VALUES ('cv1', 'lot-cv-sold', 4), ('cv2a', 'lot-cv-dissent', 2), ('cv2b', 'lot-cv-dissent', 1),
+             ('none', 'lot-cv-novehicle', 1), ('cv3', 'lot-cv-novehicle', 1), ('gone2', 'lot-cv-gone', 2),
+             ('cv6', 'lot-cv-cheap', 2)) x(n, s, k),
+     LATERAL generate_series(1, k) g;
 
 CREATE TEMP TABLE lots_before AS SELECT * FROM public.auction_events;
 TRUNCATE net.calls;  -- the fixture's own sold lots fired the trigger at setup
@@ -317,7 +334,7 @@ SELECT pg_temp.ok('bat_listings pass: creates bl_sold, bl_slash (once), nothing 
 SELECT pg_temp.ok('bat_listings pass: every evidence row counted once, by reason',
   pg_temp.skips('bl1') = jsonb_build_object(
     'vehicle_events_holds_lot', 4,   -- copies of lot-sold, lot-bidto, lot-disagree; lot-bl-owned (vehicle_events on another vehicle)
-    'no_vehicle', 1,                 -- lot-bl-feed
+    'no_vehicle', 7,                 -- lot-bl-feed and the six comment-pass feed rows
     'lot_on_several_vehicles', 2,    -- lot-bl-twin on two vehicles
     'implausible_price', 1,          -- lot-bl-cheap at $50
     'lot_exists', 1,                 -- lot-blx already on 'holder'
@@ -395,15 +412,56 @@ SELECT pg_temp.ok('no lot created for a slug any vehicle already had, and no slu
   (SELECT count(*) FROM public.auction_events WHERE lower(substring(source_url FROM 'bringatrailer\.com/listing/([^/?#]+)')) IS NOT NULL)
   = (SELECT count(DISTINCT lower(substring(source_url FROM 'bringatrailer\.com/listing/([^/?#]+)'))) FROM public.auction_events));
 
--- Idempotent: a second full walk of both sources creates nothing and changes nothing --------------------------------
+-- Walk 3: feed lots, vehicle from unanimous comment rows (lead's ruling) ---------------------------------------------
+DO $$ BEGIN
+  PERFORM public.create_missing_bat_auction_events(25, 0, 'bat_listings_comment_vehicle', 200);
+  RAISE EXCEPTION 'comment pass ran without the unkeyed comment index';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE '%idx_auction_comments_unkeyed_lot_slug is required%' THEN RAISE; END IF;
+END $$;
+\ir ../migrations/20261006130500_idx_auction_comments_unkeyed_lot_slug.sql
+SET statement_timeout = '30s';  -- the index file sets its own bounded session timeout for the build
+SELECT pg_temp.ok('unkeyed comment index is valid and partial on auction_event_id IS NULL',
+  EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+          WHERE c.relname = 'idx_auction_comments_unkeyed_lot_slug' AND i.indisvalid
+            AND pg_get_expr(i.indpred, i.indrelid) = '(auction_event_id IS NULL)'));
+SELECT pg_temp.walk('cv1', 'bat_listings_comment_vehicle', 1, 1);
+SELECT pg_temp.ok('comment pass: creates only the unanimous feed lot; every row counted once, by reason',
+  pg_temp.total('cv1', 'created') = 1 AND pg_temp.total('cv1', 'created_sold') = 1
+  AND pg_temp.skips('cv1') = jsonb_build_object(
+    'lot_exists', 6,                    -- copies of lot-sold, lot-bidto; bl_sold; bl_slash x2; lot-blx
+    'bat_listings_names_vehicle', 6,    -- disagree copy, bl_owned, bl_twin_a/b, bl_cheap, bl_endedsale
+    'vehicle_events_holds_lot', 1,      -- the feed row of lot-noresult (vehicle_events skipped it: no result)
+    'no_comment_vehicle', 1,            -- lot-bl-feed
+    'comment_vehicles_dissent', 2,      -- lot-cv-dissent (two vehicles), lot-cv-novehicle (a comment with no vehicle)
+    'vehicle_missing', 1,               -- lot-cv-gone
+    'implausible_price', 1)             -- lot-cv-cheap
+  AND pg_temp.total('cv1', 'created') + (SELECT sum(value::int) FROM jsonb_each_text(pg_temp.skips('cv1')))
+      = (SELECT count(*) FROM public.bat_listings));
+SELECT pg_temp.ok('comment-vehicle lot: the comments'' vehicle, feed price and exact feed end time, basis and count cited, no handles',
+  EXISTS (SELECT 1 FROM public.auction_events a WHERE a.vehicle_id = pg_temp.vid('cv1')
+          AND a.source_url = pg_temp.u('lot-cv-sold') AND a.outcome = 'sold' AND a.high_bid = 22000 AND a.winning_bid = 22000
+          AND a.winning_bidder IS NULL AND a.seller_name IS NULL
+          AND a.auction_end_date = timestamptz '2026-01-02 19:05Z'
+          AND a.raw_data->'evidence'->>'vehicle_basis' = 'vehicle_from_comment_rows'
+          AND a.raw_data->'evidence'->>'comment_rows' = '4'
+          AND a.raw_data->'evidence'->>'end_date_from' = 'bat_listings.raw_data.timestamp_end'
+          AND a.raw_data->'evidence'->>'feed_listing_id' = '777')
+  AND NOT EXISTS (SELECT 1 FROM public.auction_events WHERE source_url IN (pg_temp.u('lot-cv-dissent'), pg_temp.u('lot-cv-novehicle'),
+                  pg_temp.u('lot-cv-gone'), pg_temp.u('lot-cv-cheap'), pg_temp.u('lot-noresult'), pg_temp.u('lot-bl-feed')))
+  AND (SELECT count(*) FROM net.calls) = 4);
+
+-- Idempotent: a second full walk of every source creates nothing and changes nothing --------------------------------
 CREATE TEMP TABLE lots_after1 AS SELECT * FROM public.auction_events;
 SELECT pg_temp.walk('ve2', 'vehicle_events', 25, 200);
 SELECT pg_temp.walk('bl2', 'bat_listings', 25, 200);
+SELECT pg_temp.walk('cv2', 'bat_listings_comment_vehicle', 25, 200);
 SELECT pg_temp.ok('second walk creates nothing and leaves every lot unchanged',
-  pg_temp.total('ve2', 'created') = 0 AND pg_temp.total('bl2', 'created') = 0
+  pg_temp.total('ve2', 'created') = 0 AND pg_temp.total('bl2', 'created') = 0 AND pg_temp.total('cv2', 'created') = 0
+  AND (pg_temp.skips('cv2')->>'lot_exists')::int = 7
   AND (SELECT count(*) FROM public.auction_events) = (SELECT count(*) FROM lots_after1)
   AND NOT EXISTS (SELECT * FROM lots_after1 EXCEPT SELECT * FROM public.auction_events)
-  AND (pg_temp.skips('ve2')->>'lot_exists')::int = 206 AND (SELECT count(*) FROM net.calls) = 3);
+  AND (pg_temp.skips('ve2')->>'lot_exists')::int = 206 AND (SELECT count(*) FROM net.calls) = 4);
 
 -- Batch cap inside one wide window: three creatable lots, p_batch 1 -----------------------------------------------
 INSERT INTO public.vehicles (id) SELECT id FROM (VALUES (gen_random_uuid()), (gen_random_uuid()), (gen_random_uuid())) z(id);
@@ -430,9 +488,9 @@ BEGIN
 END $$;
 SELECT pg_temp.ok('comments on created lots are keyed; comments on skipped lots stay NULL',
   (SELECT count(*) FROM public.auction_comments c JOIN public.auction_events a ON a.id = c.auction_event_id
-   WHERE a.raw_data->>'extractor' = 'create_missing_bat_auction_events') = 15
-  AND (SELECT count(*) FROM public.auction_comments WHERE auction_event_id IS NULL) = 10
-  AND NOT EXISTS (SELECT 1 FROM public.auction_comments WHERE auction_event_id IS NULL
-                  AND vehicle_id NOT IN (pg_temp.vid('gone'), pg_temp.vid('cheap'))));
+   WHERE a.raw_data->>'extractor' = 'create_missing_bat_auction_events') = 19
+  AND (SELECT count(*) FROM public.auction_comments WHERE auction_event_id IS NULL) = 19
+  AND NOT EXISTS (SELECT 1 FROM public.auction_comments WHERE auction_event_id IS NULL AND vehicle_id IS NOT NULL
+                  AND vehicle_id NOT IN (SELECT pg_temp.vid(n) FROM unnest(ARRAY['gone','cheap','cv2a','cv2b','cv3','gone2','cv6']) n)));
 
 SELECT 'test_missing_bat_lots: all contracts passed' AS result;

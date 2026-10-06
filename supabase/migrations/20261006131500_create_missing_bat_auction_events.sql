@@ -9,7 +9,9 @@
 --        The January extractor ran "without auction_event_id" when no lot row existed, so these lots were never
 --        written, not deleted.
 --     36 have only a bat_listings row that names a vehicle.
---     3,361 have only a bat-closed-lots-sync feed row with no vehicle: no lot row can be made without a page read.
+--     3,361 have only a bat-closed-lots-sync feed row with no vehicle. Of those, 2,231 have comment rows that all carry
+--        one vehicle_id (147,427 comments, 0 lots with dissent; lane L's exact pass 08:26Z); 1,130 have no comments
+--        and need a page read.
 --   Where vehicle_events and bat_listings both describe a lot they agree (status 15,563/15,563, high bid 15,520/15,520,
 --   sale price 923/927): bat_listings was copied from the same read.
 --   Unkeyed comments these lots would let key_auction_comment_lots key (lane L's exact pass, 08:26Z): 1,134,958 of
@@ -48,6 +50,15 @@
 --
 -- Side effect, by design: an inserted 'sold' row fires trg_auto_create_transfer_on_auction_close (pg_net call to
 -- transfer-automator, seed_from_auction), exactly as when extract-bat-core creates a sold lot. Expected ~850 calls.
+--
+-- Third pass (lead's ruling 2026-10-06), p_source 'bat_listings_comment_vehicle': a lot recorded only by a feed row with no
+-- vehicle is created with the vehicle_id its comment rows carry, when every comment row on that URL carries the same one
+-- (at least one comment, no comment without a vehicle, no second vehicle) and their URL is the feed URL exactly. The
+-- lander set those vehicle_ids from the same URL match, so the vehicle is a retained key. Lot fields come from the feed
+-- row: outcome and prices by the rules above, auction_end_date from the feed's timestamp_end (else its date at 00:00
+-- UTC); seller and buyer are not in the feed and stay NULL. raw_data.evidence.vehicle_basis = 'vehicle_from_comment_rows'
+-- with the comment row count. Skips: comment_vehicles_dissent, no_comment_vehicle, bat_listings_names_vehicle (the
+-- bat_listings pass owns it). Needs idx_auction_comments_unkeyed_lot_slug (20261006130500).
 --
 -- Shape: walks vehicle_events (p_source 'vehicle_events') or bat_listings ('bat_listings') by physical block range like
 -- key_auction_comment_lots (20261006110000); the bat_listings pass leaves to the vehicle_events pass every lot that
@@ -95,10 +106,10 @@ BEGIN
   END IF;
   IF p_source = 'vehicle_events' THEN
     v_rel := 'public.vehicle_events'::regclass;
-  ELSIF p_source = 'bat_listings' THEN
+  ELSIF p_source IN ('bat_listings', 'bat_listings_comment_vehicle') THEN
     v_rel := 'public.bat_listings'::regclass;
   ELSE
-    RAISE EXCEPTION 'create_missing_bat_auction_events: p_source must be vehicle_events or bat_listings, got %', p_source;
+    RAISE EXCEPTION 'create_missing_bat_auction_events: p_source must be vehicle_events, bat_listings or bat_listings_comment_vehicle, got %', p_source;
   END IF;
   IF v_timeout_ms < 1 OR v_timeout_ms > 60000 THEN
     RAISE EXCEPTION 'create_missing_bat_auction_events: caller must set statement_timeout between 1 ms and 60 s (now % ms)', v_timeout_ms;
@@ -110,6 +121,14 @@ BEGIN
       AND c.relname = 'idx_auction_events_bat_lot_slug' AND i.indisvalid AND i.indisready
   ) THEN
     RAISE EXCEPTION 'create_missing_bat_auction_events: valid index idx_auction_events_bat_lot_slug is required (migration 20261006130000)';
+  END IF;
+  IF p_source = 'bat_listings_comment_vehicle' AND NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_index i
+    JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid
+    WHERE i.indrelid = 'public.auction_comments'::regclass
+      AND c.relname = 'idx_auction_comments_unkeyed_lot_slug' AND i.indisvalid AND i.indisready
+  ) THEN
+    RAISE EXCEPTION 'create_missing_bat_auction_events: valid index idx_auction_comments_unkeyed_lot_slug is required for p_source bat_listings_comment_vehicle (migration 20261006130500)';
   END IF;
 
   v_table_blocks := pg_catalog.pg_relation_size(v_rel) / current_setting('block_size')::bigint;
@@ -290,7 +309,7 @@ BEGIN
            (SELECT count(*) FROM scan s, cut WHERE ((s.row_tid::text)::point)[0]::bigint < cut.next_block) AS scanned,
            (SELECT next_block FROM cut) AS next_block
     $q$;
-  ELSE
+  ELSIF p_source = 'bat_listings' THEN
     v_sql := $q$
     WITH scan AS MATERIALIZED (
       SELECT b.id, b.ctid AS row_tid, b.vehicle_id,
@@ -417,6 +436,150 @@ BEGIN
            (SELECT count(*) FROM scan s, cut WHERE ((s.row_tid::text)::point)[0]::bigint < cut.next_block) AS scanned,
            (SELECT next_block FROM cut) AS next_block
     $q$;
+  ELSE
+    -- Feed rows (no vehicle): the vehicle comes from the lot's comment rows, only when they are unanimous (lead's
+    -- ruling 2026-10-06). Every bat_listings row of the range is classified; rows naming a vehicle belong to the
+    -- bat_listings pass.
+    v_sql := $q$
+    WITH scan AS MATERIALIZED (
+      SELECT b.id, b.ctid AS row_tid, b.vehicle_id AS bl_vehicle,
+             rtrim(split_part(split_part(b.bat_listing_url, '#', 1), '?', 1), '/') AS url,
+             lower(substring(b.bat_listing_url FROM 'bringatrailer\.com/listing/([^/?#]+)')) AS slug
+      FROM public.bat_listings b
+      WHERE b.ctid >= $1 AND b.ctid < $2
+        AND b.bat_listing_url LIKE '%bringatrailer.com/listing/%'
+    ), lots AS MATERIALIZED (
+      SELECT s.*, ((s.row_tid::text)::point)[0]::bigint AS blk,
+             EXISTS (SELECT 1 FROM public.auction_events a
+                     WHERE lower(substring(a.source_url FROM 'bringatrailer\.com/listing/([^/?#]+)')) = s.slug) AS has_lot
+      FROM scan s
+      WHERE s.slug IS NOT NULL
+    ), cand AS MATERIALIZED (
+      SELECT l.id, l.row_tid, l.blk, l.bl_vehicle, l.url, l.slug,
+             x.listing_status AS status, x.sale_price AS sale, x.final_bid AS high, x.auction_end_date AS end_date,
+             CASE WHEN x.raw_data->>'timestamp_end' ~ '^[0-9]{9,11}$'
+                  THEN to_timestamp((x.raw_data->>'timestamp_end')::bigint) END AS feed_end_at,
+             coalesce(x.raw_data->>'sync', x.raw_data->>'source') AS writer,
+             x.raw_data->>'id' AS feed_listing_id, x.raw_data->>'sold_text' AS feed_sold_text,
+             x.raw_data->>'comments' AS feed_comments, x.raw_data->>'views' AS feed_views, x.raw_data->>'watchers' AS feed_watchers,
+             x.created_at AS row_created_at, x.updated_at AS row_updated_at, x.scraped_at AS row_scraped_at,
+             EXISTS (SELECT 1 FROM public.vehicle_events o
+                     WHERE o.source_url IN (l.url, l.url || '/') AND o.source_platform = 'bat') AS ve_holds_lot,
+             g.n_vehicle_rows, g.bl_ids, g.bl_n_status, g.bl_n_sale, g.bl_n_final, g.bl_n_end,
+             cv.n_comments, cv.n_comment_vehicles, cv.n_comments_no_vehicle, cv.comment_vehicle,
+             cv.n_url_spellings, cv.url_spelling,
+             vh.id IS NOT NULL AS vehicle_exists,
+             (vh.merged_into_vehicle_id IS NOT NULL OR vh.deleted_at IS NOT NULL
+              OR coalesce(vh.status, '') IN ('merged', 'deleted', 'duplicate')) AS vehicle_retired
+      FROM lots l
+      JOIN public.bat_listings x ON x.id = l.id
+      CROSS JOIN LATERAL (
+        SELECT count(*) FILTER (WHERE y.vehicle_id IS NOT NULL) AS n_vehicle_rows,
+               array_agg(y.id ORDER BY y.id) AS bl_ids,
+               count(DISTINCT y.listing_status) AS bl_n_status, count(DISTINCT y.sale_price) AS bl_n_sale,
+               count(DISTINCT y.final_bid) AS bl_n_final, count(DISTINCT y.auction_end_date) AS bl_n_end
+        FROM public.bat_listings y
+        WHERE y.bat_listing_url IN (l.url, l.url || '/')
+      ) g
+      CROSS JOIN LATERAL (
+        SELECT count(*) AS n_comments,
+               count(DISTINCT c.vehicle_id) AS n_comment_vehicles,
+               count(*) FILTER (WHERE c.vehicle_id IS NULL) AS n_comments_no_vehicle,
+               (array_agg(DISTINCT c.vehicle_id) FILTER (WHERE c.vehicle_id IS NOT NULL))[1] AS comment_vehicle,
+               count(DISTINCT rtrim(c.source_url, '/')) AS n_url_spellings,
+               min(rtrim(c.source_url, '/')) AS url_spelling
+        FROM public.auction_comments c
+        WHERE lower(substring(c.source_url FROM 'bringatrailer\.com/listing/([^/?#]+)')) = l.slug
+          AND c.auction_event_id IS NULL
+      ) cv
+      LEFT JOIN public.vehicles vh ON vh.id = cv.comment_vehicle
+      WHERE NOT l.has_lot
+    ), cls AS MATERIALIZED (
+      SELECT c.*,
+             coalesce(c.feed_end_at, CASE WHEN c.end_date IS NOT NULL THEN c.end_date::timestamp AT TIME ZONE 'UTC' END) AS end_at,
+             CASE WHEN c.feed_end_at IS NOT NULL THEN 'bat_listings.raw_data.timestamp_end'
+                  WHEN c.end_date IS NOT NULL THEN 'bat_listings.auction_end_date at 00:00 UTC' END AS end_from,
+             CASE
+               WHEN c.bl_vehicle IS NOT NULL OR c.n_vehicle_rows > 0 THEN 'bat_listings_names_vehicle'
+               WHEN c.ve_holds_lot THEN 'vehicle_events_holds_lot'
+               WHEN c.n_comments = 0 THEN 'no_comment_vehicle'
+               WHEN c.n_comments_no_vehicle > 0 OR c.n_comment_vehicles <> 1 THEN 'comment_vehicles_dissent'
+               WHEN c.n_url_spellings <> 1 OR c.url_spelling IS DISTINCT FROM c.url THEN 'conflicting_evidence'
+               WHEN NOT c.vehicle_exists THEN 'vehicle_missing'
+               WHEN c.vehicle_retired THEN 'vehicle_retired'
+               WHEN c.bl_n_status > 1 OR c.bl_n_sale > 1 OR c.bl_n_final > 1 OR c.bl_n_end > 1 THEN 'conflicting_evidence'
+               WHEN c.status = 'active' THEN 'read_while_live'
+               WHEN c.status = 'sold' AND c.sale IS NULL THEN 'no_result'
+               WHEN c.status = 'sold' AND c.sale < 500 THEN 'implausible_price'
+               WHEN c.status = 'ended' AND c.sale IS NOT NULL THEN 'conflicting_evidence'
+               WHEN c.status = 'ended' AND c.high IS NULL THEN 'no_result'
+               WHEN c.status = 'ended' AND c.high < 500 THEN 'implausible_price'
+               WHEN c.status IS DISTINCT FROM 'sold' AND c.status IS DISTINCT FROM 'ended' THEN 'no_result'
+               WHEN coalesce(c.feed_end_at, c.end_date::timestamp AT TIME ZONE 'UTC') > now() THEN 'conflicting_evidence'
+               WHEN row_number() OVER (PARTITION BY c.slug ORDER BY c.row_tid) > 1 THEN 'same_lot_other_row'
+             END AS skip_reason
+      FROM cand c
+    ), ranked AS MATERIALIZED (
+      SELECT r.*, CASE WHEN r.skip_reason IS NULL
+                       THEN row_number() OVER (PARTITION BY (r.skip_reason IS NULL) ORDER BY r.row_tid) END AS create_rn
+      FROM cls r
+    ), cut AS MATERIALIZED (
+      -- Whole blocks only: stop after the block that holds the p_batch-th creatable row, so no row is revisited.
+      SELECT CASE WHEN count(*) FILTER (WHERE create_rn IS NOT NULL) > $3
+                  THEN min(blk) FILTER (WHERE create_rn = $3) + 1 ELSE $4 END AS next_block
+      FROM ranked
+    ), ins AS (
+      INSERT INTO public.auction_events (
+        vehicle_id, source, source_url, source_listing_id, lot_number, auction_end_date, outcome,
+        high_bid, winning_bid, winning_bidder, seller_name, total_bids, unique_bidders, comments_count,
+        page_views, watchers, scraped_at, raw_data)
+      SELECT r.comment_vehicle, 'bat', r.url, NULL, NULL, r.end_at,
+             CASE WHEN r.status = 'sold' THEN 'sold' ELSE 'bid_to' END,
+             CASE WHEN r.status = 'sold' THEN r.sale ELSE r.high END,
+             CASE WHEN r.status = 'sold' THEN r.sale END,
+             NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+             jsonb_build_object(
+               'extractor', 'create_missing_bat_auction_events',
+               'derivation', 'derived-from-retained-evidence 2026-10-06',
+               'listing_url', r.url,
+               'evidence', jsonb_strip_nulls(jsonb_build_object(
+                 'vehicle_basis', 'vehicle_from_comment_rows',
+                 'comment_rows', r.n_comments,
+                 'bat_listing_ids', to_jsonb(r.bl_ids),
+                 'writer', r.writer,
+                 'listing_status', r.status,
+                 'sale_price', r.sale,
+                 'final_bid', r.high,
+                 'auction_end_date', r.end_date,
+                 'timestamp_end', r.feed_end_at,
+                 'end_date_from', r.end_from,
+                 'feed_listing_id', r.feed_listing_id,
+                 'feed_sold_text', r.feed_sold_text,
+                 'feed_comments', r.feed_comments,
+                 'feed_views', r.feed_views,
+                 'feed_watchers', r.feed_watchers,
+                 'row_created_at', r.row_created_at,
+                 'row_updated_at', r.row_updated_at,
+                 'row_scraped_at', r.row_scraped_at)))
+      FROM ranked r, cut
+      WHERE r.create_rn IS NOT NULL AND r.blk < cut.next_block
+      ORDER BY r.row_tid
+      ON CONFLICT (vehicle_id, source_url) DO NOTHING
+      RETURNING outcome
+    )
+    SELECT (SELECT count(*) FROM ins) AS created,
+           (SELECT count(*) FROM ins WHERE outcome = 'sold') AS created_sold,
+           (SELECT count(*) FROM ins WHERE outcome = 'bid_to') AS created_bid_to,
+           (SELECT count(*) FROM ranked r, cut WHERE r.create_rn IS NOT NULL AND r.blk < cut.next_block) AS attempted,
+           (SELECT coalesce(jsonb_object_agg(reason, n), '{}'::jsonb) FROM (
+              SELECT r.skip_reason AS reason, count(*) AS n FROM ranked r, cut
+              WHERE r.skip_reason IS NOT NULL AND r.blk < cut.next_block GROUP BY 1
+              UNION ALL
+              SELECT 'lot_exists', count(*) FROM lots l, cut WHERE l.has_lot AND l.blk < cut.next_block HAVING count(*) > 0
+            ) z) AS skipped,
+           (SELECT count(*) FROM scan s, cut WHERE ((s.row_tid::text)::point)[0]::bigint < cut.next_block) AS scanned,
+           (SELECT next_block FROM cut) AS next_block
+    $q$;
   END IF;
 
   EXECUTE v_sql INTO v_res USING v_lo, v_hi, p_batch, v_end;
@@ -440,7 +603,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.create_missing_bat_auction_events(integer, bigint, text, integer) IS
-'Sanctioned writer of auction_events rows for BaT lots that no vehicle has a lot row for, from retained evidence only: a vehicle_events row (p_source vehicle_events) or a bat_listings row naming a vehicle (p_source bat_listings), for the same vehicle and lot URL. No page is read. Walks p_source by physical block range from p_from_block (p_scan_blocks per call) and inserts about p_batch rows (whole blocks: at most one more block of rows) with ON CONFLICT (vehicle_id, source_url) DO NOTHING; never updates a lot. Copies: source_url without query, fragment or trailing slash; outcome sold (sold status with a sale price) or bid_to (ended with a high bid, no sale price); high_bid, winning_bid, winning_bidder and seller_name only where every evidence row agrees; auction_end_date from ended_at, sold_at (sold), or the bat_listings date at 00:00 UTC. Leaves lot_number, counts and scraped_at NULL (evidence values kept in raw_data.evidence). raw_data names the extractor, derivation ''derived-from-retained-evidence 2026-10-06'' and the evidence row ids. Skips and counts: lot_exists (any vehicle, idx_auction_events_bat_lot_slug), vehicle_missing, vehicle_retired, lot_on_several_vehicles, read_while_live, no_result, implausible_price (under $500), conflicting_evidence, no_vehicle, vehicle_events_holds_lot, same_lot_other_row. A sold insert fires trg_auto_create_transfer_on_auction_close as any new sold lot does. Caller sets statement_timeout (1..60 s) and passes next_block back in; the cursor stops after the block in which p_batch is reached, so every evidence row is counted once. Declares app.writer create-missing-bat-lots. Requires idx_auction_events_bat_lot_slug.';
+'Sanctioned writer of auction_events rows for BaT lots that no vehicle has a lot row for, from retained evidence only: a vehicle_events row (p_source vehicle_events) or a bat_listings row naming a vehicle (p_source bat_listings), for the same vehicle and lot URL; or, for a lot only a feed row records, the vehicle_id that every comment row on that URL carries (p_source bat_listings_comment_vehicle; any dissent or no comment: skipped). No page is read. Walks p_source by physical block range from p_from_block (p_scan_blocks per call) and inserts about p_batch rows (whole blocks: at most one more block of rows) with ON CONFLICT (vehicle_id, source_url) DO NOTHING; never updates a lot. Copies: source_url without query, fragment or trailing slash; outcome sold (sold status with a sale price) or bid_to (ended with a high bid, no sale price); high_bid, winning_bid, winning_bidder and seller_name only where every evidence row agrees; auction_end_date from ended_at, sold_at (sold), or the bat_listings date at 00:00 UTC. Leaves lot_number, counts and scraped_at NULL (evidence values kept in raw_data.evidence). raw_data names the extractor, derivation ''derived-from-retained-evidence 2026-10-06'' and the evidence row ids. Skips and counts: lot_exists (any vehicle, idx_auction_events_bat_lot_slug), vehicle_missing, vehicle_retired, lot_on_several_vehicles, read_while_live, no_result, implausible_price (under $500), conflicting_evidence, no_vehicle, vehicle_events_holds_lot, bat_listings_names_vehicle, no_comment_vehicle, comment_vehicles_dissent, same_lot_other_row. A sold insert fires trg_auto_create_transfer_on_auction_close as any new sold lot does. Caller sets statement_timeout (1..60 s) and passes next_block back in; the cursor stops after the block in which p_batch is reached, so every evidence row is counted once. Declares app.writer create-missing-bat-lots. Requires idx_auction_events_bat_lot_slug, and idx_auction_comments_unkeyed_lot_slug for the comment pass.';
 
 REVOKE ALL ON FUNCTION public.create_missing_bat_auction_events(integer, bigint, text, integer) FROM PUBLIC;
 DO $grants$ BEGIN
@@ -461,14 +624,14 @@ UPDATE public.pipeline_registry SET
   owned_by = 'extract-bat-core',
   description = 'The canonical lot: one row per vehicle x lot URL (unique vehicle_id, source_url), holding the lot result and counts. auction_comments.auction_event_id keys to it. Lot rows are written by the readers of the lot page or its live frames; create_missing_bat_auction_events adds BaT lots never written, from retained vehicle_events / bat_listings rows (raw_data.extractor names it).',
   do_not_write_directly = true,
-  write_via = 'extract-bat-core upserts on (vehicle_id, source_url) at every BaT read; ingest_bat_live_events inserts a live row for a monitored lot with none and keeps it current; extract-cars-and-bids-comments inserts a Cars and Bids lot with none; create_missing_bat_auction_events(p_batch, p_from_block, p_source, p_scan_blocks) creates BaT lots that no vehicle has, from retained evidence, never updating a lot.',
+  write_via = 'extract-bat-core upserts on (vehicle_id, source_url) at every BaT read; ingest_bat_live_events inserts a live row for a monitored lot with none and keeps it current; extract-cars-and-bids-comments inserts a Cars and Bids lot with none; create_missing_bat_auction_events(p_batch, p_from_block, p_source, p_scan_blocks) creates BaT lots that no vehicle has, from retained evidence (vehicle_events, bat_listings, or the unanimous vehicle of a feed lot''s comment rows), never updating a lot.',
   updated_at = now()
 WHERE table_name = 'auction_events' AND column_name IS NULL;
 INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, description, do_not_write_directly, write_via)
 SELECT 'auction_events', NULL, 'extract-bat-core',
   'The canonical lot: one row per vehicle x lot URL (unique vehicle_id, source_url), holding the lot result and counts. auction_comments.auction_event_id keys to it. Lot rows are written by the readers of the lot page or its live frames; create_missing_bat_auction_events adds BaT lots never written, from retained vehicle_events / bat_listings rows (raw_data.extractor names it).',
   true,
-  'extract-bat-core upserts on (vehicle_id, source_url) at every BaT read; ingest_bat_live_events inserts a live row for a monitored lot with none and keeps it current; extract-cars-and-bids-comments inserts a Cars and Bids lot with none; create_missing_bat_auction_events(p_batch, p_from_block, p_source, p_scan_blocks) creates BaT lots that no vehicle has, from retained evidence, never updating a lot.'
+  'extract-bat-core upserts on (vehicle_id, source_url) at every BaT read; ingest_bat_live_events inserts a live row for a monitored lot with none and keeps it current; extract-cars-and-bids-comments inserts a Cars and Bids lot with none; create_missing_bat_auction_events(p_batch, p_from_block, p_source, p_scan_blocks) creates BaT lots that no vehicle has, from retained evidence (vehicle_events, bat_listings, or the unanimous vehicle of a feed lot''s comment rows), never updating a lot.'
 WHERE NOT EXISTS (SELECT 1 FROM public.pipeline_registry WHERE table_name = 'auction_events' AND column_name IS NULL);
 
 COMMIT;
