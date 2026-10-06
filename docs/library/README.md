@@ -97,11 +97,11 @@ The code is an implementation of the library. The library is the source of truth
 ## CURRENT STATE
 
 <!-- library-stats:start -->
-Measured 2026-10-06 06:07 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
+Measured 2026-10-06 06:51 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
 
 | Shelf | Files | Lines |
 |---|---:|---:|
-| `(top level)` | 3 | 597 |
+| `(top level)` | 3 | 621 |
 | `blog` | 1 | 82 |
 | `intellectual/contemplations` | 22 | 3,861 |
 | `intellectual/discourses` | 9 | 2,022 |
@@ -120,7 +120,7 @@ Measured 2026-10-06 06:07 UTC from the files in this directory by [`scripts/data
 | `technical/design-book` | 24 | 8,209 |
 | `technical/engineering-manual` | 25 | 9,178 |
 | `technical/schematics` | 6 | 4,998 |
-| **Total** | **181** | **76,812** |
+| **Total** | **181** | **76,836** |
 <!-- library-stats:end -->
 
 The target is 100,000+ lines. The table above is the measurement; the judgments below are from 2026-03-20 and have not been re-graded since.
