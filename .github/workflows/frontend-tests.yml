@@ -91,6 +91,10 @@ jobs:
         run: createdb dm_refinement_comment_lot_keys_ci
       - name: Verify comment lot keys by bounded backfill; one candidate keyed, several or none left NULL
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_lot_keys_ci -f supabase/sql/test_comment_lot_keys.sql
+      - name: Create disposable episode clock-lock guard database
+        run: createdb dm_refinement_clock_lock_guard_ci
+      - name: Verify a superseded episode's locked clocks survive lander updates and wholesale metadata writes
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_clock_lock_guard_ci -f supabase/sql/test_vehicle_event_clock_lock_guard.sql
       - name: Create disposable price-history sale clock database
         run: createdb dm_price_history_sale_clock_ci
       - name: Verify sale price points are clocked at the sale date; other price clocks unchanged
