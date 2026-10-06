@@ -4,10 +4,15 @@
 --   extract-bat-core upserts the lot on (vehicle_id, source_url = canonicalUrl(url), no trailing slash) and
 --   passes that row's id into every comment it builds (index.ts ~2629, batAuctionRecord.ts buildAuctionCommentRows);
 --   the comment's own source_url is the same URL with a trailing slash. ingest_bat_live_events looks the lot up on
---   vehicle_id and rtrim(source_url,'/') (20261005004554). extract-auction-comments and
+--   vehicle_id and rtrim(source_url,'/') (20261005004554); bat_live_pull_run compares
+--   rtrim(a.source_url,'/') = rtrim(m.external_auction_url,'/') (20261006060000). extract-auction-comments and
 --   extract-cars-and-bids-comments match on source + URL alone, a looser rule than this one.
---   So: a comment's lot is the auction_events row with the comment's vehicle_id and the comment's source_url,
---   ignoring one trailing slash. Exact case, as the writers do.
+--   So: a comment's lot is the auction_events row with the comment's vehicle_id, the comment's source_url ignoring
+--   trailing slashes (the lander's own rtrim comparison, on both sides), exact case, and a source that is the
+--   comment's platform. Platform mapping: source = platform, plus source 'bringatrailer' for platform 'bat' (140 lot
+--   rows carry that older spelling, all bringatrailer.com URLs). Measured over all 13,114 candidate (vehicle, URL)
+--   keys: 13,112 match on source = platform, 2 keys (56 comments) only through the bringatrailer alias, 0 on another
+--   platform's lot.
 --
 -- Population (prod, 2026-10-06 08:26-08:30Z, read-only exact pass by block range, +-0.2% for rows moving under a
 -- concurrent backfill): auction_event_id IS NULL on 2,355,074 of 19,986,304 comments (11.8%). Intake since
@@ -20,12 +25,16 @@
 --   vehicle_events for the same vehicle, 90% in bat_listings), and this function never creates one.
 --   452 have no vehicle: left NULL.
 --
+-- Write cost: auction_event_id is indexed (idx_auction_comments_auction), so every keyed row is a non-HOT update
+-- (index entries, a dead tuple in the scanned range, growth at the heap tail). The runner paces it (10,000-row
+-- batches, 3 s apart, dead-tuple log, stops on lock waiters or a slow live pull); VACUUM (ANALYZE) after the run.
+--
 -- This migration:
 --   1. key_auction_comment_lots(p_batch, p_from_block): the bounded backfill. Walks the heap by physical block range
 --      (TID range scan) like key_auction_comment_authors (20261006090000): 170-320 ms cold for the read side of a
 --      20K-row range on prod (EXPLAIN ANALYZE of the same predicates, 2026-10-06). Per range it groups the NULL rows
---      by (vehicle_id, URL), counts the candidate lots for each key, and keys only keys with exactly one candidate.
---      The caller passes the returned next_block back in and must set statement_timeout (1..60 s).
+--      by (vehicle_id, platform, URL), counts the candidate lots for each key, and keys only keys with exactly one
+--      candidate. The caller passes the returned next_block back in and must set statement_timeout (1..60 s).
 --   2. COMMENT ON the column and the function; pipeline_registry row for auction_comments.auction_event_id (upsert).
 -- No row is changed by this migration. Rows change only when the backfill function is called.
 
@@ -39,14 +48,14 @@ CREATE OR REPLACE FUNCTION public.key_auction_comment_lots(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 SET lock_timeout = '5s'
 AS $fn$
 DECLARE
   c_max_block constant bigint := 4294967295;  -- largest block number a tid can hold
-  v_timeout_ms bigint := (SELECT setting::bigint FROM pg_settings WHERE name = 'statement_timeout');
+  v_timeout_ms bigint := (SELECT setting::bigint FROM pg_catalog.pg_settings WHERE name = 'statement_timeout');
   v_rows_per_page numeric;
-  v_table_blocks bigint := pg_relation_size('public.auction_comments') / current_setting('block_size')::bigint;
+  v_table_blocks bigint := pg_catalog.pg_relation_size('public.auction_comments') / current_setting('block_size')::bigint;
   v_blocks bigint;
   v_next bigint;
   v_lo tid;
@@ -75,38 +84,42 @@ BEGIN
   PERFORM set_config('app.writer', 'key-comment-lots', true);
 
   SELECT CASE WHEN relpages > 0 AND reltuples > 0 THEN reltuples::numeric / relpages ELSE 15 END
-    INTO v_rows_per_page FROM pg_class WHERE oid = 'public.auction_comments'::regclass;
+    INTO v_rows_per_page FROM pg_catalog.pg_class WHERE oid = 'public.auction_comments'::regclass;
   v_blocks := greatest(1, ceil(p_batch / greatest(v_rows_per_page, 1)))::bigint;
   v_next := least(p_from_block + v_blocks, c_max_block);
   v_lo := format('(%s,0)', p_from_block)::tid;
   v_hi := format('(%s,0)', v_next)::tid;
 
-  -- One statement: the unkeyed rows of the range grouped by (vehicle, URL); the candidate lots of each key by the
-  -- lander's rule; the UPDATE of keys with exactly one candidate. A row with no vehicle or no URL has no candidate.
+  -- One statement: the unkeyed rows of the range grouped by (vehicle, platform, URL); the candidate lots of each key
+  -- by the lander's rule; the UPDATE of keys with exactly one candidate. A row with no vehicle, platform or URL has no
+  -- candidate. left_several and left_none are counted from the statement's snapshot: under a concurrent keyer they
+  -- can include rows another session keyed meanwhile (cosmetic; keyed is exact).
   EXECUTE $q$
     WITH keys AS MATERIALIZED (
-      SELECT c.vehicle_id, rtrim(c.source_url, '/') AS u, count(*) AS n_rows
-      FROM auction_comments c
+      SELECT c.vehicle_id, c.platform, rtrim(c.source_url, '/') AS u, count(*) AS n_rows
+      FROM public.auction_comments c
       WHERE c.ctid >= $1 AND c.ctid < $2
         AND c.auction_event_id IS NULL
-      GROUP BY 1, 2
+      GROUP BY 1, 2, 3
     ), cand AS MATERIALIZED (
-      SELECT k.vehicle_id, k.u, k.n_rows, l.n_lots, l.lot_id
+      SELECT k.vehicle_id, k.platform, k.u, k.n_rows, l.n_lots, l.lot_id
       FROM keys k
       CROSS JOIN LATERAL (
         SELECT count(*) AS n_lots, (array_agg(a.id))[1] AS lot_id
-        FROM auction_events a
+        FROM public.auction_events a
         WHERE a.vehicle_id = k.vehicle_id
-          AND a.source_url IN (k.u, k.u || '/')
+          AND rtrim(a.source_url, '/') = k.u
+          AND (a.source = k.platform OR (k.platform = 'bat' AND a.source = 'bringatrailer'))
       ) l
     ), upd AS (
-      UPDATE auction_comments c
+      UPDATE public.auction_comments c
       SET auction_event_id = cand.lot_id
       FROM cand
       WHERE c.ctid >= $1 AND c.ctid < $2
         AND c.auction_event_id IS NULL
         AND cand.n_lots = 1
         AND c.vehicle_id = cand.vehicle_id
+        AND c.platform = cand.platform
         AND rtrim(c.source_url, '/') = cand.u
       RETURNING 1
     )
@@ -132,7 +145,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.key_auction_comment_lots(integer, bigint) IS
-'Sanctioned writer of auction_comments.auction_event_id for existing rows. Scans about p_batch rows by physical block range starting at p_from_block. Keys a comment whose auction_event_id is NULL to the auction_events row with the same vehicle_id and the same source_url ignoring one trailing slash (the rule extract-bat-core and ingest_bat_live_events apply at insert), only when exactly one such row exists. Two or more candidates, no candidate, no vehicle or no URL: left NULL. Never creates an auction_events row, never changes a key already set. Idempotent. Caller sets statement_timeout (1..60 s) and passes next_block back in. Declares app.writer key-comment-lots. Returns keyed, left_several_lots, left_no_lot, next_block, remaining_blocks, done.';
+'Sanctioned writer of auction_comments.auction_event_id for existing rows. Scans about p_batch rows by physical block range starting at p_from_block. Keys a comment whose auction_event_id is NULL to the auction_events row with the same vehicle_id, the same source_url ignoring trailing slashes (the lander''s own rtrim comparison: extract-bat-core, ingest_bat_live_events, bat_live_pull_run), exact case, and source equal to the comment''s platform (or bringatrailer for bat), only when exactly one such row exists. Measured 2026-10-06 over all 13,114 candidate keys: 2 keys match only through the bringatrailer alias, 0 on another platform''s lot. Two or more candidates, no candidate, no vehicle, platform or URL: left NULL. Never creates an auction_events row, never changes a key already set. Idempotent. Caller sets statement_timeout (1..60 s) and passes next_block back in. Declares app.writer key-comment-lots. Returns keyed (exact), left_several_lots and left_no_lot (from the statement snapshot; may include rows a concurrent writer keyed meanwhile), next_block, remaining_blocks, done.';
 
 REVOKE ALL ON FUNCTION public.key_auction_comment_lots(integer, bigint) FROM PUBLIC;
 DO $grants$ BEGIN
@@ -148,12 +161,12 @@ DO $grants$ BEGIN
 END $grants$;
 
 COMMENT ON COLUMN public.auction_comments.auction_event_id IS
-'Lot the comment was posted on, FK to auction_events.id (ON DELETE CASCADE). Rule: the auction_events row with this comment''s vehicle_id and source_url, ignoring one trailing slash. At insert: extract-bat-core passes the lot row it wrote in the same read; ingest_bat_live_events looks it up by that rule. Existing rows: key_auction_comment_lots(), only where exactly one lot matches. NULL means unresolved: no auction_events row for this vehicle and URL yet, two rows (both slash spellings), or no vehicle or URL on the comment. Owner: pipeline_registry. Unit: none. Grain: one comment. Clock: n/a.';
+'Lot the comment was posted on, FK to auction_events.id (ON DELETE CASCADE). Rule: the auction_events row with this comment''s vehicle_id, its source_url ignoring trailing slashes (the lander''s own rtrim comparison), and a source equal to its platform (or bringatrailer for bat). At insert: extract-bat-core passes the lot row it wrote in the same read; ingest_bat_live_events looks it up by that rule. Existing rows: key_auction_comment_lots(), only where exactly one lot matches. NULL means unresolved: no auction_events row for this vehicle and URL yet, two rows (both slash spellings), or no vehicle or URL on the comment. Owner: pipeline_registry. Unit: none. Grain: one comment. Clock: n/a.';
 
 INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, description, do_not_write_directly, write_via)
 VALUES
 ('auction_comments', 'auction_event_id', 'key_auction_comment_lots',
- 'Lot key: auction_events.id for (vehicle_id, source_url ignoring one trailing slash), exact case. NULL = unresolved (no lot row yet, two candidate rows, or no vehicle/URL). Derived from vehicle_id + source_url, never testimony.',
+ 'Lot key: auction_events.id for (vehicle_id, source_url ignoring trailing slashes as the lander compares them, source = platform or bringatrailer for bat), exact case. NULL = unresolved (no lot row yet, two candidate rows, or no vehicle/URL). Derived from vehicle_id + platform + source_url, never testimony.',
  false,
  'At insert: extract-bat-core passes the lot row id it upserted in the same read (buildAuctionCommentRows); ingest_bat_live_events looks it up by vehicle_id + rtrim(source_url). Existing rows: key_auction_comment_lots(p_batch, p_from_block), only where exactly one lot matches.')
 ON CONFLICT (table_name, column_name) DO UPDATE SET

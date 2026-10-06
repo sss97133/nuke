@@ -27,7 +27,7 @@ END $$;
 
 CREATE TABLE public.auction_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  vehicle_id uuid, source text, source_url text, outcome text,
+  vehicle_id uuid, source text NOT NULL, source_url text, outcome text,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
 );
 CREATE UNIQUE INDEX idx_auction_events_vehicle_source_url ON public.auction_events (vehicle_id, source_url);
@@ -83,9 +83,12 @@ REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.rec
 --   v3: one lot, but its comments carry another lot's URL.
 --   v4: no lot at all; its URL's lot row exists on another vehicle v5.
 --   v6: a Cars and Bids lot.
+--   v7: one lot whose comments sit at the first and the last heap block (a group straddling batch boundaries).
+--   v8: a Cars and Bids comment whose (vehicle, URL) lot row carries source 'bat' (another platform's lot).
+--   v9: one lot with the older source spelling 'bringatrailer'.
+--   v10: one lot stored with two trailing slashes (the lander's rtrim strips all of them).
 CREATE TEMP TABLE v(name text PRIMARY KEY, id uuid);
-INSERT INTO v VALUES ('v1', gen_random_uuid()), ('v2', gen_random_uuid()), ('v3', gen_random_uuid()),
-                     ('v4', gen_random_uuid()), ('v5', gen_random_uuid()), ('v6', gen_random_uuid());
+INSERT INTO v SELECT 'v' || i, gen_random_uuid() FROM generate_series(1, 10) i;
 INSERT INTO public.auction_events (vehicle_id, source, source_url, outcome)
 SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-a', 'sold' FROM v WHERE name = 'v1'
 UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-b', 'sold' FROM v WHERE name = 'v2'
@@ -93,7 +96,15 @@ UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-b/', 'sold' F
 UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-c', 'sold' FROM v WHERE name = 'v3'
 UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-e', 'sold' FROM v WHERE name = 'v5'
 UNION ALL SELECT id, 'cars_and_bids', 'https://carsandbids.com/auctions/xyz/2001-bmw-m3', 'sold' FROM v WHERE name = 'v6'
+UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-s', 'sold' FROM v WHERE name = 'v7'
+UNION ALL SELECT id, 'bat', 'https://carsandbids.com/auctions/abc/1999-porsche-911', 'sold' FROM v WHERE name = 'v8'
+UNION ALL SELECT id, 'bringatrailer', 'https://bringatrailer.com/listing/lot-r', 'sold' FROM v WHERE name = 'v9'
+UNION ALL SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-h//', 'sold' FROM v WHERE name = 'v10'
 UNION ALL SELECT NULL::uuid, 'bat', 'https://bringatrailer.com/listing/lot-f', 'sold';
+
+-- First straddling row: lands in heap block 0.
+INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, author_username, posted_at, comment_text)
+SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-s/', 'h-straddle-1', 'x', '2026-09-28', 'straddle first' FROM v WHERE name = 'v7';
 
 -- The backfill population: 2,400 filler rows over many heap blocks so the block cursor is exercised.
 --   g%4 = 0: v1, lot-a/ (one lot)           -> keyed
@@ -113,14 +124,22 @@ VALUES
   ((SELECT id FROM v WHERE name = 'v1'), 'bat', NULL, 'h-nourl', 'x', '2026-09-28', 'no url'),
   (NULL, 'bat', 'https://bringatrailer.com/listing/lot-a/', 'h-novehicle', 'x', '2026-09-28', 'no vehicle'),
   (NULL, 'bat', 'https://bringatrailer.com/listing/lot-f/', 'h-novehicle-f', 'x', '2026-09-28', 'no vehicle, lot with no vehicle'),
-  ((SELECT id FROM v WHERE name = 'v6'), 'cars_and_bids', 'https://carsandbids.com/auctions/xyz/2001-bmw-m3/', 'h-cab', 'x', '2026-09-28', 'cars and bids');
+  ((SELECT id FROM v WHERE name = 'v6'), 'cars_and_bids', 'https://carsandbids.com/auctions/xyz/2001-bmw-m3/', 'h-cab', 'x', '2026-09-28', 'cars and bids'),
+  ((SELECT id FROM v WHERE name = 'v8'), 'cars_and_bids', 'https://carsandbids.com/auctions/abc/1999-porsche-911/', 'h-xplat', 'x', '2026-09-28', 'lot of another platform'),
+  ((SELECT id FROM v WHERE name = 'v9'), 'bat', 'https://bringatrailer.com/listing/lot-r/', 'h-alias', 'x', '2026-09-28', 'bringatrailer alias'),
+  ((SELECT id FROM v WHERE name = 'v10'), 'bat', 'https://bringatrailer.com/listing/lot-h/', 'h-slashes', 'x', '2026-09-28', 'lot stored with two slashes');
 -- A comment already keyed (to another lot than the rule would pick): never changed.
 INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, author_username, posted_at, comment_text, auction_event_id)
 SELECT (SELECT id FROM v WHERE name = 'v1'), 'bat', 'https://bringatrailer.com/listing/lot-a/', 'h-prekeyed', 'x', '2026-09-28', 'pre-keyed',
        (SELECT a.id FROM public.auction_events a JOIN v ON v.id = a.vehicle_id AND v.name = 'v3');
+-- Second straddling row: lands in the last heap block.
+INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, author_username, posted_at, comment_text)
+SELECT id, 'bat', 'https://bringatrailer.com/listing/lot-s', 'h-straddle-2', 'x', '2026-09-28', 'straddle last' FROM v WHERE name = 'v7';
 
 CREATE TEMP TABLE comments_before AS SELECT * FROM public.auction_comments;
 CREATE TEMP TABLE lots_before AS SELECT * FROM public.auction_events;
+CREATE TEMP TABLE straddle_blocks AS
+  SELECT id, ((ctid::text)::point)[0]::bigint AS blk FROM public.auction_comments WHERE content_hash LIKE 'h-straddle-%';
 -- A stale registration the migration must overwrite, not skip.
 INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, description)
 VALUES ('auction_comments', 'auction_event_id', 'stale-owner', 'stale registration');
@@ -138,11 +157,14 @@ SELECT pg_temp.ok('registry names the backfill as owner, replacing a stale owner
 SELECT pg_temp.ok('column comment names the rule and the backfill',
   col_description('public.auction_comments'::regclass,
     (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.auction_comments'::regclass AND attname = 'auction_event_id'))
-  LIKE '%key_auction_comment_lots()%');
+  LIKE '%ignoring trailing slashes%key_auction_comment_lots()%');
 SELECT pg_temp.ok('backfill is not callable by anon or authenticated',
   NOT has_function_privilege('anon', 'public.key_auction_comment_lots(integer, bigint)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.key_auction_comment_lots(integer, bigint)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.key_auction_comment_lots(integer, bigint)', 'EXECUTE'));
+SELECT pg_temp.ok('function runs with a fixed search_path ending in pg_temp',
+  (SELECT proconfig @> ARRAY['search_path=public, pg_temp'] FROM pg_proc
+   WHERE oid = 'public.key_auction_comment_lots(integer, bigint)'::regprocedure));
 
 -- Guards ----------------------------------------------------------------------------------------------
 SET statement_timeout = 0;
@@ -180,30 +202,59 @@ SELECT pg_temp.ok('start blocks at or past the end, and past the tid range, retu
          FROM unnest(ARRAY[pg_relation_size('public.auction_comments') / current_setting('block_size')::bigint,
                            1000000, 4294967294, 4294967295, 5000000000]) b) s));
 
--- Walk the whole heap -----------------------------------------------------------------------------------
+-- Walk the whole heap, one block per call ----------------------------------------------------------------
+-- p_batch 1 makes every call scan exactly one block whatever the planner statistics say
+-- (greatest(1, ceil(1 / rows_per_page)) = 1), so the cursor arithmetic is asserted, not a batch count.
+SELECT pg_temp.ok('straddling group sits in two different heap blocks before the walk',
+  (SELECT count(DISTINCT blk) FROM straddle_blocks) = 2 AND (SELECT min(blk) FROM straddle_blocks) = 0);
 CREATE TEMP TABLE walk(run text, step int, result jsonb);
 DO $$
 DECLARE r jsonb; b bigint := 0; i int := 0;
 BEGIN
   LOOP
-    r := public.key_auction_comment_lots(200, b);
+    r := public.key_auction_comment_lots(1, b);
     i := i + 1;
     INSERT INTO walk VALUES ('first', i, r);
-    EXIT WHEN (r->>'done')::boolean OR i > 1000;
+    EXIT WHEN (r->>'done')::boolean OR i > 100000;
     b := (r->>'next_block')::bigint;
   END LOOP;
 END $$;
-SELECT pg_temp.ok('walk spans several batches', (SELECT count(*) FROM walk WHERE run = 'first') > 3);
-SELECT pg_temp.ok('unambiguous: every comment with exactly one lot by (vehicle, URL ignoring the slash) is keyed',
-  (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'first') = 602  -- 600 lot-a/ + 'no trailing slash' + 'cars and bids'
+SELECT pg_temp.ok('cursor: starts at block 0; each call starts where the last ended; one block per call',
+  (SELECT (result->>'from_block')::bigint FROM walk WHERE run = 'first' AND step = 1) = 0
+  AND NOT EXISTS (SELECT 1 FROM walk w JOIN walk p ON p.run = w.run AND p.step = w.step - 1
+                  WHERE w.run = 'first' AND (w.result->>'from_block')::bigint <> (p.result->>'next_block')::bigint)
+  AND NOT EXISTS (SELECT 1 FROM walk WHERE run = 'first'
+                  AND ((result->>'next_block')::bigint - (result->>'from_block')::bigint <> 1
+                       OR (result->>'blocks_scanned')::bigint
+                          <> least((result->>'next_block')::bigint, (result->>'table_blocks')::bigint) - (result->>'from_block')::bigint
+                       OR (result->>'remaining_blocks')::bigint
+                          <> greatest(0, (result->>'table_blocks')::bigint - (result->>'next_block')::bigint))));
+SELECT pg_temp.ok('cursor: only the last call reports done, at the table end',
+  (SELECT count(*) FROM walk WHERE run = 'first' AND (result->>'done')::boolean) = 1
+  AND (SELECT (result->>'done')::boolean AND (result->>'next_block')::bigint >= (result->>'table_blocks')::bigint
+       FROM walk WHERE run = 'first' ORDER BY step DESC LIMIT 1)
+  AND (SELECT count(*) FROM walk WHERE run = 'first') >= (SELECT max(blk) FROM straddle_blocks) + 1);
+SELECT pg_temp.ok('a (vehicle, URL) group straddling batch boundaries is keyed in each batch, to the same lot',
+  (SELECT count(DISTINCT w.step) FROM straddle_blocks s JOIN walk w ON w.run = 'first'
+     AND s.blk >= (w.result->>'from_block')::bigint AND s.blk < (w.result->>'next_block')::bigint) = 2
+  AND (SELECT count(*) FROM public.auction_comments c JOIN public.auction_events a ON a.id = c.auction_event_id
+       WHERE c.content_hash LIKE 'h-straddle-%' AND a.source_url = 'https://bringatrailer.com/listing/lot-s') = 2);
+SELECT pg_temp.ok('unambiguous: every comment with exactly one lot by (vehicle, platform, URL ignoring slashes) is keyed',
+  -- 600 lot-a/ + no trailing slash + cars and bids + 2 straddling + bringatrailer alias + lot stored with two slashes
+  (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'first') = 606
   AND NOT EXISTS (SELECT 1 FROM public.auction_comments c JOIN v ON v.id = c.vehicle_id AND v.name = 'v1'
                   WHERE c.source_url IN ('https://bringatrailer.com/listing/lot-a/', 'https://bringatrailer.com/listing/lot-a')
-                    AND c.auction_event_id IS NULL));
-SELECT pg_temp.ok('every key set by the walk points at the lot with the same vehicle and URL',
+                    AND c.auction_event_id IS NULL)
+  AND (SELECT bool_and(auction_event_id IS NOT NULL) FROM public.auction_comments
+       WHERE comment_text IN ('bringatrailer alias', 'lot stored with two slashes', 'cars and bids', 'no trailing slash')));
+SELECT pg_temp.ok('every key set by the walk points at the lot with the same vehicle, URL and platform',
   NOT EXISTS (SELECT 1 FROM public.auction_comments c JOIN comments_before b USING (id)
               JOIN public.auction_events a ON a.id = c.auction_event_id
               WHERE b.auction_event_id IS NULL
-                AND (a.vehicle_id <> c.vehicle_id OR rtrim(a.source_url, '/') <> rtrim(c.source_url, '/'))));
+                AND (a.vehicle_id <> c.vehicle_id OR rtrim(a.source_url, '/') <> rtrim(c.source_url, '/')
+                     OR NOT (a.source = c.platform OR (c.platform = 'bat' AND a.source = 'bringatrailer')))));
+SELECT pg_temp.ok('a lot of another platform at the same (vehicle, URL) is never assigned',
+  (SELECT auction_event_id IS NULL FROM public.auction_comments WHERE comment_text = 'lot of another platform'));
 SELECT pg_temp.ok('two candidate lots: left NULL and counted',
   NOT EXISTS (SELECT 1 FROM public.auction_comments c JOIN v ON v.id = c.vehicle_id AND v.name = 'v2' WHERE c.auction_event_id IS NOT NULL)
   AND (SELECT sum((result->>'left_several_lots')::int) FROM walk WHERE run = 'first') = 600);
@@ -215,7 +266,8 @@ SELECT pg_temp.ok('no vehicle, no URL and a case-different URL stay NULL',
   (SELECT bool_and(auction_event_id IS NULL) FROM public.auction_comments
    WHERE comment_text IN ('no url', 'no vehicle', 'no vehicle, lot with no vehicle', 'case differs')));
 SELECT pg_temp.ok('left_no_lot counts every unkeyed row with no candidate',
-  (SELECT sum((result->>'left_no_lot')::int) FROM walk WHERE run = 'first') = 1200 + 4);
+  -- 600 v4 + 600 v3 + case differs + no url + no vehicle + no vehicle (lot-f) + lot of another platform
+  (SELECT sum((result->>'left_no_lot')::int) FROM walk WHERE run = 'first') = 1200 + 5);
 SELECT pg_temp.ok('a key already set is never changed',
   (SELECT c.auction_event_id = b.auction_event_id FROM public.auction_comments c JOIN comments_before b USING (id)
    WHERE c.comment_text = 'pre-keyed'));
@@ -229,11 +281,11 @@ SELECT pg_temp.ok('no auction_events row created or changed',
   AND NOT EXISTS (SELECT 1 FROM lots_before b JOIN public.auction_events a USING (id)
                   WHERE (a.vehicle_id, a.source, a.source_url, a.outcome, a.updated_at)
                         IS DISTINCT FROM (b.vehicle_id, b.source, b.source_url, b.outcome, b.updated_at)));
-SELECT pg_temp.ok('backfill writes a declared UPDATE receipt',
-  EXISTS (SELECT 1 FROM public.write_receipts WHERE tbl = 'auction_comments' AND op = 'UPDATE' AND writer = 'key-comment-lots')
-  AND (SELECT sum(rows) FROM public.write_receipts WHERE tbl = 'auction_comments' AND op = 'UPDATE' AND writer = 'key-comment-lots') = 602);
+SELECT pg_temp.ok('backfill writes declared UPDATE receipts that sum to the rows keyed',
+  (SELECT sum(rows) FROM public.write_receipts WHERE tbl = 'auction_comments' AND op = 'UPDATE' AND writer = 'key-comment-lots') = 606
+  AND NOT EXISTS (SELECT 1 FROM public.write_receipts WHERE tbl = 'auction_comments' AND op = 'UPDATE' AND writer <> 'key-comment-lots'));
 
--- Idempotent: a second full walk changes nothing.
+-- Idempotent: a second full walk, with multi-block batches, changes nothing.
 DO $$
 DECLARE r jsonb; b bigint := 0; i int := 0;
 BEGIN
@@ -247,4 +299,4 @@ BEGIN
 END $$;
 SELECT pg_temp.ok('second run keys 0 rows',
   (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'again') = 0
-  AND (SELECT sum(rows) FROM public.write_receipts WHERE writer = 'key-comment-lots') = 602);
+  AND (SELECT sum(rows) FROM public.write_receipts WHERE writer = 'key-comment-lots') = 606);
