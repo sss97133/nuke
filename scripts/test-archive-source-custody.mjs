@@ -40,6 +40,7 @@ function compile(path) {
 const sources = new Map([
   ['archive',compile('../supabase/functions/_shared/archiveFetch.ts')],
   ['parser',compile('../supabase/functions/_shared/batParser.ts')],
+  ['chassis',compile('../supabase/functions/_shared/batChassis.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
@@ -179,6 +180,7 @@ function fixture(options = {}) {
         if(specifier==='./hybridFetcher.ts')return {fetchPage:()=>assert.fail('No crawl')};
         if(specifier==='./firecrawl.ts')return {firecrawlScrape:()=>assert.fail('No paid fetch')};
         if(specifier==='./batParser.ts')return load('parser');
+        if(specifier==='./batChassis.ts')return load('chassis');
         if(specifier==='../_shared/archiveFetch.ts')return load('archive');
         if(specifier==='../_shared/batParser.ts')return load('parser');
         if(specifier==='./batLive.ts')return load('liveIntake');

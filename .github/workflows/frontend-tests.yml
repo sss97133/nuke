@@ -233,6 +233,8 @@ jobs:
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
         run: deno test --allow-read=supabase/functions/extract-craigslist/fixtures supabase/functions/extract-craigslist/ supabase/functions/extract-vehicle-data-ai/normalize.test.ts supabase/functions/ingest/craigslistCapture.test.ts
+      - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
+        run: deno test supabase/functions/_shared/batChassis.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest

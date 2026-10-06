@@ -34,6 +34,14 @@ import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { captureLedgerFields } from "./captureLedger.ts";
+import {
+  ledgerWriteFor,
+  planIngests,
+  readLandedBatch,
+  shouldLedger,
+  type IngestOutcome,
+  type LedgerKnown,
+} from "./ledger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -212,6 +220,13 @@ function cleanListingUrl(url: string, sourceSlug: string): string {
 /** Cost bound: max NEW listings sent to `ingest` per feed per poll. */
 const MAX_NEW_INGESTS_PER_POLL = 20;
 
+/**
+ * Ingest outcomes wait for one read-back of their vehicle rows (ledger.ts). A poll that is killed mid-loop would lose
+ * what is waiting, so the batch is flushed after this long even if URLs remain. Slow feeds (75 s a URL) flush after
+ * every URL; fast feeds flush once.
+ */
+const FLUSH_AFTER_MS = 30_000;
+
 interface FeedResult {
   feed: string;
   source: string;
@@ -220,12 +235,17 @@ interface FeedResult {
   new_ingested?: number; // firecrawl_html path
   matched_existing?: number; // firecrawl_html path
   rejected?: number; // firecrawl_html path
+  landed_no_data?: number; // firecrawl_html path: ingest created or matched a vehicle that holds no price, images or description
+  retries_due?: number; // firecrawl_html path: failed URLs whose retry came due this poll
+  backing_off?: number; // firecrawl_html path: failed URLs skipped because next_attempt_at is ahead
   ingest_outcomes?: Array<{
     url: string;
     status: string;
     vehicle_id?: string | null;
     error?: string;
     reason?: string;
+    enrichment_error?: string; // firecrawl_html path: ingest's report that the page extractor failed
+    ledger?: string; // firecrawl_html path: the import_queue status written for this URL
   }>;
   error: string | null;
 }
@@ -498,6 +518,7 @@ async function pollFirecrawlHtmlFeed(
     new_ingested: 0,
     matched_existing: 0,
     rejected: 0,
+    landed_no_data: 0,
     ingest_outcomes: [],
     error: null,
   };
@@ -664,7 +685,7 @@ async function pollFirecrawlHtmlFeed(
     `[poll-feeds] ${feed.display_name}: ${urls.length} listing URLs on search page`
   );
 
-  // Skip listings we already have. Two lookups, both needed:
+  // Decide which URLs to hand to `ingest`. Two lookups, both needed:
   //  - vehicles.listing_url stores the CANONICAL regional URL, so it only
   //    matches if a feed ever emits that form directly.
   //  - import_queue.listing_url is THIS poller's ledger of share URLs already
@@ -673,9 +694,13 @@ async function pollFirecrawlHtmlFeed(
   //    unknown and the 20-cap burned on the same page-top URLs each poll —
   //    the page tail never drained (found 2026-07-02: 24 ingested in 24h
   //    instead of ~150).
+  // A ledger row decides before vehicles.listing_url does: a `failed` row is
+  // skipped while its backoff runs and retried when due, even though its husk
+  // is already on vehicles. ledger.ts has the whole policy.
   // Chunked: 150+ long share URLs in one .in() overflows the request line
   // (HTTP/2 stream error), so query in batches of 40.
-  const knownUrls = new Set<string>();
+  const onVehicles = new Set<string>();
+  const ledgerRows = new Map<string, LedgerKnown>();
   for (let i = 0; i < urls.length; i += 40) {
     const chunk = urls.slice(i, i + 40);
     // Independent tables, neither query depends on the other's result —
@@ -687,9 +712,9 @@ async function pollFirecrawlHtmlFeed(
       supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
       supabase
         .from("import_queue")
-        .select("listing_url")
+        .select("listing_url, status, attempts, max_attempts, next_attempt_at, failure_category")
         .in("listing_url", chunk)
-        .in("status", ["complete", "skipped"]),
+        .in("status", ["complete", "skipped", "failed"]),
     ]);
 
     if (knownError) {
@@ -697,22 +722,86 @@ async function pollFirecrawlHtmlFeed(
         `fetch_failed: known-url lookup: ${knownError.message}`
       );
     }
-    for (const v of known || []) knownUrls.add(v.listing_url);
+    for (const v of known || []) onVehicles.add(v.listing_url);
 
     if (ledgerError) {
       return await failFeed(
         `fetch_failed: ledger lookup: ${ledgerError.message}`
       );
     }
-    for (const q of ledgered || []) knownUrls.add(q.listing_url);
+    for (const q of ledgered || []) ledgerRows.set(q.listing_url, q);
   }
-  result.matched_existing = knownUrls.size;
-
-  const newUrls = urls.filter((u) => !knownUrls.has(u));
-  const toIngest = newUrls.slice(0, MAX_NEW_INGESTS_PER_POLL);
+  // New URLs first, then failed ones whose retry is due; the cap applies to both.
+  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), MAX_NEW_INGESTS_PER_POLL);
+  result.matched_existing = plan.settled + plan.backoff;
+  result.retries_due = plan.retries;
+  result.backing_off = plan.backoff;
+  const toIngest = plan.toIngest;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Ledger the settled outcome so future polls skip this share URL (vehicles
+  // stores the canonical form, which never matches the share form — see the
+  // lookup above). Errors are NOT ledgered: they retry next poll. Rejections
+  // only ledger when STRUCTURAL (editorial / not-a-vehicle / implausible-year /
+  // quality-gate reject); identity-insufficient rejects are often a transient
+  // enrichment failure and deserve a retry (the 2026-07-02 VW Thing miss).
+  // "quality_gate_reject" covers deterministic gate rejects (e.g.
+  // vin_make_mismatch) added 2026-07-07 — the same URL fails the same way
+  // every time, so without this it burns a MAX_NEW_INGESTS_PER_POLL slot on
+  // every future poll forever.
+  //
+  // `complete` only when the vehicle row holds a price, an image or a
+  // description. For venues whose URL slug carries the identity, `ingest`
+  // creates the vehicle even when the page extractor fails, reports the
+  // failure in `enrichment_error` and still returns "created", so the status
+  // alone proves nothing. Outcomes wait here for one read-back of their
+  // vehicle rows (one IN query per flush); a row that landed nothing, or whose
+  // read-back failed, is `failed` with the reason (ledger.ts).
+  const waiting: Array<{
+    url: string;
+    ingest: IngestOutcome;
+    entry: NonNullable<FeedResult["ingest_outcomes"]>[number];
+  }> = [];
+  let lastFlushAt = Date.now();
+  const flushLedger = async () => {
+    if (waiting.length === 0) return;
+    const batch = await readLandedBatch(
+      supabase,
+      [...new Set(waiting.map((w) => w.ingest.vehicle_id).filter((id): id is string => !!id))]
+    );
+    for (const w of waiting) {
+      const write = ledgerWriteFor({
+        url: w.url,
+        feedId: feed.id,
+        ingest: w.ingest,
+        batch,
+        prev: ledgerRows.get(w.url),
+        now: new Date(),
+      });
+      if (!write) continue;
+      // Craigslist: post_id, posted_at, updated_at, attributes and capture_landing travel on the ledger row
+      // (captureLedger.ts); empty for every other source.
+      const captureFields = captureLedgerFields(w.ingest);
+      if (Object.keys(captureFields).length > 0) {
+        write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
+      }
+      if (write.status === "failed") result.landed_no_data!++;
+      w.entry.ledger = write.status;
+      const { error: ledgerWriteError } = await supabase
+        .from("import_queue")
+        .upsert(write.row, { onConflict: "listing_url" });
+      if (ledgerWriteError) {
+        // Non-fatal, but say so — a silent ledger gap re-burns cap slots.
+        console.error(
+          `[poll-feeds] ledger write failed for ${w.url}: ${ledgerWriteError.message}`
+        );
+      }
+    }
+    waiting.length = 0;
+    lastFlushAt = Date.now();
+  };
 
   for (const url of toIngest) {
     try {
@@ -737,70 +826,30 @@ async function pollFirecrawlHtmlFeed(
 
       clearTimeout(timeout);
 
-      const ingest = await resp.json().catch(() => ({
+      const ingest = (await resp.json().catch(() => ({
         status: "error",
         error: `ingest HTTP ${resp.status} (non-JSON body)`,
-      }));
+      }))) as IngestOutcome;
       const status = ingest.status || "error";
 
-      result.ingest_outcomes!.push({
+      const outcomeEntry: NonNullable<FeedResult["ingest_outcomes"]>[number] = {
         url,
         status,
         vehicle_id: ingest.vehicle_id ?? null,
         ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
         ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
-      });
+        ...(ingest.enrichment_error
+          ? { enrichment_error: String(ingest.enrichment_error).slice(0, 200) }
+          : {}),
+      };
+      result.ingest_outcomes!.push(outcomeEntry);
 
       if (status === "created") result.new_ingested!++;
       else if (status === "matched" || status === "duplicate")
         result.matched_existing!++;
       else if (status === "rejected") result.rejected!++;
 
-      // Ledger the settled outcome so future polls skip this share URL
-      // (vehicles stores the canonical form, which never matches the share
-      // form — see the known-check above). Errors are NOT ledgered: they
-      // retry next poll. Rejections only ledger when STRUCTURAL (editorial /
-      // not-a-vehicle / implausible-year / quality-gate reject); identity-
-      // insufficient rejects are often a transient enrichment failure and
-      // deserve a retry (the 2026-07-02 VW Thing miss).
-      // "quality_gate_reject" covers deterministic gate rejects (e.g.
-      // vin_make_mismatch) added 2026-07-07 — the same URL fails the same
-      // way every time, so without this it burns a MAX_NEW_INGESTS_PER_POLL
-      // slot on every future poll forever.
-      const rejectReason = String(ingest.reason || ingest.error || "");
-      const structuralReject =
-        status === "rejected" &&
-        /editorial|not_a_vehicle|not a vehicle|implausible|quality_gate_reject/i.test(rejectReason);
-      if (
-        ["created", "matched", "duplicate"].includes(status) ||
-        structuralReject
-      ) {
-        const { error: ledgerWriteError } = await supabase
-          .from("import_queue")
-          .upsert(
-            {
-              listing_url: url,
-              status: status === "rejected" ? "skipped" : "complete",
-              vehicle_id: ingest.vehicle_id ?? null,
-              processed_at: new Date().toISOString(),
-              raw_data: {
-                feed_id: feed.id,
-                ingested_via: "poll_firecrawl_html",
-                ingest_status: status,
-                ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
-                // Craigslist: post_id, posted_at, updated_at, attributes and capture_landing (see captureLedger.ts).
-                ...captureLedgerFields(ingest),
-              },
-            },
-            { onConflict: "listing_url" }
-          );
-        if (ledgerWriteError) {
-          // Non-fatal, but say so — a silent ledger gap re-burns cap slots.
-          console.error(
-            `[poll-feeds] ledger write failed for ${url}: ${ledgerWriteError.message}`
-          );
-        }
-      }
+      if (shouldLedger(ingest)) waiting.push({ url, ingest, entry: outcomeEntry });
     } catch (err: any) {
       result.ingest_outcomes!.push({
         url,
@@ -809,9 +858,12 @@ async function pollFirecrawlHtmlFeed(
       });
     }
 
+    if (Date.now() - lastFlushAt >= FLUSH_AFTER_MS) await flushLedger();
+
     // Small delay between ingests to be polite
     await new Promise((r) => setTimeout(r, 250));
   }
+  await flushLedger();
 
   // If every attempted ingest errored, that's a failure too -- say so.
   const ingestErrors = result.ingest_outcomes!.filter(
