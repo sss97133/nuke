@@ -7,8 +7,9 @@
 -- live C25 island view with the live ACL (every table privilege for the three API roles, from Supabase default
 -- privileges, set here with ALTER DEFAULT PRIVILEGES), so the DROP-then-CREATE path runs as it will in production.
 -- Covered: the migration applies over the old view and applies again; the column list, order and types; every comment;
--- each gap rule and its boundary; the scope rules; null safety; the rank arithmetic; the ACL; no ORDER BY or LIMIT in
--- the view; the backlog script reads the view and returns only open work.
+-- each gap rule and its boundary; the scope rules; null safety; the rank arithmetic; the ACL (service_role only, as for the
+-- atlas and job-health views) and real reads as service_role, anon and authenticated; no ORDER BY or LIMIT in the view;
+-- the backlog script reads the view and returns only open work.
 -- Not covered: the real atlas and job-health views; the refusal of DROP VIEW when a dependent exists (PostgreSQL's own
 -- rule, checked on the live database with pg_depend before the migration was written).
 \set ON_ERROR_STOP on
@@ -68,6 +69,10 @@ INSERT INTO public.v_job_health VALUES
   ('job_assayed', true, 'passed'),      -- active, carries an assay
   ('job_failed_assay', true, 'failed'), -- a failing assay is still an assay
   ('job_paused_assayed', false, 'passed'); -- paused: its assay does not count
+-- The live atlas and job-health views are service_role only; the stubs say the same, so any denial below comes from
+-- v_residual's own ACL and a view reads its sources with its owner's rights.
+REVOKE ALL ON public.v_schema_atlas, public.v_job_health FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.v_schema_atlas, public.v_job_health TO service_role;
 
 -- The live C25 view, as pg_get_viewdef printed it on 2026-10-06, with its live ACL.
 CREATE VIEW public.v_residual AS
@@ -133,6 +138,9 @@ DECLARE
   top text;
   script_cols text;
   script_n integer;
+  rows_as_service bigint;
+  anon_denied boolean;
+  authenticated_denied boolean;
 BEGIN
   -- Shape: names, order and types; the C25 tag is gone.
   SELECT string_agg(a.attname::text || ':' || format_type(a.atttypid, a.atttypmod), ',' ORDER BY a.attnum) INTO cols
@@ -153,12 +161,43 @@ BEGIN
   PERFORM pg_temp.ok(stage || ': the view has a comment that is not the fixture text',
     coalesce(obj_description('public.v_residual'::regclass, 'pg_class'), '') LIKE 'C28 repair backlog%');
 
-  -- Access: SELECT for the three API roles and nothing else for anyone but the owner, PUBLIC included.
+  -- Access: SELECT for service_role and nothing else for anyone but the owner, PUBLIC included (the posture of
+  -- v_schema_atlas and v_job_health). The ACL is read from the catalog and then exercised with real reads.
   SELECT string_agg(coalesce(r.rolname, 'PUBLIC') || ':' || x.privilege_type, ',' ORDER BY coalesce(r.rolname, 'PUBLIC'), x.privilege_type) INTO acl
   FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) x LEFT JOIN pg_roles r ON r.oid = x.grantee
   WHERE c.oid = 'public.v_residual'::regclass AND x.grantee <> c.relowner;
-  PERFORM pg_temp.ok(stage || ': ACL is SELECT for anon, authenticated and service_role only (got ' || coalesce(acl, 'none') || ')',
-    acl = 'anon:SELECT,authenticated:SELECT,service_role:SELECT');
+  PERFORM pg_temp.ok(stage || ': ACL is SELECT for service_role only (got ' || coalesce(acl, 'none') || ')',
+    acl = 'service_role:SELECT');
+  PERFORM pg_temp.ok(stage || ': the catalog says service_role can read and anon and authenticated cannot',
+    has_table_privilege('service_role', 'public.v_residual', 'SELECT')
+    AND NOT has_table_privilege('anon', 'public.v_residual', 'SELECT')
+    AND NOT has_table_privilege('authenticated', 'public.v_residual', 'SELECT'));
+  BEGIN
+    SET LOCAL ROLE service_role;
+    SELECT count(*) INTO rows_as_service FROM public.v_residual;
+  EXCEPTION WHEN insufficient_privilege THEN
+    rows_as_service := -1;
+  END;
+  RESET ROLE;
+  PERFORM pg_temp.ok(stage || ': service_role reads the rows (got ' || rows_as_service || ')', rows_as_service > 0);
+  BEGIN
+    SET LOCAL ROLE anon;
+    PERFORM 1 FROM public.v_residual LIMIT 1;
+    anon_denied := false;
+  EXCEPTION WHEN insufficient_privilege THEN
+    anon_denied := true;
+  END;
+  RESET ROLE;
+  BEGIN
+    SET LOCAL ROLE authenticated;
+    PERFORM 1 FROM public.v_residual LIMIT 1;
+    authenticated_denied := false;
+  EXCEPTION WHEN insufficient_privilege THEN
+    authenticated_denied := true;
+  END;
+  RESET ROLE;
+  PERFORM pg_temp.ok(stage || ': a read as anon or authenticated is refused with insufficient_privilege',
+    anon_denied AND authenticated_denied);
 
   PERFORM pg_temp.ok(stage || ': the view is not updatable, so only SELECT can matter',
     (SELECT is_updatable FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'v_residual') = 'NO');

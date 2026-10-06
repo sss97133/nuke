@@ -18,12 +18,13 @@
 -- creating migration only). The DROP has no CASCADE and no IF EXISTS: a dependent that appears before this runs, or a
 -- missing view, aborts the transaction and the C25 view stays.
 --
--- ACCESS. v_schema_atlas and v_job_health are service_role only. v_residual is readable by anon and authenticated as
--- well today (Supabase default privileges gave those roles every table privilege on it; the live ACL was read on
--- 2026-10-06), because a view runs with its owner's rights. This migration keeps the same three roles and narrows each
--- to SELECT: the view is not updatable, so the other privileges did nothing. Whether anon and authenticated should read
--- the backlog at all is the owner's call: REVOKE SELECT ON public.v_residual FROM anon, authenticated closes it. A view
--- has no RLS.
+-- ACCESS. v_schema_atlas and v_job_health are service_role only. v_residual was also readable by anon and
+-- authenticated (Supabase default privileges gave those roles every table privilege on it; the live ACL was read on
+-- 2026-10-06), and a view runs with its owner's rights, so the public anon key read atlas-derived data through it:
+-- GET /rest/v1/v_residual returned HTTP 200 with rows on 2026-10-06 while GET /rest/v1/v_schema_atlas returned 401.
+-- Decision 2026-10-06 (lead session, for the owner): close that here. This migration revokes everything from PUBLIC,
+-- anon, authenticated and service_role, then grants SELECT to service_role only, the posture of the two views it derives
+-- from. Nothing reads v_residual as anon or authenticated: no reader in the repo, none in the database. A view has no RLS.
 --
 -- MEASURED 2026-10-06T21:12:39Z (this file's SELECT body, run read-only through scripts/data/q.sh; nothing written):
 -- 384 rows (81 written, 303 read-only), 7 with no open gap. Open gaps: describe 369, key 90, owner 66, assay 3, reader 0.
@@ -127,7 +128,7 @@ COMMENT ON COLUMN public.v_residual.crons_mentioning IS
   'Names of the active pg_cron jobs whose command text contains this table name as a whole word; a name match, not proof that a job writes the table (a job may reach it through a function). NULL when none. Source: v_schema_atlas.crons_mentioning.';
 
 REVOKE ALL ON public.v_residual FROM PUBLIC, anon, authenticated, service_role;
-GRANT SELECT ON public.v_residual TO anon, authenticated, service_role;
+GRANT SELECT ON public.v_residual TO service_role;
 
 -- Catalog-only check: the shape is as intended and every column is described, or the transaction aborts and the C25 view stays.
 DO $$
@@ -165,4 +166,5 @@ COMMIT;
 -- Verify live after the run (read-only):
 --   select count(*) as tables, count(*) filter (where n_gaps = 0) as complete from public.v_residual;
 --   select table_name, gaps, rank_mrows from public.v_residual where n_gaps > 0 order by rank_mrows desc, est_rows desc limit 10;
---   select grantee, privilege_type from information_schema.role_table_grants where table_name = 'v_residual' order by 1, 2;  -- SELECT only
+--   select grantee, privilege_type from information_schema.role_table_grants where table_name = 'v_residual' order by 1, 2;  -- service_role SELECT only (plus the owner)
+--   anon probe: GET /rest/v1/v_residual with the public anon key returns 401 permission denied, like v_schema_atlas.
