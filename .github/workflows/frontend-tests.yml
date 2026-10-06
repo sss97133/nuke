@@ -231,6 +231,8 @@ jobs:
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
+      - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
+        run: deno test supabase/functions/_shared/batChassis.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest
