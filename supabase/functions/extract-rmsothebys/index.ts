@@ -24,6 +24,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
+import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -221,7 +222,7 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
   const estimateText = !isSold ? valueText : item.preSaleEstimate || null;
 
   return {
-    url: `https://rmsothebys.com${item.link}`,
+    url: rmLotUrl(item.link), // the API returns absolute links since 2026-10; site-relative ones still get the origin
     title: item.publicName,
     year,
     make,
@@ -729,8 +730,7 @@ Deno.serve(async (req) => {
       const items = await fetchAuctionLots(auctionCode);
 
       // Find the specific lot
-      const targetPath = new URL(url).pathname;
-      const item = items.find((i) => i.link === targetPath || url.includes(i.link));
+      const item = items.find((i) => rmLotLinkMatchesUrl(i.link, url));
 
       if (!item) {
         return okJson({ success: false, error: 'Lot not found in auction data' }, 404);
