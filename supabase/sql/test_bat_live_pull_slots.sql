@@ -132,3 +132,39 @@ SELECT pg_temp.ok('the REST p50 pause still stops all HTML dispatch',
  (SELECT (r->>'dispatched')::int=0 AND r->>'skipped' LIKE '%paused: REST p50%' FROM r6)
  AND (SELECT count(*)=0 FROM net.calls WHERE body ? 'url'));
 ROLLBACK;
+
+-- Review fix 1: a live row with no end time is not-closing and stays dispatchable (was silently dropped by a bare `>`).
+BEGIN;
+SELECT pg_temp.seed();
+INSERT INTO public.monitored_auctions(source_id,external_auction_id,external_auction_url,vehicle_id,auction_end_time,is_live,priority,
+  last_synced_at,next_poll_at)
+VALUES('00000000-0000-0000-0000-0000000000b1','no-end','https://bringatrailer.com/listing/no-end',gen_random_uuid(),NULL,true,2,
+  now()-interval '2 days',now()-interval '1 day');
+CREATE TEMP TABLE r7 AS SELECT public.bat_live_pull_run() AS r;
+SELECT pg_temp.ok('a NULL auction_end_time row is still dispatched, as not-closing',
+ (SELECT last_synced_at=now() FROM public.monitored_auctions WHERE external_auction_id='no-end')
+ AND (SELECT count(*)=1 FROM public.monitored_auctions WHERE last_synced_at=now() AND auction_end_time<=now()+interval '10 minutes'));
+ROLLBACK;
+
+-- Review fix 2: malformed config integers fall back to defaults instead of failing every run.
+BEGIN;
+SELECT pg_temp.seed();
+UPDATE public.live_auction_sources SET scraping_config=jsonb_set(jsonb_set(jsonb_set(jsonb_set(scraping_config,
+  '{live_pull,lots_per_run}','"six"'),'{live_pull,closing_slots}','"one"'),'{live_pull,pause_rest_p50_ms}','"2s"'),
+  '{live_pull,cadence_minutes,h12_to_48}','"6h"') WHERE slug='bat';
+CREATE TEMP TABLE r8 AS SELECT public.bat_live_pull_run() AS r;
+SELECT pg_temp.ok('"lots_per_run": "six" runs with the default 6 slots and 1 closing slot',
+ (SELECT (r->>'dispatched')::int=6 FROM r8)
+ AND (SELECT count(*)=1 FROM public.monitored_auctions WHERE last_synced_at=now() AND auction_end_time<=now()+interval '10 minutes'));
+SELECT pg_temp.ok('a malformed cadence falls back to its default (12-48 h lots: 360 min)',
+ (SELECT bool_and(poll_interval_ms=360*60000) FROM public.monitored_auctions WHERE last_synced_at=now() AND external_auction_id LIKE 'window-%'));
+SELECT pg_temp.ok('the run still writes its health row with a malformed config',
+ (SELECT scraping_config#>>'{live_pull,last_run,dispatched}'='6' FROM public.live_auction_sources WHERE slug='bat'));
+ROLLBACK;
+
+-- Review fix 3: re-applying the migration with no cron row neither fails nor creates a job (it raises a NOTICE).
+DELETE FROM cron.job WHERE jobname='bat-live-pull';
+\ir ../migrations/20261006060000_bat_live_pull_closing_slot_cap.sql
+SELECT pg_temp.ok('migration is re-runnable and skips a missing cron job without creating one',
+ NOT EXISTS(SELECT 1 FROM cron.job WHERE jobname='bat-live-pull')
+ AND (SELECT scraping_config#>>'{live_pull,lots_per_run}'='6' FROM public.live_auction_sources WHERE slug='bat'));

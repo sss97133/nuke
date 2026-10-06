@@ -11,6 +11,8 @@
 --   1. v_lots   = p_lots when passed, else live_pull.lots_per_run, else 6. The config key existed but was never read.
 --   2. v_closing = live_pull.closing_slots (default 1), capped by v_lots: the closing CTE's LIMIT. fresh and rest
 --      skip closing-window lots, so the cap is not bypassed through the first-read reserve or the NULLS FIRST order.
+--      Config integers are read through a digits-only guard: a malformed value falls back to its default instead of
+--      failing every run. A NULL auction_end_time counts as not-closing, so such a row is never silently dropped.
 --   3. The run writes back only rest_probes/last_run over the row's current live_pull, so a config edit made while a run
 --      is in flight is no longer overwritten by that run's stale copy.
 --   4. live_pull.lots_per_run 3 -> 6, closing_slots 1; cron 510 calls bat_live_pull_run() with no argument.
@@ -63,17 +65,17 @@ BEGIN
   IF v_src IS NULL THEN
     RAISE EXCEPTION 'bat_live_pull_run: live_auction_sources has no bat row';
   END IF;
-  v_pause_ms := coalesce((v_cfg ->> 'pause_rest_p50_ms')::integer, 2000);
-  v_window   := make_interval(hours => coalesce((v_cfg ->> 'priority_window_hours')::integer, 48));
+  v_pause_ms := coalesce(CASE WHEN v_cfg ->> 'pause_rest_p50_ms' ~ '^\d{1,6}$' THEN (v_cfg ->> 'pause_rest_p50_ms')::integer END, 2000);
+  v_window   := make_interval(hours => coalesce(CASE WHEN v_cfg ->> 'priority_window_hours' ~ '^\d{1,6}$' THEN (v_cfg ->> 'priority_window_hours')::integer END, 48));
   v_last     := coalesce(v_cfg -> 'last_run', '{}'::jsonb);
   -- C1: slots per run held for lots never dispatched (next_poll_at IS NULL), so lots beyond the priority window
   -- get their first read instead of waiting for the window to have fewer than p_lots due lots (it never does at peak).
   -- Slots per run come from live_pull.lots_per_run (default 6); p_lots overrides only when passed. Closing-window lots
   -- take at most live_pull.closing_slots (default 1): the native stream covers them, and spending every slot on them
   -- starved the hourly/daily cadences (2026-10-05: 220/220 closing lots took HTML slots; the check failed from 10Z).
-  v_lots     := greatest(coalesce(p_lots, (v_cfg ->> 'lots_per_run')::integer, 6), 0);
-  v_closing  := least(greatest(coalesce((v_cfg ->> 'closing_slots')::integer, 1), 0), v_lots);
-  v_reserve  := least(coalesce((v_cfg ->> 'reserve_first_read')::integer, 1), v_lots);
+  v_lots     := greatest(coalesce(p_lots, CASE WHEN v_cfg ->> 'lots_per_run' ~ '^\d{1,6}$' THEN (v_cfg ->> 'lots_per_run')::integer END, 6), 0);
+  v_closing  := least(greatest(coalesce(CASE WHEN v_cfg ->> 'closing_slots' ~ '^\d{1,6}$' THEN (v_cfg ->> 'closing_slots')::integer END, 1), 0), v_lots);
+  v_reserve  := least(coalesce(CASE WHEN v_cfg ->> 'reserve_first_read' ~ '^\d{1,6}$' THEN (v_cfg ->> 'reserve_first_read')::integer END, 1), v_lots);
 
   -- 1. Account the previous passes. The reader upserts the lot's auction_events row on every read.
   FOR r IN
@@ -249,12 +251,12 @@ BEGIN
         LIMIT v_closing
       ), fresh AS (
         SELECT d.id FROM due d WHERE d.next_poll_at IS NULL
-          AND d.auction_end_time > v_now + interval '10 minutes'   -- closing-window lots only via closing's cap
+          AND coalesce(d.auction_end_time, 'infinity'::timestamptz) > v_now + interval '10 minutes'   -- closing lots only via closing's cap
         ORDER BY d.auction_end_time
         LIMIT least(v_reserve, greatest(v_lots - (SELECT count(*) FROM closing), 0))
       ), rest AS (
         SELECT d.id FROM due d WHERE NOT EXISTS (SELECT 1 FROM fresh f WHERE f.id = d.id)
-          AND d.auction_end_time > v_now + interval '10 minutes'   -- closing-window lots only via closing's cap
+          AND coalesce(d.auction_end_time, 'infinity'::timestamptz) > v_now + interval '10 minutes'   -- closing lots only via closing's cap
         ORDER BY (d.auction_end_time <= v_now + v_window) DESC, d.next_poll_at NULLS FIRST, d.auction_end_time
         LIMIT greatest(v_lots - (SELECT count(*) FROM fresh) - (SELECT count(*) FROM closing), 0)
       )
@@ -266,9 +268,9 @@ BEGIN
       IF r.first_read THEN v_first := v_first + 1; END IF;
       v_cad := CASE
         WHEN r.auction_end_time <= v_now + interval '10 minutes' THEN interval '1 minute'
-        WHEN r.auction_end_time <= v_now + interval '12 hours' THEN make_interval(mins => coalesce((v_cfg #>> '{cadence_minutes,under_12h}')::integer, 60))
-        WHEN r.auction_end_time <= v_now + v_window THEN make_interval(mins => coalesce((v_cfg #>> '{cadence_minutes,h12_to_48}')::integer, 360))
-        ELSE make_interval(mins => coalesce((v_cfg #>> '{cadence_minutes,over_48h}')::integer, 1440))
+        WHEN r.auction_end_time <= v_now + interval '12 hours' THEN make_interval(mins => coalesce(CASE WHEN v_cfg #>> '{cadence_minutes,under_12h}' ~ '^\d{1,6}$' THEN (v_cfg #>> '{cadence_minutes,under_12h}')::integer END, 60))
+        WHEN r.auction_end_time <= v_now + v_window THEN make_interval(mins => coalesce(CASE WHEN v_cfg #>> '{cadence_minutes,h12_to_48}' ~ '^\d{1,6}$' THEN (v_cfg #>> '{cadence_minutes,h12_to_48}')::integer END, 360))
+        ELSE make_interval(mins => coalesce(CASE WHEN v_cfg #>> '{cadence_minutes,over_48h}' ~ '^\d{1,6}$' THEN (v_cfg #>> '{cadence_minutes,over_48h}')::integer END, 1440))
       END;
       PERFORM net.http_post(
         url := v_base || '/functions/v1/extract-bat-core',
@@ -340,6 +342,8 @@ BEGIN
   IF v_id IS NOT NULL THEN
     PERFORM cron.alter_job(job_id := v_id,
       command := $cmd$SELECT set_config('app.writer', 'bat-live-pull', true); SET statement_timeout = '50s'; SELECT public.bat_live_pull_run();$cmd$);
+  ELSE
+    RAISE NOTICE 'bat-live-pull cron job not found; command not changed';
   END IF;
 END
 $do$;
