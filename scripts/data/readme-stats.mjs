@@ -2,27 +2,29 @@
 /**
  * scripts/data/readme-stats.mjs
  *
- * Measures the live database and rewrites the block between
- * `<!-- stats:start -->` and `<!-- stats:end -->` in README.md.
+ * Measures the system and rewrites two generated blocks:
+ *   README.md               <!-- stats:start --> … <!-- stats:end -->          (the live database)
+ *   docs/library/README.md  <!-- library-stats:start --> … <!-- library-stats:end --> (the library's own files)
  *
- * Every query runs inside `begin read only … commit` on the Supabase Management
- * API (the same path scripts/data/q.sh uses), so this script cannot write to the
- * database. It needs SUPABASE_ACCESS_TOKEN in the environment.
+ * Every database query runs inside `begin read only … commit` on the Supabase
+ * Management API (the same path scripts/data/q.sh uses), so this script cannot
+ * write to the database. It needs SUPABASE_ACCESS_TOKEN in the environment.
  *
- *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite README.md
- *   dotenvx run -q -- node scripts/data/readme-stats.mjs --dry-run  # print the block only
+ *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite both blocks
+ *   dotenvx run -q -- node scripts/data/readme-stats.mjs --dry-run  # print them only
  *
- * Scheduled daily by .github/workflows/update-stats.yml. Every number in the
- * README block comes from here; none is typed by hand.
+ * Scheduled daily by .github/workflows/update-stats.yml. Every number in those
+ * blocks comes from here; none is typed by hand.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
-const README = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'README.md');
-const START = '<!-- stats:start -->';
-const END = '<!-- stats:end -->';
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const README = resolve(ROOT, 'README.md');
+const LIBRARY = resolve(ROOT, 'docs', 'library');
+const LIBRARY_README = resolve(LIBRARY, 'README.md');
 const DRY = process.argv.includes('--dry-run');
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -86,8 +88,17 @@ const pct = (part, whole) => {
   const p = (100 * Number(part)) / Number(whole);
   return `${p < 10 ? p.toFixed(1) : Math.round(p)}%`;
 };
+const stamp = () => `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
-async function main() {
+function replaceBlock(file, start, end, block) {
+  const text = readFileSync(file, 'utf8');
+  const a = text.indexOf(start);
+  const b = text.indexOf(end);
+  if (a < 0 || b < 0 || b < a) throw new Error(`${relative(ROOT, file)} has no "${start} … ${end}" block`);
+  writeFileSync(file, text.slice(0, a) + block + text.slice(b + end.length));
+}
+
+async function databaseBlock() {
   // Sequential on purpose: eight light queries, one at a time, against production.
   const [pg] = await q(`select split_part(version(), ' ', 2) as pg`);
   const [atlas] = await q(`
@@ -125,12 +136,11 @@ async function main() {
       from auction_comments tablesample system (0.2)`);
 
   const est = Object.fromEntries(ests.map((r) => [r.relname, Number(r.est)]));
-  const asOf = `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
   const row = (t, coverage = '') => `| ${TABLES[t]} | ${rows3(est[t])} | ${coverage} |`;
 
-  const block = [
-    START,
-    `Measured ${asOf} from the live database by [\`scripts/data/readme-stats.mjs\`](scripts/data/readme-stats.mjs), ` +
+  return [
+    '<!-- stats:start -->',
+    `Measured ${stamp()} from the live database by [\`scripts/data/readme-stats.mjs\`](scripts/data/readme-stats.mjs), ` +
       `run daily by [\`update-stats.yml\`](.github/workflows/update-stats.yml). ` +
       'Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.',
     '',
@@ -152,19 +162,63 @@ async function main() {
       `${num(atlas.undeclared)} tables with an undeclared writer in the last 30 days · ` +
       `${num(jobs.active)} scheduled jobs active, ${num(jobs.failing)} with a failure in the last 24 h · ` +
       `Postgres ${pg.pg}.`,
-    END,
+    '<!-- stats:end -->',
   ].join('\n');
+}
 
+// The library measured from its own files: markdown files and their lines, per shelf.
+function libraryBlock() {
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = resolve(dir, name);
+      const st = lstatSync(p); // symlinks (working-papers -> ../../writing) are not followed
+      if (st.isDirectory()) walk(p);
+      else if (st.isFile() && name.endsWith('.md')) files.push(p);
+    }
+  };
+  walk(LIBRARY);
+
+  const shelves = new Map();
+  for (const f of files) {
+    const parts = relative(LIBRARY, f).split('/');
+    const shelf = parts.length === 1 ? '(top level)' : parts.length === 2 ? parts[0] : `${parts[0]}/${parts[1]}`;
+    const lines = readFileSync(f, 'utf8').split('\n').length - 1;
+    const s = shelves.get(shelf) ?? { files: 0, lines: 0 };
+    s.files += 1;
+    s.lines += lines;
+    shelves.set(shelf, s);
+  }
+  const total = { files: 0, lines: 0 };
+  const rows = [...shelves.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([shelf, s]) => {
+    total.files += s.files;
+    total.lines += s.lines;
+    return `| \`${shelf}\` | ${num(s.files)} | ${num(s.lines)} |`;
+  });
+
+  return [
+    '<!-- library-stats:start -->',
+    `Measured ${stamp()} from the files in this directory by [\`scripts/data/readme-stats.mjs\`](../../scripts/data/readme-stats.mjs), ` +
+      'run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.',
+    '',
+    '| Shelf | Files | Lines |',
+    '|---|---:|---:|',
+    ...rows,
+    `| **Total** | **${num(total.files)}** | **${num(total.lines)}** |`,
+    '<!-- library-stats:end -->',
+  ].join('\n');
+}
+
+async function main() {
+  const db = await databaseBlock();
+  const lib = libraryBlock();
   if (DRY) {
-    console.log(block);
+    console.log(db, '\n', lib);
     return;
   }
-  const readme = readFileSync(README, 'utf8');
-  const a = readme.indexOf(START);
-  const b = readme.indexOf(END);
-  if (a < 0 || b < 0 || b < a) throw new Error(`README.md has no "${START} … ${END}" block`);
-  writeFileSync(README, readme.slice(0, a) + block + readme.slice(b + END.length));
-  console.log(block);
+  replaceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db);
+  replaceBlock(LIBRARY_README, '<!-- library-stats:start -->', '<!-- library-stats:end -->', lib);
+  console.log(db, '\n', lib);
 }
 
 main().catch((e) => {

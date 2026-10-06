@@ -96,28 +96,51 @@ The code is an implementation of the library. The library is the source of truth
 
 ## CURRENT STATE
 
-### What Exists (2026-03-20)
+<!-- library-stats:start -->
+Measured 2026-10-06 06:07 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
 
-| Book | Status | Lines | Gap |
-|------|--------|-------|-----|
-| DICTIONARY | Tables reference complete | 20,749 | Needs semantic definitions beyond column listings |
-| ENCYCLOPEDIA | Complete first draft (23 sections) | 1,250 | Needs 30-50 page chapters per entity type |
-| THESAURUS | Seed (6 category tables) | 90 | Needs complete vocabulary mapping |
-| INDEX | Frontend + backend indexed | 142+ | Growing. Needs every function, every table |
-| ALMANAC | Seed (key metrics) | 152 | Needs historical time series, all stats |
-| ATLAS | Seed (geography + institutions) | 153 | Needs every scrape target profiled |
-| SCHEMATICS | 4 chapters complete | 4,342 | Data flow, entities, observations, pipeline |
-| DESIGN BOOK | 3 chapters (README, components, interactions) | 500+ | Needs foundations + screens chapters |
-| ENGINEERING MANUAL | 8 chapters complete | 4,279 | Intake through scraping sources |
-| PAPERS | Does not exist | 0 | Entity resolution, trust scoring needed |
-| DISCOURSES | 1 captured (repositioning nuke) | 107 | Major discussions need capture |
-| THEORETICALS | 5 papers | 3,205 | Valuation, entity res, signal, half-life, organic connection |
-| STUDIES | 4 studies | 1,498 | 13K prompts, triage, vocabulary, dead features |
-| CONTEMPLATIONS | 6 essays | 1,769 | Rhizome, testimony, assets, organic, validation, i-just-know |
+| Shelf | Files | Lines |
+|---|---:|---:|
+| `(top level)` | 3 | 597 |
+| `blog` | 1 | 82 |
+| `intellectual/contemplations` | 22 | 3,861 |
+| `intellectual/discourses` | 9 | 2,022 |
+| `intellectual/papers` | 16 | 4,194 |
+| `intellectual/studies` | 8 | 1,735 |
+| `intellectual/theoreticals` | 9 | 4,356 |
+| `prompts` | 22 | 4,194 |
+| `reference/almanac` | 4 | 564 |
+| `reference/atlas` | 3 | 628 |
+| `reference/cockpit` | 5 | 381 |
+| `reference/dictionary` | 11 | 21,391 |
+| `reference/encyclopedia` | 8 | 5,841 |
+| `reference/index` | 1 | 500 |
+| `reference/thesaurus` | 1 | 90 |
+| `technical` | 3 | 3,991 |
+| `technical/design-book` | 24 | 8,209 |
+| `technical/engineering-manual` | 25 | 9,178 |
+| `technical/schematics` | 6 | 4,998 |
+| **Total** | **181** | **76,812** |
+<!-- library-stats:end -->
 
-### Total: ~40,000 lines across 50 files. Target: 100,000+ lines.
+The target is 100,000+ lines. The table above is the measurement; the judgments below are from 2026-03-20 and have not been re-graded since.
 
-We are at ~40% of target scale for existing books. PAPERS is the critical gap.
+### The gaps, as judged on 2026-03-20
+
+- **DICTIONARY**: tables reference complete; needs semantic definitions beyond column listings.
+- **ENCYCLOPEDIA**: complete first draft (23 sections); needs 30-50 page chapters per entity type.
+- **THESAURUS**: seed (6 category tables); needs the complete vocabulary mapping.
+- **INDEX**: frontend + backend indexed; needs every function, every table.
+- **ALMANAC**: seed (key metrics); needs historical time series, all stats.
+- **ATLAS**: seed (geography + institutions); needs every scrape target profiled.
+- **SCHEMATICS**: data flow, entities, observations, pipeline.
+- **DESIGN BOOK**: README, components, interactions; needs foundations + screens chapters.
+- **ENGINEERING MANUAL**: intake through scraping sources.
+- **PAPERS**: did not exist in March; called the critical gap then.
+- **DISCOURSES**: one captured (repositioning nuke); major discussions need capture.
+- **THEORETICALS**: valuation, entity resolution, signal, half-life, organic connection.
+- **STUDIES**: 13K prompts, triage, vocabulary, dead features.
+- **CONTEMPLATIONS**: rhizome, testimony, assets, organic, validation, i-just-know.
 
 ---
 
