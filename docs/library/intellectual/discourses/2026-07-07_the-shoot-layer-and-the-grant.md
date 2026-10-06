@@ -75,6 +75,6 @@ One sentence: **promote the photoshoot to a first-class asset whose profile is d
 - `docs/library/intellectual/theoreticals/entity-resolution-theory.md` (edition semantics, pHash bands, art resolution), `observation-half-life-model.md` (content/observation date triad, archive paradox), `valuation-methodology.md` (authentication ladder, provenance-gap penalties), `signal-calculation.md`, `dynamic-trust-model.md`
 - `docs/library/intellectual/papers/novel-ontological-contributions.md` (§VI image fact fabric, §VII component identity, §VIII.D open question), `user-simulation-methodology.md`, `vision-gap-analysis.md`, `trust-scoring-methodology.md`
 - `docs/library/intellectual/studies/dead-features-autopsy.md` (§VII vertical-expansion lessons), `platform-triage-2026-03.md`
-- `/Users/skylar/blur/docs/HANDOFF.md` (SessionClusterer, sha256 anti-fork rule, "l'officiel resonance"), `docs/library/working/2026-07-02_dhash-parity-verdict.md`
-- `/Users/skylar/lofficiel-concierge/FABLE_HANDOFF.md` (licensed-access model, price integrity, operator-signed binding)
+- `~/blur/docs/HANDOFF.md` (SessionClusterer, sha256 anti-fork rule, "l'officiel resonance"), `docs/library/working/2026-07-02_dhash-parity-verdict.md`
+- `~/lofficiel-concierge/FABLE_HANDOFF.md` (licensed-access model, price integrity, operator-signed binding)
 - External anchors: W3C PROV-DM (contemplations README), CIDOC-CRM (papers README), FRBR (proposed here for §VIII.D), Google macaroons (Birgisson et al. 2014, proposed here for the grant), C2PA Content Credentials (inbound half of the grant's transport)

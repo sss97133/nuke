@@ -432,11 +432,11 @@ These functions are called by users, agents, or other functions but do not run o
 | INDEX | This file | Concept-to-location mapping |
 | ALMANAC | `docs/library/reference/almanac/` | Facts, figures, platform metrics |
 | ATLAS | `docs/library/reference/atlas/` | Scraping sources, geographic data |
-| CLAUDE.md | `/Users/skylar/nuke/CLAUDE.md` | Agent instructions, hard rules, principles |
-| TOOLS.md | `/Users/skylar/nuke/TOOLS.md` | Canonical intent-to-function map |
-| PROJECT_STATE.md | `/Users/skylar/nuke/PROJECT_STATE.md` | Current sprint focus |
-| DONE.md | `/Users/skylar/nuke/DONE.md` | Completed work log |
-| ISSUES.md | `/Users/skylar/nuke/.claude/ISSUES.md` | Known bugs and regressions |
+| CLAUDE.md | `~/nuke/CLAUDE.md` | Agent instructions, hard rules, principles |
+| TOOLS.md | `~/nuke/TOOLS.md` | Canonical intent-to-function map |
+| PROJECT_STATE.md | `~/nuke/PROJECT_STATE.md` | Current sprint focus |
+| DONE.md | `~/nuke/DONE.md` | Completed work log |
+| ISSUES.md | `~/nuke/.claude/ISSUES.md` | Known bugs and regressions |
 | Extraction Handbook | `docs/library/technical/extraction-playbook.md` | Complete extraction reference (2,998 lines) |
 | Engineering Manual | `docs/library/technical/engineering-manual/` | 10 chapters, build guides |
 | Design Book | `docs/library/technical/design-book/` | 10 chapters, UI specifications |

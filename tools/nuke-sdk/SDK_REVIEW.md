@@ -287,7 +287,7 @@ The Nuke SDK is complete, well-documented, type-safe, and ready for production u
 ## Build Command
 
 ```bash
-cd /Users/skylar/nuke/tools/nuke-sdk
+cd ~/nuke/tools/nuke-sdk
 npm run build
 ```
 

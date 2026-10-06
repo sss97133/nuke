@@ -62,7 +62,7 @@ const navigate = useNavigate();
 The migration already exists. Just apply it:
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # For production
 supabase db push

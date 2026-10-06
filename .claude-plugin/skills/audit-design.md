@@ -17,7 +17,7 @@ Audit the frontend against the Nuke design system. Catches violations and genera
 
 ### 1. Scan for Violations
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Border radius violations
 grep -rn "border-radius" src/ --include="*.css" --include="*.tsx" --include="*.ts" | grep -v "node_modules" | grep -v "unified-design-system" | grep -v ": 0" | grep -v "border-radius: 0"

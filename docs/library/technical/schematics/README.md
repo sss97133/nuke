@@ -46,7 +46,7 @@ ASCII diagrams use the following conventions:
 1                 -- Cardinality marker (one)
 ```
 
-All file paths are relative to `/Users/skylar/nuke/` unless otherwise noted.
+All file paths are relative to `~/nuke/` unless otherwise noted.
 
 ## Source Files
 

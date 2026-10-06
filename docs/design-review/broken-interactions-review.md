@@ -31,7 +31,7 @@ The search dropdown renders as an absolutely-positioned panel with `zIndex: 1203
 
 4. **Autocomplete persists across navigation.** When a user selects a vehicle from autocomplete and navigates to `/vehicle/{id}`, the `showAutocomplete` state is not explicitly reset. The `useEffect` at line 275-378 checks `showPreview` but not route changes. If the user then focuses the search input on the new page, stale results from the previous query flash briefly before the 300ms debounce fires a new search.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -48,7 +48,7 @@ The VehicleTabBar intercepts `Cmd+W` / `Ctrl+W` globally and calls `e.preventDef
 - There is no guard for `e.target instanceof HTMLInputElement` on the Cmd+W path (that guard only exists for the `[` and `]` shortcuts at line 40).
 - If no vehicle tabs are open, the shortcut falls through to the browser default, creating inconsistent behavior.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
 
 ---
 
@@ -74,7 +74,7 @@ This overlay is `pointer-events: none`, which should be fine. However, `z-index:
 
 The Notification Center specifically renders at `zIndex: 1000` as a fixed panel -- on the vehicle profile, it will paint behind the paper grain overlay and could be visually obscured or have interaction issues depending on browser compositing.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/styles/vehicle-profile.css`
+**File:** `~/nuke/nuke_frontend/src/styles/vehicle-profile.css`
 
 ---
 
@@ -93,7 +93,7 @@ The Notification Center renders as a `position: fixed` panel at `top: 60px; righ
 
 4. **No focus trap.** Tab key moves focus out of the panel and into the page behind it, with no way to tab back.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/notifications/NotificationCenter.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/notifications/NotificationCenter.tsx`
 
 ---
 
@@ -111,7 +111,7 @@ There is zero user confirmation. The user pastes a URL to look at it, and the sy
 
 The comment at line 1433 says "auto-ingest immediately (no extra Enter)" -- this was intentional, but it is a UX violation. The user did not ask to create a record; they pasted text into a search box.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -159,7 +159,7 @@ The `...` button in the search bar opens an actions menu with IMG, CRIT, and GO 
 3. Pressing Escape closes the menu (line 1220), but only if the input has focus -- if the user somehow tabbed to the `...` button and pressed Escape, the handler on `handleKeyDown` (attached to the input) would not fire.
 4. The actions menu renders at `zIndex: 1200`, which is BELOW the autocomplete dropdown (`zIndex: 1203`). If both are open, autocomplete covers the actions menu.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -170,7 +170,7 @@ The `...` button in the search bar opens an actions menu with IMG, CRIT, and GO 
 
 When a tab is active, the tab title is replaced with a bullet character `'●'`. The user sees a row of tabs where the active one shows just a dot and the inactive ones show titles. This is backwards -- the active tab is the one the user needs to identify at a glance. If they have 5 tabs open, they cannot tell which vehicle is currently displayed without checking the page content.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
 
 ---
 
@@ -187,7 +187,7 @@ The OrganizationProfile page implements its own toast system using `ReactDOM.cre
 4. These toasts use custom colors (`#1a472a`, `#7f1d1d`) instead of the design system CSS variables
 5. These toasts use `boxShadow` which violates the zero-shadow design rule
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/pages/OrganizationProfile.tsx`
+**File:** `~/nuke/nuke_frontend/src/pages/OrganizationProfile.tsx`
 
 ---
 
@@ -202,7 +202,7 @@ The `onPaste` handler calls `e.preventDefault()` for any URL-like input (line 14
 3. If the paste is a URL, the auto-ingest fires immediately (see the HIGH issue above), giving the user no chance to edit the URL before submission
 4. Non-URL pastes work normally, creating inconsistent paste behavior
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -213,7 +213,7 @@ The `onPaste` handler calls `e.preventDefault()` for any URL-like input (line 14
 
 A `window.addEventListener('paste', handlePaste)` listener (line 636) captures ALL paste events that contain images, regardless of which element has focus. If the user is pasting an image into a comment box, a description field, or any other textarea, the search bar will intercept it and attach it as a search image. There is no check for `e.target` or active element.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -228,7 +228,7 @@ The HomePage renders its own header with its own search bar, its own NUKE wordma
 
 The HomePage search has its own state, its own dropdown, and its own click-outside handler. It does not share any behavior with the AIDataIngestionSearch. Typing in one does not affect the other. The homepage search dropdown renders at `z-index: 10000` while the global search dropdown renders at `z-index: 1203`.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/pages/HomePage.tsx`
+**File:** `~/nuke/nuke_frontend/src/pages/HomePage.tsx`
 
 ---
 
@@ -239,7 +239,7 @@ The HomePage search has its own state, its own dropdown, and its own click-outsi
 
 The Wiring Workbench is a chat-like panel that renders inside the search dropdown area. It shows messages from previous interactions, but there is no input field inside the panel. The user is expected to type follow-up messages in the main search input, which then routes through `processInput()` -> `isWiringIntent()` -> `runWiringWorkbench()`. This is not discoverable -- the chat panel looks like it should have its own input, but it does not.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 
@@ -250,7 +250,7 @@ The Wiring Workbench is a chat-like panel that renders inside the search dropdow
 
 The tab supports middle-click (auxClick, button === 1) to close. This is a good pattern borrowed from browser tabs, but there is no indication to the user that this shortcut exists. The `onAuxClick` is on the tab `div`, not on the close button, which is correct -- but the cursor does not change on hover to indicate the close-on-middle-click behavior.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/layout/VehicleTabBar.tsx`
 
 ---
 
@@ -265,7 +265,7 @@ The error overlay renders below the search bar with `zIndex: 1202`. It can only 
 
 Wait -- looking again: Escape at line 1217 does NOT clear `error`. The error overlay will persist through Escape presses. Only the outside-click handler at line 611 sets `setError(null)`. This means if the user is focused in the search input and presses Escape, the error stays visible. They must click somewhere else on the page.
 
-**File:** `/Users/skylar/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
+**File:** `~/nuke/nuke_frontend/src/components/search/AIDataIngestionSearch.tsx`
 
 ---
 

@@ -114,7 +114,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Transaction SMS | `send-transaction-sms` ⚠ (live FE path, source deleted — restore first) | all other sms-* fns (dead) |
 | Telegram / bots | CAPABILITY RETIRED (map's "@Sss97133_bot running" is FALSE) | telegram-* ×6, nuke-data-bot/tech-bot/nukeproof-bot/nuke-mini |
 | Conversational DB access | `mcp-connector` (prod /mcp per vercel.json) | nuke-data-bot (folded into mcp-connector 2026-03-20), mcp/ + mcp-servers/ root dirs |
-| Concierge | EXTERNAL REPO `/Users/skylar/lofficiel-concierge` (concierge-ground/house/partner) — never mint concierge code in nuke | nuke-repo concierge-notify/-webhook/-villa-discovery (deleted) |
+| Concierge | EXTERNAL REPO `~/lofficiel-concierge` (concierge-ground/house/partner) — never mint concierge code in nuke | nuke-repo concierge-notify/-webhook/-villa-discovery (deleted) |
 | **RESTORATION / WORK** | | |
 | Work record ledger | `work_sessions` table — write via `create-work-session-from-evidence` (UI) or mcp-connector `confirm_work_session` (agent) | `work-session` fn (ZERO callers — trap name), work_orders + 7 satellites (0 rows ever), vehicle_jobs, work-intake-batch / sms-work-intake / telegram-restoration-bot / intelligent-work-detector (deleted) |
 | Auto work-log from photos | `photo-pipeline-orchestrator` inline logic | generate-work-logs (2,002 LOC; both callers repointed off it 2026-07-06) |

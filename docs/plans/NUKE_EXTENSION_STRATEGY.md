@@ -376,8 +376,8 @@ contribution that enriches the graph.
 Read NUKE_EXTENSION_STRATEGY.md for the full plan. Current session goal: [specific task]
 
 Key files:
-- MCP server: /Users/skylar/nuke/mcp-server/src/index.ts
-- Strategy: /Users/skylar/nuke/NUKE_EXTENSION_STRATEGY.md
-- Architecture: /Users/skylar/nuke/digital-twin-architecture.md
-- Tools registry: /Users/skylar/nuke/TOOLS.md
+- MCP server: ~/nuke/mcp-server/src/index.ts
+- Strategy: ~/nuke/NUKE_EXTENSION_STRATEGY.md
+- Architecture: ~/nuke/digital-twin-architecture.md
+- Tools registry: ~/nuke/TOOLS.md
 ```

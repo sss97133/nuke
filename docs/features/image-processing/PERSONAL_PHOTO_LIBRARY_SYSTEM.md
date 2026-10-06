@@ -563,7 +563,7 @@ Follows existing cursor design system:
 
 ```bash
 # 1. Apply database migration
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push
 
 # Or manually:

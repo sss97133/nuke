@@ -332,7 +332,7 @@ shells are well-built and Skylar-approved:
 - iOS: full market-read terminal, already the leftmost/front-door tab, anon-safe;
   `CohortTerminalView` is the app's gold-standard populated-flag-honest surface. The
   "market read terminal" IS `ExploreView.swift` (MetroDetailView is a struct inside it).
-  Live app: `/Users/skylar/.worktrees/foundation-ios`, branch `fable5/ignition-ios`.
+  Live app: `~/.worktrees/foundation-ios`, branch `fable5/ignition-ios`.
 
 **The cardinal-rule violation (live in prod now):** every "market" surface aggregates the
 `vehicles` census (dominated by ~165k BaT auction rows + ~149k historical SOLD events),

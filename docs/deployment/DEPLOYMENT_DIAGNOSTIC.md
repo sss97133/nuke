@@ -4,7 +4,7 @@
 
 ### Run This Script:
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 bash EMERGENCY_DEPLOY.sh
 ```
 
@@ -12,7 +12,7 @@ bash EMERGENCY_DEPLOY.sh
 
 #### 1. Ensure All Files Committed
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 git add -A
 git status  # Check what's staged
 git commit -m "fix: deploy all changes"

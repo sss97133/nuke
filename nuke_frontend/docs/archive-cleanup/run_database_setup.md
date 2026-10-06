@@ -13,7 +13,7 @@ Since the database connection limit is reached, please run this manually:
 ## Option 2: Command Line (when connections available)
 
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 export PGPASSWORD="<your_db_password>"
 psql "postgresql://postgres.qkgaybvrernstplzjaam:${PGPASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres" -f database_setup.sql
 ```

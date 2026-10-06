@@ -256,7 +256,7 @@ node scripts/process-personal-library-images.js --all
 
 ### Step 1: Apply Database Migration
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push
 ```
 

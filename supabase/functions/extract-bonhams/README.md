@@ -193,7 +193,7 @@ Bonhams provides extensive galleries (30-80+ images per lot):
 
 ### Local Testing
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 dotenvx run -- deno run --allow-all supabase/functions/extract-bonhams/index.ts
 ```
 

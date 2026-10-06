@@ -2,7 +2,7 @@
 
 **To:** the executing engineer agent
 **From:** the recon lead / lead architect
-**Working dir:** `/Users/skylar/nuke` — always `cd` here first; use absolute paths everywhere.
+**Working dir:** `~/nuke` — always `cd` here first; use absolute paths everywhere.
 **Mandate:** This ecosystem EXISTS and partially WORKS. You are not building a new one. You are (1) **proving** what is actually true with live metrics instead of vibes, (2) **repairing and finishing the named imperative code already in tow** — every defect below is a real bug, an orphaned writer, a drained cron, or a half-wired loop, never a missing greenfield system — (3) **converging four schema generations and four "analyzed" namespaces onto one canonical model**, and (4) once stable, turning analysis coverage into something a visitor and the owner can literally **watch fill in over time.** Every island you are tempted to greenfield already has a half-built ancestor in this repo. **Finish the ancestor.** The seven half-finished pipeline generations sitting in the DB are the warning of what happens when you don't.
 
 Your job spans all four registers — **technical** (the bug, the indexes, the writer wiring), **programmatic** (the scheduled self-advancing harness), **intellectual** (the canonical adjudications), and **knowledge** (the coverage layer, the theory-growth loop, the authored docs). Lead with reliability and observability; you cannot grow what you cannot measure, and you cannot fix what you cannot see.
@@ -25,7 +25,7 @@ Read these before touching anything, in this order. They are load-bearing here, 
 
 **Coordination ritual (do this first, before any edits):**
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 [ -f .claude/HANDOFF.md ] && cat .claude/HANDOFF.md
 cat PROJECT_STATE.md; tail -60 DONE.md; cat .claude/agents/active/*.md 2>/dev/null
 echo "$(date +%H:%M) | IMAGE-ECOSYSTEM | prove+repair+converge+grow image analysis | scripts/daily-receipt, deep-image-analysis-byok.mjs, attribute-registry.ts, vehicle-profile/*" > .claude/agents/active/$PPID.md

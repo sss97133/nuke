@@ -1022,7 +1022,7 @@ XAI_BASE_URL=https://api.x.ai/v1
 # Ollama (local)
 OLLAMA_BASE_URL=http://localhost:11434
 
-# All env vars live in /Users/skylar/nuke/.env (encrypted with dotenvx)
+# All env vars live in ~/nuke/.env (encrypted with dotenvx)
 # AND in Supabase project secrets (for edge functions)
 # Always use `dotenvx run --` to inject them — never source .env directly
 
@@ -1654,7 +1654,7 @@ The diagnostic runbook used `$DB_HOST`, `$DB_PASSWORD`, `$DB_USER` env vars that
 ### Runbook: Condition Extraction from Descriptions
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Run a small test batch (batch_size=1 to verify the pipeline works)
 # NOTE: batch_size=0 does NOT do a dry run — it defaults to processing ~20 items.
@@ -1737,7 +1737,7 @@ If this returns an empty array after running step 2 successfully, check that the
 ### Runbook: New Source Setup
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Register the observation source
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/observation_sources" \
@@ -1779,7 +1779,7 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/import_queue?source_
 ### Runbook: Backfill from Snapshots
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Check available snapshots for a platform
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/batch-extract-snapshots" \
@@ -1803,7 +1803,7 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/batch-extract-s
 ### Runbook: Health Check
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Quick database stats
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/db-stats" \
@@ -1830,7 +1830,7 @@ npm run ops:regression
 ### Runbook: Deploy an Extraction Function
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Verify the function exists in TOOLS.md
 grep "my-new-extractor" TOOLS.md
@@ -3695,7 +3695,7 @@ Full description text including specs mentioned narratively.
 Before building new parsers, check if any existing edge functions already handle these sources:
 
 ```bash
-ls /Users/skylar/nuke/supabase/functions/ | grep -i -E "classic|market|bonhams|erclass"
+ls ~/nuke/supabase/functions/ | grep -i -E "classic|market|bonhams|erclass"
 ```
 
 Also check `TOOLS.md` and `observation_extractors` table for registered extractors.

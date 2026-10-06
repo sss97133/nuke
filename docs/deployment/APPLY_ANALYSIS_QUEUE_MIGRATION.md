@@ -55,7 +55,7 @@ WHERE trigger_name LIKE '%queue%';
 ## Alternative: Use Supabase CLI
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push
 ```
 

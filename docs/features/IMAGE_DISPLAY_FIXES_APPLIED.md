@@ -565,7 +565,7 @@ Factory Options: 12 codes from SPID
 
 ### 1. Deploy Database Changes
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 npx supabase db execute --file database/spid_verification_system.sql
 ```
 

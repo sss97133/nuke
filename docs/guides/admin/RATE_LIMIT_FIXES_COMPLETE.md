@@ -43,7 +43,7 @@ You hit OpenAI rate limits while processing images. The system now handles this 
 ### Option 1: Resume Script (Recommended)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 ./scripts/resume-image-processing.sh
 ```
 
@@ -56,7 +56,7 @@ cd /Users/skylar/nuke
 ### Option 2: Original Script (Updated)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 ./scripts/process-all-images.sh
 ```
 

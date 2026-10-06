@@ -38,7 +38,7 @@ YONO identifies vehicle makes from photos. Upload a car photo → get "Porsche",
 ### 1. Setup
 
 ```bash
-cd /Users/skylar/nuke/yono
+cd ~/nuke/yono
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -118,11 +118,11 @@ yono/
 
 ```bash
 # Export image metadata from Supabase
-cd /Users/skylar/nuke
+cd ~/nuke
 ./scripts/export-training-data.sh image_vehicle 100000 1000
 ```
 
-Creates `/Users/skylar/nuke/training-data/images/*.jsonl` with:
+Creates `~/nuke/training-data/images/*.jsonl` with:
 ```json
 {
   "id": "uuid",
@@ -153,7 +153,7 @@ Each phase:
 
 ```bash
 # Live log
-tail -f /Users/skylar/nuke/yono/training.log
+tail -f ~/nuke/yono/training.log
 
 # Check process
 ps aux | grep train_continuous

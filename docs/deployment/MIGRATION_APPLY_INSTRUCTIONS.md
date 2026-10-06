@@ -26,7 +26,7 @@ The migration is ready. You have **two options**:
 ## Option 2: Supabase CLI (If configured)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 export PGPASSWORD='$SUPABASE_DB_PASSWORD'
 supabase db push
 ```

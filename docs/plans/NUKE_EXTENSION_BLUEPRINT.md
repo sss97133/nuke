@@ -59,7 +59,7 @@
 **Debug approach:**
 ```bash
 # Test directly with service role key
-cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s \
+cd ~/nuke && dotenvx run -- bash -c 'curl -s \
   "$VITE_SUPABASE_URL/functions/v1/api-v1-vehicles?limit=1" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   -H "Content-Type: application/json"'
@@ -67,7 +67,7 @@ cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s \
 
 If this returns 401, the issue is in `apiKeyAuth.ts` — the service role comparison. Read the actual auth function and trace the failure.
 
-**Fix location:** `/Users/skylar/nuke/supabase/functions/_shared/apiKeyAuth.ts`
+**Fix location:** `~/nuke/supabase/functions/_shared/apiKeyAuth.ts`
 
 ### Fix 2: Extract Hallucination Guard
 
@@ -667,7 +667,7 @@ serve(async (req) => {
 ### Build & Pack Steps
 
 ```bash
-cd /Users/skylar/nuke/mcp-server
+cd ~/nuke/mcp-server
 
 # 1. Install mcpb CLI
 npm install -g @anthropic-ai/mcpb
@@ -863,7 +863,7 @@ Session 2: Ship
 ## THE PROMPT FOR SESSION 1
 
 ```
-Read /Users/skylar/nuke/NUKE_EXTENSION_BLUEPRINT.md — it's the complete implementation
+Read ~/nuke/NUKE_EXTENSION_BLUEPRINT.md — it's the complete implementation
 plan. Execute it top-to-bottom in one session.
 
 Summary of changes:
@@ -879,12 +879,12 @@ Summary of changes:
 9. mcpb pack
 
 Key files:
-- MCP server: /Users/skylar/nuke/mcp-server/src/index.ts (853 lines → ~1200)
-- Package: /Users/skylar/nuke/mcp-server/package.json
-- Server manifest: /Users/skylar/nuke/mcp-server/server.json
-- Auth: /Users/skylar/nuke/supabase/functions/_shared/apiKeyAuth.ts
-- Ingest: /Users/skylar/nuke/supabase/functions/ingest/index.ts
-- Observation intake: /Users/skylar/nuke/supabase/functions/ingest-observation/index.ts
+- MCP server: ~/nuke/mcp-server/src/index.ts (853 lines → ~1200)
+- Package: ~/nuke/mcp-server/package.json
+- Server manifest: ~/nuke/mcp-server/server.json
+- Auth: ~/nuke/supabase/functions/_shared/apiKeyAuth.ts
+- Ingest: ~/nuke/supabase/functions/ingest/index.ts
+- Observation intake: ~/nuke/supabase/functions/ingest-observation/index.ts
 
 Do NOT create new edge functions unless absolutely necessary.
 The 6 new MCP tools all route through EXISTING edge functions.

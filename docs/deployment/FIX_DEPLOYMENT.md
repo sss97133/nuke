@@ -4,7 +4,7 @@
 
 ### Step 1: Ensure All Files Are Committed
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 git add -A
 git status  # Verify all files are staged
 git commit -m "fix: ensure all files committed for deployment"
@@ -31,7 +31,7 @@ git push origin main
 
 ### Step 5: Force Deploy via CLI
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 vercel --prod --force --yes
 ```
 
