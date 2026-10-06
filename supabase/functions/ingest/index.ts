@@ -24,6 +24,7 @@ import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl, extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { slugStubRejection } from "./slugStub.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -1443,6 +1444,20 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       };
     }
 
+    // A venue's URL slug vouches for the identity, not for the page. When the page extractor ran and failed, the row
+    // would hold year, make and model and nothing else: a public husk nothing will fill in. Write nothing and say why;
+    // poll-listing-feeds records the rejection once and retries it on a schedule (slugStub.ts, poll-listing-feeds/ledger.ts).
+    const slugStub = slugStubRejection({ platform, identityIsSlugGuess, enrichmentSucceeded, enrichmentError });
+    if (slugStub) {
+      return {
+        status: "rejected",
+        reason: slugStub.reason,
+        enrichment_error: slugStub.enrichment_error,
+        source: platform,
+        external_id: externalId,
+      };
+    }
+
     // ── VALIDATION GATE ─────────────────────────────────────────────
     // Normalize + validate before writing to DB. Catches: wrong make from
     // VIN, RPO codes in body_style, impossible fuel/year combos, garbage.
@@ -1850,10 +1865,10 @@ Deno.serve(async (req: Request) => {
         ],
       },
       responses: {
-        created:  { description: "New vehicle created. If the source extractor failed, enrichment_error is set and quality_score is lowered — the row holds honest fields only.", fields: ["vehicle_id", "quality_score", "issues", "enrichment_error"] },
+        created:  { description: "New vehicle created. If the source extractor failed, enrichment_error is set and quality_score is lowered — the row holds honest fields only. Not for classiccars, mecum, barrett-jackson, hagerty, cars-and-bids, pcarmarket, vanguard-motors, allcollectorcars, autohunter or carandclassic URLs with no caller-supplied identity: there a failed extractor is a rejection (enrichment_failed).", fields: ["vehicle_id", "quality_score", "issues", "enrichment_error"] },
         matched:  { description: "Matched existing vehicle (enriched)", fields: ["vehicle_id", "quality_score"] },
         duplicate:{ description: "Same user+URL already ingested", fields: ["vehicle_id", "discovery_id"] },
-        rejected: { description: "Failed validation or minimum-viability gate (need year+make+model AND a recognized platform or successful extraction)", fields: ["reason", "quality_score", "issues", "suggestions"] },
+        rejected: { description: "Failed validation or minimum-viability gate (need year+make+model AND a recognized platform or successful extraction). reason starts enrichment_failed: when a slug-trusted venue's page extractor failed; nothing was written and enrichment_error carries the extractor's error.", fields: ["reason", "quality_score", "issues", "suggestions", "enrichment_error"] },
         preview:  { description: "preview:true — parsed identity only, nothing written", fields: ["parsed", "price", "location", "source", "external_id"] },
         error:    { description: "Server error", fields: ["error"] },
       },
