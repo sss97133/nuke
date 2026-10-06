@@ -170,7 +170,7 @@ SEC requires disclosure of anyone who owns 20%+ of voting securities. This trigg
 
 ## Next Steps
 
-1. **Review gap analysis:** `~/nuke/docs/SEC_FORM_COMPLIANCE_GAP_ANALYSIS.md`
+1. **Review gap analysis:** `~/nuke/docs/archive/SEC_FORM_COMPLIANCE_GAP_ANALYSIS.md`
 2. **Run SQL migration:** `~/nuke/database/sec_compliance_schema_additions.sql`
 3. **Update TypeScript types** in `nuke_frontend` to match new schema
 4. **Build admin UI** for managing offerings, financials, cap table

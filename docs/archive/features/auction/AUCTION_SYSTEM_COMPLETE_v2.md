@@ -614,7 +614,7 @@ supabase functions deploy generate-auction-description
 - `supabase/migrations/20251122_listing_export_tracking.sql`
 
 ### Documentation
-- `docs/AUCTION_SYSTEM_COMPLETE_v2.md`
+- `docs/archive/features/auction/AUCTION_SYSTEM_COMPLETE_v2.md`
 
 ---
 

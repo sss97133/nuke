@@ -272,10 +272,10 @@ Main Nav
 ## Support Resources
 
 ### Documentation
-- [Complete System Docs](./docs/AUCTION_SYSTEM_COMPLETE_v2.md)
+- [Complete System Docs](../features/auction/AUCTION_SYSTEM_COMPLETE_v2.md)
 - [Architecture Diagrams](./AUCTION_SYSTEM_ARCHITECTURE.md)
-- [Quick Start Guide](./AUCTION_MARKETPLACE_READY.md)
-- [Integration Checklist](./AUCTION_INTEGRATION_CHECKLIST.md)
+- [Quick Start Guide](../features/AUCTION_MARKETPLACE_READY.md)
+- [Integration Checklist](../features/AUCTION_INTEGRATION_CHECKLIST.md)
 - [Executive Summary](./AUCTION_SYSTEM_SUMMARY.md)
 
 ### Code Locations

@@ -409,7 +409,7 @@ supabase/migrations/20251122_listing_export_tracking.sql
 
 ### Documentation (2 files)
 ```
-docs/AUCTION_SYSTEM_COMPLETE_v2.md
+docs/archive/features/auction/AUCTION_SYSTEM_COMPLETE_v2.md
 AUCTION_MARKETPLACE_READY.md
 ```
 
@@ -493,7 +493,7 @@ Professional listing preparation tools available free to all users, building pla
 ## Support
 
 For questions or issues:
-1. Check `docs/AUCTION_SYSTEM_COMPLETE_v2.md` for detailed technical docs
+1. Check `docs/archive/features/auction/AUCTION_SYSTEM_COMPLETE_v2.md` for detailed technical docs
 2. Review migration file for database schema
 3. Test with sample data before production
 4. Monitor analytics dashboard for insights
