@@ -331,3 +331,58 @@ Deno.test("planIngests: complete, skipped and final failed rows are settled", ()
   equal(plan.toIngest, ["n"]);
   equal(plan.settled, 3);
 });
+
+// ── a slug-trusted venue whose extractor failed: ingest rejects, the poller records it once ──
+
+const rejection = (error: string): IngestOutcome => ({
+  status: "rejected",
+  reason: `enrichment_failed: ${error}`,
+  enrichment_error: error,
+});
+
+const REJECTED_URL = "https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/00000000-0000-4000-8000-0000000000aa";
+
+const writeRejection = (error: string, prev?: LedgerKnown, batch: LandedBatch = { rows: new Map(), error: null }) =>
+  ledgerWriteFor({ url: REJECTED_URL, feedId: "feed-1", ingest: rejection(error), batch, prev, now: NOW });
+
+Deno.test("an enrichment_failed rejection is ledgered failed, with no vehicle, the extractor's error and its category", () => {
+  const blocked = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site");
+  equal(blocked?.status, "failed");
+  equal(blocked?.row.vehicle_id, null);
+  equal(blocked?.row.failure_category, "blocked");
+  assert(String(blocked?.row.error_message).startsWith("enrichment_failed: extract-hagerty-listing"), "the reason keeps its prefix and the error");
+  equal([blocked?.row.attempts, blocked?.row.next_attempt_at], [1, iso(24 * HOUR)]);
+  const slow = writeRejection("extract-cars-and-bids-core: Signal timed out.");
+  equal([slow?.row.failure_category, slow?.row.attempts, slow?.row.next_attempt_at], ["timeout", 1, iso(1 * HOUR)]);
+  const billing = writeRejection("extract-vehicle-data-ai HTTP 500: OpenAI API error: 429 - You have no credits remaining");
+  equal([billing?.row.failure_category, billing?.row.attempts, billing?.row.next_attempt_at], ["billing", DEFAULT_MAX_ATTEMPTS, null]);
+});
+
+Deno.test("a rejection needs no read-back: a failed batch does not turn it into readback_error", () => {
+  const w = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site", undefined, { rows: new Map(), error: "boom" });
+  equal(w?.row.failure_category, "blocked");
+});
+
+Deno.test("a rejection is never skipped, even when the extractor's text holds a structural word", () => {
+  const w = writeRejection("extract-vehicle-data-ai: this page is not a vehicle listing");
+  equal(w?.status, "failed");
+  equal(w?.row.failure_category, "extraction_failed");
+});
+
+Deno.test("a rejection that is not enrichment_failed still follows the old rule: structural is skipped, the rest is not ledgered", () => {
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "implausible year: 1801" }, batch: { rows: new Map(), error: null }, now: NOW })?.status, "skipped");
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
+});
+
+Deno.test("the rejection is recorded once: later polls skip the URL until it is due, and a final one never returns", () => {
+  const first = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site")!;
+  const ledger = new Map<string, LedgerKnown>([[REJECTED_URL, first.row as unknown as LedgerKnown]]);
+  const at = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000);
+  // a day-long backoff: not at 1 h, not at 23 h, due at 25 h, and the cap is untouched meanwhile
+  equal(planIngests([REJECTED_URL, "new"], new Set(), ledger, at(60), 1).toIngest, ["new"]);
+  equal(planIngests([REJECTED_URL], new Set(), ledger, at(23 * 60), 20).toIngest, []);
+  equal(planIngests([REJECTED_URL], new Set(), ledger, at(25 * 60), 20).toIngest, [REJECTED_URL]);
+  // the third rejection is final
+  const third = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site", { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal(planIngests([REJECTED_URL], new Set(), new Map([[REJECTED_URL, third.row as unknown as LedgerKnown]]), at(30 * 24 * 60), 20).toIngest, []);
+});

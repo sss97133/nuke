@@ -188,6 +188,22 @@ jobs:
       - name: Verify discovery failure and evidence contracts
         run: python3 scripts/discovery/inclusion_pass_test.py
 
+  poller-ledger-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify the poller ledger. Complete means data landed, and failed rows retry on a schedule
+        run: deno test supabase/functions/poll-listing-feeds/ledger.test.ts
+      - name: Verify ingest writes no vehicle from a URL slug when the page extractor failed
+        run: |
+          deno test supabase/functions/ingest/slugStub.test.ts
+          deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
+
   profile-fold-contract:
     runs-on: ubuntu-latest
     services:
