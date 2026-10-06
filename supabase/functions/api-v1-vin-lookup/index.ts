@@ -7,6 +7,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { decodeOneVin } from "../_shared/nhtsa-vin.ts";
+import { decodeVin as decodeVinLocally } from "../_shared/vin-decoder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,6 +63,38 @@ Deno.serve(async (req) => {
       .rpc("find_vehicle_by_vin", { p_vin: vin });
 
     if (resolveError || !vehicleId) {
+      // Nuke holds no record for this VIN. Answer with a cited factory decode
+      // instead of a bare 404: NHTSA vPIC for 17-character VINs, the local
+      // WMI/year-code decoder for pre-1981 VINs or when NHTSA is unreachable.
+      // held:false tells the caller these are reference facts, not testimony.
+      const cleanVin = vin.trim().toUpperCase();
+      if (cleanVin.length === 17) {
+        try {
+          const nhtsa = await decodeOneVin(cleanVin);
+          if (nhtsa) {
+            return jsonResponse({
+              data: null,
+              held: false,
+              vin: cleanVin,
+              decode: nhtsa.fields,
+              source: { ...nhtsa.source, error_code: nhtsa.error_code, error_text: nhtsa.error_text, trust: "T1 reference (manufacturer filing)" },
+            });
+          }
+        } catch (e) {
+          console.warn("[vin-lookup] NHTSA decode failed:", e instanceof Error ? e.message : String(e));
+        }
+      }
+      const local = decodeVinLocally(cleanVin);
+      if (local.year || local.make || local.manufacturer) {
+        const { is_pre_1981, ...fields } = local;
+        return jsonResponse({
+          data: null,
+          held: false,
+          vin: cleanVin,
+          decode: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== "")),
+          source: { name: "Nuke vin-decoder", method: is_pre_1981 ? "pre-1981 WMI/year-code tables" : "WMI/year-code tables", trust: "T3 heuristic" },
+        });
+      }
       return jsonResponse({ error: "Vehicle not found for VIN", vin }, 404);
     }
 

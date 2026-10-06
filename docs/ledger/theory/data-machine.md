@@ -133,10 +133,14 @@ rows, 0 of 28 columns described. `vehicles`: 342 columns (157 described), 285 ta
 4. *Features and cohorts:* bidder records and effects as of a date; the cohort dimensions and their bridge.
 5. *Prediction:* the six blanks filled with the owner; the replay backtest.
 
+The process these lanes run, as the stages one row passes through (land, key, describe, shape, fold, replay, assay,
+prospect), its queue and its standing runner are in the case ledger, §12.
+
 **Canonical entrypoints:** `v_schema_atlas` and `v_job_health` (read with `scripts/data/q.sh`); `auction_comments`
 fed by the cron `bat-live-pull` (live lots) and the `import_queue` backfill; `vehicle_observations`;
 `external_identities`; `pipeline_registry`; `live_lot_temperature(p_vehicle_id)`; `market_index_values`
-(`BAT-LIVE-BIDS`, hourly).
+(`BAT-LIVE-BIDS`, hourly); `scripts/discovery/repair-backlog.sql` (the ranked model backlog from the atlas,
+read-only; case ledger §12).
 
 **Do NOT:** feed a lifetime aggregate into a past moment; build a feature that cannot be replayed from the log; mint a
 second identity, geography or cohort table beside an existing one; store a derived number without its as-of time;
