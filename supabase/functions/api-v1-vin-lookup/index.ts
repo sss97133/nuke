@@ -60,7 +60,11 @@ Deno.serve(async (req) => {
         drivetrain, body_style, sale_price, purchase_price, description,
         is_public, created_at, updated_at, primary_image_url
       `)
-      .ilike("vin", vin)
+      // VINs are stored upper-case with no whitespace (sampled 10,492 rows,
+      // 0 exceptions, 2026-10-06). eq() on the upper-cased input uses the
+      // vehicles_vin_unique_17char_v2 index; ilike() forced a sequential scan
+      // and a miss took ~19 s to return 404 (measured 2026-10-06).
+      .eq("vin", vin.trim().toUpperCase())
       .limit(1)
       .maybeSingle();
 
