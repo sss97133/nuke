@@ -260,7 +260,7 @@ Updated: 2026-03-27
 - **Predict hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)
 - **ARS SQL**: `compute_auction_readiness()`, `persist_auction_readiness()`
 - **Tables**: `auction_readiness`, `ars_tier_transitions`
-- **Strategy doc**: `auction-readiness-strategy.md`
+- **Strategy doc**: `docs/strategy/auction-readiness-strategy.md`
 
 ### User / Persona Intelligence
 - **Stylometric analyzer**: `scripts/user-stylometric-analyzer.mjs` (Layer 0, zero-cost)
