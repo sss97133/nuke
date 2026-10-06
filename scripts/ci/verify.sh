@@ -32,7 +32,7 @@ if [ "${CI_WRITE_BASELINE:-0}" = 1 ]; then
   g=$(count_ghost); rf=$(count_rawfetch); ti=$(count_testimony); sl=$(count_labels)
   cat > "$BASE" <<JSON
 {
-  "generated": "2026-07-12",
+  "generated": "$(date -u +%F)",
   "note": "Ratchet floor for scripts/ci/verify.sh. The gate fails only when a count EXCEEDS these. Ratchet DOWN as violations are burned; never raise.",
   "guardrails": {
     "no-dead-asset-references": { "errors": $g, "note": "ghost-table refs on live paths. 12 = webhooks (pending strip, NEEDS_SKYLAR #2); 6 = vehicle_transactions (guarded crash-safe, half-built)." },

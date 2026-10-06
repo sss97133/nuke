@@ -23,6 +23,11 @@ jobs:
       - name: Install dependencies
         working-directory: ./nuke_frontend
         run: npm ci
+      - name: Ratchet gate (scripts/ci/verify.sh, enforce mode)
+        # Fails only when a guardrail count EXCEEDS scripts/ci/baseline.json (ghost refs, raw fetch,
+        # raw testimony inserts), on any committed secret, or on a type error. Burn violations down,
+        # then lower the floor with CI_WRITE_BASELINE=1; never raise it.
+        run: CI_ENFORCE=1 bash scripts/ci/verify.sh
 
       - name: Raw-fetch guard regression tests
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
