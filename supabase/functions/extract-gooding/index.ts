@@ -24,6 +24,8 @@ import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
+import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
 
 const EXTRACTOR_VERSION = '2.1.0';
 
@@ -53,6 +55,7 @@ interface GoodingExtracted {
   auction_date: string | null;
   auction_location: string | null;
   auction_calendar_position: string | null;  // e.g. "2025 Pebble Beach Auctions (Lot 38)"
+  event_dates: GoodingEventDates;  // episode ended_at/sold_at from the page's auction sessions (eventDates.ts)
   currency: string;
 
   // Pricing
@@ -453,6 +456,7 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     auction_date: auctionDate,
     auction_location: auction?.location?.address?.addressCountry || null,
     auction_calendar_position,
+    event_dates: goodingEventDates(auction?.subEvents, status === 'sold'),
 
     currency: auction?.currency || 'USD',
 
@@ -783,10 +787,8 @@ async function saveToDatabase(
     }).catch((e: any) => console.warn(`[GOODING] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
-  // Update/insert vehicle_events
-  const { error: listingError } = await supabase
-    .from('vehicle_events')
-    .upsert({
+  // Update/insert vehicle_events by its listing key (see _shared/vehicleEventWrite.ts for why not upsert)
+  const episode = await writeVehicleEventByKey(supabase, {
       vehicle_id: vehicleId,
       source_platform: 'gooding',
       event_type: 'auction',
@@ -796,12 +798,14 @@ async function saveToDatabase(
                       extracted.status === 'active' ? 'active' :
                       extracted.status === 'sold' ? 'sold' :
                       extracted.status === 'unsold' ? 'unsold' : 'ended',
-      ended_at: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
+      // Dated only from a single real auction session; the 2004–2019 CMS placeholder session is never a sale day.
+      ended_at: extracted.event_dates.ended_at,
       final_price: extracted.sale_price,
-      sold_at: extracted.status === 'sold' && extracted.auction_date
-        ? new Date(extracted.auction_date).toISOString()
-        : null,
+      sold_at: extracted.event_dates.sold_at,
       metadata: {
+        source: 'extract-gooding',
+        sold_at_basis: extracted.event_dates.basis,
+        auction_session_days: extracted.event_dates.session_days,
         lot_number: extracted.lot_number,
         auction_name: extracted.auction_name,
         auction_calendar_position: extracted.auction_calendar_position,
@@ -819,10 +823,10 @@ async function saveToDatabase(
         salesforce_id: extracted.salesforce_id,
         contentful_id: extracted.contentful_id,
       },
-    }, { onConflict: 'source_platform,source_listing_id' });
+    });
 
-  if (listingError) {
-    console.error(`[gooding] Failed to upsert vehicle_event: ${listingError.message}`);
+  if (episode.action === 'error' || episode.action === 'skipped') {
+    console.error(`[gooding] vehicle_event not written (${episode.action}): ${'error' in episode ? episode.error : episode.reason}`);
   }
 
   // Save images
