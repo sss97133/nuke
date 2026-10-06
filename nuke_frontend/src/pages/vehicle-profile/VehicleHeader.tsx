@@ -846,11 +846,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const estimatedValue = valuation && typeof valuation.estimatedValue === 'number'
       ? valuation.estimatedValue
       : null;
+    // One line of truth: a sold car's value is its recorded sale (first in `order`). An estimate on a sold
+    // car is said as an estimate, dated, and marked pre-sale when it predates the sale. Never blended.
+    const estimateDate = valuation?.lastUpdated || null;
+    const soldOn = typedSold ? (priceFacts?.sold_on || null) : null;
+    const estimatePredatesSale = !!(soldOn && estimateDate
+      && Number.isFinite(new Date(estimateDate).getTime()) && Number.isFinite(new Date(soldOn).getTime())
+      && new Date(estimateDate).getTime() < new Date(soldOn).getTime());
     pushEntry({
       id: 'estimate',
-      label: 'Estimated Value',
+      label: typedSold ? (estimatePredatesSale ? 'Estimate, pre-sale' : 'Estimate, after the sale') : 'Estimated Value',
       amount: estimatedValue as number,
-      date: valuation?.lastUpdated || null,
+      date: estimateDate,
       source: valuation?.dataSources?.length ? valuation.dataSources[0] : 'Valuation engine',
       confidence: valuation?.confidence
     });
