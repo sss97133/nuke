@@ -61,6 +61,10 @@ jobs:
         run: createdb dm_model_health_monitor_ci
       - name: Verify metadata gaps and execution versus output evidence
         run: psql -X -v ON_ERROR_STOP=1 -d dm_model_health_monitor_ci -f scripts/discovery/data-model-health-test.sql
+      - name: Create disposable repair-backlog view database
+        run: createdb dm_residual_backlog_ci
+      - name: Verify the ranked repair-backlog view over the old island view, its columns, gap rules, scope, grants and backlog script
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_residual_backlog_ci -f supabase/sql/test_residual_ranked_backlog.sql
       - name: Create disposable bounded pipeline pulse database
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings
@@ -91,6 +95,14 @@ jobs:
         run: createdb dm_refinement_comment_lot_keys_ci
       - name: Verify comment lot keys by bounded backfill; one candidate keyed, several or none left NULL
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_lot_keys_ci -f supabase/sql/test_comment_lot_keys.sql
+      - name: Create disposable episode clock-lock guard database
+        run: createdb dm_refinement_clock_lock_guard_ci
+      - name: Verify a superseded episode's locked clocks survive lander updates and wholesale metadata writes
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_clock_lock_guard_ci -f supabase/sql/test_vehicle_event_clock_lock_guard.sql
+      - name: Create disposable lot identity key database
+        run: createdb dm_refinement_auction_event_identity_keys_ci
+      - name: Verify lot winner and seller keys at insert, on update and by bounded backfill; junk and contradicted text left NULL
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_auction_event_identity_keys_ci -f supabase/sql/test_auction_event_identity_keys.sql
       - name: Create disposable missing BaT lots database
         run: createdb dm_refinement_missing_bat_lots_ci
       - name: Verify missing BaT lot rows come only from retained evidence; existing lots untouched; idempotent
@@ -111,6 +123,10 @@ jobs:
         run: createdb dm_derived_queue_chunks_ci
       - name: Verify the derived-queue drain gives each queue its time slice, stops on repeated failures, counts completion retries, and refuses a drifted body
         run: psql -X -v ON_ERROR_STOP=1 -d dm_derived_queue_chunks_ci -f supabase/sql/test_vehicle_derived_queue_chunks.sql
+      - name: Create disposable vehicle-event supersession database
+        run: createdb dm_vehicle_event_supersession_ci
+      - name: Verify episode supersession retires the original whole, inserts the cited correction, refuses uncited plans, and readers see the replacement
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_vehicle_event_supersession_ci -f supabase/sql/test_vehicle_event_episode_supersession.sql
 
   image-projection:
     runs-on: ubuntu-latest
@@ -192,6 +208,22 @@ jobs:
       - name: Verify discovery failure and evidence contracts
         run: python3 scripts/discovery/inclusion_pass_test.py
 
+  poller-ledger-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify the poller ledger. Complete means data landed, and failed rows retry on a schedule
+        run: deno test supabase/functions/poll-listing-feeds/ledger.test.ts
+      - name: Verify ingest writes no vehicle from a URL slug when the page extractor failed
+        run: |
+          deno test supabase/functions/ingest/slugStub.test.ts
+          deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
+
   profile-fold-contract:
     runs-on: ubuntu-latest
     services:
@@ -235,6 +267,10 @@ jobs:
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
+      - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
+        run: deno test --allow-read=supabase/functions/extract-craigslist/fixtures supabase/functions/extract-craigslist/ supabase/functions/extract-vehicle-data-ai/normalize.test.ts supabase/functions/ingest/craigslistCapture.test.ts
+      - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
+        run: deno test supabase/functions/_shared/batChassis.test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest

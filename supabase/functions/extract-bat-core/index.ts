@@ -1,6 +1,10 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.4.0 — the Chassis/VIN line is read by _shared/batChassis.ts: a short or I/O/Q/separator chassis lands (2026-10-06)
+ * - The Listing Details "Chassis:" line used to need 11-17 characters of the VIN alphabet; 18% of the lots that state
+ *   one (short pre-1981 and import chassis) and every chassis with I, O, Q or a separator were left VIN-less.
+ *   Identity lookups (find_vehicle_by_vin, the INSERT) still trust only that old 11-17 region: isIdentityGradeVin().
  * Version: 4.3.0 — continuous public closing-auction events through canonical intake (2026-10-04)
  * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
  *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
@@ -32,6 +36,7 @@ import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } 
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
+import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
@@ -41,7 +46,7 @@ import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.3.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.4.0';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -599,8 +604,10 @@ function extractEssentials(html: string): {
 
     for (const t of items) {
       if (!vin) {
-        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{11,17})\b/i);
-        if (idMatch?.[1]) vin = idMatch[1].toUpperCase().trim();
+        // _shared/batChassis.ts: a 17-character VIN, or a 5-16 character chassis. A 17-character VIN that fails its check
+        // digit is handed on as stated, so the vinCheckDigitOk guard below still nulls it and keeps its receipt.
+        const chassis = chassisFromListItemText(t);
+        if (chassis) vin = chassis.value ?? (chassis.rejected === "check_digit" ? chassis.candidate : null);
       }
       if (!mileage) {
         const milesMatch =
@@ -1360,7 +1367,9 @@ Deno.serve(async (req) => {
     // v4: through find_vehicle_by_vin() — `vin = $1` matched none of the four VIN indexes (all partial or
     // on upper(vin)) and cost a 920K-row seq scan per new lot (16–60 s measured 2026-09-27); the function
     // reads idx_vehicles_vin_norm_trim. The column filter stays as a loud fallback only.
-    if (!vehicleId && essentials.vin && essentials.vin.length >= 5) {
+    // Only the region this lookup always trusted (11-17 characters of the VIN alphabet) may pick a vehicle: a 5-10
+    // character chassis is shared between makes, and resolving by it would fold two cars into one row.
+    if (!vehicleId && isIdentityGradeVin(essentials.vin)) {
       const { data: byVin, error: byVinErr } = await supabase.rpc("find_vehicle_by_vin", { p_vin: essentials.vin });
       if (!byVinErr && byVin) {
         vehicleId = String(byVin);
@@ -1400,7 +1409,9 @@ Deno.serve(async (req) => {
         year: identity.year || null,
         make: identity.make || null,
         model: identity.model || null,
-        vin: essentials.vin || null,
+        // an identity-grade VIN goes in the INSERT as before; any other chassis lands right after it (below), so a same-make
+        // unique conflict on a short chassis can never fail the lot
+        vin: isIdentityGradeVin(essentials.vin) ? essentials.vin : null,
         description: description || null,
         description_source: description ? "source_imported" : null,
         listing_title: identity.title || null,
@@ -1477,6 +1488,11 @@ Deno.serve(async (req) => {
       if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
       vehicleId = String(inserted.id);
       createdIds.push(vehicleId);
+      if (essentials.vin && !isIdentityGradeVin(essentials.vin)) {
+        // a unique conflict here only means another row of the same make already holds this chassis; the lot stays VIN-less
+        const { error: chassisErr } = await supabase.from("vehicles").update({ vin: essentials.vin }).eq("id", vehicleId);
+        if (chassisErr) console.warn(`chassis ${essentials.vin} not landed on ${vehicleId}: ${chassisErr.message || chassisErr}`);
+      }
     } else {
       // Update existing vehicle (conservative: only fill missing or polluted fields)
       if (!existing) {

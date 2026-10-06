@@ -57,6 +57,12 @@ export interface ObservationInput {
   agentModel?: string;
   agentCostCents?: number;
   agentDurationMs?: number;
+  /**
+   * Keys of `fields` that stay testimony on the observation row only: not gap-filled onto the vehicle and not
+   * written as field_evidence. For a caller that has just created the vehicle from the same page, so the values are
+   * already on it and a receipt for each would only repeat them. Omitted = every field is processed, as before.
+   */
+  testimonyOnly?: string[];
 }
 
 export interface WriteResult {
@@ -167,7 +173,13 @@ export async function writeObservation(
     agentModel,
     agentCostCents,
     agentDurationMs,
+    testimonyOnly,
   } = params;
+
+  // The fields the vehicle row and the evidence ledger see; the observation row always keeps all of `fields`.
+  const derivedFields = testimonyOnly && testimonyOnly.length > 0
+    ? Object.fromEntries(Object.entries(fields).filter(([k]) => !testimonyOnly.includes(k)))
+    : fields;
 
   // A vehicle observation (the default, and every existing caller) requires a
   // vehicleId. A non-vehicle subject requires a subjectId instead.
@@ -211,14 +223,14 @@ export async function writeObservation(
   // Skip them entirely for non-vehicle subjects (they are keyed on vehicleId).
   // For vehicle observations this path is unchanged.
   const gapFillPromise = isVehicleSubject
-    ? gapFillVehicle(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+    ? gapFillVehicle(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`gap-fill: ${e?.message || e}`);
         return null;
       })
     : Promise.resolve(null);
 
   const evidencePromise = isVehicleSubject
-    ? writeFieldEvidence(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+    ? writeFieldEvidence(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`field-evidence: ${e?.message || e}`);
         return [];
       })
