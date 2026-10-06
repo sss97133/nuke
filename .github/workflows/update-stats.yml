@@ -1,34 +1,44 @@
 name: Update Stats
 
+# Measures the live database and rewrites the numbers block in README.md
+# (scripts/data/readme-stats.mjs). Read-only queries; at most one commit a day,
+# marked [skip ci] so it triggers no build or deploy.
+
 on:
   schedule:
-    - cron: '0 6 * * *'  # Daily at 6am UTC
-  workflow_dispatch:  # Manual trigger
+    - cron: '20 6 * * *'   # daily, 06:20 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-stats
+  cancel-in-progress: false
 
 jobs:
-  update-stats:
+  readme-stats:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          ref: main
 
-      - name: Install dependencies
-        run: pip install matplotlib psycopg2-binary
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Generate stats chart
+      - name: Measure the live database and rewrite the README block
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python scripts/generate-stats-chart.py
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/data/readme-stats.mjs
 
-      - name: Commit and push if changed
+      - name: Commit if the block changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/growth-chart.png data/stats.json
-          git diff --staged --quiet || git commit -m "Update stats $(date +'%Y-%m-%d')"
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if git diff --staged --quiet; then echo "README block unchanged"; exit 0; fi
+          git commit -m "stats: $(date -u +%F) measured from the live database [skip ci]"
+          git push origin HEAD:main

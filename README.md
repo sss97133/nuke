@@ -1,147 +1,43 @@
-# nuke
+# Nuke
 
-A provenance engine that builds knowledge graphs from the traces physical assets leave as they move through networks of people and organizations.
+Nuke ([nuke.ag](https://nuke.ag)) is a vehicle data ledger: every vehicle and every observation about it, each with its source. The internet publishes the raw material (listings, bids, comments, photos, results); Postgres is the refinery.
 
+Pre-launch. Production is the test environment. The repository is public; secrets and private data never enter it.
 
----
+## The numbers
 
-```
-input:  1 auction listing, 1 VIN, 247 photos, 32 comments
-output: 10,000+ sourced observations — every claim traced to origin,
-        confidence-scored, time-ordered. Nothing overwrites. Everything compounds.
-```
-
-| What | Scale (mid-2026) |
-|------|-------|
-| Vehicles | 645,725 entities (292K active) |
-| Images | 32.8M classified by 41-zone taxonomy |
-| Auction comments | 11.6M sentiment-scored, 99.9% identity-linked |
-| Sale events | 313,539 across 10+ platforms |
-| Valuations | 503,337 nuke estimates |
-| Organizations | 4,973 dealers, shops, auction houses |
-| External identities | 510,086 seller/buyer/commenter profiles |
-| Field evidence | 746,963 source-attributed citations |
-
-## The library
-
-The system's knowledge lives in [`docs/library/`](docs/library/README.md). If the code disappeared tomorrow, the library rebuilds it.
-
-| Shelf | What | Scale (mid-2026) |
-|-------|------|-------|
-| [**Dictionary**](docs/library/reference/dictionary/) | Every table, column, term, enum | 20,749 lines |
-| [**Encyclopedia**](docs/library/reference/encyclopedia/) | 23 sections — what the system IS | 1,250 lines |
-| [**Schematics**](docs/library/technical/schematics/) | Data flow, entity relationships, pipeline architecture | 4,342 lines |
-| [**Engineering Manual**](docs/library/technical/engineering-manual/) | 8 chapters — how to build every subsystem from scratch | 4,279 lines |
-| [**Theoreticals**](docs/library/intellectual/theoreticals/) | Valuation, entity resolution, signal calc, half-life model | 3,205 lines |
-| [**Contemplations**](docs/library/intellectual/contemplations/) | The rhizome, testimony, assets accumulate data | 1,769 lines |
-| [**Studies**](docs/library/intellectual/studies/) | 13K prompts analysis, platform triage, vocabulary evolution | 1,498 lines |
-| [**Build Prompts**](docs/library/prompts/) | Phased implementation instructions (Phase 0-1) | 6 prompts |
-| [**Librarian**](docs/library/LIBRARIAN.md) | Rules for how the library grows | 218 lines |
-
-**40,000 lines. 50 files. 3% of target scale.** The library grows as a byproduct of work, not as a separate task. See [LIBRARIAN.md](docs/library/LIBRARIAN.md) for contribution rules.
+<!-- stats:start -->
+<!-- stats:end -->
 
 ## How it works
 
-```
-            ┌─────────────────────────────────────────────────┐
-            │                   raw inputs                    │
-            │  listing URL    VIN string    photo set    text │
-            └────────┬───────────┬────────────┬──────────┬───┘
-                     │           │            │          │
-                     ▼           ▼            ▼          ▼
-            ┌────────────┐ ┌──────────┐ ┌─────────┐ ┌───────┐
-            │  scrape +  │ │ NHTSA +  │ │  YONO   │ │  LLM  │
-            │  archive   │ │ decode + │ │  make   │ │ field │
-            │  (never    │ │ build    │ │ zone    │ │ ext.  │
-            │  refetch)  │ │ sheet    │ │ damage  │ │ w/    │
-            │            │ │ lookup   │ │ cond.   │ │ cite  │
-            └─────┬──────┘ └────┬─────┘ └────┬────┘ └───┬───┘
-                  │             │             │          │
-                  └──────┬──────┴─────────────┴──────┬───┘
-                         │                           │
-                         ▼                           ▼
-            ┌─────────────────────┐  ┌──────────────────────┐
-            │   observation log   │  │   conflict detection │
-            │   (append-only,     │  │   (sources disagree? │
-            │    source-tagged,   │  │    flag it, score it,│
-            │    scored 0→1)      │  │    investigate)      │
-            └─────────┬───────────┘  └──────────┬───────────┘
-                      │                         │
-                      └────────┬────────────────┘
-                               ▼
-            ┌─────────────────────────────────────────────────┐
-            │              asset as knowledge graph           │
-            │                                                 │
-            │  factory spec ── component state ── provenance  │
-            │  identity verification ── market position       │
-            │  visual inspection ── actor chain ── timeline   │
-            └─────────────────────────────────────────────────┘
-```
+Five layers, each defined inside the database. The model and its vocabulary are in [`docs/ledger/theory/data-machine.md`](docs/ledger/theory/data-machine.md).
 
-**Vision → SQL**: A photo of an engine bay becomes queryable fields: `air_cleaner_type`, `valve_cover_finish`, `engine_stamp_visible`, `modification_detected`. YONO classifies make in 4ms at $0. Florence-2 maps 41 zones.
+1. **The log.** Every bid, comment, photo and fact lands once, append-only, with its event time and its ingest time. `auction_comments` is the auction log; `vehicle_observations` is the fact log.
+2. **The state.** One row per live thing (a lot, a bidder), updated as each event lands.
+3. **The baselines.** What comparable lots looked like at each hour to close, recomputed on a schedule.
+4. **Features.** Measures keyed to an entity and an as-of time: a bidder's record, the effect of their entry, the lot-level sum.
+5. **Predictions.** A defined bet on an outcome, graded against a baseline, backtested by replaying the log.
 
-**Text → observations**: An auction comment saying "those aren't the right mirrors for a '70 SS" becomes a sourced observation on `component_state.mirrors` with `confidence: 0.50` and a citation back to the original comment.
+The invariants: append, never overwrite. Every datum carries its source, method, observed_at and trust. Every reference to another entity is a foreign key. The database describes itself: every live column carries a `COMMENT ON`, and `v_schema_atlas` keeps the score.
 
-**Nothing is trusted. Everything is evidence.** Three independent sources confirming the same fact compounds confidence. One contradicting triggers a flag. The system doesn't decide what's true — it shows you what the evidence supports.
+## Stack
 
-## Data model
-
-The database doesn't describe the vehicle. The database **is** the vehicle.
-
-```
-vehicle (identity)
-  → factory_specification (what it left the factory as)
-  → component_state (what it is NOW — per-component condition, mods, replacements)
-  → observations (append-only evidence log — every claim traced to source)
-  → field_evidence (multi-source provenance per field — agreement, conflict, citations)
-  → component_events (who did what, when, where, with what parts)
-  → actors (builders, shops, inspectors, owners — reputation through evidence)
-  → images (classified by 41-zone taxonomy)
-  → market_intelligence (auctions, valuations, comparables across platforms)
-```
-
-Sources carry trust: factory data (0.95), major auctions (0.85), forums (0.50), AI extraction (0.70). Confidence decays over time.
-
-## Architecture
-
-```
-Vercel (React SPA) ──→ Supabase Edge Functions (Deno) ──→ PostgreSQL v15
-                                    │
-                          ┌─────────┼─────────┐
-                          │         │         │
-                        Modal    Firecrawl   External APIs
-                       (YONO ML) (scraping)  (BaT, FB, NHTSA...)
-```
+- **Supabase**: Postgres and edge functions in [`supabase/functions/`](supabase/functions/). Schema, cron and SQL changes ship as migrations through CI.
+- **Web**: [`nuke_frontend/`](nuke_frontend/) (Vite, React), deployed by Vercel on merge to `main`.
+- **iOS**: the capture app in [`apps/`](apps/).
 
 ## Start here
 
-| Doc | What it is |
-|-----|-----------|
-| [**Library**](docs/library/README.md) | The system in written form — dictionary, schematics, engineering manual |
-| [**VISION.md**](VISION.md) | Why Nuke exists, the $1T gap, product stack |
-| [**TOOLS.md**](TOOLS.md) | Intent → function map. Read before building anything. |
-| [**Design Bible**](docs/DESIGN_BIBLE.md) | Three design laws, visual identity, component patterns |
-| [**Build Prompt**](docs/library/BUILD_PROMPT.md) | Phase 0-1 implementation guide for new agents |
+| Question | Read |
+|---|---|
+| How do I work in this repo? | [`AGENTS.md`](AGENTS.md) |
+| What is the data machine meant to do? | [`docs/ledger/theory/data-machine.md`](docs/ledger/theory/data-machine.md) and its [case ledger](docs/ledger/theory/data-machine-cases.md) |
+| What exists and operates now? | The `v_schema_atlas` and `v_job_health` views, computed from the live database |
+| What is alive and what is a shell? | [`docs/ledger/README.md`](docs/ledger/README.md) |
+| Which function does X? | [`TOOLS.md`](TOOLS.md) |
+| How is the market read? | [`docs/features/ask-nuke/THEORY.md`](docs/features/ask-nuke/THEORY.md) |
 
-## The three entities
+## License
 
-```
-USER (artist, collector, driver, dealer)
-  └── never an asset, always an actor
-  └── owns/creates/touches assets through organizations
-
-ORG (magazine, gallery, auction house, shop, racing team)
-  └── CAN become an asset (a magazine's archive, a gallery's reputation)
-  └── accumulates value through the assets it touches
-
-ASSET (vehicle, painting, magazine issue, photograph, garment)
-  └── immutable in identity, accumulates data forever
-  └── provenance = the chain of actors who touched it
-  └── value is a function of the data accumulated on it
-```
-
-Networks are derived from collaborative traces, not declared intent. Two actors are connected because they both touched the same asset, money moved between them, or an organization links them. These traces are permanent.
-
----
-
-[nuke.ag](https://nuke.ag)
+Proprietary. See [`LICENSE`](LICENSE).
