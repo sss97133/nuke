@@ -103,6 +103,10 @@ jobs:
         run: createdb dm_refinement_auction_event_identity_keys_ci
       - name: Verify lot winner and seller keys at insert, on update and by bounded backfill; junk and contradicted text left NULL
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_auction_event_identity_keys_ci -f supabase/sql/test_auction_event_identity_keys.sql
+      - name: Create disposable missing BaT lots database
+        run: createdb dm_refinement_missing_bat_lots_ci
+      - name: Verify missing BaT lot rows come only from retained evidence; existing lots untouched; idempotent
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_missing_bat_lots_ci -f supabase/sql/test_missing_bat_lots.sql
       - name: Create disposable price-history sale clock database
         run: createdb dm_price_history_sale_clock_ci
       - name: Verify sale price points are clocked at the sale date; other price clocks unchanged
