@@ -23,6 +23,7 @@ import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/r
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { getKnownAuctions } from './knownAuctions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -204,29 +205,6 @@ async function fetchAuctionLots(auctionCode: string, pageSize = 200): Promise<RM
   }
 
   return allItems;
-}
-
-// Get available auctions (from known codes - there's no public API for this)
-function getKnownAuctions(): { code: string; name: string; date: string }[] {
-  return [
-    // 2026 auctions
-    { code: 'PA26', name: 'Paris 2026', date: '2026-01-28' },
-    { code: 'AZ26', name: 'Arizona 2026', date: '2026-01-23' },
-    { code: 'CC26', name: 'Cavallino Palm Beach 2026', date: '2026-02-14' },
-    { code: 'MI26', name: 'Miami 2026', date: '2026-02-27' },
-    { code: 'S0226', name: 'Sealed February 2026', date: '2026-02-02' },
-    // 2025 auctions (historical)
-    { code: 'PA25', name: 'Paris 2025', date: '2025-01-29' },
-    { code: 'AZ25', name: 'Arizona 2025', date: '2025-01-24' },
-    { code: 'MO25', name: 'Monaco 2025', date: '2025-05-10' },
-    { code: 'MI25', name: 'Miami 2025', date: '2025-02-20' },
-    { code: 'MT25', name: 'Monterey 2025', date: '2025-08-15' },
-    // 2024 auctions
-    { code: 'PA24', name: 'Paris 2024', date: '2024-02-01' },
-    { code: 'AZ24', name: 'Arizona 2024', date: '2024-01-25' },
-    { code: 'MO24', name: 'Monaco 2024', date: '2024-05-11' },
-    { code: 'MT24', name: 'Monterey 2024', date: '2024-08-16' },
-  ];
 }
 
 // Transform API item to extracted vehicle
