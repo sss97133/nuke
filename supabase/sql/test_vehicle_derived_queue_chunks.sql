@@ -1,4 +1,4 @@
--- Actual PG17 contracts for the chunked derived-queue drain (migration 20261006124500). Synthetic data only; never production.
+-- Actual PG17 contracts for migration 20261006124500 (chunked derived-queue drain, completion retry count). Synthetic data only; never production.
 -- The fixture installs the live prod bodies of drain_vehicle_derived_queues (PRE), drain_vehicle_completion_queue and
 -- drain_vehicle_metric_queue, read 2026-10-06; their md5 fingerprints are asserted equal to prod's before the migration runs.
 \set ON_ERROR_STOP on
@@ -251,57 +251,68 @@ END $$;
 INSERT INTO public.vehicles(id) SELECT pg_temp.vid(i) FROM generate_series(1, 3000) i;
 INSERT INTO public.fixture_behavior(vehicle_id) SELECT id FROM public.vehicles;
 
+-- Fingerprints of the bodies before (prod, 2026-10-06) and after this migration.
+CREATE FUNCTION pg_temp.md5_derived() RETURNS text LANGUAGE sql AS
+$$ SELECT md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) $$;
+CREATE FUNCTION pg_temp.md5_completion() RETURNS text LANGUAGE sql AS
+$$ SELECT md5(pg_get_functiondef('public.drain_vehicle_completion_queue(integer)'::regprocedure)) $$;
+CREATE FUNCTION pg_temp.md5_metric() RETURNS text LANGUAGE sql AS
+$$ SELECT md5(pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)) $$;
+
 -- PRE: the fixture holds the live bodies.
-SELECT pg_temp.assert_true(
-  md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) = 'a31ee089871fefb2b1896a0bdad83027' -- gitleaks:allow (function-definition fingerprint, not a secret)
-  AND md5(pg_get_functiondef('public.drain_vehicle_completion_queue(integer)'::regprocedure)) = '60882c706b57faca9e2434081eb04a99' -- gitleaks:allow (function-definition fingerprint, not a secret)
-  AND md5(pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)) = '1eea08769907469a5fc71377de2de3fc', -- gitleaks:allow (function-definition fingerprint, not a secret)
+SELECT pg_temp.assert_true(pg_temp.md5_derived() = 'a31ee089871fefb2b1896a0bdad83027' -- gitleaks:allow (function-definition fingerprint, not a secret)
+  AND pg_temp.md5_completion() = '60882c706b57faca9e2434081eb04a99' -- gitleaks:allow (function-definition fingerprint, not a secret)
+  AND pg_temp.md5_metric() = '1eea08769907469a5fc71377de2de3fc', -- gitleaks:allow (function-definition fingerprint, not a secret)
   'Fixture bodies hash to the live prod fingerprints read 2026-10-06');
 
--- Negative control: the live body drains 50 completion rows and 100 metric rows per run.
+-- Negative controls on the live bodies.
 SELECT pg_temp.reset_fixture(2500, 300);
 CREATE TEMP TABLE pre_run AS SELECT * FROM public.drain_vehicle_derived_queues();
 SELECT pg_temp.assert_true((SELECT processed = 50 FROM pre_run WHERE queue = 'completion')
   AND (SELECT processed = 100 FROM pre_run WHERE queue = 'metric')
   AND (SELECT count(*) = 2450 FROM public.vehicle_completion_recompute_queue),
   'Live body is capped at 50 completion and 100 metric rows per run');
+SELECT pg_temp.reset_fixture(1, 0);
+UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id = pg_temp.vid(1);
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT attempts = 1 FROM public.vehicle_completion_recompute_queue WHERE vehicle_id = pg_temp.vid(1)),
+  'Live completion drain resets a poison row to attempts 1 every run, so the attempts >= 3 purge never fires');
 
-CREATE TEMP TABLE pre_contract AS SELECT oid, proacl, proowner, prosecdef, proconfig
-  FROM pg_proc WHERE oid = 'public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure;
+CREATE TEMP TABLE pre_contract AS SELECT oid, proacl, proowner, prosecdef, proconfig FROM pg_proc
+  WHERE oid IN ('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure, 'public.drain_vehicle_completion_queue(integer)'::regprocedure);
 \ir ../migrations/20261006124500_derived_queue_drain_chunks.sql
-SELECT pg_temp.assert_true(
-  md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) = '6e01a654bbff1503d8148d8e3d216f25', -- gitleaks:allow (function-definition fingerprint, not a secret)
-  'Migration installs the POST body');
-SELECT pg_temp.assert_true((SELECT o.proacl IS NOT DISTINCT FROM p.proacl AND o.proowner = p.proowner
-  AND o.prosecdef = p.prosecdef AND o.proconfig IS NOT DISTINCT FROM p.proconfig
-  FROM pre_contract o JOIN pg_proc p USING (oid)), 'Owner, ACL, invoker and config preserved in place');
+SELECT pg_temp.assert_true(pg_temp.md5_derived() = '8a90f979b6556121efc905b8e6d44fc6' -- gitleaks:allow (function-definition fingerprint, not a secret)
+  AND pg_temp.md5_completion() = 'f78c859a15440aed6ce40531333274a7', -- gitleaks:allow (function-definition fingerprint, not a secret)
+  'Migration installs both POST bodies');
+SELECT pg_temp.assert_true((SELECT count(*) = 2 AND bool_and(o.proacl IS NOT DISTINCT FROM p.proacl AND o.proowner = p.proowner
+  AND o.prosecdef = p.prosecdef AND o.proconfig IS NOT DISTINCT FROM p.proconfig)
+  FROM pre_contract o JOIN pg_proc p USING (oid)), 'Owner, ACL, invoker and config preserved in place for both functions');
 \ir ../migrations/20261006124500_derived_queue_drain_chunks.sql
-SELECT pg_temp.assert_true(
-  md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) = '6e01a654bbff1503d8148d8e3d216f25', -- gitleaks:allow (function-definition fingerprint, not a secret)
+SELECT pg_temp.assert_true(pg_temp.md5_derived() = '8a90f979b6556121efc905b8e6d44fc6' -- gitleaks:allow (function-definition fingerprint, not a secret)
+  AND pg_temp.md5_completion() = 'f78c859a15440aed6ce40531333274a7', -- gitleaks:allow (function-definition fingerprint, not a secret)
   'Replay of the migration is a no-op');
-SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.drain_vehicle_completion_queue(integer)'::regprocedure)) = '60882c706b57faca9e2434081eb04a99' -- gitleaks:allow (function-definition fingerprint, not a secret)
-  AND md5(pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)) = '1eea08769907469a5fc71377de2de3fc', -- gitleaks:allow (function-definition fingerprint, not a secret)
-  'Inner drains are untouched');
+SELECT pg_temp.assert_true(pg_temp.md5_metric() = '1eea08769907469a5fc71377de2de3fc', -- gitleaks:allow (function-definition fingerprint, not a secret)
+  'Metric drain is untouched');
 
--- Drift: a body that is neither PRE nor POST refuses the migration.
+-- Drift: a body that is neither PRE nor POST refuses the migration and is left as found.
 CREATE TEMP TABLE post_def AS SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) d;
-COMMENT ON FUNCTION public.drain_vehicle_derived_queues(boolean, integer) IS 'comment does not change the fingerprint';
 DO $$ BEGIN
   EXECUTE replace((SELECT d FROM post_def), 'chunk = rows per inner call', 'chunk = rows per inner call (drifted)');
 END $$;
+CREATE TEMP TABLE drifted AS SELECT pg_temp.md5_derived() m;
 \set ON_ERROR_STOP off
 \ir ../migrations/20261006124500_derived_queue_drain_chunks.sql
 \set ON_ERROR_STOP on
-SELECT pg_temp.assert_true(
-  md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) NOT IN
-  ('6e01a654bbff1503d8148d8e3d216f25', 'a31ee089871fefb2b1896a0bdad83027'), -- gitleaks:allow (function-definition fingerprint, not a secret)
-  'A drifted body makes the migration refuse (body left as found)');
+SELECT pg_temp.assert_true(pg_temp.md5_derived() = (SELECT m FROM drifted)
+  AND pg_temp.md5_derived() NOT IN ('8a90f979b6556121efc905b8e6d44fc6', 'a31ee089871fefb2b1896a0bdad83027'), -- gitleaks:allow (function-definition fingerprint, not a secret)
+  'A drifted body makes the migration refuse and stays as found');
 DO $$ BEGIN EXECUTE (SELECT d FROM post_def); END $$;
-SELECT pg_temp.assert_true(
-  md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)) = '6e01a654bbff1503d8148d8e3d216f25', -- gitleaks:allow (function-definition fingerprint, not a secret)
+SELECT pg_temp.assert_true(pg_temp.md5_derived() = '8a90f979b6556121efc905b8e6d44fc6', -- gitleaks:allow (function-definition fingerprint, not a secret)
   'POST body restored for the behavior contracts');
 
--- 1. Caps: 2,500 completion and 800 metric rows; one run drains 1,000 and 500.
+-- 1. Caps: one run drains 1,000 completion and 500 metric rows; stats makes one call; value stays off.
 SELECT pg_temp.reset_fixture(2500, 800);
 CREATE TEMP TABLE r1 AS SELECT * FROM public.drain_vehicle_derived_queues();
 SELECT pg_temp.assert_true((SELECT processed = 1000 AND errored = 0 AND NOT skipped FROM r1 WHERE queue = 'completion')
@@ -311,13 +322,14 @@ SELECT pg_temp.assert_true((SELECT processed = 1000 AND errored = 0 AND NOT skip
 SELECT pg_temp.assert_true((SELECT processed = 500 AND errored = 0 FROM r1 WHERE queue = 'metric')
   AND (SELECT count(*) = 300 FROM public.vehicle_metric_recompute_queue)
   AND (SELECT count(*) = 500 FROM public.vehicle_live_metrics),
-  'Metric drains 500 rows per run in chunks of 25');
+  'Metric drains 500 rows per run in chunks of 10');
 SELECT pg_temp.assert_true((SELECT count(*) = 1000 FROM public.vehicles WHERE completion_percentage = 42),
   'Each drained completion row writes its value');
 SELECT pg_temp.assert_true((SELECT skipped FROM r1 WHERE queue = 'value')
   AND (SELECT count(*) = 1 AND min(batch) = 50 FROM public.fixture_calls WHERE fn = 'stats')
-  AND NOT EXISTS (SELECT 1 FROM public.fixture_calls WHERE fn = 'value'),
-  'Stats makes one call of 50; value stays off without p_include_value');
+  AND NOT EXISTS (SELECT 1 FROM public.fixture_calls WHERE fn = 'value')
+  AND (SELECT string_agg(queue, ',') = 'metric,stats,value,completion' FROM r1),
+  'Order metric, stats, value, completion; stats makes one call of 50; value stays off');
 
 -- 2. A short queue ends the loop.
 SELECT pg_temp.reset_fixture(30, 7);
@@ -328,26 +340,57 @@ SELECT pg_temp.assert_true((SELECT processed = 30 FROM r2 WHERE queue = 'complet
   AND NOT EXISTS (SELECT 1 FROM public.vehicle_metric_recompute_queue),
   'Short queues drain to empty and stop');
 
--- 3. A failed completion row ends the completion loop after its chunk; it gets one attempt this run.
+-- 3. A single failed row does not stop the queue; it is retried behind the backlog with its attempt counted.
 SELECT pg_temp.reset_fixture(200, 0);
 UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id = pg_temp.vid(60);
 CREATE TEMP TABLE r3 AS SELECT * FROM public.drain_vehicle_derived_queues();
-SELECT pg_temp.assert_true((SELECT processed = 99 AND errored = 1 FROM r3 WHERE queue = 'completion')
-  AND (SELECT attempts = 1 AND last_error = 'synthetic completion failure' FROM public.vehicle_completion_recompute_queue
+SELECT pg_temp.assert_true((SELECT processed = 199 AND errored = 2 FROM r3 WHERE queue = 'completion')
+  AND (SELECT attempts = 2 AND last_error = 'synthetic completion failure' FROM public.vehicle_completion_recompute_queue
        WHERE vehicle_id = pg_temp.vid(60))
-  AND (SELECT count(*) = 101 FROM public.vehicle_completion_recompute_queue),
-  'Completion failure: chunk 2 finishes, the loop stops, the failed row has one attempt');
+  AND (SELECT count(*) = 1 FROM public.vehicle_completion_recompute_queue),
+  'One failed row: the other 199 drain, the failure is retried at the tail and counted twice');
 
--- 4. A failed metric row ends the metric loop; the metric drain keeps it (never drops a fold).
+-- 3b. A poison row reaches the purge: attempts 1, 2, then deleted on the third failure.
+SELECT pg_temp.reset_fixture(1, 0);
+UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id = pg_temp.vid(1);
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT attempts = 1 FROM public.vehicle_completion_recompute_queue WHERE vehicle_id = pg_temp.vid(1)),
+  'Poison row: first run counts attempt 1');
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT attempts = 2 FROM public.vehicle_completion_recompute_queue WHERE vehicle_id = pg_temp.vid(1)),
+  'Poison row: second run counts attempt 2');
+SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true(NOT EXISTS (SELECT 1 FROM public.vehicle_completion_recompute_queue WHERE vehicle_id = pg_temp.vid(1)),
+  'Poison row: third failure is purged by attempts >= 3');
+
+-- 3c. More than 20% failed rows stops the queue for the run.
+SELECT pg_temp.reset_fixture(100, 0);
+UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id IN (SELECT pg_temp.vid(i) FROM generate_series(1, 6) i);
+CREATE TEMP TABLE r3c AS SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT processed = 19 AND errored = 6 FROM r3c WHERE queue = 'completion')
+  AND (SELECT count(*) = 81 FROM public.vehicle_completion_recompute_queue)
+  AND (SELECT count(*) = 6 FROM public.vehicle_completion_recompute_queue WHERE attempts = 1),
+  'Failure ratio 6/25 > 20%: completion stops after chunk 1');
+
+-- 3d. Three chunks with failures stop the queue for the run even below 20%.
+SELECT pg_temp.reset_fixture(300, 0);
+UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id IN (pg_temp.vid(10), pg_temp.vid(35), pg_temp.vid(60), pg_temp.vid(85));
+CREATE TEMP TABLE r3d AS SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT processed = 72 AND errored = 3 FROM r3d WHERE queue = 'completion')
+  AND (SELECT count(*) = 228 FROM public.vehicle_completion_recompute_queue)
+  AND (SELECT attempts = 0 FROM public.vehicle_completion_recompute_queue WHERE vehicle_id = pg_temp.vid(85)),
+  'Three failed chunks (3/75 rows): completion stops after chunk 3');
+
+-- 4. A failed metric row is retried behind the backlog and never dropped.
 SELECT pg_temp.reset_fixture(0, 100);
 UPDATE public.fixture_behavior SET fail = true WHERE vehicle_id = pg_temp.vid(10);
 CREATE TEMP TABLE r4 AS SELECT * FROM public.drain_vehicle_derived_queues();
-SELECT pg_temp.assert_true((SELECT processed = 24 AND errored = 1 FROM r4 WHERE queue = 'metric')
-  AND (SELECT attempts = 1 FROM public.vehicle_metric_recompute_queue WHERE vehicle_id = pg_temp.vid(10))
-  AND (SELECT count(*) = 76 FROM public.vehicle_metric_recompute_queue),
-  'Metric failure: the loop stops after chunk 1 and the failed fold stays queued with one attempt');
+SELECT pg_temp.assert_true((SELECT processed = 99 AND errored = 2 FROM r4 WHERE queue = 'metric')
+  AND (SELECT attempts = 2 FROM public.vehicle_metric_recompute_queue WHERE vehicle_id = pg_temp.vid(10))
+  AND (SELECT count(*) = 1 FROM public.vehicle_metric_recompute_queue),
+  'Metric failure: the other 99 fold, the failed fold stays queued with its attempts counted');
 
--- 5. A whole-call failure keeps the earlier chunks of the same queue and later queues still run.
+-- 5. A whole-call failure keeps the earlier chunks of the same queue; a failing queue does not roll back others.
 SELECT pg_temp.reset_fixture(200, 0);
 UPDATE public.fixture_behavior SET fail_claim = true WHERE vehicle_id = pg_temp.vid(70);
 CREATE TEMP TABLE r5 AS SELECT * FROM public.drain_vehicle_derived_queues();
@@ -355,31 +398,51 @@ SELECT pg_temp.assert_true((SELECT processed = 50 AND errored = -1 FROM r5 WHERE
   AND (SELECT count(*) = 150 FROM public.vehicle_completion_recompute_queue)
   AND (SELECT min(queued_at) = '2026-01-01T00:00:00Z'::timestamptz + interval '51 seconds' FROM public.vehicle_completion_recompute_queue)
   AND (SELECT count(*) = 1 FROM public.fixture_calls WHERE fn = 'stats'),
-  'Whole-call failure in chunk 2 keeps chunk 1, restores chunk 2 and reports -1');
-SELECT pg_temp.reset_fixture(60, 0);
+  'Whole-call failure in chunk 3 keeps chunks 1-2, restores chunk 3 and reports -1');
+SELECT pg_temp.reset_fixture(60, 5);
 SET fixture.stats_fail = '1';
 CREATE TEMP TABLE r5b AS SELECT * FROM public.drain_vehicle_derived_queues();
 RESET fixture.stats_fail;
 SELECT pg_temp.assert_true((SELECT errored = -1 FROM r5b WHERE queue = 'stats')
+  AND (SELECT processed = 5 FROM r5b WHERE queue = 'metric')
   AND (SELECT processed = 60 FROM r5b WHERE queue = 'completion')
   AND NOT EXISTS (SELECT 1 FROM public.vehicle_completion_recompute_queue),
-  'A failing queue does not roll back the queues before it');
+  'A failing stats drain neither rolls back metric nor blocks completion');
 
--- 6. Time budget: no chunk starts after 2/3 of the budget.
+-- 6. Time slices. Windows are wide on purpose: shared CI runners can run 3x slower than a laptop.
+-- 6a. Completion stops starting chunks at half the budget (budget 6 s: 3 s). 25 rows x 20 ms = 0.5 s per chunk.
 SELECT pg_temp.reset_fixture(1000, 0);
-UPDATE public.fixture_behavior SET sleep_ms = 20;  -- 50 rows = 1 s per completion chunk
+UPDATE public.fixture_behavior SET sleep_ms = 20;
 CREATE TEMP TABLE t6 AS SELECT clock_timestamp() t0;
-CREATE TEMP TABLE r6 AS SELECT * FROM public.drain_vehicle_derived_queues(false, 3);
-SELECT pg_temp.assert_true((SELECT processed BETWEEN 100 AND 150 FROM r6 WHERE queue = 'completion')
-  AND (SELECT clock_timestamp() - t0 < interval '3.5 seconds' FROM t6),
-  'Budget 3 s: completion stops starting chunks at 2 s and the run ends inside the budget');
+CREATE TEMP TABLE r6 AS SELECT * FROM public.drain_vehicle_derived_queues(false, 6);
+SELECT pg_temp.assert_true((SELECT processed BETWEEN 50 AND 150 FROM r6 WHERE queue = 'completion')
+  AND (SELECT clock_timestamp() - t0 < interval '6 seconds' FROM t6),
+  'Budget 6 s: completion starts no chunk after 3 s and the run ends inside the budget');
+-- 6b. A metric burst takes at most its third (budget 12 s: 4 s) and completion still gets its slice.
 SELECT pg_temp.reset_fixture(500, 200);
-UPDATE public.fixture_behavior SET sleep_ms = 30;  -- 25 metric rows = 0.75 s per chunk
-CREATE TEMP TABLE r6b AS SELECT * FROM public.drain_vehicle_derived_queues(false, 3);
-SELECT pg_temp.assert_true((SELECT processed BETWEEN 50 AND 100 FROM r6b WHERE queue = 'metric')
-  AND (SELECT skipped AND processed = 0 FROM r6b WHERE queue = 'completion')
-  AND (SELECT count(*) = 500 FROM public.vehicle_completion_recompute_queue),
-  'A metric burst spends the budget and completion waits for the next run');
+UPDATE public.fixture_behavior SET sleep_ms = 30;  -- metric 10 x 30 ms = 0.3 s per chunk; completion 0.75 s
+CREATE TEMP TABLE t6b AS SELECT clock_timestamp() t0;
+CREATE TEMP TABLE r6b AS SELECT * FROM public.drain_vehicle_derived_queues(false, 12);
+SELECT pg_temp.assert_true((SELECT processed BETWEEN 10 AND 140 FROM r6b WHERE queue = 'metric')
+  AND (SELECT count(*) >= 60 FROM public.vehicle_metric_recompute_queue)
+  AND (SELECT NOT skipped AND processed >= 25 FROM r6b WHERE queue = 'completion')
+  AND (SELECT clock_timestamp() - t0 < interval '12 seconds' FROM t6b),
+  'Metric burst stops at a third of the budget; completion still drains in its slice');
+-- 6c. A zero budget is clamped to 5 s (not "skip everything"); NULL is treated as 45 s (not "never stop").
+SELECT pg_temp.reset_fixture(1000, 0);
+UPDATE public.fixture_behavior SET sleep_ms = 20;
+CREATE TEMP TABLE t6c AS SELECT clock_timestamp() t0;
+CREATE TEMP TABLE r6c AS SELECT * FROM public.drain_vehicle_derived_queues(false, 0);
+SELECT pg_temp.assert_true((SELECT NOT skipped AND processed BETWEEN 25 AND 125 FROM r6c WHERE queue = 'completion')
+  AND (SELECT clock_timestamp() - t0 < interval '5 seconds' FROM t6c),
+  'Budget 0 is clamped to 5 s: completion runs and stops starting chunks at 2.5 s');
+SELECT pg_temp.reset_fixture(1000, 0);
+UPDATE public.fixture_behavior SET sleep_ms = 40;  -- 1 s per completion chunk; the 1,000 cap would take 40 s
+CREATE TEMP TABLE t6d AS SELECT clock_timestamp() t0;
+CREATE TEMP TABLE r6d AS SELECT * FROM public.drain_vehicle_derived_queues(false, NULL);
+SELECT pg_temp.assert_true((SELECT processed BETWEEN 100 AND 575 FROM r6d WHERE queue = 'completion')
+  AND (SELECT clock_timestamp() - t0 < interval '45 seconds' FROM t6d),
+  'NULL budget is treated as 45 s: completion stops starting chunks at 22.5 s instead of running to the cap');
 
 -- 7. The job's statement_timeout still cancels the run and rolls it back (query_canceled is not swallowed).
 SELECT pg_temp.reset_fixture(1000, 0);
@@ -393,7 +456,7 @@ SELECT pg_temp.assert_true(dblink_exec('cancel_probe', 'SELECT * FROM public.dra
   'statement_timeout cancels the run and its claims roll back');
 SELECT dblink_disconnect('cancel_probe');
 
--- 8. A vehicles row held by another backend fails that one vehicle after 5 s; the run completes.
+-- 8. A vehicles row held by another backend fails that one vehicle after the 2 s lock_timeout; the run completes.
 SELECT pg_temp.reset_fixture(20, 0);
 SELECT dblink_connect('lock_holder', format('host=%s port=%s dbname=%s user=%s',
   split_part(current_setting('unix_socket_directories'), ',', 1), current_setting('port'), current_database(), current_user));
@@ -404,8 +467,8 @@ CREATE TEMP TABLE r8 AS SELECT * FROM public.drain_vehicle_derived_queues();
 SELECT pg_temp.assert_true((SELECT processed = 19 AND errored = 1 FROM r8 WHERE queue = 'completion')
   AND (SELECT last_error LIKE '%lock timeout%' AND attempts = 1 FROM public.vehicle_completion_recompute_queue
        WHERE vehicle_id = pg_temp.vid(5))
-  AND (SELECT clock_timestamp() - t0 BETWEEN interval '4.5 seconds' AND interval '15 seconds' FROM t8),
-  'Locked vehicle fails after the 5 s lock_timeout and is re-queued; the other 19 are written');
+  AND (SELECT clock_timestamp() - t0 BETWEEN interval '1.9 seconds' AND interval '12 seconds' FROM t8),
+  'Locked vehicle fails after the 2 s lock_timeout and is re-queued; the other 19 are written');
 SELECT pg_temp.assert_true(current_setting('lock_timeout') = '0',
   'lock_timeout is transaction-local and resets after the run');
 SELECT dblink_exec('lock_holder', 'ROLLBACK');
