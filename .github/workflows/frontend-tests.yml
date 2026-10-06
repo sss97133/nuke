@@ -105,7 +105,7 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -d dm_merge_writer_reparent_ci -f supabase/sql/test_merge_writer_reparent_children.sql
       - name: Create disposable derived-queue chunks database
         run: createdb dm_derived_queue_chunks_ci
-      - name: Verify the derived-queue drain loops metric and completion in chunks inside its budget, stops on a failed row, and refuses a drifted body
+      - name: Verify the derived-queue drain gives each queue its time slice, stops on repeated failures, counts completion retries, and refuses a drifted body
         run: psql -X -v ON_ERROR_STOP=1 -d dm_derived_queue_chunks_ci -f supabase/sql/test_vehicle_derived_queue_chunks.sql
 
   image-projection:
