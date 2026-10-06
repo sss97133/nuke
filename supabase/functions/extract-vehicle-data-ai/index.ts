@@ -11,6 +11,7 @@ import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { listingPriceColumns } from './priceColumns.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -533,8 +534,9 @@ Deno.serve(async (req) => {
           drivetrain: normalized.drivetrain || null,
           engine_type: normalized.engine || null,
           body_style: normalized.body_style || null,
-          sale_price: normalized.sold_price || normalized.price || null,
-          asking_price: normalized.price || null,
+          // A listing price is an ask: asking_price. sale_price only when the page states a sale
+          // (sold_price). See priceColumns.ts and guard_vehicle_sale_price (20260927170000).
+          ...listingPriceColumns(normalized),
           description: normalized.description?.slice(0, 5000) || null,
           discovery_url: url,
           listing_url: url,
