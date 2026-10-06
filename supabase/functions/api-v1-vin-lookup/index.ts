@@ -51,7 +51,19 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "VIN is required. Use GET /api-v1-vin-lookup/{vin}" }, 400);
     }
 
-    // Look up vehicle by VIN
+    // Resolve VIN → id through find_vehicle_by_vin (SQL, STABLE), which
+    // filters on upper(btrim(vin)) and so uses idx_vehicles_vin_norm_trim.
+    // A plain vin = $1 has no usable index (every vin index is partial or an
+    // expression), so both ilike and eq sequential-scanned ~1.1M rows and a
+    // miss hit the 10 s statement_timeout. Measured 2026-10-06, EXPLAIN:
+    // eq → statement timeout; upper(vin) = $1 → Index Scan, 0.5 ms.
+    const { data: vehicleId, error: resolveError } = await supabase
+      .rpc("find_vehicle_by_vin", { p_vin: vin });
+
+    if (resolveError || !vehicleId) {
+      return jsonResponse({ error: "Vehicle not found for VIN", vin }, 404);
+    }
+
     const { data: vehicle, error: vehicleError } = await supabase
       .from("vehicles")
       .select(`
@@ -60,12 +72,7 @@ Deno.serve(async (req) => {
         drivetrain, body_style, sale_price, purchase_price, description,
         is_public, created_at, updated_at, primary_image_url
       `)
-      // VINs are stored upper-case with no whitespace (sampled 10,492 rows,
-      // 0 exceptions, 2026-10-06). eq() on the upper-cased input uses the
-      // vehicles_vin_unique_17char_v2 index; ilike() forced a sequential scan
-      // and a miss took ~19 s to return 404 (measured 2026-10-06).
-      .eq("vin", vin.trim().toUpperCase())
-      .limit(1)
+      .eq("id", vehicleId)
       .maybeSingle();
 
     if (vehicleError || !vehicle) {
