@@ -163,6 +163,27 @@ Deno.test("failed or incomplete identity resolution stops disconnected comment i
   }), Error, "incomplete after insert");
 });
 
+Deno.test("anonymous authors are never keyed, even with an author id; Unknown stays null; named handles are keyed", async () => {
+  // Same rule as trg_key_auction_comment_author / key_auction_comment_authors (20261006090000).
+  const rows = await commentRows([
+    bid("driver", 100, 1),
+    { ...bid("anonymous", 200, 2), authorId: 777 },
+    { ...bid("ANONYMOUS", 300, 3), authorId: 778 },
+    { ...record("comment", "", "image-only, author blank", 4), authorId: 779 },
+  ]);
+  assertEquals(rows.map((r) => [r.author_username, r.bat_author_id]),
+    [["driver", 1], ["anonymous", 777], ["ANONYMOUS", 778], ["Unknown", 779]]);
+  const looked: string[] = [];
+  const minted: string[] = [];
+  const linked = await linkAuctionCommentIdentities(rows, {
+    find: async (handles) => { looked.push(...handles); return handles.filter((h) => h === "driver").map((handle) => ({ handle, id: "driver-id" })); },
+    insertMissing: async (identities) => { minted.push(...identities.map((i) => i.handle)); },
+  });
+  assertEquals(linked.map((r) => r.external_identity_id), ["driver-id", null, null, null]);
+  assertEquals(looked, ["driver"]);   // anonymous and Unknown are never looked up
+  assertEquals(minted, []);           // and never minted
+});
+
 Deno.test("replay with no fresh rows never touches the identity store", async () => {
   const linked = await linkAuctionCommentIdentities([], {
     find: async () => { throw new Error("No reads expected"); },

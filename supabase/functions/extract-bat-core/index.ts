@@ -2709,6 +2709,7 @@ Deno.serve(async (req) => {
         if (haveError) throw new Error(`Comment replay lookup failed: ${haveError.message}`);
         const haveIds = new Set((have ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite));
         const fresh = haveIds.size ? rows.filter((r) => r.bat_comment_id == null || !haveIds.has(r.bat_comment_id)) : rows;
+        // Author keys: exact (bat, handle); Unknown, blank and anonymous authors stay NULL (2026-10-06, same rule as the DB trigger).
         const linked = await linkAuctionCommentIdentities(fresh, {
           async find(handles) {
             const { data, error } = await supabase.from("external_identities")

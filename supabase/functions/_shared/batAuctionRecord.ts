@@ -222,9 +222,12 @@ export interface BatCommentIdentityStore {
 export async function linkAuctionCommentIdentities(
   rows: AuctionCommentRow[], store: BatCommentIdentityStore,
 ): Promise<Array<AuctionCommentRow & { external_identity_id: string | null }>> {
+  // Same rule as trg_key_auction_comment_author and key_auction_comment_authors (20261006090000):
+  // an author named anonymous (any case) is never keyed, whatever its bat_author_id. Different anonymous
+  // posters are not one (bat, 'anonymous') identity; NULL means unresolved.
   const identifiable = (r: AuctionCommentRow) => r.author_username !== "Unknown" &&
     r.author_username.trim() !== "" &&
-    !(r.author_username.toLowerCase() === "anonymous" && !(Number(r.bat_author_id) > 0));
+    r.author_username.toLowerCase() !== "anonymous";
   const handles = [...new Set(rows.filter(identifiable).map((r) => r.author_username))];
   const ids = new Map<string, string>();
   for (let offset = 0; offset < handles.length; offset += 200) {
