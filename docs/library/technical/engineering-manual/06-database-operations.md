@@ -180,7 +180,7 @@ mcp__supabase__apply_migration({
 ### Applying via CLI
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Create a new migration file
 supabase migration new add_vehicle_fingerprint

@@ -82,5 +82,5 @@ Rules:
 - Read `docs/library/technical/design-book/vehicle-profile-computation-surface.md` before touching any vehicle profile code.
 
 ## Reference Files
-- Design reference: `/Users/skylar/Downloads/nuke-session-files/`
+- Design reference: `~/Downloads/nuke-session-files/`
 - Design book: `docs/library/technical/design-book/`

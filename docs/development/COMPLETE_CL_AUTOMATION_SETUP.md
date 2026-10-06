@@ -63,7 +63,7 @@ WHERE jobname IN ('cl-discover-squarebodies', 'cl-process-queue');
 Once setup is complete, test with your three Craigslist URLs:
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 node scripts/test-cl-automation.js
 ```
 

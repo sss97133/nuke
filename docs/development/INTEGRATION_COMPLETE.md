@@ -67,7 +67,7 @@
 
 ### 1. Start Development Server
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 npm run dev
 ```
 
@@ -123,13 +123,13 @@ supabase/migrations/20251122_listing_export_tracking.sql
 
 **For Production:**
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push
 ```
 
 **For Local Development:**
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase migration up --local
 ```
 

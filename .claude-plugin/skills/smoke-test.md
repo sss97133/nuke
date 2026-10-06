@@ -17,7 +17,7 @@ Try `mcp__claude_ai_Nuke__describe_platform` — should return platform descript
 
 ### 2. Critical Edge Functions
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # db-stats (should return JSON with vehicle counts)
 dotenvx run -- bash -c 'curl -s -w "\nHTTP %{http_code}" "$VITE_SUPABASE_URL/functions/v1/db-stats" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | tail -1

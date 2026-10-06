@@ -40,7 +40,7 @@ exists in three places. Every doc below is load-bearing; read it before writing 
 2. **`docs/ledger/README.md`** — capability map. The live platform is ~30 functions / ~20 hot
    tables inside a much larger dead shell. Before creating anything, run
    `node scripts/guardrails/check-capability-before-mint.mjs "<name>"`.
-3. **`/Users/skylar/.worktrees/design-codex/docs/design/WEB_PARITY.md`** — **THE THREAD.**
+3. **`~/.worktrees/design-codex/docs/design/WEB_PARITY.md`** — **THE THREAD.**
    Ruled 2026-06-12 after the app was caught showing 766 images against a real 22,315. It is
    a screen→endpoint map plus one rule, quoted exactly:
    > The website is source of truth. The app mirrors its data, numbers, and palette.

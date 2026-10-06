@@ -28,7 +28,7 @@ proof gates. No relitigating decisions, no novel inventions, no plans-instead-of
   in bat_listings, canonical_models, 13.9M comments, 628K raw snapshots — all "found").
 - **Outcome + proof gate, not a plan.** A task ends at the verified result, with numbers.
 - **One heavy DB actor at a time** (db-safety rules). Batch writes, watch lock waiters.
-- Worktree `/Users/skylar/.worktrees/foundation-ios`, branch `fable5/ignition-ios`,
+- Worktree `~/.worktrees/foundation-ios`, branch `fable5/ignition-ios`,
   push = TestFlight, CI owns build numbers. Commit only files you intended (other
   sessions' WIP coexists in the worktree — check `git status` before staging).
 

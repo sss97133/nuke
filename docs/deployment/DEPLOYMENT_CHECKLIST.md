@@ -32,7 +32,7 @@
 
 ```bash
 # 1. Commit everything
-cd /Users/skylar/nuke
+cd ~/nuke
 git add -A
 git commit -m "fix: deploy all changes"
 git push origin main

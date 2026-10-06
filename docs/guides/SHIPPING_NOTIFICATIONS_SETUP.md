@@ -14,7 +14,7 @@ The shipping notification system allows responsible parties (like you) to keep v
 1. Apply the migration to create notification tables:
 ```bash
 # Apply the notification migration
-cd /Users/skylar/nuke
+cd ~/nuke
 # Copy contents of supabase/migrations/20250920_shipping_notifications.sql
 # Paste into Supabase SQL editor and run
 ```

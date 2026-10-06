@@ -64,7 +64,7 @@ COMMENT ON COLUMN vehicle_observations.extracted_by IS 'Name of the edge functio
 
 5. Deploy the updated function:
 ```bash
-cd /Users/skylar/nuke && supabase functions deploy ingest-observation --no-verify-jwt
+cd ~/nuke && supabase functions deploy ingest-observation --no-verify-jwt
 ```
 
 ## Verify

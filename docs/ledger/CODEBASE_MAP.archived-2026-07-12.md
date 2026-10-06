@@ -400,7 +400,7 @@ Cabinet members: load this at session start. It tells you who owns what, what co
 
 ```bash
 # System brief (queue health, errors, recommendations)
-cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"action\": \"brief\"}"' | jq
+cd ~/nuke && dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"action\": \"brief\"}"' | jq
 
 # DB stats
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/db-stats" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
@@ -409,5 +409,5 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/db-stats" -H "A
 PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "SELECT * FROM release_stale_locks(dry_run:=true);"
 
 # Active agents
-cat /Users/skylar/nuke/.claude/ACTIVE_AGENTS.md
+cat ~/nuke/.claude/ACTIVE_AGENTS.md
 ```

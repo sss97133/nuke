@@ -323,7 +323,7 @@ After deploying:
 
 ```bash
 # Full deployment workflow
-cd /Users/skylar/nuke
+cd ~/nuke
 git add -A
 git commit -m "Description of changes"
 git push origin main

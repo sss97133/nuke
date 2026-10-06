@@ -43,7 +43,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 ### Deploying a Single Function
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase functions deploy extract-bat-core --no-verify-jwt
 ```
 
@@ -52,7 +52,7 @@ The `--no-verify-jwt` flag is used for functions that are called by other functi
 ### Deploying All Functions
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase functions deploy --no-verify-jwt
 ```
 
@@ -211,7 +211,7 @@ SELECT cron.unschedule('process-import-queue-cron');  -- by job name
 ### Quick System Status
 
 ```bash
-cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s -X POST \
+cd ~/nuke && dotenvx run -- bash -c 'curl -s -X POST \
   "$VITE_SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   -H "Content-Type: application/json" \
@@ -226,7 +226,7 @@ This returns:
 ### Database Stats
 
 ```bash
-cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s \
+cd ~/nuke && dotenvx run -- bash -c 'curl -s \
   "$VITE_SUPABASE_URL/functions/v1/db-stats" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 ```
@@ -352,7 +352,7 @@ brew install deno
 ### Step 2: Link to Project
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase link --project-ref qkgaybvrernstplzjaam
 ```
 

@@ -107,18 +107,18 @@
 ### Files Modified/Created
 
 **Created:**
-- `/Users/skylar/nuke/supabase/migrations/20250105_shops_core.sql`
-- `/Users/skylar/nuke/supabase/migrations/20250105_shops_admin_integration.sql`
-- `/Users/skylar/nuke/supabase/migrations/20250105_shops_business_verification.sql`
-- `/Users/skylar/nuke/nuke_frontend/src/pages/AdminDashboard.tsx`
-- `/Users/skylar/nuke/nuke_frontend/src/pages/Shops.tsx`
-- `/Users/skylar/nuke/nuke_frontend/src/components/vehicle/ContributorOnboarding.tsx`
-- `/Users/skylar/nuke/docs/ADMIN_SYSTEM_SETUP.md`
-- `/Users/skylar/nuke/docs/PLACEHOLDER_AUDIT.md`
-- `/Users/skylar/nuke/docs/IMPLEMENTATION_COMPLETE.md` (this file)
+- `~/nuke/supabase/migrations/20250105_shops_core.sql`
+- `~/nuke/supabase/migrations/20250105_shops_admin_integration.sql`
+- `~/nuke/supabase/migrations/20250105_shops_business_verification.sql`
+- `~/nuke/nuke_frontend/src/pages/AdminDashboard.tsx`
+- `~/nuke/nuke_frontend/src/pages/Shops.tsx`
+- `~/nuke/nuke_frontend/src/components/vehicle/ContributorOnboarding.tsx`
+- `~/nuke/docs/ADMIN_SYSTEM_SETUP.md`
+- `~/nuke/docs/PLACEHOLDER_AUDIT.md`
+- `~/nuke/docs/IMPLEMENTATION_COMPLETE.md` (this file)
 
 **Modified:**
-- `/Users/skylar/nuke/nuke_frontend/src/App.tsx` (added imports + routes)
+- `~/nuke/nuke_frontend/src/App.tsx` (added imports + routes)
 
 ### How to Deploy
 

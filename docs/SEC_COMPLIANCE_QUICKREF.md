@@ -123,7 +123,7 @@
 
 ## SQL Migration File
 
-Location: `/Users/skylar/nuke/database/sec_compliance_schema_additions.sql`
+Location: `~/nuke/database/sec_compliance_schema_additions.sql`
 
 **What it includes:**
 - 7 new tables (offerings, financials, share classes, debt, related parties, etc.)
@@ -134,7 +134,7 @@ Location: `/Users/skylar/nuke/database/sec_compliance_schema_additions.sql`
 
 **How to run:**
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push database/sec_compliance_schema_additions.sql
 ```
 
@@ -170,8 +170,8 @@ SEC requires disclosure of anyone who owns 20%+ of voting securities. This trigg
 
 ## Next Steps
 
-1. **Review gap analysis:** `/Users/skylar/nuke/docs/SEC_FORM_COMPLIANCE_GAP_ANALYSIS.md`
-2. **Run SQL migration:** `/Users/skylar/nuke/database/sec_compliance_schema_additions.sql`
+1. **Review gap analysis:** `~/nuke/docs/SEC_FORM_COMPLIANCE_GAP_ANALYSIS.md`
+2. **Run SQL migration:** `~/nuke/database/sec_compliance_schema_additions.sql`
 3. **Update TypeScript types** in `nuke_frontend` to match new schema
 4. **Build admin UI** for managing offerings, financials, cap table
 5. **Implement Form D/C export** functions to generate SEC filings

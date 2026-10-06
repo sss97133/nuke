@@ -6,7 +6,7 @@ Deep integration check for all connectors, API calls, and MCP endpoints. Goes be
 
 ### 1. Supabase Edge Function Inventory
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 # List all deployed functions
 supabase functions list 2>/dev/null | head -60
 ```
@@ -44,7 +44,7 @@ Log which ones respond vs timeout vs error.
 
 ### 4. External API Connectivity
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Firecrawl (if configured)
 dotenvx run -- bash -c 'curl -s -w "\nHTTP %{http_code}" "https://api.firecrawl.dev/v1/scrape" -H "Authorization: Bearer $FIRECRAWL_API_KEY" -H "Content-Type: application/json" -d "{\"url\":\"https://example.com\",\"formats\":[\"markdown\"]}"' | tail -5

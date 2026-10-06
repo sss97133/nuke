@@ -109,7 +109,7 @@ Keep unknown price units unqualified; do not fill an actual close timestamp from
 ## Evidence and reusable code
 
 Private receipts are outside the public repository under
-`/Users/skylar/nuke-logs/market-evidence-hypothesis-20261004/`. If unavailable on another machine,
+`~/nuke-logs/market-evidence-hypothesis-20261004/`. If unavailable on another machine,
 use the linked PRs and committed synthetic fixtures; retrieve protected evidence through the
 authorized archive owner rather than copying raw captures into the repository.
 

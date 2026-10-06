@@ -471,7 +471,7 @@ Add to vehicle profile:
 ### 1. Apply Migration
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db reset # if on local
 # OR
 supabase db push # if on production

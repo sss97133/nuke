@@ -34,10 +34,10 @@ crontab -e
 # Add one of these lines (adjust path if needed):
 
 # Nightly at 2am: 6-hour verified run (BaT, Hagerty, KSL only)
-0 2 * * * /Users/skylar/nuke/scripts/cron-verified-extraction.sh >> /Users/skylar/nuke/logs/cron-verified-extraction.log 2>&1
+0 2 * * * ~/nuke/scripts/cron-verified-extraction.sh >> ~/nuke/logs/cron-verified-extraction.log 2>&1
 
 # Same with explicit env
-0 2 * * * VERIFIED_SOURCES_ONLY=1 HOURS=6 /Users/skylar/nuke/scripts/cron-verified-extraction.sh >> /Users/skylar/nuke/logs/cron-verified-extraction.log 2>&1
+0 2 * * * VERIFIED_SOURCES_ONLY=1 HOURS=6 ~/nuke/scripts/cron-verified-extraction.sh >> ~/nuke/logs/cron-verified-extraction.log 2>&1
 ```
 
 ### Manual runs

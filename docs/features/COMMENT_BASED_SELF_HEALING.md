@@ -139,7 +139,7 @@ Added automatic BAT URL detection for **existing comments** when the comments se
 ## Deployment
 
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 vercel --prod --force --yes
 ```
 

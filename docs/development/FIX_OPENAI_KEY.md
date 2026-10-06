@@ -29,7 +29,7 @@ Copy the key (starts with `sk-proj-...`)
 ### Step 2: Update Supabase Secret
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Replace with your actual key
 supabase secrets set OPENAI_API_KEY=sk-proj-your-actual-key-here
@@ -73,7 +73,7 @@ Check:
 
 ```bash
 # All in one:
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Update key (paste your key)
 supabase secrets set OPENAI_API_KEY=sk-proj-YOUR-KEY-HERE

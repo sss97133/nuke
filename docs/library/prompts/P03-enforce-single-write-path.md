@@ -97,7 +97,7 @@ await supabase.from('auction_comments').insert({...});
 
 5. Deploy all modified functions:
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 # Deploy each modified function
 supabase functions deploy extract-bat-core --no-verify-jwt
 supabase functions deploy extract-auction-comments --no-verify-jwt

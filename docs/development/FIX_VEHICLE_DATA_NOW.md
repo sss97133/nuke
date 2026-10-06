@@ -64,7 +64,7 @@ Trans Type:      Automatic
 ### Step 1: Run Database Migrations (2 minutes)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Add new columns to vehicles table
 npx supabase db reset
@@ -84,7 +84,7 @@ This creates:
 ### Step 2: Deploy Edge Function (1 minute)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 npx supabase functions deploy analyze-image
 ```
 
@@ -97,7 +97,7 @@ This updates the AI to:
 ### Step 3: Deploy Frontend (2 minutes)
 
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 vercel --prod --force --yes
 
 # Verify deployment
@@ -113,7 +113,7 @@ This fixes:
 ### Step 4: Process Your Images (5 minutes)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 node scripts/process-january-images.js
 ```
 
@@ -354,7 +354,7 @@ Result:
 ## RUN THESE COMMANDS NOW
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Add new columns (30 seconds)
 npx supabase db reset
@@ -367,7 +367,7 @@ cd nuke_frontend
 vercel --prod --force --yes
 
 # 4. Process January images (5 minutes)
-cd /Users/skylar/nuke
+cd ~/nuke
 node scripts/process-january-images.js
 ```
 

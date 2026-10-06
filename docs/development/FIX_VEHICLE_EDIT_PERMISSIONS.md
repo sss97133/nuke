@@ -66,7 +66,7 @@ The new comprehensive policy checks **ALL** of these (you only need ONE to edit)
 ## Deployment Steps
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # 1. Deploy the permission fix migration
 supabase db push
@@ -76,7 +76,7 @@ cd nuke_frontend
 # (frontend changes already accepted by user)
 
 # 3. Deploy to production
-cd /Users/skylar/nuke
+cd ~/nuke
 vercel --prod --force --yes
 
 # 4. Verify deployment

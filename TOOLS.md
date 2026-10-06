@@ -566,7 +566,7 @@ VALUES ('vehicle-docs/abc123.pdf', 'pending', 50, 'title');
 
 ### Check queue depth
 ```bash
-cd /Users/skylar/nuke && dotenvx run -- bash -c \
+cd ~/nuke && dotenvx run -- bash -c \
   'curl -s "$VITE_SUPABASE_URL/functions/v1/queue-status" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 ```
