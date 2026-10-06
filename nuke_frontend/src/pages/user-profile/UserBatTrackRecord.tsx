@@ -4,7 +4,7 @@
  * Data sources (read directly; no vehicle_events dependency):
  *   - bat_listings WHERE seller_username = username
  *                     OR seller_external_identity_id IN identityIds
- *   - auction_comments WHERE author_external_identity_id IN identityIds
+ *   - auction_comments WHERE external_identity_id IN identityIds
  *                        AND bid_amount IS NULL (comments, not bids)
  *
  * Self-guarding: returns null while loading and when 0 listings AND 0 comments.
@@ -180,12 +180,12 @@ const UserBatTrackRecord: React.FC<UserBatTrackRecordProps> = ({ userId, usernam
               .limit(100)
           : Promise.resolve({ data: [] as BatListingRow[], error: null, count: null });
 
-        // Comments on the indexed author_external_identity_id; bids excluded.
+        // Comments on the canonical, indexed external_identity_id; bids excluded.
         const commentsPromise = resolvedIds.length > 0
           ? supabase
               .from('auction_comments')
               .select('id, comment_text, posted_at, vehicle_id', { count: 'exact' })
-              .in('author_external_identity_id', resolvedIds)
+              .in('external_identity_id', resolvedIds)
               .is('bid_amount', null)
               .order('posted_at', { ascending: false })
               .limit(10)
