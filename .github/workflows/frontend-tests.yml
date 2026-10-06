@@ -61,6 +61,10 @@ jobs:
         run: createdb dm_model_health_monitor_ci
       - name: Verify metadata gaps and execution versus output evidence
         run: psql -X -v ON_ERROR_STOP=1 -d dm_model_health_monitor_ci -f scripts/discovery/data-model-health-test.sql
+      - name: Create disposable repair-backlog view database
+        run: createdb dm_residual_backlog_ci
+      - name: Verify the ranked repair-backlog view over the old island view, its columns, gap rules, scope, grants and backlog script
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_residual_backlog_ci -f supabase/sql/test_residual_ranked_backlog.sql
       - name: Create disposable bounded pipeline pulse database
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings

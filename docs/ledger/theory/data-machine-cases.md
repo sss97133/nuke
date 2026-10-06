@@ -959,7 +959,7 @@ This section is the index he asked for, the process in the card's own words, and
 | How the schema may grow | `lofficiel-concierge/supabase/SCHEMA_LAW.md`; `schema_proposals` (15 approved, 7 open, 4 withdrawn) | search before mint; facts are observations first; one DNA grammar; supersede, never overwrite |
 | Who owns a capability or a computed field | `docs/ledger/CAPABILITY_MAP.md` (2026-07-12, verify live); `pipeline_registry` (175 rows over 51 tables) | extend the owner, never mint a parallel one |
 | What runs, and whether it proves its yield | `v_job_health` (26 active of 126 jobs, 2 with an assay); `v_write_pulse` (declared and undeclared writers, 30 d); `docs/ledger/CRON_LEDGER.md` (2026-09-27 snapshot); the Mac's `~/Library/LaunchAgents/ag.nuke.*` (23 plists, not in the repo); four read-only claude.ai routines at 06:00–09:00Z | the cloud lands and folds; the Mac runs finite batches; nothing agentic stands between shifts |
-| What the model lacks, per table | `v_schema_atlas`; `v_residual` (175 tables); `scripts/discovery/repair-backlog.sql` (this case) | described %, islands, owners, assays, ranked by rows × gaps |
+| What the model lacks, per table | `v_schema_atlas`; `v_residual` (one row per live table with its `gaps` and `rank_mrows` = rows × gaps, from migration `20261006210524_v_residual_ranked_backlog.sql`, 2026-10-06; it listed the 175 islands before); `scripts/discovery/repair-backlog.sql` reads its top | described %, islands, owners, assays, ranked by rows × gaps |
 | Which text columns name an entity, and how many rows would key | the Keys lane's entity-text-field memo (`~/nuke-logs/data-hygiene-20261005/C-ENTITY-TEXT-FIELDS.md`, 2026-10-06; numbers only) | BaT handles resolve 96–99.9% exact on every column; the gaps are unwritten keys, not unmatched text |
 | The hypotheses | `vein_ledger` (11 veins), `vein_runs` (15 runs) | a vein is a query with its pass rule written before any counting |
 | The last standing worker | `~/.claude/audit/night_shift.sh --data-machine` with `data_machine_build.prompt.txt` (Codex; hourly checkpoints 10:00–18:00 PT on 2026-10-05, 45 min cap; last run 22:00Z: 740 identity links, PR #613) | its plist has been unloaded since 2026-10-02; the headless Claude form is blocked by the local permission classifier |
@@ -1008,10 +1008,11 @@ the pass runs between shifts, taking its gap from a queue the database computes.
 
 ### The efficient form (proposal; nothing minted here)
 
-1. **The queue lives in the database.** `repair-backlog.sql` ranks every live table by rows × gaps from the atlas.
-   Extend `v_residual` into that ranked view (its `residual_kind` becomes the `gaps` array) rather than adding a second
-   view. The Keys lane's match-rate probe becomes a scheduled job writing its numbers, so the key stage ranks by
-   resolvable rows, not by an island flag.
+1. **The queue lives in the database.** `v_residual` now carries the ranking (migration
+   `20261006210524_v_residual_ranked_backlog.sql`, 2026-10-06): every live table by rows × gaps from the atlas, its
+   `residual_kind` replaced by the `gaps` array, no second view; `repair-backlog.sql` reads its top. The Keys lane's
+   match-rate probe becomes a scheduled job writing its numbers, so the key stage ranks by resolvable rows, not by an
+   island flag.
 2. **One runner.** The K, L and S batch runners share a shape: batch size, state file, STOP file, REST-p50 governor,
    launchd KeepAlive, idempotent resume. One parameterized script and one plist with a job list replaces the per-lane
    copies; commit the script before the first run.
