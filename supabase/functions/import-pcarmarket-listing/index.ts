@@ -771,7 +771,9 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
+    });
 
     // Get or create scrape source
     const { data: source } = await supabase
