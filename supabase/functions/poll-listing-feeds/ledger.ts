@@ -45,6 +45,11 @@
  * row, and nothing re-queues it today: process-import-queue claims only `pending` rows, and the extraction watchdog
  * that would move failed rows back to pending is not scheduled.
  *
+ * A slug-trusted venue whose page extractor failed no longer gets a vehicle at all: `ingest` returns status "rejected",
+ * reason "enrichment_failed: <the extractor's error>" and writes nothing (ingest/slugStub.ts). That is ledgered
+ * `failed` the same way, with no vehicle_id and the category read from the extractor's error, so it follows the same
+ * schedule. It is never `skipped`, even when the error text contains a word the structural check looks for.
+ *
  * Errors from `ingest` itself (HTTP failure, timeout on the poller's side) are not ledgered, as before: the next poll
  * asks again. Structural rejections (editorial, not a vehicle, implausible year, quality-gate) are `skipped`, as before.
  */
@@ -274,17 +279,30 @@ export function ledgerOutcomeForIngest(ingest: IngestOutcome, readback: Readback
   return { status: "failed", message, failure_category: failureCategoryFor(message), landed };
 }
 
+/**
+ * The rejection `ingest` returns when a slug-trusted venue's page extractor failed and it wrote no vehicle
+ * (ingest/slugStub.ts). It is retried on a schedule, so it is `failed`, not `skipped`.
+ */
+export function isEnrichmentFailedReject(ingest: IngestOutcome): boolean {
+  return ingest.status === "rejected" && /^enrichment_failed\b/.test(String(ingest.reason ?? ""));
+}
+
 /** Rejections that will not change on a retry; the poller ledgers them `skipped`. */
 export function isStructuralReject(ingest: IngestOutcome): boolean {
   return (
     ingest.status === "rejected" &&
+    !isEnrichmentFailedReject(ingest) &&
     /editorial|not_a_vehicle|not a vehicle|implausible|quality_gate_reject/i.test(String(ingest.reason || ingest.error || ""))
   );
 }
 
 /** Whether this ingest result gets a ledger row at all. Errors do not: the next poll retries them. */
 export function shouldLedger(ingest: IngestOutcome): boolean {
-  return ["created", "matched", "duplicate"].includes(ingest.status ?? "") || isStructuralReject(ingest);
+  return (
+    ["created", "matched", "duplicate"].includes(ingest.status ?? "") ||
+    isStructuralReject(ingest) ||
+    isEnrichmentFailedReject(ingest)
+  );
 }
 
 export interface LedgerWrite {
@@ -310,10 +328,17 @@ export function ledgerWriteFor(input: {
   const { url, feedId, ingest, batch, prev, now } = input;
   if (!shouldLedger(ingest)) return null;
 
-  // A structural rejection has no vehicle to read back. Every other ledgered result has one, and must be read.
-  const outcome = isStructuralReject(ingest)
-    ? null
-    : ledgerOutcomeForIngest(ingest, readbackFor(ingest.vehicle_id, batch));
+  // A rejection has no vehicle to read back. Every other ledgered result has one, and must be read.
+  let outcome: LedgerOutcome | null;
+  if (isEnrichmentFailedReject(ingest)) {
+    const extractorError = String(ingest.enrichment_error ?? "").trim();
+    const message = String(ingest.reason);
+    outcome = { status: "failed", message, failure_category: failureCategoryFor(extractorError || message), landed: null };
+  } else if (isStructuralReject(ingest)) {
+    outcome = null;
+  } else {
+    outcome = ledgerOutcomeForIngest(ingest, readbackFor(ingest.vehicle_id, batch));
+  }
   const status = outcome ? outcome.status : "skipped";
   const landed = outcome ? outcome.landed : null;
 
