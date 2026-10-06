@@ -33,6 +33,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { LANDED_COLUMNS, ledgerOutcomeForIngest, type LedgerOutcome } from "./ledger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -219,12 +220,15 @@ interface FeedResult {
   new_ingested?: number; // firecrawl_html path
   matched_existing?: number; // firecrawl_html path
   rejected?: number; // firecrawl_html path
+  landed_no_data?: number; // firecrawl_html path: ingest created or matched a vehicle that holds no price, images or description
   ingest_outcomes?: Array<{
     url: string;
     status: string;
     vehicle_id?: string | null;
     error?: string;
     reason?: string;
+    enrichment_error?: string; // firecrawl_html path: ingest's report that the page extractor failed
+    ledger?: string; // firecrawl_html path: the import_queue status written for this URL
   }>;
   error: string | null;
 }
@@ -497,6 +501,7 @@ async function pollFirecrawlHtmlFeed(
     new_ingested: 0,
     matched_existing: 0,
     rejected: 0,
+    landed_no_data: 0,
     ingest_outcomes: [],
     error: null,
   };
@@ -684,11 +689,13 @@ async function pollFirecrawlHtmlFeed(
       { data: ledgered, error: ledgerError },
     ] = await Promise.all([
       supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
+      // `failed` is settled too: a URL whose page extraction failed is ledgered `failed`
+      // (see ledger.ts) and is retried by the queue drain, not by the next poll.
       supabase
         .from("import_queue")
         .select("listing_url")
         .in("listing_url", chunk)
-        .in("status", ["complete", "skipped"]),
+        .in("status", ["complete", "skipped", "failed"]),
     ]);
 
     if (knownError) {
@@ -742,13 +749,17 @@ async function pollFirecrawlHtmlFeed(
       }));
       const status = ingest.status || "error";
 
-      result.ingest_outcomes!.push({
+      const outcomeEntry: NonNullable<FeedResult["ingest_outcomes"]>[number] = {
         url,
         status,
         vehicle_id: ingest.vehicle_id ?? null,
         ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
         ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
-      });
+        ...(ingest.enrichment_error
+          ? { enrichment_error: String(ingest.enrichment_error).slice(0, 200) }
+          : {}),
+      };
+      result.ingest_outcomes!.push(outcomeEntry);
 
       if (status === "created") result.new_ingested!++;
       else if (status === "matched" || status === "duplicate")
@@ -774,18 +785,53 @@ async function pollFirecrawlHtmlFeed(
         ["created", "matched", "duplicate"].includes(status) ||
         structuralReject
       ) {
+        // `complete` only when the vehicle row holds a price, an image or a
+        // description (ledger.ts). For venues whose URL slug carries the
+        // identity, `ingest` creates the vehicle even when the page extractor
+        // fails, reports the failure in `enrichment_error` and still returns
+        // "created", so the status alone proves nothing. A row that landed
+        // nothing is ledgered `failed`, with the reason.
+        let outcome: LedgerOutcome | null = null;
+        if (status !== "rejected") {
+          let vehicleRow = null;
+          if (ingest.vehicle_id) {
+            const { data } = await supabase
+              .from("vehicles")
+              .select(LANDED_COLUMNS)
+              .eq("id", ingest.vehicle_id)
+              .maybeSingle();
+            vehicleRow = data ?? null;
+          }
+          outcome = ledgerOutcomeForIngest(ingest, vehicleRow);
+        }
+        const ledgerStatus = outcome ? outcome.status : "skipped";
+        if (outcome?.status === "failed") result.landed_no_data!++;
+        outcomeEntry.ledger = ledgerStatus;
         const { error: ledgerWriteError } = await supabase
           .from("import_queue")
           .upsert(
             {
               listing_url: url,
-              status: status === "rejected" ? "skipped" : "complete",
+              status: ledgerStatus,
+              ...(outcome?.status === "failed"
+                ? {
+                    error_message: outcome.error_message,
+                    failure_category: outcome.failure_category,
+                    last_attempt_at: new Date().toISOString(),
+                  }
+                : outcome?.status === "complete"
+                  ? { error_message: null, failure_category: null }
+                  : {}),
               vehicle_id: ingest.vehicle_id ?? null,
               processed_at: new Date().toISOString(),
               raw_data: {
                 feed_id: feed.id,
                 ingested_via: "poll_firecrawl_html",
                 ingest_status: status,
+                ...(outcome?.landed ? { landed: outcome.landed } : {}),
+                ...(ingest.enrichment_error
+                  ? { enrichment_error: String(ingest.enrichment_error).slice(0, 200) }
+                  : {}),
                 ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
               },
             },
