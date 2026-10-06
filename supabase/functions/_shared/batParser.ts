@@ -6,6 +6,7 @@
  *
  * Version: 1.0.0
  */
+import { chassisFromListItemText } from "./batChassis.ts";
 
 export const BAT_PARSER_VERSION = "batParser:1.0.0";
 
@@ -614,15 +615,10 @@ export function extractEssentials(html: string): BatEssentials {
 
     for (const t of items) {
       if (!vin) {
-        // Modern VINs: 17 chars. Pre-1981 chassis: 3-16 chars. Both valid.
-        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{3,17})\b/i);
-        if (idMatch?.[1]) {
-          const candidate = idMatch[1].toUpperCase().trim();
-          // Reject very short strings that are likely noise (e.g., "VIN: N/A")
-          if (candidate.length >= 5 || /^\d{3,4}$/.test(candidate)) {
-            vin = candidate;
-          }
-        }
+        // One reader for the Chassis/VIN line (_shared/batChassis.ts): a 17-character VIN, or a 5-16 character chassis.
+        // A 17-character VIN that fails its check digit is returned as stated; the guard is the caller's.
+        const chassis = chassisFromListItemText(t);
+        if (chassis) vin = chassis.value ?? (chassis.rejected === "check_digit" ? chassis.candidate : null);
       }
       if (!mileage) {
         const milesMatch = t.match(/\b([0-9,]+)\s*Miles?\b/i) || t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);

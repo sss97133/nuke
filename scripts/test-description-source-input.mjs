@@ -46,6 +46,8 @@ const sources = new Map([
   ['guard', compile('../supabase/functions/_shared/writeGuard.ts')],
   ['hash', compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['bat', compile('../supabase/functions/_shared/batParser.ts')],
+  ['chassis', compile('../supabase/functions/_shared/batChassis.ts')],
+  ['record', compile('../supabase/functions/_shared/batAuctionRecord.ts')],
 ]);
 
 function fixture(options = {}) {
@@ -172,6 +174,8 @@ function fixture(options = {}) {
         };
         if (specifier === './descriptionInput.ts') return load('input');
         if (specifier === '../_shared/batParser.ts') return load('bat');
+        if (specifier === './batChassis.ts') return load('chassis');
+        if (specifier === './batAuctionRecord.ts') return load('record');
         if (specifier === '../_shared/observationContentHash.ts') return load('hash');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path is used') };
