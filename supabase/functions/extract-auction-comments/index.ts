@@ -103,7 +103,9 @@ Deno.serve(async (req) => {
     if (!supabaseUrl) throw new Error('Missing SUPABASE_URL')
     if (!serviceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { 'X-Nuke-Writer': 'extract-auction-comments' } },
+    })
 
     const { auction_url, auction_event_id, vehicle_id } = await req.json()
     if (!auction_url) throw new Error('Missing auction_url')

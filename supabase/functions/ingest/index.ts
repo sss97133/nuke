@@ -27,7 +27,8 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  { global: { headers: { "X-Nuke-Writer": "ingest" } } },
 );
 
 // ── Source Detection ────────────────────────────────────────────
