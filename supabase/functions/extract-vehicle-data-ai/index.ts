@@ -8,11 +8,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
-import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
-import { listingPriceColumns } from './priceColumns.ts'
-import { insertRefusal } from './insertRefusal.ts'
+import { writeVehicle } from './vehicleWrite.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -497,111 +495,16 @@ Deno.serve(async (req) => {
 
     if (save_to_db && normalized.year && normalized.make && !looksLikeNonVehicle) {
       try {
-        // Check for existing vehicle by URL or VIN
-        let existing = null
-        if (normalized.vin && normalized.vin.length >= 11) {
-          const { data } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('vin', normalized.vin)
-            .limit(1)
-            .maybeSingle()
-          existing = data
+        // Find the vehicle, then gap-fill it or create it (vehicleWrite.ts). A write that creates nothing is
+        // returned to the caller as an error response, never answered as success with no vehicle.
+        const written = await writeVehicle(supabase, { normalized, url, source, sourceSlug })
+        if (!written.ok) {
+          return new Response(JSON.stringify(written.body), {
+            status: written.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
         }
-        if (!existing && url) {
-          const { data } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('discovery_url', url)
-            .limit(1)
-            .maybeSingle()
-          existing = data
-        }
-
-        // Normalize make/model/transmission/drivetrain/VIN via shared canonical layer
-        normalizeVehicleFields(normalized);
-
-        const vehiclePayload: Record<string, any> = {
-          year: normalized.year,
-          make: normalized.make,
-          model: normalized.model || null,
-          series: normalized.series || null,
-          trim: normalized.trim || null,
-          vin: normalized.vin || null,
-          mileage: normalized.mileage || null,
-          color: normalized.exterior_color || normalized.color || null,
-          interior_color: normalized.interior_color || null,
-          transmission: normalized.transmission || null,
-          drivetrain: normalized.drivetrain || null,
-          engine_type: normalized.engine || null,
-          body_style: normalized.body_style || null,
-          // A listing price is an ask: asking_price. sale_price only when the page states a sale
-          // (sold_price). See priceColumns.ts and guard_vehicle_sale_price (20260927170000).
-          ...listingPriceColumns(normalized),
-          description: normalized.description?.slice(0, 5000) || null,
-          discovery_url: url,
-          listing_url: url,
-          // Provenance: hostname-derived slug (e.g. 'craigslist', 'hemmings') — never 'unknown'
-          source: sourceSlug || source || 'ai_extraction',
-          discovery_source: source || sourceSlug || 'ai_extraction',
-          profile_origin: source || 'ai_extraction',
-          // Scraped page = third-party testimony, not an owner claim
-          // (matches scripts/import-fb-saved.mjs; vehicles_entry_type_check allows:
-          //  owner_claim | contributor_data | title_verified | disputed)
-          entry_type: 'contributor_data',
-          // 1.3 (2026-07-02): gap-fill-only updates, domain-derived observation
-          // platform, no-DELETE image dedupe (DNA audit §IV)
-          extractor_version: 'extract-vehicle-data-ai:1.3',
-          status: 'active',
-        }
-
-        if (existing) {
-          vehicleId = existing.id
-          // GAP-FILL ONLY (Tetris discipline — _shared/batUpsertWithProvenance.ts):
-          // fetch the existing row and fill only columns that are currently NULL.
-          // Re-extractions never overwrite existing values. (2026-07-02 DNA audit:
-          // the old loop checked only the NEW value for null, so it clobbered
-          // existing columns despite its own comment.)
-          // entry_type is set at record creation only — never downgrade an existing
-          // owner_claim/title_verified vehicle to contributor_data on re-extraction
-          const { data: existingRow } = await supabase
-            .from('vehicles')
-            .select('*')
-            .eq('id', vehicleId)
-            .maybeSingle()
-          const updates: Record<string, any> = {}
-          if (existingRow) {
-            for (const [key, val] of Object.entries(vehiclePayload)) {
-              if (val === null || key === 'discovery_url' || key === 'status' || key === 'entry_type') continue
-              if (existingRow[key] === null || existingRow[key] === undefined) {
-                updates[key] = val
-              }
-            }
-          }
-          if (Object.keys(updates).length > 0) {
-            await supabase.from('vehicles').update(updates).eq('id', vehicleId)
-          }
-          console.log(`[extract-vehicle-data-ai] Gap-filled ${Object.keys(updates).length} NULL fields on existing vehicle: ${vehicleId}`)
-        } else {
-          const { data: inserted, error: insertErr } = await supabase
-            .from('vehicles')
-            .insert(vehiclePayload)
-            .select('id')
-            .maybeSingle()
-          if (insertErr) {
-            console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
-            // Return the refusal. Falling through answered success with vehicle_id null, and the queue
-            // processors then marked the row complete with no vehicle. See insertRefusal.ts.
-            const refusal = insertRefusal(insertErr, normalized, url)
-            return new Response(JSON.stringify(refusal.body), {
-              status: refusal.status,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            })
-          } else if (inserted?.id) {
-            vehicleId = inserted.id
-            console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
-          }
-        }
+        vehicleId = written.vehicleId
 
         // Fire-and-forget observation write
         if (vehicleId) {
