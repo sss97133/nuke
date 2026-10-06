@@ -10,6 +10,11 @@
 -- CONCURRENTLY: no BEGIN in this file on purpose (the deploy applies each file with psql -f in autocommit;
 -- precedent 20260227040000_bat_snapshot_parser_index_fix.sql). Merge only after the keying job has unloaded,
 -- so the build does not race 20K-row UPDATE batches. Partial, like the 2025-12-16 declaration.
+-- The deploy role (postgres) carries statement_timeout=10s in rolconfig (read 2026-10-06 10:00Z); a 20M-row build needs
+-- a bounded session override or it is killed at 10 s and left INVALID. Bounded, never 0.
+SET statement_timeout = '30min';
+SET lock_timeout = '5s';
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_auction_comments_external_identity
   ON public.auction_comments (external_identity_id)
   WHERE external_identity_id IS NOT NULL;
