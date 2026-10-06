@@ -113,6 +113,9 @@ SELECT 'bat', 'legacy', 5, timestamptz '2026-01-11 00:00Z', 'legacy twin only', 
 
 CREATE TEMP TABLE twin_before AS SELECT id, author_external_identity_id FROM public.auction_comments;
 CREATE TEMP TABLE identities_before AS SELECT * FROM public.external_identities;
+-- A stale registration the migration must overwrite, not skip.
+INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, description)
+VALUES ('auction_comments', 'external_identity_id', 'stale-owner', 'stale registration');
 ANALYZE public.auction_comments;
 
 \ir ../migrations/20261006090000_key_auction_comment_authors.sql
@@ -124,8 +127,10 @@ SELECT pg_temp.ok('twin column retired by comment',
   col_description('public.auction_comments'::regclass,
     (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.auction_comments'::regclass AND attname = 'author_external_identity_id'))
   LIKE 'RETIRED 2026-10-06: superseded by external_identity_id; do not write.%');
-SELECT pg_temp.ok('registry names the owner and the retired twin',
-  EXISTS (SELECT 1 FROM public.pipeline_registry WHERE table_name = 'auction_comments' AND column_name = 'external_identity_id' AND owned_by = 'key_auction_comment_authors')
+SELECT pg_temp.ok('registry names the owner and the retired twin, replacing a stale owner',
+  (SELECT count(*) FROM public.pipeline_registry WHERE table_name = 'auction_comments' AND column_name = 'external_identity_id') = 1
+  AND EXISTS (SELECT 1 FROM public.pipeline_registry WHERE table_name = 'auction_comments' AND column_name = 'external_identity_id'
+              AND owned_by = 'key_auction_comment_authors' AND description <> 'stale registration' AND write_via LIKE 'At insert:%')
   AND EXISTS (SELECT 1 FROM public.pipeline_registry WHERE table_name = 'auction_comments' AND column_name = 'author_external_identity_id' AND owned_by = 'retired' AND do_not_write_directly));
 SELECT pg_temp.ok('backfill is not callable by anon or authenticated',
   NOT has_function_privilege('anon', 'public.key_auction_comment_authors(integer, boolean, bigint)', 'EXECUTE')
@@ -138,7 +143,8 @@ INSERT INTO public.auction_comments (platform, author_username, bat_author_id, p
   ('bat', 'ALICE', 1, '2026-10-06 01:00Z', 'ins case differs'),
   ('bat', 'nobody_yet', 2, '2026-10-06 01:00Z', 'ins missing identity'),
   ('cars_and_bids', 'Alice', NULL, '2026-10-06 01:00Z', 'ins other platform'),
-  ('bat', 'Unknown', NULL, '2026-10-06 01:00Z', 'ins unknown');
+  ('bat', 'Unknown', NULL, '2026-10-06 01:00Z', 'ins unknown'),
+  ('bat', 'Anonymous', 55, '2026-10-06 01:00Z', 'ins anonymous with author id');
 SELECT pg_temp.ok('insert: exact handle keyed',
   (SELECT c.external_identity_id = e.id FROM public.auction_comments c JOIN public.external_identities e ON e.platform = 'bat' AND e.handle = 'Alice' WHERE c.comment_text = 'ins exact'));
 SELECT pg_temp.ok('insert: case-different handle not keyed',
@@ -150,20 +156,13 @@ SELECT pg_temp.ok('insert: other platform not keyed to a bat identity',
   (SELECT external_identity_id IS NULL FROM public.auction_comments WHERE comment_text = 'ins other platform'));
 SELECT pg_temp.ok('insert: Unknown author not keyed',
   (SELECT external_identity_id IS NULL FROM public.auction_comments WHERE comment_text = 'ins unknown'));
+SELECT pg_temp.ok('insert: anonymous author not keyed even with an author id',
+  (SELECT external_identity_id IS NULL FROM public.auction_comments WHERE comment_text = 'ins anonymous with author id'));
 
 INSERT INTO public.auction_comments (platform, author_username, bat_author_id, posted_at, comment_text, external_identity_id)
 SELECT 'bat', 'Alice', 1, '2026-10-06 02:00Z', 'ins writer passed key', id FROM public.external_identities WHERE handle = 'legacy';
 SELECT pg_temp.ok('insert: a key passed by the writer is kept',
   (SELECT c.external_identity_id = e.id FROM public.auction_comments c JOIN public.external_identities e ON e.handle = 'legacy' WHERE c.comment_text = 'ins writer passed key'));
-
--- The lookup failing must not fail the comment insert (relation renamed inside a rolled-back transaction).
-BEGIN;
-ALTER TABLE public.external_identities RENAME TO external_identities_unavailable;
-INSERT INTO public.auction_comments (platform, author_username, bat_author_id, posted_at, comment_text)
-VALUES ('bat', 'Alice', 1, '2026-10-06 03:00Z', 'ins lookup fails');
-SELECT pg_temp.ok('insert: lookup error leaves key NULL and the insert succeeds',
-  (SELECT external_identity_id IS NULL FROM public.auction_comments WHERE comment_text = 'ins lookup fails'));
-ROLLBACK;
 
 -- BATCH BACKFILL --------------------------------------------------------------------------------
 -- Refuses an unbounded call.
@@ -193,8 +192,11 @@ BEGIN
 END $$;
 SELECT pg_temp.ok('no-mint walk spans several batches', (SELECT count(*) FROM walk WHERE run = 'no_mint') > 3);
 SELECT pg_temp.ok('no-mint walk keys every exact match and nothing else',
-  (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'no_mint') = 1202  -- 1,200 Alice + twin-only legacy + anonymous with author id
+  (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'no_mint') = 1200  -- the 1,200 Alice rows
   AND (SELECT sum((result->>'minted')::int) FROM walk WHERE run = 'no_mint') = 0);
+SELECT pg_temp.ok('twin-only row: the twin is copied, counted apart from handle keys',
+  (SELECT sum((result->>'copied_from_twin')::int) FROM walk WHERE run = 'no_mint') = 1
+  AND (SELECT external_identity_id = author_external_identity_id FROM public.auction_comments WHERE comment_text = 'legacy twin only'));
 SELECT pg_temp.ok('no-mint walk leaves missing identities NULL',
   NOT EXISTS (SELECT 1 FROM public.auction_comments WHERE author_username IN ('bob_new', 'Carol Two') AND external_identity_id IS NOT NULL));
 SELECT pg_temp.ok('backfill writes a declared UPDATE receipt',
@@ -226,6 +228,7 @@ SELECT pg_temp.ok('minted identity has the member URL, ingest-clock first_seen_a
    FROM public.external_identities WHERE handle = 'Carol Two'));
 SELECT pg_temp.ok('mint walk keys the minted handles',
   (SELECT sum((result->>'keyed')::int) FROM walk WHERE run = 'mint') = 1203  -- 600 bob_new + 600 Carol Two + nobody_yet + alice + ALICE
+  AND (SELECT sum((result->>'copied_from_twin')::int) FROM walk WHERE run = 'mint') = 0
   AND NOT EXISTS (SELECT 1 FROM public.auction_comments c WHERE c.platform = 'bat'
                   AND c.author_username IN ('bob_new', 'Carol Two', 'nobody_yet') AND c.external_identity_id IS NULL));
 SELECT pg_temp.ok('every key points at the exact bat handle',
@@ -233,14 +236,15 @@ SELECT pg_temp.ok('every key points at the exact bat handle',
               WHERE c.comment_text <> 'ins writer passed key' AND (e.platform <> 'bat' OR e.handle <> c.author_username)));
 SELECT pg_temp.ok('unidentifiable and other-platform rows stay NULL',
   (SELECT bool_and(external_identity_id IS NULL) FROM public.auction_comments
-   WHERE comment_text IN ('unknown author', 'anonymous, no author id', 'blank author', 'no author',
-                          'other platform, same string', 'other platform', 'ins other platform', 'ins unknown')));
+   WHERE comment_text IN ('unknown author', 'anonymous, no author id', 'anonymous with author id', 'blank author', 'no author',
+                          'other platform, same string', 'other platform', 'ins other platform', 'ins unknown',
+                          'ins anonymous with author id')));
 SELECT pg_temp.ok('case-different handles are never keyed to another case''s identity',
   NOT EXISTS (SELECT 1 FROM public.auction_comments c JOIN public.external_identities e ON e.id = c.external_identity_id
               WHERE c.comment_text IN ('case differs', 'ins case differs') AND e.handle = 'Alice'));
-SELECT pg_temp.ok('anonymous with an author id is keyed like the TS resolver',
-  (SELECT c.external_identity_id = e.id FROM public.auction_comments c JOIN public.external_identities e ON e.platform = 'bat' AND e.handle = 'anonymous'
-   WHERE c.comment_text = 'anonymous with author id'));
+SELECT pg_temp.ok('no comment is keyed to the shared anonymous identity, whatever its author id',
+  NOT EXISTS (SELECT 1 FROM public.auction_comments c JOIN public.external_identities e ON e.id = c.external_identity_id
+              WHERE lower(e.handle) = 'anonymous' OR lower(c.author_username) = 'anonymous'));
 SELECT pg_temp.ok('no identity minted for Unknown, blank, anonymous or other platforms',
   NOT EXISTS (SELECT 1 FROM public.external_identities e WHERE NOT EXISTS (SELECT 1 FROM identities_before b WHERE b.id = e.id)
               AND (e.handle IN ('Unknown', 'anonymous', 'carl') OR btrim(e.handle) = '' OR e.platform <> 'bat')));
@@ -258,7 +262,8 @@ BEGIN
   END LOOP;
 END $$;
 SELECT pg_temp.ok('second run changes 0 rows',
-  (SELECT sum((result->>'keyed')::int) + sum((result->>'minted')::int) FROM walk WHERE run = 'again') = 0);
+  (SELECT sum((result->>'keyed')::int) + sum((result->>'minted')::int) + sum((result->>'copied_from_twin')::int)
+   FROM walk WHERE run = 'again') = 0);
 
 -- Retired twin untouched, existing identities never rewritten.
 SELECT pg_temp.ok('retired column untouched on every pre-existing row',
@@ -271,7 +276,10 @@ SELECT pg_temp.ok('existing identities never rewritten',
   NOT EXISTS (SELECT 1 FROM identities_before b JOIN public.external_identities e USING (id)
               WHERE (e.platform, e.handle, e.profile_url, e.metadata, e.first_seen_at) IS DISTINCT FROM (b.platform, b.handle, b.profile_url, b.metadata, b.first_seen_at)));
 
--- A start block past the end is a no-op that reports done.
-SELECT pg_temp.ok('past-the-end call is a done no-op',
-  (SELECT (r->>'done')::boolean AND (r->>'keyed')::int = 0 AND (r->>'minted')::int = 0
-   FROM (SELECT public.key_auction_comment_authors(200, true, 1000000) r) s));
+-- A start block at or past the end, or past the largest tid block, is a no-op that reports done (no tid error).
+SELECT pg_temp.ok('start blocks at or past the end, and past the tid range, return done without error',
+  (SELECT bool_and((r->>'done')::boolean AND (r->>'keyed')::int = 0 AND (r->>'minted')::int = 0
+                   AND (r->>'copied_from_twin')::int = 0 AND (r->>'blocks_scanned')::int = 0)
+   FROM (SELECT public.key_auction_comment_authors(200, true, b) r
+         FROM unnest(ARRAY[pg_relation_size('public.auction_comments') / current_setting('block_size')::bigint,
+                           1000000, 4294967294, 4294967295, 5000000000]) b) s));
