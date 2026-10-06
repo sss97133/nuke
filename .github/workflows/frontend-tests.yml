@@ -99,6 +99,10 @@ jobs:
         run: createdb dm_refinement_clock_lock_guard_ci
       - name: Verify a superseded episode's locked clocks survive lander updates and wholesale metadata writes
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_clock_lock_guard_ci -f supabase/sql/test_vehicle_event_clock_lock_guard.sql
+      - name: Create disposable sale-date retraction guard database
+        run: createdb dm_refinement_sale_date_retraction_guard_ci
+      - name: Verify a sale day retracted as a write clock stays retracted against every lander, the cited writer path passes, and the producer skips write clocks
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_date_retraction_guard_ci -f supabase/sql/test_vehicle_sale_date_retraction_guard.sql
       - name: Create disposable lot identity key database
         run: createdb dm_refinement_auction_event_identity_keys_ci
       - name: Verify lot winner and seller keys at insert, on update and by bounded backfill; junk and contradicted text left NULL
