@@ -188,9 +188,9 @@ UPDATE public.vehicles SET created_at='2026-09-29' WHERE id='created_at';
 SELECT pg_temp.ok('old dependency list leaves each changed result stale',canonical_outcome='sold') FROM public.vehicles ORDER BY id;
 CREATE TEMP TABLE prior_rows AS SELECT * FROM public.vehicles;
 CREATE TEMP TABLE prior_properties AS SELECT oid,tgname,tgtype,tgenabled,tgfoid,tgnargs,tgargs,tgqual FROM pg_trigger WHERE tgrelid='public.vehicles'::regclass;
-\ir ../migrations/20261005013500_canonical_trigger_input_dependencies.sql
+\ir ../migrations/20261006045233_canonical_trigger_input_dependencies.sql
 -- Applying the actual guarded migration twice must preserve rows and trigger identity.
-\ir ../migrations/20261005013500_canonical_trigger_input_dependencies.sql
+\ir ../migrations/20261006045233_canonical_trigger_input_dependencies.sql
 
 SELECT pg_temp.ok('trigger replacement does not replay any rows',NOT EXISTS((SELECT * FROM prior_rows EXCEPT SELECT * FROM public.vehicles) UNION ALL (SELECT * FROM public.vehicles EXCEPT SELECT * FROM prior_rows)));
 SELECT pg_temp.ok('trigger oid mode timing function and arguments retained',NOT EXISTS(SELECT * FROM prior_properties EXCEPT SELECT oid,tgname,tgtype,tgenabled,tgfoid,tgnargs,tgargs,tgqual FROM pg_trigger WHERE tgrelid='public.vehicles'::regclass));
