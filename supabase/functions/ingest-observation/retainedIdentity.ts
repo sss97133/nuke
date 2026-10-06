@@ -67,6 +67,7 @@ export async function ingestRetainedIdentity(store: RetainedIdentityStore,
     throw new RetainedIdentityConflict("Existing publisher identity or ambiguous alias conflicts");
   }
   let inserted = false;
+  // Author keys: exact (bat, handle); Unknown, blank and anonymous authors stay NULL (2026-10-06, same rule as the DB trigger).
   const linked = await linkAuctionCommentIdentities([source], {
     async find(handles) {
       const found = await store.find(handles);
