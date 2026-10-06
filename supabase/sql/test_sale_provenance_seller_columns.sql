@@ -1,5 +1,5 @@
 -- Isolated PostgreSQL 17 regression: synthetic rows and placeholder handles only, never production data.
--- Contract for migration 20261006100000_sale_provenance_allow_seller_columns.sql: the sale-provenance writer
+-- Contract for migration 20261006101500_sale_provenance_allow_seller_columns.sql: the sale-provenance writer
 -- can correct vehicles.bat_seller and vehicles.seller_name with the same citation rule, expected-value guard
 -- and audit trail as every other allowed field, and the migration's drift guard sees the live fingerprint.
 -- The frozen live writer below is a dependency fixture (its body as installed 2026-10-06), not a rule change.
@@ -238,7 +238,7 @@ DO $$ DECLARE f text; BEGIN
   PERFORM pg_temp.ok('fixture reproduces the live fingerprint', f = '0279775cb71ebe2e5ba3afaec70112c0'); -- gitleaks:allow (fingerprint)
 END $$;
 
-\ir ../migrations/20261006100000_sale_provenance_allow_seller_columns.sql
+\ir ../migrations/20261006101500_sale_provenance_allow_seller_columns.sql
 
 DO $$ DECLARE f text; BEGIN
   f := md5(pg_get_functiondef('public.correct_vehicle_sale_provenance_batch(jsonb,text,text)'::regprocedure));
@@ -247,7 +247,7 @@ DO $$ DECLARE f text; BEGIN
 END $$;
 
 -- Re-running the migration is a no-op (the guard accepts the post-apply fingerprint).
-\ir ../migrations/20261006100000_sale_provenance_allow_seller_columns.sql
+\ir ../migrations/20261006101500_sale_provenance_allow_seller_columns.sql
 
 INSERT INTO public.vehicles (id, year, make, model, bat_seller, bat_buyer, seller_name, sale_price, asking_price, sale_status, auction_outcome)
 VALUES ('00000000-0000-0000-0000-000000000001', 1990, 'Make A', 'Model A', 'handle_b', 'handle_b', NULL, 10000, NULL, 'sold', 'sold'),
