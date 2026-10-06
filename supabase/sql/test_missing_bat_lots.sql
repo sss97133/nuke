@@ -85,8 +85,12 @@ CREATE SCHEMA net;
 CREATE TABLE net.calls (id bigint GENERATED ALWAYS AS IDENTITY, url text, body jsonb);
 CREATE FUNCTION net.http_post(url text, headers jsonb, body jsonb, timeout_milliseconds integer) RETURNS bigint
 LANGUAGE sql AS $$ INSERT INTO net.calls (url, body) VALUES (url, body) RETURNING id $$;
+-- pg_get_functiondef of 2026-10-06 ~12:45Z, verbatim (md5 29cd0119a2a2fae0e77d0962c68a0dd0 on prod and on PG17 17.9).
 CREATE OR REPLACE FUNCTION public.auto_create_transfer_on_auction_close()
- RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $function$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
   v_url text;
   v_key text;
@@ -97,25 +101,37 @@ BEGIN
   IF OLD.outcome = 'sold' THEN
     RETURN NEW;
   END IF;
+
   v_key := COALESCE(
     (SELECT value FROM public._app_secrets WHERE key = 'service_role_key' LIMIT 1),
     current_setting('app.settings.service_role_key', true),
     current_setting('app.service_role_key', true)
   );
+
   v_url := 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/transfer-automator';
+
   BEGIN
     PERFORM net.http_post(
       url := v_url,
-      headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || COALESCE(v_key, '')),
-      body := jsonb_build_object('action', 'seed_from_auction', 'auction_event_id', NEW.id::text),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || COALESCE(v_key, '')
+      ),
+      body := jsonb_build_object(
+        'action', 'seed_from_auction',
+        'auction_event_id', NEW.id::text
+      ),
       timeout_milliseconds := 30000
     );
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING '[auto_create_transfer] pg_net call failed: %', SQLERRM;
   END;
+
   RETURN NEW;
 END;
 $function$;
+SELECT pg_temp.ok('trigger fixture is the live definition (fingerprint)',
+  md5(pg_get_functiondef('public.auto_create_transfer_on_auction_close()'::regprocedure)) = '29cd0119a2a2fae0e77d0962c68a0dd0'); -- gitleaks:allow (function fingerprint, not a secret)
 CREATE TRIGGER trg_auto_create_transfer_on_auction_close AFTER INSERT OR UPDATE OF outcome ON public.auction_events
 FOR EACH ROW EXECUTE FUNCTION public.auto_create_transfer_on_auction_close();
 
@@ -125,7 +141,7 @@ INSERT INTO v SELECT n, gen_random_uuid() FROM unnest(ARRAY[
   'sold','bidto','exists_other','exists_case','holder','gone','merged','twin_a','twin_b','live','cheap','noresult',
   'endedsale','disagree','slash','versions','future','nobl','filler',
   'bl_sold','bl_slash','bl_owned','bl_twin_a','bl_twin_b','bl_cheap','bl_exists','bl_endedsale',
-  'cv1','cv2a','cv2b','cv3','cv6','gone2']) n;
+  'cv1','cv2a','cv2b','cv3','cv6','gone2','spell','spellx','casea','caseb','quiet']) n;
 INSERT INTO public.vehicles (id, status, merged_into_vehicle_id)
 SELECT id, CASE WHEN name = 'merged' THEN 'merged' ELSE 'active' END,
        CASE WHEN name = 'merged' THEN (SELECT id FROM v WHERE name = 'holder') END
@@ -174,7 +190,19 @@ VALUES
   (pg_temp.vid('future'),      'bat', pg_temp.u('lot-future'), 'ended', NULL, 8000, now() + interval '3 days', NULL, NULL, NULL, 1, 1, '{}', NULL),
   (pg_temp.vid('nobl'),        'bat', pg_temp.u('lot-nobl'), 'sold', 61000, 61000, '2026-01-02 19:05Z', '2026-01-02 00:00Z', NULL, NULL, 1, 1,
      '{"buyer_username":"buyerN","seller_username":"sellerN"}', NULL),
-  (pg_temp.vid('filler'),      'bat', pg_temp.u('lot-bl-owned'), 'ended', NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL);
+  (pg_temp.vid('filler'),      'bat', pg_temp.u('lot-bl-owned'), 'ended', NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  -- One lot under several URL spellings (fix 3: every check goes by the lower-cased slug):
+  --   lot-spell: two agreeing rows on one vehicle (canonical, and upper case with a junk path) -> one lot, canonical URL
+  (pg_temp.vid('spell'),       'bat', pg_temp.u('LOT-SPELL') || '/contact', 'ended', NULL, 9000, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  (pg_temp.vid('spell'),       'bat', pg_temp.u('lot-spell'), 'ended', NULL, 9000, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  --   lot-spellx: two rows on one vehicle that disagree, one under another host -> conflicting, nothing created
+  (pg_temp.vid('spellx'),      'bat', pg_temp.u('lot-spellx'), 'sold', 20000, 20000, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  (pg_temp.vid('spellx'),      'bat', 'https://www.bringatrailer.com/listing/lot-spellx/', 'sold', 21000, 21000, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  --   lot-case: two vehicles, the second spelled in upper case -> lot on several vehicles
+  (pg_temp.vid('casea'),       'bat', pg_temp.u('lot-case'), 'ended', NULL, 6600, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  (pg_temp.vid('caseb'),       'bat', pg_temp.u('LOT-CASE'), 'ended', NULL, 6600, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL),
+  -- A BaT URL with no listing slug (fix 2: counted, not dropped)
+  (pg_temp.vid('holder'),      'bat', 'https://bringatrailer.com/listing/?ref=feed', 'ended', NULL, 1000, NULL, NULL, NULL, NULL, 1, 1, '{}', NULL);
 
 -- bat_listings evidence.
 INSERT INTO public.bat_listings (vehicle_id, bat_listing_url, listing_status, sale_price, final_bid, auction_end_date, sale_date,
@@ -206,7 +234,9 @@ VALUES
   (NULL, pg_temp.u('lot-cv-novehicle') || '/', 'ended', NULL, 7000, '2026-01-04', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
   (NULL, pg_temp.u('lot-cv-gone') || '/', 'sold', 9000, 9000, '2026-01-05', '2026-01-05', NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
   (NULL, pg_temp.u('lot-cv-cheap') || '/', 'sold', 50, 50, '2026-01-06', '2026-01-06', NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
-  (NULL, pg_temp.u('lot-noresult') || '/', 'ended', NULL, 5000, '2026-01-07', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}');
+  (NULL, pg_temp.u('lot-noresult') || '/', 'ended', NULL, 5000, '2026-01-07', NULL, NULL, NULL, NULL, 0, 0, '{"sync":"bat-closed-lots-sync:1.2.0"}'),
+  -- A BaT URL with no listing slug (fix 2)
+  (NULL, 'https://bringatrailer.com/listing/', 'ended', NULL, 5000, NULL, NULL, NULL, NULL, NULL, 0, 0, '{}');
 
 -- Comments waiting on their lot row (comment URLs carry the trailing slash, as extract-auction-comments wrote them).
 INSERT INTO public.auction_comments (vehicle_id, platform, source_url, content_hash, comment_text)
@@ -234,6 +264,9 @@ ANALYZE;
 \ir ../migrations/20261006131500_create_missing_bat_auction_events.sql
 
 SELECT pg_temp.ok('migration writes no lot row', (SELECT count(*) FROM public.auction_events) = (SELECT count(*) FROM lots_before));
+SELECT pg_temp.ok('transfer trigger now reads app.seed_transfers; fingerprint is the migration''s POST',
+  md5(pg_get_functiondef('public.auto_create_transfer_on_auction_close()'::regprocedure)) = '797a4e97cd2c7ae54082c3afe6277ae8' -- gitleaks:allow (function fingerprint, not a secret)
+  AND strpos(pg_get_functiondef('public.auto_create_transfer_on_auction_close()'::regprocedure), 'app.seed_transfers') > 0);
 DO $$ BEGIN
   PERFORM public.create_missing_bat_auction_events(25, 0, 'vehicle_events', 200);
   RAISE EXCEPTION 'ran without the lot identity index';
@@ -242,6 +275,18 @@ EXCEPTION WHEN raise_exception THEN
 END $$;
 
 \ir ../migrations/20261006130000_idx_auction_events_bat_lot_slug.sql
+SET statement_timeout = '30s';  -- the index files set their own bounded session timeout for the build
+DO $$ BEGIN
+  PERFORM public.create_missing_bat_auction_events(25, 0, 'vehicle_events', 200);
+  RAISE EXCEPTION 'ran without the evidence slug indexes';
+EXCEPTION WHEN raise_exception THEN
+  IF SQLERRM NOT LIKE '%idx_vehicle_events_bat_lot_slug is required%' THEN RAISE; END IF;
+END $$;
+\ir ../migrations/20261006133500_idx_evidence_bat_lot_slug.sql
+SET statement_timeout = '30s';
+SELECT pg_temp.ok('evidence slug indexes are valid',
+  (SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+   WHERE c.relname IN ('idx_vehicle_events_bat_lot_slug', 'idx_bat_listings_lot_slug') AND i.indisvalid) = 2);
 
 SELECT pg_temp.ok('lot identity index is valid and keyed on the lower-cased slug',
   EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
@@ -254,12 +299,12 @@ SELECT pg_temp.ok('registry: one table-level row for auction_events, stale owner
               AND owned_by = 'extract-bat-core' AND do_not_write_directly
               AND write_via LIKE '%create_missing_bat_auction_events%'));
 SELECT pg_temp.ok('not callable by anon or authenticated; callable by service_role',
-  NOT has_function_privilege('anon', 'public.create_missing_bat_auction_events(integer, bigint, text, integer)', 'EXECUTE')
-  AND NOT has_function_privilege('authenticated', 'public.create_missing_bat_auction_events(integer, bigint, text, integer)', 'EXECUTE')
-  AND has_function_privilege('service_role', 'public.create_missing_bat_auction_events(integer, bigint, text, integer)', 'EXECUTE'));
+  NOT has_function_privilege('anon', 'public.create_missing_bat_auction_events(integer, bigint, text, integer, boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.create_missing_bat_auction_events(integer, bigint, text, integer, boolean)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.create_missing_bat_auction_events(integer, bigint, text, integer, boolean)', 'EXECUTE'));
 SELECT pg_temp.ok('fixed search_path ending in pg_temp',
   (SELECT proconfig @> ARRAY['search_path=public, pg_temp'] FROM pg_proc
-   WHERE oid = 'public.create_missing_bat_auction_events(integer, bigint, text, integer)'::regprocedure));
+   WHERE oid = 'public.create_missing_bat_auction_events(integer, bigint, text, integer, boolean)'::regprocedure));
 
 -- Guards ------------------------------------------------------------------------------------------------------
 SET statement_timeout = 0;
@@ -307,11 +352,11 @@ SELECT pg_temp.ok('start blocks at or past the end return done without error',
 SELECT pg_temp.ok('evidence spans many heap blocks',
   pg_relation_size('public.vehicle_events') / current_setting('block_size')::bigint > 20);
 CREATE TEMP TABLE walk(run text, step int, result jsonb);
-CREATE FUNCTION pg_temp.walk(p_run text, p_source text, p_batch int, p_scan int) RETURNS void LANGUAGE plpgsql AS $$
+CREATE FUNCTION pg_temp.walk(p_run text, p_source text, p_batch int, p_scan int, p_fire boolean DEFAULT true) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE r jsonb; b bigint := 0; i int := 0;
 BEGIN
   LOOP
-    r := public.create_missing_bat_auction_events(p_batch, b, p_source, p_scan);
+    r := public.create_missing_bat_auction_events(p_batch, b, p_source, p_scan, p_fire);
     i := i + 1;
     INSERT INTO walk VALUES (p_run, i, r);
     EXIT WHEN (r->>'done')::boolean OR i > 100000;
@@ -339,6 +384,7 @@ SELECT pg_temp.ok('bat_listings pass: every evidence row counted once, by reason
     'implausible_price', 1,          -- lot-bl-cheap at $50
     'lot_exists', 1,                 -- lot-blx already on 'holder'
     'conflicting_evidence', 1,       -- ended with a sale price
+    'no_slug', 1,                    -- https://bringatrailer.com/listing/ (fix 2: counted, not dropped)
     'same_lot_other_row', 1)         -- the second slash spelling of lot-bl-slash
   AND pg_temp.total('bl1', 'evidence_rows_scanned') = (SELECT count(*) FROM public.bat_listings)
   AND pg_temp.total('bl1', 'created') + (SELECT sum(value::int) FROM jsonb_each_text(pg_temp.skips('bl1')))
@@ -369,17 +415,21 @@ SELECT pg_temp.ok('cursor: starts at 0; each call starts where the last ended; n
   AND NOT EXISTS (SELECT 1 FROM walk WHERE run = 've1'
                   AND (result->>'next_block')::bigint - (result->>'from_block')::bigint > 1)
   AND NOT EXISTS (SELECT 1 FROM walk WHERE run = 've1' AND (result->>'created')::int > 1));
-SELECT pg_temp.ok('vehicle_events pass: creates sold, bidto, slash, nobl and nothing else',
-  pg_temp.total('ve1', 'created') = 4 AND pg_temp.total('ve1', 'created_sold') = 2 AND pg_temp.total('ve1', 'created_bid_to') = 2
+SELECT pg_temp.ok('vehicle_events pass: creates sold, bidto, slash, nobl, spell and nothing else',
+  pg_temp.total('ve1', 'created') = 5 AND pg_temp.total('ve1', 'created_sold') = 2 AND pg_temp.total('ve1', 'created_bid_to') = 3
   AND pg_temp.total('ve1', 'insert_conflicts') = 0
   AND (SELECT count(*) FROM public.auction_events a JOIN v ON v.id = a.vehicle_id
-       WHERE a.raw_data->>'extractor' = 'create_missing_bat_auction_events' AND v.name IN ('sold', 'bidto', 'slash', 'nobl')) = 4);
+       WHERE a.raw_data->>'extractor' = 'create_missing_bat_auction_events' AND v.name IN ('sold', 'bidto', 'slash', 'nobl', 'spell')) = 5);
 SELECT pg_temp.ok('vehicle_events pass: every evidence row counted once, by reason',
   pg_temp.skips('ve1') = jsonb_build_object(
-    'lot_exists', 202,                -- 200 BaT filler rows on lot-x, exists_other (lot-x), exists_case (LOT-Y/)
-    'vehicle_missing', 1, 'vehicle_retired', 1, 'lot_on_several_vehicles', 2, 'read_while_live', 1,
+    'lot_exists', 203,                -- 200 BaT filler rows on lot-x, exists_other (lot-x), exists_case (LOT-Y/),
+                                      -- and the lot-spell row (its lot was created from LOT-SPELL/contact one block earlier)
+    'vehicle_missing', 1, 'vehicle_retired', 1,
+    'lot_on_several_vehicles', 4,     -- twin_a/b; casea/caseb (lot-case and LOT-CASE: one slug)
+    'read_while_live', 1,
     'implausible_price', 1, 'no_result', 2,     -- noresult; filler's lot-bl-owned (ended, no price)
-    'conflicting_evidence', 5)        -- endedsale, disagree, versions x2, future
+    'conflicting_evidence', 7,        -- endedsale, disagree, versions x2, future, spellx x2 (one row under www.)
+    'no_slug', 1)                     -- https://bringatrailer.com/listing/?ref=feed
   AND pg_temp.total('ve1', 'evidence_rows_scanned') = (SELECT count(*) FROM public.vehicle_events WHERE source_platform = 'bat')
   AND pg_temp.total('ve1', 'created') + (SELECT sum(value::int) FROM jsonb_each_text(pg_temp.skips('ve1')))
       = (SELECT count(*) FROM public.vehicle_events WHERE source_platform = 'bat'));
@@ -400,6 +450,12 @@ SELECT pg_temp.ok('URL stored without the trailing slash; metadata handles used 
           AND auction_end_date = timestamptz '2026-01-20 18:00Z' AND seller_name = 'sellerS')
   AND EXISTS (SELECT 1 FROM public.auction_events WHERE vehicle_id = pg_temp.vid('nobl') AND winning_bidder = 'buyerN'
               AND seller_name = 'sellerN' AND auction_end_date = timestamptz '2026-01-02 19:05Z'));
+SELECT pg_temp.ok('URL spellings of one lot: one lot at the canonical URL, evidence URL kept; disagreeing or multi-vehicle spellings create nothing',
+  (SELECT count(*) FROM public.auction_events WHERE vehicle_id = pg_temp.vid('spell')) = 1
+  AND EXISTS (SELECT 1 FROM public.auction_events WHERE vehicle_id = pg_temp.vid('spell')
+              AND source_url = 'https://bringatrailer.com/listing/lot-spell' AND outcome = 'bid_to' AND high_bid = 9000
+              AND raw_data->'evidence'->>'evidence_url' = 'https://bringatrailer.com/listing/LOT-SPELL/contact')
+  AND NOT EXISTS (SELECT 1 FROM public.auction_events WHERE vehicle_id IN (pg_temp.vid('spellx'), pg_temp.vid('casea'), pg_temp.vid('caseb'))));
 SELECT pg_temp.ok('transfer trigger fired once per created sold lot, never for bid_to',
   (SELECT count(*) FROM net.calls) = (SELECT count(*) FROM public.auction_events
                                       WHERE raw_data->>'extractor' = 'create_missing_bat_auction_events' AND outcome = 'sold')
@@ -435,7 +491,8 @@ SELECT pg_temp.ok('comment pass: creates only the unanimous feed lot; every row 
     'no_comment_vehicle', 1,            -- lot-bl-feed
     'comment_vehicles_dissent', 2,      -- lot-cv-dissent (two vehicles), lot-cv-novehicle (a comment with no vehicle)
     'vehicle_missing', 1,               -- lot-cv-gone
-    'implausible_price', 1)             -- lot-cv-cheap
+    'implausible_price', 1,             -- lot-cv-cheap
+    'no_slug', 1)                       -- https://bringatrailer.com/listing/
   AND pg_temp.total('cv1', 'created') + (SELECT sum(value::int) FROM jsonb_each_text(pg_temp.skips('cv1')))
       = (SELECT count(*) FROM public.bat_listings));
 SELECT pg_temp.ok('comment-vehicle lot: the comments'' vehicle, feed price and exact feed end time, basis and count cited, no handles',
@@ -461,7 +518,7 @@ SELECT pg_temp.ok('second walk creates nothing and leaves every lot unchanged',
   AND (pg_temp.skips('cv2')->>'lot_exists')::int = 7
   AND (SELECT count(*) FROM public.auction_events) = (SELECT count(*) FROM lots_after1)
   AND NOT EXISTS (SELECT * FROM lots_after1 EXCEPT SELECT * FROM public.auction_events)
-  AND (pg_temp.skips('ve2')->>'lot_exists')::int = 206 AND (SELECT count(*) FROM net.calls) = 4);
+  AND (pg_temp.skips('ve2')->>'lot_exists')::int = 208 AND (SELECT count(*) FROM net.calls) = 4);
 
 -- Batch cap inside one wide window: three creatable lots, p_batch 1 -----------------------------------------------
 INSERT INTO public.vehicles (id) SELECT id FROM (VALUES (gen_random_uuid()), (gen_random_uuid()), (gen_random_uuid())) z(id);
@@ -474,6 +531,25 @@ SELECT pg_temp.ok('p_batch caps lots per call (one row per block here); the curs
   pg_temp.total('cap', 'created') = 3 AND (SELECT count(*) FROM walk WHERE run = 'cap' AND (result->>'created')::int = 1) = 3
   AND NOT EXISTS (SELECT 1 FROM walk WHERE run = 'cap' AND (result->>'created')::int > 1)
   AND (SELECT count(*) FROM public.auction_events WHERE source_url LIKE '%/lot-cap-%') = 3);
+
+-- p_fire_transfers false: the lot is created, no transfer call; the setting does not outlive the call ---------------
+INSERT INTO public.vehicle_events (vehicle_id, source_platform, source_url, event_status, final_price, current_price)
+VALUES (pg_temp.vid('quiet'), 'bat', pg_temp.u('lot-quiet'), 'sold', 27000, 27000);
+SELECT pg_temp.walk('quiet', 'vehicle_events', 25, 5000, false);
+SELECT pg_temp.ok('p_fire_transfers false: sold lot created, transfer trigger skipped, result says so',
+  pg_temp.total('quiet', 'created_sold') = 1
+  AND EXISTS (SELECT 1 FROM public.auction_events WHERE vehicle_id = pg_temp.vid('quiet') AND outcome = 'sold')
+  AND (SELECT count(*) FROM net.calls) = 4
+  AND NOT EXISTS (SELECT 1 FROM walk WHERE run = 'quiet' AND (result->>'fire_transfers')::boolean));
+CREATE TEMP TABLE guc(v text);
+DO $$ BEGIN
+  PERFORM public.create_missing_bat_auction_events(25, 0, 'vehicle_events', 1, false);
+  INSERT INTO guc VALUES (coalesce(current_setting('app.seed_transfers', true), ''));
+END $$;
+INSERT INTO public.auction_events (vehicle_id, source, source_url, outcome)
+VALUES (pg_temp.vid('holder'), 'bat', pg_temp.u('lot-after-quiet'), 'sold');
+SELECT pg_temp.ok('app.seed_transfers is reset inside the calling transaction; later sold lots seed transfers again',
+  (SELECT v FROM guc) = '' AND (SELECT count(*) FROM net.calls) = 5);
 
 -- End to end: lane L's keying function keys the waiting comments to the new lots -----------------------------------
 \ir ../migrations/20261006110000_key_auction_comment_lots.sql
@@ -492,5 +568,24 @@ SELECT pg_temp.ok('comments on created lots are keyed; comments on skipped lots 
   AND (SELECT count(*) FROM public.auction_comments WHERE auction_event_id IS NULL) = 19
   AND NOT EXISTS (SELECT 1 FROM public.auction_comments WHERE auction_event_id IS NULL AND vehicle_id IS NOT NULL
                   AND vehicle_id NOT IN (SELECT pg_temp.vid(n) FROM unnest(ARRAY['gone','cheap','cv2a','cv2b','cv3','gone2','cv6']) n)));
+
+-- Drift guard: a transfer trigger body that is neither the live one nor this migration's is refused and left alone --
+CREATE OR REPLACE FUNCTION public.auto_create_transfer_on_auction_close()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN NEW;  -- drifted fixture
+END;
+$function$;
+SELECT md5(pg_get_functiondef('public.auto_create_transfer_on_auction_close()'::regprocedure)) AS drifted_fp \gset
+\echo The ERROR below is the drift guard of the migration refusing a drifted trigger body: the expected result.
+\set ON_ERROR_STOP off
+\ir ../migrations/20261006131500_create_missing_bat_auction_events.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.ok('drifted trigger body: migration refused, definition untouched, writer still in place',
+  md5(pg_get_functiondef('public.auto_create_transfer_on_auction_close()'::regprocedure)) = :'drifted_fp'
+  AND to_regprocedure('public.create_missing_bat_auction_events(integer,bigint,text,integer,boolean)') IS NOT NULL);
 
 SELECT 'test_missing_bat_lots: all contracts passed' AS result;
