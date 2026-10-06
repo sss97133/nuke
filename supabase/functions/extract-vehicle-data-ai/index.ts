@@ -12,6 +12,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { listingPriceColumns } from './priceColumns.ts'
+import { insertRefusal } from './insertRefusal.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -589,6 +590,13 @@ Deno.serve(async (req) => {
             .maybeSingle()
           if (insertErr) {
             console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
+            // Return the refusal. Falling through answered success with vehicle_id null, and the queue
+            // processors then marked the row complete with no vehicle. See insertRefusal.ts.
+            const refusal = insertRefusal(insertErr, normalized, url)
+            return new Response(JSON.stringify(refusal.body), {
+              status: refusal.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
           } else if (inserted?.id) {
             vehicleId = inserted.id
             console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
