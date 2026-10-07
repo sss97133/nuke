@@ -15,8 +15,9 @@
 --   * 1995-lot-f-frames: live frames give the scheduled close, six minutes before the final one; a prediction between the two
 --     is not written; the T-2 horizon is available;
 --   * 1996-lot-g-nullend: no auction_end_date, the close is predicted_at + hours_remaining; 2005-lot-q: no close clock at all;
---   * a vehicle with two lots: the prediction goes to the one whose close fits; two lots that both fit leave it held; a lot
---     whose close is far from the prediction's own is held; two sold rows with different hammers are held;
+--   * a vehicle with two lots: the prediction goes to the one whose close fits, or whose hammer the bid it saw does not pass;
+--     two lots that both fit leave it held; a lot whose close is far from the prediction's own is held; a bid above the only
+--     lot's hammer is held; two sold rows with different hammers are held;
 --   * one lot under two vehicles with a stale live duplicate row: one lot, the sold row;
 --   * legacy grades (score_closed_predictions): kept, keyed, a disagreement with the lot counted, never overwritten;
 --   * no lot key, no lot row.
