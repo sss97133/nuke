@@ -159,6 +159,10 @@ jobs:
         run: createdb dm_readiness_placeholder_rows_ci
       - name: Verify failed analysis runs add nothing to auction readiness, genuine signals still do, one statement of the body changed, grants unchanged, a drifted body refused
         run: psql -X -v ON_ERROR_STOP=1 -d dm_readiness_placeholder_rows_ci -f supabase/sql/test_compute_auction_readiness_placeholders.sql
+      - name: Create disposable live-lot reader database
+        run: createdb dm_refinement_live_lot_reader_ci
+      - name: Verify the live-lot reader grades a lot against comparables the same time before their close, reads point in time, names a cohort miss, uses the scheduled close in the last minutes, stays service_role-only and writes nothing
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_lot_reader_ci -f supabase/sql/test_live_lot_reader.sql
       - name: Create disposable lot identity arrival database
         run: createdb dm_refinement_auction_event_identity_arrival_ci
       - name: Verify an arriving BaT identity keys the lots waiting for it (never a stop word, contradicted text, a set key, another platform or case), skips held rows, caps its work, never fails the identity insert, and reads auction_events only through the partial indexes
