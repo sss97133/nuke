@@ -48,7 +48,7 @@ Units are lots, not rows, and every rate names its denominator. Hand-read on pro
 |---|---|---|
 | Settled BaT lots held | 106,551 with a sale price, of 174,518 listings; 93,135 of the sold keyed to a vehicle; 1,216 settled since 2026-09-27 | `bat_listings` |
 | Price predictions | 53,922 hourly rows, 46,093 keyed to their lot (`auction_event_id`, PR #774); lots predicted per model: v24 995, v30 980, v31 1,342 | `hammer_predictions`, 2026-10-07 09:00Z |
-| Graded error, per lot (last prediction before close, against `auction_events` outcomes) | 1,997 sold lots graded (ten at 03:30Z the same day). v31, live: 751 lots, median abs error 26.2%, bias +16.2%, 80% band holds the hammer on 591 (78.7%); v30: 489 lots, 30.7%, band 74.6%; v24: 747 lots, 24.3%, bias −13.2%, 50% band holds 25.8%; v13: 10 lots, 12.0% | `prediction_accuracy` (lots as the unit since PR #774), 2026-10-07 09:00Z |
+| Graded error, per lot (the last prediction before each lot's close: the scheduled close where live frames hold it, the final close otherwise; against `auction_events` outcomes) | 1,997 sold lots graded (ten at 03:30Z the same day). v31, live: 751 lots, median abs error 26.2%, bias +16.2%, 80% band holds the hammer on 591 (78.7%); v30: 489 lots, 30.7%, band 74.6%; v24: 747 lots, 24.3%, bias −13.2%, 50% band holds 25.8%; v13: 10 lots, 12.0% | `prediction_accuracy` (lots as the unit since PR #774), 2026-10-07 09:00Z |
 | Prediction to outcome key | 46,093 of 53,922 rows keyed to their lot by `auction_event_id` and graded against `auction_events` outcomes, not through the vehicle key (which landed on 6 settled listings) | PR #774, walk finished 2026-10-07 08:51Z |
 | Stack registry | 64 stacks; 5 at or above 0.9 coverage; mean 0.12; order book SA v2 at 0.50 (8 of 16 needs present, 2 partial, 6 missing) | `v_stacks`, 03:11Z |
 | Buyer concentration (V012 discovery) | 68,957 distinct BaT buyers; top 1% took 14% of lots; 39 won 50 or more | `vein_ledger` |
@@ -87,7 +87,8 @@ For a funder who funds R&D, the question is one sentence with a grading rule:
 The unproven parts, each a Phase I objective:
 
 0. **The outcome join.** Done 2026-10-07 08:51Z (PR #774): every prediction keyed to its lot and graded against the
-   lot's outcome at the last prediction before close; 1,997 sold lots graded, up from ten that morning. The bar: the
+   lot's outcome at the last prediction before each lot's close (the scheduled close where live frames hold it, 282
+   of model 31's lots; the final close otherwise, 469); 1,997 sold lots graded, up from ten that morning. The bar: the
    live model's median absolute error of 26.2% per lot, with an 80% interval that holds the hammer 78.7% of the time
    (751 lots): calibrated, and wide.
 1. **Condition and configuration from images and text**, at the accuracy the error demands. Today 0.5% of images are
@@ -276,13 +277,13 @@ Language and vision models have a defined role: they are sensors, never sources.
 
 Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: about 157,000 settled Bring a Trailer lots, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
 
-**2. The Technical Objectives and Challenges** (2,658 of 3,500 characters)
+**2. The Technical Objectives and Challenges** (2,762 of 3,500 characters)
 
 The research question: can point-in-time state, estimated from heterogeneous untrusted observations that each keep their source, clock and relation to the asset, predict an asset's clearing price with a graded per-lot error, and keep correcting that prediction inside the two-minute closing window as bids and comments arrive?
 
 Phase I objectives, each graded in the same public table.
 
-0. The outcome join. Grade every prediction the system has made against the recorded hammer, per lot, point-in-time, at n ≥ 1,000 lots. Done 2026-10-07: 1,997 sold lots graded at the last prediction before close; the live model's median absolute error is 26.2% per lot and its 80% interval holds the hammer 78.7% of the time (751 lots). That is the bar.
+0. The outcome join. Grade every prediction the system has made against the recorded hammer, per lot, point-in-time, at n ≥ 1,000 lots. Done 2026-10-07: 1,997 sold lots graded at the last prediction before each lot's close (the scheduled close where live frames hold it, the final close otherwise); the live model's median absolute error is 26.2% per lot and its 80% interval holds the hammer 78.7% of the time (751 lots), close to nominal. That is the bar.
 1. Condition and configuration from images and text. Vision and text extraction producing attributed condition observations. Success: a measured reduction in median absolute per-lot error against the objective-0 baseline, on a held-out final month, by price tier.
 2. Relation-weighted credibility. Weight each claim by the claimant's relation to the asset and their record on earlier claims. Success: lift on the outcome (above or below the cohort median at close) with an 80% interval excluding 1, on held-out lots.
 3. Leakage-free replay at scale. A replay engine that recomputes every feature for every past moment from prior events only, over 20 million comments. Success: a passing leakage audit and a per-horizon error curve at 120, 48, 24, 12, 6 and 2 hours before close.
