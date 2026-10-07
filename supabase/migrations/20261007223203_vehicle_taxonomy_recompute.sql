@@ -257,7 +257,8 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public,pg_temp SET statemen
  failures AS (SELECT count(*) n,count(*) FILTER(WHERE consecutive_failures=3) paused FROM public.vehicle_taxonomy_recompute_queue WHERE consecutive_failures>0),
  s AS (SELECT * FROM public.vehicle_taxonomy_replay_state WHERE id)
  SELECT jsonb_build_object('status',CASE WHEN failures.n>0 THEN 'failed'
-   WHEN pending.n+ingress.n>0 AND coalesce(s.last_batch_at,s.started_at)<statement_timestamp()-interval '15 minutes' THEN 'failed'
+   WHEN (s.scan_completed_at IS NULL OR pending.n+ingress.n>0)
+     AND coalesce(s.last_batch_at,s.started_at)<statement_timestamp()-interval '15 minutes' THEN 'failed'
    WHEN s.scan_completed_at IS NULL OR pending.n+ingress.n>0 OR s.binding_overflow_events>0 THEN 'partial' ELSE 'passed' END,
   'scope','retained_cache_replay_and_incremental_dirty_vehicle_inputs','state',to_jsonb(s)-'vin_cursor',
   'pending',pending.n,'pending_invalidations',ingress.n,'oldest_due_at',pending.oldest,'record_failures',failures.n,'paused_failures',failures.paused,

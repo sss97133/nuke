@@ -29,6 +29,9 @@ SELECT fixture_assert(derive_vehicle_taxonomy('1DDDDDDDDDDDDDDD4',NULL)->>'refer
 SELECT fixture_assert(derive_vehicle_taxonomy('1EEEEEEEEEEEEEEE5',NULL)->>'reference_status'='provider','other provider withheld');
 SELECT fixture_assert(derive_vehicle_taxonomy('SHORT123456','sedan')->>'canonical_body_style'='SEDAN','physical style survives bad reference');
 SELECT fixture_assert(assay_vehicle_taxonomy_fold()->>'status'='partial','initial replay not prematurely passed');
+UPDATE vehicle_taxonomy_replay_state SET started_at=now()-interval '16 minutes';
+SELECT fixture_assert(assay_vehicle_taxonomy_fold()->>'status'='failed','never-started replay stalls visible even with empty queue');
+UPDATE vehicle_taxonomy_replay_state SET started_at=now();
 SELECT drain_vehicle_taxonomy_queue();
 SELECT fixture_assert((SELECT canonical_body_style='COUPE' FROM vehicles WHERE id='11111111-1111-1111-1111-111111111111'),'retained source reaches canonical column');
 SELECT fixture_assert((SELECT fixture_updates=1 FROM vehicles WHERE id='11111111-1111-1111-1111-111111111111'),'one real update');
