@@ -1,3 +1,7 @@
+// Redeployed 2026-10-07 (lead skylar-64): the deployed bundle dated 2026-04-12 booted (function_logs 'booted' 23-29 ms) but
+// never answered a GET (no function_edge_logs row within 15 s) while api-v1-vehicle-auction answered 401 in 0.3 s with the
+// same _shared/apiKeyAuth.ts; rate_limits is 473 rows with no lock waiters. This commit changes no behavior; it makes CI
+// deploy the current source so the probe measures today's code. Probe: curl -sS -o /dev/null -w '%{http_code} %{time_total}s' --max-time 15 <function url>
 /**
  * API v1 - Search
  *
