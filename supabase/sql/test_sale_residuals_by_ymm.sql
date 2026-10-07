@@ -55,6 +55,7 @@ INSERT INTO vehicle_location_observations VALUES
  -- A newer unrelated listing cannot move either sale's county.
  ('20000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','listing','https://bringatrailer.com/listing/unrelated/','2025-05-04','2025-05-04','US',0.9,'06037');
 \ir ../migrations/20261007183841_sale_residuals_by_ymm.sql
+\ir ../migrations/20261007191200_qualify_sale_residual_county_country.sql
 SELECT pg_temp.ok('service role only, invoker, fixed path',
  has_function_privilege('service_role','sale_residuals_by_ymm(integer,text,text,date,text)','EXECUTE')
  AND NOT has_function_privilege('anon','sale_residuals_by_ymm(integer,text,text,date,text)','EXECUTE')
@@ -75,6 +76,22 @@ SELECT pg_temp.ok('denominators and absent metrics explicit',
  (SELECT j#>>'{coverage,county_residuals}'='2' AND j->'sell_through'='null'::jsonb
  AND j->'days_to_sale'='null'::jsonb AND j->>'knowledge_mode'='retrospective'
  AND j->'source_receipt' IS NOT NULL FROM result));
+BEGIN;
+UPDATE vehicle_location_observations SET country_code=NULL;
+SELECT pg_temp.ok('unknown country qualifies only through the canonical US county entity',
+ sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')#>>'{coverage,county_keyed_sales}'='2'
+ AND sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')->>'method'='sale_residual_month_start_v2');
+UPDATE vehicle_location_observations SET country_code='CA';
+SELECT pg_temp.ok('explicit non-US country contradicts a US county key and is refused',
+ sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')#>>'{coverage,county_keyed_sales}'='0'
+ AND sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')#>>'{coverage,residuals}'='2');
+UPDATE vehicle_location_observations SET country_code='';
+SELECT pg_temp.ok('unrecognized country spelling is not silently treated as unknown',
+ sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')#>>'{coverage,county_keyed_sales}'='0');
+UPDATE vehicle_location_observations SET country_code=NULL,county_fips='_none';
+SELECT pg_temp.ok('unknown country without a registered US county stays withheld',
+ sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')#>>'{coverage,county_keyed_sales}'='0');
+ROLLBACK;
 SELECT pg_temp.ok('open month refused',sale_residuals_by_ymm(1970,'Synthetic','Coupe',date_trunc('month',now())::date)?'error');
 SELECT pg_temp.ok('invalid month refused',sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-02')?'error');
 SELECT pg_temp.ok('unknown units refused',sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01','CAD')?'error');
@@ -143,5 +160,5 @@ BEGIN;
 SELECT pg_temp.ok('same statement replay is deterministic',
  sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01')=sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-03-01'));
 ROLLBACK;
-\ir ../migrations/20261007183841_sale_residuals_by_ymm.sql
+\ir ../migrations/20261007191200_qualify_sale_residual_county_country.sql
 SELECT pg_temp.ok('reapply preserves access',NOT has_function_privilege('anon','sale_residuals_by_ymm(integer,text,text,date,text)','EXECUTE'));

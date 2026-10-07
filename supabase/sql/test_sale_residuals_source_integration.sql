@@ -14,12 +14,13 @@ CREATE INDEX ON public.vehicle_location_observations(vehicle_id,observed_at DESC
 CREATE TABLE public.us_county_boundaries(fips text PRIMARY KEY);
 INSERT INTO public.us_county_boundaries VALUES('32003');
 INSERT INTO public.vehicle_location_observations VALUES(md5('location-11')::uuid,md5('vehicle-11')::uuid,
- 'listing','https://bringatrailer.com/listing/synthetic-11/','2025-07-16','2025-07-16','US',0.9,'32003');
+ 'listing','https://bringatrailer.com/listing/synthetic-11/','2025-07-16','2025-07-16',NULL,0.9,'32003');
 \ir ../migrations/20261007183841_sale_residuals_by_ymm.sql
+\ir ../migrations/20261007191200_qualify_sale_residual_county_country.sql
 DO $$ DECLARE r jsonb:=sale_residuals_by_ymm(1970,'Synthetic','Coupe','2025-07-01'); BEGIN
  PERFORM pg_temp.ok('real source parser and price owner feed the residual baseline',
  r#>>'{baseline,n}'='10' AND (r#>>'{baseline,median}')::numeric=5500);
- PERFORM pg_temp.ok('real source receipt reaches residual and listing county',
+ PERFORM pg_temp.ok('real source receipt reaches residual and canonical US county with unknown country',
  r#>>'{coverage,residuals}'='1' AND abs((r#>>'{sales,0,log_residual}')::numeric-ln(2::numeric))<0.000000001
  AND r#>>'{sales,0,county_fips}'='32003'
  AND r#>>'{sales,0,snapshot_id}'=md5('snapshot-11')::uuid::text);
