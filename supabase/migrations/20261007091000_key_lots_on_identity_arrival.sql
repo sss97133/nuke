@@ -58,6 +58,9 @@
 -- column, so trg_key_auction_event_identities_upd does not fire, updated_at is untouched, and no identity is minted. A
 -- case-different text (the lower-cased feed handles) is not matched here: that is the comment-side fallback of
 -- 20261007090000, reached by the next write of the text or by the backfill.
+-- A lot and its identity committed at the same moment can miss each other: the lot's insert trigger runs before the identity is
+-- visible, and the identity's trigger runs before the lot is. The window is one transaction wide (the landers' writes are
+-- separate requests; the lot and identity quoted above are 141 ms apart); the assay counts such a lot and the backfill keys it.
 -- Contradicting evidence is judged on what the lot holds at that moment. extract-bat-core writes its comments after the
 -- identities, so the same read's bids are not there yet: the same limit the insert trigger has, and a set key is never
 -- touched afterwards.
