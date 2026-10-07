@@ -1388,3 +1388,50 @@ where you could own something or not."
    direction under a dated header that points at the operating description. The one-line descriptions that agents read
    first (`AGENTS.md`, the owner's private instructions) are the owner's to change; the recommendation is the README's
    first sentence.
+
+### 13.7 The owner on the CLI auction coach (2026-10-07)
+
+**Owner direction (substance kept).** The simplest product demo is in the `nuke` CLI: "you just drop the URL to the
+auction and it spins and tells you what to do", "the modern sniper bidding, and it can coach you". "We want our own
+model to help with that decision-making." Then connectors and MCP, then the website: "the core machinery of that is the
+same; if we get it working in CLI it works everywhere else." On how to talk about it: storing data goes without saying
+("everybody knows we're already storing all the data"); talk about what the model does: "we have the best data model for
+predictions, we are the prediction model." The README leads with prediction from this date.
+
+**Lead's reading (nothing minted):**
+1. **The verb:** `nuke lot <bat-url> [--watch] [--max N]`. Run once, it prints the read. With `--watch` it re-reads on a
+   cadence that tightens toward the close (every 60 s, then every 5 s in the last 3 minutes). At the hammer it prints
+   the outcome against the forecast, so every coached lot is a prediction row with its outcome row.
+2. **What exists to reuse, read 2026-10-07:**
+   - `live_lot_temperature(vehicle_id)` places the lot's bid and bidders against comparable sold lots at the same hours
+     to close. Example: a 2019 Ferrari 488 Spider, closing 15:01Z, bid $255,000, was above 18 of 39 comparables 16.4 h
+     out.
+   - The hammer band (`hammer_predictions` model 31) and the curve (share of the final price reached at h hours left,
+     36,700 sales, `market_pulse_live()`).
+   - The temperature backtest (BaT coverage audit §5): 69,295 lots, hot 86.8% and cold 11.3% above the band middle
+     24 h out.
+   - The stack A page, `/stacks/order-book/:vehicleId`.
+3. **Gaps, in order:**
+   - **(a) Freshness.** The database's read of a live lot can be hours old. The 488's last read was 22:34Z for a 15:01Z
+     close, still the latest at 03:51Z. In the last minutes the CLI reads the lot page itself (one public page,
+     throttled) and passes the live bid, bidders and clock to the machine.
+   - **(b) A reader that takes the live state.** The function reads a stored vehicle's stored state. It needs a form
+     taking (lot, bid, bidders, at) and grading against the same point-in-time comparables.
+   - **(c) The last two minutes.** The curve is measured in hours. Minutes to close need bid frames at second precision
+     (the `bat_bids` copy stopped 2026-10-05). This is stack A's missing prediction layer.
+   - **(d) Cohort misses.** A lot whose model text matches no cohort says so with its denominator. Example: a 2003 GMC
+     Sierra 2500HD whose model field carries the cab and engine, with 0 comparables.
+   - **(e) Auth.** The CLI reaches the reader through the `api-v1` key system, not anon RPC.
+4. **The coaching starts deterministic:**
+   - where the lot stands against its cohort, and the expected hammer band with its n;
+   - the user's `--max` against that band;
+   - BaT's soft close: a bid in the last two minutes resets the clock, so the play is one bid at your max, late, not a
+     snipe.
+
+   The house model comes after the outcome ledger, which is what calibrates it.
+5. **Order and acceptance:**
+   1. The live-state reader, plus a replay at T-2 min on past lots. Acceptance: the 80% band holds the hammer on 80%
+      ± 5% of replayed lots.
+   2. The `api-v1` route.
+   3. The CLI verb.
+   4. The MCP tool and the web page, on the same reader.
