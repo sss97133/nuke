@@ -88,6 +88,18 @@ it('puts coverage first, every number with its denominator, then the nine layers
   expect(container.querySelector('[data-coverage="key_conflicts"]')).toBeNull();
 });
 
+it('puts the forecast panel after the coverage block and before the nine layers, and for a closed lot makes no forecast', async () => {
+  await render();
+  const coverage = container.querySelector('.stack-coverage')!;
+  const forecast = container.querySelector('.stack-forecast')!;
+  const path = container.querySelector('.stack-path')!;
+  expect(coverage.compareDocumentPosition(forecast) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(forecast.compareDocumentPosition(path) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(forecast.getAttribute('data-forecast')).toBe('closed');
+  expect(forecast.textContent).toContain('Its result is in the Outcome layer.');
+  expect(forecast.textContent).not.toMatch(/\$\d/);
+});
+
 it('opens on the fold and moves the book to the chosen bid, using only bids posted by then', async () => {
   await render();
   expect(container.querySelector('.stack-asof')?.textContent).toContain('3 of 3');

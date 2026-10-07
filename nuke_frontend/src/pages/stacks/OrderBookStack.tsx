@@ -9,6 +9,7 @@ import {
   type BidEvent, type CommentRow, type FoldState, type OrderBookRead, type OrderBookView,
 } from './orderBookReader';
 import { CoverageTable, LayerPath } from './stackParts';
+import { ForecastPanel } from './ForecastPanel';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
 import './stacks.css';
 
@@ -594,6 +595,8 @@ export default function OrderBookStack() {
       )}
 
       <CoverageTable rows={view.coverage} readAt={readAt} caption="this lot" onOpen={(id) => setParam('layer', id === 'fold' ? null : id)} />
+
+      <ForecastPanel read={read} view={view} />
 
       <LayerPath layers={STACK.layers} current={layer} readings={readings} onSelect={(id) => setParam('layer', id === 'fold' ? null : id)} />
 
