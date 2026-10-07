@@ -16,6 +16,11 @@
  *   ... --live --receipts <file.jsonl> [--resume] [--limit N] [--sleep-ms 500] [--stop-file <path>]
  *       [--require-registered] [--subject-org-id <uuid>]
  *
+ * WRITE BOUNDARY. It calls ingest-observation only. It never writes vehicle_observations or any other table itself: its
+ * database access is read-only SQL inside `begin read only`, and every observation goes through the sanctioned writer.
+ * The launchd plist for the NSF run (~/Library/LaunchAgents/ag.nuke.declared-source-nsf.plist) stays unloaded until the
+ * owner approves the two add_source proposals (sbir-gov-awards, nsf-awards-api); its runner passes --require-registered.
+ *
  * Without --live it only reads: the registry through the Supabase Management API inside `begin read only` (as q.sh and
  * readme-stats.mjs do) and the file. It prints the mapping report and the first payloads. With --live it POSTs one
  * observation per award to the deployed ingest-observation with the service-role bearer, the only write it makes.
