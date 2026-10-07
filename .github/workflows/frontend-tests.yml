@@ -171,6 +171,10 @@ jobs:
         run: createdb dm_refinement_schema_proposal_add_source_ci
       - name: Verify an approved add_source proposal registers its source from the payload (duplicate slugs kept, malformed payloads refused, proposal left open), the other branches unchanged, the body prod plus one branch, a drifted body refused
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_schema_proposal_add_source_ci -f supabase/sql/test_schema_proposal_add_source_contract.sql
+      - name: Create disposable per-lot grader database
+        run: createdb dm_refinement_grade_hammer_predictions_ci
+      - name: Verify hammer predictions are keyed to their lot and graded by it (hammer from auction_events only, scheduled/final/predicted close named, held rows counted by reason), idempotent, receipted under the declared writer, service_role only, lots as the unit in the views, a changed prediction_accuracy refused
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_grade_hammer_predictions_ci -f supabase/sql/test_grade_hammer_predictions_by_lot.sql
 
   image-projection:
     runs-on: ubuntu-latest
