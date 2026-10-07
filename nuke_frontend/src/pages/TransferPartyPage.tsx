@@ -264,6 +264,7 @@ export default function TransferPartyPage() {
         body: JSON.stringify({
           action: 'advance_manual',
           transfer_id: transferId,
+          access_token: token,
           milestone_type: milestoneType,
           notes: `Confirmed by ${role} via transfer page`,
         }),

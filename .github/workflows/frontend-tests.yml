@@ -220,6 +220,19 @@ jobs:
         run: createdb dm_refinement_field_evidence_read_ci
       - name: Verify anonymous readers no longer see money-source rows or person-name fields in field_evidence (listing facts stay public, signed-in and service_role unchanged, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_field_evidence_read_ci -f supabase/sql/test_field_evidence_anon_read.sql
+      - name: Create disposable import queue claim doors database
+        run: createdb dm_refinement_import_queue_claim_ci
+      - name: Verify the import_queue claim functions are service_role only (anon claimed and read rows through them before; anon and authenticated refused after; service_role still claims; the describe sentences rewritten; re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_import_queue_claim_ci -f supabase/sql/test_import_queue_claim_doors.sql
+      - name: Create disposable live auctions view database
+        run: createdb dm_refinement_live_auctions_view_ci
+      - name: Verify live_auctions_view runs with the reader's rights (anon read live monitors through it before; anon and authenticated 0 rows after; service_role reads; definition and grants unchanged; re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_auctions_view_ci -f supabase/sql/test_live_auctions_view_security_invoker.sql
+      - name: Create disposable extraction metadata write policy database
+        run: createdb dm_refinement_extraction_metadata_ci
+      - name: Verify extraction_metadata's write policy is service_role only (anon wrote and deleted rows before; anon and authenticated refused after while still reading; service_role writes; describe clause rewritten; re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_extraction_metadata_ci -f supabase/sql/test_extraction_metadata_write_policy.sql
+
   image-projection:
     runs-on: ubuntu-latest
     services:
