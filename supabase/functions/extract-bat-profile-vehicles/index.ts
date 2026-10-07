@@ -19,10 +19,22 @@ async function sha256Hex(s: string): Promise<string> {
 // city or finer. Returns null when not confidently found — a location is never guessed. Observed rendered shape
 // (2026-10-07): a "Location:" label followed by e.g. "IL, United States". Until validated against live pages,
 // the caller keeps write_location=false so the parsed value is returned for inspection but never written.
+// Anchored on a known-country list so the capture ends cleanly in single-spaced stripped text (a bare
+// comma-pair regex ran into the next section word). A 3-part "City, State, Country" drops the city (masking);
+// a 2-part "State, Country" keeps both. A country not in the list returns null — unknown, never guessed. The
+// list is provisional and must be validated/extended against real member pages before write_location is flipped.
+const MEMBER_LOCATION_COUNTRY =
+  "(United States|USA|U\\.S\\.A\\.|Canada|United Kingdom|UK|Australia|Germany|France|Italy|Spain|Netherlands|" +
+  "New Zealand|Mexico|Japan|Sweden|Switzerland|Belgium|Ireland|Norway|Denmark|Austria|Portugal|Brazil|Finland|" +
+  "Poland|Scotland|England)";
+const MEMBER_LOCATION_RE = new RegExp(
+  "Location:\\s*(?:[A-Za-z][A-Za-z .'-]{0,40}?,\\s*)?([A-Za-z][A-Za-z .'-]{0,40}?),\\s*" +
+  MEMBER_LOCATION_COUNTRY + "\\b",
+);
 function parseMemberLocation(html: string): { state: string; country: string } | null {
   if (!html) return null;
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const m = text.match(/Location:\s*([A-Za-z][A-Za-z .'-]{0,40}?),\s*([A-Za-z][A-Za-z .'-]{1,40}?)\s{2,}/);
+  const m = text.match(MEMBER_LOCATION_RE);
   if (!m) return null;
   const state = m[1].trim();
   const country = m[2].trim();
