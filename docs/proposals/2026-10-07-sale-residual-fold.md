@@ -8,7 +8,7 @@ Read 2026-10-07 18:35–18:40Z. The atlas and catalog have no sale-residual orga
 
 The earlier S01 sizing used raw vehicle columns; its dated-sale totals cannot establish qualified residual coverage. An existing-reader probe of the retained 1963 Corvette cohort returned 21 qualified episodes over September 2023–September 2026, with 1,256 current members, 30 agreeing qualified captures and nine duplicate presentations. Six qualified sales occurred in March 2026. These are source-qualified captured episodes, not the whole market. They demonstrate why a dense scalar population and a qualified-price population must be measured separately.
 
-The geography atlas exposes another boundary: live `observed_at` often means extraction time, and county keys were filled later from ZIP evidence. A vehicle's latest county does not establish its county at a historical sale. The prototype only accepts a county on the same vehicle and normalized BaT listing URL, listing source type, US country, confidence at least 0.5, non-future observation/creation clocks and an existing county key. Conflicting counties and bounded lookup overflow withhold geography. The output explicitly calls this a current county key on same-listing testimony, not a verified sale-time location.
+The geography atlas exposes another boundary: live `observed_at` often means extraction time, and county keys were filled later from ZIP evidence. A vehicle's latest county does not establish its county at a historical sale. The prototype only accepts a county on the same vehicle and normalized BaT listing URL, listing source type, US country or unknown country with a registered US county entity, confidence at least 0.5, non-future observation/creation clocks and an existing county key. Conflicting counties and bounded lookup overflow withhold geography. The output explicitly calls this a current county key on same-listing testimony, not a verified sale-time location.
 
 ## Contract and seven pre-mint questions
 
@@ -36,3 +36,7 @@ The synthetic contract proves repeat sales, disjoint windows, minimum sample, mi
 4. Introduce known-at geography and historical membership only when their evidence exists. Do not rename this retrospective prototype into a backtest.
 
 S01 is partial until persistence, replay, bounded scheduling and runtime throughput are proved. S20 and SA may reuse the grammar, but their distinct residual grains do not become satisfied by this function's existence.
+
+## County qualification repair
+
+The deployed first assay computed six residuals but no counties. An indexed exact vehicle/listing follow-up found five with one registered US county each and NULL country; the sixth had no county key. The forward migration accepts unknown country only through that existing canonical US county relation and refuses explicitly contradictory countries. The method becomes `sale_residual_month_start_v2`; all event, knowledge, same-listing and cap boundaries remain. This changes a derived reader only. It does not rewrite location testimony or establish sale-time geography. Synthetic fixtures and the actual-source integration cover this qualification.
