@@ -661,4 +661,27 @@ SELECT pg_temp.ok('re-applying the S61 file adds nothing',
   AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'S61') = 13
   AND (SELECT count(*) FROM public.stack_substrates g JOIN s61_new_substrates n USING (substrate)) = 12);
 
+-- Version 3 of SA, the prediction layer partial (20261007200000) ----------------------------------------------------
+RESET ROLE;
+\ir ../migrations/20261007200000_stack_sa_v3_prediction_partial.sql
+SELECT pg_temp.ok('SA v3: showable, supersedes 2, nine path entries, same name and question; v2 untouched with 16 needs',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'SA') = 3
+  AND (SELECT status = 'showable' AND supersedes_version = 2 AND cardinality(path) = 9
+       FROM public.stacks WHERE stack_id = 'SA' AND version = 3)
+  AND (SELECT s3.name = s2.name AND s3.question = s2.question AND s3.scoring = s2.scoring
+       FROM public.stacks s2 JOIN public.stacks s3 ON s3.stack_id = s2.stack_id
+       WHERE s2.stack_id = 'SA' AND s2.version = 2 AND s3.version = 3)
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA' AND version = 2) = 16);
+SELECT pg_temp.ok('SA v3 carries 18 needs: the 16 of v2 plus the reader function and the lot key column',
+  (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA' AND version = 3) = 18
+  AND EXISTS (SELECT 1 FROM public.stack_needs WHERE stack_id = 'SA' AND version = 3 AND layer = 'prediction' AND kind = 'function' AND object = 'live_lot_temperature_at')
+  AND EXISTS (SELECT 1 FROM public.stack_needs WHERE stack_id = 'SA' AND version = 3 AND layer = 'outcome' AND kind = 'column' AND object = 'hammer_predictions.auction_event_id'));
+SELECT pg_temp.ok('the reader takes SA at version 3 with 18 needs, and the function grades all 18',
+  (SELECT version = 3 AND n_needs = 18 AND status = 'showable' FROM public.v_stacks WHERE stack_id = 'SA')
+  AND (SELECT n_present + n_partial + n_missing = 18 FROM public.stack_coverage('SA')));
+\ir ../migrations/20261007200000_stack_sa_v3_prediction_partial.sql
+SELECT pg_temp.ok('re-applying the v3 file adds nothing',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'SA') = 3
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA') = 39);
+
 SELECT pg_temp.ok('done: stack registry contract', true);
