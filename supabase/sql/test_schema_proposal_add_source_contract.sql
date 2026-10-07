@@ -5,11 +5,12 @@
 -- The approval machinery is frozen from prod (pg_get_functiondef, 2026-10-07 05:30Z) and fingerprinted against it:
 -- schema_proposal_evidence_check, fn_schema_proposal_required_approvals, fn_schema_proposal_review_handler and
 -- fn_schema_proposal_apply, with their two triggers. Tables carry the live columns, defaults, CHECKs, UNIQUEs and FKs of
--- observation_sources, observation_properties, schema_proposals and schema_proposal_reviews.
+-- observation_sources, observation_extractors, observation_properties, schema_proposals and schema_proposal_reviews.
 -- Checked: the defect on the frozen body (an approved add_source registers nothing); after the migration, an approved
--- add_source registers its row with the payload values and promoted_to_id; a duplicate slug keeps the registered row and
--- does not error; the July payload shape applies (null trust stays null); malformed payloads are refused and leave the
--- proposal open; the add_property, add_observation_kind, reject and manual branches behave as before; the body is the
+-- add_source registers its row with the payload values and promoted_to_id, and its declared reader as one
+-- observation_extractors row; a duplicate slug keeps the registered row, adds no reader and does not error; the July
+-- payload shape applies (null trust stays null); malformed payloads and a taken reader slug are refused and leave the
+-- proposal open with nothing registered; the add_property, add_observation_kind, reject and manual branches behave as before; the body is the
 -- prod body plus one declaration and one branch; attributes and grants are unchanged; a second run is a no-op, a drifted
 -- body is refused, and a database without the function gets it created.
 \set ON_ERROR_STOP on
@@ -63,6 +64,14 @@ CREATE TABLE public.observation_sources (
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
   business_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL, tier integer, decay_half_life_days integer,
   veracity numeric(3,2), consecration numeric(3,2));
+CREATE TABLE public.observation_extractors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_id uuid NOT NULL REFERENCES public.observation_sources(id),
+  slug text NOT NULL UNIQUE, display_name text NOT NULL, extractor_type text NOT NULL, edge_function_name text,
+  extractor_config jsonb DEFAULT '{}'::jsonb, produces_kinds public.observation_kind[] NOT NULL,
+  is_active boolean DEFAULT true, schedule_type text DEFAULT 'on_demand', schedule_cron text, rate_limit_per_hour integer,
+  min_interval_seconds integer DEFAULT 1, last_run_at timestamptz, last_success_at timestamptz, last_error text,
+  consecutive_failures integer DEFAULT 0, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  UNIQUE (source_id, slug));
 CREATE TABLE public.schema_proposals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), proposed_at timestamptz NOT NULL DEFAULT now(),
   proposed_by_user_id uuid REFERENCES auth.users(id), proposed_by_agent_key text, proposal_type text NOT NULL,
@@ -297,14 +306,16 @@ INSERT INTO payloads VALUES
      "base_url": "https://www.sbir.gov", "tier": 1, "base_trust_score": 0.90, "notes": "Public bulk award file.",
      "url_patterns": ["https://data.www.sbir.gov/awarddatapublic/award_data.csv%", "https://www.sbir.gov/awards%"],
      "supported_observations": ["activity"],
-     "trust_factors": {"data_access": "public_bulk_file", "structured": "csv", "has_extractor": true,
-       "declared_reader": {"reader": "scripts/data/declared-source-reader.mjs", "format": "csv",
+     "trust_factors": {"data_access": "public_bulk_file", "structured": "csv", "has_extractor": true},
+     "extractor": {"slug": "sbir-gov-awards-declared-reader", "display_name": "Declared-source reader: SBIR.gov award file",
+       "extractor_type": "script", "produces_kinds": ["activity"],
+       "extractor_config": {"script": "scripts/data/declared-source-reader.mjs", "format": "csv",
          "identifier_column": "Agency Tracking Number", "subject_rule": "funder organization", "subject_org_id": null}},
      "why": "case ledger 13.9.1"}'),
   ('nsf', '{"slug": "nsf-awards-api", "display_name": "NSF awards API (SBIR/STTR)", "category": "registry",
      "base_url": "https://www.nsf.gov", "tier": 1, "base_trust_score": 0.95,
      "url_patterns": ["https://api.nsf.gov/services/v1/awards%", "https://www.nsf.gov/awardsearch/showAward?AWD_ID=%"],
-     "supported_observations": ["activity"], "trust_factors": {"declared_reader": {"format": "json"}}}'),
+     "supported_observations": ["activity"], "trust_factors": {"data_access": "public_api"}}'),
   ('july', '{"why": "Named rival witness in 33 measured organization geocode conflicts.", "slug": "applemaps",
      "category": "registry", "display_name": "Apple Maps Local Search", "base_trust_score": null,
      "base_trust_score_note": "Owner decision.", "supported_observations": ["specification", "sighting"]}');
@@ -343,7 +354,7 @@ SELECT pg_temp.ok('the add_source branch sits between add_observation_kind and E
       AND position('ELSIF v_proposal.proposal_type = ''add_source'' THEN' IN d)
           < position(E'  ELSE\n    UPDATE public.schema_proposals' IN d) FROM after_def));
 SELECT pg_temp.ok('the migrated definition carries the fingerprint the migration guard accepts',
-  md5(pg_get_functiondef('public.fn_schema_proposal_apply(uuid)'::regprocedure)) = '1509d99bc683d99edffe718d0ad1c345'); -- gitleaks:allow (function-definition fingerprint, not a secret)
+  md5(pg_get_functiondef('public.fn_schema_proposal_apply(uuid)'::regprocedure)) = '631a3406c541e23c1635e4ef23f35aba'); -- gitleaks:allow (function-definition fingerprint, not a secret)
 SELECT pg_temp.ok('owner, language, volatility, configuration, SECURITY INVOKER and grants are unchanged',
   (SELECT p.proacl IS NOT DISTINCT FROM b.proacl AND p.prosecdef = b.prosecdef AND NOT p.prosecdef
       AND p.provolatile = b.provolatile AND p.proowner = b.proowner AND p.prolang = b.prolang
@@ -371,11 +382,18 @@ SELECT pg_temp.ok('approved: the sbir-gov-awards row carries every payload value
       AND s.notes = 'Public bulk award file.'
       AND s.url_patterns = ARRAY['https://data.www.sbir.gov/awarddatapublic/award_data.csv%', 'https://www.sbir.gov/awards%']
       AND s.supported_observations = ARRAY['activity']::public.observation_kind[]
-      AND s.trust_factors -> 'declared_reader' ->> 'identifier_column' = 'Agency Tracking Number'
-      AND s.trust_factors ->> 'data_access' = 'public_bulk_file'
-      AND s.trust_factors -> 'declared_reader' -> 'subject_org_id' = 'null'::jsonb
-      AND NOT s.trust_factors ? 'why' AND s.requires_auth = false AND s.business_id IS NULL
+      AND s.trust_factors = '{"data_access": "public_bulk_file", "structured": "csv", "has_extractor": true}'::jsonb
+      AND s.requires_auth = false AND s.business_id IS NULL
      FROM public.observation_sources s WHERE s.slug = 'sbir-gov-awards'));
+SELECT pg_temp.ok('approved: the declared reader rides along as one observation_extractors row on the new source',
+  (SELECT count(*) = 1 AND bool_and(e.source_id = s.id AND e.display_name = 'Declared-source reader: SBIR.gov award file'
+      AND e.extractor_type = 'script' AND e.edge_function_name IS NULL AND e.schedule_type = 'on_demand' AND e.is_active
+      AND e.produces_kinds = ARRAY['activity']::public.observation_kind[]
+      AND e.extractor_config ->> 'script' = 'scripts/data/declared-source-reader.mjs'
+      AND e.extractor_config ->> 'identifier_column' = 'Agency Tracking Number'
+      AND e.extractor_config -> 'subject_org_id' = 'null'::jsonb)
+     FROM public.observation_extractors e JOIN public.observation_sources s ON s.id = e.source_id
+    WHERE s.slug = 'sbir-gov-awards'));
 SELECT pg_temp.ok('approved: the proposal is resolved and promoted_to_id names the new source row',
   (SELECT sp.status = 'approved' AND sp.resolved_at IS NOT NULL AND sp.promoted_to_id = s.id
       AND sp.decision_rationale IS NULL
@@ -385,20 +403,23 @@ SELECT pg_temp.ok('what ingest-observation checks now passes: the slug resolves 
   EXISTS (SELECT 1 FROM public.observation_sources WHERE slug = 'sbir-gov-awards'
            AND 'activity' = ANY (supported_observations)));
 SELECT pg_temp.review((SELECT id FROM p WHERE name = 'nsf'), '00000000-0000-0000-0000-00000000a001', 'approve');
-SELECT pg_temp.ok('approved: nsf-awards-api is registered at trust 0.95, tier 1, and promoted',
+SELECT pg_temp.ok('approved: nsf-awards-api is registered at trust 0.95, tier 1, and promoted; no extractor declared, none made',
   (SELECT s.base_trust_score = 0.95 AND s.tier = 1 AND s.notes IS NULL AND sp.promoted_to_id = s.id
-      AND s.trust_factors = '{"declared_reader": {"format": "json"}}'::jsonb
+      AND s.trust_factors = '{"data_access": "public_api"}'::jsonb
      FROM public.observation_sources s, public.schema_proposals sp
-    WHERE s.slug = 'nsf-awards-api' AND sp.id = (SELECT id FROM p WHERE name = 'nsf')));
+    WHERE s.slug = 'nsf-awards-api' AND sp.id = (SELECT id FROM p WHERE name = 'nsf'))
+  AND NOT EXISTS (SELECT 1 FROM public.observation_extractors e JOIN public.observation_sources s ON s.id = e.source_id
+                   WHERE s.slug = 'nsf-awards-api'));
 
 -- 4. Duplicates and second reviews ------------------------------------------------------------------------------------------
 INSERT INTO p VALUES ('dup', pg_temp.propose('add_source',
   (SELECT payload || '{"display_name": "Renamed by a duplicate", "base_trust_score": 0.10, "tier": 4}'::jsonb
      FROM payloads WHERE name = 'sbir')));
 SELECT pg_temp.review((SELECT id FROM p WHERE name = 'dup'), '00000000-0000-0000-0000-00000000a001', 'approve');
-SELECT pg_temp.ok('a second approved proposal for a registered slug does not error and edits nothing',
+SELECT pg_temp.ok('a second approved proposal for a registered slug does not error and edits nothing, its extractor included',
   (SELECT count(*) = 1 AND bool_and(display_name = 'SBIR.gov award data (all agencies)' AND base_trust_score = 0.90
-      AND tier = 1) FROM public.observation_sources WHERE slug = 'sbir-gov-awards'));
+      AND tier = 1) FROM public.observation_sources WHERE slug = 'sbir-gov-awards')
+  AND (SELECT count(*) = 1 FROM public.observation_extractors WHERE slug = 'sbir-gov-awards-declared-reader'));
 SELECT pg_temp.ok('the duplicate points at the registered row and its rationale says it was kept',
   (SELECT sp.status = 'approved' AND sp.promoted_to_id = s.id
       AND sp.decision_rationale LIKE '%Source sbir-gov-awards was already registered; the existing row was kept.%'
@@ -458,15 +479,44 @@ SELECT pg_temp.refused('a payload without a slug',
     '00000000-0000-0000-0000-00000000a001', 'approve'), 'has no slug');
 SELECT pg_temp.refused('trust_factors that is not an object',
   format('SELECT pg_temp.review(%L, %L, %L)', (SELECT id FROM p WHERE name = 'scalar_trust'),
-    '00000000-0000-0000-0000-00000000a001', 'approve'), 'trust_factors as an object');
+    '00000000-0000-0000-0000-00000000a001', 'approve'), 'trust_factors, extractor and extractor_config as objects');
+INSERT INTO p VALUES ('string_extractor', pg_temp.propose('add_source',
+  '{"slug": "string-extractor", "display_name": "String extractor", "category": "registry", "extractor": "reader.mjs"}'));
+INSERT INTO p VALUES ('array_config', pg_temp.propose('add_source',
+  '{"slug": "array-config", "display_name": "Array config", "category": "registry",
+    "extractor": {"slug": "array-config-reader", "display_name": "Array config reader", "extractor_type": "script",
+      "produces_kinds": ["activity"], "extractor_config": ["csv"]}}'));
+INSERT INTO p VALUES ('no_kinds', pg_temp.propose('add_source',
+  '{"slug": "no-kinds", "display_name": "No kinds", "category": "registry",
+    "extractor": {"slug": "no-kinds-reader", "display_name": "No kinds reader", "extractor_type": "script"}}'));
+INSERT INTO p VALUES ('taken_reader', pg_temp.propose('add_source',
+  '{"slug": "taken-reader", "display_name": "Taken reader", "category": "registry",
+    "extractor": {"slug": "sbir-gov-awards-declared-reader", "display_name": "Same reader slug", "extractor_type": "script",
+      "produces_kinds": ["activity"]}}'));
+SELECT pg_temp.refused('an extractor that is not an object',
+  format('SELECT pg_temp.review(%L, %L, %L)', (SELECT id FROM p WHERE name = 'string_extractor'),
+    '00000000-0000-0000-0000-00000000a001', 'approve'), 'trust_factors, extractor and extractor_config as objects');
+SELECT pg_temp.refused('an extractor_config that is not an object',
+  format('SELECT pg_temp.review(%L, %L, %L)', (SELECT id FROM p WHERE name = 'array_config'),
+    '00000000-0000-0000-0000-00000000a001', 'approve'), 'trust_factors, extractor and extractor_config as objects');
+SELECT pg_temp.refused('an extractor without produces_kinds',
+  format('SELECT pg_temp.review(%L, %L, %L)', (SELECT id FROM p WHERE name = 'no_kinds'),
+    '00000000-0000-0000-0000-00000000a001', 'approve'), 'without a produces_kinds array');
+SELECT pg_temp.refused('an extractor slug another source already holds (the whole approval rolls back)',
+  format('SELECT pg_temp.review(%L, %L, %L)', (SELECT id FROM p WHERE name = 'taken_reader'),
+    '00000000-0000-0000-0000-00000000a001', 'approve'), 'observation_extractors_slug_key');
 SELECT pg_temp.ok('every refused approval left its proposal open, unreviewed and unpromoted, and registered nothing',
   (SELECT bool_and(sp.status = 'open' AND sp.resolved_at IS NULL AND sp.promoted_to_id IS NULL)
      FROM public.schema_proposals sp
-    WHERE sp.id IN (SELECT id FROM p WHERE name IN ('object_patterns', 'bad_category', 'bad_kind', 'no_slug', 'scalar_trust')))
+    WHERE sp.id IN (SELECT id FROM p WHERE name IN ('object_patterns', 'bad_category', 'bad_kind', 'no_slug', 'scalar_trust',
+      'string_extractor', 'array_config', 'no_kinds', 'taken_reader')))
   AND NOT EXISTS (SELECT 1 FROM public.schema_proposal_reviews r
-    WHERE r.proposal_id IN (SELECT id FROM p WHERE name IN ('object_patterns', 'bad_category', 'bad_kind', 'no_slug', 'scalar_trust')))
+    WHERE r.proposal_id IN (SELECT id FROM p WHERE name IN ('object_patterns', 'bad_category', 'bad_kind', 'no_slug',
+      'scalar_trust', 'string_extractor', 'array_config', 'no_kinds', 'taken_reader')))
   AND NOT EXISTS (SELECT 1 FROM public.observation_sources
-    WHERE slug IN ('object-patterns', 'bad-category', 'bad-kind', 'scalar-trust')));
+    WHERE slug IN ('object-patterns', 'bad-category', 'bad-kind', 'scalar-trust', 'string-extractor', 'array-config',
+      'no-kinds', 'taken-reader'))
+  AND (SELECT count(*) = 1 FROM public.observation_extractors));
 
 -- 7. The other branches behave as before ------------------------------------------------------------------------------------
 INSERT INTO p VALUES ('property', pg_temp.propose('add_property',
