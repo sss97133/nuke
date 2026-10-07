@@ -1,12 +1,16 @@
 # Nuke
 
-Nuke ([nuke.ag](https://nuke.ag)) is a data model for physical assets, starting with vehicles. Every
-observation about a vehicle is a row that keeps its source, its clocks and its trust. What matters
-is the shape those rows take after they land.
+Nuke ([nuke.ag](https://nuke.ag)) is a data machine. It combines a model of entities and the
+evidence about them with the computation that keeps running over that model. Every observation is a
+row that keeps its source, its clocks and its trust. What matters is the shape those rows take after
+they land.
+
+Vehicles are the first entity Nuke tracks. Tracking one vehicle already means tracking people,
+organizations, places, parts, documents, money and time.
 
 ## A model that grows sideways
 
-Most vehicle data is a catalog: a fixed schema filled from the top down. Nuke grows from the bottom.
+Most data products are catalogs: a fixed schema filled from the top down. Nuke grows from the bottom.
 A bid, a comment, a photo, a receipt or a title transfer lands once in an append-only log. It is
 then keyed to every entity it mentions: a vehicle, a person, a lot, a place or a part.
 
