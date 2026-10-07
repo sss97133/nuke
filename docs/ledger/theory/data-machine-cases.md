@@ -1335,11 +1335,12 @@ where you could own something or not."
    reader prices the ratio of claim to checkable evidence, not the idea. The repair is one voice, and a description
    that carries a measured number wherever it travels.
 2. **Measured results exist, and they are modest, which is the asset.** Read on prod 2026-10-07:
-   - `prediction_accuracy`: hammer model v13, 208 scored, median abs error 48.2%, bias +32.0%, 0 within 10%; v24,
-     399 scored, median 33.2%, bias −12.5%, 36 within 10%, 103 within 20%. The predictor ran live 2026-02-19 →
-     2026-04-01 (`hammer_predictions`, 50,534 rows). The documented cause of the remaining error is condition
-     blindness: condition and configuration live in images and comments, not in fields (ask-nuke THEORY.md, "the ±40%
-     calibration killer").
+   - `prediction_accuracy` (corrected 03:50Z, see 13.8: its unit is hourly rows, not lots): hammer model v13, 208
+     rows on 2 lots, median abs error 48.2%; v24, 399 rows on 7 lots, 33.2% by row and 23.5% per lot (last
+     prediction before close), 1 lot within 10%. `hammer_predictions` holds 50,534 rows: v24 predicted 4,612 lots
+     from 2026-02-19 and v31 2,314 more from 2026-09-27; ten lots were ever graded. The cause named in ask-nuke
+     THEORY.md (condition and configuration in images and comments, not fields) is a hypothesis from those cases,
+     not a measured decomposition.
    - The band tag backtest (coverage audit of 2026-09-30, §5): 69,295 sold BaT lots, 2024-09-01 to 2026-09-27, each
      priced only from earlier sales, bid as of 24 h before close: cold 11.3%, in line 40.9%, hot 86.8% finished
      above their band middle (48 h: 13.2 / 40.3 / 82.9%).
@@ -1349,12 +1350,13 @@ where you could own something or not."
      named.
    - V012 discovery: 68,957 distinct BaT buyers; the top 1% took 14% of lots; 39 buyers won 50 or more.
 
-   A 33% median error is not an edge. It is a baseline with a named cause and a grading table, which is where a
-   research proposal starts and what a stranger can check in an afternoon.
+   Ten graded lots are not a calibration record (corrected 03:50Z). They prove the grading machinery exists and
+   that the outcome join never ran; the large-n graded result is the band backtest. What a stranger can check in an
+   afternoon is the unit and the denominator, so both now travel with every number (13.8).
 3. **The research claim, as R&D rather than engineering.** Can point-in-time state, estimated from heterogeneous
    untrusted observations (images, comments, receipts, bids) that each keep their source, clock and relation to the
-   asset, close a measured 33% median error in asset price prediction, and be ready inside a two-minute decision
-   window? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
+   asset, predict a clearing price with a graded per-lot error at n ≥ 1,000, lower it, and keep correcting it inside
+   the two-minute closing window (corrected and extended 03:50Z, 13.8)? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
    error demands; (b) relation-weighted claim credibility (who said it, their relation to the lot at the time, how
    their earlier claims resolved; 13.3), which has no measured instance yet; (c) leakage-free replay over 19.9M
    comments and 4.27M bids (README planner estimates, 2026-10-06), the invariant most market-data products violate.
@@ -1437,3 +1439,74 @@ predictions, we are the prediction model." The README leads with prediction from
    2. The `api-v1` route.
    3. The CLI verb.
    4. The MCP tool and the web page, on the same reader.
+
+### 13.8 The owner follows the evidence: units, denominators, the nowcast, the cost of text, and what positioning is against (2026-10-07 03:30Z, in substance)
+
+**Owner direction (substance kept).** Reading 13.6 he asked whether v13 had been better than v24, whether v24 simply
+had more lots, and "those 399 lots are out of how many lots we have access to." The exercise is "for me to be better
+situated in knowing how to communicate on what the product is, but maybe more importantly that the product is shaped
+so that it can communicate on itself"; the agent is "an external auditor." On the lead's 13.6 point 4 he called a
+fallacy: "the model reads your ledger" is not the reply to his claim, because "the model isn't making the ledger, and
+if the ledger doesn't exist the model has nothing to read." His claim restated: LLMs "are not capable of creating
+factual documentation; they generate opinions that could influence actions, and those actions get documented and turn
+into history, so it's a different path"; "they can't predict gambling and they can't predict sales", so those markets
+are "forever insulated" and "nobody is talking about it; we are, building the substrate." On the research question: it
+should also be "self-correcting within the two-minute window as bid velocity and the other indicators, commentary,
+eventually social media, weigh in in real time; how do our models readjust?" And: "how much is it going to cost us to
+analyze all of our data, and why can't we run our text-based data faster?" On positioning: "does it auto-update? Do
+new agents go in and read it and say that's ass, let's fix it?"; "positioning is based on your foe, the one you're
+positioning against"; "just putting up our stats in our substrate is our ultimate positioning; it becomes take it or
+leave it; it becomes a resource." On team: "I am the founder, I am the research partner. I could absolutely have a
+research partner; I could get the museums on board, a school." On hearing the unit correction (03:55Z): "why are we
+only running on seven lots ... I've been in total agent psychosis thinking we're moving forward ... this is what
+bothers me, we are just not understanding data at scale." And the scope ruling for this session: "you're not supposed
+to be working on fixing those sorts of things, you're supposed to be helping me figure out how to structure NSF seed
+funding ... we have to really stay on target."
+
+**Lead's reading (nothing minted; the repair items below are handed to the data-model lane, per the scope ruling):**
+
+1. **The unit was wrong, and the generator is the cure.** `prediction_accuracy` counts hourly rows. v24's "399 scored"
+   is 7 lots re-scored through their final 48 hours; v13's 208 is 2 lots. Per lot (last prediction before close) v24
+   is 23.5% median abs error on 7 lots, 1 within 10%; by horizon the row-level median runs from 19.5% at 2 h (3 lots)
+   to 45.8% at 24 h (3 lots). None of it supports a claim about model quality, and v13 against v24 is 2 lots against
+   7. The owner's instinct (ask for the denominator) was right before the numbers were. The hand-typed table in
+   `docs/POSITIONING.md` was wrong in unit within an hour. The cure is a block that `readme-stats.mjs` writes daily,
+   whose queries define the unit (distinct lots) and print the denominators, so a stranger reads the same query the
+   owner does: "the product communicates on itself." Not built tonight (scope ruling above); handed to the data-model
+   lane with the queries in this section.
+2. **The outcome join is the trunk, and it is a key repair.** Nobody chose seven lots. `hammer_predictions` holds
+   4,612 v24 lots and 2,314 v31 lots (6,926 distinct across versions); `bat_listings` holds 106,551 sale prices,
+   93,135 keyed to a vehicle, 1,216 of them settled in the ten days to 2026-10-07; yet the predicted lots' vehicle keys
+   land on six settled listings (03:30Z). The outcomes exist in `bat_listings.sale_price` and in `auction_events`
+   (`outcome`, `winning_bid`, `high_bid`); the keys between the prediction rows and the lot rows do not meet. Which key
+   is broken (duplicate vehicles, husks, a slug mismatch) was not diagnosed tonight. Repairing it grades thousands of
+   lots with no new data and sets the bar every later objective is measured against. Objective 0 in
+   `docs/POSITIONING.md`; the data-model lane owns keys.
+3. **The nowcast is stacks SA and S24, and its gate is cadence.** A prediction row per lot per minute through the
+   closing chain, graded against the outcome, the update rule being the fold over bids, comment stance and later other
+   signals. Historically the per-second data exists (bids are timed comments, §4). Live, `bat-live-pull` runs every
+   minute over six lots with one slot held for closing lots (`v_job_health`, 03:30Z), so a lot in its final chain is
+   observed about once a minute; `sync-live-auctions` runs every 15 minutes. Whether the fold recomputes inside that
+   cadence is a feasibility question and belongs in the research question, where it now sits.
+4. **The cost of text, and why SQL is the fast path.** 13.5 measured the free local model at 16 to 17 tokens per
+   second. At 30 output tokens per comment, 20M comments is about 600M tokens, about 13 months of one local GPU. A
+   regex or full-text pass over the same 20M rows in Postgres is minutes. So the plan in 13.5 stands: rules over every
+   row (free, measured against denominators), the model grading a stratified sample to calibrate the rules, never the
+   whole log. API models change the price, not the shape; their cost is a lookup, not a memory, and is not quoted here.
+   Images are the expensive side (52.1M, 0.5% analyzed): the vision gate selects, it does not sweep.
+5. **The fallacy conceded, the claim restated.** "The model reads your ledger" answers a claim the owner did not make.
+   His claim is about creation: a model emits priors, it cannot emit an observation, and an auction close is an
+   observation that does not exist until it happens. That form holds under a referee and it is the form 13.6 point 4
+   should have led with. `docs/POSITIONING.md` now carries it in his words.
+6. **Positioning is against the unverifiable number.** The alternatives (price guides, aggregators, venue comps, a model
+   asked for a value) give a number with no error table. Nuke's position is the opposite, and the stats in the
+   substrate are the positioning, which is why they are generated and why they carry unit, date and denominator.
+7. **Team.** The owner is the research partner today. STTR requires a research institution (a university is the clean
+   case; a museum is a partner and a letter); who to ask is the owner's call and a message to other people.
+8. **Scale, read correctly.** The failure the owner names is real, and its shape matters: the predictor ran at scale
+   (6,926 lots) and the grader ran at seven, because the join between them never landed and nothing noticed. That is
+   the "silent failure" law of `production-engineering.md` applied to the grading layer. The repair belongs to the
+   data-model lane; this session returns to the funding structure, as ruled.
+
+**Correction trail.** 13.6 point 2 and point 3 edited in place at 03:50Z with the marker "corrected"; the originals
+are in the git history (PR #744).
