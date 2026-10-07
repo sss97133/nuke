@@ -21,11 +21,11 @@
 --   No organizations row for the National Science Foundation: create-org-from-url needs a signed-in user.
 --   Applicant: organizations f32ea08c (Nuke); the program's criteria are not recorded as claims about it.
 --
--- NEEDS (15, across all nine layers). The registry reads them structurally (stack_coverage comment).
---   log        observation_sources, observation_extractors, vehicle_observations (tables). The three tables exist with
---              rows, so these read present before any award lands; the notes name the rows the stack needs. The lead's
---              draft named the registry rows as an intake need; an intake need reads the newest value of one clock column
---              across a table and cannot single out two rows, so they are table needs with the rows in the note.
+-- NEEDS (13, across all nine layers), all abstract. The registry reads them structurally (stack_coverage comment).
+--   log        funding award observations (abstract, missing). Not three table needs: the registry grades a table need
+--              by the table's existence and rows, so observation_sources, observation_extractors and vehicle_observations
+--              would read present tonight with no award row (review on PR #768, data-model lead). The substrate is
+--              declared when the first awards land, which moves this stack with no new version (13.1 point 4).
 --   key        awardee organization key, research institution key, person subject (abstract, missing)
 --   dimension  funding program and phase, funding topic code (abstract, missing: staged as text in structured_data);
 --              place entity (abstract, existing substrate) for the awardee's state
@@ -36,9 +36,11 @@
 --              ownership share, PI hours, place of work, as owner-input observations on f32ea08c
 --   prediction funding invitation probability (abstract, missing; a thesis vein later)
 --   outcome    pitch result (abstract, missing)
--- Coverage will read 3 of 15 (0.2): the three log tables. That number counts tables, not award rows.
+-- Coverage will read 0 of 13 until a substrate is declared.
+-- FAMILY: the machine's economics, beside S59 value of information and S60 trust calibration (the registry's family
+-- grouping; NULL would hide the stack from it).
 --
--- SUBSTRATES: eleven new rows, undeclared (declared_table NULL), so every need on them reads missing; 'place entity' and
+-- SUBSTRATES: twelve new rows, undeclared (declared_table NULL), so every need on them reads missing; 'place entity' and
 -- the registry's grammar are reused. Declaring a table for a substrate later moves this stack with no new version.
 -- SCHEMA_LAW: no table, column, kind, vocabulary value or function. Rows only, in the registry's own tables, by the
 -- registry's writer (a migration file). Every insert is idempotent (ON CONFLICT DO NOTHING); a replay adds nothing.
@@ -51,6 +53,9 @@ SET LOCAL lock_timeout = '5s';
 
 INSERT INTO public.stack_substrates (substrate, note, source, registered_by)
 VALUES
+  ('funding award observations',
+   'The award rows of the opportunity stack: vehicle_observations of kind activity with structured_data.kind_detail funding_award, relation awarded_to, on the funder organization, from the sources sbir-gov-awards and nsf-awards-api (add_source proposals 8684c1c9 and 97b3c2d5, open 2026-10-07). Undeclared until the first awards land; then declared as vehicle_observations.',
+   'data-machine-cases.md 13.9.1 (2026-10-07); review on PR #768', 'claude-code (Opus 5.5) night-expansion for the owner, 2026-10-07'),
   ('awardee organization key',
    'An award''s awardee keyed to organizations.id by name, UEI or DUNS. On 2026-10-07 the awardee is text in the award row''s structured_data (name, city, state, zip; UEI on NSF API rows, DUNS on some SBIR.gov rows). The organization resolver is the candidate reader (case ledger 13.9.1 point 4).',
    'data-machine-cases.md 13.9.1 (2026-10-07)', 'claude-code (Opus 5.5) night-expansion for the owner, 2026-10-07'),
@@ -92,7 +97,7 @@ INSERT INTO public.stacks
 VALUES (
   'S61', 1, 'Funding opportunity fit',
   'How far is the company from a given funding program''s award, and which keys are missing?',
-  NULL,
+  'the machine''s economics',
   ARRAY[
     'log: staged, not landed. Each award is one observation (kind activity, structured_data.kind_detail funding_award, relation awarded_to) on the funder organization, from two declared sources: sbir-gov-awards (the SBIR.gov bulk award file) and nsf-awards-api (the NSF awards API), read by scripts/data/declared-source-reader.mjs through ingest-observation. On 2026-10-07 both are add_source proposals awaiting approval; dry runs map 2,927 and 3,342 NSF Phase I awards. Readers: vehicle_observations, observation_sources, observation_extractors',
     'key: missing, named. Awardee name, UEI or DUNS to organizations.id; STTR research institution to organizations.id; PI to a person subject, which does not exist (docs/features/organization-entity/SPEC.md 1.5). The funder is the subject of every award row; its organization row does not exist yet',
@@ -121,9 +126,7 @@ ON CONFLICT (stack_id, version) DO NOTHING;
 INSERT INTO public.stack_needs (stack_id, version, layer, kind, object, denominator, fresh_within, note)
 SELECT 'S61', 1, v.layer, v.kind, v.object, v.denominator, v.fresh_within, v.note
 FROM (VALUES
-  ('log',        'table',    'observation_sources',                        NULL, NULL::interval, 'the registry rows sbir-gov-awards and nsf-awards-api (add_source proposals 8684c1c9 and 97b3c2d5, open 2026-10-07); a table-level reading, present before the two rows exist'),
-  ('log',        'table',    'observation_extractors',                     NULL, NULL,           'their declared readers sbir-gov-awards-declared-reader and nsf-awards-api-declared-reader, registered with the sources on approval'),
-  ('log',        'table',    'vehicle_observations',                       NULL, NULL,           'each award as kind activity, structured_data.kind_detail funding_award, on the funder organization; 0 rows on 2026-10-07, dry runs map 2,927 and 3,342'),
+  ('log',        'abstract', 'funding award observations',                 NULL, NULL::interval, 'each award as kind activity, structured_data.kind_detail funding_award, on the funder organization, from sbir-gov-awards and nsf-awards-api; 0 rows on 2026-10-07, dry runs map 2,927 and 3,342'),
   ('key',        'abstract', 'awardee organization key',                   NULL, NULL,           'awardee name, UEI or DUNS to organizations.id; text in structured_data today'),
   ('key',        'abstract', 'research institution key',                   NULL, NULL,           'STTR research institution to organizations.id; the track is a function of this edge (case ledger 13.9 point 2)'),
   ('key',        'abstract', 'person subject',                             NULL, NULL,           'PI to a person subject; the structural blocker in docs/features/organization-entity/SPEC.md 1.5'),
