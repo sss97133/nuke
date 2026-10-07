@@ -19,7 +19,7 @@
 --   Estimated claims about the lot's own vehicle: 119,500, or 0.93% of text comments (95% sampling interval 115,000 ..
 --   124,000; 102,000 with every pattern at its Wilson lower bound). By relation: the seller's own tenure 104,700;
 --   sighting 7,900; past owner 4,600; family 2,000; shop 270.
---   Windows: 15.8% of matches state a year, month or range; 9.3% a time relative to the comment; 1.0% a decade.
+--   Windows: 15.7% of matches state a year, month or range; 9.3% a time relative to the comment; 1.0% a decade.
 --   Of 48 true claims in the validation read, 18 state a window and the parser recovered 11 of them.
 --   Keys on the matched comments today: author 100% (external_identity_id), lot 94.3% (auction_event_id),
 --   vehicle 100%.
