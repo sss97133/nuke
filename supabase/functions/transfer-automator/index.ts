@@ -461,8 +461,7 @@ async function resolveUserFromIdentity(
 // Fire-and-forget call to notify-transfer-parties.
 // Never awaited at call sites — a notification failure must never break a seed.
 function fireAndForgetNotify(transfer_id: string, event: string, milestone_type?: string): void {
-  const url = `${SUPABASE_URL}/functions/v1/notify-transfer-parties`;
-  fetch(url, {
+  fetch(`${SUPABASE_URL}/functions/v1/notify-transfer-parties`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

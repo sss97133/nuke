@@ -264,7 +264,7 @@ async function sendSMS(
 
   try {
     const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const res = await fetch(url, {
+    const res = await fetch(url, { // guardrail-allow: raw-fetch (Twilio Messages API: a service API send, not a page fetch)
       method: 'POST',
       headers: {
         'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
