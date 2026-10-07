@@ -151,8 +151,10 @@ INSERT INTO public.external_identities (platform, handle) VALUES
 
 CREATE TEMP TABLE identities_initial AS SELECT * FROM public.external_identities;
 
--- THE BASE: 20261006213000, as the deploy role ------------------------------------------------------------------------
+-- THE BASE, as the deploy role: 20261006213000 (the rule and the insert and update triggers), then 20261007090000 (the rule's
+-- flagged-comment fallback for lower-cased sellers), the chain prod runs when the arrival trigger lands.
 \ir ../migrations/20261006213000_key_auction_event_identities.sql
+\ir ../migrations/20261007090000_key_lot_seller_by_flagged_comment.sql
 
 CREATE FUNCTION pg_temp.ident(p_handle text) RETURNS uuid LANGUAGE sql STABLE AS $$
   SELECT id FROM public.external_identities WHERE platform = 'bat' AND handle = p_handle $$;
@@ -372,8 +374,11 @@ SELECT pg_temp.ok('arrival: a winner whom another handle outbid at the sale pric
 INSERT INTO public.external_identities (platform, handle) VALUES ('cars_and_bids', 'Lateplat');
 SELECT pg_temp.ok('arrival: an identity of another platform keys nothing', pg_temp.keys('arr-platform') = '-/-');
 INSERT INTO public.external_identities (platform, handle) VALUES ('bat', 'LowerCased');
-SELECT pg_temp.ok('arrival: the match is on the exact text; another letter case is left to the next write or the backfill',
+SELECT pg_temp.ok('arrival: the match is on the exact text; another letter case is not keyed at arrival',
   pg_temp.keys('arr-case') = '-/-');
+SELECT pg_temp.say('arr-case', 'LowerCased', true, 'LowerCased');
+SELECT pg_temp.ok('arrival: once the lot''s flagged comment names the identity the fallback rule says keyed, and the lot stays open until its next write or the backfill',
+  pg_temp.verdicts('arr-case') = '-/keyed' AND pg_temp.keys('arr-case') = '-/-');
 
 -- A live lot: the key is set through preserve_bat_live_projection, with raw_data and updated_at as they were.
 INSERT INTO public.external_identities (platform, handle) VALUES ('bat', 'Livelate');
@@ -458,27 +463,27 @@ SELECT pg_temp.ok('no identity was minted, changed or removed by the trigger: 5 
   AND NOT EXISTS (SELECT 1 FROM public.external_identities e JOIN identities_initial i USING (id) WHERE e IS DISTINCT FROM i));
 
 -- THE BACKFILL PICKS UP WHAT THE TRIGGER SKIPPED OR CAPPED ---------------------------------------------------------------
-SELECT pg_temp.ok('the open keys the rule would fill today are exactly the 20 capped lots, the held lot and the lot whose key the script cleared',
+SELECT pg_temp.ok('the open keys the rule would fill today are exactly the 20 capped lots, the held lot, the lot whose key the script cleared and the lower-cased lot with its flagged comment',
   (SELECT count(*) FROM public.auction_events a
    CROSS JOIN LATERAL public.resolve_auction_event_identities(a.id, a.source, a.winning_bidder, a.winning_bid, a.seller_name) r
    WHERE (a.seller_name IS NOT NULL AND a.seller_external_identity_id IS NULL AND r.seller_verdict = 'keyed')
-      OR (a.winning_bidder IS NOT NULL AND a.winning_bidder_external_identity_id IS NULL AND r.winning_bidder_verdict = 'keyed')) = 20 + 1 + 1);
+      OR (a.winning_bidder IS NOT NULL AND a.winning_bidder_external_identity_id IS NULL AND r.winning_bidder_verdict = 'keyed')) = 20 + 1 + 1 + 1);
 CREATE TEMP TABLE backfill_result AS SELECT public.key_auction_event_identities(2000, 0) AS r;
-SELECT pg_temp.ok('the existing backfill keys them: the 20 capped lots, the held lot and the cleared lot, nothing else; the lower-cased lot stays open',
-  (SELECT (r->>'keyed')::int = 22 AND (r->>'keyed_seller')::int = 22 AND (r->>'keyed_winning_bidder')::int = 0 FROM backfill_result)
+SELECT pg_temp.ok('the existing backfill keys them: the 20 capped lots, the held lot, the cleared lot and the lower-cased lot, nothing else',
+  (SELECT (r->>'keyed')::int = 23 AND (r->>'keyed_seller')::int = 23 AND (r->>'keyed_winning_bidder')::int = 0 FROM backfill_result)
   AND (SELECT count(*) FILTER (WHERE seller_external_identity_id IS NOT NULL) = 120 FROM public.auction_events WHERE lot_number LIKE 'arr-cap-%')
-  AND pg_temp.keys('arr-locked') = '-/Locked' AND pg_temp.keys('arr-conflict') = '-/Postgrest' AND pg_temp.keys('arr-case') = '-/-');
+  AND pg_temp.keys('arr-locked') = '-/Locked' AND pg_temp.keys('arr-conflict') = '-/Postgrest' AND pg_temp.keys('arr-case') = '-/LowerCased');
 
 -- THE ASSAY: no open key whose verdict is keyed ---------------------------------------------------------------------------
-SELECT pg_temp.ok('assay: after the backfill no open key has a keyed verdict; what stays open is stop words, contradicted text, another letter case, another platform and a non-BaT lot',
+SELECT pg_temp.ok('assay: after the backfill no open key has a keyed verdict; what stays open is stop words, contradicted text, another platform and a non-BaT lot',
   (SELECT count(*) FROM public.auction_events a
    CROSS JOIN LATERAL public.resolve_auction_event_identities(a.id, a.source, a.winning_bidder, a.winning_bid, a.seller_name) r
    WHERE a.source IN ('bat', 'bringatrailer')
      AND ((a.seller_name IS NOT NULL AND a.seller_external_identity_id IS NULL AND r.seller_verdict = 'keyed')
        OR (a.winning_bidder IS NOT NULL AND a.winning_bidder_external_identity_id IS NULL AND r.winning_bidder_verdict = 'keyed'))) = 0
   AND (SELECT count(*) FROM public.auction_events
-       WHERE lot_number IN ('arr-stop-seller', 'arr-stop-winner', 'arr-contradicted-seller', 'arr-contradicted-winner', 'arr-platform', 'arr-case', 'arr-dealer-nonbat')
-         AND seller_external_identity_id IS NULL AND winning_bidder_external_identity_id IS NULL) = 7);
+       WHERE lot_number IN ('arr-stop-seller', 'arr-stop-winner', 'arr-contradicted-seller', 'arr-contradicted-winner', 'arr-platform', 'arr-dealer-nonbat')
+         AND seller_external_identity_id IS NULL AND winning_bidder_external_identity_id IS NULL) = 6);
 
 -- RE-APPLYING THE MIGRATION IS A NO-OP -----------------------------------------------------------------------------------
 CREATE TEMP TABLE reapply_before AS

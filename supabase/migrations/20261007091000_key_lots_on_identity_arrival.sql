@@ -16,7 +16,8 @@
 --   row was first written for 440, was minted later for 111 (19%), and does not exist in any case for 25. Of the 86 late
 --   ones on 10-02 to 10-04, 79 were written again after the identity arrived and keyed by the update trigger; 7 were not
 --   (about 2 a day). One lot was written at 02:27:03.769Z and its seller's identity minted at 02:27:03.910Z.
---   Decay now (03:54Z; the same at 03:39Z). BaT lot rows created since the backfill ended (01:57:02Z): 0. Open keys 5,345 sellers and 430 winners.
+--   Decay now (03:54Z, before the backfill re-run that 20261007090000 enables; the same at 03:39Z). BaT lot rows created since
+--   the backfill ended (01:57:02Z): 0. Open keys 5,345 sellers and 430 winners.
 --   Written since 01:57:02Z and still open: 6 sellers, of which 2 are keyable today (the identity arrived after the write)
 --   and 4 truly no_identity. Created since the triggers went live (21:55:59Z): 3,731 open sellers, 3 keyable today and
 --   3,727 no_identity (3,597 of those resolve through the flagged-comment fallback of 20261007090000), 1 contradicted;
