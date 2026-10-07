@@ -68,7 +68,7 @@ INSERT INTO public.vehicle_observations (subject_type, subject_id, is_superseded
    '{"home_state":"IL","home_country":"USA","grain":"state_country","source":"bat_member_page"}'::jsonb, '2026-10-07T00:00:00Z'),
   ('external_identity', '22222222-2222-2222-2222-222222222222', false, 'specification',
    '{"home_state":"NV","home_country":"USA","city":"Las Vegas","source":"bat_member_page"}'::jsonb, '2026-10-07T00:00:00Z'),
-  -- source passthrough: a comment-sourced location keeps source bat_comment; a source-less one falls back to bat.
+  -- source passthrough: a comment-sourced location keeps source bat_comment; a source-less one writes no location_source.
   ('external_identity', '33333333-3333-3333-3333-333333333333', false, 'specification',
    '{"home_state":"TX","home_country":"USA","source":"bat_comment"}'::jsonb, '2026-10-07T00:00:00Z'),
   ('external_identity', '44444444-4444-4444-4444-444444444444', false, 'specification',
@@ -89,12 +89,15 @@ SELECT metadata AS m2 FROM public.external_identities WHERE handle = 'CityMember
 SELECT pg_temp.ok('masking: city never written for the city observation', NOT (:'m2'::jsonb ? 'city'));
 SELECT pg_temp.ok('state still folded for CityMember: NV',               (:'m2'::jsonb ->> 'state') = 'NV');
 
--- Source passthrough: the observation's own source is carried to metadata.location_source (fallback 'bat').
+-- Source passthrough: the observation's own source is carried to metadata.location_source; a source-less
+-- observation writes NO location_source (never invented), and is counted in folded_without_source.
 SELECT metadata AS m3 FROM public.external_identities WHERE handle = 'CommentMember' \gset
 SELECT pg_temp.ok('comment-sourced location_source carried: bat_comment', (:'m3'::jsonb ->> 'location_source') = 'bat_comment');
 SELECT pg_temp.ok('comment-sourced state folded: TX',                      (:'m3'::jsonb ->> 'state') = 'TX');
 SELECT metadata AS m4 FROM public.external_identities WHERE handle = 'NoSourceMember' \gset
-SELECT pg_temp.ok('source-less location_source falls back to bat',         (:'m4'::jsonb ->> 'location_source') = 'bat');
+SELECT pg_temp.ok('source-less writes NO location_source (not invented)',  NOT (:'m4'::jsonb ? 'location_source'));
+SELECT pg_temp.ok('source-less state still folded: OR',                    (:'m4'::jsonb ->> 'state') = 'OR');
+SELECT pg_temp.ok('first fold counts the source-less gap: folded_without_source=1', (:'r1'::jsonb ->> 'folded_without_source')::int = 1);
 
 -- Idempotency: a second fold changes nothing.
 SELECT public.fold_external_identity_location(100) AS r2 \gset

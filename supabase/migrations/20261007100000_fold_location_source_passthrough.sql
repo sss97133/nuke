@@ -5,9 +5,11 @@
 -- seller-listing-address and comment-mined locations land (both write structured_data.source), the hardcode
 -- would mislabel their provenance. Confirmed finding 2026-10-07: 457/457 located identities are sellers, so
 -- the real sources are the listing address and comments, not member pages; provenance matters for the
--- multi-evidence model. Fix: carry the observation's structured_data.source through to metadata.location_source
--- (fallback 'bat'). No behavior change otherwise; CREATE OR REPLACE preserves the service_role-only ACL, and
--- the REVOKE/GRANT is re-applied to be explicit.
+-- multi-evidence model. Fix: carry the observation's structured_data.source through to metadata.location_source.
+-- When the observation has no source, write NO location_source at all (jsonb_strip_nulls drops the NULL) rather
+-- than invent one — facts are never invented; those rows are counted in the return (folded_without_source) so the
+-- gap is visible and a reader reads "no source" as exactly that. No behavior change otherwise; CREATE OR REPLACE
+-- preserves the service_role-only ACL, and the REVOKE/GRANT is re-applied below to keep it explicit.
 
 BEGIN;
 SET LOCAL statement_timeout = '15s';
@@ -25,6 +27,7 @@ DECLARE
   v_prev_writer text := current_setting('app.writer', true);
   v_changed integer := 0;
   v_candidates integer := 0;
+  v_no_source integer := 0;
 BEGIN
   IF p_batch IS NULL OR p_batch < 1 OR p_batch > 50000 THEN
     RAISE EXCEPTION 'fold_external_identity_location: p_batch must be 1..50000, got %', p_batch;
@@ -62,14 +65,17 @@ BEGIN
     SET metadata = coalesce(e.metadata, '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object(
           'state', p.state,
           'country', p.country,
-          'location_source', coalesce(p.src, 'bat'),
+          'location_source', p.src,
           'location_observed_at', p.observed_at
         ))
     FROM pick p
     WHERE e.id = p.subject_id
-    RETURNING 1
+    RETURNING p.src AS src
   )
-  SELECT (SELECT count(*) FROM pick), (SELECT count(*) FROM upd) INTO v_candidates, v_changed;
+  SELECT (SELECT count(*) FROM pick),
+         (SELECT count(*) FROM upd),
+         (SELECT count(*) FROM upd WHERE src IS NULL)
+    INTO v_candidates, v_changed, v_no_source;
 
   IF v_changed > 0 THEN
     INSERT INTO public.write_receipts (at, tbl, op, rows, writer, db_role, app_name, txid)
@@ -79,13 +85,14 @@ BEGIN
 
   PERFORM set_config('app.writer', coalesce(v_prev_writer, ''), true);
 
-  RETURN jsonb_build_object('candidates', v_candidates, 'folded', v_changed, 'batch', p_batch,
+  RETURN jsonb_build_object('candidates', v_candidates, 'folded', v_changed,
+                            'folded_without_source', v_no_source, 'batch', p_batch,
                             'more', v_candidates >= p_batch);
 END
 $fn$;
 
 COMMENT ON FUNCTION public.fold_external_identity_location(integer) IS
-'Projects a BaT member home location (state + country ONLY, masking) from identity-subject observations into external_identities.metadata (migration 20261007070000; source passthrough 20261007100000). Reads the latest non-superseded vehicle_observations row per subject (subject_type external_identity; structured_data.home_state/home_country) and merges {state, country, location_source = the observation''s structured_data.source (member page, listing address, comment, ...; fallback bat), location_observed_at} into metadata by id, only where state/country differ. Bounded by p_batch (1..50000). Never writes city or finer, never touches platform/handle, merges (never replaces) metadata. app.writer=fold-external-identity-location set in the body and the caller value restored; one write_receipts row per changing call. Returns {candidates, folded, batch, more}.';
+'Projects a BaT member home location (state + country ONLY, masking) from identity-subject observations into external_identities.metadata (migration 20261007070000; source passthrough 20261007100000). Reads the latest non-superseded vehicle_observations row per subject (subject_type external_identity; structured_data.home_state/home_country) and merges {state, country, location_source = the observation''s structured_data.source (member page, listing address, comment, ...; omitted entirely when the observation has no source, never invented), location_observed_at} into metadata by id, only where state/country differ. Bounded by p_batch (1..50000). Never writes city or finer, never touches platform/handle, merges (never replaces) metadata. app.writer=fold-external-identity-location set in the body and the caller value restored; one write_receipts row per changing call. Returns {candidates, folded, folded_without_source, batch, more}.';
 
 REVOKE ALL ON FUNCTION public.fold_external_identity_location(integer) FROM PUBLIC;
 DO $grants$ BEGIN
