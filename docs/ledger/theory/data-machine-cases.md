@@ -1109,3 +1109,98 @@ and can financially participate in it."
 5. **Stacks as theses.** A stack with a stated expectation and a measured coverage is something a person can back
    without owning a car: the marketplace of actions. Product and legal shape are the owner's; the data shape is the
    same registry plus an outcome ledger per stack version.
+
+### 13.2 The stack grammar, four stacks built through every layer, and forty more (lead, 2026-10-07 00:30Z)
+
+**Owner, 2026-10-07:** "that's barely scratching it ... how do we get to these is the next issue, and how do we make
+this more of our product ... not a classified, not pretty pictures of cars ... make it comprehensible in the design
+system ... a local agent could be spinning these up for free and measuring them."
+
+**The grammar.** A stack is a path through nine typed layers; each layer is a table with a declared grain, key and
+clock, plus two columns every layer carries: `coverage` (how much of its universe it holds) and `provenance` (which
+layer version it read).
+
+| Layer | Holds | Grain and clock |
+|---|---|---|
+| Log | append-only source rows | one source event; event clock and ingest clock |
+| Key | every text reference as a foreign key | one row; set at insert, backfilled by bounded batch |
+| Dimension | taxonomies built from evidence (generation, body, engine, color, options, place, platform, part, failure mode) | one member; versioned |
+| Fold | state and aggregates per entity, replayable from the log | one entity; declared cadence |
+| Baseline | the expected value of a measure for a cohort as of a time | one cohort × time |
+| Residual | observed minus baseline, with the baseline version | one entity × time |
+| Feature | a residual or fold indexed by entity and as-of time | one entity × as-of |
+| Prediction | a feature set + model version + horizon | one entity × as-of × horizon |
+| Outcome | what happened, joined back by key and clock | one entity × event clock |
+
+A page is a rendering of one path. A thesis is a prediction row waiting for its outcome row. A stack's coverage is the
+product of its layers' coverages, shown first on every page: no number without its denominator.
+
+**Four stacks built all the way down.**
+
+*A. The auction as an order book.* Log: every bid comment is a timed quote; a stated "I'd pay X" is a reservation price;
+"too rich" is a refusal. Key: bid → identity, bid → lot (done 2026-10-06). Dimension: comment stance (bid, reservation,
+refusal, question) from the text fold. Fold: per lot per minute, the implied demand curve (identities revealing a price
+≥ P). Baseline: the cohort's curve shape at the same minutes-to-close. Residual: this lot's curve against its cohort
+(thin at the top is visible 12 h before close). Feature: slope, depth, top-two gap as of each minute. Prediction: hammer
+distribution and P(reserve met), intervals calibrated on every past lot. Outcome: the hammer. Coverage: lots with full
+frame history / all lots; comments keyed / all comments. Page: the live curve against its cohort. Thesis: "clears above
+estimate", backable before close, scored at close. Needs: bid frames at second precision (the bat_bids copy).
+
+*B. The car as a bond.* Value = present value of use (miles/year × cohort enjoyment proxy), maintenance (receipts
+cadence × parts price index × hidden-defect prior) and residual (cohort price path). Log: odometer observations,
+receipts, work sessions. Key: vehicle, part, shop. Dimension: parts taxonomy, failure modes. Fold: miles/year and
+spend/mile per vehicle. Baseline: cohort medians. Residual: maintained above or below cohort. Prediction: total cost
+of ownership and residual at 1, 3, 5 years per county (tax, emissions, climate). Outcome: later sales and receipts.
+Coverage today: receipts intake landed 0 rows in 14 days; the stack reports its emptiness and the sources with cost.
+
+*C. Liquidity as an option.* Log: listing open and close clocks. Key: lot, venue, place. Dimension: cohort. Fold: per
+cohort × venue, the survival curve of time-to-sale by price-to-baseline ratio. Baseline: the cohort median curve.
+Residual: per county and season. Feature: N-day sell probability at a discount. Prediction: the discount that sells in
+14 days, with intervals. Outcome: realized sales. The option value is the gap between the 14-day price and the patient
+price; a widening option value is a nervous cohort, weeks before prices move. Needs: dense clocks on every episode.
+
+*D. Ownership as flow.* Log: dated locations from listings, titles, transfers. Key: place. Fold: county→county transfer
+matrix per cohort per quarter. Baseline: a gravity model (population, income, distance, climate). Residual: corridors
+above gravity. Feature: net inflow per county per cohort. Prediction: where supply thins next quarter. Outcome: the
+quarter's sales. The first stack whose primary page is a map; it is also "where to set up shop" with a time axis.
+
+**What the stacks make that the car cannot.** (1) Evidence futures: a prediction row has a known uncertainty and the
+value-of-information table prices which single observation would collapse it most; someone can pay for that observation
+and be paid back in resolution: a market for information about assets. (2) Outcome ledgers make every stack a track
+record; a thesis with a scored history is an instrument, and its holders are the movement, not the owners. Data shape:
+a stack registry, a prediction table, an outcome table, a coverage table; the hard part is the keyed, clocked layers
+beneath, which is the repair loop's work.
+
+**Forty more, each with the layer it needs.**
+Market microstructure: 21 bid hazard model (bid frames at second precision); 22 snipe cascades and rivalry pairs
+(extension chains from frames); 23 reserve inference (outcome clocks); 24 demand nowcast with calibrated intervals
+(watcher counts as a time series); 25 attention saturation (platform entity, every venue's close clocks); 26 catalogue
+position effects (lot order per auction event).
+Physics of the asset: 27 corrosion exposure prior (state history, zone dimension, climate dimension); 28 use profile
+from odometer curves (uniform odometer observations, receipts); 29 survival by production (production dimension,
+cross-source VIN identity); 30 factory batch effects (VIN → build sequence, option keys); 31 modification recipes and
+outcomes (parts/labor taxonomy, modifications dimension); 32 documentation premium (image fold → document kinds); 33
+title brand arbitrage (title observations with clocks, image fold).
+Information and attention: 34 information half-life (relist chains, text fold); 35 disclosure drift (description
+observations per listing); 36 expertise graph (text fold, author keys); 37 photographer fingerprints and image reuse
+(EXIF, dhash on every image); 38 event impact studies (dense dated sales); 39 inconsistency graphs (odometer OCR,
+receipts).
+Geography, logistics, tax: 40 delivered-price surface (place entity, buyer location); 41 tax and rule geography
+(jurisdiction dimension); 42 regional taste maps (dimensions + place); 43 demographic overlays (Census dimension); 44
+cohort migration (state history); 45 service capacity market (work_sessions intake, organization keys).
+People and reputation: 46 unified dealer entity (cross-platform identity, platform entity); 47 dealer markdown curves
+(price observations as time series); 48 tenure mix as stability (transfers with clocks); 49 venue integrity index (9, 5,
+23); 50 restorer lineage (organization keys on work, long clocks).
+Economics and finance: 51 rate and fuel betas (dense dated sales, macro series); 52 carry-adjusted returns (2 +
+cost-of-carry dimension); 53 guide lag (licensed guide dimension); 54 portfolio construction (10, 18, 51); 55 parts price
+indices (parts taxonomy, receipts intake).
+Counterfactuals: 56 venue design replays (21); 57 feature attribution by matched siblings (12, 30); 58 what-if pricing for
+one VIN (10, 21, 24, 31).
+The machine's economics: 59 value of information (20 + the price model); 60 trust calibration (outcomes vs claims).
+
+**How we get there (the owner's "next issue").** (1) The registry as data: extend `vein_ledger` (a hypothesis as a
+query with a pass rule) or a child of it, through SCHEMA_LAW, seeded with these 60, with a coverage function from the
+atlas and pipeline_registry so "how close are we" is a number per stack refreshed by the pulse. (2) A local generator:
+Odysseus (Qwen 3.5 9B, free) proposes stacks nightly in a strict JSON shape; each is measured against the atlas and
+lands as `proposed`; Claude reviews the top by coverage. (3) The first stack as a page: Stack A on one live BaT lot,
+rendered from its registry row in the design system, coverage block first, every layer drillable.
