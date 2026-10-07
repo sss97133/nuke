@@ -1269,3 +1269,41 @@ never exist"; an LLM cannot do them from language alone.
    construction: it can't say what was known two hours before a close. Its place in the machine is the text
    fold (comments into attributed claims) and stack generation (13.2), measured by the atlas. The
    calculations and the retained, replayable log are the part it can't produce.
+
+### 13.5 The text fold as it stands, and the first stance dimension (lead, 2026-10-07 02:30Z)
+
+Six stacks wait on the text fold (`stack_needs`, latest versions, 2026-10-07): S04, S05, S19, S34 and S36 need the
+`text fold` substrate, SA needs `comment stance dimension`, S04 also `comment sentiment per lot`. The claims layer of
+§13.3 weighs speakers by their record, which is a text fold too. None of these substrates has a declared table.
+
+**What exists (read live, `v_schema_atlas`, `pg_stats`, column comments, 02:28Z).**
+
+| Object | Rows / fill | State |
+|---|---|---|
+| `auction_comments` | 19,978,200 rows, 56 of 56 columns described | the log; written daily |
+| `auction_comments.comment_type` | fill 1.00, 5 values in use (CHECK: bid, sold, question, answer, observation, seller_update, seller_response, expert_opinion) | the builder's kind, the only full-coverage dimension |
+| `auction_comments.has_question` | fill 1.00 | a question mark, derived |
+| `auction_comments.sentiment`, `sentiment_score`, `key_claims`, `analyzed_at` | fill 0.111 | `analyze-auction-comments`, deleted 2026-03-09 (5741560ae); scored 2026-01-20 to 2026-03-06 |
+| `auction_comments.question_primary_l1/l2`, `question_classified_at`, `question_classify_method` | fill 0.074 / 0.092 | `scripts/question-classify-bulk.mjs` regex_v1, 2026-03-27 to 2026-04-13 |
+| `auction_comments.community_stance_score`, `stance_scored_at`, `stance_model`, `extracted_claims` | fill 0.0001 | BYOK rubric v2, on demand |
+| `comment_persona_signals` → `author_personas` | 224,369 rows → 363 | tone, expertise, style per comment; read-only, no writer in 30 days |
+| `comment_discoveries` | 133,445 | raw LLM analysis (sentiment and trends); read-only |
+| `vehicle_sentiment` | 127,348 | per-vehicle fold, last 2026-02-07; read-only |
+| `sentiment_update_queue` | 18,839 | trigger-fed (`trg_queue_sentiment_update`), written, **no reader** |
+| `comment_claims_progress` | 22,285 | which comments the claim refinery has seen (0.11% of the log) |
+| `_shared/commentRefinery.ts` | code | comment → claim_triage (regex) → extract_claims (LLM) → field_evidence / vehicle_observations / comment_discoveries / comment_library_extractions; categories A specs, B condition, C provenance, D market signals, E library, Q questions; `statement_kind` assertion/question; `epistemic_status` asserted/uncertain/unknown/refused |
+
+Case 8 above already names the organs frozen (sentiment 2026-03-06 at 11.5%, question classification 2026-04-14 at
+8.7%, stance 0%, 15 of 16 analysis crons inactive). The shape is there; the writers stopped, and each one wrote its
+result as more columns on the 20M-row log.
+
+**The first stance dimension, v1 (the plan, not yet built).** The order book (stack A) and the claims layer need, per
+comment: *bid* (typed already), *question* (typed or `has_question`), *reservation* (a stated price or a willingness,
+"I'd go to X", "worth X all day"), *refusal* ("not at this price", "no sale here"), else *observation*. Rules first:
+the refinery's regex triage covers all 20M rows for free and is measured against denominators (share per class, per
+platform and year); the free local model (`scripts/stacks` shows it runs at 16 to 17 tokens per second) grades a
+stratified sample to calibrate the rules, never the whole log. The dimension is a **declared table for the
+`comment stance dimension` substrate** (one row per comment: stance, method, version, scored_at), not a seventh set of
+columns on `auction_comments`: it keys the comment, carries its method and clock, is re-runnable by version, and
+declaring it moves every stack that names the substrate with no new stack version (13.1 point 4). The frozen columns
+stay as the record of the earlier organs. Coverage is the number the registry reports once the table is declared.
