@@ -39,8 +39,10 @@ practical purposes (26 rows, 0 writers).
 ### 2. Observations first?
 Yes. An option on a vehicle is testimony: a SPID label photographed, a build sheet, a seller's "RPO Z28, L82" in the
 listing text. It belongs in the observation log keyed to the vehicle and the source, folded into `vehicle_options`
-(which already carries `source` and `verified_by_spid`). Listing text is a real source: in a 1% sample of vehicles with
-a description, [{"sampled":4567,"mentions_rpo":3,"code_shaped":643}] (sampled / mention the word RPO / contain a code-shaped token like Z28, both regex, upper bound).
+(which already carries `source` and `verified_by_spid`). Listing text is a thin source for the word itself and a noisy one for codes: in a 1% sample of 4,567 vehicles with a
+description (2026-10-07 12:38Z), 3 mention the word RPO and 643 contain a code-shaped token (one capital and two digits,
+an upper bound: engine and model names match too). The SPID extractor and build sheets are the precise sources; text
+mining needs the code dimension to filter against before it can count.
 
 ### 3. DNA
 The dimension's key must be (manufacturer, code, year range), not the bare code. None of the three libraries has it as a
@@ -59,9 +61,9 @@ belong with that migration.
 
 ### 6. Writers and registry
 Libraries: loaded by scripts (`enrich-rpo-library.mjs`; the others Unknown). `vehicle_options`: no writer. The intake
-candidates, in cost order: (a) listing text mining for RPO tokens into observations of kind `specification` with the
-token list in `structured_data` (cheap, every BaT description already captured); (b) the SPID extractor
-(`vehicle_spid_data`, 6 code files, 1 row) pointed at the owner's own GM photos first; (c) build-sheet uploads.
+candidates: (a) the SPID extractor (`vehicle_spid_data`, 6 code files, 1 row) pointed at the owner's own GM photos first;
+(b) build-sheet uploads; (c) listing-text mining for code tokens, filtered against the keyed dimension (without it the
+token match is 14% of descriptions and mostly not options).
 
 ### 7. Migration
 None now. Order: intake fold (a) with a per-vehicle count as its assay → dedupe one library into the keyed dimension →
@@ -73,5 +75,5 @@ coverage would rise about 0.006 with no vehicle gaining an option.
 
 ## Decision asked
 Rule on the dimension key (manufacturer, code, year range) and which library is primary (`vintage_rpo_codes` has the
-shape; `gm_rpo_library` has the rows). Approve the text-mining intake as the first feed. Declare after the first fold
+shape; `gm_rpo_library` has the rows). Approve the SPID extractor run on the owner's GM photos as the first feed. Declare after the first fold
 writes rows.
