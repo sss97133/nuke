@@ -50,7 +50,7 @@
 --   (the 49 earliest had fewer than 9 lots with a clock), held 257 = 82.6% (95% CI 78.0-86.4), by day 81.7% and 83.7%, every miss
 --   above. The stored model-31 band, same lots with a row (271): 84.5% at 1.34 times the bid wide; this band 0.44 times.
 --   The one-sided shape was chosen after seeing the 91.0% of finding 5 on these lots, so they are not out-of-sample for it: the
---   hold-out is QUERY 1 of the replay script on lots that close after this change (2026-10-07 21:00Z on).
+--   hold-out is QUERY 1 of the replay script on lots that close after this change (closing from 2026-10-07 07:00Z).
 --   Hours regime, 1,200 BaT sold lots drawn by md5(id), 100 a month 2025-10..2026-09, read 24 h, 6 h and 1 h before the final
 --   close (1,057, 1,058, 1,058 have a bid log that reproduces the hammer; a band for 685, 684, 684, the rest have no cohort of 9
 --   sold lots in the last 365 days at either level): held 79.3% (543 of 685), 80.8% (553 of 684), 78.4% (536 of 684). At 24 h by half: 79.4% on

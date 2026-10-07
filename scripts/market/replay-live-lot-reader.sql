@@ -5,14 +5,15 @@
 -- 150 lots (the read path times out at 55 s; 147 lots took 37 s) and split a longer period by day or by hour.
 --
 -- QUERY 1: T-2 on lots the public live collector followed (exact scheduled close from the frames). The default window
---   is the lots that close after this change froze (2026-10-07 21:00Z to midnight): a hold-out no design choice has seen.
+--   is lots that close after this change froze (2026-10-07 17:00Z to 19:00Z; repeat for 19:00Z to midnight): a hold-out no
+--   design choice has seen.
 --   p_at = scheduled close - 120 s; the clock given is the scheduled close; the bid and bidders are the lot's own bid
 --   rows at or before p_at. The scheduled close is the earliest previous_scheduled_end in the lot's live frames
 --   (the stored auction_end_date is the FINAL close after soft-close extensions: a read 120 s before it already sees the
 --   hammer, 311 of 311 lots on 2026-10-04..06). Lots whose bid log does not reproduce the hammer are left out and counted.
 --   Output: one row, with the denominators.
 -- QUERY 1
-with since as (select timestamptz '2026-10-07 21:00:00+00' as t, timestamptz '2026-10-08 00:00:00+00' as u),
+with since as (select timestamptz '2026-10-07 17:00:00+00' as t, timestamptz '2026-10-07 19:00:00+00' as u),
 m as (select ma.vehicle_id, ma.external_auction_id slug from monitored_auctions ma where ma.stream_state ? 'last_frame_received_at'),
 fr as (select o.vehicle_id, min((o.structured_data->>'previous_scheduled_end')::timestamptz) o_true
        from vehicle_observations o where o.vehicle_id in (select vehicle_id from m) and o.extraction_method = 'bat_public_live_v1' group by 1),
