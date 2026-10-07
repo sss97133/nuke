@@ -5,39 +5,33 @@
   <!-- Nightly local stack generator (scripts/stacks/propose.mjs): asks the local Odysseus + Qwen 3.5 9B for STACKS_N new data
        stacks, measures them read-only against the live data model, appends ~/nuke-logs/stacks/proposals/<UTC>.jsonl and
        rewrites ~/nuke-logs/stacks/INDEX.md. Zero API spend; reads the database through scripts/data/q.sh only.
-       NOT LOADED. To load: (1) the Odysseus workspace must be running (cd ~/odysseus && ./start-macos.sh) and
-       ODYSSEUS_API_TOKEN must be in the dotenvx environment of ~/nuke; (2) ~/nuke must be on a commit that contains
-       scripts/stacks (this folder), or edit the one path below to a worktree on main; (3) ~/nuke-logs/stacks must exist
-       (propose.mjs creates it on its first run); then: launchctl load ~/Library/LaunchAgents/ag.nuke.stack-generator.plist.
+       Runs from the runner worktree ~/.worktrees/stacks-nightly, fetched and detached to origin/main before each run
+       (~/nuke is a shared checkout on whatever branch a session left it on). The .env comes from ~/nuke through dotenvx -f.
+       To load: (1) Ollama must be serving qwen3.5:9b; (2) the runner worktree must exist
+       (git -C ~/nuke worktree add --detach ~/.worktrees/stacks-nightly origin/main); then copy this file to
+       ~/Library/LaunchAgents/ and launchctl load it.
        Stop: launchctl unload the same file. Runs at 03:30 local time, caffeinate keeps the Mac awake while it works, gtimeout
        stops it after 30 minutes (propose.mjs also ends gracefully at 25). PATH adds ~/.local/bin, where ody lives.
        STACKS_ASKER=auto asks `ody ask` first and, if the workspace is down, the token is missing or the reply comes back empty,
        asks the already-running Ollama server directly (same Qwen 3.5 9B, thinking off); every proposal records which one answered.
        Measured 2026-10-07: through Odysseus today Qwen 3.5 spends all 4096 reply tokens thinking (Ollama ignores think:false
-       on /v1), so ody alone returns empty replies; set STACKS_ASKER=ody to insist on it, or ollama to skip it.
+       on /v1), so ody alone returns empty replies; at 05:00Z a 3-proposal run through ody took 171 s + 232 s of repair and
+       admitted 0 of 6 (malformed). Straight to Ollama at 05:06Z the same 3-proposal run took 196 s + 14 s + 14 s and
+       recorded 3 of 3, each measured live. The job therefore asks Ollama directly (STACKS_ASKER=ollama).
        Repo copy is source of truth; keep identical to ~/Library/LaunchAgents/ag.nuke.stack-generator.plist. -->
   <key>Label</key><string>ag.nuke.stack-generator</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/caffeinate</string>
-    <string>-i</string>
-    <string>/opt/homebrew/bin/gtimeout</string>
-    <string>-k</string>
-    <string>60</string>
-    <string>30m</string>
-    <string>/opt/homebrew/bin/dotenvx</string>
-    <string>run</string>
-    <string>-q</string>
-    <string>--</string>
-    <string>/opt/homebrew/bin/node</string>
-    <string>/Users/skylar/nuke/scripts/stacks/propose.mjs</string>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>cd "$HOME/.worktrees/stacks-nightly" &amp;&amp; git fetch -q origin main &amp;&amp; git checkout -q --detach origin/main &amp;&amp; exec /usr/bin/caffeinate -i /opt/homebrew/bin/gtimeout -k 60 30m /opt/homebrew/bin/dotenvx run -q -f "$HOME/nuke/.env" -- /opt/homebrew/bin/node scripts/stacks/propose.mjs</string>
   </array>
-  <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
+  <key>WorkingDirectory</key><string>/Users/skylar/.worktrees/stacks-nightly</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key><string>/Users/skylar/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>STACKS_N</key><string>20</string>
-    <key>STACKS_ASKER</key><string>auto</string>
+    <key>STACKS_ASKER</key><string>ollama</string>
   </dict>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>30</integer></dict>
