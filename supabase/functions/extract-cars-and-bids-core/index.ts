@@ -495,7 +495,9 @@ Deno.serve(async (req) => {
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
     if (!firecrawlApiKey) throw new Error("Missing FIRECRAWL_API_KEY");
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { "X-Nuke-Writer": "extract-cars-and-bids-core" } },
+    });
 
     const body = await req.json().catch(() => ({}));
     const inputUrl = String(body?.url || body?.listing_url || body?.auction_url || "").trim();
@@ -1094,7 +1096,9 @@ Deno.serve(async (req) => {
       const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
       const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
       if (supabaseUrl && serviceRoleKey) {
-        const supabase = createClient(supabaseUrl, serviceRoleKey);
+        const supabase = createClient(supabaseUrl, serviceRoleKey, {
+          global: { headers: { "X-Nuke-Writer": "extract-cars-and-bids-core" } },
+        });
         const body = await req.clone().json().catch(() => ({}));
         const inputUrl = String(body?.url || body?.listing_url || body?.auction_url || "").trim();
         if (inputUrl) {
