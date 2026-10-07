@@ -1,4 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261007014500_stack_registry.sql (case ledger 13.2: the stack registry as data).
+-- Isolated PostgreSQL 17 contract for 20261007014500_stack_registry.sql (case ledger 13.2: the stack registry as data)
+-- and for 20261007040000_stack_sa_v2_showable.sql (SA version 2, the stack as a page), applied in that order below.
 -- Synthetic rows only; never production. Run from the repo root in an empty disposable dm_refinement_* database:
 --   createdb dm_refinement_stack_registry_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_stack_registry_ci -f supabase/sql/test_stack_registry.sql
@@ -580,5 +581,38 @@ BEGIN
   END LOOP;
   PERFORM pg_temp.ok('anon and authenticated are refused on the view, the function and the three tables', length(denied) = 10);
 END $$;
+
+-- Version 2 of SA, the stack as a page (20261007040000) -------------------------------------------------------------
+-- Applied after the registry, as CI does on prod. Checks: the version row, its full need list across the nine layers,
+-- the two new substrates, the reader taking the latest version, and the replay adding nothing.
+RESET ROLE;
+\ir ../migrations/20261007040000_stack_sa_v2_showable.sql
+SELECT pg_temp.ok('SA v2: showable, supersedes 1, nine path entries, same name and question as v1; v1 untouched',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'SA') = 2
+  AND (SELECT status = 'showable' AND supersedes_version = 1 AND cardinality(path) = 9
+         AND name = 'The auction as an order book' AND source LIKE 'PR #724%'
+       FROM public.stacks WHERE stack_id = 'SA' AND version = 2)
+  AND (SELECT s2.question = s1.question AND s2.scoring = s1.scoring
+       FROM public.stacks s1 JOIN public.stacks s2 ON s2.stack_id = s1.stack_id
+       WHERE s1.stack_id = 'SA' AND s1.version = 1 AND s2.version = 2)
+  AND (SELECT status = 'measured' FROM public.stacks WHERE stack_id = 'SA' AND version = 1)
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA' AND version = 1) = 5);
+SELECT pg_temp.ok('SA v2 carries 16 needs over all nine layers, every abstract need on a registered substrate, the two new substrates undeclared',
+  (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA' AND version = 2) = 16
+  AND (SELECT count(DISTINCT layer) FROM public.stack_needs WHERE stack_id = 'SA' AND version = 2) = 9
+  AND NOT EXISTS (SELECT 1 FROM public.stack_needs n LEFT JOIN public.stack_substrates g ON g.substrate = n.object
+                  WHERE n.stack_id = 'SA' AND n.version = 2 AND n.kind = 'abstract' AND g.substrate IS NULL)
+  AND (SELECT count(*) FROM public.stack_substrates
+       WHERE substrate IN ('order book fold per lot per minute', 'cohort demand curve by minutes to close')
+         AND declared_table IS NULL AND declared_at IS NULL) = 2);
+SELECT pg_temp.ok('the reader takes SA at version 2 with 16 needs, and the function grades all 16',
+  (SELECT version = 2 AND n_needs = 16 AND status = 'showable' FROM public.v_stacks WHERE stack_id = 'SA')
+  AND (SELECT n_present + n_partial + n_missing = 16 FROM public.stack_coverage('SA')));
+\ir ../migrations/20261007040000_stack_sa_v2_showable.sql
+SELECT pg_temp.ok('re-applying the version file adds nothing',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'SA') = 2
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA') = 21
+  AND (SELECT count(*) FROM public.stack_substrates
+       WHERE substrate IN ('order book fold per lot per minute', 'cohort demand curve by minutes to close')) = 2);
 
 SELECT pg_temp.ok('done: stack registry contract', true);
