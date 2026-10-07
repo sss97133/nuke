@@ -116,7 +116,8 @@
 --   6 writer: this function only; registry rows below; the old writer (score_closed_predictions, cron paused) and the
 --     inserters are unchanged.
 --   7 this file; RLS on hammer_predictions is unchanged (anon reads nine columns of model 31 rows; the new columns have no
---     grant); the new view is service_role only.
+--     grant); the two new views (v_prediction_lot_grades, prediction_accuracy_hourly) are service_role only, as the old
+--     prediction_accuracy was.
 -- schema_proposals has add_column (20261006213000); the change is recorded as one open row. No row of hammer_predictions
 -- changes in this migration: rows change only when the function is called.
 -- Applied by CI, never by hand. After the merge: run the hand batch, then the runner (~/nuke-logs/data-hygiene-20261005/
