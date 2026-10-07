@@ -1307,3 +1307,84 @@ stratified sample to calibrate the rules, never the whole log. The dimension is 
 columns on `auction_comments`: it keys the comment, carries its method and clock, is re-runnable by version, and
 declaring it moves every stack that names the substrate with no new stack version (13.1 point 4). The frozen columns
 stay as the record of the earlier organs. Coverage is the number the registry reports once the table is declared.
+
+### 13.6 The owner on the outside read, observation, the two-minute window and the physical shape (2026-10-07, in substance)
+
+**Owner direction (substance kept).** He asked a model whether the project could get seed funding (NSF SBIR) and it
+dismissed the project the way a smart stranger without time to inspect would. He agrees the outside read is fair: from
+outside "it looks stupid and annoying", from inside "I'm touching something incredible, very streamlined and very
+usable" that "just needs financial support". The question: how does the project take shape so it fits what funders look
+for, and what is the outside reader looking at that makes it uninteresting. The physical expansion he sees: live-streamed
+garage sessions; the software becomes "the software for financial interaction and documentation, so it has this whole
+accounting system, because that's how you do it"; image analysis and the user data structure are "completely passive".
+On what it is: "it's really just a database. It's a data model. I like that wording." On models: "how do LLMs compete
+with just factual documentation? They literally cannot exist in the same reality"; "do LLMs tell the future or not is
+maybe a key point"; observation is the important thing; "being able to process data as fast as possible helps you
+predict what to do in the next second". On auctions: "a very interesting point in time to act within, like bumper cars,
+you have two minutes to make a decision"; "crazy calculations and actually win, because you are arbitrating the moment
+where you could own something or not."
+
+**Lead's reading (nothing minted; one positioning doc revised, `docs/POSITIONING.md`):**
+
+1. **What the outside reader saw.** Not the machine. The model that dismissed the project read two words of a
+   description ("vehicle data ledger", still the first sentence of `AGENTS.md`) and never opened the README. A
+   reviewer screening pitches does the same. The repo also carried three one-liners from three eras: `VISION.md`
+   (2026-02-05: "makes every collector vehicle in the world liquid", ETFs, derivatives, vaults), the positioning note
+   (2026-02-08: "vertical data + applied AI", "bots that hire humans") and the README (2026-10-06: a data machine,
+   nine layers, stacks). A reader without time takes the loudest, and the loudest was the least evidenced. A smart
+   reader prices the ratio of claim to checkable evidence, not the idea. The repair is one voice, and a description
+   that carries a measured number wherever it travels.
+2. **Measured results exist, and they are modest, which is the asset.** Read on prod 2026-10-07:
+   - `prediction_accuracy`: hammer model v13, 208 scored, median abs error 48.2%, bias +32.0%, 0 within 10%; v24,
+     399 scored, median 33.2%, bias −12.5%, 36 within 10%, 103 within 20%. The predictor ran live 2026-02-19 →
+     2026-04-01 (`hammer_predictions`, 50,534 rows). The documented cause of the remaining error is condition
+     blindness: condition and configuration live in images and comments, not in fields (ask-nuke THEORY.md, "the ±40%
+     calibration killer").
+   - The band tag backtest (coverage audit of 2026-09-30, §5): 69,295 sold BaT lots, 2024-09-01 to 2026-09-27, each
+     priced only from earlier sales, bid as of 24 h before close: cold 11.3%, in line 40.9%, hot 86.8% finished
+     above their band middle (48 h: 13.2 / 40.3 / 82.9%).
+   - The stack registry (`v_stacks`, measured 03:11Z): 64 stacks, 5 at or above 0.9 coverage (S03 bidder record as
+     of a date, S21 bid hazard model, S47 dealer markdown curves, S48 tenure mix, S56 venue design replays), mean
+     coverage 0.12. SA v2, the auction as an order book, at 0.50: 8 of 16 needs present, 2 partial, 6 missing and
+     named.
+   - V012 discovery: 68,957 distinct BaT buyers; the top 1% took 14% of lots; 39 buyers won 50 or more.
+
+   A 33% median error is not an edge. It is a baseline with a named cause and a grading table, which is where a
+   research proposal starts and what a stranger can check in an afternoon.
+3. **The research claim, as R&D rather than engineering.** Can point-in-time state, estimated from heterogeneous
+   untrusted observations (images, comments, receipts, bids) that each keep their source, clock and relation to the
+   asset, close a measured 33% median error in asset price prediction, and be ready inside a two-minute decision
+   window? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
+   error demands; (b) relation-weighted claim credibility (who said it, their relation to the lot at the time, how
+   their earlier claims resolved; 13.3), which has no measured instance yet; (c) leakage-free replay over 19.9M
+   comments and 4.27M bids (README planner estimates, 2026-10-06), the invariant most market-data products violate.
+   Grading: median abs % error against the cohort baseline on a held-out last month, in the same
+   `prediction_accuracy` table, by price tier. Generality: any asset class whose record is fragmented public
+   observation (equipment, aircraft, property, art). Vehicles are the testbed because they are the largest public
+   corpus with timed bids.
+4. **Observation versus generation, in the form that survives a smart reader.** "They cannot exist in the same
+   reality" is the strong form, and it loses the room because the reply is "the model reads your ledger." The
+   defensible form is already here (13.4 point 4) and in `docs/content/thesis-aperture-of-llm-control.md`: a model
+   trained on today's web has leakage by construction and cannot say what was known two hours before a close; its
+   place is as an observer whose outputs land as claims with provenance (the text fold, the vision gate), never as the
+   source of a number. A model is a sensor; the ledger is the instrument; the calculations and the retained,
+   replayable log are what the model cannot produce. "Do LLMs tell the future" then has a precise answer: not about a
+   specific asset at a specific moment, because that future is a fold over observations the model has not seen. Said
+   this way the point reads as method, not as a flag.
+5. **The two-minute window is the forcing function, not a feature.** BaT's soft close moves the close to bid time + 2
+   minutes; 322 of 400 settled lots extended (§4). The decision moment is the chain, so everything the system knows
+   about a lot must be folded before the chain starts. That is why the architecture is a fold over a log and not a
+   query at decision time, and why "predict what to do in the next second" is a property of the layers, not of a
+   model. SA's missing substrates (comment stance dimension, order-book fold per lot per minute, cohort demand curve by
+   minutes to close, residual snapshots, outcome ledger) are the work plan, already written as a backlog.
+6. **The physical shape is a set of sources, and it comes after the instrument.** Live-streamed garage sessions are
+   observations with the richest provenance available: a camera on the work, the receipt, the person doing it, all
+   clocked. The accounting system is money as one more observation layer on the same entities (§9 already frames
+   investment, maintenance and repair as evidenced interventions). Passive capture is the vision gate and the photo
+   sync. All three land in the same substrates (13.1 point 4). To a funder they are the market and the company, not
+   the innovation. Lead with the instrument; the garage is where the instrument gets its best data.
+7. **One voice.** The README is the description. `docs/POSITIONING.md` says it to a reviewer, an investor and a
+   mechanic, with the evidence table, the research question and what loses the room. `VISION.md` keeps the long-range
+   direction under a dated header that points at the operating description. The one-line descriptions that agents read
+   first (`AGENTS.md`, the owner's private instructions) are the owner's to change; the recommendation is the README's
+   first sentence.
