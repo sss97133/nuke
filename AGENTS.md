@@ -109,6 +109,23 @@ not close the work. The bounded discovery assays are operator tools, not autonom
   afterwards.
 - **Never** hand-apply a migration or function deploy, and never change compute, plan or disk.
 
+## PR titles and commit messages
+The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
+permanent record. Write both as `type(scope): summary`, at most 72 characters. The PR gate in
+`pre-deploy-check.yml` fails any other form.
+- **type**: `feat`, `fix`, `perf`, `refactor`, `data` (backfills and corrections), `docs`, `test`, `ci`,
+  `build`, `chore` or `revert`.
+- **scope**: the component, by its code name. That can be a table (`vehicle_events`), a function
+  (`extract-gooding`) or an area (`db`, `ingest`, `frontend`, `ios`, `cad`, `ci`).
+- **summary**: lowercase and imperative, with no trailing period. Name the mechanism (index, writer,
+  trigger, parser, view, migration).
+- Keep these out of titles and put them in the body: narration, internal case numbers (C28, §13.3),
+  personal vehicles, people and money.
+- Examples: `feat(extract-craigslist): parse listing attributes into vehicle fields`,
+  `perf(db): partial index on vehicle_observations.source_vehicle_event_id`,
+  `data(vehicle_events): backfill listing_key on Gooding and RM episodes`,
+  `feat(cad): engine assembly mesh at 1:1 scale`.
+
 ## Working alongside other agents
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`.
