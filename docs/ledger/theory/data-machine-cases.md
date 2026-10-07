@@ -1308,6 +1308,17 @@ columns on `auction_comments`: it keys the comment, carries its method and clock
 declaring it moves every stack that names the substrate with no new stack version (13.1 point 4). The frozen columns
 stay as the record of the earlier organs. Coverage is the number the registry reports once the table is declared.
 
+**Measured 2026-10-07 (stance lane; `docs/features/stance-fold/SPEC.md`).** On a 200,836-row ctid sample of the log, the
+fields already on the row settle 48.0% (bid 34.8%, question mark 13.0%). Twelve candidate regexes for reservation and
+refusal fire on 0.62% of non-bid comments. Nine are worth shipping: they label 0.17% reservation and 0.23% refusal of
+non-bid comments (about 22,000 and 30,000 comments of the 20M), at 67% and 73% precision read by the author agent and 58%
+to 72% agreement with the local model on the rule classes. 79.5% of non-bid comments stay `observation`, and the rules
+miss most stance statements (recall near 19%, interval 8% to 54%, from three clear misses in 200 residual rows). One rule
+pass costs 9.8 s of server time per 100K rows (33 minutes of one backend for the whole log, about a second a night), and
+the table would be 2.65 GB at 20M rows. Declaring it moves SA from 8 to 9 of 16 needs and no `text fold` stack, and the
+registry reports presence, not the share covered. The three decisions before the build (dense or sparse, where soft
+valuations live, the precision floor) are in §9 of the spec.
+
 ### 13.6 The owner on the outside read, observation, the two-minute window and the physical shape (2026-10-07, in substance)
 
 **Owner direction (substance kept).** He asked a model whether the project could get seed funding (NSF SBIR) and it
