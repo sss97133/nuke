@@ -187,6 +187,10 @@ jobs:
         run: createdb dm_refinement_county_key_ci
       - name: Verify county_fips is keyed at intake from the postal code (ZIP and ZIP+4 keyed with method, non-US and unknown ZIPs left alone, receipted idempotent back-fill honouring its batch, service_role only, registry rows, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_key_ci -f supabase/sql/test_key_vehicle_location_county_from_zip.sql
+      - name: Create disposable platform entity database
+        run: createdb dm_refinement_platform_entity_ci
+      - name: Verify the platform entity declaration (observation_sources declared, 22 of 22 columns described with the five existing comments unchanged, registry row extended once, no row written, re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_platform_entity_ci -f supabase/sql/test_platform_entity_declaration.sql
 
   image-projection:
     runs-on: ubuntu-latest
