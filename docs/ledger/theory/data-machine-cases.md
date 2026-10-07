@@ -1204,3 +1204,39 @@ atlas and pipeline_registry so "how close are we" is a number per stack refreshe
 Odysseus (Qwen 3.5 9B, free) proposes stacks nightly in a strict JSON shape; each is measured against the atlas and
 lands as `proposed`; Claude reviews the top by coverage. (3) The first stack as a page: Stack A on one live BaT lot,
 rendered from its registry row in the design system, coverage block first, every layer drillable.
+
+### 13.3 The owner on the glue: relation-weighted claims, the generated questionnaire, pursuit, user stacks (2026-10-07 00:40Z)
+
+**Owner direction (substance kept, lightly trimmed):** "A very valuable thing would be an in-depth and very simple
+questionnaire to help people provide data on vehicles. If somebody asks me about a vehicle and shows me pictures I can
+give and confirm so much information; if the conversation is fast and simple and changes the vehicle's profile, people
+feel that giving information to a vehicle is value. That data has to be processed in relation to the weights of the user
+making the statements: an actual owner's statements are far more valuable, especially citing information from during
+the ownership. That is how we always tried to structure it; we had a hard time facilitating the transfer from the source
+to the database and having the database handle it correctly; people commenting is the stupid version. I guarantee BaT
+comments already hold people claiming they owned a car at a certain date: find those examples, block that time out, and
+pursue it. That becomes an AI's pursuit: an agent collects the information, a thread of text, then photos or access
+('when were these photos taken; can I look at your photos to find them'). The transfer becomes palpable and trustworthy
+as a string of thought rather than slamming people with permissions at login. It builds their identity on the system:
+user data stacks, helping a user become more valuable. My own profile, with thousands of images, is incoherent because
+it is not held together with the right glue. The data model is the glue."
+
+**Model reading (lead; shape decisions through SCHEMA_LAW, none minted here):**
+1. **A claim is an observation with a relation.** The testimony table already exists (`vehicle_observations`: source,
+   method, observed_at, trust). A claim is an observation kind whose structured data carries the statement, the asserted
+   window, and the speaker's relation to the vehicle as of that window: owner, prior owner, shop, bidder, observer.
+2. **Relation is a fold, not a free text.** identity × vehicle × window, derived from `ownership_transfers`, lots won,
+   shop work, and the claims themselves (a claim of ownership is provisional until corroborated).
+3. **Weight = relation × calibration.** The speaker's record: how their earlier claims resolved. Owner-during-window
+   with a dated receipt outranks a bystander's recollection. This is the record layer of two-layer confidence.
+4. **The questionnaire is generated.** For one vehicle, the questions are its missing layers ordered by value of
+   information (stack 59); each answer lands as an observation with its source; the page changes while the person
+   watches. The CLI is the first door.
+5. **Pursuit is an agent task with the owner's send-gate.** Detection (claims in 20M comments) → provisional window on
+   the ownership timeline → outreach draft → thread → dated photos (EXIF) → observations. Agents draft and never send
+   (owner rule); the person opts in through a flow they start, or the owner sends.
+6. **User stacks.** A profile is the fold of a person's claims, evidence, vehicles over time and calibration. The first
+   user stack to build is the owner's own.
+
+**Test cases the owner predicted:** ownership claims already present in BaT comments. Measure first (count, parseable
+windows, examples by id), then shape, then the pursuit flow.
