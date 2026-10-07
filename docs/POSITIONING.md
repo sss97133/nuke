@@ -30,8 +30,8 @@ Lead with the instrument and its grading table. The vision comes after, and only
 
 ## What is measured
 
-Read on prod 2026-10-07 unless stated. Modest numbers with a named cause are the asset; they are what a reviewer can
-check.
+Read on prod 2026-10-07 between 02:50Z and 03:11Z unless stated. The registry and the daily measurements move;
+re-read before quoting. Modest numbers with a named cause are the asset; they are what a reviewer can check.
 
 | Result | Number | Source |
 |---|---|---|
@@ -40,7 +40,7 @@ check.
 | Predictor run, live | 2026-02-19 to 2026-04-01, 50,534 predictions, hourly scoring | `hammer_predictions`; `docs/ledger/INTENT_LEDGER.md` §2 |
 | Named cause of the residual error | condition and configuration live in images and comments, not fields ("the ±40% calibration killer") | `docs/features/ask-nuke/THEORY.md` |
 | Band tag backtest, 24 h before close | 69,295 sold BaT lots 2024-09-01..2026-09-27, each priced from earlier sales only: cold 11.3%, in line 40.9%, hot 86.8% finished above their band middle (48 h: 13.2 / 40.3 / 82.9%) | `docs/ledger/2026-09-30_bat-data-coverage-audit.md` §5 |
-| Stack registry | 64 stacks; 5 at full coverage; mean coverage 0.11; the order-book stack at 0.50 with six named gaps | `v_stacks` |
+| Stack registry | 64 stacks; 5 at or above 0.9 coverage; mean 0.12; the order-book stack SA v2 at 0.50 (8 of 16 needs present, 2 partial, 6 missing) | `v_stacks`, measured 2026-10-07 03:11Z |
 | Buyer concentration (V012 discovery) | 68,957 distinct BaT buyers; top 1% took 14% of lots; 39 won 50 or more | `vein_ledger` |
 | Soft-close extension | 322 of 400 settled BaT lots extended past the scheduled close (80%) | `docs/ledger/theory/data-machine-cases.md` §4 |
 | Corpus (planner estimates, 2026-10-06) | 19.9M auction comments (84% keyed to an identity), 4.27M bids, 157K BaT listings, 1.12M vehicles, 52.1M images (0.5% vision-analyzed) | README daily measurements |

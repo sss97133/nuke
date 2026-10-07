@@ -1343,9 +1343,10 @@ where you could own something or not."
    - The band tag backtest (coverage audit of 2026-09-30, §5): 69,295 sold BaT lots, 2024-09-01 to 2026-09-27, each
      priced only from earlier sales, bid as of 24 h before close: cold 11.3%, in line 40.9%, hot 86.8% finished
      above their band middle (48 h: 13.2 / 40.3 / 82.9%).
-   - The stack registry (`v_stacks`): 64 stacks, 5 at full coverage (S03 bidder record as of a date, S21 bid hazard
-     model, S47 dealer markdown curves, S48 tenure mix, S56 venue design replays), mean coverage 0.11. SA, the auction
-     as an order book, at 0.50 with its six missing substrates named.
+   - The stack registry (`v_stacks`, measured 03:11Z): 64 stacks, 5 at or above 0.9 coverage (S03 bidder record as
+     of a date, S21 bid hazard model, S47 dealer markdown curves, S48 tenure mix, S56 venue design replays), mean
+     coverage 0.12. SA v2, the auction as an order book, at 0.50: 8 of 16 needs present, 2 partial, 6 missing and
+     named.
    - V012 discovery: 68,957 distinct BaT buyers; the top 1% took 14% of lots; 39 buyers won 50 or more.
 
    A 33% median error is not an edge. It is a baseline with a named cause and a grading table, which is where a
