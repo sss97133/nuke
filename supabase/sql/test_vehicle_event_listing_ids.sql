@@ -1,4 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261007020500_key_vehicle_event_listing_ids.sql.
+-- Isolated PostgreSQL 17 contract for 20261007031500_key_vehicle_event_listing_ids_v2.sql (the deployable form of
+-- 20261007020500, which is now a comment-only ledger note).
 -- Synthetic rows only; never production. Run in an empty disposable dm_refinement_* database:
 --   createdb dm_refinement_vehicle_event_listing_ids_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_event_listing_ids_ci -f supabase/sql/test_vehicle_event_listing_ids.sql
@@ -30,6 +31,17 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dm_contract_deployer') THEN CREATE ROLE dm_contract_deployer NOLOGIN; END IF;
+END $$;
+-- Prod's deploy role owns the tables and is not a superuser. The fixture is built, and the migration applied, as such a
+-- role, so a statement only a superuser may run fails here as it failed on prod (#722: a function-level SET of
+-- app.writer, "permission denied to set parameter", deploy run 37557001434).
+GRANT CREATE ON SCHEMA public TO dm_contract_deployer;
+SET ROLE dm_contract_deployer;
+DO $$ BEGIN
+  IF (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+    RAISE EXCEPTION 'the contract must run as a non-superuser after SET ROLE';
+  END IF;
 END $$;
 
 CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
@@ -226,6 +238,12 @@ CREATE FUNCTION public.probe_clock_column_updates() RETURNS trigger LANGUAGE plp
 BEGIN INSERT INTO public.probe_clock_column_updates(event_id) VALUES (NEW.id); RETURN NEW; END $$;
 CREATE TRIGGER zz_probe_clock_column_updates BEFORE UPDATE OF sold_at, ended_at, metadata ON public.vehicle_events
   FOR EACH ROW EXECUTE FUNCTION public.probe_clock_column_updates();
+-- Probe: the writer a statement-level trigger (record_write_receipt reads the same setting) sees on each UPDATE.
+CREATE TABLE public.probe_update_writers(writer text, at timestamptz DEFAULT clock_timestamp());
+CREATE FUNCTION public.probe_update_writers() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN INSERT INTO public.probe_update_writers(writer) VALUES (current_setting('app.writer', true)); RETURN NULL; END $$;
+CREATE TRIGGER zz_probe_update_writers AFTER UPDATE ON public.vehicle_events
+  FOR EACH STATEMENT EXECUTE FUNCTION public.probe_update_writers();
 
 CREATE TEMP TABLE events_before AS SELECT * FROM public.vehicle_events;
 CREATE TEMP TABLE straddle_blocks AS
@@ -236,7 +254,11 @@ INSERT INTO public.pipeline_registry (table_name, column_name, owned_by, descrip
 VALUES ('vehicle_events', 'source_listing_id', 'stale-owner', 'stale registration');
 ANALYZE public.vehicle_events;
 
+-- The first file is a comment-only ledger note now; replaying it runs nothing. The corrected file applies after it.
 \ir ../migrations/20261007020500_key_vehicle_event_listing_ids.sql
+SELECT pg_temp.ok('the ledger note 20261007020500 creates nothing',
+  to_regprocedure('public.key_vehicle_event_listing_ids(integer, bigint)') IS NULL);
+\ir ../migrations/20261007031500_key_vehicle_event_listing_ids_v2.sql
 
 -- The migration itself ---------------------------------------------------------------------------------------------
 SELECT pg_temp.ok('migration keys no row',
@@ -258,9 +280,13 @@ SELECT pg_temp.ok('backfill is callable by service_role only',
   NOT has_function_privilege('anon', 'public.key_vehicle_event_listing_ids(integer, bigint)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.key_vehicle_event_listing_ids(integer, bigint)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.key_vehicle_event_listing_ids(integer, bigint)', 'EXECUTE'));
-SELECT pg_temp.ok('function runs with a fixed search_path, its own lock_timeout and its own app.writer',
-  (SELECT proconfig @> ARRAY['search_path=public, pg_temp', 'lock_timeout=5s', 'app.writer=key-vehicle-event-listing-ids']
+SELECT pg_temp.ok('function runs with a fixed search_path and its own lock_timeout',
+  (SELECT proconfig @> ARRAY['search_path=public, pg_temp', 'lock_timeout=5s']
    FROM pg_proc WHERE oid = 'public.key_vehicle_event_listing_ids(integer, bigint)'::regprocedure));
+SELECT pg_temp.ok('no function-level SET names a custom parameter (prod''s deploy role may not set one)',
+  NOT EXISTS (SELECT 1 FROM pg_proc p, unnest(p.proconfig) c
+              WHERE p.oid = 'public.key_vehicle_event_listing_ids(integer, bigint)'::regprocedure
+                AND split_part(c, '=', 1) LIKE '%.%'));
 SELECT pg_temp.ok('the clock-lock guard fires only on UPDATE OF sold_at, ended_at, metadata (a key-only UPDATE is outside it)',
   (SELECT array_agg(a.attname::text ORDER BY a.attname) FROM pg_trigger t
      JOIN pg_attribute a ON a.attrelid = t.tgrelid AND a.attnum = ANY (t.tgattr::int2[])
@@ -328,6 +354,9 @@ SELECT pg_temp.ok('cursor: starts at block 0; each call starts where the last en
                   AND (result->>'next_block')::bigint - (result->>'from_block')::bigint <> 1)
   AND (SELECT count(*) FROM walk WHERE run = 'first' AND (result->>'done')::boolean) = 1
   AND (SELECT count(*) FROM walk WHERE run = 'first') >= (SELECT max(blk) FROM straddle_blocks) + 1);
+SELECT pg_temp.ok('triggers on the walk''s UPDATE statements see the declared writer key-vehicle-event-listing-ids',
+  (SELECT count(*) FROM public.probe_update_writers) = (SELECT count(*) FROM walk WHERE run = 'first')
+  AND NOT EXISTS (SELECT 1 FROM public.probe_update_writers WHERE writer IS DISTINCT FROM 'key-vehicle-event-listing-ids'));
 SELECT pg_temp.ok('the caller''s app.writer is restored after every call',
   NOT EXISTS (SELECT 1 FROM walk WHERE writer_after IS DISTINCT FROM 'caller-writer')
   AND current_setting('app.writer') = 'caller-writer'
@@ -423,7 +452,7 @@ SELECT pg_temp.ok('second walk keys 0 rows, counts the same holds, writes no rec
   AND (SELECT sum(rows) FROM public.write_receipts WHERE writer = 'key-vehicle-event-listing-ids') = 9);
 
 -- Re-applying the migration changes nothing (registry and comment are written once).
-\ir ../migrations/20261007020500_key_vehicle_event_listing_ids.sql
+\ir ../migrations/20261007031500_key_vehicle_event_listing_ids_v2.sql
 SELECT pg_temp.ok('re-apply: one registry row, the backfill named once in the column comment',
   (SELECT count(*) FROM public.pipeline_registry WHERE table_name = 'vehicle_events' AND column_name = 'source_listing_id') = 1
   AND (SELECT count(*) FROM regexp_matches(col_description('public.vehicle_events'::regclass,
