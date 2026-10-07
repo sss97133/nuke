@@ -194,8 +194,9 @@ and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
   company (the solicitation: at least 51% at award and through the award; the get-started page: at least 20 hours a
   week), needs no degree, and commits at least 173 hours to the project per six months.
 - **Tracks.** SBIR: the company alone. STTR: a subaward to a not-for-profit research institution with a co-PI from
-  it; the PI still at the company. STTR answers the team question with a partner; SBIR answers it with the founder's
-  record and letters of support.
+  it; the PI still at the company. Team size is not the question: the median NSF Phase I awardee has three employees at award and a
+  fifth have one or none (SBIR.gov bulk data, 2015 to 2023). STTR adds a partner's co-PI; SBIR stands on the
+  founder's record and letters of support.
 - **Amounts.** Phase I up to $305,000 for 6 to 18 months. Phase II up to $1,250,000 for 24 months. Fast-Track up to
   $1,555,555 (Phase I $400,000, then Phase II $1,155,000) for teams past the proof stage. Strategic Breakthrough
   awards up to $30M for proven Phase II awardees (secondary source). No equity taken.
@@ -220,29 +221,42 @@ and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
 
 ### What winners look like
 
-NSF awards with start dates 2024-10-01 to 2025-09-30, pulled 2026-10-07 from the public NSF awards API
-(`api.nsf.gov/services/v1/awards.json`, filtered by `fundProgramName`, exact program names kept): 146 Phase I
-awards (107 SBIR, 39 STTR; six with a TABA supplement), median $305K; 108 Phase II, median $1.25M; 10 Fast-Track.
-A thin year that ended in the authority lapse: the program averaged about 338 Phase I awards a year from about 2,112
-proposals (16%) over 2008 to 2017 (National Academies; SSTI). Starts clustered April to July (85 of 144).
+Two public sources, pulled 2026-10-07. **The whole resource**: SBIR.gov's bulk award file
+(`data.www.sbir.gov/awarddatapublic/award_data.csv`, refreshed monthly; 207,731 awards across 12 agencies, 41
+columns including employee count at award, PI, STTR research institution and abstract), of which 14,796 are NSF:
+9,959 SBIR Phase I, 1,279 STTR Phase I, 3,558 Phase II, award years through 2023. **The latest two years**: the NSF
+awards API (`api.nsf.gov/services/v1/awards.json`), which carries 2024 and 2025.
 
-- **Topic.** By title and abstract, over the 144 whose program name ends in "Phase I": 37 mention AI or machine
-  learning; 15 software; 4 a database or data platform; 1 a marketplace or auction; 0 valuation, pricing or
-  appraisal; 0 provenance or ledger. The nearest neighbours are decision tools with a model inside (a clinical
-  decision tool, a financial coaching platform, a student-success platform, an oblivious-computation framework). NSF
-  funded the inference method, never the market. The pitch is therefore the estimator and its grading rule; the
-  ledger is the testbed and the moat, told second.
-- **Geography.** CA 27, MA 18, NY 11, IL 8; Nevada 1 (a battery-materials company in Las Vegas). No award names the
-  University of Nevada. The program says it wants all 50 states; a Nevada applicant is scarce, not disqualified.
-- **Track.** STTR was 27% of Phase I (39 of 146). The track is a function of one edge: a research-institution
-  partner with a co-PI (STTR) or none (SBIR). Nothing else in the data separates the two; the track makes itself
-  known when the partner edge exists by pitch time.
-- **Team.** The NSF API carries no team size. SBIR.gov's API, which does, refused the request (HTTP 403,
-  2026-10-07). Unknown until that source opens or the awards are read one by one.
-- **What this is for.** These rows are the first baseline of an opportunity stack (`data-machine-cases.md` §13.9):
-  a funding program as a cohort of awards with outcomes, Nuke's fit as keyed claims against the program's criteria,
-  and a score that says how far the company is from the opportunity and which keys are missing. The pull is
-  reproducible from the query above.
+- **Team.** NSF Phase I awardees are tiny companies. Median 3 employees at award; 61% have three or fewer and 18%
+  have one or none (2015 to 2019, n=1,534 with a count). 2020 to 2023: median 3, 65% three or fewer, 21% one or
+  none (n=779). STTR awardees are no larger (median 3, 69% three or fewer). Solo is the norm, not the gap.
+- **Repeat and conversion.** 2,927 Phase I awards since 2015 went to 2,802 firms; 96% hold exactly one. 32% of
+  those firms later hold an NSF Phase II.
+- **Track.** STTR is 19% of Phase I since 2015 (560 of 2,927), naming 252 distinct research institutions (Purdue
+  15, Arizona State 10, Wisconsin-Madison 8). The Nevada System of Higher Education (Reno) appears once. The track
+  is a function of one edge: a research-institution partner with a co-PI, or none.
+- **Geography.** Since 2015: CA 637, MA 248, NY 207, TX 158, CO 111; Nevada 3 of 2,927, one since 2020 (Las Vegas,
+  2023). FY2025 by the API: CA 27, MA 18, NY 11; Nevada 1. Scarce, not disqualified; the program says it wants all
+  50 states.
+- **Topic.** By title and abstract since 2015 (n=2,927, word-boundary matches): AI or machine learning 495;
+  software 479; database or data platform 93; marketplace or auction 46; blockchain 37; provenance or ledger 24;
+  valuation, pricing or appraisal 11; used or collector car market 0. NSF's own topic codes for 2020-plus Phase I
+  (n=1,381): BT 130, BM 125, ET 119, MD 103, DH 94, AI 79, PT 72, CT 69, EN 66, M 61, R 61, SP 50, IT 45; AI, IT
+  and DL together are 150 (11%). The nearest neighbours are protocols and tools, not markets: scalable auctions for
+  decentralized marketplaces (MD, 2023), a product-experience protocol and marketplace (VA, one employee, 2020),
+  water markets on a distributed ledger (UT, 2022), demand simulation for transportation modes (GA, 2023), a
+  public-health data API (NY, one employee, 2021). NSF funded the method inside the tool, never the market. The
+  pitch is therefore the estimator and its grading rule; the ledger is the testbed and the moat, told second.
+- **Money.** Phase I median $274,883 in 2023, before the raise to $305,000; FY2025 by the API, median $305K. 2020
+  to 2023 Phase I: 17.5% women-owned, 12.1% HUBZone, 15.6% socially and economically disadvantaged.
+- **FY2025 by the API** (start dates 2024-10-01 to 2025-09-30): 146 Phase I (107 SBIR, 39 STTR), 108 Phase II, 10
+  Fast-Track; a thin year that ended in the authority lapse, against a 2008 to 2023 run of 240 to 459 Phase I a
+  year. Historical rate about 16% of proposals (National Academies; SSTI); the pitch-to-invitation rate is
+  unpublished.
+- **What this is for.** Winners-only data gives the shape of winners, not the odds. These rows are the first
+  baseline of an opportunity stack (`data-machine-cases.md` §13.9 and §13.9.1): a funding program as a cohort of
+  awards with outcomes, Nuke's fit as keyed claims against the program's criteria, and a score that says how far
+  the company is from the opportunity and which keys are missing. Both pulls are reproducible from the URLs above.
 
 The prose is not drafted here. It is drafted when the owner says go, from this doc and the README, and he reviews it
 before anything is submitted.
