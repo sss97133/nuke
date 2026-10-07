@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     // Find vehicles with VINs but missing factory specs using PostgREST
     let query = supabase
       .from("vehicles")
-      .select("id, vin, year, make, model, horsepower, engine_type, engine_liters, drivetrain, body_style, fuel_type, doors, seats, weight_lbs, trim, series, transmission_type, transmission_speeds, wheelbase_inches")
+      .select("id, vin, year, make, model, horsepower, engine_type, engine_liters, engine_displacement, drivetrain, body_style, fuel_type, doors, seats, weight_lbs, trim, series, transmission_type, transmission_speeds, wheelbase_inches")
       .not("vin", "is", null)
       .is("deleted_at", null)
       .or("horsepower.is.null,engine_type.is.null,drivetrain.is.null,body_style.is.null,fuel_type.is.null,doors.is.null")

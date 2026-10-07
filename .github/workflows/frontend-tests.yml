@@ -499,7 +499,7 @@ jobs:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
       - name: Verify preserved description input and sanctioned intake
-        run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs scripts/test-field-evidence-reader.mjs
+        run: node --test scripts/test-description-source-input.mjs scripts/test-listing-description-intake.mjs scripts/test-field-evidence-reader.mjs scripts/test-vin-batch-existing-fields.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
