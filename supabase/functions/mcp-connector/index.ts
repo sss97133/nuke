@@ -2254,6 +2254,7 @@ async function handleQueryFieldEvidence(args: Record<string, unknown>): Promise<
     .select("*")
     .eq("vehicle_id", vid)
     .eq("field_name", field)
+    .eq("flagged_as_incorrect", false)
     .order("confidence_score", { ascending: false });
 
   if (error) return toolErr(error.message);
