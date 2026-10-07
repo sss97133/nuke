@@ -208,6 +208,10 @@ jobs:
         run: createdb dm_refinement_pub_pages_ci
       - name: Verify publication_pages' write policies and the mag_* rewrite functions are service_role only (anon reads, cannot insert or update; service_role writes; re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pub_pages_ci -f supabase/sql/test_publication_pages_write_door.sql
+      - name: Create disposable fabricated evidence value predicate database
+        run: createdb dm_refinement_flag_evidence_value_ci
+      - name: Verify the flag writer's value predicate (only matching rows of the source flagged, real decodes untouched, record carries value_text, old form still works, idempotent, service_role only)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_flag_evidence_value_ci -f supabase/sql/test_flag_fabricated_field_evidence_value_predicate.sql
       - name: Create disposable location sightings read database
         run: createdb dm_refinement_vlo_sightings_ci
       - name: Verify anonymous readers no longer see photo sightings in vehicle_location_observations (listings still public, signed-in and service_role unchanged, county_fips comment corrected, re-apply a no-op)
