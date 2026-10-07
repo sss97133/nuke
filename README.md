@@ -8,20 +8,17 @@ they land.
 Vehicles are the first entity Nuke tracks. Tracking one vehicle already means tracking people,
 organizations, places, parts, documents, money and time.
 
-## Built to predict
+## A live auction, measured
 
-Every layer exists so that the machine can make a prediction at a moment and grade it against what
-happened.
+The machine places a live lot's current bid and bidder count against every comparable lot at the
+same time to close, each priced only from the sales before it. The test covered 69,295 sold BaT lots,
+from 2024-09 to 2026-09. Lots it tagged hot 24 hours before close finished above the middle of their
+price band 86.8% of the time. Lots it tagged cold did so 11.3% of the time
+([BaT coverage audit, §5](docs/ledger/2026-09-30_bat-data-coverage-audit.md#5-the-temperature)).
 
-The live auction is the first case. The machine places a lot's current bid and bidder count against
-every comparable lot at the same time to close, each priced only from the sales before it. The test
-covered 69,295 sold BaT lots, from 2024-09 to 2026-09. Lots it tagged hot 24 hours before close
-finished above the middle of their price band 86.8% of the time. Lots it tagged cold did so 11.3% of
-the time ([BaT coverage audit, §5](docs/ledger/2026-09-30_bat-data-coverage-audit.md#5-the-temperature)).
-
-A language model can't make that call. It has no clock, and it was trained after the fact, so it
-already knows how past auctions ended. The machine replays only what was known at each moment, and
-that replay is how every prediction gets graded.
+A language model can't take that reading. It has no clock, and it was trained after the fact, so it
+already knows how past auctions ended. The machine reads only what was known at each moment, and the
+same replay checks every reading against the result.
 
 ## A model that grows sideways
 

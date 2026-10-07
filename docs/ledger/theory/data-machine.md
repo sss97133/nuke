@@ -44,7 +44,7 @@ smartest person can be wrong. What we're operating within is record-keeping and 
 potentially the opposite of models." Do LLMs tell the future? Not from knowledge: prediction needs what
 happened, as of when, processed as fast as it lands (an auction's last two minutes). Documentation should be
 as current as the chain of thought: the record stays as up to date as an agent's reasoning, but it is what
-happened. The README now leads with what the model does, prediction (case ledger §13.7).
+happened. The README leads with a measured result, the live auction (case ledger §13.7).
 
 **The model:** the internet publishes the raw material (listings, bids, comments, photos, results); Postgres is the
 refinery. The machine has five layers, each defined inside the database itself so any agent can read it cold:
