@@ -2259,6 +2259,26 @@ async function handleQueryFieldEvidence(args: Record<string, unknown>): Promise<
 
   if (error) return toolErr(error.message);
   if (!evidence?.length) {
+    // An empty qualified result can mean the retained evidence was rejected.
+    // Do not resurrect its value through the legacy scalar fallback (some
+    // evidence fields do not even have matching vehicle/source columns).
+    const { data: withheld, error: withheldError } = await supabase
+      .from("vehicle_field_evidence")
+      .select("id")
+      .eq("vehicle_id", vid)
+      .eq("field_name", field)
+      .eq("flagged_as_incorrect", true)
+      .limit(1);
+    if (withheldError) return toolErr(withheldError.message);
+    if (withheld?.length) {
+      return toolOk({
+        field,
+        vehicle_id: vid,
+        evidence_count: 0,
+        evidence: [],
+        note: "No unflagged detailed evidence remains for this field. Incorrect evidence and scalar fallback are withheld.",
+      });
+    }
     // Fall back to checking the vehicle record directly
     const { data: vehicle } = await supabase
       .from("vehicles")
