@@ -216,6 +216,10 @@ jobs:
         run: createdb dm_refinement_vlo_sightings_ci
       - name: Verify anonymous readers no longer see photo sightings in vehicle_location_observations (listings still public, signed-in and service_role unchanged, county_fips comment corrected, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vlo_sightings_ci -f supabase/sql/test_vlo_sightings_anon_read.sql
+      - name: Create disposable field evidence read database
+        run: createdb dm_refinement_field_evidence_read_ci
+      - name: Verify anonymous readers no longer see money-source rows or person-name fields in field_evidence (listing facts stay public, signed-in and service_role unchanged, re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_field_evidence_read_ci -f supabase/sql/test_field_evidence_anon_read.sql
       - name: Create disposable import queue claim doors database
         run: createdb dm_refinement_import_queue_claim_ci
       - name: Verify the import_queue claim functions are service_role only (anon claimed and read rows through them before; anon and authenticated refused after; service_role still claims; the describe sentences rewritten; re-apply a no-op)
