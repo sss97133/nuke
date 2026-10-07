@@ -155,6 +155,21 @@ CREATE TABLE public.schema_proposals (
     'deprecate_property', 'modify_property', 'add_source', 'modify_trust_tier', 'add_observation_kind',
     'add_source_category', 'add_image_attribute', 'add_column', 'add_table'])));
 
+-- The live evidence trigger (prod 2026-10-07): a proposal of the listed types needs evidence[]; the migration's row sets it anyway.
+CREATE FUNCTION public.schema_proposal_evidence_check() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.proposal_type IN ('add_property','fork_property','modify_property','add_source','add_source_category','add_observation_kind')
+     AND (NEW.evidence IS NULL OR jsonb_array_length(NEW.evidence) = 0)
+     AND (NEW.motivating_observation_ids IS NULL OR array_length(NEW.motivating_observation_ids, 1) IS NULL)
+     AND (NEW.motivating_pending_claim_ids IS NULL OR array_length(NEW.motivating_pending_claim_ids, 1) IS NULL)
+  THEN
+    RAISE EXCEPTION 'schema_proposal_evidence: proposal type % requires evidence[]', NEW.proposal_type;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_schema_proposal_evidence BEFORE INSERT ON public.schema_proposals
+  FOR EACH ROW EXECUTE FUNCTION public.schema_proposal_evidence_check();
+
 -- Probe: the writer a statement-level trigger (record_write_receipt reads the same setting) sees on each UPDATE.
 CREATE TABLE public.probe_update_writers(writer text, at timestamptz DEFAULT clock_timestamp());
 CREATE FUNCTION public.probe_update_writers() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -358,6 +373,7 @@ SELECT pg_temp.ok('drifted view: the migration refused it whole and left everyth
   md5(pg_get_viewdef('public.prediction_accuracy'::regclass, true)) = :'drifted_fp'
   AND to_regprocedure('public.grade_hammer_predictions_by_lot(integer, bigint)') IS NULL
   AND to_regclass('public.v_prediction_lot_grades') IS NULL
+  AND to_regclass('public.prediction_accuracy_hourly') IS NULL
   AND NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.hammer_predictions'::regclass AND attname = 'auction_event_id' AND NOT attisdropped)
   AND (SELECT count(*) FROM public.schema_proposals) = 0
   AND (SELECT count(*) FROM public.pipeline_registry) = 1);
@@ -448,11 +464,36 @@ SELECT pg_temp.ok('prediction_accuracy keeps its nine columns (names, types, ord
   AND (SELECT string_agg(a.attname, ',' ORDER BY a.attnum) FROM pg_attribute a
        WHERE a.attrelid = 'public.prediction_accuracy'::regclass AND a.attnum > 9 AND NOT a.attisdropped)
       = 'lots_without_hammer,bands_scored,bands_held,band_hold_pct');
-SELECT pg_temp.ok('one proposal row records the columns, with evidence and its rule',
+SELECT pg_temp.ok('prediction_accuracy_hourly is the old definition under its own name: the prod text, the same nine columns, service_role only',
+  left(md5(pg_get_viewdef('public.prediction_accuracy_hourly'::regclass, true)), 16) = 'df2da8985aba061f'
+  AND (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.prediction_accuracy_hourly'::regclass AND attnum > 0 AND NOT attisdropped) = 9
+  AND NOT EXISTS (SELECT 1 FROM accuracy_columns_before b
+                  LEFT JOIN pg_attribute a ON a.attrelid = 'public.prediction_accuracy_hourly'::regclass AND a.attnum = b.attnum AND NOT a.attisdropped
+                  WHERE a.attname::text IS DISTINCT FROM b.attname OR format_type(a.atttypid, a.atttypmod) IS DISTINCT FROM b.typ)
+  AND NOT has_table_privilege('anon', 'public.prediction_accuracy_hourly', 'SELECT')
+  AND NOT has_table_privilege('authenticated', 'public.prediction_accuracy_hourly', 'SELECT')
+  AND has_table_privilege('service_role', 'public.prediction_accuracy_hourly', 'SELECT'));
+SELECT pg_temp.ok('both view comments say the unit changed on 2026-10-07, why, and name the other view',
+  obj_description('public.prediction_accuracy'::regclass, 'pg_class') LIKE '%THE UNIT CHANGED ON 2026-10-07%'
+  AND obj_description('public.prediction_accuracy'::regclass, 'pg_class') LIKE '%prediction_accuracy_hourly%'
+  AND obj_description('public.prediction_accuracy'::regclass, 'pg_class') LIKE '%399 scored for 7 lots%'
+  AND obj_description('public.prediction_accuracy_hourly'::regclass, 'pg_class') LIKE '%unit of prediction_accuracy changed on 2026-10-07 from rows to lots%'
+  AND obj_description('public.prediction_accuracy_hourly'::regclass, 'pg_class') LIKE '%399 scored rows of model 24 were 7 lots%'
+  AND obj_description('public.prediction_accuracy_hourly'::regclass, 'pg_class') LIKE '%v_prediction_lot_grades%');
+SELECT pg_temp.ok('one proposal row records the columns, with evidence[] and its rule',
   (SELECT count(*) FROM public.schema_proposals) = 1
   AND EXISTS (SELECT 1 FROM public.schema_proposals WHERE proposal_type = 'add_column' AND status = 'open'
               AND payload->>'table' = 'hammer_predictions' AND jsonb_array_length(payload->'columns') = 4
               AND jsonb_array_length(evidence) >= 8 AND payload ? 'rule' AND payload ? 'writers'));
+SELECT pg_temp.ok('the evidence cites the lot count behind the vehicle ids, the sold lots with no end date, and the legacy grade path',
+  (SELECT count(*) FROM public.schema_proposals sp, jsonb_array_elements(sp.evidence) e
+   WHERE (e->>'measure' LIKE 'distinct vehicle ids in hammer_predictions%' AND (e->>'value')::int = 6917)
+      OR (e->>'measure' LIKE 'distinct BaT lot slugs known for the predicted vehicles%' AND (e->>'value')::int = 3380)
+      OR (e->>'measure' LIKE 'model 24 sold lots with a NULL auction_end_date%' AND (e->>'value')::int = 496 AND (e->>'denominator')::int = 740)
+      OR (e->>'measure' LIKE 'rows graded before this migration%' AND (e->>'value')::int = 608)
+      OR (e->>'measure' LIKE 'vehicle ids whose rows the legacy path%' AND (e->>'value')::int = 10)
+      OR (e->>'measure' LIKE 'lots those 10 vehicles have%' AND (e->>'value')::int = 22)
+      OR (e->>'measure' LIKE 'legacy rows the rule resolves to a lot%' AND (e->>'value')::int = 0 AND (e->>'denominator')::int = 340)) = 7);
 SELECT pg_temp.ok('registry: the eight columns name the grader as owner; the table-level row names it once',
   (SELECT count(*) FROM public.pipeline_registry WHERE table_name = 'hammer_predictions' AND owned_by = 'grade_hammer_predictions_by_lot') = 8
   AND (SELECT count(*) FROM public.pipeline_registry WHERE table_name = 'hammer_predictions') = 9
@@ -541,7 +582,9 @@ RESET app.writer;
 -- Counts per reason, summed over the walk (every row is counted once: 32 written + 612 held = 644).
 CREATE TEMP TABLE first_totals AS
   SELECT k AS key, sum((result->>k)::bigint) AS n
-  FROM walk, unnest(ARRAY['graded', 'held', 'written', 'keyed_legacy', 'grade_conflicts', 'skipped_reserve_not_met',
+  FROM walk, unnest(ARRAY['graded', 'held', 'written', 'keyed_legacy', 'grade_conflicts', 'grade_conflict_lots',
+                          'written_scheduled', 'written_final', 'written_predicted',
+                          'graded_scheduled', 'graded_final', 'graded_predicted', 'skipped_reserve_not_met',
                           'skipped_no_sale', 'skipped_no_lot_key', 'skipped_no_outcome', 'skipped_lot_ambiguous',
                           'skipped_lot_conflict', 'skipped_lot_mismatch', 'skipped_no_close_clock', 'skipped_after_close',
                           'skipped_already_graded']) k
@@ -561,8 +604,27 @@ SELECT pg_temp.ok('held back, each counted by its reason: no lot key 601, no out
   AND (SELECT n FROM first_totals WHERE key = 'skipped_lot_mismatch') = 2
   AND (SELECT n FROM first_totals WHERE key = 'skipped_no_close_clock') = 1
   AND (SELECT n FROM first_totals WHERE key = 'skipped_after_close') = 2);
-SELECT pg_temp.ok('two legacy grades disagree with their lot (one names another lot''s price, one a price on an unsold lot) and are counted, not changed',
-  (SELECT n FROM first_totals WHERE key = 'grade_conflicts') = 2);
+SELECT pg_temp.ok('two legacy grades disagree with their lot (one names another lot''s price, one a price on an unsold lot) and are counted by row and by lot, not changed',
+  (SELECT n FROM first_totals WHERE key = 'grade_conflicts') = 2
+  AND (SELECT n FROM first_totals WHERE key = 'grade_conflict_lots') = 2);
+SELECT pg_temp.ok('the three closes are counted apart in the return: scheduled 5, final 23, predicted 4 rows written; 5, 16 and 3 graded; each trio sums to its total',
+  (SELECT n FROM first_totals WHERE key = 'written_scheduled') = 5
+  AND (SELECT n FROM first_totals WHERE key = 'written_final') = 23
+  AND (SELECT n FROM first_totals WHERE key = 'written_predicted') = 4
+  AND (SELECT n FROM first_totals WHERE key = 'graded_scheduled') = 5
+  AND (SELECT n FROM first_totals WHERE key = 'graded_final') = 16
+  AND (SELECT n FROM first_totals WHERE key = 'graded_predicted') = 3
+  AND (SELECT sum(n) FROM first_totals WHERE key IN ('written_scheduled', 'written_final', 'written_predicted'))
+      = (SELECT n FROM first_totals WHERE key = 'written')
+  AND (SELECT sum(n) FROM first_totals WHERE key IN ('graded_scheduled', 'graded_final', 'graded_predicted'))
+      = (SELECT n FROM first_totals WHERE key = 'graded'));
+SELECT pg_temp.ok('the return''s close counts equal the table''s: rows by lot_close_basis, and graded rows by basis',
+  (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'scheduled') = 5
+  AND (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'final') = 23
+  AND (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'predicted') = 4
+  AND (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'scheduled' AND scored_at IS NOT NULL AND id NOT IN (SELECT id FROM legacy_ids)) = 5
+  AND (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'final' AND scored_at IS NOT NULL AND id NOT IN (SELECT id FROM legacy_ids)) = 16
+  AND (SELECT count(*) FROM public.hammer_predictions WHERE lot_close_basis = 'predicted' AND scored_at IS NOT NULL AND id NOT IN (SELECT id FROM legacy_ids)) = 3);
 SELECT pg_temp.ok('rows in the table: 32 resolved, 612 not',
   (SELECT count(*) FROM public.hammer_predictions WHERE lot_outcome IS NOT NULL) = 32
   AND (SELECT count(*) FROM public.hammer_predictions WHERE auction_event_id IS NOT NULL) = 32
@@ -690,6 +752,13 @@ SELECT pg_temp.ok('prediction_accuracy counts lots of model 31: 2 with an outcom
    FROM public.prediction_accuracy WHERE model_version = 31)
   AND (SELECT count(*) FROM public.prediction_accuracy) = 2);
 
+SELECT pg_temp.ok('prediction_accuracy_hourly keeps counting graded rows (all horizons, the legacy grades with them), where prediction_accuracy counts lots',
+  (SELECT total_predictions = (SELECT count(*) FROM public.hammer_predictions WHERE model_version = 24 AND scored_at IS NOT NULL)
+          AND scored = (SELECT count(actual_hammer) FROM public.hammer_predictions WHERE model_version = 24)
+          AND total_predictions = 26
+   FROM public.prediction_accuracy_hourly WHERE model_version = 24)
+  AND (SELECT scored FROM public.prediction_accuracy_hourly WHERE model_version = 24) > (SELECT scored FROM public.prediction_accuracy WHERE model_version = 24));
+
 -- Idempotent: a second walk writes nothing, counts the same holds, and every resolved row as already graded -----------------
 CREATE TEMP TABLE hp_second_before AS SELECT * FROM public.hammer_predictions;
 INSERT INTO walk SELECT 'again', 1, public.grade_hammer_predictions_by_lot(100000, 0), NULL;
@@ -727,8 +796,9 @@ SELECT pg_temp.ok('deleting a lot row sets the key NULL (ON DELETE SET NULL) and
 \set ON_ERROR_STOP off
 \ir ../migrations/20261007170000_grade_hammer_predictions_by_lot.sql
 \set ON_ERROR_STOP on
-SELECT pg_temp.ok('a second run is refused: one proposal row, nine registry rows, one function, the columns once',
+SELECT pg_temp.ok('a second run is refused: one proposal row, nine registry rows, one function, one hourly view, the columns once',
   (SELECT count(*) FROM public.schema_proposals) = 1
+  AND (SELECT count(*) FROM pg_class WHERE relname = 'prediction_accuracy_hourly' AND relnamespace = 'public'::regnamespace) = 1
   AND (SELECT count(*) FROM public.pipeline_registry WHERE table_name = 'hammer_predictions') = 9
   AND (SELECT count(*) FROM pg_proc WHERE proname = 'grade_hammer_predictions_by_lot') = 1
   AND (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.hammer_predictions'::regclass AND attname = 'auction_event_id' AND NOT attisdropped) = 1);

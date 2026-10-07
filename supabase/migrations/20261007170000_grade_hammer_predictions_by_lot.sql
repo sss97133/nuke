@@ -22,7 +22,9 @@
 -- is the capability map's owner of "Hammer prediction": extend it, do not mint). The row gains the lot key and the facts the
 -- grade is measured against; the lot as the unit is a selection over rows, made in a view (v_prediction_lot_grades), because
 -- the latest prediction standing at a horizon depends on the lot's other rows. prediction_accuracy is a view over graded
--- rows, one row per model, not a table: it cannot take rows. It is redefined on the lot view (see 5).
+-- rows, one row per model, not a table: it cannot take rows. It is redefined on the lot view (see 5), and its present
+-- definition is kept as prediction_accuracy_hourly (0b): the unit changed on 2026-10-07 from rows to lots, so its readers can be
+-- moved deliberately.
 --
 -- MEASURED (prod, read-only through scripts/data/q.sh, 2026-10-07 07:15Z to 09:00Z; the rule below run as one SELECT over
 -- every row, the way the function runs it per block range; nothing written):
@@ -47,11 +49,13 @@
 --   bid is below the later hammer, is graded against the later lot: not measurable here, and rare (relisted vehicles are the
 --   ambiguous 966 and the 86 above).
 --   Duplicate lot rows: of the 3,321 slugs with a row, 15 have several (7 with different outcomes), none with two hammers.
---   The 608 legacy grades (10 vehicle ids): the rule resolves 340 of them to a lot. 141 sit on a sold lot whose hammer differs
---   from the stored price (the vehicle was relisted; the legacy join gave every row the later sale's price) and 199 on a lot
---   that ended unsold (a stored price on a lot that did not sell). The other 268 belong to vehicles with two lots that both
---   fit. None of the 608 equals its lot's hammer. The grader keeps them as they are and counts the disagreement; the lot view
---   does not read them.
+--   The 608 legacy grades (10 vehicle ids, 22 lots between them). The rule resolves 340 rows to 5 lots: 141 rows sit on 2
+--   sold lots whose hammer differs from the stored price (the vehicle was relisted; the legacy join gave every row another
+--   sale's price) and 199 rows on 3 lots that ended unsold (a stored price on a lot that did not sell). None of those 340
+--   equals its lot's hammer. The other 268 rows belong to 5 vehicles with two lots that both fit: for 177 the stored price
+--   equals the hammer of one of the fitting lots (it may be right, and cannot be tied to one lot), for 91 it equals none that
+--   fits. The grader never overwrites a grade: it keeps them, counts the disagreement by row and by lot (grade_conflicts,
+--   grade_conflict_lots; PG-verify.sql lists the lots by id), and the lot view does not read them.
 --   Hold rate of the stored band at the last prediction before the close (dry run, lots sold, the band as each model states
 --   it: 80% for 30 and 31, 50% for 24): model 31 591 of 751 (78.7%); model 30 365 of 489 (74.6%); model 24 193 of 747 (25.8%);
 --   model 13 2 of 10. At the scheduled close minus 2 minutes (live frames): model 31 239 of 282 (84.8%).
@@ -78,6 +82,11 @@
 -- hammer, grade_conflicts counts it. v_prediction_lot_grades then picks, per model and lot, the last prediction made at or
 -- before the close, and the one standing 24 h, 6 h, 1 h and (scheduled close only) 2 minutes before it.
 --
+-- THE THREE CLOSES, counted apart. lot_close_basis names the clock on every row; the function returns written_ and graded_
+-- counts for scheduled, final and predicted separately, and PG-verify.sql counts them apart again (block 7), so a hold rate is
+-- never quoted without saying against which close it was measured. The scheduled close is known for live-collector lots only
+-- (376 of 2,313 model 31 lots); final needs auction_end_date; predicted is the schedule the row itself recorded.
+--
 -- WRITES (only these, only by the function, only where the key is NULL):
 --   hammer_predictions: auction_event_id, lot_outcome, lot_close_at, lot_close_basis, and for sold rows with no grade
 --   actual_hammer, prediction_error_pct, prediction_error_usd, scored_at. One write_receipts row per call that wrote (the
@@ -87,8 +96,9 @@
 --
 -- LOCK COST. ALTER TABLE takes ACCESS EXCLUSIVE on hammer_predictions (53,922 rows) until COMMIT: the columns are nullable with
 -- no default (catalog only), the CHECKs and the index scan 54K rows (tens of ms). The foreign key is added last: it takes
--- SHARE ROW EXCLUSIVE on auction_events, which blocks that table's writers, for the time to check the 54K NULL keys (ms), and
--- is created validated. With lock_timeout 5 s, a session that holds a conflicting lock for 5 s makes the migration fail
+-- SHARE ROW EXCLUSIVE on auction_events, which blocks that table's writers, for the time to check the 54K NULL keys (a scan
+-- of hammer_predictions took 12.7 ms, EXPLAIN ANALYZE 2026-10-07), and is created validated: validation reads only this table,
+-- which the transaction already holds, so it waits for nothing and ends far inside the 60 s. With lock_timeout 5 s, a session that holds a conflicting lock for 5 s makes the migration fail
 -- before it changes anything. live-bands.mjs inserts into hammer_predictions at :40 each hour; an insert waits the few ms.
 --
 -- SCHEMA_LAW (lofficiel-concierge/supabase/SCHEMA_LAW.md), the seven questions:
@@ -125,6 +135,47 @@ BEGIN
   END IF;
 END
 $guard$;
+
+-- 0b. The definition prediction_accuracy has today, kept under its own name, before prediction_accuracy changes unit (5).
+-- Created first, from the text the guard just matched, and checked equal to the live definition.
+CREATE VIEW public.prediction_accuracy_hourly AS
+ SELECT model_version,
+    count(*) AS total_predictions,
+    count(actual_hammer) AS scored,
+    round(avg(abs(prediction_error_pct)), 2) AS avg_abs_error_pct,
+    round(percentile_cont(0.5::double precision) WITHIN GROUP (ORDER BY (abs(prediction_error_pct)::double precision))::numeric, 2) AS median_abs_error_pct,
+    round(avg(prediction_error_pct), 2) AS avg_bias_pct,
+    count(*) FILTER (WHERE abs(prediction_error_pct) < 5::numeric) AS within_5pct,
+    count(*) FILTER (WHERE abs(prediction_error_pct) < 10::numeric) AS within_10pct,
+    count(*) FILTER (WHERE abs(prediction_error_pct) < 20::numeric) AS within_20pct
+   FROM hammer_predictions
+  WHERE scored_at IS NOT NULL
+  GROUP BY model_version;
+
+DO $same$
+BEGIN
+  IF pg_catalog.pg_get_viewdef('public.prediction_accuracy_hourly'::regclass, true)
+     IS DISTINCT FROM pg_catalog.pg_get_viewdef('public.prediction_accuracy'::regclass, true) THEN
+    RAISE EXCEPTION 'prediction_accuracy_hourly is not a copy of the current prediction_accuracy';
+  END IF;
+END
+$same$;
+
+COMMENT ON VIEW public.prediction_accuracy_hourly IS
+'Accuracy of the stored hammer predictions counted in ROWS, one row per model_version: the definition prediction_accuracy had until 2026-10-07, kept under its own name so its readers can be moved deliberately. total_predictions and scored count graded prediction rows, so a lot predicted every hour counts every hour: a model that re-predicts a lot more often looks bigger, and the figures are not per lot (before 2026-10-07 the 399 scored rows of model 24 were 7 lots). Before 2026-10-07 it held 608 graded rows of 10 vehicle ids, graded by score_closed_predictions through external_listings, which can name another lot of a relisted vehicle. grade_hammer_predictions_by_lot now grades every pre-close prediction of each sold lot (about 34,000 rows), so the counts here jump and mix every horizon. The unit of prediction_accuracy changed on 2026-10-07 from rows to lots because the question is per lot, with its denominator (case ledger 13.8: hourly rows were read as lots); read prediction_accuracy and v_prediction_lot_grades for lots. service_role only.';
+
+REVOKE ALL ON public.prediction_accuracy_hourly FROM PUBLIC;
+DO $grants$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON public.prediction_accuracy_hourly FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON public.prediction_accuracy_hourly FROM authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT SELECT ON public.prediction_accuracy_hourly TO service_role;
+  END IF;
+END $grants$;
 
 -- 1. The proposal row for the four columns -----------------------------------------------------------------------------
 INSERT INTO public.schema_proposals (
@@ -163,7 +214,11 @@ VALUES (
     jsonb_build_object('measure', 'rule dry run, sold lots graded at the last prediction, model 24', 'value', 747, 'at', '2026-10-07T08:40Z'),
     jsonb_build_object('measure', 'rule dry run, distinct sold lots, any model', 'value', 1482, 'denominator', 2289, 'at', '2026-10-07T08:50Z'),
     jsonb_build_object('measure', 'rule dry run, rows resolved to a lot with an outcome', 'value', 46093, 'denominator', 53922, 'at', '2026-10-07T08:50Z'),
-    jsonb_build_object('measure', 'legacy grades (608 rows) whose price equals the hammer of their lot', 'value', 0, 'denominator', 608, 'at', '2026-10-07T08:50Z')),
+    jsonb_build_object('measure', 'distinct vehicle ids in hammer_predictions, any model (behind the 3,380 lots)', 'value', 6917, 'at', '2026-10-07T09:10Z'),
+    jsonb_build_object('measure', 'vehicle ids whose rows the legacy path (score_closed_predictions) graded', 'value', 10, 'denominator', 6917, 'at', '2026-10-07T09:10Z'),
+    jsonb_build_object('measure', 'lots those 10 vehicles have in auction_events, the lots the legacy path touched', 'value', 22, 'at', '2026-10-07T09:10Z'),
+    jsonb_build_object('measure', 'legacy rows the rule resolves to a lot (5 lots) whose stored price equals that lot''s hammer', 'value', 0, 'denominator', 340, 'at', '2026-10-07T09:10Z'),
+    jsonb_build_object('measure', 'legacy rows left ambiguous (two lots fit) whose stored price equals the hammer of one fitting lot', 'value', 177, 'denominator', 268, 'at', '2026-10-07T09:10Z')),
   jsonb_build_object('rows_in_table', 53922, 'rows_to_write_estimate', 'see the PR body (dry run of the rule, read-only)', 'method', 'bounded block-range walk, service_role only'),
   jsonb_build_object('additive', true, 'nullable', true, 'table_rewrite', false, 'existing_writers_changed', false,
     'existing_readers_changed', 'prediction_accuracy counts lots from the last prediction before the close (it counted graded rows); no reader of it found in the repo or the database',
@@ -257,7 +312,9 @@ BEGIN
   -- Past the end (or past the largest tid block): nothing to scan; report done before building any tid.
   IF p_from_block >= v_table_blocks OR p_from_block >= c_max_block THEN
     RETURN jsonb_build_object(
-      'graded', 0, 'held', 0, 'written', 0, 'keyed_legacy', 0, 'grade_conflicts', 0, 'lots', 0,
+      'graded', 0, 'held', 0, 'written', 0, 'keyed_legacy', 0, 'grade_conflicts', 0, 'grade_conflict_lots', 0, 'lots', 0,
+      'written_scheduled', 0, 'written_final', 0, 'written_predicted', 0,
+      'graded_scheduled', 0, 'graded_final', 0, 'graded_predicted', 0,
       'skipped_reserve_not_met', 0, 'skipped_no_sale', 0, 'skipped_no_lot_key', 0, 'skipped_no_outcome', 0,
       'skipped_lot_ambiguous', 0, 'skipped_lot_conflict', 0, 'skipped_lot_mismatch', 0, 'skipped_no_close_clock', 0,
       'skipped_after_close', 0, 'skipped_already_graded', 0,
@@ -408,7 +465,7 @@ BEGIN
         AND h.id = f.id
         AND f.result IN ('sold', 'reserve_not_met', 'no_sale')
         AND h.auction_event_id IS NULL
-      RETURNING f.slug, f.result, f.grade,
+      RETURNING f.slug, f.result, f.grade, f.close_basis,
                 (f.result = 'sold' AND NOT f.grade AND h.actual_hammer IS DISTINCT FROM f.winning_bid) AS conflict,
                 (f.result <> 'sold' AND NOT f.grade AND h.actual_hammer IS NOT NULL) AS conflict_unsold,
                 (f.winning_bid BETWEEN f.predicted_low AND f.predicted_high) AS band_held
@@ -418,7 +475,14 @@ BEGIN
            (SELECT count(*) FROM upd)::bigint AS written,
            (SELECT count(*) FROM upd WHERE result = 'sold' AND NOT grade)::bigint AS keyed_legacy,
            (SELECT count(*) FROM upd WHERE conflict OR conflict_unsold)::bigint AS grade_conflicts,
+           (SELECT count(DISTINCT slug) FROM upd WHERE conflict OR conflict_unsold)::bigint AS grade_conflict_lots,
            (SELECT count(DISTINCT slug) FROM upd)::bigint AS lots,
+           (SELECT count(*) FROM upd WHERE close_basis = 'scheduled')::bigint AS written_scheduled,
+           (SELECT count(*) FROM upd WHERE close_basis = 'final')::bigint AS written_final,
+           (SELECT count(*) FROM upd WHERE close_basis = 'predicted')::bigint AS written_predicted,
+           (SELECT count(*) FROM upd WHERE grade AND close_basis = 'scheduled')::bigint AS graded_scheduled,
+           (SELECT count(*) FROM upd WHERE grade AND close_basis = 'final')::bigint AS graded_final,
+           (SELECT count(*) FROM upd WHERE grade AND close_basis = 'predicted')::bigint AS graded_predicted,
            (SELECT count(*) FROM upd WHERE result = 'reserve_not_met')::bigint AS skipped_reserve_not_met,
            (SELECT count(*) FROM upd WHERE result = 'no_sale')::bigint AS skipped_no_sale,
            count(*) FILTER (WHERE f.result = 'no_lot_key')::bigint AS skipped_no_lot_key,
@@ -452,7 +516,14 @@ BEGIN
     'written', v_res.written,
     'keyed_legacy', v_res.keyed_legacy,
     'grade_conflicts', v_res.grade_conflicts,
+    'grade_conflict_lots', v_res.grade_conflict_lots,
     'lots', v_res.lots,
+    'written_scheduled', v_res.written_scheduled,
+    'written_final', v_res.written_final,
+    'written_predicted', v_res.written_predicted,
+    'graded_scheduled', v_res.graded_scheduled,
+    'graded_final', v_res.graded_final,
+    'graded_predicted', v_res.graded_predicted,
     'skipped_reserve_not_met', v_res.skipped_reserve_not_met,
     'skipped_no_sale', v_res.skipped_no_sale,
     'skipped_no_lot_key', v_res.skipped_no_lot_key,
@@ -475,7 +546,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.grade_hammer_predictions_by_lot(integer, bigint) IS
-'Sanctioned per-lot grader of hammer_predictions (2026-10-07). Scans about p_batch rows by physical block range starting at p_from_block. For each row that carries no lot key it finds the BaT lot its vehicle was predicted for (the slug of bringatrailer.com/listing/<slug>, lower-cased, from vehicles.listing_url, the vehicle''s own auction_events rows and the lot URL on its observations; exactly one candidate lot that fits: its close lies within 48 h of the close the row recorded and, if it sold, its hammer is not passed by the bid the row saw; else the row is held), reads how that lot ended from auction_events only (a sold row with a hammer; reserve_not_met and bid_to; no_sale, cancelled and relisted; live and pending wait), and writes auction_event_id, lot_outcome, lot_close_at and lot_close_basis. For a sold lot it also fills actual_hammer, prediction_error_pct, prediction_error_usd and scored_at when the row has no grade; a grade already there is kept and a disagreement with the lot is counted (grade_conflicts). The close is the earliest previous_scheduled_end in the lot''s bat_public_live_v1 frames (scheduled), else auction_events.auction_end_date (final), else predicted_at + hours_remaining (predicted); a row made after its close is not written. Never reads bat_listings. Idempotent: a keyed row is not visited again. One write_receipts row per call that wrote. Returns graded, held (graded rows whose stored band held the hammer), written, keyed_legacy, grade_conflicts, lots, skipped_* by reason (reserve_not_met and no_sale rows get an outcome and no hammer grade), next_block, remaining_blocks and done. The caller must set statement_timeout between 1 ms and 60 s. EXECUTE: service_role only.';
+'Sanctioned per-lot grader of hammer_predictions (2026-10-07). Scans about p_batch rows by physical block range starting at p_from_block. For each row that carries no lot key it finds the BaT lot its vehicle was predicted for (the slug of bringatrailer.com/listing/<slug>, lower-cased, from vehicles.listing_url, the vehicle''s own auction_events rows and the lot URL on its observations; exactly one candidate lot that fits: its close lies within 48 h of the close the row recorded and, if it sold, its hammer is not passed by the bid the row saw; else the row is held), reads how that lot ended from auction_events only (a sold row with a hammer; reserve_not_met and bid_to; no_sale, cancelled and relisted; live and pending wait), and writes auction_event_id, lot_outcome, lot_close_at and lot_close_basis. For a sold lot it also fills actual_hammer, prediction_error_pct, prediction_error_usd and scored_at when the row has no grade; a grade already there is kept and a disagreement with the lot is counted (grade_conflicts). The close is the earliest previous_scheduled_end in the lot''s bat_public_live_v1 frames (scheduled), else auction_events.auction_end_date (final), else predicted_at + hours_remaining (predicted); a row made after its close is not written. Never reads bat_listings. Idempotent: a keyed row is not visited again. One write_receipts row per call that wrote. Returns graded, held (graded rows whose stored band held the hammer), written, keyed_legacy, grade_conflicts and grade_conflict_lots (a stored grade that is not the lot''s hammer, by row and by lot), lots, written_ and graded_ counts for each of the three closes apart (scheduled, final, predicted), skipped_* by reason (reserve_not_met and no_sale rows get an outcome and no hammer grade), next_block, remaining_blocks and done. The caller must set statement_timeout between 1 ms and 60 s. EXECUTE: service_role only.';
 
 REVOKE ALL ON FUNCTION public.grade_hammer_predictions_by_lot(integer, bigint) FROM PUBLIC;
 DO $grants$ BEGIN
@@ -633,7 +704,9 @@ END $grants$;
 
 -- prediction_accuracy keeps its nine columns (names, types, order) and counts lots now: the last prediction before the
 -- close, one row per lot, where it counted every graded row (hourly rows, 399 'scored' for 7 lots of model 24). Four columns
--- are appended. Nothing in the repo or the database reads it (searched views, functions and code 2026-10-07).
+-- are appended. The old definition is prediction_accuracy_hourly (0b). Nothing in the repo or the database reads either
+-- (searched views, functions and code 2026-10-07; docs/POSITIONING.md names prediction_accuracy as the place to grade, per
+-- lot, which is what it now counts).
 CREATE OR REPLACE VIEW public.prediction_accuracy AS
 SELECT model_version,
        count(*) AS total_predictions,
@@ -653,7 +726,7 @@ WHERE horizon = 'last'
 GROUP BY model_version;
 
 COMMENT ON VIEW public.prediction_accuracy IS
-'Accuracy of the stored hammer predictions, one row per model_version, counted in LOTS at the last prediction before the close (from 2026-10-07; before, it counted every graded hourly row: 399 scored for 7 lots of model 24). total_predictions = lots that ended with an outcome (sold, reserve_not_met, no_sale); scored = lots sold, with a hammer to grade against; avg_abs_error_pct, median_abs_error_pct, avg_bias_pct (signed) and within_5/10/20pct are over the sold lots; lots_without_hammer = total minus sold; bands_scored = sold lots with a stated band; bands_held = those whose band contained the hammer; band_hold_pct = held over scored. Model 31 and 30 state an 80% band (p10 to p90), model 24 a 50% band (p25 to p75): compare band_hold_pct with that. Other horizons and the denominators: v_prediction_lot_grades. The lots it has not reached are not in it: compare with hammer_predictions.';
+'Accuracy of the stored hammer predictions, one row per model_version, counted in LOTS at the last prediction before the close. THE UNIT CHANGED ON 2026-10-07: until then it counted graded prediction rows (hourly rows: 399 scored for 7 lots of model 24, so a count of rows was read as a count of lots, case ledger 13.8); that definition is kept as prediction_accuracy_hourly. total_predictions = lots that ended with an outcome (sold, reserve_not_met, no_sale); scored = lots sold, with a hammer to grade against; avg_abs_error_pct, median_abs_error_pct, avg_bias_pct (signed) and within_5/10/20pct are over the sold lots; lots_without_hammer = total minus sold; bands_scored = sold lots with a stated band; bands_held = those whose band contained the hammer; band_hold_pct = held over scored. Model 31 and 30 state an 80% band (p10 to p90), model 24 a 50% band (p25 to p75): compare band_hold_pct with that. Other horizons, the close basis and the denominators: v_prediction_lot_grades. The lots the grader has not reached or holds are not in it: compare with hammer_predictions. service_role only.';
 
 -- 6. The foreign key last: adding it takes SHARE ROW EXCLUSIVE on auction_events until COMMIT -----------------------------
 ALTER TABLE public.hammer_predictions
