@@ -1,5 +1,6 @@
 -- Isolated PostgreSQL 17 contract for 20261007014500_stack_registry.sql (case ledger 13.2: the stack registry as data)
--- and for 20261007040000_stack_sa_v2_showable.sql (SA version 2, the stack as a page), applied in that order below.
+-- and for 20261007040000_stack_sa_v2_showable.sql (SA version 2, the stack as a page) and
+-- 20261007121000_stack_s61_funding_fit.sql (S61 version 1, funding opportunity fit), applied in that order below.
 -- Synthetic rows only; never production. Run from the repo root in an empty disposable dm_refinement_* database:
 --   createdb dm_refinement_stack_registry_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_stack_registry_ci -f supabase/sql/test_stack_registry.sql
@@ -614,5 +615,50 @@ SELECT pg_temp.ok('re-applying the version file adds nothing',
   AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA') = 21
   AND (SELECT count(*) FROM public.stack_substrates
        WHERE substrate IN ('order book fold per lot per minute', 'cohort demand curve by minutes to close')) = 2);
+
+-- Stack S61 version 1, funding opportunity fit (20261007121000) ---------------------------------------------------------
+-- Applied after SA v2. Checks: the version row, its 13 abstract needs across the nine layers, the twelve new substrates
+-- (undeclared) beside the reused place entity, the reader and the function at version 1 (every need missing), SA
+-- untouched, and the replay adding nothing.
+RESET ROLE;
+CREATE TEMP TABLE s61_new_substrates (substrate text PRIMARY KEY);
+INSERT INTO s61_new_substrates VALUES ('funding award observations'), ('awardee organization key'), ('research institution key'), ('person subject'),
+  ('funding program and phase'), ('funding topic code'), ('awards per organization per year'),
+  ('award baseline by state, topic and year'), ('applicant distance from award winners'),
+  ('funding criteria coverage for an applicant'), ('funding invitation probability'), ('pitch result');
+SELECT pg_temp.ok('before S61: none of its new substrates is registered, place entity is',
+  NOT EXISTS (SELECT 1 FROM public.stack_substrates g JOIN s61_new_substrates n USING (substrate))
+  AND EXISTS (SELECT 1 FROM public.stack_substrates WHERE substrate = 'place entity'));
+\ir ../migrations/20261007121000_stack_s61_funding_fit.sql
+SELECT pg_temp.ok('S61 v1: measured, family the machine''s economics, nine path entries in layer order, no thesis, no earlier version',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'S61') = 1
+  AND (SELECT status = 'measured' AND name = 'Funding opportunity fit' AND family = 'the machine''s economics' AND cardinality(path) = 9
+         AND path[1] LIKE 'log:%' AND path[9] LIKE 'outcome:%' AND thesis_vein_id IS NULL AND supersedes_version IS NULL
+         AND cardinality(external_dimensions) = 2 AND who_cares IS NOT NULL AND scoring IS NOT NULL
+       FROM public.stacks WHERE stack_id = 'S61' AND version = 1));
+SELECT pg_temp.ok('S61 carries 13 needs over all nine layers, all abstract, every one on a registered substrate',
+  (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'S61' AND version = 1) = 13
+  AND (SELECT count(DISTINCT layer) FROM public.stack_needs WHERE stack_id = 'S61' AND version = 1) = 9
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'S61' AND kind = 'abstract') = 13
+  AND (SELECT layer FROM public.stack_needs WHERE stack_id = 'S61' AND object = 'funding award observations') = 'log'
+  AND NOT EXISTS (SELECT 1 FROM public.stack_needs n LEFT JOIN public.stack_substrates g ON g.substrate = n.object
+                  WHERE n.stack_id = 'S61' AND n.kind = 'abstract' AND g.substrate IS NULL));
+SELECT pg_temp.ok('the twelve new substrates are registered undeclared, and place entity is reused, not duplicated',
+  (SELECT count(*) FROM public.stack_substrates g JOIN s61_new_substrates n USING (substrate)
+    WHERE g.declared_table IS NULL AND g.declared_at IS NULL AND g.registered_by LIKE 'claude-code%night-expansion%') = 12
+  AND (SELECT count(*) FROM public.stack_substrates WHERE substrate = 'place entity') = 1);
+SELECT pg_temp.ok('the reader takes S61 at version 1 with 13 needs; the function reads 0 of 13, every need missing',
+  (SELECT version = 1 AND n_needs = 13 AND status = 'measured' FROM public.v_stacks WHERE stack_id = 'S61')
+  AND (SELECT coverage = 0 AND n_present = 0 AND n_partial = 0 AND n_missing = 13 FROM public.stack_coverage('S61'))
+  AND (SELECT count(*) = 13 FROM public.stack_coverage('S61') c, jsonb_array_elements(c.needs) e
+        WHERE e ->> 'kind' = 'abstract' AND e ->> 'verdict' = 'missing'));
+SELECT pg_temp.ok('S61 leaves SA as it was',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'SA') = 2
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'SA') = 21);
+\ir ../migrations/20261007121000_stack_s61_funding_fit.sql
+SELECT pg_temp.ok('re-applying the S61 file adds nothing',
+  (SELECT count(*) FROM public.stacks WHERE stack_id = 'S61') = 1
+  AND (SELECT count(*) FROM public.stack_needs WHERE stack_id = 'S61') = 13
+  AND (SELECT count(*) FROM public.stack_substrates g JOIN s61_new_substrates n USING (substrate)) = 12);
 
 SELECT pg_temp.ok('done: stack registry contract', true);
