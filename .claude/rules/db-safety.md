@@ -2,7 +2,6 @@
 paths:
   - "supabase/migrations/**"
   - "supabase/functions/**"
-  - "database/**"
   - "scripts/**/*.sql"
 ---
 

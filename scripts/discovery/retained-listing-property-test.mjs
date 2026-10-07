@@ -59,7 +59,7 @@ try {
  '{"interior_color":"Black Vinyl","color":"Signal Red","transmission":"Four-Speed Manual"}');`);
  const priorReader=readFileSync('supabase/migrations/20261005013641_bounded_field_provenance_inputs.sql','utf8');
  sql(priorReader.slice(priorReader.indexOf('CREATE OR REPLACE FUNCTION public.get_field_provenance'),priorReader.indexOf('$function$;')+12));
- const priorView=readFileSync('database/migrations/20260517_fix_vehicle_canonical_multi_cardinality.sql','utf8');
+ const priorView=readFileSync('scripts/discovery/fixtures/vehicle_canonical_20260517.sql','utf8');
  sql(priorView.slice(priorView.indexOf('CREATE OR REPLACE VIEW public.vehicle_canonical'),priorView.indexOf('COMMENT ON VIEW')));
  sql(readFileSync('supabase/migrations/20261005083255_retained_listing_interior_property.sql','utf8'));
  sql(readFileSync('supabase/migrations/20261005134051_retained_listing_exterior_property.sql','utf8'));
