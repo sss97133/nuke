@@ -1073,3 +1073,39 @@ layer (3,483 episodes corrected by supersession). The place entity, the text fol
 stacks outranks a large table with a describe gap: the place entity (1, 11, 13, 16), the text fold (4, 5, 19), the
 dimensions (12, 14), the clocks (10, 18), the image zone dimension (6). Each shift picks its first item from this table,
 then from the view.
+
+### 13.1 The owner on what a stack is (2026-10-07 00:05Z, captured verbatim in substance)
+
+"A stack is actually a great thing we could call a page. For me that already becomes a method of exploration that would
+be represented in a tab on the header. We want to teach people how to explore data, and it's useful for ourselves anyway:
+these are endless cams to drill and drill and drill into. We start becoming some kind of design language for SQL; it's
+almost what's missing for SQL, for data model design. And we get to prove the statistics of what we would consider
+positives and negatives, what makes a performance positive versus negative, because there are so many different weights,
+so many ways to calculate positive. There are so many ways for change to add up to a dollar. If a vehicle has 10,000 points
+where you measure positive and negative, with weights affected by the data and also by the lack of data: we know how much
+we don't know, we can often calculate how much we don't know, and then wait for that data to show up. We don't have to
+operate in total ignorance. We know roughly how many cars are sold in the United States, and this is how many we have.
+There are places where we can collect data; we just don't know what they are and how much it costs to unlock them, but if
+our system is set up properly it's just a matter of eventually plugging in other data sources. I like discussing these
+stacks and seeing how close we are to actually showing them, because stacks could develop into an investment-grade
+opportunity: a product where people can invest in the marketplace of actions rather than the core object itself, another
+way to support something they believe in. They don't have to believe in the direct owners; they believe in the movement
+and can financially participate in it."
+
+**What this adds to the model (lead's reading, for the next shape decisions, none minted yet):**
+1. **A stack is a page.** Each of the twenty is a named, versioned definition (its spine query, its dimensions, its
+   denominators) that the app can render as a tab and a reader can drill through. The definition is data: a stack
+   registry row, not a hand-written page. Readers of a stack cite the stack version they read.
+2. **Positives and negatives are named metrics with weights, as data.** A vehicle's "10,000 points" is a metric
+   catalog (each point: its source observation kind, its direction, its weight, who set the weight and when) and a
+   weighting is a versioned row, so two weightings of the same evidence can be compared and the statistics of each
+   can be proved against outcomes. This is the two-layer confidence rule (record vs design) made into tables.
+3. **Ignorance is measured, not assumed.** Every stack carries its denominators: the universe it claims to describe
+   (US sales of a cohort per year, from outside estimates), the share Nuke holds, the share that is keyed and dated,
+   and the sources that would close the gap with their cost. A number without its coverage is not shown (the
+   "no count without a denominator" rule); a stack whose coverage is thin says so and waits for the source.
+4. **Sources are pluggable.** A new source lands into the same five substrates (keys, clocks, dimensions, text fold,
+   image fold) and the stacks above it move without redesign. That is the test of "set up properly".
+5. **Stacks as theses.** A stack with a stated expectation and a measured coverage is something a person can back
+   without owning a car: the marketplace of actions. Product and legal shape are the owner's; the data shape is the
+   same registry plus an outcome ledger per stack version.
