@@ -25,6 +25,10 @@
 --   VALIDATE would full-scan vehicle_observations (large) and exceed the deploy role's 10s timeout. The
 --   constraint is enforced for every write going forward regardless.
 
+-- One transaction: SET LOCAL only takes effect inside one (the deploy runs psql without
+-- --single-transaction), and DROP+ADD must be atomic so the table is never left without the CHECK.
+BEGIN;
+
 SET LOCAL statement_timeout = '8s';
 SET LOCAL lock_timeout = '5s';
 
@@ -60,3 +64,5 @@ VALUES (
   ),
   'open'
 );
+
+COMMIT;
