@@ -22,6 +22,7 @@ const NAV_LINKS = [
   { label: 'SEARCH', to: '/search' },
   { label: 'GARAGE', to: '/?tab=garage' },
   { label: 'JOURNAL', to: '/journal' },
+  { label: 'STACKS', to: '/stacks' },
 ];
 
 /**

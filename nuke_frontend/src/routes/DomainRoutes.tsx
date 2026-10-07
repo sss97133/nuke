@@ -23,6 +23,9 @@ const DealRead = React.lazy(() => import('../pages/DealRead'));
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
+// Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
+const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
+const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
 
 // Public map page — no auth, no DeckGL
 function MapPage() {
@@ -193,6 +196,8 @@ export const DomainRoutes = () => {
         <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/valuation" element={<Valuation />} />
+        <Route path="/stacks" element={<StacksIndex />} />
+        <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
