@@ -1638,3 +1638,34 @@ automate expansion of the data model to fit this in?"
    declared-source reader, with the queue drain. To the identity-origin lane: funders and research institutions as
    organizations with relation edges, and the person-subject proposal. This session stays on the owner's funding
    question and drafts the pitch from the measured shape of winners.
+
+#### 13.9.2 The owner: NSF is a case study for expanding the model; the product is matching every organization to its opportunities (2026-10-07 18:10Z, in substance)
+
+**Owner direction (substance kept).** "The NSF is more of a case study on how to expand the data model; that's really
+the idea. Typically it's manual and requires human labor to submit a business to opportunities like the NSF, but if
+there was a way to automate it, more companies would be exposed to the opportunity, if the data surfaces and they're
+actually a good match. That's what I would have preferred to see: the data model expanded and prepared to accept the
+appropriate data to make this possible, more than sending out our application. You almost missed the mark. I get that
+we have to collect and analyze the data to understand the odds."
+
+**Lead's reading (nothing minted).**
+
+1. **The miss, stated.** This session steered toward Nuke's own application: the pitch, the company's blanks, and S61
+   v1, whose feature need names organization f32ea08c as the applicant. The owner's case is the case study; the
+   product is the general function: for every organization in the ledger, which opportunities it fits, how well, and
+   which keys are missing, surfaced when the data says so and recomputed as observations land.
+2. **What was built that serves the general function.** The `add_source` branch (any opportunity source registers
+   through one approval, #766); the declared-source reader (award rows to observations with funder, awardee, program,
+   amount and dates, #767); the award history as the outcome set (14,796 NSF awards; 207,731 across 12 agencies in the
+   SBIR.gov file); the batch organization creator keyed by canonical domain and DUNS (#810), which makes the awardees
+   and institutions organizations.
+3. **What the model still lacks for matching.** (a) An opportunity entity: a program or solicitation with its funder,
+   its windows as clocks (deadlines, award dates) and its criteria as keyed claims (size, ownership, place of work,
+   topic, track partner), each criterion a vocabulary entry through `add_property` proposals, not prose. (b) Every
+   organization's facts as observations against those keys (employee count, location, topic, prior awards), which the
+   award rows already carry for 2,802 awardee firms. (c) The match as a fold per (organization, opportunity): criteria
+   coverage, fit to the winners' cohort baseline, missing keys named, with the odds marked as winners-only until a
+   denominator exists. (d) A surface that shows a match when it appears; the "natural occurrence" is a new match row.
+4. **S61 generalizes.** Version 2's entity is (organization, program), not the company; Nuke is one row among the
+   organizations it scores. The registry change is the data-model lane's; the needs above are its list.
+5. **The pitch is secondary.** It stays in `docs/POSITIONING.md` as one application of the function, not the goal.
