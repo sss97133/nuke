@@ -33,8 +33,8 @@ export function span(ms: number): string {
   return `${sign}${m}m ${s % 60}s`;
 }
 
-export function percent(numerator: number, denominator: number | null): string | null {
-  if (denominator == null || denominator <= 0) return null;
+export function percent(numerator: number | null, denominator: number | null): string | null {
+  if (numerator == null || denominator == null || denominator <= 0) return null;
   const p = (100 * numerator) / denominator;
   return `${p >= 99.95 || p === 0 ? p.toFixed(0) : p.toFixed(1)}%`;
 }

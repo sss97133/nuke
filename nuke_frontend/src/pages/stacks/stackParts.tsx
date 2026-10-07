@@ -30,7 +30,7 @@ export function CoverageTable({ rows, readAt, caption, onOpen }: {
         <tbody>
           {rows.map((r) => {
             const pct = percent(r.numerator, r.denominator);
-            const width = r.denominator && r.denominator > 0 ? Math.min(1, r.numerator / r.denominator) : 0;
+            const width = r.numerator != null && r.denominator && r.denominator > 0 ? Math.min(1, r.numerator / r.denominator) : 0;
             return (
               <tr key={r.id} data-coverage={r.id}>
                 <td>
@@ -40,11 +40,11 @@ export function CoverageTable({ rows, readAt, caption, onOpen }: {
                 </td>
                 <td>
                   <span className="stack-ratio">
-                    {count(r.numerator)} / {r.denominator == null ? 'unknown' : count(r.denominator)}
+                    {r.numerator == null ? 'unknown' : count(r.numerator)} / {r.denominator == null ? 'unknown' : count(r.denominator)}
                     {pct && <small> · {pct}</small>}
                   </span>
                   <span className="stack-basis"> {r.of}</span>
-                  {r.denominator != null && r.denominator > 0 && (
+                  {r.numerator != null && r.denominator != null && r.denominator > 0 && (
                     <span className="stack-bar" aria-hidden="true"><span style={{ width: `${width * 100}%` }} /></span>
                   )}
                 </td>

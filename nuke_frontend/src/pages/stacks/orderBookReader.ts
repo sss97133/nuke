@@ -442,7 +442,8 @@ export function commentKinds(rows: CommentRow[]): KindCount[] {
 export interface CoverageRow {
   id: 'bids_keyed' | 'bids_held' | 'comments_keyed' | 'frames' | 'key_conflicts';
   label: string;
-  numerator: number;
+  /** null when the measure cannot be taken on this lot (then the basis says why). */
+  numerator: number | null;
   /** null when the denominator is unknown (then the row says why). */
   denominator: number | null;
   /** What the denominator counts. */
@@ -507,7 +508,15 @@ export function shapeOrderBook(read: OrderBookRead): OrderBookView | null {
       basis: `${frames.frames.toLocaleString('en-US')} public live frames held (vehicle_observations, bat_public_live_v1); the collector subscribes from 15 minutes before close`,
     },
   ];
-  if (partition.outside.length > 0) {
+  if (closeAt == null) {
+    // Without a close clock the window cannot judge any row (on 2026-10-07 a quarter of a 0.2% sample of lot-keyed
+    // BaT comments sat on lots with no auction_end_date), so the check is reported as not run rather than as zero.
+    coverage.push({
+      id: 'key_conflicts', label: 'Key conflicts', numerator: null, denominator: read.comments.length,
+      of: 'rows keyed to this lot', asOf: readAt, asOfBasis: 'database read',
+      basis: `not checked: this lot has no close time (auction_events.auction_end_date), so the ${LOT_WINDOW_DAYS}-day window cannot judge its rows`,
+    });
+  } else if (partition.outside.length > 0) {
     coverage.push({
       id: 'key_conflicts', label: 'Key conflicts', numerator: partition.outside.length, denominator: read.comments.length,
       of: 'rows keyed to this lot', asOf: readAt, asOfBasis: 'database read',

@@ -153,6 +153,13 @@ describe('coverage', () => {
     expect(conflicted.coverage.find((c) => c.id === 'bids_held')?.numerator).toBe(3);
   });
 
+  it('reports the key-conflict check as not run when the lot has no close time', () => {
+    const view = shapeOrderBook(read({ lot: lot({ auction_end_date: null, total_bids: 3 }) }))!;
+    expect(view.coverage.find((c) => c.id === 'key_conflicts')).toMatchObject({ numerator: null, denominator: 4 });
+    expect(view.coverage.find((c) => c.id === 'frames')?.denominator).toBeNull();
+    expect(view.states.every((s) => s.msToClose === null)).toBe(true);
+  });
+
   it('keeps an unknown source count unknown instead of inventing one', () => {
     const view = shapeOrderBook(read({ lot: lot({ total_bids: null }) }))!;
     expect(view.coverage.find((c) => c.id === 'bids_held')?.denominator).toBeNull();

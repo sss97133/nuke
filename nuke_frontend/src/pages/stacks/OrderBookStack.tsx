@@ -111,6 +111,12 @@ function LogLayer({ read, view, onPickBid }: { read: OrderBookRead; view: OrderB
   return (
     <>
       <LotClock view={view} />
+      {view.window.closeAt == null && (
+        <p className="stack-note">
+          This lot has no close time recorded, so its rows cannot be checked against its own window: rows from another
+          run on the same URL would not be caught, and time to close is unknown.
+        </p>
+      )}
       <p className="stack-note">
         {count(view.bids.length)} bids among {count(view.partition.inWindow.length)} rows keyed to this lot inside its window.
         Posted is the source clock (BaT comment time, to the second); landed is when the row reached the database.
