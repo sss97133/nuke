@@ -4,8 +4,9 @@ Rules for every coding agent here. Claude Code loads this file through `CLAUDE.m
 other tools read it directly. It holds what is true everywhere and points to the rest.
 
 ## What this is
-Nuke (nuke.ag) is a vehicle data ledger: every vehicle and every observation about it, each with its
-source. The stack:
+Nuke (nuke.ag) is a data machine for physical assets: every observation about an asset is kept with its
+source, its clocks and its trust, and state, baselines and predictions are computed from that log, point-in-time,
+so every number can be replayed and graded. Vehicles are the first asset class (see `README.md`). The stack:
 - Supabase project `qkgaybvrernstplzjaam`: Postgres, plus edge functions in `supabase/functions/`.
 - Web frontend in `nuke_frontend/` (Vite), deployed by Vercel.
 - iOS app in `apps/`.

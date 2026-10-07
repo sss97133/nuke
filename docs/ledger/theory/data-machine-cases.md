@@ -1269,3 +1269,122 @@ never exist"; an LLM cannot do them from language alone.
    construction: it can't say what was known two hours before a close. Its place in the machine is the text
    fold (comments into attributed claims) and stack generation (13.2), measured by the atlas. The
    calculations and the retained, replayable log are the part it can't produce.
+
+### 13.5 The text fold as it stands, and the first stance dimension (lead, 2026-10-07 02:30Z)
+
+Six stacks wait on the text fold (`stack_needs`, latest versions, 2026-10-07): S04, S05, S19, S34 and S36 need the
+`text fold` substrate, SA needs `comment stance dimension`, S04 also `comment sentiment per lot`. The claims layer of
+§13.3 weighs speakers by their record, which is a text fold too. None of these substrates has a declared table.
+
+**What exists (read live, `v_schema_atlas`, `pg_stats`, column comments, 02:28Z).**
+
+| Object | Rows / fill | State |
+|---|---|---|
+| `auction_comments` | 19,978,200 rows, 56 of 56 columns described | the log; written daily |
+| `auction_comments.comment_type` | fill 1.00, 5 values in use (CHECK: bid, sold, question, answer, observation, seller_update, seller_response, expert_opinion) | the builder's kind, the only full-coverage dimension |
+| `auction_comments.has_question` | fill 1.00 | a question mark, derived |
+| `auction_comments.sentiment`, `sentiment_score`, `key_claims`, `analyzed_at` | fill 0.111 | `analyze-auction-comments`, deleted 2026-03-09 (5741560ae); scored 2026-01-20 to 2026-03-06 |
+| `auction_comments.question_primary_l1/l2`, `question_classified_at`, `question_classify_method` | fill 0.074 / 0.092 | `scripts/question-classify-bulk.mjs` regex_v1, 2026-03-27 to 2026-04-13 |
+| `auction_comments.community_stance_score`, `stance_scored_at`, `stance_model`, `extracted_claims` | fill 0.0001 | BYOK rubric v2, on demand |
+| `comment_persona_signals` → `author_personas` | 224,369 rows → 363 | tone, expertise, style per comment; read-only, no writer in 30 days |
+| `comment_discoveries` | 133,445 | raw LLM analysis (sentiment and trends); read-only |
+| `vehicle_sentiment` | 127,348 | per-vehicle fold, last 2026-02-07; read-only |
+| `sentiment_update_queue` | 18,839 | trigger-fed (`trg_queue_sentiment_update`), written, **no reader** |
+| `comment_claims_progress` | 22,285 | which comments the claim refinery has seen (0.11% of the log) |
+| `_shared/commentRefinery.ts` | code | comment → claim_triage (regex) → extract_claims (LLM) → field_evidence / vehicle_observations / comment_discoveries / comment_library_extractions; categories A specs, B condition, C provenance, D market signals, E library, Q questions; `statement_kind` assertion/question; `epistemic_status` asserted/uncertain/unknown/refused |
+
+Case 8 above already names the organs frozen (sentiment 2026-03-06 at 11.5%, question classification 2026-04-14 at
+8.7%, stance 0%, 15 of 16 analysis crons inactive). The shape is there; the writers stopped, and each one wrote its
+result as more columns on the 20M-row log.
+
+**The first stance dimension, v1 (the plan, not yet built).** The order book (stack A) and the claims layer need, per
+comment: *bid* (typed already), *question* (typed or `has_question`), *reservation* (a stated price or a willingness,
+"I'd go to X", "worth X all day"), *refusal* ("not at this price", "no sale here"), else *observation*. Rules first:
+the refinery's regex triage covers all 20M rows for free and is measured against denominators (share per class, per
+platform and year); the free local model (`scripts/stacks` shows it runs at 16 to 17 tokens per second) grades a
+stratified sample to calibrate the rules, never the whole log. The dimension is a **declared table for the
+`comment stance dimension` substrate** (one row per comment: stance, method, version, scored_at), not a seventh set of
+columns on `auction_comments`: it keys the comment, carries its method and clock, is re-runnable by version, and
+declaring it moves every stack that names the substrate with no new stack version (13.1 point 4). The frozen columns
+stay as the record of the earlier organs. Coverage is the number the registry reports once the table is declared.
+
+### 13.6 The owner on the outside read, observation, the two-minute window and the physical shape (2026-10-07, in substance)
+
+**Owner direction (substance kept).** He asked a model whether the project could get seed funding (NSF SBIR) and it
+dismissed the project the way a smart stranger without time to inspect would. He agrees the outside read is fair: from
+outside "it looks stupid and annoying", from inside "I'm touching something incredible, very streamlined and very
+usable" that "just needs financial support". The question: how does the project take shape so it fits what funders look
+for, and what is the outside reader looking at that makes it uninteresting. The physical expansion he sees: live-streamed
+garage sessions; the software becomes "the software for financial interaction and documentation, so it has this whole
+accounting system, because that's how you do it"; image analysis and the user data structure are "completely passive".
+On what it is: "it's really just a database. It's a data model. I like that wording." On models: "how do LLMs compete
+with just factual documentation? They literally cannot exist in the same reality"; "do LLMs tell the future or not is
+maybe a key point"; observation is the important thing; "being able to process data as fast as possible helps you
+predict what to do in the next second". On auctions: "a very interesting point in time to act within, like bumper cars,
+you have two minutes to make a decision"; "crazy calculations and actually win, because you are arbitrating the moment
+where you could own something or not."
+
+**Lead's reading (nothing minted; one positioning doc revised, `docs/POSITIONING.md`):**
+
+1. **What the outside reader saw.** Not the machine. The model that dismissed the project read two words of a
+   description ("vehicle data ledger", still the first sentence of `AGENTS.md`) and never opened the README. A
+   reviewer screening pitches does the same. The repo also carried three one-liners from three eras: `VISION.md`
+   (2026-02-05: "makes every collector vehicle in the world liquid", ETFs, derivatives, vaults), the positioning note
+   (2026-02-08: "vertical data + applied AI", "bots that hire humans") and the README (2026-10-06: a data machine,
+   nine layers, stacks). A reader without time takes the loudest, and the loudest was the least evidenced. A smart
+   reader prices the ratio of claim to checkable evidence, not the idea. The repair is one voice, and a description
+   that carries a measured number wherever it travels.
+2. **Measured results exist, and they are modest, which is the asset.** Read on prod 2026-10-07:
+   - `prediction_accuracy`: hammer model v13, 208 scored, median abs error 48.2%, bias +32.0%, 0 within 10%; v24,
+     399 scored, median 33.2%, bias −12.5%, 36 within 10%, 103 within 20%. The predictor ran live 2026-02-19 →
+     2026-04-01 (`hammer_predictions`, 50,534 rows). The documented cause of the remaining error is condition
+     blindness: condition and configuration live in images and comments, not in fields (ask-nuke THEORY.md, "the ±40%
+     calibration killer").
+   - The band tag backtest (coverage audit of 2026-09-30, §5): 69,295 sold BaT lots, 2024-09-01 to 2026-09-27, each
+     priced only from earlier sales, bid as of 24 h before close: cold 11.3%, in line 40.9%, hot 86.8% finished
+     above their band middle (48 h: 13.2 / 40.3 / 82.9%).
+   - The stack registry (`v_stacks`, measured 03:11Z): 64 stacks, 5 at or above 0.9 coverage (S03 bidder record as
+     of a date, S21 bid hazard model, S47 dealer markdown curves, S48 tenure mix, S56 venue design replays), mean
+     coverage 0.12. SA v2, the auction as an order book, at 0.50: 8 of 16 needs present, 2 partial, 6 missing and
+     named.
+   - V012 discovery: 68,957 distinct BaT buyers; the top 1% took 14% of lots; 39 buyers won 50 or more.
+
+   A 33% median error is not an edge. It is a baseline with a named cause and a grading table, which is where a
+   research proposal starts and what a stranger can check in an afternoon.
+3. **The research claim, as R&D rather than engineering.** Can point-in-time state, estimated from heterogeneous
+   untrusted observations (images, comments, receipts, bids) that each keep their source, clock and relation to the
+   asset, close a measured 33% median error in asset price prediction, and be ready inside a two-minute decision
+   window? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
+   error demands; (b) relation-weighted claim credibility (who said it, their relation to the lot at the time, how
+   their earlier claims resolved; 13.3), which has no measured instance yet; (c) leakage-free replay over 19.9M
+   comments and 4.27M bids (README planner estimates, 2026-10-06), the invariant most market-data products violate.
+   Grading: median abs % error against the cohort baseline on a held-out last month, in the same
+   `prediction_accuracy` table, by price tier. Generality: any asset class whose record is fragmented public
+   observation (equipment, aircraft, property, art). Vehicles are the testbed because they are the largest public
+   corpus with timed bids.
+4. **Observation versus generation, in the form that survives a smart reader.** "They cannot exist in the same
+   reality" is the strong form, and it loses the room because the reply is "the model reads your ledger." The
+   defensible form is already here (13.4 point 4) and in `docs/content/thesis-aperture-of-llm-control.md`: a model
+   trained on today's web has leakage by construction and cannot say what was known two hours before a close; its
+   place is as an observer whose outputs land as claims with provenance (the text fold, the vision gate), never as the
+   source of a number. A model is a sensor; the ledger is the instrument; the calculations and the retained,
+   replayable log are what the model cannot produce. "Do LLMs tell the future" then has a precise answer: not about a
+   specific asset at a specific moment, because that future is a fold over observations the model has not seen. Said
+   this way the point reads as method, not as a flag.
+5. **The two-minute window is the forcing function, not a feature.** BaT's soft close moves the close to bid time + 2
+   minutes; 322 of 400 settled lots extended (§4). The decision moment is the chain, so everything the system knows
+   about a lot must be folded before the chain starts. That is why the architecture is a fold over a log and not a
+   query at decision time, and why "predict what to do in the next second" is a property of the layers, not of a
+   model. SA's missing substrates (comment stance dimension, order-book fold per lot per minute, cohort demand curve by
+   minutes to close, residual snapshots, outcome ledger) are the work plan, already written as a backlog.
+6. **The physical shape is a set of sources, and it comes after the instrument.** Live-streamed garage sessions are
+   observations with the richest provenance available: a camera on the work, the receipt, the person doing it, all
+   clocked. The accounting system is money as one more observation layer on the same entities (§9 already frames
+   investment, maintenance and repair as evidenced interventions). Passive capture is the vision gate and the photo
+   sync. All three land in the same substrates (13.1 point 4). To a funder they are the market and the company, not
+   the innovation. Lead with the instrument; the garage is where the instrument gets its best data.
+7. **One voice.** The README is the description. `docs/POSITIONING.md` says it to a reviewer, an investor and a
+   mechanic, with the evidence table, the research question and what loses the room. `VISION.md` keeps the long-range
+   direction under a dated header that points at the operating description. The one-line descriptions that agents read
+   first (`AGENTS.md`, the owner's private instructions) are the owner's to change; the recommendation is the README's
+   first sentence.

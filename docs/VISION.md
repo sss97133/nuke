@@ -1,6 +1,10 @@
 # nuke Vision
 
-> **Read this before touching anything in the product. This is the founder's vision, not a spec.**
+> **Read this for where the system is going, not for what exists.** This is the founder's long-range direction,
+> first written 2026-02-05 and last edited 2026-10-04. What the system is today is [`README.md`](../README.md) and
+> [`docs/ledger/theory/data-machine.md`](ledger/theory/data-machine.md). How to say it to someone outside, with the
+> measured results, is [`docs/POSITIONING.md`](POSITIONING.md). The financial instruments and physical infrastructure
+> below are direction; none of them is built, and none should be the first thing a stranger reads.
 
 ## The One-Liner
 
