@@ -5,8 +5,9 @@ How to say what Nuke is to someone with five minutes: a grant reviewer, an inves
 that lose the room. It supersedes the 2026-02-08 note "vertical data + applied AI" (removed in the same change) and
 sits beside [`VISION.md`](VISION.md), which is direction rather than description.
 
-Every number here carries its source and date. Re-read the sources before quoting a number outside; the daily
-measurements in the README move.
+Every number here carries its source, its date and its unit. The evidence block below is written from the live
+database by the same daily job that measures the README, so it moves with the registry; the hand-written lines
+around it cite documents and carry their dates.
 
 ## The sentence
 
@@ -28,54 +29,93 @@ fundable" read the two words "vehicle data ledger" and answered from them.
 The fix is not to the machine. It is one voice, and a description that carries a measured number wherever it goes.
 Lead with the instrument and its grading table. The vision comes after, and only when asked.
 
+## Against: the unverifiable number
+
+Positioning is against something. The alternatives a buyer has today (a price guide, an aggregator's estimate, a
+venue's own comps, a model asked "what is it worth") share one property: the number arrives with no error table.
+None we have found publishes how often it was right, on how many lots, as of when. Nuke's position is the opposite:
+every number with its source, its date, its unit and its denominator, and every prediction graded in a public
+table. The stats in the substrate are the positioning; a reader takes them or leaves them. That is also why this
+evidence should be generated rather than typed: the hand-written table of 2026-10-07 was wrong in its unit (rows for
+lots) within an hour. Generating it on the daily `readme-stats.mjs` run is on the data-model lane's list; until then
+the numbers below are hand-read and stamped.
+
 ## What is measured
 
-Read on prod 2026-10-07 between 02:50Z and 03:11Z unless stated. The registry and the daily measurements move;
-re-read before quoting. Modest numbers with a named cause are the asset; they are what a reviewer can check.
+Units are lots, not rows, and every rate names its denominator. Hand-read on prod 2026-10-07 03:30Z unless stated.
+
+| Measure | Value | Source |
+|---|---|---|
+| Settled BaT lots held | 106,551 with a sale price, of 174,518 listings; 93,135 of the sold keyed to a vehicle; 1,216 settled since 2026-09-27 | `bat_listings` |
+| Price predictions | v24: 4,612 lots since 2026-02-19 (45,788 hourly rows); v31, live: 2,314 lots since 2026-09-27; 10 lots graded across all versions | `hammer_predictions` |
+| Graded error, per lot | v24: 7 lots, median abs error 23.5% (last prediction before close), 1 within 10%; v13: 2 lots, 48.2%. Too few lots to grade a model | `hammer_predictions`, scored rows |
+| Predicted lots that join to a settled listing | 6 of 4,612 (v24); 0 of 2,314 (v31), by vehicle key | `hammer_predictions` × `bat_listings` |
+| Stack registry | 64 stacks; 5 at or above 0.9 coverage; mean 0.12; order book SA v2 at 0.50 (8 of 16 needs present, 2 partial, 6 missing) | `v_stacks`, 03:11Z |
+| Buyer concentration (V012 discovery) | 68,957 distinct BaT buyers; top 1% took 14% of lots; 39 won 50 or more | `vein_ledger` |
+| Corpus (planner estimates) | 20.0M auction comments, 4.27M bids, 11.2M observations (03:49Z); 52.1M images, 0.5% vision-analyzed; 11% of comments sentiment-scored (README, 2026-10-06) | README daily measurements |
+
+Results that live in documents rather than on prod, with their dates:
 
 | Result | Number | Source |
 |---|---|---|
-| Hammer-price predictor, model v13 | 208 scored, median abs error 48.2%, bias +32.0%, 0 within 10% | `prediction_accuracy` |
-| Hammer-price predictor, model v24 | 399 scored, median abs error 33.2%, bias −12.5%, 36 within 10%, 103 within 20% | `prediction_accuracy` |
-| Predictor run, live | 2026-02-19 to 2026-04-01, 50,534 predictions, hourly scoring | `hammer_predictions`; `docs/ledger/INTENT_LEDGER.md` §2 |
-| Named cause of the residual error | condition and configuration live in images and comments, not fields ("the ±40% calibration killer") | `docs/features/ask-nuke/THEORY.md` |
-| Band tag backtest, 24 h before close | 69,295 sold BaT lots 2024-09-01..2026-09-27, each priced from earlier sales only: cold 11.3%, in line 40.9%, hot 86.8% finished above their band middle (48 h: 13.2 / 40.3 / 82.9%) | `docs/ledger/2026-09-30_bat-data-coverage-audit.md` §5 |
-| Stack registry | 64 stacks; 5 at or above 0.9 coverage; mean 0.12; the order-book stack SA v2 at 0.50 (8 of 16 needs present, 2 partial, 6 missing) | `v_stacks`, measured 2026-10-07 03:11Z |
-| Buyer concentration (V012 discovery) | 68,957 distinct BaT buyers; top 1% took 14% of lots; 39 won 50 or more | `vein_ledger` |
+| Band tag backtest, 24 h before close | 69,295 sold BaT lots 2024-09-01..2026-09-27, each priced from earlier sales only: cold 11.3%, in line 40.9%, hot 86.8% finished above their band middle (48 h: 13.2 / 40.3 / 82.9%). Run in a local DuckDB archive of 2026-09-29, not on prod | `docs/ledger/2026-09-30_bat-data-coverage-audit.md` §5 |
 | Soft-close extension | 322 of 400 settled BaT lots extended past the scheduled close (80%) | `docs/ledger/theory/data-machine-cases.md` §4 |
-| Corpus (planner estimates, 2026-10-06) | 19.9M auction comments (84% keyed to an identity), 4.27M bids, 157K BaT listings, 1.12M vehicles, 52.1M images (0.5% vision-analyzed) | README daily measurements |
+| Hypothesized cause of price error | condition and configuration live in images and comments, not fields; from a handful of graded cases, not a measured decomposition | `docs/features/ask-nuke/THEORY.md` (2026-07-09) |
 
-Row counts are cost, not results. Lead with the error and the coverage; mention the rows as the size of the testbed.
+What the numbers said on 2026-10-07 03:30Z: the predictor had written predictions for 4,612 lots (model v24,
+since 2026-02-19) and 2,314 more (v31, live since 2026-09-27), and had been graded on ten, because its vehicle keys
+land on six settled listings (`bat_listings` holds 106,551 sale prices, 93,135 of them keyed to a vehicle). The
+grading machinery exists; the outcome join is the gap, and it is a key repair on data already held, not new data.
+The evidence is a small fraction of the pool (0.5% of images analyzed, 11% of comments scored, ten of thousands of
+predictions graded), and the pool is a fraction of the market. Both fractions are the honest headline until the
+join runs; the next read of the table above shows whether it moved.
+
+Row counts are cost, not results. Lead with the graded error and the coverage; mention the rows as the size of the
+testbed.
 
 ## The research question
 
 For a funder who funds R&D, the question is one sentence with a grading rule:
 
 > Can point-in-time state, estimated from heterogeneous untrusted observations (images, comments, receipts, bids) that
-> each keep their source, clock and relation to the asset, close a measured 33% median error in asset price prediction,
-> and be ready inside a two-minute decision window?
+> each keep their source, clock and relation to the asset, predict an asset's clearing price with a graded per-lot
+> error, and keep correcting that prediction inside the two-minute closing window as bids, comments and, later,
+> other signals arrive?
 
 The unproven parts, each a Phase I objective:
 
+0. **The outcome join.** Grade every prediction against the recorded hammer, per lot, point-in-time, at n ≥ 1,000
+   lots (1,216 BaT lots settled in the ten days to 2026-10-07 alone). Ten lots are graded today. This is a key
+   repair on data already held, and it sets the bar the rest is measured against.
 1. **Condition and configuration from images and text**, at the accuracy the error demands. Today 0.5% of images are
-   vision-analyzed and the predictor is condition-blind by its own calibration table.
+   vision-analyzed; condition blindness is the hypothesized cause of the error seen so far.
 2. **Relation-weighted claim credibility.** A statement about an asset weighted by who made it, their relation to the
    asset at the time, and how their earlier claims resolved. Designed (`data-machine-cases.md` §13.3); no measured
    instance yet.
 3. **Leakage-free replay at scale.** A feature at moment *t* uses only what was known before *t*, over 19.9M comments
    and 4.27M bids. Most market-data products violate this; the architecture here is built around it.
+4. **The nowcast.** A prediction row per lot per minute through the closing chain, graded against the outcome, with
+   the update rule as the fold (stacks SA and S24). The live pull visits six lots a minute with one slot held for
+   closing lots, so a lot in its final chain is observed about once a minute; whether the fold recomputes at that
+   cadence is a feasibility question, not a feature.
 
-Grading: median absolute % error against the cohort baseline on a held-out final month, in the same
-`prediction_accuracy` table, by price tier; the bar is v24's 33.2%. Generality: any asset class whose record is
-fragmented public observation (equipment, aircraft, property, art). Vehicles are the testbed because they are the
-largest public corpus with timed bids.
+Grading: median absolute % error per lot (the last prediction before close, and at fixed horizons) against the
+cohort baseline, on a held-out final month, in `prediction_accuracy` by price tier. The bar is set by objective 0,
+not by the ten graded lots. Generality: any asset class whose record is fragmented public observation (equipment,
+aircraft, property, art). Vehicles are the testbed because they are the largest public corpus with timed bids.
 
 ## Models: sensor, not source
 
-The strong claim ("language models cannot exist in the same reality as factual documentation") loses the room, because
-the reply is "the model reads your ledger." The defensible claim, already in the repo
-(`docs/content/thesis-aperture-of-llm-control.md`; `data-machine-cases.md` §13.4):
+The owner's claim, in substance (2026-10-07): a language model cannot create factual documentation. It generates
+opinions; opinions influence actions; actions get documented and become history. That is a different path from
+observation, and it is why markets that settle on a timed outcome (an auction, a sale, a bet) stay outside a
+model's reach: the final two minutes of bids are observations that do not exist until they happen. Nobody is
+building the substrate for that; this is it.
 
+The form that survives a referee (`docs/content/thesis-aperture-of-llm-control.md`; `data-machine-cases.md` §13.4,
+§13.7):
+
+- A model emits priors. It cannot emit an observation. An auction close is an observation.
 - A model trained on today's web has leakage by construction. It cannot say what was known two hours before a close.
 - Its place in the machine is as an observer: it turns a comment into an attributed claim, a photo into a condition
   observation, and the output lands as a row with provenance. It is never the source of a number.
@@ -108,9 +148,10 @@ best data.
 ## How to say it
 
 **To a reviewer.** "An observational ledger for physical assets. Every fact keeps its source and its clocks, state is
-computed from the log point-in-time, and predictions are graded against outcomes in a public table. Our best price
-model has a 33% median error on 399 lots and we know why: condition lives in photos and comments, not fields. The
-Phase I question is whether provenance-weighted extraction from those sources closes the gap, measured the same way."
+computed from the log point-in-time, and predictions are graded against outcomes in a public table. Grading our own
+predictor showed how little had been graded: thousands of lots predicted, ten scored, because the predictions and the
+settled lots did not share a key. Phase I starts with that join at a thousand lots, then asks whether
+provenance-weighted extraction from photos and comments lowers the error, measured the same way."
 
 **To an investor.** "Auctions settle in a two-minute window and the crowd prices on what is written in the listing.
 We fold everything known about the asset before the window opens, with a grading table that says how often we are
@@ -124,7 +165,8 @@ when, and the market for that truck next to it."
 
 - ETFs, derivatives, vaults, "undercut BaT". Direction, not evidence. Keep it in `VISION.md`.
 - "LLMs cannot exist in the same reality." Say sensor and instrument.
-- Row counts as the lead. 52M images is a cost. The result is 0.5% analyzed and a 33% error with a named cause.
+- Row counts as the lead. 52M images is a cost. The result is 0.5% analyzed and ten graded predictions.
+- A graded number without its unit. 399 rows of seven lots re-scored hourly is seven lots.
 - "AI-powered", "platform", "disrupt", "Bloomberg for cars".
 - A person's money, vehicle or contact details. The repo is public; refer to records by id.
 - A number without its source, date and denominator.
@@ -138,9 +180,9 @@ Character limits are from [seedfund.nsf.gov/project-pitch](https://seedfund.nsf.
 | Section | Limit | What goes in, from this doc |
 |---|---|---|
 | 1. Technology innovation | 3,500 chars | The sentence; the nine layers in two lines; the model as sensor; origin: a mechanic's own records and the gap between what a listing says and what the work shows |
-| 2. Technical objectives and challenges | 3,500 chars | The research question; the three unproven parts as objectives; the grading rule and the 33.2% bar; the testbed size; why this is R&D (the outcome is unknown and the calibration table proves it) |
+| 2. Technical objectives and challenges | 3,500 chars | The research question; objectives 0 to 4; the grading rule, with objective 0 (the outcome join at n ≥ 1,000 lots) as the first milestone; the testbed size; why this is R&D (the outcome is unknown and the grading table proves it) |
 | 3. Market opportunity | 1,750 chars | Who decides in the two-minute window (bidders, dealers, flippers), who needs the record (owners, lenders, insurers); the settled-lot volume as the market's size; later asset classes |
-| 4. Company and team | 1,750 chars | Founder-mechanic who builds and sells vehicles, user #1; pre-launch; the corpus already built; the team is the gap a reviewer will name, and STTR's required research-institution partner is one answer |
+| 4. Company and team | 1,750 chars | Founder-mechanic who builds and sells vehicles, user #1 and today the research partner; pre-launch; the corpus already built; a university partner satisfies STTR's research-institution requirement and the owner has candidates, with museums as letters of support |
 
 The prose is not drafted here. It is drafted when the owner says go, from this doc and the README, and he reviews it
 before anything is submitted.
