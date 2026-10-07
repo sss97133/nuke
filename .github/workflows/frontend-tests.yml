@@ -200,6 +200,10 @@ jobs:
         run: createdb dm_refinement_vin_policy_ci
       - name: Verify vin_decoded_data's write policy is scoped to service_role (anon reads, cannot insert or delete; service_role writes; registry row; re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vin_policy_ci -f supabase/sql/test_vin_decoded_data_policy.sql
+      - name: Create disposable fabricated evidence flag database
+        run: createdb dm_refinement_flag_evidence_ci
+      - name: Verify the fabricated-evidence flag writer (only the named source_type flagged, batch honoured, values untouched, metadata record, receipts, idempotent, service_role only, re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_flag_evidence_ci -f supabase/sql/test_flag_fabricated_field_evidence.sql
   image-projection:
     runs-on: ubuntu-latest
     services:
