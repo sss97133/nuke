@@ -29,7 +29,8 @@ export function readAllRecords(logRoot = LOG_ROOT) {
 }
 
 const cell = (s, max = 110) => {
-  const flat = String(s ?? '').replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+  // Backslashes first, then pipes: a model-written cell must not break the table or smuggle an escape (CodeQL js/incomplete-sanitization).
+  const flat = String(s ?? '').replace(/\s+/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').trim();
   return flat.length > max ? `${flat.slice(0, max - 3)}...` : flat;
 };
 const pct = x => `${(100 * x).toFixed(0)}%`;
