@@ -113,7 +113,7 @@ model's reach: the final two minutes of bids are observations that do not exist 
 building the substrate for that; this is it.
 
 The form that survives a referee (`docs/content/thesis-aperture-of-llm-control.md`; `data-machine-cases.md` §13.4,
-§13.7):
+§13.8):
 
 - A model emits priors. It cannot emit an observation. An auction close is an observation.
 - A model trained on today's web has leakage by construction. It cannot say what was known two hours before a close.

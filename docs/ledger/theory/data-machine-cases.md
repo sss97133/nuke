@@ -1335,7 +1335,7 @@ where you could own something or not."
    reader prices the ratio of claim to checkable evidence, not the idea. The repair is one voice, and a description
    that carries a measured number wherever it travels.
 2. **Measured results exist, and they are modest, which is the asset.** Read on prod 2026-10-07:
-   - `prediction_accuracy` (corrected 03:50Z, see 13.7: its unit is hourly rows, not lots): hammer model v13, 208
+   - `prediction_accuracy` (corrected 03:50Z, see 13.8: its unit is hourly rows, not lots): hammer model v13, 208
      rows on 2 lots, median abs error 48.2%; v24, 399 rows on 7 lots, 33.2% by row and 23.5% per lot (last
      prediction before close), 1 lot within 10%. `hammer_predictions` holds 50,534 rows: v24 predicted 4,612 lots
      from 2026-02-19 and v31 2,314 more from 2026-09-27; ten lots were ever graded. The cause named in ask-nuke
@@ -1352,11 +1352,11 @@ where you could own something or not."
 
    Ten graded lots are not a calibration record (corrected 03:50Z). They prove the grading machinery exists and
    that the outcome join never ran; the large-n graded result is the band backtest. What a stranger can check in an
-   afternoon is the unit and the denominator, so both now travel with every number (13.7).
+   afternoon is the unit and the denominator, so both now travel with every number (13.8).
 3. **The research claim, as R&D rather than engineering.** Can point-in-time state, estimated from heterogeneous
    untrusted observations (images, comments, receipts, bids) that each keep their source, clock and relation to the
    asset, predict a clearing price with a graded per-lot error at n ≥ 1,000, lower it, and keep correcting it inside
-   the two-minute closing window (corrected and extended 03:50Z, 13.7)? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
+   the two-minute closing window (corrected and extended 03:50Z, 13.8)? The unproven parts: (a) condition and configuration extraction from images and text at the accuracy the
    error demands; (b) relation-weighted claim credibility (who said it, their relation to the lot at the time, how
    their earlier claims resolved; 13.3), which has no measured instance yet; (c) leakage-free replay over 19.9M
    comments and 4.27M bids (README planner estimates, 2026-10-06), the invariant most market-data products violate.
@@ -1391,7 +1391,7 @@ where you could own something or not."
    first (`AGENTS.md`, the owner's private instructions) are the owner's to change; the recommendation is the README's
    first sentence.
 
-### 13.7 The owner follows the evidence: units, denominators, the nowcast, the cost of text, and what positioning is against (2026-10-07 03:30Z, in substance)
+### 13.8 The owner follows the evidence: units, denominators, the nowcast, the cost of text, and what positioning is against (2026-10-07 03:30Z, in substance)
 
 **Owner direction (substance kept).** Reading 13.6 he asked whether v13 had been better than v24, whether v24 simply
 had more lots, and "those 399 lots are out of how many lots we have access to." The exercise is "for me to be better
