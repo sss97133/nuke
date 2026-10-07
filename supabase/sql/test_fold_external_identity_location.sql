@@ -21,6 +21,15 @@ CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE 
   RAISE NOTICE 'PASS %', label;
 END $$;
 
+-- The three Supabase API roles must exist before the migration applies, so its REVOKE/GRANT block runs and the
+-- ACL assertions below can read real grants. A freshly CREATEd function gets EXECUTE for PUBLIC by default (the
+-- anonymous write door); the migration must take it away.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+END $$;
+
 CREATE TABLE public.external_identities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   platform text NOT NULL, handle text NOT NULL, metadata jsonb DEFAULT '{}'::jsonb
@@ -83,5 +92,13 @@ SELECT pg_temp.ok('exactly one write_receipt for the one changing call',
 
 -- app.writer restored to empty (no caller set one in this script).
 SELECT pg_temp.ok('app.writer restored after the call', coalesce(current_setting('app.writer', true), '') = '');
+
+-- ACL: SECURITY DEFINER write function must be service_role-only (no anonymous write door, case 10).
+SELECT pg_temp.ok('ACL: anon cannot EXECUTE the fold',
+  has_function_privilege('anon', 'public.fold_external_identity_location(integer)', 'EXECUTE') = false);
+SELECT pg_temp.ok('ACL: authenticated cannot EXECUTE the fold',
+  has_function_privilege('authenticated', 'public.fold_external_identity_location(integer)', 'EXECUTE') = false);
+SELECT pg_temp.ok('ACL: service_role can EXECUTE the fold',
+  has_function_privilege('service_role', 'public.fold_external_identity_location(integer)', 'EXECUTE') = true);
 
 DO $$ BEGIN RAISE NOTICE 'ALL CONTRACTS PASSED: fold_external_identity_location'; END $$;

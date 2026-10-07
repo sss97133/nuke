@@ -22,6 +22,17 @@
 --   and metadata.country. It never writes city or anything finer, never touches platform or handle, and merges
 --   (metadata || patch) so no other metadata key is disturbed.
 --
+-- OVERWRITE RULE: the latest non-superseded observation wins over an existing differing metadata.state/country.
+--   metadata is a projection; the observations are the preserved record (supersession, never deleted), so the
+--   projection reflects current best testimony and a person who moved is updated by the newer dated read. An
+--   existing value with no corresponding observation (e.g. the 457 seller-listing-sourced locations) is untouched
+--   until that identity's member page is read and yields an observation. location_observed_at records which
+--   observation the projection came from. Re-running with the same latest observation is a no-op (idempotent).
+--
+-- ACCESS: the function is SECURITY DEFINER and writes external_identities, so EXECUTE is revoked from PUBLIC,
+--   anon and authenticated (Supabase grants those by default — an anonymous write door otherwise, case ledger
+--   case 10) and granted to service_role only.
+--
 -- WRITER: external_identities is not a testimony table; the metadata merge is the sanctioned path the
 --   data-model lead pre-approved (update by id, jsonb merge, never replace). app.writer is set in the body and
 --   the caller's value restored; the function self-writes one write_receipts row per call that changed rows.
@@ -108,7 +119,7 @@ BEGIN
 
   IF v_changed > 0 THEN
     INSERT INTO public.write_receipts (at, tbl, op, rows, writer, db_role, app_name, txid)
-    VALUES (now(), 'external_identities', 'update', v_changed, c_writer, current_user,
+    VALUES (now(), 'external_identities', 'UPDATE', v_changed, c_writer, current_user,
             current_setting('application_name', true), txid_current());
   END IF;
 
@@ -122,5 +133,19 @@ $fn$;
 
 COMMENT ON FUNCTION public.fold_external_identity_location(integer) IS
 'Projects a BaT member home location (state + country ONLY, masking) from identity-subject observations into external_identities.metadata (migration 20261007070000). Reads the latest non-superseded vehicle_observations row per subject (subject_type external_identity; structured_data.home_state/home_country written by the extract-bat-profile-vehicles fetcher) and merges {state, country, location_source, location_observed_at} into metadata by id, only where state/country differ. Bounded by p_batch (1..50000). Never writes city or finer, never touches platform/handle, merges (never replaces) metadata. Sets app.writer=fold-external-identity-location in the body and restores the caller value; writes one write_receipts row per call that changed rows. Returns {candidates, folded, batch, more}. Stands ahead of data: folds 0 until the fetcher lands observations.';
+
+-- SECURITY DEFINER + writes external_identities: close the default EXECUTE grant (case ledger case 10).
+REVOKE ALL ON FUNCTION public.fold_external_identity_location(integer) FROM PUBLIC;
+DO $grants$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION public.fold_external_identity_location(integer) FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.fold_external_identity_location(integer) FROM authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT EXECUTE ON FUNCTION public.fold_external_identity_location(integer) TO service_role;
+  END IF;
+END $grants$;
 
 COMMIT;
