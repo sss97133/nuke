@@ -1417,8 +1417,10 @@ predictions, we are the prediction model." The README leads with prediction from
      throttled) and passes the live bid, bidders and clock to the machine.
    - **(b) A reader that takes the live state.** The function reads a stored vehicle's stored state. It needs a form
      taking (lot, bid, bidders, at) and grading against the same point-in-time comparables.
-   - **(c) The last two minutes.** The curve is measured in hours. Minutes to close need bid frames at second precision
-     (the `bat_bids` copy stopped 2026-10-05). This is stack A's missing prediction layer.
+   - **(c) The last two minutes.** The curve is measured in hours. The `bat_bids` copy stopped 2026-10-05, but the
+     stack A page already counts `bat_public_live_v1` frames in `vehicle_observations` for lots subscribed from 15
+     minutes before close (607 frames on one closed lot). The minute-level evidence exists for subscribed lots; the
+     question is coverage. This is stack A's missing prediction layer, and the lead's prediction lane builds it.
    - **(d) Cohort misses.** A lot whose model text matches no cohort says so with its denominator. Example: a 2003 GMC
      Sierra 2500HD whose model field carries the cab and engine, with 0 comparables.
    - **(e) Auth.** The CLI reaches the reader through the `api-v1` key system, not anon RPC.
