@@ -204,6 +204,10 @@ jobs:
         run: createdb dm_refinement_flag_evidence_ci
       - name: Verify the fabricated-evidence flag writer (only the named source_type flagged, batch honoured, values untouched, metadata record, receipts, idempotent, service_role only, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_flag_evidence_ci -f supabase/sql/test_flag_fabricated_field_evidence.sql
+      - name: Create disposable publication pages door database
+        run: createdb dm_refinement_pub_pages_ci
+      - name: Verify publication_pages' write policies and the mag_* rewrite functions are service_role only (anon reads, cannot insert or update; service_role writes; re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pub_pages_ci -f supabase/sql/test_publication_pages_write_door.sql
   image-projection:
     runs-on: ubuntu-latest
     services:
