@@ -7,7 +7,7 @@
  *   STACKS_N=5 node scripts/stacks/propose.mjs --dry-run         # build and print the prompt; ask nothing
  *   STACKS_ASKER=ollama node scripts/stacks/propose.mjs          # same model, straight from the running Ollama server
  *   STACKS_ASKER=auto node scripts/stacks/propose.mjs            # ody first; on any asker failure or empty batch, Ollama for the rest
- *   node scripts/stacks/propose.mjs --registry                   # also write registry-<run>.sql for review (the registry's writer is a migration; nothing is applied)
+ *   node scripts/stacks/propose.mjs --registry                   # also write promote/<name>.sql per proposal (the registry is written only by migrations; nothing is applied)
  *
  * Flow: one atlas pull plus one registry read (cached in the run folder) -> prompt (grammar, top live tables, gaps, names to avoid) -> ask in
  * batches -> extract JSON (one repair retry on bad JSON) -> strict validation -> drop duplicates of the 60 existing stacks
@@ -241,7 +241,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
       } else emptyBatches = 0;
       const measuredAt = new Date().toISOString();
       const fresh = result.admitted.map(proposal => buildRecord({
-        proposal, asker: { via: asker.via, model: asker.model }, run, proposedAt: measuredAt, measuredAt, atlas, measured: measureNeeds(index, proposal.needs),
+        proposal, asker: { via: asker.via, model: asker.model }, run, proposedAt: measuredAt, measuredAt, atlas, measured: measureNeeds(index, proposal.needs), registry,
       }));
       appendRecords(outFile, fresh);
       records.push(...fresh);
@@ -258,7 +258,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
     if (records.length) say(`index: ${join(o.logRoot, 'INDEX.md')}`);
     if (o.registry && records.length) {
       const { writeToRegistry } = await import('./lib/registry.mjs');
-      const outcome = await writeToRegistry(records, { runDir, registry });
+      const outcome = await writeToRegistry(records, { logRoot: o.logRoot, registry });
       summary.registry = outcome;
       say(`registry: ${outcome.note}`);
     }

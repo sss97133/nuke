@@ -23,6 +23,7 @@
  * with the live stack_coverage() output.
  *
  *   node scripts/stacks/measure.mjs --in proposals.json|proposals.jsonl [--run-dir DIR] [--atlas FILE] [--out FILE] [--registry]
+ *   (--registry writes a migration-ready promote/<name>.sql per proposal; nothing is applied)
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -32,9 +33,9 @@ import { LAYERS, validateProposal } from './lib/grammar.mjs';
 import { LOG_ROOT, ensureDir, nameKey, singular, tokens, utcStamp } from './lib/common.mjs';
 import { atlasMeta, loadAtlas, loadRegistry } from './lib/atlas.mjs';
 import { appendRecords, proposalsDir, writeIndex } from './lib/output.mjs';
-import { stackIdFor } from './lib/registry.mjs';
+import { sharedWith, stackIdFor, writeToRegistry } from './lib/registry.mjs';
 
-export const MEASURE_VERSION = 2;
+export const MEASURE_VERSION = 3;
 export const FILL_BAR = 0.9; // stack_coverage: a column is present from this fill up
 const DERIVED_LAYERS = new Set(['fold', 'baseline', 'residual', 'feature', 'prediction']);
 const PARTIAL_SOURCES = ['purpose', 'registry', 'table_name', 'column_name'];
@@ -251,8 +252,9 @@ export function measureNeeds(index, needs) {
 }
 
 /** One JSONL line: the proposal, its verdicts and coverage, and where it came from. */
-export function buildRecord({ proposal, asker, run, proposedAt, measuredAt, atlas, measured }) {
+export function buildRecord({ proposal, asker, run, proposedAt, measuredAt, atlas, measured, registry = {} }) {
   const { dropped_needs: dropped, ...definition } = proposal;
+  const shares = sharedWith(measured.verdicts, registry); // registered stacks that already need the same table, column or substrate
   return {
     schema: 'stack-proposal/1',
     id: proposalId(definition.name),
@@ -268,6 +270,8 @@ export function buildRecord({ proposal, asker, run, proposedAt, measuredAt, atla
     needs: measured.verdicts,
     coverage: measured.coverage,
     by_layer: measured.by_layer,
+    shares,
+    shares_with: [...new Set(shares.flatMap(sh => sh.stacks.map(t => t.stack_id)))].sort(),
     atlas: atlasMeta(atlas),
     measure_version: MEASURE_VERSION,
   };
@@ -296,7 +300,7 @@ function parseArgs(argv) {
 export async function main(argv = process.argv.slice(2)) {
   const opts = parseArgs(argv);
   if (opts.help || !opts.in) {
-    console.log('usage: node scripts/stacks/measure.mjs --in proposals.json|proposals.jsonl [--run-dir DIR] [--atlas atlas.json] [--out FILE] [--registry] [--no-index]');
+    console.log('usage: node scripts/stacks/measure.mjs --in proposals.json|proposals.jsonl [--run-dir DIR] [--atlas atlas.json] [--out FILE] [--log-dir DIR] [--registry] [--no-index]');
     return opts.help ? 0 : 2;
   }
   const run = utcStamp();
@@ -312,17 +316,14 @@ export async function main(argv = process.argv.slice(2)) {
     if (!checked.ok) { console.error(`skipped (${row.proposal?.name ?? 'unnamed'}): ${checked.errors.slice(0, 3).join('; ')}`); continue; }
     records.push(buildRecord({
       proposal: checked.value, asker: row.asker ?? { via: 'measure.mjs', model: null }, run,
-      proposedAt: row.proposed_at ?? new Date().toISOString(), measuredAt: new Date().toISOString(), atlas, measured: measureNeeds(index, checked.value.needs),
+      proposedAt: row.proposed_at ?? new Date().toISOString(), measuredAt: new Date().toISOString(), atlas, measured: measureNeeds(index, checked.value.needs), registry,
     }));
   }
   appendRecords(outFile, records);
   console.log(`measured ${records.length} proposal(s) -> ${outFile}`);
   for (const r of records) console.log(`  ${(100 * r.coverage.coverage).toFixed(0).padStart(3)}%  ${r.coverage.present}/${r.coverage.partial}/${r.coverage.missing}  ${r.name}`);
   if (opts.index && records.length) console.log(`index: ${writeIndex(logRoot).path}`);
-  if (opts.registry) {
-    const { writeToRegistry } = await import('./lib/registry.mjs');
-    console.log(JSON.stringify(await writeToRegistry(records, { runDir, registry })));
-  }
+  if (opts.registry) console.log(JSON.stringify(await writeToRegistry(records, { logRoot, registry })));
   return 0;
 }
 

@@ -42,8 +42,14 @@ export const ATLAS_SQL = `select json_build_object(
 
 export const REGISTRY_SQL = `select json_build_object(
   'stacks', (select coalesce(json_agg(x), '[]'::json) from (
-      select distinct on (stack_id) stack_id, version, name, status
-      from public.stacks order by stack_id, version desc) x),
+      select v.stack_id, v.version, v.name, v.status, v.coverage, v.n_needs, v.n_present, v.n_partial, v.n_missing
+      from public.v_stacks v order by v.stack_id) x),
+  'needs', (select coalesce(json_agg(n), '[]'::json) from (
+      select n.stack_id, n.layer, n.kind, n.object
+      from public.stack_needs n
+      join (select distinct on (stack_id) stack_id, version from public.stacks order by stack_id, version desc) c
+        on c.stack_id = n.stack_id and c.version = n.version
+      order by n.stack_id, n.layer, n.object) n),
   'substrates', (select coalesce(json_agg(s), '[]'::json) from (
       select substrate, declared_table from public.stack_substrates order by substrate) s)
 ) as registry`;
@@ -66,7 +72,8 @@ export async function loadAtlas({ runDir, refresh = false, pull = pg } = {}) {
 }
 
 /**
- * The stack registry's names and substrates (public.stacks, public.stack_substrates), cached as registry.json.
+ * The stack registry as it stands (v_stacks for names and live coverage, the latest version of every stack's needs, and
+ * public.stack_substrates), cached as registry.json. v_stacks is service_role only; q.sh reads with that access.
  * Best effort: when the registry is not there or not readable the run goes on without it and says so.
  */
 export async function loadRegistry({ runDir, refresh = false, pull = pg } = {}) {
@@ -77,12 +84,12 @@ export async function loadRegistry({ runDir, refresh = false, pull = pg } = {}) 
   try {
     const rows = await pull(REGISTRY_SQL);
     const registry = rows?.[0]?.registry;
-    if (!Array.isArray(registry?.stacks) || !Array.isArray(registry?.substrates)) throw new Error('unexpected shape');
-    const out = { available: true, stacks: registry.stacks, substrates: registry.substrates };
+    if (!Array.isArray(registry?.stacks) || !Array.isArray(registry?.substrates) || !Array.isArray(registry?.needs)) throw new Error('unexpected shape');
+    const out = { available: true, stacks: registry.stacks, needs: registry.needs, substrates: registry.substrates };
     if (cache) writeJson(cache, out);
     return out;
   } catch (error) {
-    return { available: false, error: String(error.message).slice(0, 200), stacks: [], substrates: [] };
+    return { available: false, error: String(error.message).slice(0, 200), stacks: [], needs: [], substrates: [] };
   }
 }
 

@@ -2,7 +2,7 @@
 // Offline tests: no database, no model, no network. Fixtures are synthetic; nothing here is private data.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,9 +12,10 @@ import { atlasMeta, atlasSummary, liveTables, loadAtlas, loadRegistry, pickSeeds
 import { assertSelectOnly, duplicateOf, nameKey, readonlySql, redact, tokens } from './lib/common.mjs';
 import { DEFAULT_CASES_DOC, loadExistingStacks, parseExistingStacks } from './lib/existing.mjs';
 import { LAYERS, NEED_LAYERS, batchSchema, buildPrompt, extractProposalObjects, validateProposal } from './lib/grammar.mjs';
-import { readAllRecords, renderIndex } from './lib/output.mjs';
+import { rankRecords, readAllRecords, renderIndex } from './lib/output.mjs';
 import { compare } from './check-registry-parity.mjs';
-import { stackIdFor, registrySql, toRegistryRows, writeToRegistry } from './lib/registry.mjs';
+import { nextFreeStackId, promotionSql, sharedWith, slugify, stackIdFor, toRegistryRows, writePromotion, writeToRegistry } from './lib/registry.mjs';
+import { choose, main as promoteMain } from './promote.mjs';
 import { buildIndex, buildRecord, measureNeeds, proposalId, resolveNeed } from './measure.mjs';
 import { admit, askBatch, main, parseArgs } from './propose.mjs';
 
@@ -68,7 +69,18 @@ const atlas = {
 };
 const registryFixture = {
   available: true,
-  stacks: [{ stack_id: 'S10', version: 1, name: 'Liquidity surface', status: 'measured' }, { stack_id: 'S99', version: 1, name: 'Auction rhythm spectrum', status: 'proposed' }],
+  stacks: [
+    { stack_id: 'S01', version: 1, name: 'Liquidity surface', status: 'measured', coverage: 0, n_needs: 1, n_present: 0, n_partial: 0, n_missing: 1 },
+    { stack_id: 'S02', version: 1, name: 'Bidder record as of a date', status: 'measured', coverage: 1, n_needs: 1, n_present: 1, n_partial: 0, n_missing: 0 },
+    { stack_id: 'S03', version: 1, name: 'Promoted earlier', status: 'proposed', coverage: 0.5, n_needs: 2, n_present: 1, n_partial: 0, n_missing: 1 },
+    { stack_id: 'S04', version: 1, name: 'Auction rhythm spectrum', status: 'proposed', coverage: 0.5, n_needs: 2, n_present: 1, n_partial: 0, n_missing: 1 },
+  ],
+  needs: [
+    { stack_id: 'S02', layer: 'log', kind: 'table', object: 'bat_bids' },
+    { stack_id: 'S01', layer: 'dimension', kind: 'abstract', object: 'place entity' },
+    { stack_id: 'S04', layer: 'dimension', kind: 'abstract', object: 'place entity' },
+    { stack_id: 'S04', layer: 'key', kind: 'column', object: 'bat_bids.bidder_identity_id' },
+  ],
   substrates: [
     { substrate: 'place entity', declared_table: null },
     { substrate: 'comment stance dimension', declared_table: null },
@@ -397,13 +409,13 @@ describe('atlas', () => {
   it('reads the registry once, caches it, and degrades to unavailable instead of failing the run', async () => {
     const dir = mkdtempSync(join(scratch, 'registry-'));
     let pulls = 0;
-    const pull = async () => { pulls++; return [{ registry: { stacks: registryFixture.stacks, substrates: registryFixture.substrates } }]; };
+    const pull = async () => { pulls++; return [{ registry: { stacks: registryFixture.stacks, needs: registryFixture.needs, substrates: registryFixture.substrates } }]; };
     const first = await loadRegistry({ runDir: dir, pull });
-    assert.deepEqual([first.available, first.stacks.length, first.substrates.length], [true, 2, 5]);
+    assert.deepEqual([first.available, first.stacks.length, first.needs.length, first.substrates.length], [true, 4, 4, 5]);
     await loadRegistry({ runDir: dir, pull });
     assert.equal(pulls, 1);
     const down = await loadRegistry({ runDir: mkdtempSync(join(scratch, 'registry-')), pull: async () => { throw new Error('relation "stacks" does not exist'); } });
-    assert.deepEqual([down.available, down.stacks, down.substrates], [false, [], []]);
+    assert.deepEqual([down.available, down.stacks, down.needs, down.substrates], [false, [], [], []]);
     assert.match(down.error, /does not exist/);
   });
   it('pulls once and serves the cache afterwards', async () => {
@@ -464,7 +476,8 @@ describe('output', () => {
     const low = record('Low | coverage stack', measureNeeds(idx, [need('nothing_here'), need('also_nothing'), need('bat_bids')]));
     const text = renderIndex([low, high]);
     assert.ok(text.indexOf('High coverage stack') < text.indexOf('Low \\| coverage stack'));
-    assert.match(text, /\| 1 \| High coverage stack \| 100% \| 3 \/ 0 \/ 0 \|/);
+    assert.match(text, /\| 1 \| High coverage stack \| 100% \| 3 \/ 0 \/ 0 \| /);
+    assert.match(text, /Shares needs with/);
     function need(object) { return { layer: 'log', kind: 'table', object }; }
   });
   it('keeps the latest measurement of each proposal across files', () => {
@@ -643,7 +656,7 @@ describe('registry hook', () => {
   const recordFor = (name, needs) => {
     const checked = validateProposal(proposal(name, needs));
     assert.equal(checked.ok, true, checked.errors.join('; '));
-    return buildRecord({ proposal: checked.value, asker: { via: 'ollama', model: 'qwen3.5:9b' }, run: '20261007T000000Z', proposedAt: 'p', measuredAt: 'm', atlas, measured: measureNeeds(index, checked.value.needs) });
+    return buildRecord({ proposal: checked.value, asker: { via: 'ollama', model: 'qwen3.5:9b' }, run: '20261007T000000Z', proposedAt: 'p', measuredAt: '2026-10-07T00:00:00.000Z', atlas, measured: measureNeeds(index, checked.value.needs), registry: registryFixture });
   };
 
   it('maps needs onto the registry kinds: tables and columns by their real names, phrases to substrates', () => {
@@ -655,7 +668,7 @@ describe('registry hook', () => {
       { layer: 'outcome', kind: 'source', object: 'comment stance' },
       { layer: 'dimension', kind: 'dimension', object: 'exterior color family' }, // resolves to an existing column
     ]);
-    const { stack, needs, newSubstrates, skipped } = toRegistryRows(record, new Set(registryFixture.substrates.map(s => s.substrate)));
+    const { stack, needs, newSubstrates, skipped } = toRegistryRows(record, registryFixture);
     assert.match(stack.stack_id, /^S[0-9A-Z]+$/);
     assert.deepEqual(needs.map(n => [n.layer, n.kind, n.object]), [
       ['log', 'table', 'bat_bids'], ['key', 'column', 'bat_bids.bidder_identity_id'], ['dimension', 'abstract', 'place entity'],
@@ -667,31 +680,127 @@ describe('registry hook', () => {
     assert.match(stack.path[0], /^log: /);
   });
 
-  it('writes INSERTs in dependency order inside one transaction, escaping quotes and control characters', () => {
+  it('cites the registered stacks that already need the same table, column or substrate, with their live coverage', () => {
+    const record = recordFor('Sharing check stack', [
+      { layer: 'log', kind: 'table', object: 'bat_bids' },
+      { layer: 'key', kind: 'column', object: 'bat_bids.bidder_identity_id' },
+      { layer: 'dimension', kind: 'dimension', object: 'place' },
+      { layer: 'dimension', kind: 'dimension', object: 'Tidal Harmonics' },
+    ]);
+    assert.deepEqual(record.shares_with, ['S01', 'S02', 'S04']);
+    const byObject = Object.fromEntries(record.shares.map(sh => [sh.object, sh.stacks.map(t => [t.stack_id, t.coverage])]));
+    assert.deepEqual(byObject, { bat_bids: [['S02', 1]], 'bat_bids.bidder_identity_id': [['S04', 0.5]], 'place entity': [['S01', 0], ['S04', 0.5]] });
+    assert.deepEqual(sharedWith(record.needs, { stacks: [], needs: [] }), []);
+    assert.deepEqual(recordFor('No registry given', undefined).shares.length > 0, true);
+  });
+
+  it('suggests the ledger\'s next stack number and slugs names for file names', () => {
+    assert.equal(nextFreeStackId(registryFixture), 'S05');
+    assert.equal(nextFreeStackId({ stacks: [] }), 'S01');
+    const ledger = Array.from({ length: 60 }, (_, i) => ({ stack_id: `S${String(i + 1).padStart(2, '0')}` }));
+    assert.equal(nextFreeStackId({ stacks: [...ledger, { stack_id: 'SA' }] }), 'S61', 'lettered stacks do not count');
+    assert.equal(nextFreeStackId({ stacks: [...ledger, { stack_id: 'S61' }, { stack_id: 'S99' }] }), 'S62', 'a stray high number does not move the suggestion');
+    assert.equal(slugify("O'Brien's Bidder Graph: v2!"), 'o-brien-s-bidder-graph-v2');
+    assert.equal(slugify('!!!'), 'stack');
+    assert.ok(slugify('x'.repeat(200)).length <= 60);
+  });
+
+  it('writes migration-ready INSERTs for one proposal: dependency order, no transaction control, quotes and control characters escaped', () => {
     const record = recordFor("O'Brien's bidder graph", undefined);
     record.proposal.who_cares = "Sellers who can't wait\nfor a reserve";
-    const { sql, totals } = registrySql([record], registryFixture);
-    assert.match(sql, /^-- Proposed stacks from the local generator\. NOT APPLIED\./);
-    assert.ok(sql.indexOf('BEGIN;') < sql.indexOf('INSERT INTO public.stacks') && sql.indexOf('INSERT INTO public.stacks') < sql.indexOf('INSERT INTO public.stack_needs') && sql.trimEnd().endsWith('COMMIT;'));
+    const built = promotionSql(record, registryFixture);
+    assert.equal(built.refused, undefined);
+    const { sql, totals, stack_id } = built;
+    assert.match(sql, /^-- PROMOTION CANDIDATE, NOT APPLIED\./);
+    assert.ok(!/\b(BEGIN|COMMIT|ROLLBACK)\b;/.test(sql), 'a migration pastes this into its own transaction');
+    assert.ok(sql.indexOf('INSERT INTO public.stack_substrates') < sql.indexOf('INSERT INTO public.stacks') && sql.indexOf('INSERT INTO public.stacks') < sql.indexOf('INSERT INTO public.stack_needs'));
     assert.match(sql, /'O''Brien''s bidder graph'/);
     assert.match(sql, /'Sellers who can''t wait for a reserve'/);
-    assert.equal((sql.match(/INSERT INTO public\.stacks /g) ?? []).length, 1);
-    assert.deepEqual(totals, { stacks: 1, needs: 5, substrates: 2, skipped: 0 });
-    assert.match(sql, /INSERT INTO public\.stack_substrates \(substrate, source, registered_by\) VALUES \('bid frames at second precision'/);
+    assert.match(sql, /Stack id SG[0-9A-F]{8} is the generator's\. The ledger's next free number is S05/);
+    assert.match(sql, /Already needed by registered stacks[\s\S]*log table bat_bids: S02 \(1\)/);
+    assert.match(sql, /key column bat_bids\.bidder_identity_id: S04 \(0\.5\)/);
+    assert.deepEqual(totals, { needs: 5, substrates: 2, skipped: 0 });
+    assert.equal(stack_id, stackIdFor("O'Brien's bidder graph"));
     assert.ok(!/DELETE|UPDATE|DROP|TRUNCATE/.test(sql), 'inserts only');
   });
 
-  it('declares each new substrate once across several stacks, and writes the file without touching a database', async () => {
-    const a = recordFor('First phrase stack', [...proposal('x y').needs.slice(0, 2), { layer: 'dimension', kind: 'dimension', object: 'Shared new phrase' }]);
-    const b = recordFor('Second phrase stack', [...proposal('x y').needs.slice(0, 2), { layer: 'dimension', kind: 'dimension', object: 'Shared new phrase' }]);
-    const { sql } = registrySql([a, b], registryFixture);
-    assert.equal((sql.match(/INSERT INTO public\.stack_substrates/g) ?? []).length, 1);
-    const dir = mkdtempSync(join(scratch, 'sql-'));
-    const out = await writeToRegistry([a, b], { runDir: dir, registry: registryFixture });
+  it('uses a chosen stack id, and refuses a bad or taken id and a name the registry already holds', () => {
+    const record = recordFor('Chosen id stack', undefined);
+    assert.match(promotionSql(record, registryFixture, { stackId: 'S05' }).sql, /VALUES \('S05', 1, 'Chosen id stack'/);
+    assert.match(promotionSql(record, registryFixture, { stackId: 's05' }).refused, /not in the registry's S\[0-9A-Z\]\+ form/);
+    assert.match(promotionSql(record, registryFixture, { stackId: 'S03' }).refused, /already taken/);
+    const repeat = recordFor('Auction rhythm spectrum', undefined);
+    assert.match(promotionSql(repeat, registryFixture).refused, /already holds "Auction rhythm spectrum" \(S04\)/);
+  });
+
+  it('writes one file per proposal into promote/ named for the proposal, and nothing else', async () => {
+    const root = mkdtempSync(join(scratch, 'promote-'));
+    const a = recordFor('First promoted stack', undefined);
+    const b = recordFor('Second promoted stack', undefined);
+    const repeat = recordFor('Auction rhythm spectrum', undefined);
+    const out = await writeToRegistry([a, b, repeat], { logRoot: root, registry: registryFixture });
     assert.equal(out.written, 0);
-    assert.equal(out.stacks, 2);
-    assert.ok(existsSync(out.sql_file));
-    assert.deepEqual(await writeToRegistry([], { runDir: dir }), { written: 0, note: 'no proposals to hand over' });
+    assert.deepEqual(readdirSync(join(root, 'promote')).sort(), ['first-promoted-stack.sql', 'second-promoted-stack.sql']);
+    assert.deepEqual(out.skipped.map(x => x.name), ['Auction rhythm spectrum']);
+    assert.match(out.note, /no writer function/);
+    assert.deepEqual(await writeToRegistry([], { logRoot: root }), { written: 0, note: 'no proposals to hand over' });
+    const one = writePromotion(a, registryFixture, { dir: join(root, 'promote'), stackId: 'S05' });
+    assert.equal(one.stack_id, 'S05');
+    assert.match(readFileSync(one.file, 'utf8'), /VALUES \('S05', 1, 'First promoted stack'/);
+  });
+});
+
+// ---- promoting a chosen proposal -----------------------------------------------------------------------------------------
+describe('promote', () => {
+  const index = buildIndex(atlas, registryFixture);
+  const rec = (name, needs) => {
+    const checked = validateProposal(proposal(name, needs));
+    return buildRecord({ proposal: checked.value, asker: { via: 'ollama', model: 'm' }, run: '20261007T000000Z', proposedAt: '2026-10-07T00:00:00.000Z', measuredAt: '2026-10-07T00:00:00.000Z', atlas, measured: measureNeeds(index, checked.value.needs), registry: registryFixture });
+  };
+  const all = [
+    rec('Low ranked stack', [{ layer: 'log', kind: 'table', object: 'nothing_here' }, { layer: 'key', kind: 'column', object: 'nope.nope' }, { layer: 'dimension', kind: 'dimension', object: 'tidal harmonics' }]),
+    rec('High ranked stack', [{ layer: 'log', kind: 'table', object: 'bat_bids' }, { layer: 'key', kind: 'column', object: 'bat_bids.bidder_identity_id' }, { layer: 'outcome', kind: 'table', object: 'places' }]),
+  ];
+
+  it('chooses by rank in INDEX order, proposal id, registry id, or name', () => {
+    assert.deepEqual(rankRecords(all).map(r => r.name), ['High ranked stack', 'Low ranked stack']);
+    assert.equal(choose(all, '1').name, 'High ranked stack');
+    assert.equal(choose(all, '#2').name, 'Low ranked stack');
+    assert.equal(choose(all, all[0].id).name, 'Low ranked stack');
+    assert.equal(choose(all, all[1].registry_stack_id.toLowerCase()).name, 'High ranked stack');
+    assert.equal(choose(all, 'the Low-ranked STACK').name, 'Low ranked stack');
+    assert.equal(choose(all, '3'), null);
+    assert.equal(choose(all, 'no such stack'), null);
+  });
+
+  it('writes the chosen proposal to promote/, reading the registry fresh, and says where', async () => {
+    const root = mkdtempSync(join(scratch, 'promote-run-'));
+    const dir = join(root, 'proposals');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'a.jsonl'), all.map(r => JSON.stringify(r)).join('\n') + '\n');
+    const lines = [];
+    const log = console.log;
+    console.log = (...a) => lines.push(a.join(' '));
+    let code;
+    try { code = await promoteMain(['1', '--stack-id', 'S05', '--log-dir', root], { loadRegistry: async () => registryFixture }); } finally { console.log = log; }
+    assert.equal(code, 0);
+    const sql = readFileSync(join(root, 'promote', 'high-ranked-stack.sql'), 'utf8');
+    assert.match(sql, /VALUES \('S05', 1, 'High ranked stack'/);
+    assert.match(lines.join('\n'), /nothing was applied/);
+  });
+
+  it('fails clearly: nothing matches, the registry is unreadable, the registry already has the name, no selector', async () => {
+    const root = mkdtempSync(join(scratch, 'promote-run-'));
+    mkdirSync(join(root, 'proposals'), { recursive: true });
+    writeFileSync(join(root, 'proposals', 'a.jsonl'), all.map(r => JSON.stringify(r)).join('\n') + '\n');
+    const quietErr = async fn => { const err = console.error, log = console.log; console.error = () => {}; console.log = () => {}; try { return await fn(); } finally { console.error = err; console.log = log; } };
+    assert.equal(await quietErr(() => promoteMain(['9', '--log-dir', root], { loadRegistry: async () => registryFixture })), 1);
+    assert.equal(await quietErr(() => promoteMain(['1', '--log-dir', root], { loadRegistry: async () => ({ available: false, error: 'down', stacks: [], needs: [], substrates: [] }) })), 1);
+    const held = { ...registryFixture, stacks: [...registryFixture.stacks, { stack_id: 'S70', name: 'High ranked stack', coverage: 0 }] };
+    assert.equal(await quietErr(() => promoteMain(['1', '--log-dir', root], { loadRegistry: async () => held })), 1);
+    assert.equal(existsSync(join(root, 'promote', 'high-ranked-stack.sql')), false);
+    assert.equal(await quietErr(() => promoteMain([], {})), 2);
+    assert.equal(await quietErr(() => promoteMain(['1', '--bogus'], {})), 2);
   });
 });
 
@@ -867,7 +976,7 @@ describe('propose', () => {
     assert.equal(made, 0);
   });
 
-  it('with --registry, writes the review SQL next to the run files and applies nothing', async () => {
+  it('with --registry, writes one migration-ready file per proposal into promote/ and applies nothing', async () => {
     const logRoot = mkdtempSync(join(scratch, 'run-'));
     const { asker } = fakeAsker([JSON.stringify([proposal('Registry hook check')])]);
     const lines = [];
@@ -876,11 +985,10 @@ describe('propose', () => {
     try {
       await main(['--n', '1', '--registry', '--log-dir', logRoot], {}, { loadAtlas: async () => atlas, loadRegistry: async () => registryFixture, makeAsker: () => asker, existing, earlier: [] });
     } finally { console.log = log; }
-    assert.ok(lines.some(l => /registry: the registry has no runtime writer/.test(l)), lines.join('\n'));
-    const runs = readdirSync(join(logRoot, 'runs'));
-    const files = readdirSync(join(logRoot, 'runs', runs[0])).filter(f => f.startsWith('registry-') && f.endsWith('.sql'));
-    assert.equal(files.length, 1);
-    const sql = readFileSync(join(logRoot, 'runs', runs[0], files[0]), 'utf8');
+    assert.ok(lines.some(l => /registry: the registry has no writer function/.test(l)), lines.join('\n'));
+    const files = readdirSync(join(logRoot, 'promote'));
+    assert.deepEqual(files, ['registry-hook-check.sql']);
+    const sql = readFileSync(join(logRoot, 'promote', files[0]), 'utf8');
     assert.match(sql, /NOT APPLIED/);
     assert.match(sql, /INSERT INTO public\.stacks \(stack_id, version, name,/);
     assert.match(sql, new RegExp(`'${stackIdFor('Registry hook check')}', 1, 'Registry hook check'`));
