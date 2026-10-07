@@ -96,8 +96,8 @@ contract; RLS: `observation_sources` policies to read before any public page rel
 
 ## What the declaration would move
 - S25 0/2 → 1/2 (its other need is `vehicle_events.ended_at`, partial); S46 0/2 → 1/2 (other need
-  `cross-platform person identity`); SC 0/5 → 1/5 after the place entity made it... (SC also names `place entity`,
-  present since 11:33Z, and S12). Substrates declared 1 → 2 of 61.
+  `cross-platform person identity`); SC 1/5 → 2/5 (`place entity` present since 11:33Z; S12 still missing; two
+  partial clocks). Substrates declared 1 → 2 of 61.
 - The real value is the keys: a platform page (SC) and venue close clocks (S25) can only be computed when
   `vehicles`, `vehicle_events`, `external_listings` and `auction_comments` resolve to one platform row.
 
