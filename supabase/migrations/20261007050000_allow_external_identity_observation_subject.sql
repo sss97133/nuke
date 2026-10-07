@@ -1,4 +1,4 @@
--- 20261007020000_allow_external_identity_observation_subject.sql
+-- 20261007050000_allow_external_identity_observation_subject.sql
 --
 -- Widen vehicle_observations.subject_type to admit 'external_identity', so facts observed about a
 -- person/platform-identity (a BaT member's home location at state/country grain, and the lots they
@@ -48,7 +48,7 @@ VALUES (
   'modify_property',
   jsonb_build_object(
     'why', 'identity-origin harvest needs identity-subject observations (BaT member-page facts about the person: state/country location, lots bought/listed). external_identities.id is uuid, cleanly addressable. The subject_type CHECK was the only gate blocking it.',
-    'change', 'vehicle_observations_subject_type_chk widened to add external_identity (NOT VALID); applied in migration 20261007020000.',
+    'change', 'vehicle_observations_subject_type_chk widened to add external_identity (NOT VALID); applied in migration 20261007050000.',
     'subject_type', 'external_identity',
     'subject_table', 'external_identities',
     'subject_pk', 'id (uuid)',
