@@ -13,6 +13,13 @@ import { supabase } from '../../lib/supabase';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SERVICE_ROLE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
+// The signed-in admin's JWT. transfer-advance and transfer-automator refuse the public anon key since 2026-10-07,
+// so the dashboard sends its session token (the constant above holds the anon key, despite its name).
+async function adminBearer(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  return `Bearer ${data.session?.access_token ?? SERVICE_ROLE_KEY}`;
+}
+
 const MILESTONE_LABELS: Record<string, string> = {
   agreement_reached: 'Deal agreed',
   contact_exchanged: 'Contact exchanged',
@@ -228,7 +235,7 @@ export default function TransfersDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          Authorization: await adminBearer(),
         },
         body: JSON.stringify({
           action: 'advance_manual',
@@ -263,7 +270,7 @@ export default function TransfersDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          Authorization: await adminBearer(),
         },
         body: JSON.stringify({
           action: 'seed_from_listing',
