@@ -1,3 +1,6 @@
+-- NOTE (2026-10-07, lead): this file shares its version prefix 20261007100000 with 20261007100000_fold_location_source_passthrough.sql (#759); both applied on
+-- 2026-10-07. Never rename either: CI applies files a merge commit adds, a rename is an added path, and the md5 guard in
+-- the apply-function file would refuse a re-apply. A comment edit like this one is ignored by the deploy.
 -- fn_schema_proposal_apply(): an approved add_source proposal now registers its source in observation_sources.
 -- Case: data-machine-cases.md §13.9.1 (owner, 2026-10-07 05:00Z): "How do we automate expansion of the data model to fit
 -- this in?" In the lead's reading, point 4 is one observation_sources row "or an add_source proposal that the review

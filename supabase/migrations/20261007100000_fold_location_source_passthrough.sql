@@ -1,3 +1,6 @@
+-- NOTE (2026-10-07, lead): this file shares its version prefix 20261007100000 with 20261007100000_schema_proposal_apply_add_source.sql (#766); both applied on
+-- 2026-10-07. Never rename either: CI applies files a merge commit adds, a rename is an added path, and the md5 guard in
+-- the apply-function file would refuse a re-apply. A comment edit like this one is ignored by the deploy.
 -- 20261007100000_fold_location_source_passthrough.sql
 --
 -- fold_external_identity_location (20261007070000) hardcodes metadata.location_source = 'bat_member_page'.
