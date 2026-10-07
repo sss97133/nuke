@@ -4,6 +4,7 @@ import { extractBatListingWithFirecrawl } from '../_shared/batFirecrawlMapper.ts
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { fetchBatPage } from '../_shared/batFetcher.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -143,10 +144,8 @@ Deno.serve(async (req: Request) => {
     // extraction. Owner-directed: capture the raw blob, parse the JSON field, not rendered text.
     let nativeHtml = '';
     try {
-      const r = await fetch(profileUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36' },
-      });
-      if (r.ok) nativeHtml = await r.text();
+      const r = await fetchBatPage(profileUrl, { skipFirecrawlFallback: true });
+      if (r.html) nativeHtml = r.html;
     } catch (_e) { /* keep '' */ }
     const bodyHtml = nativeHtml || profileHtml;
 
