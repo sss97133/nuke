@@ -1,10 +1,99 @@
 # Nuke
 
-Nuke ([nuke.ag](https://nuke.ag)) is a vehicle data ledger: every vehicle and every observation about it, each with its source. The internet publishes the raw material (listings, bids, comments, photos, results); Postgres is the refinery.
+Nuke ([nuke.ag](https://nuke.ag)) is a data model for physical assets, starting with vehicles. Every
+observation about a vehicle is a row that keeps its source, its clocks and its trust. What matters
+is the shape those rows take after they land.
 
-Pre-launch. Production is the test environment. The repository is public; secrets and private data never enter it.
+## A model that grows sideways
 
-## The numbers
+Most vehicle data is a catalog: a fixed schema filled from the top down. Nuke grows from the bottom.
+A bid, a comment, a photo, a receipt or a title transfer lands once in an append-only log. It is
+then keyed to every entity it mentions: a vehicle, a person, a lot, a place or a part.
+
+Each key opens a new path. A commenter becomes an identity with a history, and the history becomes a
+record. That record then becomes a feature on every lot the person enters. Paths branch and they
+cross. One identity sits in the bidder record, the seller-trust record and an ownership chain at
+once.
+
+There is no bottom to drill to. Resolution doesn't stop at the vehicle. It continues into
+components, claims, time windows and the people making the claims. The work is foraging: follow a key
+to the next entity, and add a new source without redesigning what is already there.
+
+## Nine layers
+
+Every path through the data runs through the same nine typed layers. Each layer is a table with a
+declared grain, key and clock.
+
+| Layer | Holds |
+|---|---|
+| Log | append-only source events, each with an event time and an ingest time |
+| Key | every text reference, resolved to a foreign key |
+| Dimension | taxonomies built from evidence: generation, body, engine, color, options, place, part |
+| Fold | state per entity, replayable from the log |
+| Baseline | the expected value of a measure for a cohort as of a time |
+| Residual | the observed value minus the baseline |
+| Feature | a residual or fold indexed by entity and as-of time |
+| Prediction | a feature set, a model version and a horizon |
+| Outcome | what happened, joined back by key and clock |
+
+The present is a fold over the log. The past is a replay: a new feature is computed for every past
+moment from only what was known then, so it is graded honestly.
+
+## Stacks
+
+A **stack** is a named path through the layers that answers one question. Parallel agent sessions
+develop them at the same time. A repair to a shared layer, such as a key, a clock or a dimension,
+moves every stack that runs through it.
+
+Examples:
+- **The auction as an order book.** Every bid in the comments is a timed quote, and a stated "I'd pay
+  X" is a reservation price. Folded minute by minute, each lot has a demand curve. Its residual
+  against the cohort can show a thin top hours before close.
+- **The car as a bond.** Value is modeled as use, maintenance and residual, from odometer readings,
+  receipts and the cohort's price path.
+- **Liquidity as an option.** Time-to-sale curves per cohort and venue. The gap between the price that
+  sells in 14 days and the patient price is the option value.
+- **Ownership as flow.** County-to-county transfers per cohort, compared with a gravity model, show
+  where supply thins next.
+- **Claims with relations.** A statement about a vehicle is weighted by who made it, their relation to
+  the vehicle at the time, and how their earlier claims resolved.
+
+The registry holds 64 stacks as data, read from the live `v_stacks` view on 2026-10-07. Each stack
+lists the layers it needs, and a coverage function measures them against the live schema. On average,
+12% of a stack's needs exist today, and the rest is the backlog.
+
+A stack shows its coverage before its numbers: how much of its universe it describes, what share of
+that is keyed and dated, and which sources would close the gap. A prediction row waiting for its
+outcome row is a thesis. A stack with an outcome ledger has a track record.
+
+## Invariants
+
+- **Append, never overwrite.** A correction supersedes the original, which is kept.
+- **Bitemporal.** Every event carries the time it happened and the time it was learned.
+- **Point-in-time correct.** A feature at moment *t* uses only events from before *t*.
+- **Every reference is a key.** Text that names another entity becomes a foreign key to it.
+- **The database describes itself.** Every column carries a comment with its meaning, unit, source,
+  grain and clock. `v_schema_atlas` scores the schema and `v_job_health` scores the scheduled jobs.
+- **No number without its denominator.**
+
+## Built on
+
+- **Postgres on Supabase.** The model lives in the database. Edge functions are in
+  [`supabase/functions/`](supabase/functions/), and schema changes ship as migrations through CI.
+- **Web**: [`nuke_frontend/`](nuke_frontend/) (Vite, React), deployed by Vercel.
+- **iOS**: the capture app in [`apps/`](apps/).
+
+## Read further
+
+| Question | Read |
+|---|---|
+| What is the model, in full? | [`docs/ledger/theory/data-machine.md`](docs/ledger/theory/data-machine.md) |
+| What are the stacks, and what does each one need? | [`data-machine-cases.md` §13](docs/ledger/theory/data-machine-cases.md#13-aspiration-twenty-stacks-the-model-must-be-able-to-carry-owner-2026-10-06) |
+| How do I work in this repo? | [`AGENTS.md`](AGENTS.md) |
+| Which function does X? | [`TOOLS.md`](TOOLS.md) |
+
+<details>
+<summary>Daily measurements</summary>
 
 <!-- stats:start -->
 Measured 2026-10-06 08:40 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
@@ -23,34 +112,7 @@ Measured 2026-10-06 08:40 UTC from the live database by [`scripts/data/readme-st
 The database describing itself (`v_schema_atlas`, `v_job_health`): 927 tables (655 non-empty) · 3,377 of 16,452 columns described (21%) · 188 non-empty tables with no foreign key in or out · 6 tables with an undeclared writer in the last 30 days · 24 scheduled jobs active, 2 with a failure in the last 24 h · Postgres 17.6.
 <!-- stats:end -->
 
-## How it works
-
-Five layers, each defined inside the database. The model and its vocabulary are in [`docs/ledger/theory/data-machine.md`](docs/ledger/theory/data-machine.md).
-
-1. **The log.** Every bid, comment, photo and fact lands once, append-only, with its event time and its ingest time. `auction_comments` is the auction log; `vehicle_observations` is the fact log.
-2. **The state.** One row per live thing (a lot, a bidder), updated as each event lands.
-3. **The baselines.** What comparable lots looked like at each hour to close, recomputed on a schedule.
-4. **Features.** Measures keyed to an entity and an as-of time: a bidder's record, the effect of their entry, the lot-level sum.
-5. **Predictions.** A defined bet on an outcome, graded against a baseline, backtested by replaying the log.
-
-The invariants: append, never overwrite. Every datum carries its source, method, observed_at and trust. Every reference to another entity is a foreign key. The database describes itself: every live column carries a `COMMENT ON`, and `v_schema_atlas` keeps the score.
-
-## Stack
-
-- **Supabase**: Postgres and edge functions in [`supabase/functions/`](supabase/functions/). Schema, cron and SQL changes ship as migrations through CI.
-- **Web**: [`nuke_frontend/`](nuke_frontend/) (Vite, React), deployed by Vercel on merge to `main`.
-- **iOS**: the capture app in [`apps/`](apps/).
-
-## Start here
-
-| Question | Read |
-|---|---|
-| How do I work in this repo? | [`AGENTS.md`](AGENTS.md) |
-| What is the data machine meant to do? | [`docs/ledger/theory/data-machine.md`](docs/ledger/theory/data-machine.md) and its [case ledger](docs/ledger/theory/data-machine-cases.md) |
-| What exists and operates now? | The `v_schema_atlas` and `v_job_health` views, computed from the live database |
-| What is alive and what is a shell? | [`docs/ledger/README.md`](docs/ledger/README.md) |
-| Which function does X? | [`TOOLS.md`](TOOLS.md) |
-| How is the market read? | [`docs/features/ask-nuke/THEORY.md`](docs/features/ask-nuke/THEORY.md) |
+</details>
 
 ## License
 
