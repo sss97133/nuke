@@ -137,6 +137,19 @@ Deno.serve(async (req: Request) => {
       profileHtml = await profileResponse.text();
     }
 
+    // Native server HTML (the lot-page fetch path): the member page's embedded JSON (with the home location) and
+    // the first listings are in the server response; Firecrawl can return a JS shell (seen 2026-10-07: thin page,
+    // one listing, no location). Prefer the native body for capture + location parse; keep profileHtml for listing
+    // extraction. Owner-directed: capture the raw blob, parse the JSON field, not rendered text.
+    let nativeHtml = '';
+    try {
+      const r = await fetch(profileUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36' },
+      });
+      if (r.ok) nativeHtml = await r.text();
+    } catch (_e) { /* keep '' */ }
+    const bodyHtml = nativeHtml || profileHtml;
+
     // Extract listing URLs from rendered HTML
     const listingUrls = new Set<string>();
     
@@ -329,26 +342,39 @@ Deno.serve(async (req: Request) => {
       location_written: false,
     };
 
-    // --- identity-origin: member-page receipt + home-location (docs/features/identity-origin/SPEC.md) -------------
-    // Receipt only (we index BaT's public data, never copy it): no html body. Always landed.
-    try {
-      await supabase.from('listing_page_snapshots').insert({
-        platform: 'bat',
-        listing_url: profileUrl,
-        fetched_at: new Date().toISOString(),
-        http_status: profileHtml ? 200 : 0,
-        success: !!profileHtml,
-        content_length: profileHtml.length,
-        html_sha256: profileHtml ? await sha256Hex(profileHtml) : null,
-        fetch_method: FIRECRAWL_API_KEY ? 'firecrawl' : 'fetch',
-        metadata: { page_type: 'bat_member', username: batUsername },
-      });
-    } catch (e: any) { console.warn(`[BAT-PROFILE] snapshot receipt error: ${e?.message}`); }
+    // --- identity-origin: member-page snapshot + home-location (docs/features/identity-origin/SPEC.md) -----------
+    // Capture the raw blob (fetch once, extract forever): the HTML and the parsed __INITIAL_STATE__, so the parser
+    // can be fixed/re-run against stored structure without re-fetching. Owner-directed 2026-10-07 (reverses the
+    // body-less receipt for member pages).
+    // Capture the raw body once (fetch once, extract forever), deduped by html_sha256 like the lot pages, so the
+    // parser can be written/re-run against stored structure — the member page embeds its data as JSON, so we keep
+    // the whole body and parse the location field from it at read time. RLS keeps the body service-role/admin only.
+    const bodySha = bodyHtml ? await sha256Hex(bodyHtml) : null;
+    if (bodySha) {
+      const { data: dupe } = await supabase.from('listing_page_snapshots')
+        .select('id').eq('platform', 'bat').eq('listing_url', profileUrl).eq('html_sha256', bodySha).maybeSingle();
+      if (!dupe) {
+        try {
+          await supabase.from('listing_page_snapshots').insert({
+            platform: 'bat',
+            listing_url: profileUrl,
+            fetched_at: new Date().toISOString(),
+            http_status: 200,
+            success: true,
+            content_length: bodyHtml.length,
+            html: bodyHtml,
+            html_sha256: bodySha,
+            fetch_method: nativeHtml ? 'fetch' : (FIRECRAWL_API_KEY ? 'firecrawl' : 'fetch'),
+            metadata: { page_type: 'bat_member', username: batUsername, location_label_present: /Location/i.test(bodyHtml) },
+          });
+        } catch (e: any) { console.warn(`[BAT-PROFILE] snapshot insert error: ${e?.message}`); }
+      }
+    }
 
     // Home location: STATE/COUNTRY only (masking). Always parsed and RETURNED for validation; the observation is
     // WRITTEN only when write_location=true, so an unvalidated parse pollutes nothing (facts are never guessed).
     // The fold (fold_external_identity_location, migration 20261007070000) reads exactly these structured_data keys.
-    results.identity_location = parseMemberLocation(profileHtml);
+    results.identity_location = parseMemberLocation(bodyHtml);
     if (results.identity_location && write_location && externalIdentityId) {
       try {
         await writeObservation(supabase, {
