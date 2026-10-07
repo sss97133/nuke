@@ -36,22 +36,39 @@ venue's own comps, a model asked "what is it worth") share one property: the num
 None we have found publishes how often it was right, on how many lots, as of when. Nuke's position is the opposite:
 every number with its source, its date, its unit and its denominator, and every prediction graded in a public
 table. The stats in the substrate are the positioning; a reader takes them or leaves them. That is also why this
-evidence should be generated rather than typed: the hand-written table of 2026-10-07 was wrong in its unit (rows for
-lots) within an hour. Generating it on the daily `readme-stats.mjs` run is on the data-model lane's list; until then
-the numbers below are hand-read and stamped.
+evidence is generated rather than typed: the hand-written table of 2026-10-07 was wrong in its unit (rows for lots)
+within an hour. The block below is written by the daily `readme-stats.mjs` run, and its queries fix the unit and print
+the denominators.
 
 ## What is measured
 
-Units are lots, not rows, and every rate names its denominator. Hand-read on prod 2026-10-07 03:30Z unless stated.
+Units are lots, not rows, and every rate names its denominator. The block below is generated from the live database
+and moves with it. The figures quoted in prose further down (objective 0, the scripts, the pitch) are the baseline of
+2026-10-07 09:00Z and match the block at that date.
+
+<!-- evidence:start -->
+Measured 2026-10-07 10:23 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
+
+| Model | Sold lots graded, of lots ended | Median absolute error | Bias (mean signed error) | Hammer inside its stated band | Close: scheduled / final / predicted |
+|---|---|---|---|---|---|
+| 31 | 751 of 1,342 | 26.2% | +16.2% | 591 of 751 = 78.7% (80% band) | 282 / 469 / 0 |
+| 30 | 489 of 980 | 30.7% | +16.2% | 365 of 489 = 74.6% (80% band) | 30 / 459 / 0 |
+| 24 | 747 of 995 | 24.3% | −13.2% | 193 of 747 = 25.8% (50% band) | 0 / 244 / 503 |
+| 13 | 10 of 13 | 12.0% | −15.4% | 2 of 10 = 20.0% (band width unknown) | 0 / 0 / 10 |
+
+- **Lots predicted:** 2,289 distinct lots, in 46,093 of 53,922 prediction rows; 7,829 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
+- **Lots graded:** 1,482 distinct sold lots, and 1,997 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
+- **Stacks:** 65 registered, 64 at status measured; 5 at coverage 0.9 or above; mean coverage 0.11 (`v_stacks`). Order book SA v2: coverage 0.50, 8 of 16 needs present, 2 partial, 6 missing; status showable.
+- **Thesis vein V012 v1** (cited by S03; `vein_ledger`, status active): 68,957 distinct buyers, the top 1% took 14% of lots, 39 won 50 or more (discovery run, as of 2026-09-30). Runs that can grade it: 0 of 1 (`vein_runs`).
+- **Live-lot reader replay** (cited from PR #771, 2026-10-07; a replay, not a view, so not recomputed here): 2 minutes before the scheduled close the hammer sat inside its 80% band on 257 of 311 lots the live collector followed (closes 2026-10-05 to 06) = 82.6%. Not out-of-sample: the band's shape was chosen after seeing these lots.
+<!-- evidence:end -->
+
+Testbed size, hand-read on prod 2026-10-07 03:30Z (cost, not results; the README's measured block carries the live
+corpus counts):
 
 | Measure | Value | Source |
 |---|---|---|
 | Settled BaT lots held | 106,551 with a sale price, of 174,518 listings; 93,135 of the sold keyed to a vehicle; 1,216 settled since 2026-09-27 | `bat_listings` |
-| Price predictions | v24: 4,612 lots since 2026-02-19 (45,788 hourly rows); v31, live: 2,314 lots since 2026-09-27; 10 lots graded across all versions | `hammer_predictions` |
-| Graded error, per lot | v24: 7 lots, median abs error 23.5% (last prediction before close), 1 within 10%; v13: 2 lots, 48.2%. Too few lots to grade a model | `hammer_predictions`, scored rows |
-| Predicted lots that join to a settled listing | 6 of 4,612 (v24); 0 of 2,314 (v31), by vehicle key | `hammer_predictions` × `bat_listings` |
-| Stack registry | 64 stacks; 5 at or above 0.9 coverage; mean 0.12; order book SA v2 at 0.50 (8 of 16 needs present, 2 partial, 6 missing) | `v_stacks`, 03:11Z |
-| Buyer concentration (V012 discovery) | 68,957 distinct BaT buyers; top 1% took 14% of lots; 39 won 50 or more | `vein_ledger` |
 | Corpus (planner estimates) | 20.0M auction comments, 4.27M bids, 11.2M observations (03:49Z); 52.1M images, 0.5% vision-analyzed; 11% of comments sentiment-scored (README, 2026-10-06) | README daily measurements |
 
 Results that live in documents rather than on prod, with their dates:
@@ -59,16 +76,19 @@ Results that live in documents rather than on prod, with their dates:
 | Result | Number | Source |
 |---|---|---|
 | Band tag backtest, 24 h before close | 69,295 sold BaT lots 2024-09-01..2026-09-27, each priced from earlier sales only: cold 11.3%, in line 40.9%, hot 86.8% finished above their band middle (48 h: 13.2 / 40.3 / 82.9%). Run in a local DuckDB archive of 2026-09-29, not on prod | `docs/ledger/2026-09-30_bat-data-coverage-audit.md` §5 |
+| Settled BaT lots, by rule | 141,869 lots with source bat, outcome sold, a recorded winning or high bid and a close date on or before 2026-10-07; 190,678 carry the sold outcome and price without the close-date filter (the rest lack a usable close date). The README's 157K is a planner estimate of `bat_listings` rows, not a settled count | `auction_events`, read 2026-10-07 10:45Z |
 | Soft-close extension | 322 of 400 settled BaT lots extended past the scheduled close (80%) | `docs/ledger/theory/data-machine-cases.md` §4 |
 | Hypothesized cause of price error | condition and configuration live in images and comments, not fields; from a handful of graded cases, not a measured decomposition | `docs/features/ask-nuke/THEORY.md` (2026-07-09) |
 
-What the numbers said on 2026-10-07 03:30Z: the predictor had written predictions for 4,612 lots (model v24,
+What the numbers said on 2026-10-07 03:30Z: the predictor had written predictions for 4,612 vehicle ids (model v24,
 since 2026-02-19) and 2,314 more (v31, live since 2026-09-27), and had been graded on ten, because its vehicle keys
 land on six settled listings (`bat_listings` holds 106,551 sale prices, 93,135 of them keyed to a vehicle). The
 grading machinery exists; the outcome join is the gap, and it is a key repair on data already held, not new data.
 The evidence is a small fraction of the pool (0.5% of images analyzed, 11% of comments scored, ten of thousands of
-predictions graded), and the pool is a fraction of the market. Both fractions are the honest headline until the
-join runs; the next read of the table above shows whether it moved.
+predictions graded), and the pool is a fraction of the market. Both fractions were the honest headline that morning.
+At 08:51Z the same day the join landed (PR #774): every prediction keyed to its lot and graded against the lot's
+outcome, 1,482 distinct sold lots (1,997 model-lot grades). Objective 0 is met at n ≥ 1,000 lots; the bar is now the
+live model's 26.2% median per-lot error with an 80% interval that holds the hammer 78.7% of the time.
 
 Row counts are cost, not results. Lead with the graded error and the coverage; mention the rows as the size of the
 testbed.
@@ -84,9 +104,12 @@ For a funder who funds R&D, the question is one sentence with a grading rule:
 
 The unproven parts, each a Phase I objective:
 
-0. **The outcome join.** Grade every prediction against the recorded hammer, per lot, point-in-time, at n ≥ 1,000
-   lots (1,216 BaT lots settled in the ten days to 2026-10-07 alone). Ten lots are graded today. This is a key
-   repair on data already held, and it sets the bar the rest is measured against.
+0. **The outcome join.** Done 2026-10-07 08:51Z (PR #774): every prediction keyed to its lot and graded against the
+   lot's outcome at the last prediction before each lot's close (the scheduled close where live frames hold it, 282
+   of model 31's lots; the final close otherwise, 469); 1,482 distinct sold lots graded (1,997 model-lot grades, a lot
+   counting once for each model that priced it), up from ten that morning. The bar: the live model's median absolute
+   error of 26.2% per lot, with an 80% interval that holds the hammer 78.7% of the time (751 lots): calibrated, and
+   wide.
 1. **Condition and configuration from images and text**, at the accuracy the error demands. Today 0.5% of images are
    vision-analyzed; condition blindness is the hypothesized cause of the error seen so far.
 2. **Relation-weighted claim credibility.** A statement about an asset weighted by who made it, their relation to the
@@ -100,8 +123,8 @@ The unproven parts, each a Phase I objective:
    cadence is a feasibility question, not a feature.
 
 Grading: median absolute % error per lot (the last prediction before close, and at fixed horizons) against the
-cohort baseline, on a held-out final month, in `prediction_accuracy` by price tier. The bar is set by objective 0,
-not by the ten graded lots. Generality: any asset class whose record is fragmented public observation (equipment,
+cohort baseline, on a held-out final month, in `prediction_accuracy` by price tier. The bar is objective 0's result: 26.2% median
+per-lot error and a 78.7% interval hold on 751 lots. Generality: any asset class whose record is fragmented public observation (equipment,
 aircraft, property, art). Vehicles are the testbed because they are the largest public corpus with timed bids.
 
 ## Models: sensor, not source
@@ -148,14 +171,14 @@ best data.
 ## How to say it
 
 **To a reviewer.** "An observational ledger for physical assets. Every fact keeps its source and its clocks, state is
-computed from the log point-in-time, and predictions are graded against outcomes in a public table. Grading our own
-predictor showed how little had been graded: thousands of lots predicted, ten scored, because the predictions and the
-settled lots did not share a key. Phase I starts with that join at a thousand lots, then asks whether
-provenance-weighted extraction from photos and comments lowers the error, measured the same way."
+computed from the log point-in-time, and predictions are graded against outcomes in a public table. Our live price model
+is graded on 751 sold lots: median error 26.2% per lot, and its 80% interval holds the hammer 78.7% of the time, so
+it is calibrated but wide. Phase I asks whether provenance-weighted extraction from photos and comments narrows it,
+measured the same way."
 
 **To an investor.** "Auctions settle in a two-minute window and the crowd prices on what is written in the listing.
 We fold everything known about the asset before the window opens, with a grading table that says how often we are
-right. Collector vehicles are the testbed: 157K settled BaT lots, 20M comments, 4M bids. The ledger generalizes to any
+right. Collector vehicles are the testbed: 141,869 BaT lots sold with a recorded price and a close on or before today, 20M comments, 4M bids. The ledger generalizes to any
 asset with a fragmented public record."
 
 **To a mechanic.** "It's the record. Every job, every part, every photo, every dollar on the truck, with who did it and
@@ -165,7 +188,7 @@ when, and the market for that truck next to it."
 
 - ETFs, derivatives, vaults, "undercut BaT". Direction, not evidence. Keep it in `VISION.md`.
 - "LLMs cannot exist in the same reality." Say sensor and instrument.
-- Row counts as the lead. 52M images is a cost. The result is 0.5% analyzed and ten graded predictions.
+- Row counts as the lead. 52M images is a cost. The result is 0.5% analyzed and a 26.2% median error on 751 graded lots.
 - A graded number without its unit. 399 rows of seven lots re-scored hourly is seven lots.
 - "AI-powered", "platform", "disrupt", "Bloomberg for cars".
 - A person's money, vehicle or contact details. The repo is public; refer to records by id.
@@ -215,9 +238,8 @@ and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
   out of reach in practice, so the proposal is written December to February for 2027-03-04, the decision follows
   around September 2027, and the first dollar arrives in the fall of 2027: about eleven months. The pitch is the
   only step that costs nothing.
-- **One dependency on the trunk.** Section 2 should say "graded on N lots as of <date>", not "ten". Objective 0 (the
-  outcome join at n ≥ 1,000 lots) lands before the pitch goes in; it is a key repair on held data and belongs to the
-  data-model lane.
+- **The trunk dependency, landed.** 2026-10-07 08:51Z (PR #774): 1,482 distinct sold lots graded by lot (1,997
+  model-lot grades). Section 2 carries the number.
 
 ### What winners look like
 
@@ -261,10 +283,10 @@ awards API (`api.nsf.gov/services/v1/awards.json`), which carries 2024 and 2025.
 ### The pitch, drafted (owner review; nothing is submitted by an agent)
 
 Drafted 2026-10-07 from this document. Character counts are measured on the text below, against the limits on the
-Project Pitch form. Three blanks in square brackets wait on the owner and the grading join: the graded-lot count and
-its date (objective 0), the legal entity and its state, and the track line.
+Project Pitch form. Two blanks in square brackets wait on the owner: the legal entity and its state, and the track line. The
+graded-lot count landed 2026-10-07 08:51Z and is filled.
 
-**1. The Technology Innovation** (2,410 of 3,500 characters)
+**1. The Technology Innovation** (2,464 of 3,500 characters)
 
 Nuke is an observational ledger for physical assets, with its predictions graded in the open. Every observation about an asset (a bid, a comment, a photograph, a receipt, a title transfer) is kept as an append-only row with its source, its event time, its ingest time and its trust. The asset's state, its cohort baseline and its predicted clearing price are computed from that log point-in-time, so any number the system shows can be replayed from only what was known at the moment it was made, and graded against the outcome when it arrives.
 
@@ -272,27 +294,27 @@ The innovation is the estimator built on that ledger: a provenance-weighted, poi
 
 Language and vision models have a defined role: they are sensors, never sources. A model turns a comment into an attributed claim or a photograph into a condition observation, and its output lands as a row with provenance. It never produces the number. A model trained on today's web cannot say what was known two hours before an auction closed; the ledger can.
 
-Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: about 157,000 settled Bring a Trailer lots, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
+Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: 141,869 Bring a Trailer lots sold with a recorded price and a close date on or before 2026-10-07, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
 
-**2. The Technical Objectives and Challenges** (2,587 of 3,500 characters)
+**2. The Technical Objectives and Challenges** (2,771 of 3,500 characters)
 
 The research question: can point-in-time state, estimated from heterogeneous untrusted observations that each keep their source, clock and relation to the asset, predict an asset's clearing price with a graded per-lot error, and keep correcting that prediction inside the two-minute closing window as bids and comments arrive?
 
 Phase I objectives, each graded in the same public table.
 
-0. The outcome join. Grade every prediction the system has made against the recorded hammer, per lot, point-in-time, at n ≥ 1,000 lots. Today [N] lots are graded as of [DATE]; the predictor wrote predictions for 6,926 lots whose keys did not meet the settled-lot records. A data-engineering milestone that sets the bar.
+0. The outcome join. Grade every prediction the system has made against the recorded hammer, per lot, point-in-time, at n ≥ 1,000 lots. Done 2026-10-07: 1,482 distinct sold lots graded at the last prediction before each lot's close (the scheduled close where live frames hold it, the final close otherwise); the live model's median absolute error is 26.2% per lot and its 80% interval holds the hammer 78.7% of the time (751 lots), close to nominal. That is the bar.
 1. Condition and configuration from images and text. Vision and text extraction producing attributed condition observations. Success: a measured reduction in median absolute per-lot error against the objective-0 baseline, on a held-out final month, by price tier.
 2. Relation-weighted credibility. Weight each claim by the claimant's relation to the asset and their record on earlier claims. Success: lift on the outcome (above or below the cohort median at close) with an 80% interval excluding 1, on held-out lots.
 3. Leakage-free replay at scale. A replay engine that recomputes every feature for every past moment from prior events only, over 20 million comments. Success: a passing leakage audit and a per-horizon error curve at 120, 48, 24, 12, 6 and 2 hours before close.
 4. The nowcast. A prediction row per lot per minute through the closing chain, updated as each bid and comment lands. Success: calibration at each minute, and a measured recompute latency inside the two-minute extension.
 
-Why this is R&D: the outcome is unknown. Our calibration record exists and is honest. A comparables-only predictor ran live for six weeks; its graded cases fail by tens of percent, with condition blindness the hypothesized cause. Whether provenance-weighted extraction closes that gap, and whether a fold over the log can recompute fast enough inside a soft-close window, are open questions with a yes-or-no answer that costs money to obtain. One baseline is already measured point-in-time: a three-class price tag computed 24 hours before close on 69,295 settled lots, each priced only from earlier sales, finished above its band middle 86.8% of the time when tagged hot and 11.3% when tagged cold.
+Why this is R&D: the outcome is unknown. Our calibration record exists and is honest. A comparables-only predictor runs live; graded on 751 sold lots, its median error is 26.2% and its interval is calibrated but wide, with condition blindness the hypothesized cause. Whether provenance-weighted extraction closes that gap, and whether a fold over the log can recompute fast enough inside a soft-close window, are open questions with a yes-or-no answer that costs money to obtain. One baseline is already measured point-in-time: a three-class price tag computed 24 hours before close on 69,295 settled lots, each priced only from earlier sales, finished above its band middle 86.8% of the time when tagged hot and 11.3% when tagged cold.
 
 Risks: sparse or biased outcomes (reserves not met), adversarial sellers, and image volume (52 million images, 0.5% analyzed) that forces selective rather than exhaustive vision.
 
-**3. The Market Opportunity** (1,024 of 1,750 characters)
+**3. The Market Opportunity** (1,037 of 1,750 characters)
 
-Near-term customers decide under time pressure with an unverifiable number. Online collector-vehicle auctions settle in a two-minute soft-close window; dealers, flippers and serious private buyers bid against a crowd that prices on what the listing says, with price guides and aggregators that publish no error table. The first product is the graded estimate and its evidence for a live lot, sold to professional buyers and sellers who transact repeatedly: about 157,000 settled lots on one venue alone, with buyer concentration (the top 1% of 68,957 buyers took 14% of lots) that identifies the paying segment. The second is the asset record itself, for owners, lenders and insurers who need provenance for a specific physical asset. The method generalizes to any asset class with a fragmented public record (equipment, aircraft, property, art), each with its own timed venues. The company's position is the opposite of the incumbents': every number with its source, date and denominator, every prediction graded in public.
+Near-term customers decide under time pressure with an unverifiable number. Online collector-vehicle auctions settle in a two-minute soft-close window; dealers, flippers and serious private buyers bid against a crowd that prices on what the listing says, with price guides and aggregators that publish no error table. The first product is the graded estimate and its evidence for a live lot, sold to professional buyers and sellers who transact repeatedly: 141,869 lots sold with a recorded price on one venue alone, with buyer concentration (the top 1% of 68,957 buyers took 14% of lots) that identifies the paying segment. The second is the asset record itself, for owners, lenders and insurers who need provenance for a specific physical asset. The method generalizes to any asset class with a fragmented public record (equipment, aircraft, property, art), each with its own timed venues. The company's position is the opposite of the incumbents': every number with its source, date and denominator, every prediction graded in public.
 
 **4. The Company and Team** (921 of 1,750 characters)
 

@@ -33,6 +33,14 @@ export function span(ms: number): string {
   return `${sign}${m}m ${s % 60}s`;
 }
 
+/** A fraction as a rank out of 100: 0.619 is "62nd". */
+export function ordinal(fraction: number): string {
+  const n = Math.round(fraction * 100);
+  const tail = n % 100;
+  const suffix = tail >= 11 && tail <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
 export function percent(numerator: number | null, denominator: number | null): string | null {
   if (numerator == null || denominator == null || denominator <= 0) return null;
   const p = (100 * numerator) / denominator;

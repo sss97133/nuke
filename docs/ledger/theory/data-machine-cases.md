@@ -1484,7 +1484,7 @@ funding ... we have to really stay on target."
    7. The owner's instinct (ask for the denominator) was right before the numbers were. The hand-typed table in
    `docs/POSITIONING.md` was wrong in unit within an hour. The cure is a block that `readme-stats.mjs` writes daily,
    whose queries define the unit (distinct lots) and print the denominators, so a stranger reads the same query the
-   owner does: "the product communicates on itself." Not built tonight (scope ruling above); handed to the data-model
+   owner does: "the product communicates on itself." Not built tonight (scope ruling above); handed to the data-model Built 2026-10-07 10:35Z: PR #781 (`scripts/data/readme-stats.mjs` writes the evidence block between markers in `docs/POSITIONING.md`; `update-stats.yml` stages it daily; 1,482 distinct sold lots graded as of 10:23Z).
    lane with the queries in this section.
 2. **The outcome join is the trunk, and it is a key repair.** Nobody chose seven lots. `hammer_predictions` holds
    4,612 v24 lots and 2,314 v31 lots (6,926 distinct across versions); `bat_listings` holds 106,551 sale prices,

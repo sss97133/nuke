@@ -31,6 +31,21 @@
 .stack-bar > span { display: block; height: 4px; background: var(--text); }
 .stack-basis { font-size: 10px; color: var(--text-secondary); }
 
+/* Forecast panel: the route's answer for this lot's stored state, or the reason there is none. */
+.stack-forecast { margin: 14px 0 0; border: 2px solid var(--border); }
+.stack-forecast-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 6px 10px; border-bottom: 2px solid var(--border); }
+.stack-forecast-body { padding: 10px; }
+.stack-forecast-note { margin: 0; font-size: 11px; }
+.stack-forecast-note button { border: 2px solid var(--border); background: var(--bg); color: var(--text); font: 11px Arial, sans-serif; padding: 2px 8px; cursor: pointer; }
+.stack-forecast-grid { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
+.stack-forecast-grid dt { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); padding-top: 3px; }
+.stack-forecast-grid dd { margin: 0; }
+.stack-forecast-flag { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.stack-forecast-stale { border: 2px solid var(--text); padding: 8px 10px; margin: 0 0 10px; }
+.stack-forecast table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.stack-forecast th, .stack-forecast td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 11px; }
+.stack-forecast th { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); }
+
 /* The path: nine layers, each a button. */
 .stack-path { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0; margin: 14px 0 0; border: 2px solid var(--border); }
 .stack-path button { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 8px; border-right: 2px solid var(--border); min-height: 58px; display: flex; flex-direction: column; gap: 2px; }
@@ -105,6 +120,11 @@
   .stack-coverage tr { display: block; border-bottom: 1px solid var(--border); }
   .stack-coverage td { display: block; border-bottom: 0; padding: 3px 10px; }
   .stack-layer-def { grid-template-columns: minmax(0, 1fr); }
+  .stack-forecast-grid { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+  .stack-forecast-grid dd { margin-bottom: 8px; }
+  .stack-forecast thead { display: none; }
+  .stack-forecast tr { display: block; border-bottom: 1px solid var(--border); }
+  .stack-forecast td { display: block; border-bottom: 0; padding: 3px 6px; }
   .stack-table .hide-narrow { display: none; }
   .stack-chart text { font-size: 20px; }
 }
