@@ -258,5 +258,43 @@ awards API (`api.nsf.gov/services/v1/awards.json`), which carries 2024 and 2025.
   awards with outcomes, Nuke's fit as keyed claims against the program's criteria, and a score that says how far
   the company is from the opportunity and which keys are missing. Both pulls are reproducible from the URLs above.
 
-The prose is not drafted here. It is drafted when the owner says go, from this doc and the README, and he reviews it
-before anything is submitted.
+### The pitch, drafted (owner review; nothing is submitted by an agent)
+
+Drafted 2026-10-07 from this document. Character counts are measured on the text below, against the limits on the
+Project Pitch form. Three blanks in square brackets wait on the owner and the grading join: the graded-lot count and
+its date (objective 0), the legal entity and its state, and the track line.
+
+**1. The Technology Innovation** (2,410 of 3,500 characters)
+
+Nuke is an observational ledger for physical assets, with its predictions graded in the open. Every observation about an asset (a bid, a comment, a photograph, a receipt, a title transfer) is kept as an append-only row with its source, its event time, its ingest time and its trust. The asset's state, its cohort baseline and its predicted clearing price are computed from that log point-in-time, so any number the system shows can be replayed from only what was known at the moment it was made, and graded against the outcome when it arrives.
+
+The innovation is the estimator built on that ledger: a provenance-weighted, point-in-time price estimator for assets whose public record is fragmented across untrusted observations. Three parts are unproven. (1) Condition and configuration extraction from images and free text at the accuracy a price requires. The facts that move a collector-vehicle price (body configuration, documented work, condition) live in photographs and comment threads, not in listing fields, and our own calibration table shows a comparables-only model failing by tens of percent for that reason. (2) Relation-weighted claim credibility: a statement about an asset weighted by who made it, their relation to the asset at that time (seller, prior owner, bidder, bystander), and how their earlier claims resolved. Designed, never measured. (3) Leakage-free replay at scale: a feature computed for moment t may use only events known before t, over tens of millions of comments and millions of bids. Most market-data products violate this; the architecture is built around it.
+
+Language and vision models have a defined role: they are sensors, never sources. A model turns a comment into an attributed claim or a photograph into a condition observation, and its output lands as a row with provenance. It never produces the number. A model trained on today's web cannot say what was known two hours before an auction closed; the ledger can.
+
+Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: about 157,000 settled Bring a Trailer lots, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
+
+**2. The Technical Objectives and Challenges** (2,587 of 3,500 characters)
+
+The research question: can point-in-time state, estimated from heterogeneous untrusted observations that each keep their source, clock and relation to the asset, predict an asset's clearing price with a graded per-lot error, and keep correcting that prediction inside the two-minute closing window as bids and comments arrive?
+
+Phase I objectives, each graded in the same public table.
+
+0. The outcome join. Grade every prediction the system has made against the recorded hammer, per lot, point-in-time, at n ≥ 1,000 lots. Today [N] lots are graded as of [DATE]; the predictor wrote predictions for 6,926 lots whose keys did not meet the settled-lot records. A data-engineering milestone that sets the bar.
+1. Condition and configuration from images and text. Vision and text extraction producing attributed condition observations. Success: a measured reduction in median absolute per-lot error against the objective-0 baseline, on a held-out final month, by price tier.
+2. Relation-weighted credibility. Weight each claim by the claimant's relation to the asset and their record on earlier claims. Success: lift on the outcome (above or below the cohort median at close) with an 80% interval excluding 1, on held-out lots.
+3. Leakage-free replay at scale. A replay engine that recomputes every feature for every past moment from prior events only, over 20 million comments. Success: a passing leakage audit and a per-horizon error curve at 120, 48, 24, 12, 6 and 2 hours before close.
+4. The nowcast. A prediction row per lot per minute through the closing chain, updated as each bid and comment lands. Success: calibration at each minute, and a measured recompute latency inside the two-minute extension.
+
+Why this is R&D: the outcome is unknown. Our calibration record exists and is honest. A comparables-only predictor ran live for six weeks; its graded cases fail by tens of percent, with condition blindness the hypothesized cause. Whether provenance-weighted extraction closes that gap, and whether a fold over the log can recompute fast enough inside a soft-close window, are open questions with a yes-or-no answer that costs money to obtain. One baseline is already measured point-in-time: a three-class price tag computed 24 hours before close on 69,295 settled lots, each priced only from earlier sales, finished above its band middle 86.8% of the time when tagged hot and 11.3% when tagged cold.
+
+Risks: sparse or biased outcomes (reserves not met), adversarial sellers, and image volume (52 million images, 0.5% analyzed) that forces selective rather than exhaustive vision.
+
+**3. The Market Opportunity** (1,024 of 1,750 characters)
+
+Near-term customers decide under time pressure with an unverifiable number. Online collector-vehicle auctions settle in a two-minute soft-close window; dealers, flippers and serious private buyers bid against a crowd that prices on what the listing says, with price guides and aggregators that publish no error table. The first product is the graded estimate and its evidence for a live lot, sold to professional buyers and sellers who transact repeatedly: about 157,000 settled lots on one venue alone, with buyer concentration (the top 1% of 68,957 buyers took 14% of lots) that identifies the paying segment. The second is the asset record itself, for owners, lenders and insurers who need provenance for a specific physical asset. The method generalizes to any asset class with a fragmented public record (equipment, aircraft, property, art), each with its own timed venues. The company's position is the opposite of the incumbents': every number with its source, date and denominator, every prediction graded in public.
+
+**4. The Company and Team** (921 of 1,750 characters)
+
+Nuke is a pre-launch small business [legal entity and state of registration] founded by a mechanic who builds and sells vehicles and is the system's first user. The founder is the principal investigator and leads the technical work; the company's engineering is run with AI coding agents under a public repository and a written engineering law. The data machine already exists in production: an append-only observation log of 11 million rows, 20 million auction comments keyed to 650,000 identities, a registry of 64 measured analytical stacks, and a self-describing schema. What does not yet exist is the graded estimator this proposal funds. [Track line. SBIR: the company alone, with letters of support from named institutions. STTR: named research institution as partner and its named co-PI.] Phase I funds the founder's time, compute and image analysis, and a part-time researcher for the extraction and replay work.
+
