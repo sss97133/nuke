@@ -1398,7 +1398,8 @@ auction and it spins and tells you what to do", "the modern sniper bidding, and 
 model to help with that decision-making." Then connectors and MCP, then the website: "the core machinery of that is the
 same; if we get it working in CLI it works everywhere else." On how to talk about it: storing data goes without saying
 ("everybody knows we're already storing all the data"); talk about what the model does: "we have the best data model for
-predictions, we are the prediction model." The README leads with prediction from this date.
+predictions, we are the prediction model." Later the same night he rejected "Built to predict" as the README
+heading ("cringe": everyone claims prediction). The README states the measured live-auction result plainly instead.
 
 **Lead's reading (nothing minted):**
 1. **The verb:** `nuke lot <bat-url> [--watch] [--max N]`. Run once, it prints the read. With `--watch` it re-reads on a
