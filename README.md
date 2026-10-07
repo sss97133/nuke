@@ -8,6 +8,25 @@ they land.
 Vehicles are the first entity Nuke tracks. Tracking one vehicle already means tracking people,
 organizations, places, parts, documents, money and time.
 
+## Observation, not knowledge
+
+A language model holds knowledge. It compresses everything it read into a generalization, with no
+timestamps and no sources. A fluent answer can be wrong, and the model can't tell which. It was also
+trained after the fact, so it already knows how past auctions ended and can't say what was known two
+hours before a close.
+
+Nuke holds observations. Each one records what was said or seen, by whom, where and when, exactly as
+it was recorded. A correction supersedes an observation and never erases it, so the record of what
+was known at any moment survives. A model can read a comment and propose a claim. The record keeps
+who made the claim and when, and the claim's weight comes from how that speaker's earlier claims
+resolved.
+
+The two sit at opposite ends of a spectrum: generalization against record-keeping and provenance.
+Prediction lives on the observation side. Knowing what usually happens is knowledge. Knowing what is
+happening takes a live, timestamped record and arithmetic that runs as events land. In the last two
+minutes of an auction, that means every bid and bidder measured against every comparable lot at the
+same minute.
+
 ## A model that grows sideways
 
 Most data products are catalogs: a fixed schema filled from the top down. Nuke grows from the bottom.

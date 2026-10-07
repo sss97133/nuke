@@ -38,6 +38,14 @@ operations manual for execution and acceptance boundaries.
 Promoted by the owner on 2026-09-30 as "the absolute most important thing": the database structure, its vocabulary,
 and how the owner and every agent talk about it. Read this before designing any table, feature, cohort or prediction.
 
+**Owner positioning, 2026-10-07: observation, not knowledge.** "LLMs are taking up market share in
+knowledge, but knowledge is not observation. Knowledge is hallucination, just like for humans: even the
+smartest person can be wrong. What we're operating within is record-keeping and provenance, and that's
+potentially the opposite of models." Do LLMs tell the future? Not from knowledge: prediction needs what
+happened, as of when, processed as fast as it lands (an auction's last two minutes). Documentation should be
+as current as the chain of thought: the record stays as up to date as an agent's reasoning, but it is what
+happened. The README carries this as its second section.
+
 **The model:** the internet publishes the raw material (listings, bids, comments, photos, results); Postgres is the
 refinery. The machine has five layers, each defined inside the database itself so any agent can read it cold:
 
