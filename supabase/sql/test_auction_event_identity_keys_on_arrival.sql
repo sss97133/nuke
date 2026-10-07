@@ -506,12 +506,14 @@ SELECT pg_temp.ok('re-applying the migration changes no lot, function, registry 
 -- A SAME-NAMED INDEX THAT IS SOMETHING ELSE IS REFUSED ---------------------------------------------------------------------
 DROP INDEX public.idx_auction_events_open_seller_text;
 CREATE INDEX idx_auction_events_open_seller_text ON public.auction_events (seller_name);
+COMMENT ON FUNCTION public.key_auction_events_on_identity_arrival() IS 'marker: written before the refused run';
 DO $$ BEGIN RAISE NOTICE 'EXPECTED ERROR FOLLOWS: the migration refuses an index of the same name that is not the open-key index'; END $$;
 \set ON_ERROR_STOP off
 \ir ../migrations/20261007091000_key_lots_on_identity_arrival.sql
 \set ON_ERROR_STOP on
-SELECT pg_temp.ok('a same-named index that is not the partial open-key index is refused, and the function is as it was',
+SELECT pg_temp.ok('a same-named index that is not the partial open-key index is refused: the second transaction wrote nothing (the function''s comment is still the marker)',
   (SELECT pg_get_indexdef(c.oid) NOT LIKE '%WHERE%' FROM pg_class c WHERE c.relname = 'idx_auction_events_open_seller_text')
+  AND obj_description('public.key_auction_events_on_identity_arrival()'::regprocedure, 'pg_proc') = 'marker: written before the refused run'
   AND (SELECT md5(prosrc) FROM pg_proc WHERE proname = 'key_auction_events_on_identity_arrival') = (SELECT body FROM reapply_before));
 
 SELECT 'auction_event_identity_keys_on_arrival contract complete' AS result;
