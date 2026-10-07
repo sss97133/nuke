@@ -1,38 +1,23 @@
 # Nuke
 
 Nuke ([nuke.ag](https://nuke.ag)) is a data machine. It combines a model of entities and the
-evidence about them with the computation that keeps running over that model. Every observation is a
-row that keeps its source, its clocks and its trust. What matters is the shape those rows take after
-they land.
+evidence about them with the computation that keeps running over that model.
 
-Vehicles are the first entity Nuke tracks. Tracking one vehicle already means tracking people,
-organizations, places, parts, documents, money and time.
-
-## A live auction, measured
-
-The machine places a live lot's current bid and bidder count against every comparable lot at the
-same time to close, each priced only from the sales before it. The test covered 69,295 sold BaT lots,
-from 2024-09 to 2026-09. Lots it tagged hot 24 hours before close finished above the middle of their
-price band 86.8% of the time. Lots it tagged cold did so 11.3% of the time
-([BaT coverage audit, §5](docs/ledger/2026-09-30_bat-data-coverage-audit.md#5-the-temperature)).
-
-A language model can't take that reading. It has no clock, and it was trained after the fact, so it
-already knows how past auctions ended. The machine reads only what was known at each moment, and the
-same replay checks every reading against the result.
+Vehicles are the first entity in the model. One vehicle's history already runs through sales, shops,
+places, parts, documents, money and time.
 
 ## A model that grows sideways
 
 Most data products are catalogs: a fixed schema filled from the top down. Nuke grows from the bottom.
 A bid, a comment, a photo, a receipt or a title transfer lands once in an append-only log. It is
-then keyed to every entity it mentions: a vehicle, a person, a lot, a place or a part.
+then keyed to every entity it mentions: a vehicle, a lot, a place, a part or a document.
 
-Each key opens a new path. A commenter becomes an identity with a history, and the history becomes a
-record. That record then becomes a feature on every lot the person enters. Paths branch and they
-cross. One identity sits in the bidder record, the seller-trust record and an ownership chain at
-once.
+Each key opens a new path. A sale links to the vehicle's earlier sales, a part to every vehicle that
+carries it, and a place to every sale near it. Paths branch and they cross. One sale sits in a
+vehicle's history, a cohort's price curve and a venue's record at once.
 
 There is no bottom to drill to. Resolution doesn't stop at the vehicle. It continues into
-components, claims, time windows and the people making the claims. The work is foraging: follow a key
+components, claims, time windows and the source behind each claim. The work is foraging: follow a key
 to the next entity, and add a new source without redesigning what is already there.
 
 ## Nine layers
@@ -71,8 +56,8 @@ Examples:
   sells in 14 days and the patient price is the option value.
 - **Ownership as flow.** County-to-county transfers per cohort, compared with a gravity model, show
   where supply thins next.
-- **Claims with relations.** A statement about a vehicle is weighted by who made it, their relation to
-  the vehicle at the time, and how their earlier claims resolved.
+- **Claims with relations.** A statement about a vehicle is weighted by its source, the source's
+  relation to the vehicle at the time, and how the source's earlier claims resolved.
 
 The registry holds 64 stacks as data, read from the live `v_stacks` view on 2026-10-07. Each stack
 lists the layers it needs, and a coverage function measures them against the live schema. On average,
