@@ -2,7 +2,7 @@
 # scripts/night-run/run.sh: one bounded nightly Claude Code session that works the repair loop and opens PRs
 # for the lead's morning review. It runs on the owner's subscription through `claude -p`, never on API billing
 # (ANTHROPIC_API_KEY is unset for the child). The session never merges, deploys, pushes to main or loads jobs;
-# prompt.md holds the work order and the rails.
+# work-order.md holds the work order and the rails.
 #
 #   bash scripts/night-run/run.sh            # the nightly run (ag.nuke.night-run.plist)
 #   bash scripts/night-run/run.sh --dry-run  # prepare the worktree and the report header, ask nothing
@@ -18,16 +18,33 @@ LOG_DIR=$HOME/nuke-logs/night-run
 REPORT=$LOG_DIR/$DATE.md
 CAP=${NIGHT_RUN_CAP:-45m}
 MODEL=${NIGHT_RUN_MODEL:-claude-opus-5-5}
-SCHEMA_LAW_DIR=$HOME/lofficiel-concierge/supabase
+SCHEMA_LAW=$HOME/lofficiel-concierge/supabase/SCHEMA_LAW.md
 
 mkdir -p "$LOG_DIR"
+# Remove night worktrees older than two days, so one accumulates per night at most for 48 h.
+for old in "$HOME"/.worktrees/night-run-*; do
+  [ -d "$old" ] || continue
+  [ -n "$(find "$old" -maxdepth 0 -mtime +2)" ] && git -C "$REPO" worktree remove --force "$old" 2>/dev/null || true
+done
 git -C "$REPO" fetch -q origin main
 # One worktree per night, detached at origin/main; the session branches from it for each PR.
 [ -d "$WT" ] || git -C "$REPO" worktree add -q --detach "$WT" origin/main
 # The pre-commit hook type-checks the frontend; share the main checkout's node_modules.
 [ -e "$WT/nuke_frontend/node_modules" ] || ln -s "$REPO/nuke_frontend/node_modules" "$WT/nuke_frontend/node_modules"
 
-PROMPT=$WT/scripts/night-run/prompt.md
+# SCHEMA_LAW.md lives only in the lofficiel-concierge repo. Copy it in as an untracked, git-excluded file so
+# the session can read it without edit rights in that repo.
+mkdir -p "$WT/.night"
+cp "$SCHEMA_LAW" "$WT/.night/SCHEMA_LAW.md"
+EXCLUDE="$(git -C "$WT" rev-parse --git-common-dir)/info/exclude"
+grep -qx '.night/' "$EXCLUDE" 2>/dev/null || echo '.night/' >> "$EXCLUDE"
+
+WORK_ORDER=$WT/scripts/night-run/work-order.md
+[ -s "$WORK_ORDER" ] || { echo "- no work order at $WORK_ORDER; nothing asked" >> "$REPORT"; exit 0; }
+# The work order is static; the run's own date and report path go in front of it.
+PROMPT="Today (UTC): $DATE. Your report file: $REPORT. Append to it and to no other log.
+
+$(cat "$WORK_ORDER")"
 {
   echo
   echo "## Run $(date -u +%FT%TZ)"
@@ -35,7 +52,7 @@ PROMPT=$WT/scripts/night-run/prompt.md
 } >> "$REPORT"
 
 if [ "${1:-}" = "--dry-run" ]; then
-  echo "- dry run: would ask $MODEL with $PROMPT in $WT" | tee -a "$REPORT"
+  echo "- dry run: would ask $MODEL with $WORK_ORDER in $WT" | tee -a "$REPORT"
   exit 0
 fi
 
@@ -43,10 +60,9 @@ cd "$WT"
 set +e
 /usr/bin/caffeinate -i /opt/homebrew/bin/gtimeout -k 60 "$CAP" \
   /opt/homebrew/bin/dotenvx run -q -f "$REPO/.env" -- \
-  env -u ANTHROPIC_API_KEY claude -p "$(cat "$PROMPT")" \
+  env -u ANTHROPIC_API_KEY claude -p "$PROMPT" \
     --model "$MODEL" \
     --permission-mode acceptEdits \
-    --add-dir "$SCHEMA_LAW_DIR" \
     --allowedTools "Read" "Edit" "Write" "Grep" "Glob" \
       "Bash(git status*)" "Bash(git diff*)" "Bash(git log*)" "Bash(git show*)" "Bash(git fetch*)" \
       "Bash(git switch*)" "Bash(git checkout*)" "Bash(git add*)" "Bash(git commit*)" "Bash(git push -u origin night/*)" \
