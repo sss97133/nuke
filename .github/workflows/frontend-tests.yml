@@ -196,6 +196,10 @@ jobs:
       - name: Verify the stack coverage time series (append-only keyed table with checks, one reading per clock with a receipt, same-clock replay a no-op, series view, service_role only, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_stack_coverage_snapshots_ci -f supabase/sql/test_stack_coverage_snapshots.sql
 
+      - name: Create disposable sale residual database
+        run: createdb dm_refinement_sale_residual_ci
+      - name: Verify monthly source-sale residuals, episode grain, exclusions and same-listing county boundaries
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_residual_ci -f supabase/sql/test_sale_residuals_by_ymm.sql
       - name: Create disposable vin decode policy database
         run: createdb dm_refinement_vin_policy_ci
       - name: Verify vin_decoded_data's write policy is scoped to service_role (anon reads, cannot insert or delete; service_role writes; registry row; re-apply a no-op)
@@ -441,7 +445,7 @@ jobs:
       - name: Create disposable source-sale receipt database
         run: createdb dm_refinement_sale_receipt
       - name: Verify actual valuation reader, source custody and price-cutoff contracts
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_receipt -f scripts/discovery/valuation-source-sale-receipt-test.sql
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_receipt -f scripts/discovery/valuation-source-sale-receipt-test.sql -f supabase/sql/test_sale_residuals_source_integration.sql
       - name: Create disposable canonical price helper database
         run: createdb dm_refinement_price_facts_ci
       - name: Verify price helper equivalence, lazy dates and invoker privacy
