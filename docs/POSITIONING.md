@@ -184,5 +184,36 @@ Character limits are from [seedfund.nsf.gov/project-pitch](https://seedfund.nsf.
 | 3. Market opportunity | 1,750 chars | Who decides in the two-minute window (bidders, dealers, flippers), who needs the record (owners, lenders, insurers); the settled-lot volume as the market's size; later asset classes |
 | 4. Company and team | 1,750 chars | Founder-mechanic who builds and sells vehicles, user #1 and today the research partner; pre-launch; the corpus already built; a university partner satisfies STTR's research-institution requirement and the owner has candidates, with museums as letters of support |
 
+### Path and clock
+
+Read 2026-10-07 from the [solicitation](https://www.nsf.gov/funding/opportunities/small-business-innovation-research-small-business-technology/nsf26-510/solicitation)
+and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
+
+- **Eligibility.** Under 500 employees, US-located, at least 50% owned by US citizens or permanent residents, not
+  majority-owned by venture, private-equity or hedge funds; all funded work in the US. The PI is employed by the
+  company (the solicitation: at least 51% at award and through the award; the get-started page: at least 20 hours a
+  week), needs no degree, and commits at least 173 hours to the project per six months.
+- **Tracks.** SBIR: the company alone. STTR: a subaward to a not-for-profit research institution with a co-PI from
+  it; the PI still at the company. STTR answers the team question with a partner; SBIR answers it with the founder's
+  record and letters of support.
+- **Amounts.** Phase I up to $305,000 for 6 to 18 months. Phase II up to $1,250,000 for 24 months. Fast-Track up to
+  $1,555,555 (Phase I $400,000, then Phase II $1,155,000) for teams past the proof stage. Strategic Breakthrough
+  awards up to $30M for proven Phase II awardees (secondary source). No equity taken.
+- **Steps and limits.** The Project Pitch can go in any time (the window reopened 2026-06-02): four sections, one
+  pending at a time, at most two per company per twelve months and three ever for the same technology; NSF answers
+  in about one to two months. On an invitation, the full proposal is due at the next window: 2026-11-04,
+  2027-03-04, 2027-07-07, then the first Wednesday of November, first Thursday of March and first Wednesday of July
+  each year. One proposal per organization per window. A funding decision takes roughly six months from
+  submission.
+- **Registrations, free, start now.** SAM.gov (up to three weeks), the SBA company registry (the SBC ID),
+  Research.gov (up to 48 hours). All three are needed before a proposal can be submitted; the pitch needs none.
+- **The clock from 2026-10-07.** A pitch in by the end of October is answered by December. The 2026-11-04 window is
+  out of reach in practice, so the proposal is written December to February for 2027-03-04, the decision follows
+  around September 2027, and the first dollar arrives in the fall of 2027: about eleven months. The pitch is the
+  only step that costs nothing.
+- **One dependency on the trunk.** Section 2 should say "graded on N lots as of <date>", not "ten". Objective 0 (the
+  outcome join at n ≥ 1,000 lots) lands before the pitch goes in; it is a key repair on held data and belongs to the
+  data-model lane.
+
 The prose is not drafted here. It is drafted when the owner says go, from this doc and the README, and he reviews it
 before anything is submitted.
