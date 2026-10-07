@@ -1,7 +1,7 @@
 -- Isolated PostgreSQL 17 contract: a BaT lot's winner and seller are keyed to external_identities by the database, for
 -- every lander at once (the triggers 20261006213000 installed on prod 2026-10-06 21:55Z), and the seller is also keyed
 -- through the lot's own seller-flagged comment when its text differs from the handle only in letter case
--- (20261007073000_key_lot_seller_by_flagged_comment.sql).
+-- (20261007090000_key_lot_seller_by_flagged_comment.sql).
 -- Synthetic rows only; never production. Run in an empty disposable dm_refinement_* database:
 --   createdb dm_refinement_auction_event_identity_keys_at_insert_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_auction_event_identity_keys_at_insert_ci -f supabase/sql/test_auction_event_identity_keys_at_insert.sql
@@ -306,7 +306,7 @@ CREATE TEMP TABLE shape_before AS
          pg_temp.state() AS lots_state;
 
 -- THE SECOND MIGRATION -------------------------------------------------------------------------------------------------
-\ir ../migrations/20261007073000_key_lot_seller_by_flagged_comment.sql
+\ir ../migrations/20261007090000_key_lot_seller_by_flagged_comment.sql
 
 SELECT pg_temp.ok('the migration changes no lot, identity or comment row',
   pg_temp.state() = (SELECT lots_state FROM shape_before)
@@ -442,7 +442,7 @@ CREATE TEMP TABLE reapply_before AS
          (SELECT string_agg(coalesce(col_description('public.auction_events'::regclass, a.attnum), ''), '|' ORDER BY a.attnum)
           FROM pg_attribute a WHERE a.attrelid = 'public.auction_events'::regclass AND a.attnum > 0 AND NOT a.attisdropped) AS comments
   FROM pg_proc WHERE oid = 'public.resolve_auction_event_identities(uuid, text, text, numeric, text)'::regprocedure;
-\ir ../migrations/20261007073000_key_lot_seller_by_flagged_comment.sql
+\ir ../migrations/20261007090000_key_lot_seller_by_flagged_comment.sql
 SELECT pg_temp.ok('re-applying the migration changes neither the function, the registry nor a column comment',
   (SELECT left(md5(prosrc), 16) = '0938e28889802dfc' AND md5(prosrc) = (SELECT body FROM reapply_before)
    FROM pg_proc WHERE oid = 'public.resolve_auction_event_identities(uuid, text, text, numeric, text)'::regprocedure)
@@ -462,7 +462,7 @@ UPDATE public.pipeline_registry SET description = description || ' [marker]'
 WHERE table_name = 'auction_events' AND column_name = 'seller_external_identity_id';
 DO $$ BEGIN RAISE NOTICE 'EXPECTED ERROR FOLLOWS: the migration refuses a drifted function body'; END $$;
 \set ON_ERROR_STOP off
-\ir ../migrations/20261007073000_key_lot_seller_by_flagged_comment.sql
+\ir ../migrations/20261007090000_key_lot_seller_by_flagged_comment.sql
 \set ON_ERROR_STOP on
 SELECT pg_temp.ok('a drifted function body is refused: it is still the other body, and the migration wrote nothing',
   (SELECT left(md5(prosrc), 16) NOT IN ('ff6aeb85191dbfdc', '0938e28889802dfc') AND prosrc LIKE '%drifted%'

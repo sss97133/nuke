@@ -1,4 +1,4 @@
--- 20261007073000_key_lot_seller_by_flagged_comment.sql
+-- 20261007090000_key_lot_seller_by_flagged_comment.sql
 --
 -- Keys lane, 2026-10-07 (case C28, data-machine-cases.md section 12 item 3, "key at insert, everywhere").
 --
@@ -187,7 +187,7 @@ COMMENT ON FUNCTION public.resolve_auction_event_identities(uuid, text, text, nu
 
 -- Name the mechanism where the rule is stated: the seller key's registry row and column comment (append once).
 UPDATE public.pipeline_registry
-SET description = description || ' When no identity has exactly the text, a comment on the lot that BaT flags as the seller''s, by a BaT identity whose handle equals the text in any letter case, names the key if all such comments name one identity (20261007073000; the missing-lot writer copied lower-cased feed handles).',
+SET description = description || ' When no identity has exactly the text, a comment on the lot that BaT flags as the seller''s, by a BaT identity whose handle equals the text in any letter case, names the key if all such comments name one identity (20261007090000; the missing-lot writer copied lower-cased feed handles).',
     updated_at = now()
 WHERE table_name = 'auction_events'
   AND column_name = 'seller_external_identity_id'
@@ -201,7 +201,7 @@ BEGIN
   WHERE a.attrelid = 'public.auction_events'::regclass AND a.attname = 'seller_external_identity_id' AND NOT a.attisdropped;
   IF cur IS NOT NULL AND cur NOT LIKE '%flags as the seller%' THEN
     EXECUTE format('COMMENT ON COLUMN public.auction_events.seller_external_identity_id IS %L',
-      cur || ' Fallback (20261007073000): when no identity has exactly the text, a comment on the lot that BaT flags as the seller''s, by a BaT identity whose handle equals the text in any letter case, names the key if all such comments name one identity.');
+      cur || ' Fallback (20261007090000): when no identity has exactly the text, a comment on the lot that BaT flags as the seller''s, by a BaT identity whose handle equals the text in any letter case, names the key if all such comments name one identity.');
   END IF;
 END
 $comments$;
