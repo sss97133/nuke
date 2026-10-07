@@ -267,6 +267,8 @@ jobs:
         run: |
           deno test supabase/functions/ingest/slugStub.test.ts
           deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
+      - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
+        run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
 
   profile-fold-contract:
     runs-on: ubuntu-latest

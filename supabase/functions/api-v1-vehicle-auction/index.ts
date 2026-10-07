@@ -3,10 +3,13 @@
  *
  * Auction results + bid counts + comment sentiment for a vehicle by VIN.
  * GET /v1/vehicles/{vin}/auction
+ *
+ * Live-lot forecast for the CLI auction coach (`nuke lot`): GET /api-v1-vehicle-auction/forecast, see ./forecast.ts.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { FORECAST_SEGMENT, handleForecast } from "./forecast.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,10 +17,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-function jsonResponse(data: any, status = 200) {
+function jsonResponse(data: any, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...extraHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -38,13 +41,20 @@ Deno.serve(async (req) => {
     // Authenticate
     const auth = await authenticateRequest(req, supabase, { endpoint: 'vehicle-auction' });
     if (auth.error || !auth.userId) {
-      return jsonResponse({ error: auth.error || "Authentication required" }, auth.status || 401);
+      return jsonResponse({ error: auth.error || "Authentication required" }, auth.status || 401, auth.headers);
     }
     const userId = auth.userId;
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     const vin = pathParts[pathParts.length - 1];
+
+    if (vin === FORECAST_SEGMENT) {
+      return await handleForecast(req, supabase, {
+        headers: { ...corsHeaders, ...(auth.headers ?? {}) },
+        logUsage: (resourceId) => logApiUsage(supabase, userId, "vehicle-auction", "forecast", resourceId),
+      });
+    }
 
     if (!vin || vin === 'api-v1-vehicle-auction' || vin.length < 5) {
       return jsonResponse({ error: "VIN is required. Use GET /api-v1-vehicle-auction/{vin}" }, 400);
