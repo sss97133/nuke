@@ -76,7 +76,7 @@ Results that live in documents rather than on prod, with their dates:
 | Result | Number | Source |
 |---|---|---|
 | Band tag backtest, 24 h before close | 69,295 sold BaT lots 2024-09-01..2026-09-27, each priced from earlier sales only: cold 11.3%, in line 40.9%, hot 86.8% finished above their band middle (48 h: 13.2 / 40.3 / 82.9%). Run in a local DuckDB archive of 2026-09-29, not on prod | `docs/ledger/2026-09-30_bat-data-coverage-audit.md` §5 |
-| Settled BaT lots, by rule | 141,869 190,678 lots with source bat, outcome sold, a recorded winning or high bid and a close date on or before 2026-10-07;  carry the sold outcome and price without the close-date filter (the rest lack a usable close date). The README's 157K is a planner estimate of `bat_listings` rows, not a settled count | `auction_events`, read 2026-10-07 10:45Z |
+| Settled BaT lots, by rule | 141,869 lots with source bat, outcome sold, a recorded winning or high bid and a close date on or before 2026-10-07; 190,678 carry the sold outcome and price without the close-date filter (the rest lack a usable close date). The README's 157K is a planner estimate of `bat_listings` rows, not a settled count | `auction_events`, read 2026-10-07 10:45Z |
 | Soft-close extension | 322 of 400 settled BaT lots extended past the scheduled close (80%) | `docs/ledger/theory/data-machine-cases.md` §4 |
 | Hypothesized cause of price error | condition and configuration live in images and comments, not fields; from a handful of graded cases, not a measured decomposition | `docs/features/ask-nuke/THEORY.md` (2026-07-09) |
 
@@ -178,7 +178,7 @@ measured the same way."
 
 **To an investor.** "Auctions settle in a two-minute window and the crowd prices on what is written in the listing.
 We fold everything known about the asset before the window opens, with a grading table that says how often we are
-right. Collector vehicles are the testbed: 141,869 190,678 BaT lots sold with a recorded price and a close on or before today, 20M comments, 4M bids. The ledger generalizes to any
+right. Collector vehicles are the testbed: 141,869 BaT lots sold with a recorded price and a close on or before today, 20M comments, 4M bids. The ledger generalizes to any
 asset with a fragmented public record."
 
 **To a mechanic.** "It's the record. Every job, every part, every photo, every dollar on the truck, with who did it and
@@ -286,7 +286,7 @@ Drafted 2026-10-07 from this document. Character counts are measured on the text
 Project Pitch form. Two blanks in square brackets wait on the owner: the legal entity and its state, and the track line. The
 graded-lot count landed 2026-10-07 08:51Z and is filled.
 
-**1. The Technology Innovation** (2,472 of 3,500 characters)
+**1. The Technology Innovation** (2,464 of 3,500 characters)
 
 Nuke is an observational ledger for physical assets, with its predictions graded in the open. Every observation about an asset (a bid, a comment, a photograph, a receipt, a title transfer) is kept as an append-only row with its source, its event time, its ingest time and its trust. The asset's state, its cohort baseline and its predicted clearing price are computed from that log point-in-time, so any number the system shows can be replayed from only what was known at the moment it was made, and graded against the outcome when it arrives.
 
@@ -294,7 +294,7 @@ The innovation is the estimator built on that ledger: a provenance-weighted, poi
 
 Language and vision models have a defined role: they are sensors, never sources. A model turns a comment into an attributed claim or a photograph into a condition observation, and its output lands as a row with provenance. It never produces the number. A model trained on today's web cannot say what was known two hours before an auction closed; the ledger can.
 
-Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: 141,869 190,678 Bring a Trailer lots sold with a recorded price and a close date on or before 2026-10-07, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
+Origin: the founder is a mechanic who builds and sells vehicles and kept his own records this way. The testbed is the largest public corpus of timed asset auctions: 141,869 Bring a Trailer lots sold with a recorded price and a close date on or before 2026-10-07, 20 million timestamped comments and 4.3 million bids, where every late bid extends the close, so the decision window is two minutes. The method is asset-agnostic: equipment, aircraft, property and art have the same fragmented public record.
 
 **2. The Technical Objectives and Challenges** (2,771 of 3,500 characters)
 
@@ -312,9 +312,9 @@ Why this is R&D: the outcome is unknown. Our calibration record exists and is ho
 
 Risks: sparse or biased outcomes (reserves not met), adversarial sellers, and image volume (52 million images, 0.5% analyzed) that forces selective rather than exhaustive vision.
 
-**3. The Market Opportunity** (1,045 of 1,750 characters)
+**3. The Market Opportunity** (1,037 of 1,750 characters)
 
-Near-term customers decide under time pressure with an unverifiable number. Online collector-vehicle auctions settle in a two-minute soft-close window; dealers, flippers and serious private buyers bid against a crowd that prices on what the listing says, with price guides and aggregators that publish no error table. The first product is the graded estimate and its evidence for a live lot, sold to professional buyers and sellers who transact repeatedly: 141,869 190,678 lots sold with a recorded price on one venue alone, with buyer concentration (the top 1% of 68,957 buyers took 14% of lots) that identifies the paying segment. The second is the asset record itself, for owners, lenders and insurers who need provenance for a specific physical asset. The method generalizes to any asset class with a fragmented public record (equipment, aircraft, property, art), each with its own timed venues. The company's position is the opposite of the incumbents': every number with its source, date and denominator, every prediction graded in public.
+Near-term customers decide under time pressure with an unverifiable number. Online collector-vehicle auctions settle in a two-minute soft-close window; dealers, flippers and serious private buyers bid against a crowd that prices on what the listing says, with price guides and aggregators that publish no error table. The first product is the graded estimate and its evidence for a live lot, sold to professional buyers and sellers who transact repeatedly: 141,869 lots sold with a recorded price on one venue alone, with buyer concentration (the top 1% of 68,957 buyers took 14% of lots) that identifies the paying segment. The second is the asset record itself, for owners, lenders and insurers who need provenance for a specific physical asset. The method generalizes to any asset class with a fragmented public record (equipment, aircraft, property, art), each with its own timed venues. The company's position is the opposite of the incumbents': every number with its source, date and denominator, every prediction graded in public.
 
 **4. The Company and Team** (921 of 1,750 characters)
 
