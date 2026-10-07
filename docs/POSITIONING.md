@@ -204,9 +204,12 @@ and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
   in about one to two months. On an invitation, the full proposal is due at the next window: 2026-11-04,
   2027-03-04, 2027-07-07, then the first Wednesday of November, first Thursday of March and first Wednesday of July
   each year. One proposal per organization per window. A funding decision takes roughly six months from
-  submission.
+  submission. Historically about 16% of Phase I proposals were funded (about 338 of 2,112 a year over 2008 to
+  2017; National Academies, SSTI); the pitch-to-invitation rate is not published.
 - **Registrations, free, start now.** SAM.gov (up to three weeks), the SBA company registry (the SBC ID),
-  Research.gov (up to 48 hours). All three are needed before a proposal can be submitted; the pitch needs none.
+  Research.gov (up to 48 hours). All three are needed before a proposal can be submitted; the pitch needs none. No
+  SAM.gov, SBA-registry or SBIR mail under the owner's primary address as of 2026-10-07, and a login.gov reset in
+  October 2024 found no account there: treat the company as not registered.
 - **The clock from 2026-10-07.** A pitch in by the end of October is answered by December. The 2026-11-04 window is
   out of reach in practice, so the proposal is written December to February for 2027-03-04, the decision follows
   around September 2027, and the first dollar arrives in the fall of 2027: about eleven months. The pitch is the
@@ -214,6 +217,32 @@ and [seedfund.nsf.gov/apply](https://seedfund.nsf.gov/apply/get-started/).
 - **One dependency on the trunk.** Section 2 should say "graded on N lots as of <date>", not "ten". Objective 0 (the
   outcome join at n ≥ 1,000 lots) lands before the pitch goes in; it is a key repair on held data and belongs to the
   data-model lane.
+
+### What winners look like
+
+NSF awards with start dates 2024-10-01 to 2025-09-30, pulled 2026-10-07 from the public NSF awards API
+(`api.nsf.gov/services/v1/awards.json`, filtered by `fundProgramName`, exact program names kept): 146 Phase I
+awards (107 SBIR, 39 STTR; six with a TABA supplement), median $305K; 108 Phase II, median $1.25M; 10 Fast-Track.
+A thin year that ended in the authority lapse: the program averaged about 338 Phase I awards a year from about 2,112
+proposals (16%) over 2008 to 2017 (National Academies; SSTI). Starts clustered April to July (85 of 144).
+
+- **Topic.** By title and abstract, over the 144 whose program name ends in "Phase I": 37 mention AI or machine
+  learning; 15 software; 4 a database or data platform; 1 a marketplace or auction; 0 valuation, pricing or
+  appraisal; 0 provenance or ledger. The nearest neighbours are decision tools with a model inside (a clinical
+  decision tool, a financial coaching platform, a student-success platform, an oblivious-computation framework). NSF
+  funded the inference method, never the market. The pitch is therefore the estimator and its grading rule; the
+  ledger is the testbed and the moat, told second.
+- **Geography.** CA 27, MA 18, NY 11, IL 8; Nevada 1 (a battery-materials company in Las Vegas). No award names the
+  University of Nevada. The program says it wants all 50 states; a Nevada applicant is scarce, not disqualified.
+- **Track.** STTR was 27% of Phase I (39 of 146). The track is a function of one edge: a research-institution
+  partner with a co-PI (STTR) or none (SBIR). Nothing else in the data separates the two; the track makes itself
+  known when the partner edge exists by pitch time.
+- **Team.** The NSF API carries no team size. SBIR.gov's API, which does, refused the request (HTTP 403,
+  2026-10-07). Unknown until that source opens or the awards are read one by one.
+- **What this is for.** These rows are the first baseline of an opportunity stack (`data-machine-cases.md` §13.9):
+  a funding program as a cohort of awards with outcomes, Nuke's fit as keyed claims against the program's criteria,
+  and a score that says how far the company is from the opportunity and which keys are missing. The pull is
+  reproducible from the query above.
 
 The prose is not drafted here. It is drafted when the owner says go, from this doc and the README, and he reviews it
 before anything is submitted.

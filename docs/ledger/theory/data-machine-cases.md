@@ -1510,3 +1510,53 @@ funding ... we have to really stay on target."
 
 **Correction trail.** 13.6 point 2 and point 3 edited in place at 03:50Z with the marker "corrected"; the originals
 are in the git history (PR #744).
+
+### 13.9 The owner on opportunity as a function of the model, and what the winners look like (2026-10-07 04:30Z, in substance)
+
+**Owner direction (substance kept).** Reading the NSF path: "this becomes an interesting function, an interesting
+result: opportunity as a logical conclusion with confidence scores based on nodes of data, where this opportunity
+surfaces naturally based on the actions of the entities that are making decisions. Twofold: one, to see how far we
+are from the opportunity; two, the painfully obvious: this should be a natural occurrence in our system, and then we
+start always monitoring for these opportunities, because this is a potential match for an organization." On a
+subaward: "we measure the importance of a potential award and then we look at Nuke's relationships and say maybe
+that's a good one to pursue; who's in our group of potential." On the school conversation: "we just automate that;
+agents will be doing these conversations anyway." On eligibility: "super easy, that's just a key. Data model the
+shit out of this, measure all those keys, give those keys values, and then we calculate which key combinations win.
+This is the exact type of stuff people want to automate in order to stay focused on what they're interested in.
+They're giving such specific layouts of what they expect, and we can research all of the previous winners to
+identify the patterns; that's organization profile research; they start getting profiles built out. That's why
+we're a data model system more than anything else." On the track: "I don't pick the track; the track makes itself
+known based on what we do." On SAM.gov: "I feel like I have SAM.gov; worth checking my email."
+
+**Lead's reading (nothing minted; a first baseline pulled):**
+
+1. **An opportunity is a stack.** Entities: a funding program (NSF SBIR/STTR) as an organization with published
+   criteria; its awards as outcome rows (public, dated, keyed to awardee organizations, states and programs); the
+   criteria as keyed claims about the applicant (employee count, ownership share, PI hours, place of work, partner
+   edge); Nuke itself as an entity in its own ledger with those claims attributed and dated, the database describing
+   its owner the way it describes itself. The score is coverage of criteria met, times fit to the winners' cohort
+   (topic, geography, track), times the presence of the edges a track needs. "How far we are from the opportunity"
+   is that score's complement with the missing keys named, exactly as a stack shows its missing layers before its
+   number (13.1 point 3).
+2. **The track is a function of one edge.** STTR means a research-institution partner with a co-PI; SBIR means
+   none. Nothing else in the FY2025 data separates the tracks (STTR 39 of 146 Phase I; same median award; same
+   windows). So the track is decided by whether the partner edge exists by pitch time, and the pursuit of that edge
+   is an agent task with a send gate (13.3): candidates found and messages drafted by agents, sent by the owner.
+3. **The first baseline, pulled 2026-10-07 from the public NSF awards API** (FY2025 start dates): 146 Phase I (107
+   SBIR, 39 STTR; median $305K), 108 Phase II (median $1.25M), 10 Fast-Track. Topic, over the 144 with exact
+   program names: AI or machine learning 37, software 15, database or data platform 4, marketplace or auction 1,
+   valuation, pricing or appraisal 0, provenance or ledger 0. Nevada 1 of 144 (Las Vegas, battery materials); no
+   award names the University of Nevada. Historically about 16% of Phase I proposals were funded (338 of about 2,112
+   a year, 2008 to 2017; National Academies, SSTI). What NSF funded is the inference method inside a tool, never the
+   market itself. The pitch's innovation section is therefore the estimator and its grading rule; the ledger is the
+   testbed and the moat, told second. Details and the query in `docs/POSITIONING.md`, "What winners look like".
+4. **Keys the data does not yet carry.** Team size (SBIR.gov's API has `number_employees` and answered HTTP 403 on
+   2026-10-07); the partner institution of STTR awards (only in abstracts); the pitch-to-invitation rate
+   (unpublished). These are the stack's named gaps.
+5. **The owner's registrations, from his own records.** No SAM.gov, SBA registry or SBIR mail under his primary
+   address as of 2026-10-07; a login.gov password reset in October 2024 returned "email not found". Treat the company
+   as unregistered. The registrations are free and are the owner's to create.
+6. **Shape, for the lanes that own it.** A `funding_awards` source (public rows, reproducible pull); funding programs
+   and research institutions as organizations with relation edges to Nuke (the identity-origin lane owns the
+   organization entity); claims about the company itself as attributed rows. SCHEMA_LAW before any table. The
+   FY2025 pull sits in this session's scratchpad; the query is in `docs/POSITIONING.md`.
