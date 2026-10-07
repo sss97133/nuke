@@ -25,6 +25,10 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/BrowseVehicles') },
   { test: (h) => h === '/journal' || h === '/journal/',
     load: () => import('../pages/journal/JournalIndex') },
+  { test: (h) => h.startsWith('/stacks/order-book/'),
+    load: () => import('../pages/stacks/OrderBookStack') },
+  { test: (h) => h === '/stacks' || h === '/stacks/',
+    load: () => import('../pages/stacks/StacksIndex') },
 ];
 
 function resolveChunk(href: string): (() => Promise<unknown>) | null {

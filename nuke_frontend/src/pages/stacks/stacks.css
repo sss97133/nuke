@@ -1,0 +1,110 @@
+/* Stack pages: one path through the nine layers. Design system: Arial, Courier New for data, 2px borders, no radius,
+   no shadow, no gradient, color only for data. Tokens from unified-design-system.css. */
+.stack-page { max-width: 1280px; margin: 0 auto; padding: 16px 12px 48px; color: var(--text); background: var(--bg); font: 12px/1.5 Arial, sans-serif; overflow-wrap: anywhere; }
+.stack-page a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.stack-page :is(a, button, summary, [role=button]):focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.stack-eyebrow, .stack-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-secondary); }
+.stack-eyebrow a { color: var(--text-secondary); }
+.stack-title { font-size: 20px; line-height: 1.25; margin: 4px 0 4px; font-weight: 700; }
+.stack-question { margin: 0 0 8px; color: var(--text-secondary); max-width: 900px; }
+.stack-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+.stack-meta .stack-mono { font-size: 11px; }
+.stack-mono { font-family: 'Courier New', monospace; }
+.stack-note { font-size: 10px; color: var(--text-secondary); margin: 4px 0 8px; }
+.stack-status { padding: 24px 0; }
+
+.stack-lots { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 0; }
+.stack-chip { border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 3px 8px; font: 11px 'Courier New', monospace; cursor: pointer; text-decoration: none; }
+.stack-chip[aria-pressed=true], .stack-chip[aria-current=page] { border-color: var(--text); font-weight: 700; }
+
+/* Coverage block: first on every stack page. */
+.stack-coverage { margin: 14px 0 0; border: 2px solid var(--text); }
+.stack-coverage-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 6px 10px; border-bottom: 2px solid var(--border); }
+.stack-coverage table { width: 100%; border-collapse: collapse; }
+.stack-coverage th, .stack-coverage td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.stack-coverage tr:last-child td { border-bottom: 0; }
+.stack-coverage th { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); }
+.stack-ratio { font: 700 13px 'Courier New', monospace; white-space: nowrap; }
+.stack-coverage-open { all: unset; cursor: pointer; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.stack-ratio small { font-weight: 400; color: var(--text-secondary); font-size: 11px; }
+.stack-bar { display: block; height: 4px; background: var(--border); margin-top: 3px; width: 120px; }
+.stack-bar > span { display: block; height: 4px; background: var(--text); }
+.stack-basis { font-size: 10px; color: var(--text-secondary); }
+
+/* The path: nine layers, each a button. */
+.stack-path { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0; margin: 14px 0 0; border: 2px solid var(--border); }
+.stack-path button { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 8px; border-right: 2px solid var(--border); min-height: 58px; display: flex; flex-direction: column; gap: 2px; }
+.stack-path button:last-child { border-right: 0; }
+.stack-path button[aria-current=true] { background: var(--text); color: var(--bg); }
+.stack-path button[aria-current=true] .stack-label { color: var(--bg); }
+.stack-path .stack-layer-name { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.stack-path .stack-layer-reading { font: 11px 'Courier New', monospace; }
+.stack-state-missing .stack-layer-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* One layer's view. */
+.stack-layer { margin-top: 14px; border: 2px solid var(--border); padding: 12px; }
+.stack-layer-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; }
+.stack-layer-head h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+.stack-layer-def { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 2px 12px; margin: 0 0 10px; }
+.stack-layer-def dt { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); padding-top: 2px; }
+.stack-layer-def dd { margin: 0; }
+.stack-missing { border: 2px dashed var(--border); padding: 10px; margin: 8px 0; }
+.stack-missing strong { text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
+.stack-walk { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.stack-walk button { border: 0; background: none; color: var(--text); padding: 0; font: 11px Arial, sans-serif; text-decoration: underline; cursor: pointer; }
+
+/* Tables inside layers. */
+.stack-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.stack-table th, .stack-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.stack-table th { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); }
+.stack-table td.num, .stack-table th.num { text-align: right; font-family: 'Courier New', monospace; white-space: nowrap; }
+.stack-table td.mono { font-family: 'Courier New', monospace; white-space: nowrap; }
+.stack-table tr[aria-selected=true] td { background: var(--accent-dim); }
+.stack-table button.stack-link { all: unset; cursor: pointer; text-decoration: underline; font-family: 'Courier New', monospace; }
+.stack-scroll { max-height: 460px; overflow-y: auto; }
+
+/* Fold: as-of control, bid path, demand curve, ladder. */
+.stack-asof { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 10px; border: 2px solid var(--text); margin-bottom: 10px; }
+.stack-asof button { border: 2px solid var(--border); background: var(--bg); color: var(--text); font: 12px 'Courier New', monospace; min-width: 32px; min-height: 28px; cursor: pointer; }
+.stack-asof button:disabled { opacity: .4; cursor: default; }
+.stack-fold-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.stack-chart { display: block; width: 100%; height: auto; }
+.stack-chart text { fill: var(--text-secondary); font: 10px 'Courier New', monospace; }
+.stack-chart .grid { stroke: var(--border); stroke-width: 1; }
+.stack-chart .path { fill: none; stroke: var(--text-secondary); stroke-width: 1; }
+.stack-chart .curve { fill: none; stroke: var(--text); stroke-width: 2; }
+.stack-chart .pt { fill: var(--text-secondary); }
+.stack-chart .pt-on { fill: var(--text); }
+.stack-chart .pt-future { fill: var(--border); }
+.stack-chart [role=button] { cursor: pointer; }
+.stack-chart [role=button]:focus { outline: none; }
+.stack-chart [role=button]:focus .pt-on, .stack-chart [role=button]:focus .pt { stroke: var(--text); stroke-width: 4px; }
+.stack-ladder-bar { display: block; height: 6px; background: var(--text); min-width: 1px; }
+
+/* Lot clock: the lot's life as a line with a tick per bid. */
+.stack-clock { position: relative; height: 40px; margin: 4px 0 2px; }
+.stack-clock-line { position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: var(--border); }
+.stack-clock-tick { position: absolute; top: 6px; width: 1px; height: 14px; background: var(--text); }
+.stack-clock-now { position: absolute; top: 2px; width: 2px; height: 22px; background: var(--text-secondary); }
+.stack-clock-now-label { position: absolute; top: 26px; transform: translateX(-50%); font: 10px 'Courier New', monospace; color: var(--text-secondary); white-space: nowrap; }
+.stack-clock-ends { display: flex; justify-content: space-between; gap: 12px; font: 10px 'Courier New', monospace; color: var(--text-secondary); }
+
+/* Index. */
+.stack-card { border: 2px solid var(--text); padding: 12px; margin-top: 16px; }
+.stack-card h2 { margin: 2px 0 6px; font-size: 16px; }
+.stack-card-open { display: inline-block; margin-top: 10px; font-weight: 700; }
+
+@media (max-width: 900px) {
+  .stack-path { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stack-path button { border-bottom: 2px solid var(--border); }
+  .stack-fold-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .stack-title { font-size: 17px; }
+  .stack-coverage thead { display: none; }
+  .stack-coverage tr { display: block; border-bottom: 1px solid var(--border); }
+  .stack-coverage td { display: block; border-bottom: 0; padding: 3px 10px; }
+  .stack-layer-def { grid-template-columns: minmax(0, 1fr); }
+  .stack-table .hide-narrow { display: none; }
+  .stack-chart text { font-size: 20px; }
+}
