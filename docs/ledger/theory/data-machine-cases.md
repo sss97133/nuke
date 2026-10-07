@@ -1572,3 +1572,69 @@ known based on what we do." On SAM.gov: "I feel like I have SAM.gov; worth check
    and research institutions as organizations with relation edges to Nuke (the identity-origin lane owns the
    organization entity); claims about the company itself as attributed rows. SCHEMA_LAW before any table. The
    FY2025 pull sits in this session's scratchpad; the query is in `docs/POSITIONING.md`.
+
+#### 13.9.1 The owner: this is the seed round for the entity model; how does expansion automate? (2026-10-07 05:00Z, in substance)
+
+**Owner direction (substance kept).** "You took one tiny sample. The way you turn this into work is what I said
+earlier: this is where we make use of this effort. This is the seed round to develop this into a model for
+entities: organization entity, user entity. This is very important. I'm glad you did some research. How do we
+automate expansion of the data model to fit this in?"
+
+**Lead's reading (nothing minted; the mechanisms below were read live at 04:50Z):**
+
+1. **The whole resource, not the sample.** SBIR.gov publishes every award ever made as one CSV
+   (`data.www.sbir.gov/awarddatapublic/award_data.csv`, refreshed monthly): 207,731 awards across 12 agencies,
+   14,796 of them NSF (9,959 SBIR Phase I, 1,279 STTR Phase I, 3,558 Phase II), 41 columns including employee
+   count at award, flags, PI and STTR research-institution names, and the abstract. Its award years end at 2023;
+   the NSF awards API covers 2024 and 2025 (the FY2025 pull in 13.9) and is being pulled for 2008 to 2025 to join
+   on title and awardee. Pulled 2026-10-07 to the lead's scratchpad; the file is public and reproducible.
+2. **What the whole resource says that the sample could not.** NSF Phase I awardees are tiny companies: median 3
+   employees at award (2015 to 2019 n=1,534; 2020 to 2023 n=779), 65% with three or fewer, 21% with one or none.
+   Solo is the norm, not the gap. Since 2015: 2,927 Phase I awards to 2,802 firms (96% hold exactly one); 32% of
+   those firms later hold an NSF Phase II; STTR is 19% of Phase I, with 252 distinct research institutions named
+   (Purdue 15, Arizona State 10); Nevada 3 of 2,927, one of them since 2020 (Las Vegas, 2023), and the Nevada
+   System of Higher Education appears once as an STTR partner. Phase I median award was $274,883 in 2023, before
+   the raise to $305,000. The 2020-plus cohort: 17.5% women-owned, 12.1% HUBZone, 15.6% socially and economically
+   disadvantaged. Winners-only data gives the shape of winners, not the odds; the odds need the proposal
+   denominator NSF publishes only in aggregate (about 16%).
+3. **How the model already expands, mechanism by mechanism (read live).**
+   - *Entities.* `vehicle_observations.subject_type` is CHECKed to `vehicle | organization | user | asset |
+     external_identity` (NOT VALID), and `organization` and `user` subjects already carry rows (a 0.5% sample held
+     10 and 2). A fact about a funder, an awardee or a university lands today as an observation on an
+     `organizations` row, the cross-domain commons SCHEMA_LAW §10 names. Nuke itself is organization
+     `f32ea08c`, with `employee_count` and `registration_state` null: the eligibility keys are columns waiting for
+     observations, and the owner's other entities are already modeled (`organization_hierarchy`, 3 rows).
+   - *Sources.* `observation_sources` (176 rows: slug, category, tier, base_url, trust) is the registry the fact
+     log keys to by FK. A new source is one row. Five sibling registries exist (`source_registry` 97,
+     `scrape_sources` 548, `live_auction_sources` 18, `forum_sources` 179, `catalog_sources` 17): a toolbox to
+     adjudicate toward the one the log keys to, never a sixth.
+   - *Vocabulary.* `schema_proposals` (proposal_type `add_property`, `add_source`, `add_observation_kind`,
+     `modify_property`; `fn_schema_proposal_review_handler`, `fn_schema_proposal_apply`) is the curator path
+     data-machine.md names for missing vocabulary: 13 approved properties, 2 proposed today, and 4 `add_source`
+     proposals open since 2026-07-20 with no drain. `financial_field_registry` (37 rows: field_key, storage,
+     promoted_at) is the plasticity pattern: a field lives in staging until use earns it a column.
+   - *Measurement.* The atlas scores description, keys and writers; `v_residual` ranks the backlog;
+     `stack_coverage` scores a stack's needs against the live schema; the local generator proposes stacks.
+   - *Law.* SCHEMA_LAW §2: a new fact class lands as observation rows first and earns a table only when a query
+     pattern demands one; §10: share only the commons, copy the grammar for a new domain's high-volume organ, and
+     generalize bottom-up at the third tenant.
+4. **So "automate expansion" is wiring, not invention.** The path for a funding award, in the machine's own
+   terms: one `observation_sources` row (or an `add_source` proposal that the review handler applies) → rows
+   landed through `ingest-observation` as observations on organization subjects (funder → awardee, with program,
+   amount, dates and state as the payload and `funds` / `awarded_to` / `partners_with` as relation claims, 13.3) →
+   awardee names and institutions keyed to `organizations` by the existing resolver, states to places, PIs to
+   identities → fields the grammar lacks staged, and promoted through `add_property` when they recur → the atlas
+   measures, the stack declares its needs, `stack_coverage` reports the distance. When cohort baselines by year,
+   topic and state demand window scans, the fact class earns a domain table that copies the grammar
+   (`funding_awards`, FK into the commons), per §2 and §10.2.
+5. **What is not yet automated, and is the real work.** (a) A generic ingester for declared API and file sources:
+   every source today is a bespoke `extract-*` function (the CI ratchet counts their raw fetches), so an NSF
+   awards API or an SBIR.gov CSV has no reader until someone writes one; a declared-source reader keyed by the
+   registry row is the subtractive fix. (b) The proposal queue has no drain: four `add_source` rows have waited
+   since July. (c) A first-class person subject, named as the structural blocker in the organization-entity
+   spec; PIs and co-PIs are people. (d) The track and the fit are stacks, not pages: the registry row for the
+   opportunity stack is the lead's to mint.
+6. **Hand-offs.** To the data-model lane: the `add_source` proposal for the two award sources and the generic
+   declared-source reader, with the queue drain. To the identity-origin lane: funders and research institutions as
+   organizations with relation edges, and the person-subject proposal. This session stays on the owner's funding
+   question and drafts the pitch from the measured shape of winners.
