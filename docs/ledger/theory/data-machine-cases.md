@@ -1240,3 +1240,32 @@ it is not held together with the right glue. The data model is the glue."
 
 **Test cases the owner predicted:** ownership claims already present in BaT comments. Measure first (count, parseable
 windows, examples by id), then shape, then the pursuit flow.
+
+### 13.4 The owner on the API, the name and the calculations (2026-10-07)
+
+**Owner direction (substance kept):** an API is "a definitive opportunity" and "the standard we need".
+API and MCP connectors are things Nuke will offer. On the name: "I feel like we're using data model as a
+technology; we're actually using it as a machine more than just data." The lead is the entity, not the
+vehicle: "in order to track a vehicle, look at all the other shit we actually have to do." On AI: the
+stacks "answer questions that are real", and the calculations "have to be done somehow, otherwise they
+never exist"; an LLM cannot do them from language alone.
+
+**Lead's reading (no shape minted):**
+1. **The name is already in this file: a data machine.** The model is the shape, and the machine is the
+   shape plus the folds, baselines, residuals and predictions that keep running over it. The README leads
+   this way from 2026-10-07.
+2. **The API is the machine's natural door, and a stack version is its unit.** One reader per stack version
+   (entity, as-of) returns its layers with the coverage block first. The MCP connector and the CLI call the
+   same reader. A new endpoint per question is the anti-pattern.
+3. **What exists, probed 2026-10-07:** 18 `api-v1-*` edge functions are deployed. Without a key, 16 answer
+   at once (12 with 401, 2 with 400, 1 with 405, and `api-v1-agent-register` with 200), and `api-v1-search`
+   and `api-v1-vehicles` gave no answer within 15 s. `mcp-connector` answers at `nuke.ag/mcp` (200).
+   `middleware.ts` serves `/api/v1/vehicle/{id}` with no key and CORS `*`, reading with the service-role
+   key (same fields as the anon key on the probed vehicle, but past any masking the database adds later).
+   The work is to put stack readers behind the existing key system (`api-keys-manage`), not to build a
+   second API.
+4. **Why a model can't skip the machine:** a stack number is arithmetic over keyed, clocked rows
+   (157K BaT lots and 19.9M comments by the 2026-10-06 planner estimates), point-in-time. A language model trained on today's web has leakage by
+   construction: it can't say what was known two hours before a close. Its place in the machine is the text
+   fold (comments into attributed claims) and stack generation (13.2), measured by the atlas. The
+   calculations and the retained, replayable log are the part it can't produce.
