@@ -1684,3 +1684,40 @@ we have to collect and analyze the data to understand the odds."
 4. **S61 generalizes.** Version 2's entity is (organization, program), not the company; Nuke is one row among the
    organizations it scores. The registry change is the data-model lane's; the needs above are its list.
 5. **The pitch is secondary.** It stays in `docs/POSITIONING.md` as one application of the function, not the goal.
+
+### 13.10 Used-vehicle buying evidence: resale reassurance and personal use (owner, 2026-10-08)
+
+**Owner direction, in substance.** A buyer comparing a truck at 94k miles and a higher price with one at
+104k miles and a lower price needing maintenance must weigh more than the odometer. Maintenance, owner
+history, storage, usage, region, weather and wear evidence are buried in descriptions, images and comments.
+For the owner, the reassuring number for the next buyer is a major weight; buying for oneself at 100–150k
+raises a different question. A vehicle at 50–100k cannot be assumed to need no work. The owner authorized
+planning and building the data tools needed to find this evidence in retained raw material.
+
+**First bounded tool, PR #900.** `scripts/discovery/buying-evidence.mjs` extends the existing operator
+discovery lane, preserving existing description, comment, observation and image owners. It reads 1–10
+explicit public vehicles through `q.sh` in finite READ ONLY transactions, searches exact source regions
+with deterministic vocabulary or a literal query, and writes private JSON receipts and an HTML comparison.
+Inline BaT captures use the existing parser after same-vehicle binding and recomputed SHA256 verification.
+Source IDs, episode references, author/seller metadata, original clocks, quote offsets and duplicate-text
+clusters survive. Questions, hypothetical work, negation and model-level statements remain review candidates.
+No database/schema writes, intake, new model calls, financial weights or failure predictions.
+
+**Dated local/runtime assay, 2026-10-08 20:24Z.** Three selected public trucks yielded 169 comment rows,
+5 observations, 378 eligible image rows and 4 capture rows; every selected collection reached an empty
+continuation page. The default vocabulary returned 108 excerpts. A cache-only heater-core query returned
+6 excerpts including earlier questions and a later recorded seller statement of replacement. This is
+testimony with dates, not verified repair or automatic contradiction resolution. The selected images had
+no searchable text in the inspected `ai_extractions` field; other image-analysis fields remain unmeasured.
+One capture was offloaded and two lacked the required vehicle binding.
+These are reported gaps, not proof that the underlying history or condition evidence does not exist.
+Fourteen offline contracts and the existing ENFORCE gate passed; the private HTML rendered and was inspected.
+This entry establishes implemented, tested and bounded runtime-read stages; PR/CI establish merge status.
+Private receipts: `~/nuke-private-data/buying-evidence/20261008-verified-read/` and
+`20261008-heater-core-review/`. Usage and retrieval boundaries: `scripts/discovery/buying-evidence.md`.
+
+**Remaining stack work.** Reviewed source regions need existing canonical component/procedure, performed
+versus planned action, event date/mileage and ownership-window relationships, with corroborating evidence
+and sanctioned admission. Qualify outcome histories before learning cost/reliability weights; missing records
+do not establish neglect or successful work. Measure resale reassurance against later price/liquidity
+separately from personal-use repair expense, downtime and useful service over an explicit buyer horizon.

@@ -72,6 +72,8 @@ if node --test "$GD/no-raw-fetch.test.mjs" >/tmp/ci_rawfetch_tests.out 2>&1; the
 else red "  ✗ raw-fetch regression tests FAILED"; cat /tmp/ci_rawfetch_tests.out; fail=1; fi
 if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >/tmp/ci_declared_reader_tests.out 2>&1; then grn "  ✓ declared-source reader mapping"
 else red "  ✗ declared-source reader mapping FAILED"; cat /tmp/ci_declared_reader_tests.out; fail=1; fi
+if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" >/tmp/ci_buying_evidence_tests.out 2>&1; then grn "  ✓ buying-evidence source and refusal contracts"
+else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat /tmp/ci_buying_evidence_tests.out; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"
