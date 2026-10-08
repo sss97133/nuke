@@ -61,6 +61,7 @@ const sources = new Map([
 
 function fixture(options = {}) {
   const requests = [], writes = [], observations = [], completions = [];
+  let storageAbortObserved = false;
   const identities = [];
   const retainedAccount = { id: snapshotId, vehicle_id: vehicleId, platform: 'bat', author_username: 'abc123',
     bat_author_id: 123, source_url: sourceUrl, posted_at: '2026-10-01T00:00:00.123456Z',
@@ -75,6 +76,7 @@ function fixture(options = {}) {
   const bytes = options.bytes ?? Buffer.from(html);
   async function http(raw,init) {
     const request = raw instanceof Request ? raw : new Request(raw,init);
+    if(request.signal.aborted)throw new DOMException('Fixture request aborted','AbortError');
     const u = new URL(request.url);requests.push({method:request.method,path:u.pathname,query:Object.fromEntries(u.searchParams)});
     if(u.pathname==='/rest/v1/rpc/claim_bat_sale_snapshots') {
       assert.equal(options.sourceQueue,true);const input=await request.json();
@@ -176,6 +178,12 @@ function fixture(options = {}) {
     if(u.pathname.startsWith('/storage/v1/object/')) {
       assert.equal(request.method,'GET');
       assert(u.pathname.endsWith('/listing-snapshots/'+actualSnapshot.html_storage_path));
+      if(options.storageStall)return await new Promise((resolve,reject)=>{
+        const stopped=()=>{storageAbortObserved=true;clearTimeout(timer);reject(new DOMException('Fixture request aborted','AbortError'));};
+        const timer=setTimeout(()=>{request.signal.removeEventListener('abort',stopped);reject(new Error('Fixture deadline did not propagate'));},11000);
+        request.signal.addEventListener('abort',stopped,{once:true});
+        options.onStorageWaiting?.();
+      });
       return new Response(options.storageMissing ? null : bytes,{status:options.storageMissing?404:200});
     }
     assert.fail(`Unexpected HTTP path ${u.pathname}`);
@@ -190,7 +198,10 @@ function fixture(options = {}) {
     runInNewContext(sources.get(name),{exports,URL,Request,Response,Headers,TextEncoder,TextDecoder,Uint8Array,Date,crypto:webcrypto,AbortSignal,atob,btoa,fetch:http,
       console:{log(){},warn(){},error(){}},Deno:{env:{get:key=>env[key]},serve:callback=>{handlers.set(name,callback);}},
       require:specifier=>{
-        if(specifier.startsWith('https://esm.sh/@supabase/supabase-js@'))return {createClient:()=>supabase};
+        if(specifier.startsWith('https://esm.sh/@supabase/supabase-js@'))return {createClient:(url,key,config={})=>createClient(url,key,{
+          ...config,auth:{persistSession:false,autoRefreshToken:false,...config.auth},
+          global:{...config.global,fetch:config.global?.fetch ?? http},
+        })};
         if(specifier==='./batFetcher.ts')return {fetchBatPage:()=>assert.fail('No crawl'),logFetchCost:()=>assert.fail('No paid fetch'),isLoginPage:()=>false};
         if(specifier==='./hybridFetcher.ts')return {fetchPage:()=>assert.fail('No crawl')};
         if(specifier==='./firecrawl.ts')return {firecrawlScrape:()=>assert.fail('No paid fetch')};
@@ -225,10 +236,11 @@ function fixture(options = {}) {
     return exports;
   }
   return {requests,writes,observations,completions,snapshot:actualSnapshot,episode:actualEpisode,parser:load('parser'),
+    storageAbortObserved:()=>storageAbortObserved,
     read:(extra={})=>load('archive').readPinnedArchivedPage({snapshotId,vehicleId,sourceUrl,...extra},{supabase,now:()=>new Date('2026-01-03T00:00:00Z')}),
     attach:(capture,receipt)=>load('archive').attachPinnedArchivedSaleQualification(capture,receipt,{supabase}),
-    intake:async(body={},token='svc-test')=>{
-      load('intake');const response=await handlers.get('intake')(new Request('https://fixture.invalid/ingest-observation',{method:'POST',
+    intake:async(body={},token='svc-test',signal)=>{
+      load('intake');const response=await handlers.get('intake')(new Request('https://fixture.invalid/ingest-observation',{method:'POST',signal,
         headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
         body:JSON.stringify({mode:'source_sale_qualification',vehicle_id:vehicleId,...body})}));
       return {status:response.status,body:await response.json()};
@@ -605,6 +617,19 @@ test('actual optional-v1 producer payloads cover inline and protected-storage cu
 });
 
 const queueBody={use_source_queue:true,vehicle_ids:undefined,dry_run:false};
+test('source leaf cancellation reaches real SDK pinned-storage fetch with no testimony write',async()=>{
+ const controller=new AbortController();
+ const f=fixture({allowObservationWrite:true,storageStall:true,onStorageWaiting:()=>controller.abort()});
+ const r=await f.intake({dry_run:false},'svc-test',controller.signal);
+ assert.equal(r.status,422);assert.equal(r.body.reason,'storage_body_unavailable');
+ assert(f.storageAbortObserved());assert.equal(f.writes.length,0);assert.equal(f.observations.length,0);
+});
+test('source SDK stalled storage automatically stops at the existing10s deadline',async()=>{
+ const f=fixture({allowObservationWrite:true,storageStall:true});
+ const started=Date.now();const r=await f.intake({dry_run:false});
+ assert.equal(r.status,422);assert.equal(r.body.reason,'storage_body_unavailable');
+ assert(f.storageAbortObserved());assert(Date.now()-started<12000);assert.equal(f.writes.length,0);
+});
 const canonicalQueueBody={use_source_queue:true,vehicle_id:undefined,dry_run:false,batch_size:40};
 test('canonical sale queue reuses real source intake without nested Edge calls and converges on repeat',async()=>{
  const f=fixture({sourceQueue:true,sourceQueueLimit:40,allowObservationWrite:true});

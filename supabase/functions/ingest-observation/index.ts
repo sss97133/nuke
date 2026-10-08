@@ -254,7 +254,7 @@ Deno.serve(async function handleObservation(req) {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  let retainedListingBudget = false;
+  let retainedListingBudget = false, retainedSaleBudget = false;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -264,14 +264,15 @@ Deno.serve(async function handleObservation(req) {
       global: { headers: { "X-Nuke-Writer": "ingest-observation" },
         fetch: (supabaseUrl, init) => {
           const supplied = (init as { signal?: AbortSignal } | undefined)?.signal;
-          if (retainedListingBudget) {
+          if (retainedListingBudget || retainedSaleBudget) {
             const target = new URL(typeof supabaseUrl === "string" ? supabaseUrl
               : supabaseUrl instanceof URL ? supabaseUrl.href : supabaseUrl.url);
+            const allowed = retainedSaleBudget ? /^\/(rest|auth|storage)\/v1\// : /^\/(rest|auth)\/v1\//;
             if (target.origin !== new URL(Deno.env.get("SUPABASE_URL") ?? "").origin ||
-              !/^\/(rest|auth)\/v1\//.test(target.pathname)) throw new Error("Unexpected retained listing SDK target");
+              !allowed.test(target.pathname)) throw new Error("Unexpected retained source SDK target");
           }
-          return fetch(supabaseUrl, retainedListingBudget ? {
-            ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(5000),
+          return fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget ? {
+            ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(retainedSaleBudget ? 10000 : 5000),
               ...(supplied ? [supplied] : [])]),
           } : init);
         },
@@ -282,6 +283,9 @@ Deno.serve(async function handleObservation(req) {
   try {
     let input: ObservationInput = await req.json();
     retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, RETAINED_INTERIOR_MODE, RETAINED_EXTERIOR_MODE].includes(input.mode ?? "");
+    // Direct sale leaves must carry the worker's10s record cancellation through
+    // every SDK query/download; creating a Request signal alone does not do so.
+    retainedSaleBudget = input.mode === "source_sale_qualification";
     if (input.mode === RETAINED_LISTING_DRAIN_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
