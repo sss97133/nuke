@@ -233,6 +233,20 @@ jobs:
           fi
           psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT public.activate_retained_vin_reference_intake();'
 
+      - name: Activate installed retained listing property intake
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
+        run: |
+          if ! grep -Fxq 'supabase/migrations/20261008071324_retained_listing_property_intake.sql' /tmp/migrations.txt; then
+            exit 0
+          fi
+          if ! grep -Fxq 'ingest-observation' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'Retained listing intake remains paused: canonical owner or database unavailable.'
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT public.activate_retained_listing_property_intake();'
+
       - name: Summary
         if: always()
         run: |

@@ -38,6 +38,7 @@ import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
+import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties } from "./retainedListingDrain.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
 
 const corsHeaders = {
@@ -251,18 +252,44 @@ Deno.serve(async function handleObservation(req) {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let retainedListingBudget = false;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     {
       auth: { persistSession: false, autoRefreshToken: false },
       // Receipt attribution is a producer declaration, never authorization.
-      global: { headers: { "X-Nuke-Writer": "ingest-observation" } },
+      global: { headers: { "X-Nuke-Writer": "ingest-observation" },
+        fetch: (supabaseUrl, init) => {
+          const supplied = (init as { signal?: AbortSignal } | undefined)?.signal;
+          if (retainedListingBudget) {
+            const target = new URL(typeof supabaseUrl === "string" ? supabaseUrl
+              : supabaseUrl instanceof URL ? supabaseUrl.href : supabaseUrl.url);
+            if (target.origin !== new URL(Deno.env.get("SUPABASE_URL") ?? "").origin ||
+              !/^\/(rest|auth)\/v1\//.test(target.pathname)) throw new Error("Unexpected retained listing SDK target");
+          }
+          return fetch(supabaseUrl, retainedListingBudget ? {
+            ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(5000),
+              ...(supplied ? [supplied] : [])]),
+          } : init);
+        },
+      },
     }
   );
 
   try {
     let input: ObservationInput = await req.json();
+    retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, RETAINED_INTERIOR_MODE, RETAINED_EXTERIOR_MODE].includes(input.mode ?? "");
+    if (input.mode === RETAINED_LISTING_DRAIN_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained listing drain requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return drainRetainedListingProperties(req, input as unknown as Record<string, unknown>, supabase, handleObservation);
+    }
     if (input.mode === RETAINED_VIN_BATCH_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
