@@ -125,6 +125,7 @@ struct NukeCaptureApp: App {
                     // The source record starts at intake, before opening Profile.
                     // Bounded local originals only; deeper progress uses the
                     // existing power/Wi-Fi backfill job.
+                    await LibraryStore.shared.refreshAlbums()
                     await LibraryIngest.shared.runAlbumReview(budget: 24)
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
