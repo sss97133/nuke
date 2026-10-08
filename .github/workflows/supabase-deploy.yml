@@ -238,7 +238,8 @@ jobs:
           SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
           PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
         run: |
-          if ! grep -Fxq 'supabase/migrations/20261008071324_retained_listing_property_intake.sql' /tmp/migrations.txt; then
+          if ! grep -Fxq 'supabase/migrations/20261008071324_retained_listing_property_intake.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261008104856_raise_retained_listing_batch_ceiling.sql' /tmp/migrations.txt; then
             exit 0
           fi
           if ! grep -Fxq 'ingest-observation' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then

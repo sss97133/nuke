@@ -10,9 +10,10 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=3 and (len(sys.argv)<3 or sys.argv[2]=='--two-front')
+assert len(sys.argv)<=4 and set(sys.argv[2:]) <= {'--two-front','--bulk120'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
-two_front = len(sys.argv)==3
+two_front = '--two-front' in sys.argv[2:]
+bulk120 = '--bulk120' in sys.argv[2:]
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
 def sql(text):
@@ -122,14 +123,58 @@ if two_front:
 assert sql("SELECT assay_status FROM v_job_health WHERE jobname='project-retained-listing-properties'") == 'partial'
 passed('real staged migration, exact owner fingerprint, 500-key scan/backpressure without canonical writes')
 
-def claim(worker, limit=60):
+# Stage the measured120 ceiling only after the real existing intake/replay setup.
+if bulk120:
+    ceiling = Path('supabase/migrations/20261008104856_raise_retained_listing_batch_ceiling.sql').read_text()
+    snapshot = sql("SELECT md5((SELECT jsonb_agg(to_jsonb(o) ORDER BY id)::text FROM vehicle_observations o)),md5((SELECT jsonb_agg(to_jsonb(q) ORDER BY source_observation_id,property_id)::text FROM retained_listing_property_work q))")
+    owners = sql("SELECT jsonb_agg(jsonb_build_object('name',proname,'owner',proowner,'acl',proacl,'security',prosecdef,'config',proconfig) ORDER BY proname) FROM pg_proc WHERE oid IN('claim_retained_listing_properties(text,integer)'::regprocedure,'activate_retained_listing_property_intake()'::regprocedure)")
+    sql('UPDATE cron.job SET active=false')
+    rejects(ceiling)
+    assert sql('SELECT active FROM cron.job')=='f'
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    command = read('SELECT to_json(command) FROM cron.job')
+    for batch in ('61','600'):
+        sql(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":60}}','\"batch_size\":{batch}}}')")
+        rejects(ceiling)
+        sql("UPDATE cron.job SET command="+"'"+command.replace("'","''")+"'")
+    sql('UPDATE observation_extractors SET min_interval_seconds=61')
+    rejects(ceiling)
+    assert sql('SELECT rate_limit_per_hour FROM observation_extractors')=='3600'
+    sql('UPDATE observation_extractors SET min_interval_seconds=60')
+    before_claim = sql("SELECT pg_get_functiondef('claim_retained_listing_properties(text,integer)'::regprocedure)")
+    sql("CREATE OR REPLACE FUNCTION claim_retained_listing_properties(p_worker text,p_limit integer DEFAULT 20) RETURNS TABLE(source_observation_id uuid,property_id uuid,mode text) LANGUAGE sql AS $$ SELECT NULL::uuid,NULL::uuid,NULL::text WHERE false $$")
+    rejects(ceiling)
+    assert sql('SELECT rate_limit_per_hour FROM observation_extractors')=='3600'
+    sql(before_claim)
+    sql(ceiling)
+    assert sql('SELECT active FROM cron.job')=='f'
+    assert sql("SELECT command LIKE '%\"batch_size\":120}%' FROM cron.job")=='t'
+    assert sql("SELECT rate_limit_per_hour=7200 AND min_interval_seconds=60 AND extractor_config->>'batch_size'='120' FROM observation_extractors")=='t'
+    assert sql("SELECT jsonb_agg(jsonb_build_object('name',proname,'owner',proowner,'acl',proacl,'security',prosecdef,'config',proconfig) ORDER BY proname) FROM pg_proc WHERE oid IN('claim_retained_listing_properties(text,integer)'::regprocedure,'activate_retained_listing_property_intake()'::regprocedure)")==owners
+    assert sql("SELECT md5((SELECT jsonb_agg(to_jsonb(o) ORDER BY id)::text FROM vehicle_observations o)),md5((SELECT jsonb_agg(to_jsonb(q) ORDER BY source_observation_id,property_id)::text FROM retained_listing_property_work q))")==snapshot
+    for batch in ('121','600'):
+        sql(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":120}}','\"batch_size\":{batch}}}')")
+        rejects('SELECT activate_retained_listing_property_intake()')
+        assert sql('SELECT active FROM cron.job')=='f'
+        sql(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":{batch}}}','\"batch_size\":120}}')")
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    sql(ceiling)
+    rejects(ceiling)  # A paused job cannot imply a reason to revive it.
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    default = sql("BEGIN;SELECT count(*) FROM claim_retained_listing_properties('default20');ROLLBACK;")
+    assert '20' in default.splitlines()
+    passed('120staged contract, pause/job/config/owner atomic guards, exact activation/replay, unchanged data/access/default20')
+
+claim_limit = 120 if bulk120 else 60
+def claim(worker, limit=None):
+    limit = claim_limit if limit is None else limit
     return read(f"SELECT coalesce(jsonb_agg(to_jsonb(q)),'[]') FROM claim_retained_listing_properties('{worker}',{limit})q")
 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
     batches = list(pool.map(claim, ['parallel-a', 'parallel-b']))
-assert [len(b) for b in batches] == [60, 60]
-assert len({(r['source_observation_id'], r['property_id']) for b in batches for r in b}) == 120
-rejects("SELECT * FROM claim_retained_listing_properties('too-many',61)")
-passed('actual simultaneous 60+60 SKIPLOCKED claims, distinct source-property keys, 61 refused')
+assert [len(b) for b in batches] == [claim_limit, claim_limit]
+assert len({(r['source_observation_id'], r['property_id']) for b in batches for r in b}) == 2*claim_limit
+rejects(f"SELECT * FROM claim_retained_listing_properties('too-many',{claim_limit+1})")
+passed(f'actual simultaneous {claim_limit}+{claim_limit} SKIPLOCKED claims, distinct source-property keys, {claim_limit+1} refused')
 
 counter = 0
 def complete(row, worker):
@@ -173,7 +218,8 @@ passed('1202 protected canonical source-property results; wrong worker/result/re
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
     assert sql('SELECT seed_retained_listing_properties()')=='0'
-    sql(repair)
+    if not bulk120:
+        sql(repair)  # Its original60 command guard predates the120 deployment.
     assert sql('SELECT keys_seen FROM retained_listing_property_replay')=='2101'
     passed('both fronts converge across tied-clock gap:2101unique visits/1202canonical results, no duplicate visit and idempotent replay')
 
