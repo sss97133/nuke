@@ -66,7 +66,9 @@ options they inspect. Pin both touched production SDK imports to2.117.3, the
 current version actually resolved by the fresh CI attempt and verified against
 the official October7 release. All59 tests and the worker check pass with that
 exact SDK. The legacy Node HTTP harness explicitly recognizes this pinned
-import; all76 existing intake tests pass, preserving their source/refusal checks.
+import. The archive harness explicitly loads the new pure qualifier. All239
+coupled existing intake/source/field/VIN/archive tests pass, preserving their
+source/refusal checks.
 
 The migration creates its cron inactive. Existing automatic deployment activates
 the fixed contract only after both edge owners successfully deploy in that run.
