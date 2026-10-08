@@ -51,6 +51,7 @@ const sources = new Map([
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
   ['retainedIdentity',compile('../supabase/functions/ingest-observation/retainedIdentity.ts')],
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
+  ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -209,6 +210,7 @@ function fixture(options = {}) {
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
+        if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
