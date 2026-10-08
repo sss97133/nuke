@@ -39,6 +39,7 @@ import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBa
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties } from "./retainedListingDrain.ts";
+import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
 
 const corsHeaders = {
@@ -54,6 +55,7 @@ interface ObservationInput {
   snapshot_id?: string;
   dry_run?: boolean;
   qualification_version?: string;
+  use_source_queue?: boolean;
   /** Optional protected-v1 selector. Generic input never assigns this typed FK. */
   source_vehicle_event_id?: string;
   source_slug: string;
@@ -410,6 +412,9 @@ Deno.serve(async function handleObservation(req) {
       if (!writer.ok || writer.caller.kind !== "service_role") {
         return new Response(JSON.stringify({ error: "Protected sale qualification requires a service writer" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (input.use_source_queue === true) {
+        return drainBatSaleQueue(supabase, input, { request: req, admit: handleObservation });
       }
       const dryRun = input.dry_run !== false;
       // The separately reviewed episode-v2 preview is not installed here.

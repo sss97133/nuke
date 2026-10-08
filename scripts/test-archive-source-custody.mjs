@@ -78,7 +78,7 @@ function fixture(options = {}) {
     const u = new URL(request.url);requests.push({method:request.method,path:u.pathname,query:Object.fromEntries(u.searchParams)});
     if(u.pathname==='/rest/v1/rpc/claim_bat_sale_snapshots') {
       assert.equal(options.sourceQueue,true);const input=await request.json();
-      assert.equal(input.p_limit,20);assert(input.p_worker.startsWith('bat-sale-'));
+      assert.equal(input.p_limit,options.sourceQueueLimit ?? 20);assert(input.p_worker.startsWith('bat-sale-'));
       return Response.json([{id:'00000000-0000-4000-8000-000000000009',source_snapshot_id:snapshotId,source_vehicle_id:vehicleId}]);
     }
     if(u.pathname==='/rest/v1/rpc/finish_bat_sale_snapshot') {
@@ -203,6 +203,7 @@ function fixture(options = {}) {
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
         if(specifier==='./batSaleQueue.ts')return load('batSaleQueue');
+        if(specifier==='../batch-extract-snapshots/batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
         if(specifier==='../_shared/observationWriter.ts')return {writeObservation:()=>assert.fail('No testimony write')};
@@ -604,6 +605,36 @@ test('actual optional-v1 producer payloads cover inline and protected-storage cu
 });
 
 const queueBody={use_source_queue:true,vehicle_ids:undefined,dry_run:false};
+const canonicalQueueBody={use_source_queue:true,vehicle_id:undefined,dry_run:false,batch_size:40};
+test('canonical sale queue reuses real source intake without nested Edge calls and converges on repeat',async()=>{
+ const f=fixture({sourceQueue:true,sourceQueueLimit:40,allowObservationWrite:true});
+ const first=await f.intake(canonicalQueueBody);assert.equal(first.status,200,JSON.stringify(first));
+ assert.equal(first.body.stored,1);assert.equal(first.body.writes,1);assert.equal(first.body.model_calls,0);
+ assert.equal(f.completions[0].p_observation,f.observations[0].id);
+ assert.equal(f.observations[0].observed_at,'2025-06-15T00:00:00.000Z');
+ const again=await f.intake(canonicalQueueBody);assert.equal(again.body.stored,1);assert.equal(again.body.writes,0);
+ assert.equal(f.observations.length,1);
+ assert.equal(f.requests.filter(r=>r.path.startsWith('/functions/')).length,0);
+});
+test('canonical sale queue refuses mixed/raw/paid/held/unbounded requests before claim',async()=>{
+ for(const patch of [{dry_run:undefined},{dry_run:true},{vehicle_id:vehicleId},{snapshot_id:snapshotId},
+  {qualification_version:'episode_v2'},{batch_size:41},{batch_size:null},{force:true},{platform_credential:true}]){
+  const f=fixture({sourceQueue:true});const r=await f.intake({...canonicalQueueBody,...patch});
+  assert.equal(r.status,400);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+ }
+});
+test('canonical sale queue remains service-only and reports failed persisted completion honestly',async()=>{
+ const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+ const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
+ const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+ for(const actor of ['',token]){
+  const f=fixture({sourceQueue:true});const r=await f.intake(canonicalQueueBody,actor);
+  assert([401,403].includes(r.status));assert.equal(f.requests.length,0);
+ }
+ const f=fixture({sourceQueue:true,sourceQueueLimit:40,allowObservationWrite:true,completionRejected:true});
+ const r=await f.intake(canonicalQueueBody);assert.equal(r.status,503);assert.equal(r.body.writes,0);
+ assert.equal(r.body.writes_reported,1);assert.equal(r.body.completion_failures,1);
+});
 test('actual source queue pins capture, admits only through canonical intake, and repeat converges',async()=>{
  const f=fixture({sourceQueue:true,allowObservationWrite:true});
  const first=await f.run(queueBody);assert.equal(first.status,200,JSON.stringify(first));
