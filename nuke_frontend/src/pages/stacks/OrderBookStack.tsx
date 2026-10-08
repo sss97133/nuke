@@ -10,6 +10,7 @@ import {
 } from './orderBookReader';
 import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
+import VehicleCohort from './VehicleCohort';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
 import './stacks.css';
 
@@ -600,7 +601,7 @@ export default function OrderBookStack() {
     <main className="stack-page">
       {header}
       <h1 className="stack-title">{lotName(read)}</h1>
-      <p className="stack-question">{STACK.question}</p>
+      <p className="stack-question">How does this auction’s bidding compare with its captured peers?</p>
       <div className="stack-meta">
         <span className="stack-mono">BaT lot {lot.lot_number ?? 'number not recorded'}</span>
         <span><span className="stack-label">Status</span> {outcomeWord(lot, view.window.open)}</span>
@@ -620,6 +621,8 @@ export default function OrderBookStack() {
           ))}
         </div>
       )}
+
+      <VehicleCohort key={lot.id} read={read} />
 
       <CoverageTable rows={view.coverage} readAt={readAt} caption="this lot" compact onOpen={(id) => setParam('layer', id === 'fold' ? null : id)} />
 

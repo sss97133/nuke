@@ -13,6 +13,7 @@ vi.mock('../market/useLiveLotTemperature', () => ({ useLiveLotTemperature: () =>
 vi.mock('../../components/PrefetchLink', () => ({
   PrefetchLink: ({ to, ...p }: { to: string } & Record<string, unknown>) => <a href={to} {...p} />,
 }));
+vi.mock('./bidPopulationReader', () => ({useBidStudy:() => ({isPending:true})}));
 import OrderBookStack from './OrderBookStack';
 import type { CommentRow, OrderBookRead } from './orderBookReader';
 

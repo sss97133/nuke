@@ -3,6 +3,7 @@ import { evaluateBidExpression, participantBehaviorMap, type ParticipantMapPoint
 
 import ComparisonPlot from './ComparisonPlot';
 import CalendarPlot from './CalendarPlot';
+import AnalyticalHeading from './AnalyticalHeading';
 
 const base: BidExpression = { measure: 'typical', grouping: 'make', from: 2016, to: new Date().getUTCFullYear(), make: null, model: null, weighting: 'auction' };
 
@@ -22,6 +23,7 @@ function MiniParticipants({points,onSelect}:{points:ParticipantMapPoint[];onSele
 }
 
 export default function StackExploreOverview({ dataset, onOpen }: { dataset: StudyDataset; onOpen: (id: string, scope?: Record<string,string|null>) => void }) {
+  const [makePage, setMakePage] = useState(0);
   const readings = useMemo(() => ({
     raises: evaluateBidExpression(dataset, base),
     pacing: evaluateBidExpression(dataset, { ...base, measure: 'spacing' }),
@@ -34,10 +36,11 @@ export default function StackExploreOverview({ dataset, onOpen }: { dataset: Stu
     <h2>Compare the behavior behind the bids.</h2>
     <div className="sx-overview-grid">
       <section className="sx-preview" aria-label="Raise size by make">
-        <button type="button" className="sx-preview-title" onClick={() => onOpen('SA')}><h3>Raise size by make</h3><span>Explore →</span></button>
+        <AnalyticalHeading expression={base} measureLabel="Raise size" onChange={patch => onOpen('SA',patch)}><button type="button" className="sx-text-button" aria-label="Explore raise size by make" onClick={() => onOpen('SA')}>Explore →</button></AnalyticalHeading>
         <span className="sx-preview-measure">Average auction median raise · % of preceding bid</span>
-        <ComparisonPlot compact result={readings.raises} groups={readings.raises.groups.slice(0,6)} referenceName={`All sampled makes · ${readings.raises.values.length.toLocaleString()} auctions`} onSelect={g => onOpen('SA',{make:g.make!,by:'model'})} />
-        <span className="sx-preview-note">Six most captured makes · select a row to explore its models.</span>
+        <ComparisonPlot compact result={readings.raises} groups={readings.raises.groups.slice(makePage*6,makePage*6+6)} scaleGroups={readings.raises.groups} referenceName={`All sampled makes · ${readings.raises.values.length.toLocaleString()} auctions`} onSelect={g => onOpen('SA',{make:g.make!,by:'model'})} />
+        <div className="sx-make-pages" aria-label="Browse makes"><button type="button" disabled={makePage === 0} onClick={() => setMakePage(p => p-1)}>Previous</button><span>{makePage*6+1}–{Math.min(makePage*6+6,readings.raises.groups.length)} / {readings.raises.groups.length}</span><button type="button" disabled={(makePage+1)*6 >= readings.raises.groups.length} onClick={() => setMakePage(p => p+1)}>Next</button><button type="button" className="sx-text-button" onClick={() => onOpen('SA')}>All {readings.raises.groups.length} makes →</button></div>
+        <span className="sx-preview-note">Captured make labels · same axis and reference on every page.</span>
       </section>
       <section className="sx-preview" aria-label="Behavior over time">
         <button type="button" className="sx-preview-title" onClick={() => onOpen('S18')}><h3>Bidding through time</h3><span>Explore →</span></button>
@@ -49,9 +52,9 @@ export default function StackExploreOverview({ dataset, onOpen }: { dataset: Stu
         <span className="sx-preview-note">{repeatedN.toLocaleString()} participants · {readings.actors.reduce((n,p) => n + p.n,0).toLocaleString()} paired records · completed observed bid span.</span>
       </section>
       <section className="sx-preview" aria-label="Bid pacing by make">
-        <button type="button" className="sx-preview-title" onClick={() => onOpen('S21')}><h3>Bid pacing by make</h3><span>Explore →</span></button>
+        <AnalyticalHeading expression={{...base,measure:'spacing'}} measureLabel="Bid pacing" onChange={patch => onOpen('S21',patch)}><button type="button" className="sx-text-button" aria-label="Explore bid pacing by make" onClick={() => onOpen('S21')}>Explore →</button></AnalyticalHeading>
         <span className="sx-preview-measure">Average auction median gap · time between bids</span>
-        <ComparisonPlot compact result={readings.pacing} groups={readings.pacing.groups.slice(0,6)} referenceName={`All sampled makes · ${readings.pacing.values.length.toLocaleString()} auctions`} onSelect={g => onOpen('S21',{make:g.make!,by:'model'})} />
+        <ComparisonPlot compact result={readings.pacing} groups={readings.pacing.groups.slice(0,6)} scaleGroups={readings.pacing.groups} referenceName={`All sampled makes · ${readings.pacing.values.length.toLocaleString()} auctions`} onSelect={g => onOpen('S21',{make:g.make!,by:'model'})} />
       </section>
     </div>
     <p className="sx-chart-note">Public sold BaT episodes, sampled by calendar quarter. These are observed comparisons; bidder skill and final-bid prediction need separate outcome tests.</p>
