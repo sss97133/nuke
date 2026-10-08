@@ -3,6 +3,7 @@ import {
   retainedVinSelector,
 } from "./retainedVinReference.ts";
 
+export const RETAINED_VIN_BATCH_LIMIT = 120;
 export const RETAINED_VIN_BATCH_MODE = "retained_vin_reference_batch_v1";
 
 /** Source selectors only. Each record still enters the same canonical handler. */
@@ -32,7 +33,8 @@ export async function ingestRetainedVinBatch(
     Object.keys(input).some((key) =>
       !["mode", "revision_ids", "dry_run"].includes(key)
     ) ||
-    ids.length < 1 || ids.length > 60 || selectors.some((id) => id === null) ||
+    ids.length < 1 || ids.length > RETAINED_VIN_BATCH_LIMIT ||
+    selectors.some((id) => id === null) ||
     new Set(selectors).size !== selectors.length
   ) {
     return json({

@@ -209,6 +209,11 @@ jobs:
               echo 'Retained VIN intake remains paused: both edge owners must deploy.'
               exit 1
             fi
+          elif grep -Fxq 'supabase/migrations/20261008064630_tune_canonical_vin_bulk_throughput.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: both120-record edge owners must deploy.'
+              exit 1
+            fi
           elif grep -Fxq 'supabase/migrations/20261008054943_stage_canonical_vin_batch_transport.sql' /tmp/migrations.txt; then
             if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
               echo 'Retained VIN intake remains paused: canonical batch and worker must deploy.'

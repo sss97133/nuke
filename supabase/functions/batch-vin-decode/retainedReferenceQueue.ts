@@ -4,7 +4,10 @@ import {
   retainedVinSelector,
 } from "../ingest-observation/retainedVinReference.ts";
 
-import { RETAINED_VIN_BATCH_MODE } from "../ingest-observation/retainedVinBatch.ts";
+import {
+  RETAINED_VIN_BATCH_LIMIT,
+  RETAINED_VIN_BATCH_MODE,
+} from "../ingest-observation/retainedVinBatch.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (data: unknown, status = 200) =>
@@ -27,7 +30,8 @@ export async function drainRetainedReferenceQueue(
     ) ||
     body.use_retained_reference_queue !== true || body.dry_run !== false ||
     (body.batch_size !== undefined && (!Number.isInteger(body.batch_size) ||
-      Number(body.batch_size) < 1 || Number(body.batch_size) > 60))
+      Number(body.batch_size) < 1 ||
+      Number(body.batch_size) > RETAINED_VIN_BATCH_LIMIT))
   ) {
     return json({
       success: false,
