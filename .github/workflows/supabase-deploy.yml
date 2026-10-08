@@ -253,7 +253,8 @@ jobs:
           SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
           PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
         run: |
-          if ! grep -Fxq 'supabase/migrations/20261008111928_stage_direct_bat_sale_queue_drain.sql' /tmp/migrations.txt; then
+          if ! grep -Fxq 'supabase/migrations/20261008111928_stage_direct_bat_sale_queue_drain.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261008133638_tune_retained_sale_parallel_throughput.sql' /tmp/migrations.txt; then
             exit 0
           fi
           if ! grep -Fxq 'ingest-observation' /tmp/functions.txt ||
@@ -264,20 +265,25 @@ jobs:
           # Deployment-owner SQL only; no new API-role activation or raw writes.
           psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
           DO $activate$
-          DECLARE j bigint;
+          DECLARE j bigint;cmd_hash text;claim_hash text;rate integer;
           BEGIN
-            SELECT jobid INTO j FROM cron.job WHERE jobname='qualify-bat-archived-sales'
+            SELECT jobid,encode(sha256(convert_to(command,'UTF8')),'base64') INTO j,cmd_hash
+              FROM cron.job WHERE jobname='qualify-bat-archived-sales'
               AND schedule='* * * * *'
-              AND encode(sha256(convert_to(command,'UTF8')),'base64')='C+rU5RmwHhyj8yqdJqMgDrj7EohcbKHP3aM4um8dlpA=';
+              AND encode(sha256(convert_to(command,'UTF8')),'base64') IN
+                ('C+rU5RmwHhyj8yqdJqMgDrj7EohcbKHP3aM4um8dlpA=','AWFMWVBSwPlq8ZF2/FpDJNe4z/bmRc5IHjyW5qha2XY=');
+            rate:=CASE WHEN cmd_hash='C+rU5RmwHhyj8yqdJqMgDrj7EohcbKHP3aM4um8dlpA=' THEN 2400 ELSE 7200 END;
+            claim_hash:=CASE WHEN rate=2400 THEN 'GA2BidAHRpM+bbXoaSgEninREgjbRoE39lsfs7VHEu4='
+              ELSE 'xXb1hN6EnQDCcuDEtG+SZJ0nwwYuI6Tfu4u3ocNdsPE=' END;
             IF j IS NULL OR NOT EXISTS(SELECT 1 FROM public.observation_extractors e
               JOIN public.observation_sources s ON s.id=e.source_id WHERE s.slug='bat'
               AND e.slug='bat-archived-sale-v1' AND e.is_active AND e.extractor_type='edge_function'
               AND e.edge_function_name='ingest-observation' AND e.schedule_type='cron'
-              AND e.rate_limit_per_hour=2400 AND e.min_interval_seconds=60
+              AND e.rate_limit_per_hour=rate AND e.min_interval_seconds=60
               AND e.extractor_config='{"mode":"source_sale_qualification","use_source_queue":true,"qualification_version":"v1","model_calls":0}'::jsonb
               AND e.produces_kinds=ARRAY['sale_result']::public.observation_kind[]) OR
               encode(sha256(convert_to(pg_get_functiondef('public.claim_bat_sale_snapshots(text,integer)'::regprocedure),'UTF8')),'base64')
-                IS DISTINCT FROM 'GA2BidAHRpM+bbXoaSgEninREgjbRoE39lsfs7VHEu4=' THEN
+                IS DISTINCT FROM claim_hash THEN
               RAISE EXCEPTION 'Protected sale activation contract changed; keep paused';
             END IF;
             PERFORM cron.alter_job(job_id:=j,active:=true);

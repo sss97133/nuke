@@ -8,11 +8,14 @@ const input = { mode: "source_sale_qualification", use_source_queue: true,
   qualification_version: "v1", dry_run: false, batch_size: 40 };
 async function run(body: Record<string, unknown>, work: unknown, options: {
   legacy?: boolean; completionRejected?: boolean; badAck?: boolean; aborted?: boolean;
+  completionThrows?: boolean; rejectFirst?: boolean; onAdmit?: () => Promise<void>;
 } = {}) {
   const calls: { name: string; args: any }[] = [], selectors: any[] = [];
   const db = { rpc(name: string, args: any) {
-    calls.push({ name, args });return { abortSignal() { return Promise.resolve({
-      data: name === "claim_bat_sale_snapshots" ? work : !options.completionRejected, error: null,
+    calls.push({ name, args });return { abortSignal() {
+     if(name === "finish_bat_sale_snapshot" && options.completionThrows)return Promise.reject(new Error("offline finish unavailable"));
+     return Promise.resolve({
+      data: name === "claim_bat_sale_snapshots" ? work : !options.completionRejected && !(options.rejectFirst && args.p_id === uuid(0)), error: null,
     }); } };
   } };
   const abort = new AbortController();if (options.aborted) abort.abort();
@@ -21,6 +24,7 @@ async function run(body: Record<string, unknown>, work: unknown, options: {
   const canonical = { request, admit: async (req: Request) => {
     assert(req.headers.get("authorization") === "Bearer service-test");
     const selector = await req.json();selectors.push(selector);
+    await options.onAdmit?.();
     return Response.json({ success: true, dry_run: false, model_calls: 0, writes: 1,
       observation_id: options.badAck ? "bad" : uuid(999), receipt: {
         method: "protected_archived_sale_observation_v1", snapshot_id: selector.snapshot_id,
@@ -40,7 +44,7 @@ Deno.test("canonical40 source claims reuse the exact protected leaf and verify e
   })));
 });
 Deno.test("canonical input remains source-only; legacy outer request ceiling stays20", async () => {
-  for (const patch of [{ batch_size: 41 }, { batch_size: null }, { batch_size: 0 }, { batch_size: 1.5 },
+  for (const patch of [{ batch_size: 121 }, { batch_size: null }, { batch_size: 0 }, { batch_size: 1.5 },
     { dry_run: true }, { use_source_queue: false }, { mode: "other" }, { observations: [] },
     { snapshot_id: uuid(100) }, { qualification_version: "episode_v2" }, { force: true }]) {
     const r = await run({ ...input, ...patch }, []);assert(r.status === 400 && r.calls.length === 0);
@@ -59,9 +63,29 @@ Deno.test("overclaimed and duplicate leased work cannot enter canonical intake",
 Deno.test("invalid record acknowledgement and failed custody never count verified new writes", async () => {
   const malformed = await run(input, rows(2), { badAck: true });
   assert(malformed.body.writes === 0 && malformed.body.retries === 2);
-  const failed = await run(input, rows(2), { completionRejected: true });
-  assert(failed.status === 503 && failed.body.writes === 0 && failed.body.writes_reported === 1);
-  assert(failed.body.completion_failures === 1 && failed.selectors.length === 1);
+  const failed = await run(input, rows(20), { completionRejected: true });
+  assert(failed.status === 503 && failed.body.writes === 0 && failed.body.writes_reported === 2);
+  assert(failed.body.completion_failures === 2 && failed.selectors.length === 2);
+});
+Deno.test("canonical120 overlaps exactly two records and settles120 ordered protected completions", async () => {
+  let active=0, maximum=0;
+  const r=await run({...input,batch_size:120},rows(120),{onAdmit:async()=>{
+    active++;maximum=Math.max(maximum,active);await Promise.resolve();active--;
+  }});
+  assert(maximum===2 && active===0 && r.body.record_concurrency===2);
+  assert(r.status===200 && r.body.stored===120 && r.body.writes===120 && r.calls.length===121);
+  assert(r.body.completion_failures===0 && r.body.results.every((v:any,i:number)=>v.id===uuid(i)));
+});
+Deno.test("failed completion stops new records while the other admitted result is still verified", async()=>{
+  const r=await run({...input,batch_size:120},rows(120),{rejectFirst:true});
+  assert(r.status===503 && r.selectors.length===2 && r.calls.length===3);
+  assert(r.body.completion_failures===1 && r.body.writes_reported===2 && r.body.writes===1 && r.body.stored===1);
+  assert(r.body.results[0].status==='completion_unverified' && r.body.results[1].status==='done');
+});
+Deno.test("thrown finish requests are settled and never escape or become verified writes",async()=>{
+  const r=await run(input,rows(20),{completionThrows:true});
+  assert(r.status===503 && r.selectors.length===2 && r.body.completion_failures===2);
+  assert(r.body.writes===0 && r.body.writes_reported===2);
 });
 Deno.test("cancelled canonical request preserves unstarted budget deferrals without source reads", async () => {
   const r = await run(input, rows(40), { aborted: true });

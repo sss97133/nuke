@@ -67,6 +67,12 @@ function fixture(options = {}) {
     bat_author_id: 123, source_url: sourceUrl, posted_at: '2026-10-01T00:00:00.123456Z',
     created_at: '2026-10-05T00:00:00.234567Z', content_hash: 'a'.repeat(64), external_identity_id: null, author_external_identity_id: null };
   const actualSnapshot = { ...snapshot, ...(options.snapshot ?? {}) };
+  const fixtureUuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+  const queued=Array.from({length:options.sourceQueueCount??1},(_,i)=>({
+    id:i===0?fixtureUuid(9):fixtureUuid(200000+i),
+    source_snapshot_id:i===0?snapshotId:fixtureUuid(300000+i),source_vehicle_id:vehicleId,
+  }));
+  const queueCaptures=new Map(queued.map((q,i)=>[q.source_snapshot_id,i===0?actualSnapshot:{...actualSnapshot,id:q.source_snapshot_id}]));
   const actualParent = { ...parent, ...(options.parent ?? {}) };
   const actualEpisode = {...episode,...options.episode};
   const retainedParent={id:snapshotId,vehicle_id:vehicleId,kind:'listing',is_superseded:false,property_id:null,
@@ -81,12 +87,12 @@ function fixture(options = {}) {
     if(u.pathname==='/rest/v1/rpc/claim_bat_sale_snapshots') {
       assert.equal(options.sourceQueue,true);const input=await request.json();
       assert.equal(input.p_limit,options.sourceQueueLimit ?? 20);assert(input.p_worker.startsWith('bat-sale-'));
-      return Response.json([{id:'00000000-0000-4000-8000-000000000009',source_snapshot_id:snapshotId,source_vehicle_id:vehicleId}]);
+      return Response.json(queued);
     }
     if(u.pathname==='/rest/v1/rpc/finish_bat_sale_snapshot') {
       assert.equal(options.sourceQueue,true);const input=await request.json();completions.push(input);
-      assert.equal(input.p_id,'00000000-0000-4000-8000-000000000009');assert(input.p_worker.startsWith('bat-sale-'));
-      if(input.p_status==='done')assert(observations.some(o=>o.id===input.p_observation&&o.source_snapshot_id===snapshotId));
+      const work=queued.find(q=>q.id===input.p_id);assert(work);assert(input.p_worker.startsWith('bat-sale-'));
+      if(input.p_status==='done')assert(observations.some(o=>o.id===input.p_observation&&o.source_snapshot_id===work.source_snapshot_id));
       return Response.json(options.completionRejected!==true);
     }
     if(u.pathname==='/functions/v1/ingest-observation') {
@@ -128,11 +134,11 @@ function fixture(options = {}) {
         assert(!('source_snapshot_id'in row),'Generic intake ignores caller typed capture key');
         assert(!('source_vehicle_event_id'in row),'Generic intake ignores caller typed episode key');
       }
-      else if(!options.retained){assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert.equal(row.source_snapshot_id,snapshotId);}
+      else if(!options.retained){assert.equal(row.extraction_method,'protected_archived_sale_observation_v1');assert(queueCaptures.has(row.source_snapshot_id));}
       if(row.source_vehicle_event_id&&options.guardRefusal)return Response.json({code:'23514',message:'pinned source headers changed'},{status:409});
       const keys=['source_id','source_identifier','kind','content_hash'];
       if(keys.every(k=>row[k]!=null)&&observations.some(o=>keys.every(k=>o[k]===row[k])))return Response.json({code:'23505',message:'unique_observation'},{status:409});
-      const saved={is_superseded:false,extractor_id:null,source_vehicle_event_id:null,...row,id:'00000000-0000-4000-8000-000000000003',ingested_at:'2026-01-02T00:00:00.000123+00:00'};
+      const saved={is_superseded:false,extractor_id:null,source_vehicle_event_id:null,...row,id:observations.length===0?fixtureUuid(3):fixtureUuid(400000+observations.length),ingested_at:'2026-01-02T00:00:00.000123+00:00'};
       if(options.jsonbOrder)saved.extraction_metadata=jsonb(saved.extraction_metadata);
       observations.push(saved);writes.push(row);return Response.json(saved);
     }
@@ -161,9 +167,11 @@ function fixture(options = {}) {
       return Response.json(options.parentMissing ? null : actualParent);
     }
     if(u.pathname==='/rest/v1/listing_page_snapshots') {
-      assert.equal(u.searchParams.get('id'),`eq.${snapshotId}`,'Exact capture, no URL/latest');
+      const captureId=u.searchParams.get('id')?.slice(3);assert.equal(u.searchParams.get('id'),`eq.${captureId}`);
+      assert(queueCaptures.has(captureId),'Exact capture, no URL/latest');
       assert(!u.searchParams.has('order'));
       if(request.method==='PATCH') {
+        assert.equal(captureId,snapshotId,'Qualification metadata writer uses its original fixture only');
         assert(options.allowQualificationWrite,'Only explicit qualification fixture allows metadata PATCH');
         const body=await request.json();assert.deepEqual(Object.keys(body),['metadata']);
         assert.deepEqual(JSON.parse(u.searchParams.get('metadata').slice(3)),actualSnapshot.metadata,'Whole protected metadata compare-and-set');
@@ -173,7 +181,7 @@ function fixture(options = {}) {
         writes.push(body);actualSnapshot.metadata=body.metadata;return Response.json([{id:snapshotId}]);
       }
       assert.equal(request.method,'GET');
-      return Response.json(options.snapshotMissing ? null : actualSnapshot);
+      return Response.json(options.snapshotMissing ? null : queueCaptures.get(captureId));
     }
     if(u.pathname.startsWith('/storage/v1/object/')) {
       assert.equal(request.method,'GET');
@@ -643,7 +651,7 @@ test('canonical sale queue reuses real source intake without nested Edge calls a
 });
 test('canonical sale queue refuses mixed/raw/paid/held/unbounded requests before claim',async()=>{
  for(const patch of [{dry_run:undefined},{dry_run:true},{vehicle_id:vehicleId},{snapshot_id:snapshotId},
-  {qualification_version:'episode_v2'},{batch_size:41},{batch_size:null},{force:true},{platform_credential:true}]){
+  {qualification_version:'episode_v2'},{batch_size:121},{batch_size:null},{force:true},{platform_credential:true}]){
   const f=fixture({sourceQueue:true});const r=await f.intake({...canonicalQueueBody,...patch});
   assert.equal(r.status,400);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
  }
@@ -659,6 +667,20 @@ test('canonical sale queue remains service-only and reports failed persisted com
  const f=fixture({sourceQueue:true,sourceQueueLimit:40,allowObservationWrite:true,completionRejected:true});
  const r=await f.intake(canonicalQueueBody);assert.equal(r.status,503);assert.equal(r.body.writes,0);
  assert.equal(r.body.writes_reported,1);assert.equal(r.body.completion_failures,1);
+});
+test('canonical120 processes distinct captures through real SDK intake and verifies replay without nested Edge calls',async()=>{
+ const f=fixture({sourceQueue:true,sourceQueueLimit:120,sourceQueueCount:120,allowObservationWrite:true});
+ const body={...canonicalQueueBody,batch_size:120};const first=await f.intake(body);
+ assert.equal(first.status,200,JSON.stringify(first.body));assert.equal(first.body.record_concurrency,2);
+ assert.equal(first.body.stored,120);assert.equal(first.body.writes,120);assert.equal(first.body.completion_failures,0);
+ assert.equal(f.observations.length,120);assert.equal(new Set(f.observations.map(o=>o.source_snapshot_id)).size,120);
+ assert.equal(new Set(f.observations.map(o=>o.id)).size,120);
+ assert.equal(f.completions.length,120);assert(f.completions.every(c=>c.p_status==='done'));
+ const clocks=f.observations.map(o=>o.ingested_at);const again=await f.intake(body);
+ assert.equal(again.status,200);assert.equal(again.body.stored,120);assert.equal(again.body.writes,0);
+ assert.equal(f.observations.length,120);assert.deepEqual(f.observations.map(o=>o.ingested_at),clocks);
+ assert.equal(f.requests.filter(r=>r.path.startsWith('/functions/')).length,0);
+ assert(f.observations.every(o=>o.structured_data.source_sale_receipt.original_parsed_at===snapshot.metadata.parsed_at));
 });
 test('actual source queue pins capture, admits only through canonical intake, and repeat converges',async()=>{
  const f=fixture({sourceQueue:true,allowObservationWrite:true});

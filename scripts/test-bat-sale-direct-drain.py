@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic PG17 proof of the staged existing sale owner and real40+40 leases."""
+"""Synthetic PG17 proof of the staged sale owner and parallel protected leases."""
 import concurrent.futures
 import json
 import os
@@ -8,7 +8,9 @@ import re
 import subprocess
 import sys
 
-database = sys.argv[1] if len(sys.argv) == 2 else ''
+assert len(sys.argv) in (2,3) and (len(sys.argv)==2 or sys.argv[2]=='--throughput')
+throughput = len(sys.argv)==3
+database = sys.argv[1]
 assert re.fullmatch(r'dm_refinement_[A-Za-z0-9_]+', database)
 assert os.environ.get('PGHOST', '/private/tmp') in ('localhost', '/private/tmp')
 command = [os.environ.get('NUKE_TEST_PSQL', 'psql'), '-XAtq', '-v', 'ON_ERROR_STOP=1', '-d', database]
@@ -124,3 +126,66 @@ assert query("SELECT has_function_privilege('authenticated','finish_bat_sale_sna
 assert query("SELECT has_table_privilege('service_role','bat_sale_replay_state','UPDATE')") == 'f'
 assert query("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock'") == '0'
 print('PASS actual parallel40+40 disjoint leases and80 protected persisted results; wrong worker/result, privacy, source clocks and API doors', flush=True)
+
+if throughput:
+    parallel_stage = (root/'supabase/migrations/20261008133638_tune_retained_sale_parallel_throughput.sql').read_text()
+    query('SELECT fixture_capture(i) FROM generate_series(20201,20460)i')
+    parallel_before = query(snapshot)
+    query(f'UPDATE cron.job SET active=false WHERE {job}')
+    rejects(parallel_stage, 'preserve owner pause')
+    query(f'UPDATE cron.job SET active=true WHERE {job}')
+    query("UPDATE observation_extractors SET rate_limit_per_hour=2401 WHERE slug='bat-archived-sale-v1'")
+    rejects(parallel_stage, 'Registered protected-v1 sale contract changed')
+    query("UPDATE observation_extractors SET rate_limit_per_hour=2400 WHERE slug='bat-archived-sale-v1'")
+    query(new_claim.replace('p_limit NOT BETWEEN 1 AND 40', 'p_limit NOT BETWEEN 1 AND 41'))
+    rejects(parallel_stage, 'Protected sale claim owner changed')
+    query(new_claim)
+    query(f'UPDATE cron.job SET command=replace(command,\'"batch_size":40}}\',\'"batch_size":41}}\') WHERE {job}')
+    rejects(parallel_stage, 'preserve owner pause')
+    query(f'UPDATE cron.job SET command={quoted(new_command)} WHERE {job}')
+    query(parallel_stage)
+    assert query(snapshot)==parallel_before and query(metadata)==owner and query(unchanged)==unchanged_before
+    assert query(f'SELECT active FROM cron.job WHERE {job}')=='f'
+    assert query("SELECT edge_function_name||':'||rate_limit_per_hour FROM observation_extractors WHERE slug='bat-archived-sale-v1'")=='ingest-observation:7200'
+    assert query("SELECT encode(sha256(convert_to(pg_get_functiondef('claim_bat_sale_snapshots(text,integer)'::regprocedure),'UTF8')),'base64')")=='xXb1hN6EnQDCcuDEtG+SZJ0nwwYuI6Tfu4u3ocNdsPE='
+    assert query(f"SELECT encode(sha256(convert_to(command,'UTF8')),'base64') FROM cron.job WHERE {job}")=='AWFMWVBSwPlq8ZF2/FpDJNe4z/bmRc5IHjyW5qha2XY='
+    query("UPDATE observation_extractors SET rate_limit_per_hour=2400 WHERE slug='bat-archived-sale-v1'")
+    rejects(activation, 'activation contract changed')
+    query("UPDATE observation_extractors SET rate_limit_per_hour=7200 WHERE slug='bat-archived-sale-v1'")
+    query(new_claim)  #40 claim with120 command must fail the paired contract.
+    rejects(activation, 'activation contract changed')
+    query(new_claim.replace('p_limit NOT BETWEEN 1 AND 40','p_limit NOT BETWEEN 1 AND 120'))
+    query(activation)
+    query(parallel_stage)
+    rejects(parallel_stage, 'preserve owner pause')
+    query(activation)
+    assert query(snapshot)==parallel_before and query(metadata)==owner
+    assert '20' in query("BEGIN;SELECT count(*) FROM claim_bat_sale_snapshots('default20');ROLLBACK").splitlines()
+    rejects("SELECT * FROM claim_bat_sale_snapshots('unbounded',121)", 'Invalid bounded worker')
+    print('PASS staged120 paired job/claim/rate guards, replay, CI activation and default20; zero source/testimony/ACL drift',flush=True)
+    def claim120(worker):
+        return json.loads(query(f"SELECT jsonb_agg(to_jsonb(q)) FROM claim_bat_sale_snapshots('{worker}',120)q"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        batches120=list(pool.map(claim120,['parallel-a','parallel-b']))
+    assert [len(b) for b in batches120]==[120,120]
+    assert len({r['id'] for b in batches120 for r in b})==240
+    a,b=batches120[0][0],batches120[1][0]
+    b_result=query(f"SELECT fixture_observation('{b['source_snapshot_id']}')")
+    assert query(f"SELECT finish_bat_sale_snapshot('{a['id']}','wrong','done','{b_result}')")=='f'
+    rejects(f"SELECT finish_bat_sale_snapshot('{a['id']}','parallel-a','done','{b_result}')")
+    for worker in ('parallel-a','parallel-b'):
+        query(f"""DO $$ DECLARE r record;oid uuid;BEGIN
+          FOR r IN SELECT * FROM derivation_queue WHERE status='claimed' AND locked_by='{worker}' LOOP
+           SELECT id INTO oid FROM vehicle_observations WHERE source_snapshot_id=r.source_snapshot_id LIMIT 1;
+           IF oid IS NULL THEN oid:=fixture_observation(r.source_snapshot_id);END IF;
+           ASSERT finish_bat_sale_snapshot(r.id,'{worker}','done',oid);
+          END LOOP;END $$;""")
+    assert query("SELECT count(*) FROM derivation_queue WHERE status='done'")=='320'
+    assert query('SELECT count(*) FROM vehicle_observations')=='320'
+    read120=json.loads(query(f"SELECT read_bat_sale_intake('{a['source_snapshot_id']}')"))
+    assert not read120['stale'] and read120['receipt']['original_parsed_at']=='2025-06-16T12:00:00Z'
+    query(f"UPDATE vehicles SET is_public=false WHERE id='{a['source_vehicle_id']}'")
+    assert json.loads(query(f"SELECT read_bat_sale_intake('{a['source_snapshot_id']}')"))['stale']
+    query(f"UPDATE vehicles SET is_public=true WHERE id='{a['source_vehicle_id']}'")
+    assert query("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock'")=='0'
+    print('PASS actual parallel120+120 disjoint leases and240 protected results; CAS/parent privacy/source clocks preserved',flush=True)
