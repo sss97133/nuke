@@ -233,6 +233,8 @@ jobs:
         run: python3 scripts/test-retained-vin-reference-throughput.py dm_refinement_vin_reference_ci
       - name: Verify bulk taxonomy reaches protected factory intake and cached reader
         run: python3 scripts/test-vehicle-taxonomy-throughput.py dm_refinement_vin_reference_ci
+      - name: Verify bounded current factory custody health and unavailable reads
+        run: python3 scripts/test-vin-reference-intake-health.py dm_refinement_vin_reference_ci
       - name: Create disposable protected archived sale intake database
         run: createdb dm_refinement_bat_sale_intake_ci
       - name: Verify protected capture receipts, private work isolation, retries and bounds
