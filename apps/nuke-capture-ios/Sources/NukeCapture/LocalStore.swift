@@ -224,6 +224,11 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
         return "\(r.start_date ?? "Start unknown") → \(end)"
     }
 
+    var rejectedOnlyRelationship: Bool {
+        guard statementConflict != true, let statement = relationshipStatement else { return false }
+        return statement.ownership_denied && statement.roles.isEmpty
+    }
+
     static func applying(_ corrections: [GarageOwnerCorrection], to vehicles: [GarageVehicle],
                          today: String = String(ISO8601DateFormatter().string(from: Date()).prefix(10))) -> [GarageVehicle] {
         var groups: [String: [GarageOwnerCorrection]] = [:]
@@ -231,7 +236,7 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
             guard let id = correction.vehicle_id else { continue }
             groups[id, default: []].append(correction)
         }
-        return vehicles.map { vehicle in
+        return vehicles.compactMap { vehicle -> GarageVehicle? in
             var result = vehicle
             let rows = groups[vehicle.id] ?? []
             if !rows.isEmpty { result.relationshipEvidenceIds = rows.map(\.id).sorted() }
@@ -259,7 +264,9 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
                 if result.relationship == "owner" && (r.disputed || r.title_status == "transfer_pending" ||
                     (r.start_date.map { $0 > today } ?? false)) { result.relationship = "claimed_interest" }
             }
-            return result
+            // Rejection remains sourced testimony, not a vehicle in the garage.
+            // Also applies to mirrors written by older app versions.
+            return result.rejectedOnlyRelationship ? nil : result
         }
     }
 }

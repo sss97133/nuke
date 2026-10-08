@@ -106,7 +106,7 @@ unresolved vehicles, outside identified-vehicle and asset totals.
 | Shared interest, physical vehicle unresolved | Unresolved shared interest; do not attach the closest existing model/year. |
 | Consignment or sales intermediary | Consignment or sales representation; excluded from personal ownership/assets. |
 | Business held and sold vehicle | Organization custody/sale, with operator role separately attributed; no personal owner inference. |
-| Owner rejects personal ownership; other role unknown | Relationship review with the denial retained; remove the false ownership assertion from the projection. |
+| Owner rejects personal ownership; no supported role remains | Excluded from the garage and its totals; the private source rejection remains in the observation log. A supported consignment, business or sales role remains visible. |
 | Acquisition/title transfer in progress | Pending transfer, without a completed acquisition date. |
 | Photographs or inferred sessions only | Documentation/work evidence awaiting qualification, not ownership or confirmed performed labor. |
 

@@ -46,9 +46,15 @@ it('keeps disputed interest and pending transfers distinct from registered owner
   expect(pending.relationship_type).toBe('TRANSFER PENDING');
   expect(pending.ownership_start_date).toBeNull();
 });
-it('retains a denial without inventing another role, and preserves simultaneous roles', () => {
-  expect(applyGarageOwnerCorrections([old], [statement([], { ownership_denied: true })])[0].relationship_type)
-    .toBe('RELATIONSHIP REVIEW');
+it('excludes a rejected association without a supported role, even with a retained cover', () => {
+  const denial = statement([], { ownership_denied: true });
+  const cover: GarageOwnerCorrection = { id: 'cover', vehicle_id: 'car', correction: { cover_image_id: 'image' },
+    observed_at: '2026-10-07', cover_image_url: 'chosen-photo' };
+  const other = { ...old, id: 'unaffected' };
+  expect(applyGarageOwnerCorrections([old, other], [denial, cover])).toEqual([other]);
+  expect(denial.correction.relationship?.ownership_denied).toBe(true);
+});
+it('preserves simultaneous supported roles', () => {
   const [car] = applyGarageOwnerCorrections([old], [statement(['consignment','sales_representative'])]);
   expect(car.relationship_roles).toEqual(['CONSIGNED','SALES REPRESENTATIVE']);
 });

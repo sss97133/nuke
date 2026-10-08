@@ -801,7 +801,7 @@ struct ProfileView: View {
             // fresh account/device with nothing cached yet still surfaces the
             // honest "couldn't load" state, same as before this change.
             if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
-                garage = cached.vehicles.map(\.projection)
+                garage = GarageVehicle.applying([], to: cached.vehicles.map(\.projection))
                 garageIsCached = true
                 garageCachedAt = cached.cachedAt
                 garageError = false
