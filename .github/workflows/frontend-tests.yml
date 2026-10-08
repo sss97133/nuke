@@ -225,6 +225,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vin_reference_ci -f supabase/sql/test_retained_vin_reference_intake.sql
       - name: Verify factory intake under real backend locks
         run: python3 scripts/test-retained-vin-reference-concurrency.py dm_refinement_vin_reference_ci
+      - name: Verify measured factory intake cadence and pause guards
+        run: python3 scripts/test-retained-vin-reference-cadence.py dm_refinement_vin_reference_ci
       - name: Create disposable protected archived sale intake database
         run: createdb dm_refinement_bat_sale_intake_ci
       - name: Verify protected capture receipts, private work isolation, retries and bounds
