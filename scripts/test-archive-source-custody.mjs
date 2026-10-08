@@ -42,6 +42,7 @@ const sources = new Map([
   ['parser',compile('../supabase/functions/_shared/batParser.ts')],
   ['chassis',compile('../supabase/functions/_shared/batChassis.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
+  ['batSaleQueue',compile('../supabase/functions/batch-extract-snapshots/batSaleQueue.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
@@ -56,7 +57,7 @@ const sources = new Map([
 ]);
 
 function fixture(options = {}) {
-  const requests = [], writes = [], observations = [];
+  const requests = [], writes = [], observations = [], completions = [];
   const identities = [];
   const retainedAccount = { id: snapshotId, vehicle_id: vehicleId, platform: 'bat', author_username: 'abc123',
     bat_author_id: 123, source_url: sourceUrl, posted_at: '2026-10-01T00:00:00.123456Z',
@@ -72,6 +73,17 @@ function fixture(options = {}) {
   async function http(raw,init) {
     const request = raw instanceof Request ? raw : new Request(raw,init);
     const u = new URL(request.url);requests.push({method:request.method,path:u.pathname,query:Object.fromEntries(u.searchParams)});
+    if(u.pathname==='/rest/v1/rpc/claim_bat_sale_snapshots') {
+      assert.equal(options.sourceQueue,true);const input=await request.json();
+      assert.equal(input.p_limit,20);assert(input.p_worker.startsWith('bat-sale-'));
+      return Response.json([{id:'00000000-0000-4000-8000-000000000009',source_snapshot_id:snapshotId,source_vehicle_id:vehicleId}]);
+    }
+    if(u.pathname==='/rest/v1/rpc/finish_bat_sale_snapshot') {
+      assert.equal(options.sourceQueue,true);const input=await request.json();completions.push(input);
+      assert.equal(input.p_id,'00000000-0000-4000-8000-000000000009');assert(input.p_worker.startsWith('bat-sale-'));
+      if(input.p_status==='done')assert(observations.some(o=>o.id===input.p_observation&&o.source_snapshot_id===snapshotId));
+      return Response.json(options.completionRejected!==true);
+    }
     if(u.pathname==='/functions/v1/ingest-observation') {
       load('intake');return handlers.get('intake')(request);
     }
@@ -187,6 +199,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/batLiveEvents.ts')return load('liveEvents');
         if(specifier==='./batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
+        if(specifier==='./batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
         if(specifier==='../_shared/observationWriter.ts')return {writeObservation:()=>assert.fail('No testimony write')};
@@ -204,7 +217,7 @@ function fixture(options = {}) {
       }});
     return exports;
   }
-  return {requests,writes,observations,snapshot:actualSnapshot,episode:actualEpisode,parser:load('parser'),
+  return {requests,writes,observations,completions,snapshot:actualSnapshot,episode:actualEpisode,parser:load('parser'),
     read:(extra={})=>load('archive').readPinnedArchivedPage({snapshotId,vehicleId,sourceUrl,...extra},{supabase,now:()=>new Date('2026-01-03T00:00:00Z')}),
     attach:(capture,receipt)=>load('archive').attachPinnedArchivedSaleQualification(capture,receipt,{supabase}),
     intake:async(body={},token='svc-test')=>{
@@ -582,4 +595,47 @@ test('actual optional-v1 producer payloads cover inline and protected-storage cu
   // Optional private artifact for the disposable PG17 guard cross-check. Never
   // captures live rows or performs a production connection.
   if(process.env.CURRENT_SALE_WRITER_FIXTURE_OUTPUT)writeFileSync(process.env.CURRENT_SALE_WRITER_FIXTURE_OUTPUT,JSON.stringify(cases,null,2));
+});
+
+const queueBody={use_source_queue:true,vehicle_ids:undefined,dry_run:false};
+test('actual source queue pins capture, admits only through canonical intake, and repeat converges',async()=>{
+ const f=fixture({sourceQueue:true,allowObservationWrite:true});
+ const first=await f.run(queueBody);assert.equal(first.status,200,JSON.stringify(first));
+ assert.equal(first.body.stored,1);assert.equal(first.body.writes,1);assert.equal(first.body.model_calls,0);
+ assert.equal(f.writes.length,1);assert.equal(f.completions[0].p_status,'done');
+ assert.equal(f.completions[0].p_observation,f.observations[0].id);
+ const again=await f.run(queueBody);assert.equal(again.body.stored,1);assert.equal(again.body.writes,0);assert.equal(f.writes.length,1);
+});
+test('canonical admission followed by failed completion remains explicitly unverified',async()=>{
+ const f=fixture({sourceQueue:true,allowObservationWrite:true,completionRejected:true});
+ const r=await f.run(queueBody);assert.equal(r.status,503);assert.equal(r.body.success,false);
+ assert.equal(r.body.writes_reported,1);assert.equal(r.body.writes,0);assert.equal(f.writes.length,1);
+ assert.equal(r.body.completion_failures,1);
+});
+for(const [label,patch,reason,status] of [
+ ['unknown sale',{fact:{sold_on:null}},'current_sourced_sale_unknown','skipped'],
+ ['hash conflict',{snapshot:{html:html+' changed'}},'source_hash_conflict','skipped'],
+ ['private parent',{parent:{is_public:false}},'parent_not_public_real_vehicle','skipped'],
+ ['missing stored body',{storageMissing:true},'storage_body_unavailable','retry'],
+])test(`source queue ${label} preserves refusal and never writes`,async()=>{
+ const f=fixture({sourceQueue:true,...patch});const r=await f.run(queueBody);
+ assert.equal(r.status,200,JSON.stringify(r));assert.equal(f.writes.length,0);
+ assert.equal(f.completions[0].p_status,status);assert.equal(f.completions[0].p_reason,reason);
+ assert.equal(f.completions[0].p_observation,null);assert.equal(r.body.model_calls,0);
+});
+test('source queue refuses previews, mixed selectors, paid flags and held episode versions before claiming',async()=>{
+ for(const patch of [{dry_run:undefined},{dry_run:true},{vehicle_ids:[vehicleId]},
+   {platform_credential:true},{qualification_version:'episode_v2'},{batch_size:21},{batch_size:0},{force:true}]){
+  const f=fixture({sourceQueue:true});const r=await f.run({...queueBody,...patch});
+  assert.equal(r.status,400);assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+ }
+});
+test('source queue remains service-only before claim or raw access',async()=>{
+ const header=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+ const payload=Buffer.from(JSON.stringify({role:'authenticated',sub:vehicleId,exp:4102444800})).toString('base64url');
+ const signing=`${header}.${payload}`,token=signing+'.'+createHmac('sha256','test-jwt').update(signing).digest('base64url');
+ for(const actor of ['',token]){
+  const f=fixture({sourceQueue:true});const r=await f.run(queueBody,actor);
+  assert([401,403].includes(r.status));assert.equal(f.requests.length,0);assert.equal(f.writes.length,0);
+ }
 });

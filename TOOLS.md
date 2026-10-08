@@ -260,6 +260,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 |--------|----------|-------|
 | Queue BaT listings for extraction | `crawl-bat-active` | Discovers active auctions |
 | Process BaT extraction queue | `process-bat-extraction-queue` | Works `bat_extraction_queue` |
+| Admit supported retained BaT sales automatically | `qualify-bat-archived-sales` cron → existing `batch-extract-snapshots` → canonical `ingest-observation` | Service-only protected-v1 route in existing `derivation_queue`;20 captures/5min, finite replay plus metadata arrival,0 model calls. Inspect `assay_bat_sale_intake()` and `read_bat_sale_intake(snapshot_uuid)`. Unknown/conflicting current sold facts remain explicit refusals; native/episode-v2 holds persist. Do not manually drain. |
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
 | Monitor a BaT buyer | `bat-buyer-monitors` table | Insert record to start monitoring |
 | Parse BaT snapshot HTML | `bat-snapshot-parser` | Parses archived BaT pages |
