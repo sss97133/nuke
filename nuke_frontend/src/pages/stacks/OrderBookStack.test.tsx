@@ -14,7 +14,6 @@ vi.mock('../../components/PrefetchLink', () => ({
   PrefetchLink: ({ to, ...p }: { to: string } & Record<string, unknown>) => <a href={to} {...p} />,
 }));
 import OrderBookStack from './OrderBookStack';
-import StacksIndex from './StacksIndex';
 import type { CommentRow, OrderBookRead } from './orderBookReader';
 
 const VEHICLE = '00000000-0000-4000-8000-000000000001';
@@ -60,7 +59,6 @@ async function render(path = `/stacks/order-book/${VEHICLE}`) {
   await act(async () => root.render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/stacks" element={<StacksIndex />} />
         <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
       </Routes>
     </MemoryRouter>,
@@ -161,54 +159,8 @@ it('says what was not read instead of drawing an empty page', async () => {
   expect(container.textContent).toContain('could not be read completely');
 });
 
-it('shows the stack operating on the index and keeps the selected event, demand and drill aligned', async () => {
-  await render('/stacks');
-  const operation = container.querySelector('.stack-operation')!;
-  expect(operation.querySelectorAll('svg')).toHaveLength(2);
-  expect(container.querySelector('.stack-mode')?.textContent).toContain('Recorded lot · replay');
-  expect(container.querySelector('.stack-method')?.hasAttribute('open')).toBe(false);
-  expect(container.querySelector('.stack-coverage')!.compareDocumentPosition(operation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(operation.querySelector('.stack-event-flow')?.textContent).toContain('$100 change in the high bid');
-  expect(container.querySelector('.stack-result')?.textContent).toContain('sold · $300 (buyer fee excluded)');
-
-  await click(operation.querySelectorAll('svg [role="button"]')[0]);
-  const firstId = (fixture.query.data as OrderBookRead).comments[0].id;
-  expect(operation.querySelector('input')?.value).toBe('0');
-  expect(operation.querySelector('.stack-event-flow')?.textContent).toContain('First received bid');
-  expect(operation.querySelector('.stack-event-flow')?.textContent).toContain('1 keyed of 1 book entries');
-  expect(operation.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('as of bid 1: 1 entries');
-  expect(operation.querySelector('.stack-event-flow a')?.getAttribute('href')).toContain('#comment-101');
-  expect(operation.querySelector('.stack-operation-heading a')?.getAttribute('href')).toContain(`&at=${firstId}`);
-});
-
-it('follows new received bids at latest and preserves a chosen bid when the index refreshes', async () => {
-  const data = fixture.query.data as OrderBookRead;
-  await render('/stacks');
-  data.comments.push(row({ comment_type: 'bid', bid_amount: 400, posted_at: at(5), external_identity_id: ID_B }));
-  fixture.query = { ...fixture.query, data: { ...data } };
-  await render('/stacks');
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('4 of 4');
-  await click(container.querySelectorAll('.stack-operation svg [role="button"]')[0]);
-  data.comments.push(row({ comment_type: 'bid', bid_amount: 500, posted_at: at(1), external_identity_id: ID_A }));
-  fixture.query = { ...fixture.query, data: { ...data } };
-  await render('/stacks');
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('1 of 5');
-  expect(container.querySelector('.stack-event-flow')?.textContent).not.toContain('$500');
-  await click([...container.querySelectorAll('.stack-asof button')].find((b) => b.textContent === 'Latest'));
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('5 of 5');
-});
-
-it('does not claim an operating reading when evidence is missing or the read failed', async () => {
-  const data = fixture.query.data as OrderBookRead;
-  fixture.query = { data: { ...data, comments: [] }, isPending: false, isError: false };
-  await render('/stacks');
-  expect(container.querySelector('.stack-operation')?.textContent).toContain('No bids in this lot');
-  expect(container.querySelector('.stack-operation svg')).toBeNull();
-  fixture.query = { data: null, isPending: false, isError: false };
-  await render('/stacks');
-  expect(container.textContent).toContain('not publicly readable');
-  fixture.query = { data: null, isPending: false, isError: true, refetch: vi.fn() };
-  await render('/stacks');
-  expect(container.textContent).toContain('The latest read failed; no coverage is shown');
-  expect(container.querySelector('.stack-operation')).toBeNull();
+it('returns to the exact source exploration expression from a contributor drill', async () => {
+  const back = 'stack=SA&by=auction&measure=typical&make=Chevrolet&model=Corvette&from=2026&to=2026&group=lot';
+  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&back=${encodeURIComponent(back)}`);
+  expect(container.querySelector('.stack-eyebrow a')?.getAttribute('href')).toBe(`/stacks?${back}`);
 });

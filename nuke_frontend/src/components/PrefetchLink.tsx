@@ -27,7 +27,7 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/journal/JournalIndex') },
   { test: (h) => h.startsWith('/stacks/order-book/'),
     load: () => import('../pages/stacks/OrderBookStack') },
-  { test: (h) => h === '/stacks' || h === '/stacks/',
+  { test: (h) => h === '/stacks' || h === '/stacks/' || h.startsWith('/stacks?'),
     load: () => import('../pages/stacks/StacksIndex') },
 ];
 

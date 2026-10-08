@@ -569,7 +569,7 @@ export default function OrderBookStack() {
     return <main className="stack-page"><p className="stack-status" role="status">This address does not name a vehicle. Nothing was read.</p></main>;
   }
   const header = (
-    <div className="stack-eyebrow"><Link to="/stacks">Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
+    <div className="stack-eyebrow"><Link to={params.get('back') ? `/stacks?${params.get('back')}` : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
   );
   if (query.isPending) return <main className="stack-page">{header}<p className="stack-status" role="status">Reading the lot…</p></main>;
   if (query.isError) {
