@@ -201,13 +201,21 @@ jobs:
           SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
           PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
         run: |
-          # This migration initially pauses its job: an older VIN worker ignores
-          # the new mode. Activate only after this exact migration and both edge
-          # owners successfully deploy in this run. Partial rollouts stay paused.
-          if ! grep -Fxq 'supabase/migrations/20261008023725_retained_vin_reference_intake.sql' /tmp/migrations.txt; then exit 0; fi
-          if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
-            echo 'Retained VIN intake remains paused: both edge owners must deploy.'
-            exit 1
+          # Initial intake needs both owners; the batch increase needs its
+          # matching worker. These migrations pause the job until the exact
+          # changed owners deploy successfully. Partial rollouts stay paused.
+          if grep -Fxq 'supabase/migrations/20261008023725_retained_vin_reference_intake.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: both edge owners must deploy.'
+              exit 1
+            fi
+          elif grep -Fxq 'supabase/migrations/20261008051404_tune_retained_vin_batch_throughput.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: matching batch worker must deploy.'
+              exit 1
+            fi
+          else
+            exit 0
           fi
           if [ -z "$SUPABASE_DB_URL" ]; then
             echo 'Retained VIN intake remains paused: deployment DB unavailable.'
