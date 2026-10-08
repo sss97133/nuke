@@ -11,9 +11,9 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 export async function drainBatSaleQueue(supabase: any, body: any,
   canonical?: { request: Request; admit: (request: Request) => Promise<Response> },
 ): Promise<Response> {
-  // The existing outer worker keeps its20-call bound. The canonical owner can
-  // reuse this same queue/receipt loop in process without nested Edge requests.
-  const limit = body.batch_size === undefined ? 20 : body.batch_size, ceiling = canonical ? 40 : 20;
+  // Two canonical records share the existing finite budget without nested Edge
+  // calls. The legacy outer worker stays sequential with its20-call ceiling.
+  const limit = body.batch_size === undefined ? 20 : body.batch_size, ceiling = canonical ? 120 : 20;
   const allowed = new Set(["mode", "use_source_queue", "dry_run", "batch_size", "platform", "qualification_version"]);
   if (body.mode !== "source_sale_qualification" || body.use_source_queue !== true
     || Object.keys(body).some(key => !allowed.has(key)) || body.dry_run !== false
@@ -34,7 +34,10 @@ export async function drainBatSaleQueue(supabase: any, body: any,
   }
   let stored = 0, refused = 0, retries = 0, writes = 0, verifiedWrites = 0, completionFailures = 0;
   const results: Record<string, unknown>[] = [];
-  for (const item of items) {
+  let next = 0;
+  async function lane() {
+   while (next < items.length && completionFailures === 0) {
+    const index = next++, item = items[index];
     let status = "retry", reason = "intake_request_failed", observationId: string | null = null, recordWrites = 0;
     const unstarted = canonical?.request.signal.aborted || Date.now() - started >= 40000;
     if (unstarted) reason = "batch_budget_deferred";
@@ -73,19 +76,29 @@ export async function drainBatSaleQueue(supabase: any, body: any,
     }
     // CAS and typed result validation live in PostgreSQL. An HTTP200 is insufficient.
     writes += recordWrites;
-    const { data: completed, error: completionError } = await supabase.rpc("finish_bat_sale_snapshot", {
-      p_id: item.id, p_worker: worker, p_status: status, p_observation: observationId,
-      p_reason: reason || null,
-    }).abortSignal(AbortSignal.timeout(Math.max(1, Math.min(5000, 55000 - (Date.now() - started)))));
+    let completed: unknown, completionError: unknown;
+    try {
+      const ack = await supabase.rpc("finish_bat_sale_snapshot", {
+        p_id: item.id, p_worker: worker, p_status: status, p_observation: observationId,
+        p_reason: reason || null,
+      }).abortSignal(AbortSignal.timeout(Math.max(1, Math.min(5000, 55000 - (Date.now() - started)))));
+      completed = ack.data; completionError = ack.error;
+    } catch { completionError = true; }
     if (completionError || completed !== true) {
-      completionFailures++; results.push({ id: item.id, status: "completion_unverified" }); break;
+      completionFailures++; results[index] = { id: item.id, status: "completion_unverified" }; break;
     }
     if (status === "done") { stored++; verifiedWrites += recordWrites; }
     else if (status === "skipped") refused++;
     else retries++;
-    results.push({ id: item.id, status, ...(reason ? { reason } : {}), ...(observationId ? { observation_id: observationId } : {}) });
+    results[index] = { id: item.id, status, ...(reason ? { reason } : {}), ...(observationId ? { observation_id: observationId } : {}) };
+   }
   }
+  // A failed completion stops new admissions. Both in-flight records settle so
+  // already-written testimony is reported even when one CAS acknowledgement fails.
+  const recordConcurrency = canonical ? 2 : 1;
+  await Promise.all(Array.from({ length: recordConcurrency }, () => lane()));
   return json({ success: completionFailures === 0, mode: "source_sale_qualification", use_source_queue: true,
     dry_run: false, claimed: items.length, stored, refused, retries, completion_failures: completionFailures,
-    writes_reported: writes, writes: verifiedWrites, model_calls: 0, duration_ms: Date.now() - started, results }, completionFailures ? 503 : 200);
+    writes_reported: writes, writes: verifiedWrites, model_calls: 0, record_concurrency: recordConcurrency,
+    duration_ms: Date.now() - started, results }, completionFailures ? 503 : 200);
 }

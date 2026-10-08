@@ -418,6 +418,8 @@ Deno.serve(async function handleObservation(req) {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (input.use_source_queue === true) {
+        // Existing sale owner: at most120claims, two in-process records, same
+        // protected leaf/CAS and40/55/60s budgets; legacy outer requests stay20.
         return drainBatSaleQueue(supabase, input, { request: req, admit: handleObservation });
       }
       const dryRun = input.dry_run !== false;
