@@ -4,6 +4,7 @@ import {
   RETAINED_VIN_MODE,
 } from "./retainedVinReference.ts";
 import { observationContentHash } from "../_shared/observationContentHash.ts";
+import { RETAINED_VIN_BATCH_MODE } from "./retainedVinBatch.ts";
 const assert = (ok: unknown, message = "assertion failed") => {
   if (!ok) throw new Error(message);
 };
@@ -107,6 +108,7 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
   }[] = [];
   const originalFetch = globalThis.fetch;
   let reads = 0;
+  let persisted = false;
   globalThis.fetch = async (request, options) => {
     const init = options as {
       method?: string;
@@ -137,6 +139,7 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
         headers: { "Content-Type": "application/json" },
       });
     if (url.pathname.endsWith("read_retained_vin_reference_input")) {
+      if (scenario === "batch_replay") c.revision.id = payload.p_revision_id;
       return scenario === "read_error"
         ? response({ message: "unavailable" }, 503)
         : response(c);
@@ -150,6 +153,10 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
     }
     if (url.pathname.endsWith("vehicle_observations")) {
       if (method === "POST") {
+        if (scenario === "batch_replay") {
+          persisted = true;
+          Object.assign(row, payload);
+        }
         return scenario === "race"
           ? response({ code: "23505", message: "duplicate" }, 409)
           : scenario === "guard_failure"
@@ -163,8 +170,10 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
       }
       reads++;
       return response(
-        scenario === "success" || scenario === "guard_failure" ||
-          (scenario === "race" && reads === 1)
+        scenario === "batch_replay"
+          ? (persisted ? [row] : [])
+          : scenario === "success" || scenario === "guard_failure" ||
+              (scenario === "race" && reads === 1)
           ? []
           : [row],
       );
@@ -188,6 +197,114 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
   }
 }
 const selector = { mode: RETAINED_VIN_MODE, revision_id: "7", dry_run: false };
+Deno.test("canonical60selector batch reuses real leaf custody and source dedup without nested edge calls", async () => {
+  const r = await run({
+    mode: RETAINED_VIN_BATCH_MODE,
+    dry_run: false,
+    revision_ids: Array.from({ length: 60 }, (_, i) => String(i + 7)),
+  }, "batch_replay");
+  assert(r.status === 200 && r.data.results.length === 60);
+  assert(
+    r.data.results.every((x: any) =>
+      x.status_code === 200 && x.body.observation_id === OBS &&
+      x.body.requested_taxonomy_revision_id === x.revision_id &&
+      x.body.receipt.physical_configuration_verified === false
+    ),
+  );
+  assert(
+    r.data.results.reduce((n: number, x: any) => n + x.body.writes, 0) === 1,
+  );
+  assert(
+    r.calls.filter((c) =>
+      c.method === "POST" && c.path.endsWith("vehicle_observations")
+    ).length === 1,
+  );
+  assert(r.calls.every((c) => c.path.startsWith("/rest/v1/")));
+  assert(
+    r.calls.filter((c) => c.path.endsWith("read_retained_vin_reference_input"))
+      .length === 60,
+  );
+});
+Deno.test("canonical VIN batch rejects anonymous and invalid selectors before any database request", async () => {
+  const batch = {
+    mode: RETAINED_VIN_BATCH_MODE,
+    dry_run: false,
+    revision_ids: ["7"],
+  };
+  const anonymous = await run(batch, "success", "invalid-token");
+  assert(anonymous.status === 401 && anonymous.calls.length === 0);
+  for (
+    const input of [{ ...batch, dry_run: true }, {
+      ...batch,
+      revision_ids: ["7", "7"],
+    }, {
+      ...batch,
+      revision_ids: Array.from({ length: 61 }, (_, i) => String(i + 7)),
+    }, { ...batch, fields: { BodyClass: "Coupe" } }]
+  ) {
+    const r = await run(input);
+    assert(r.status === 400 && r.calls.length === 0);
+  }
+});
+Deno.test("canonical batch keeps signed-in users out and private parents explicitly refused", async () => {
+  const batch = {
+    mode: RETAINED_VIN_BATCH_MODE,
+    dry_run: false,
+    revision_ids: ["7"],
+  };
+  const secret = Deno.env.get("JWT_SIGNING_SECRET");
+  Deno.env.set("JWT_SIGNING_SECRET", "test-secret");
+  try {
+    const encode = (value: unknown) =>
+      btoa(JSON.stringify(value)).replace(/=/g, "").replace(/\+/g, "-").replace(
+        /\//g,
+        "_",
+      );
+    const base = `${encode({ alg: "HS256", typ: "JWT" })}.${
+      encode({
+        role: "authenticated",
+        sub: VID,
+        exp: Math.floor(Date.now() / 1000) + 60,
+      })
+    }`;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode("test-secret"),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = new Uint8Array(
+      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(base)),
+    );
+    const token = `${base}.${
+      btoa(String.fromCharCode(...signature)).replace(/=/g, "").replace(
+        /\+/g,
+        "-",
+      ).replace(/\//g, "_")
+    }`;
+    const user = await run(batch, "success", token);
+    assert(user.status === 403 && user.calls.length === 0);
+  } finally {
+    secret === undefined
+      ? Deno.env.delete("JWT_SIGNING_SECRET")
+      : Deno.env.set("JWT_SIGNING_SECRET", secret);
+  }
+  const privateParent = await run(batch, "private");
+  assert(
+    privateParent.status === 200 &&
+      privateParent.data.results[0].status_code === 422,
+  );
+  assert(
+    privateParent.data.results[0].body.reason ===
+      "parent_not_public_real_vehicle",
+  );
+  assert(
+    !privateParent.calls.some((c) =>
+      c.method === "POST" && c.path.endsWith("vehicle_observations")
+    ),
+  );
+});
 Deno.test("canonical VIN handler admits typed source and original clock with no downstream inference", async () => {
   const r = await run(selector);
   assert(

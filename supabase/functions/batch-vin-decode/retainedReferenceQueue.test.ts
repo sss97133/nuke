@@ -48,33 +48,56 @@ async function run(
       payload: JSON.parse(String(init?.body)),
     });
     if (scenario === "network_error") throw new Error("unavailable");
-    const out: any = {
-      success: true,
-      dry_run: false,
-      model_calls: 0,
-      writes: scenario === "duplicate" ? 0 : 1,
-      observation_id: OBS,
-      vehicle_id: VID,
-      requested_taxonomy_revision_id:
-        JSON.parse(String(init?.body)).revision_id,
-      physical_configuration_verified: false,
-      receipt: {
-        method: "protected_retained_vin_reference_v1",
-        role: "factory_reference",
-        vehicle_id: VID,
-        physical_configuration_verified: false,
+    const payload = JSON.parse(String(init?.body));
+    const records = payload.revision_ids.map(
+      (revision: string, index: number) => {
+        const out: any = {
+          success: true,
+          dry_run: false,
+          model_calls: 0,
+          writes: scenario === "duplicate" ? 0 : 1,
+          observation_id: OBS,
+          vehicle_id: VID,
+          requested_taxonomy_revision_id: revision,
+          physical_configuration_verified: false,
+          receipt: {
+            method: "protected_retained_vin_reference_v1",
+            role: "factory_reference",
+            vehicle_id: VID,
+            physical_configuration_verified: false,
+          },
+        };
+        if (scenario === "wrong_receipt") {
+          out.requested_taxonomy_revision_id = "8";
+        }
+        if (scenario === "physical_claim") {
+          out.receipt.physical_configuration_verified = true;
+        }
+        const deferred = scenario === "budget60" && index > 0;
+        return {
+          revision_id: revision,
+          status_code: deferred ? 503 : scenario === "refused" ? 422 : 200,
+          body: deferred
+            ? { reason: "batch_budget_deferred" }
+            : scenario === "refused"
+            ? { reason: "reference_error_code" }
+            : out,
+        };
       },
-    };
-    if (scenario === "wrong_receipt") out.requested_taxonomy_revision_id = "8";
-    if (scenario === "physical_claim") {
-      out.receipt.physical_configuration_verified = true;
-    }
+    );
+    if (scenario === "missing_record") records.pop();
+    if (scenario === "wrong_record") records[0].revision_id = "99";
+    if (scenario === "duplicate_record") records.push(records[0]);
     if (scenario === "budget60") elapsed = 40001;
     return new Response(
-      JSON.stringify(
-        scenario === "refused" ? { reason: "reference_error_code" } : out,
-      ),
-      { status: scenario === "refused" ? 422 : 200 },
+      JSON.stringify({
+        success: true,
+        mode: payload.mode,
+        dry_run: false,
+        model_calls: 0,
+        provider_calls: 0,
+        results: records,
+      }),
     );
   };
   try {
@@ -115,10 +138,9 @@ Deno.test("larger retained batch completes60 canonical selectors without widenin
     r.data.provider_calls === 0 && r.data.model_calls === 0 &&
       r.data.completion_failures === 0,
   );
-  assert(r.calls.filter((c) => c.request).length === 60);
+  assert(r.calls.filter((c) => c.request).length === 1);
   assert(
-    new Set(r.calls.filter((c) => c.request).map((c) => c.payload.revision_id))
-      .size === 60,
+    new Set(r.calls.find((c) => c.request).payload.revision_ids).size === 60,
   );
   assert(
     r.calls.filter((c) => c.name === "finish_vin_reference_intake").length ===
@@ -156,7 +178,7 @@ Deno.test("retained worker calls canonical selector, finalizes persisted result 
     assert(
       r.calls[1].request ===
           "https://db.test/functions/v1/ingest-observation" &&
-        r.calls[1].payload.revision_id === "7",
+        r.calls[1].payload.revision_ids[0] === "7",
     );
     assert(
       r.calls[2].args.p_status === "done" &&
@@ -171,6 +193,9 @@ Deno.test("semantic refusal rechecks, transient errors retry, invalid receipts c
       "network_error",
       "wrong_receipt",
       "physical_claim",
+      "missing_record",
+      "wrong_record",
+      "duplicate_record",
     ]
   ) {
     const r = await run(body, scenario);

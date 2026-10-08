@@ -123,3 +123,34 @@ assert query(f"SELECT finish_vin_reference_intake({replay},'replay','done','{obs
 assert query(f"SELECT source_vin_taxonomy_revision_id={revision} FROM vehicle_observations WHERE id='{observation}'") == 't'
 assert query(f"SELECT read_vehicle_taxonomy_fold('{vehicle}')#>>'{{factory_reference,stale}}'") == 'false'
 print('PASS throughput migration: owner pause/config guards, atomic rollback, staged60/minute activation, ACLs, unchanged testimony,60/60 disjoint claims, default20, lease recovery, budget deferral, canonical replay and cached consumer')
+
+# Canonical batching changes transport, not the existing queue/data contract.
+stage = migration.parent / '20261008054943_stage_canonical_vin_batch_transport.sql'
+stage_snapshot = query(snapshot_sql)
+
+
+def stage_apply(expect_failure=None):
+    result = subprocess.run(command + ['-f', str(stage)], capture_output=True, text=True, timeout=15)
+    if expect_failure:
+        assert result.returncode != 0 and expect_failure in result.stderr, result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+
+
+query(f"UPDATE cron.job SET active=false WHERE {job}")
+stage_apply('preserve owner pause')
+assert query(f"SELECT active FROM cron.job WHERE {job}") == 'f'
+query(f"UPDATE cron.job SET active=true,command=replace(command,'\"batch_size\":60}}','\"batch_size\":600}}') WHERE {job}")
+stage_apply('preserve owner pause')
+query(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":600}}','\"batch_size\":60}}') WHERE {job}")
+query(f"UPDATE observation_extractors SET rate_limit_per_hour=3599 WHERE {extractor}")
+stage_apply('capacity unavailable')
+assert query(f"SELECT active FROM cron.job WHERE {job}") == 't'
+query(f"UPDATE observation_extractors SET rate_limit_per_hour=3600 WHERE {extractor}")
+stage_apply()
+assert query(f"SELECT NOT active AND command LIKE '%\"batch_size\":60}}%' FROM cron.job WHERE {job}") == 't'
+assert query(snapshot_sql) == stage_snapshot
+assert query("SELECT has_function_privilege('service_role','activate_retained_vin_reference_intake()','EXECUTE')") == 'f'
+assert query("SELECT activate_retained_vin_reference_intake()") == 't'
+assert query("SELECT activate_retained_vin_reference_intake()") == 't'
+print('PASS canonical batch staging: pause/changed-job/capacity refusal, atomic rollback, unchanged source/work, private exact60activation')

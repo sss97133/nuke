@@ -35,6 +35,7 @@ import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
 import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
   qualifyRetainedVinReference } from "./retainedVinReference.ts";
+import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
@@ -245,7 +246,7 @@ async function allowShareVerdict(supabase: any, req: Request, input: Observation
   return rl.allowed;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async function handleObservation(req) {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -262,6 +263,16 @@ Deno.serve(async (req) => {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === RETAINED_VIN_BATCH_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained VIN batch requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return ingestRetainedVinBatch(req, input as unknown as Record<string, unknown>, handleObservation);
+    }
     if (input.mode === BAT_LIVE_MODE) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
