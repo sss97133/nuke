@@ -37,6 +37,33 @@ In Xcode: target **NukeCapture-iOS** → Signing & Capabilities → set your
 
 ## Shipping
 
+The Library's **Albums** door preserves native album names, folder paths and exact
+photo membership as the first organization pass. **Analyze album / Analyze library**
+reads original on-device photos, including already-assigned images, and saves a
+separate versioned Apple Vision/OCR pass. The background backfill visits albums
+first, then ungrouped photos. Reads are reused only for matching source and method
+versions; unavailable originals stay pending. These reads do not assign ownership,
+performer identity or canonical vehicle membership. Existing cloud vehicle IDs are
+context, not independent confirmation.
+
+The pass retains raw OCR lines as well as modern VIN-shaped candidates, so shorter
+classic-vehicle serials are preserved for later identity review. It is a source and
+coverage foundation; it does not yet identify every vehicle or repair garage roles.
+
+Album grouping and on-device review coverage persist locally. Limited Photos access
+cannot expose user albums, so the screen reports unknown album coverage. No new
+permission prompt, cloud write, paid analysis or upload path is added by this layer.
+
+The local ledger contracts can be tested offline against the lockfile's installed
+GRDB checkout:
+
+```bash
+GRDB_SOURCE_DIR=/path/to/GRDB.swift bash scripts/test-native-photo-albums.sh
+```
+
+For native screen verification, a Debug build accepts `NUKE_DEBUG_SCREEN=library`
+without an injected account; it still uses the actual device's PhotoKit access.
+
 The complete TestFlight + App Store submission runbook lives at
 [`../APP_STORE_LAUNCH.md`](../APP_STORE_LAUNCH.md) — including the
 **pre-submission server TODO** (`request_account_deletion` RPC) that App

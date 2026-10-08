@@ -20,6 +20,10 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
 
     @Published private(set) var assets: PHFetchResult<PHAsset>
     @Published private(set) var count: Int
+    @Published private(set) var albumCatalog: LocalAlbumCatalog?
+    @Published private(set) var albumError: String?
+    @Published private(set) var refreshingAlbums = false
+    private var albumRefreshPending = false
 
     private let imageManager = PHCachingImageManager()
     private let scale = UIScreen.main.scale
@@ -66,6 +70,62 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
             if i != NSNotFound { out[asset.localIdentifier] = i }
         }
         return out
+    }
+
+    /// Metadata-only human pass. No parsing album titles into vehicle IDs, no
+    /// photo uploads, and no change to Photos. Limited access cannot fetch user
+    /// albums; retain that coverage boundary instead of reporting an empty garage.
+    func refreshAlbums() async {
+        if refreshingAlbums { albumRefreshPending = true; return }
+        refreshingAlbums = true
+        defer { refreshingAlbums = false }
+        repeat {
+            albumRefreshPending = false
+            let catalog = await Task.detached(priority: .utility) { Self.readAlbums() }.value
+            albumCatalog = catalog
+            do {
+                try await Task.detached { try LocalStore.shared.recordAlbumCatalog(catalog) }.value
+                albumError = nil
+            } catch {
+                albumError = "Album organization could not be saved. Try again."
+            }
+        } while albumRefreshPending
+    }
+
+    private nonisolated static func readAlbums() -> LocalAlbumCatalog {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized else {
+            return LocalAlbumCatalog(accessScope: status == .limited ? "limited" : "unavailable",
+                                     observedAt: Date(), albums: [])
+        }
+        var paths: [String: [String]] = [:]
+        func walk(_ collections: PHFetchResult<PHCollection>, path: [String]) {
+            collections.enumerateObjects { collection, _, _ in
+                if let folder = collection as? PHCollectionList {
+                    let next = path + (folder.localizedTitle.map { [$0] } ?? [])
+                    walk(PHCollection.fetchCollections(in: folder, options: nil), path: next)
+                } else if let album = collection as? PHAssetCollection {
+                    paths[album.localIdentifier] = path
+                }
+            }
+        }
+        walk(PHCollectionList.fetchTopLevelUserCollections(with: nil), path: [])
+        let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: nil)
+        var albums: [LocalPhotoAlbum] = []
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        collections.enumerateObjects { album, _, _ in
+            var photos: [LocalAlbumPhoto] = []
+            PHAsset.fetchAssets(in: album, options: options).enumerateObjects { asset, _, _ in
+                // Modification time is a source-version hint, never a capture date.
+                let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
+                photos.append(LocalAlbumPhoto(localIdentifier: asset.localIdentifier, sourceVersion: version))
+            }
+            albums.append(LocalPhotoAlbum(id: album.localIdentifier, name: album.localizedTitle,
+                folderPath: paths[album.localIdentifier] ?? [],
+                sourceKind: String(album.assetCollectionSubtype.rawValue), photos: photos))
+        }
+        return LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: albums.sorted { $0.id < $1.id })
     }
 
     /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
@@ -132,9 +192,13 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
         Task { @MainActor in
-            guard let details = changeInstance.changeDetails(for: assets) else { return }
-            assets = details.fetchResultAfterChanges
-            count = assets.count
+            if let details = changeInstance.changeDetails(for: assets) {
+                assets = details.fetchResultAfterChanges
+                count = assets.count
+            }
+            // An album rename/member edit can happen without changing the global
+            // asset fetch. It must still produce a new human/source snapshot.
+            await refreshAlbums()
         }
     }
 }

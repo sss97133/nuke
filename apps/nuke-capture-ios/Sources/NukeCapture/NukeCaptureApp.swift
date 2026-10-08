@@ -71,6 +71,9 @@ struct NukeCaptureApp: App {
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "library" {
+                    // Actual on-device sources and album passes; no injected account.
+                    LibraryView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
                     DebugScreenDeepLink()
                 } else if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],

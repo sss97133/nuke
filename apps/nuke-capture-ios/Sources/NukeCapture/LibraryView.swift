@@ -25,6 +25,7 @@ struct LibraryView: View {
     @State private var selectMode = false
     @State private var selected: Set<Int> = []
     @State private var showDays = false
+    @State private var showAlbums = false
 
     @State private var columns = 3
     @State private var gestureStartColumns: Int?
@@ -85,6 +86,10 @@ struct LibraryView: View {
                 }
                 if !selectMode {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showAlbums = true } label: { Image(systemName: "rectangle.stack") }
+                            .accessibilityLabel("Albums")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { showDays = true } label: { Image(systemName: "calendar") }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
@@ -136,12 +141,149 @@ struct LibraryView: View {
                 .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
         .sheet(isPresented: $showDays) { LibraryDaysView() }   // the local-first day receipt
+        .sheet(isPresented: $showAlbums) { LibraryAlbumsView() }
     }
 
     private func applyVerdict(approved: Bool) {
         let lids = selected.compactMap { LibraryStore.shared.asset(at: $0)?.localIdentifier }
         overlay.setVerdict(lids, approved: approved)
         withAnimation { selected.removeAll() }
+    }
+}
+
+/// The human grouping and the agent pass share the original Photos grid. Album
+/// names and memberships remain visible even before a vehicle identity is known.
+private struct LibraryAlbumsView: View {
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var ingest = LibraryIngest.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Your existing albums are the starting groups. Nuke reads each photo separately; an album can contain several vehicles.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    if let error = store.albumError { Text(error).foregroundStyle(.secondary) }
+                    if store.refreshingAlbums && store.albumCatalog == nil { ProgressView("Reading albums…") }
+                }
+                if let catalog = store.albumCatalog, catalog.accessScope == "full" {
+                    Section("Photos albums · \(catalog.albums.count)") {
+                        ForEach(catalog.albums.sorted { ($0.name ?? "").localizedStandardCompare($1.name ?? "") == .orderedAscending }) { album in
+                            NavigationLink {
+                                LibraryAlbumPhotosView(albumId: album.id)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(album.name ?? "Album name unavailable")
+                                    if !album.folderPath.isEmpty {
+                                        Text(album.folderPath.joined(separator: " / ")).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Text("\(album.photos.count) photos").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    Section("On-device pass") {
+                        Button("Analyze library") {
+                            Task { await ingest.runAlbumReview() }
+                        }.disabled(ingest.running)
+                        Text("Albums first, then ungrouped photos. Each run makes bounded progress and reuses unchanged reads. Vehicle identity and your relationship stay open until supported.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
+                        if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                    }
+                } else if let catalog = store.albumCatalog {
+                    Section {
+                        Text(catalog.accessScope == "limited"
+                            ? "Photos provides selected images but hides your albums with limited access. Album coverage is unknown."
+                            : "Albums are unavailable with the current Photos access.")
+                    }
+                }
+            }
+            .navigationTitle("Albums")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+            .task { await store.refreshAlbums() }
+            .refreshable { await store.refreshAlbums() }
+        }
+    }
+}
+
+private struct LibraryAlbumPhotosView: View {
+    let albumId: String
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var ingest = LibraryIngest.shared
+    @State private var indices: [String: Int] = [:]
+    @State private var coverage: LocalAlbumCoverage?
+    @State private var readError: String?
+    @State private var detailIndex: Int?
+
+    private var album: LocalPhotoAlbum? {
+        guard store.albumCatalog?.accessScope == "full" else { return nil }
+        return store.albumCatalog?.albums.first { $0.id == albumId }
+    }
+
+    var body: some View {
+        ScrollView {
+            if let album {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Photos album grouping").font(.caption).foregroundStyle(.secondary)
+                    if let coverage {
+                        Text("\(coverage.reviewed) / \(coverage.total) photos read on-device · \(coverage.vehicleFrames) vehicle/work frames")
+                            .font(.subheadline).monospacedDigit()
+                        if coverage.otherFrames > 0 {
+                            Text("\(coverage.otherFrames) other frames to review").font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !coverage.vinReadings.isEmpty {
+                            Text("\(coverage.vinReadings.count) distinct VIN-shaped text readings · vehicle identity needs review")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if coverage.cachedDeepReads > 0 {
+                            Text("\(coverage.cachedDeepReads) photos also have cached deep analysis")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let readError { Text(readError).font(.caption).foregroundStyle(.secondary) }
+                    Button(ingest.running ? "Reading photos…" : "Analyze album") {
+                        Task { await ingest.runAlbumReview(albumId: albumId); await reload() }
+                    }.disabled(ingest.running || album.photos.isEmpty)
+                    Text("The pass preserves your grouping and owner corrections. Visual tags and VIN text do not establish ownership or who performed work.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding()
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
+                    ForEach(album.photos, id: \.localIdentifier) { photo in
+                        if let index = indices[photo.localIdentifier] {
+                            LibraryCell(index: index, selecting: false, isSelected: false)
+                                .onTapGesture { detailIndex = index }
+                        }
+                    }
+                }
+                if indices.count < album.photos.count {
+                    Text("\(album.photos.count - indices.count) photos are currently unavailable.")
+                        .font(.caption).foregroundStyle(.secondary).padding()
+                }
+            } else {
+                Text("This album is currently unavailable.").foregroundStyle(.secondary).padding()
+            }
+        }
+        .navigationTitle(album?.name ?? "Album")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await reload() }
+        .onReceive(store.$albumCatalog) { _ in Task { await reload() } }
+        .onChange(of: ingest.running) { _, running in if !running { Task { await reload() } } }
+        .fullScreenCover(item: Binding(get: { detailIndex.map(IndexBox.init) }, set: { detailIndex = $0?.id })) {
+            LibraryDetailView(startIndex: $0.id)
+        }
+    }
+
+    @MainActor private func reload() async {
+        guard let album else { indices = [:]; coverage = nil; return }
+        indices = store.indexMap(forLocalIdentifiers: album.photos.map(\.localIdentifier))
+        let method = LibraryIngest.albumMethodVersion
+        do {
+            coverage = try await Task.detached { try LocalStore.shared.albumCoverage(album, methodVersion: method) }.value
+            readError = nil
+        } catch { coverage = nil; readError = "Analysis coverage could not load. Totals are unknown." }
     }
 }
 
