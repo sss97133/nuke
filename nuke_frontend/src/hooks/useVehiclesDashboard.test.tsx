@@ -17,7 +17,8 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
     return q;
   },
-  rpc: async () => ({ data: [], error: null }),
+  rpc: async (name: string) => ({ data: name === 'get_my_garage_owner_corrections'
+    ? fixture.rows.garage_owner_corrections ?? [] : [], error: null }),
 } }));
 
 import { resolveGarageRelationships, useVehiclesDashboard } from './useVehiclesDashboard';
@@ -159,4 +160,25 @@ it('uses the retained model name and keeps distinguishing trim in every garage v
   await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={state.vehicles.find(v => v.id === 'car')!} /></MemoryRouter>));
   expect(container.textContent).toContain('K5');
   expect(container.textContent).toContain('JIMMY');
+});
+
+it('loads private corrections into sections, personal assets and the selected garage cover', async () => {
+  seedGarage();
+  fixture.rows.garage_owner_corrections = [
+    { id: 'statement', vehicle_id: 'car', observed_at: '2026-10-07', cover_image_url: null,
+      correction: { relationship: { roles: ['consignment'], ownership_denied: false,
+        title_status: 'unknown', disputed: false, start_date: null, end_date: null } } },
+    { id: 'cover', vehicle_id: 'car', observed_at: '2026-10-07', cover_image_url: 'chosen-whole-car',
+      correction: { cover_image_id: 'chosen-image' } },
+  ];
+  await act(async () => root.render(<Harness />));
+  const car = state.vehicles.find(v => v.id === 'car')!;
+  expect(car.relationship_type).toBe('CONSIGNED');
+  expect(car.resolved_image_url).toBe('chosen-whole-car');
+  expect(state.sections.find(s => s.relationship_type === 'CONSIGNED')?.vehicles[0].id).toBe('car');
+  expect(state.data?.my_vehicles.some(v => v.vehicle_id === 'car')).toBe(false);
+  expect(state.data?.client_vehicles.map(v => v.vehicle_id)).toEqual(['car']);
+  expect(state.totalEstimatedValue).toBe(0);
+  await act(async () => state.setFilterMode('OWNED'));
+  expect(state.vehicles.map(v => v.id)).toEqual(['old']);
 });
