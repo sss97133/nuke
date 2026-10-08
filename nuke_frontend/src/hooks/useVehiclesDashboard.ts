@@ -324,7 +324,7 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, trim, vin, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
+const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
 
 const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
@@ -333,6 +333,7 @@ interface VehicleRow {
   year: number | null;
   make: string | null;
   model: string | null;
+  normalized_model?: string | null;
   trim: string | null;
   vin: string | null;
   purchase_price: number | null;
@@ -361,7 +362,7 @@ function rowToGarageVehicle(
     id: row.id,
     year: row.year,
     make: row.make,
-    model: row.model,
+    model: row.normalized_model?.trim() || row.model,
     trim: row.trim,
     vin: row.vin,
     primary_image_url: row.primary_image_url,

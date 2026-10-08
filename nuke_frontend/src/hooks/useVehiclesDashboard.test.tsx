@@ -139,3 +139,24 @@ it('keeps data confidence out of mechanical health in every card view', async ()
     expect(container.textContent).not.toContain('HEALTH');
   }
 });
+
+it('uses the retained model name and keeps distinguishing trim in every garage view', async () => {
+  seedGarage();
+  fixture.rows.vehicles[0] = { ...fixture.rows.vehicles[0], model: 'Blazer',
+    normalized_model: 'K5 Blazer', trim: 'Cheyenne' };
+  await act(async () => root.render(<Harness />));
+  const vehicle = state.vehicles.find(v => v.id === 'car')!;
+  expect(vehicle.model).toBe('K5 Blazer');
+  expect(state.data?.my_vehicles.find(v => v.vehicle_id === 'car')?.model).toBe('K5 Blazer');
+  for (const viewMode of ['GRID', 'LIST', 'COMPACT'] as const) {
+    await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} viewMode={viewMode} /></MemoryRouter>));
+    expect(container.textContent).toContain('K5 BLAZER');
+    expect(container.textContent).toContain('CHEYENNE');
+  }
+  fixture.rows.vehicles[0] = { ...fixture.rows.vehicles[0], model: 'K5',
+    normalized_model: 'K5', trim: 'Jimmy' };
+  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={state.vehicles.find(v => v.id === 'car')!} /></MemoryRouter>));
+  expect(container.textContent).toContain('K5');
+  expect(container.textContent).toContain('JIMMY');
+});
