@@ -19,6 +19,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { drainBatSaleQueue } from "./batSaleQueue.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,14 +42,15 @@ Deno.serve(async (req) => {
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    // Separate, service-only deterministic source qualification. No AI fallback,
-    // queue claim, vehicle mutation or testimony write; default is no-write preview.
+    // Separate, service-only deterministic source qualification. Explicit-ID calls
+    // default to preview; the registered queue requires explicit writes. No AI fallback.
     if (body.mode === "source_sale_qualification") {
       const verdict = await authenticateWriter(req);
       if (!verdict.ok || verdict.caller.kind !== "service_role") {
         return new Response(JSON.stringify({ error: "Source qualification requires a service writer" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      if (body.use_source_queue === true) return await drainBatSaleQueue(supabase, body);
       return await qualifySourceSales(supabase, body);
     }
     const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 200);
