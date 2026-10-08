@@ -7,7 +7,10 @@ import re
 import subprocess
 import sys
 
-database = sys.argv[1] if len(sys.argv) == 2 else ''
+database = sys.argv[1] if len(sys.argv) in (2,3) else ''
+configuration = len(sys.argv) == 3 and sys.argv[2] == '--configuration'
+if len(sys.argv) == 3 and not configuration:
+    raise SystemExit('Unknown consumer proof option')
 if not re.fullmatch(r'dm_refinement_[A-Za-z0-9_]+', database):
     raise SystemExit('Disposable dm_refinement_* database required')
 command = [os.environ.get('NUKE_TEST_PSQL', 'psql'), '-XAtq', '-v', 'ON_ERROR_STOP=1', '-d', database]
@@ -141,3 +144,90 @@ assert query(f"SELECT finish_vin_reference_intake({revision},'restore-fixture','
 assert query(f"SELECT count(*) FROM vehicle_observations WHERE id='{observation}'") == '1', 'Original evidence retained'
 assert query("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock'") == '0'
 print('PASS typed liters/class consumer, exact source/recording/ingestion clocks, unchanged existing reader, data/ACL/replay/drift guards, registry/visibility/supersession withdrawal, source correction precision, missing/invalid values and retained history')
+
+if configuration:
+    migration = migration.with_name('20261008114303_expose_factory_engine_configuration_property.sql')
+    config_snapshot = query(snapshot_sql)
+    base_reading = read()
+    apply('Factory configuration property contract changed')  # Must not mint a missing property.
+    query("""INSERT INTO observation_properties VALUES('c0f743ae-dc94-4dfd-98ef-514b76f74a9b',
+     'engine_configuration','core','string',NULL,'class','single',ARRAY['specification']::observation_kind[],NULL);""")
+    apply()
+    assert read() == base_reading, 'Absent configuration must leave the existing reader exactly unchanged'
+    assert query(snapshot_sql) == config_snapshot and query(metadata_sql) == metadata
+    config_definition = query("SELECT pg_get_functiondef('read_vehicle_taxonomy_fold(uuid)'::regprocedure)")
+    assert query("SELECT encode(sha256(convert_to(pg_get_functiondef('read_vehicle_taxonomy_fold(uuid)'::regprocedure),'UTF8')),'base64')") == 'DekNDK3cCmxbtlUiuczuXXk7KIX/Rvpsi99/jihtJI0='
+    apply()
+    assert query(snapshot_sql) == config_snapshot
+    query("CREATE OR REPLACE FUNCTION read_vehicle_taxonomy_fold(p_vehicle_id uuid) RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$")
+    apply('Factory reader owner changed')
+    query(config_definition)
+    # The real canonical guard requires the complete supported source projection;
+    # malformed/placeholder source values must be omitted by this fixture too.
+    configuration_fields = """'Doors','2') || CASE
+     WHEN jsonb_typeof(c.raw_response->'EngineConfiguration')='string'
+      AND btrim(c.raw_response->>'EngineConfiguration')<>''
+      AND btrim(c.raw_response->>'EngineConfiguration') !~* '^(N/?A|Not Applicable|Not Available|Not Reported|Unknown|0 - Not Applicable)$'
+     THEN jsonb_build_object('EngineConfiguration',btrim(c.raw_response->>'EngineConfiguration'))
+     ELSE '{}'::jsonb END,"""
+    assert original_fixture.count("'Doors','2'),") == 1
+    query(original_fixture.replace("'Doors','2'),", configuration_fields))
+
+    def configured(value, missing=False):
+        old_sha = query(f"SELECT md5(raw_response::text) FROM vin_decoded_data WHERE vin='{vin}'")
+        raw = "raw_response-'EngineConfiguration'" if missing else (
+            "jsonb_set(raw_response,'{EngineConfiguration}','" + json.dumps(value).replace("'", "''") + "'::jsonb)")
+        query(f"UPDATE vin_decoded_data SET raw_response={raw},updated_at=clock_timestamp() WHERE vin='{vin}'")
+        stale = read()['factory_reference']
+        if old_sha != query(f"SELECT md5(raw_response::text) FROM vin_decoded_data WHERE vin='{vin}'"):
+            assert stale['stale'] and stale['property_projections'] == {}
+        query('SELECT drain_vehicle_taxonomy_queue()')
+        rid = query(f"SELECT last_receipt_id FROM vehicle_taxonomy_recompute_queue WHERE vehicle_id='{vehicle}'")
+        assert query("SELECT revision_id FROM claim_vin_reference_intake('configuration-fixture',1)") == rid
+        oid = query(f'SELECT fixture_vin_observation({rid})')
+        assert query(f"SELECT finish_vin_reference_intake({rid},'configuration-fixture','done','{oid}')") == 't'
+        reading = read()['factory_reference']
+        assert not reading['stale'] and reading['property_projections']['engine_displacement_l']['value'] == 5.7
+        return reading
+
+    current = configured('V-Shaped')
+    typed = current['property_projections']['engine_configuration']
+    assert typed['value'] == typed['source_value'] == 'V-Shaped'  # Never infer V8 from another field.
+    assert typed['data_type'] == 'string' and typed['unit'] is None and typed['verification_scope'] == 'class'
+    assert typed['claim_role'] == 'factory_reference' and typed['physical_configuration_verified'] is False
+    assert typed['source_observation_id'] == current['observation_id']
+    assert typed['supporting_taxonomy_revision_id'] == current['supporting_taxonomy_revision_id']
+    assert typed['ingested_at'] == current['ingested_at']
+    for key in ('source_sha256','source_recorded_at','recorded_clock_basis'):
+        assert typed[key] == current['receipt'][key]
+    first_config_observation = current['observation_id']
+    assert query("SELECT bool_and(NOT has_function_privilege(r,'read_vehicle_taxonomy_fold(uuid)','EXECUTE')) FROM unnest(ARRAY['anon','authenticated'])r") == 't'
+    assert json.loads(query(f"SET ROLE service_role;SELECT read_vehicle_taxonomy_fold('{vehicle}')"))['factory_reference']['property_projections']['engine_configuration']['value'] == 'V-Shaped'
+    for change in ("unit='liters'","verification_scope='instance'","data_type='enum'","cardinality='many'",
+                   "namespace='other'","deprecated_at=now()","applies_to_kinds=ARRAY['condition']::observation_kind[]"):
+        query('UPDATE observation_properties SET '+change+" WHERE property_key='engine_configuration'")
+        props = read()['factory_reference']['property_projections']
+        assert 'engine_configuration' not in props and props['engine_displacement_l']['value'] == 5.7
+        apply('Factory configuration property contract changed')
+        query("UPDATE observation_properties SET unit=NULL,verification_scope='class',data_type='string',cardinality='single',namespace='core',deprecated_at=NULL,applies_to_kinds=ARRAY['specification']::observation_kind[] WHERE property_key='engine_configuration'")
+    query("UPDATE observation_properties SET unit='cc' WHERE property_key='engine_displacement_l'")
+    assert list(read()['factory_reference']['property_projections']) == ['engine_configuration'], 'Independent property registry guards'
+    query("UPDATE observation_properties SET unit='liters' WHERE property_key='engine_displacement_l'")
+    query(f"UPDATE vehicles SET is_public=false WHERE id='{vehicle}'")
+    assert read()['factory_reference']['property_projections'] == {}
+    query(f"UPDATE vehicles SET is_public=true WHERE id='{vehicle}'")
+    query(f"UPDATE vehicle_observations SET is_superseded=true WHERE id='{first_config_observation}'")
+    assert read()['factory_reference']['property_projections'] == {}
+    query(f"UPDATE vehicle_observations SET is_superseded=false WHERE id='{first_config_observation}'")
+    for value in ('In-Line','Horizontally Opposed','Rotary',"Source's literal configuration"):
+        assert configured(value)['property_projections']['engine_configuration']['value'] == value
+    for value in (None,True,8,[],{},'', '   ','Unknown','N/A','Not Applicable','0','0 - Not Applicable','X'*501):
+        assert 'engine_configuration' not in configured(value)['property_projections']
+    assert 'engine_configuration' not in configured(None,missing=True)['property_projections']
+    query(original_fixture)
+    # Future existing cadence/bulk checks see their original producer/source shape.
+    current = configured(None,missing=True)
+    assert query(f"SELECT count(*) FROM vehicle_observations WHERE id='{first_config_observation}'") == '1'
+    assert query(metadata_sql) == metadata
+    assert query("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock'") == '0'
+    print('PASS exact string/class configuration consumer, preserved numeric property, independent registry/source/privacy guards, retained clocks/history, malformed/placeholder rejection and original producer restoration')
