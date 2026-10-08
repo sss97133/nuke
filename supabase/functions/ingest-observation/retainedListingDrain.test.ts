@@ -29,7 +29,7 @@ async function run(input: Record<string, unknown>, claimed: unknown, scenario = 
 }
 const input = { mode: RETAINED_LISTING_DRAIN_MODE, batch_size: 60 };
 Deno.test("listing drain refuses arbitrary input before claim", async () => {
-  for (const patch of [{ batch_size: 61 }, { batch_size: 0 }, { batch_size: null }, { batch_size: 1.5 },
+  for (const patch of [{ batch_size: 121 }, { batch_size: 0 }, { batch_size: null }, { batch_size: 1.5 },
     { observations: [] }, { source_observation_id: source }, { dry_run: false }]) {
     const r = await run({ ...input, ...patch }, []);assert(r.response.status === 400 && r.calls.length === 0);
   }
@@ -43,6 +43,23 @@ Deno.test("sixty claims use exact existing selectors and require verified comple
 });
 Deno.test("duplicate acknowledges custody without counting new writes", async () => {
   const r = await run(input, rows(2), "duplicate");assert(r.body.stored === 2 && r.body.duplicates === 2 && r.body.writes === 0);
+});
+Deno.test("120 claims retain exact selectors, verified custody and zero inference", async () => {
+  const r = await run({ ...input, batch_size: 120 }, rows(120));
+  assert(r.body.claimed === 120 && r.body.stored === 120 && r.body.writes === 120);
+  assert(r.calls.length === 121 && r.selectors.length === 120 && r.body.completion_failures === 0);
+  assert(r.body.model_calls === 0 && r.body.provider_calls === 0);
+  r.selectors.forEach((s, i) => assert(JSON.stringify(s) === JSON.stringify({
+    mode: rows(120)[i].mode, source_observation_id: rows(120)[i].source_observation_id })));
+});
+Deno.test("120-cap drain still defers unstarted records at the existing35s boundary", async () => {
+  const original = Date.now;let calls = 0;
+  Date.now = () => calls++ < 100 ? 0 : 36000;
+  try {
+    const r = await run({ ...input, batch_size: 120 }, rows(120));
+    assert(r.body.stored > 0 && r.body.deferred > 0 && r.body.stored + r.body.deferred === 120);
+    assert(r.body.completion_failures === 0 && r.calls.length === 121);
+  } finally { Date.now = original; }
 });
 Deno.test("malformed, duplicate, overclaimed and wrong-property server work is refused", async () => {
   for (const work of [rows(61), [rows(1)[0], rows(1)[0]], [{ ...rows(1)[0], mode: "invented" }],

@@ -1,7 +1,7 @@
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE } from "./retainedInterior.ts";
 
 export const RETAINED_LISTING_DRAIN_MODE = "retained_listing_property_drain_v1";
-export const RETAINED_LISTING_DRAIN_LIMIT = 60;
+export const RETAINED_LISTING_DRAIN_LIMIT = 120;
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const INTERIOR = "514cacd3-82b4-4330-b3df-e292612ee718";
 const EXTERIOR = "efcb8c61-1ff5-4790-890e-2e09118e87e3";
