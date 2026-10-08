@@ -45,6 +45,7 @@ export interface GarageVehicle {
   purchase_price: number | null;
   value_delta: number | null;
   health_score: number | null;
+  confidence_score?: number | null;
   image_count: number | null;
   event_count: number | null;
   view_count: number | null;
@@ -263,7 +264,7 @@ function garageToMyVehicle(v: GarageVehicle): MyVehicle {
     last_activity_date: v.last_event_at ?? v.updated_at ?? null,
     event_count: v.event_count,
     image_count: v.image_count,
-    confidence_score: v.health_score ?? 0,
+    confidence_score: v.confidence_score ?? 0,
     interaction_score: 0,
     primary_image_url: v.resolved_image_url ?? v.primary_image_url ?? null,
     current_value: v.estimated_value,
@@ -369,7 +370,9 @@ function rowToGarageVehicle(
     purchase_price: row.purchase_price,
     // Vehicle-level purchase price is not an attributed ownership-period cost.
     value_delta: null,
-    health_score: row.confidence_score,
+    // Data confidence does not describe the vehicle's mechanical condition.
+    health_score: null,
+    confidence_score: row.confidence_score,
     image_count: image_count ?? null,
     event_count: event_summary?.total_events ?? null,
     view_count: row.view_count,
