@@ -76,3 +76,27 @@ The activation function is deployment-owner-only and rejects a changed cadence,
 route or body; API roles cannot activate a partial rollout. This prevents old
 worker versions from interpreting a new queue request as ordinary VIN decoding.
 All actual PR checks and natural runtime remain required before delivery.
+
+The initial deployment is merged in PR871 and automatically deployed by run
+37724161406. Live catalog checks verify the fixed cron, described queue, typed
+source FKs and restricted grants. A deployed canonical dry-run qualifies17field
+keys with0writes and0modelcalls. Natural write verification is a separate stage.
+
+A latest5000revisionPK rate sample at03:48Z covers375taxonomy revisions over
+15minutes,374accepted across374vehicles. The initial80/hour intake ceiling is
+below that arrival rate. A follow-up cadence migration preserves20claims,
+the load/lock governor and all source/lease/deadline/refusal contracts, while
+moving the existing schedule to one minute and registered capacity to1200/hour.
+This remains an attempt ceiling; finite source replay and actual new claims
+must be measured separately. The first04:00Z natural invocation reached the
+installed worker, returning HTTP200/0claims in560ms, with no replay progress.
+Due work existed before and after the invocation; the only pre-seed empty
+return in the claim function is its unchanged load/lock governor. A03:48Z
+rate sample and04:03Z quiet-pressure reading support retrying in additional
+minutes rather than reserving only the busy quarter-hour slot. This is evidence
+for cadence repair, not proof of sustained throughput. The fixed20record/55s
+transport budget and SKIP LOCKED leases remain the concurrency boundary.
+The change refuses paused or changed jobs and unexpected extractor
+configuration, rolls back atomically, and updates private activation to the new
+fixed contract. Actual PostgreSQL tests prove those guards and idempotency,
+and verify that canonical observations and existing work rows do not change.
