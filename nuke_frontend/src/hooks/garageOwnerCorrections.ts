@@ -55,7 +55,7 @@ export function applyGarageOwnerCorrections(
     const rows = byVehicle.get(c.vehicle_id) ?? [];
     rows.push(c); byVehicle.set(c.vehicle_id, rows);
   }
-  return vehicles.map(vehicle => {
+  return vehicles.flatMap<GarageVehicle>(vehicle => {
     const rows = byVehicle.get(vehicle.id) ?? [];
     const relationships = rows.filter(r => r.correction.relationship);
     const covers = rows.filter(r => r.correction.cover_image_id);
@@ -74,6 +74,9 @@ export function applyGarageOwnerCorrections(
       const statement = relationships[0];
       const claim = statement.correction.relationship!;
       const roles = claim.roles.filter(role => GROUPS[role]);
+      // A rejection without a supported role removes the automated association
+      // from this projection. Its private source remains in the observation log.
+      if (claim.ownership_denied && roles.length === 0) return [];
       result.relationship_roles = roles.map(role => GROUPS[role]);
       // Display grouping retains the other roles; it grants neither title nor access.
       result.relationship_type = GROUPS[roles[0]] ?? 'RELATIONSHIP REVIEW';

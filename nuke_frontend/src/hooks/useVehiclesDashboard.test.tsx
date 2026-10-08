@@ -188,6 +188,22 @@ it('loads private corrections into sections, personal assets and the selected ga
   expect(state.vehicles.map(v => v.id)).toEqual(['old']);
 });
 
+it('excludes a rejected legacy association from rendered garage, every section and all dashboard counts', async () => {
+  seedGarage();
+  fixture.rows.garage_owner_corrections = [{ id: 'denial', vehicle_id: 'car', observed_at: '2026-10-08',
+    cover_image_url: null, correction: { relationship: { roles: [], ownership_denied: true,
+      title_status: 'unknown', disputed: false, start_date: null, end_date: null } } }];
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles.map(v => v.id)).toEqual(['old']);
+  expect(state.sections.flatMap(s => s.vehicles.map(v => v.id))).toEqual(['old']);
+  expect(state.sections.some(s => s.relationship_type === 'RELATIONSHIP REVIEW')).toBe(false);
+  expect(state.data?.my_vehicles.map(v => v.vehicle_id)).toEqual(['old']);
+  expect(state.totalEstimatedValue).toBe(0);
+  await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));
+  expect(container.querySelector('a[href="/vehicle/car"]')).toBeNull();
+  expect(container.querySelector('a[href="/vehicle/old"]')).not.toBeNull();
+});
+
 it('shows a pending-only garage with exact source context and no physical vehicle hydration or asset', async () => {
   fixture.rows.garage_owner_corrections = [{ id: 'raw', vehicle_id: null, observed_at: '2026-10-08',
     cover_image_url: null, source_excerpt: 'Synthetic shared interest, identity unknown.',

@@ -303,4 +303,28 @@ final class PhotoAlbumLedgerTests: XCTestCase {
         XCTAssertTrue(result.statementConflict == true)
         XCTAssertNil(result.image_url)
     }
+
+    func testRejectedOnlyAssociationIsExcludedOnlineAndFromOlderOfflineMirrorWithoutHidingSupportedRoles() throws {
+        let denial = GarageRelationshipStatement(roles: [], ownership_denied: true,
+            title_status: "unknown", disputed: false, start_date: nil, end_date: nil)
+        let statement = GarageOwnerCorrection(id: "denial", vehicle_id: "one",
+            correction: .init(relationship: denial, cover_image_id: nil), observed_at: "today", cover_image_url: nil)
+        XCTAssertTrue(GarageVehicle.applying([statement], to: [vehicle("one")]).isEmpty)
+
+        var oldMirror = vehicle("one")
+        oldMirror.relationship = "relationship_review"
+        oldMirror.relationshipStatement = denial
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        store.cacheGarage(userId: "account", vehicles: [oldMirror])
+        let cached = try XCTUnwrap(store.cachedGarage(userId: "account"))
+        XCTAssertTrue(GarageVehicle.applying([], to: cached.vehicles.map(\.projection)).isEmpty)
+
+        for role in ["consignment", "business_handling", "sales_representative"] {
+            let supported = GarageRelationshipStatement(roles: [role], ownership_denied: true,
+                title_status: "unknown", disputed: false, start_date: nil, end_date: nil)
+            let correction = GarageOwnerCorrection(id: "role", vehicle_id: "one",
+                correction: .init(relationship: supported, cover_image_id: nil), observed_at: "today", cover_image_url: nil)
+            XCTAssertEqual(GarageVehicle.applying([correction], to: [vehicle("one")]).first?.relationship, role)
+        }
+    }
 }
