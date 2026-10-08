@@ -2,15 +2,8 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { quantile, MIN_DISTRIBUTION, type MeasurementGroup, type MeasurementResult } from './bidMeasurements';
 
 import { formatMeasure, usePlotWidth } from './stackFormat';
-
-const makeLogos: Record<string, string> = {
-  chevrolet: 'chevrolet.svg', porsche: 'porsche.jpg', toyota: 'toyota.svg',
-  bmw: 'bmw.svg', ford: 'ford.svg', 'mercedes-benz': 'mercedes-benz.svg',
-};
-export function MakeLogo({ make }: { make: string }) {
-  const file = makeLogos[make.toLowerCase()];
-  return file ? <img className="sx-make-logo" src={`/stacks/makes/${file}`} alt="" width="24" height="24" /> : null;
-}
+import { MakeIdentity, MakeLogo } from './makeIdentity';
+export { MakeLogo } from './makeIdentity';
 export function PlotKey({ spread = 'Middle 50% of records', reference = true, average = 'Group average' }: { spread?: string; reference?: boolean; average?: string }) {
   return <div className="sx-chart-key"><span><i className="sx-key-dot" />{average}</span><span><i className="sx-key-range" />{spread}</span>{reference && <span><i className="sx-key-reference" />Selection median</span>}</div>;
 }
@@ -62,7 +55,7 @@ export default function ComparisonPlot({ result, groups, scaleGroups = groups, s
     {groups.map(g => <Fragment key={g.key}>
       <button type="button" className="sx-distribution-row sx-comparison-grid" aria-pressed={selected === g.key} onClick={() => onSelect(g)}
         aria-label={`Explore ${result.expression.grouping === 'participant' ? `${g.lotIds.length} auctions, ${g.label}` : g.label}, ${auction ? 'reading' : 'average'} ${formatMeasure(metric, g.mean)}, ${g.values.length} records`}>
-        <span className="sx-row-label">{g.make && <MakeLogo make={g.make} />}<strong>{result.expression.grouping === 'participant' ? `${g.wins} / ${g.knownOutcomes} captured wins` : g.label}</strong></span>
+        <span className="sx-row-label">{result.expression.grouping === 'make' && g.make ? <MakeIdentity make={g.make} /> : <>{g.make && <MakeLogo make={g.make} />}<strong>{result.expression.grouping === 'participant' ? `${g.wins} / ${g.knownOutcomes} captured wins` : g.label}</strong></>}</span>
         <svg width="100%" viewBox={`0 0 ${width} 44`} aria-hidden="true">
           {ticks.map((t, i) => <line key={i} x1={x(t)} x2={x(t)} y1="0" y2="44" className="sx-grid" />)}
           {(auction || wins ? n : g.values.length) >= MIN_DISTRIBUTION && <rect x={x(auction || wins ? q25! : g.q25)} y="17" width={Math.max(0, x(auction || wins ? q75! : g.q75) - x(auction || wins ? q25! : g.q25))} height="10" className="sx-iqr" />}

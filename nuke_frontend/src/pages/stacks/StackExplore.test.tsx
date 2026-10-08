@@ -44,7 +44,7 @@ it('opens on four measured corpus views and never auto-loads or displays a demon
   expect(container.querySelector('.sx-expression')).toBeNull();
 });
 it('carries make→model→auction comparison into its contributing source drill', async () => {
-  await render();await click(button('Raise size by make','.sx-preview-title'));
+  await render();await click(container.querySelector('[aria-label="Explore raise size by make"]'));
   await click(button('Chevrolet','.sx-distribution-row'));
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('10 auctions');
   await click(button('Corvette','.sx-distribution-row'));
@@ -104,7 +104,7 @@ it('opens the clicked overview make directly, with recognizable local logos and 
   await render();
   const overview = container.querySelector('.sx-overview')!;
   expect(overview.querySelectorAll('button button')).toHaveLength(0);
-  expect(overview.querySelector('img[src="/stacks/makes/chevrolet.svg"]')?.getAttribute('width')).toBe('24');
+  expect(overview.querySelector('img[src="/stacks/makes/chevrolet-wordmark.svg"]')?.getAttribute('width')).toBe('104');
   await click(button('Chevrolet','.sx-preview[aria-label="Raise size by make"] .sx-distribution-row'));
   expect(container.querySelector('.sx-breadcrumb')?.textContent).toContain('Chevrolet');
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('by model');
@@ -150,4 +150,60 @@ it('keeps a scatter drill on its paired denominator until the user explicitly br
   expect(back.get('paired')).toBe('entry-outcome');
   await click(button('All captured outcomes'));
   expect(container.querySelector('.sx-contributors')?.textContent).toContain('13 recorded wins / 13 known winner records');
+});
+
+it('explains a heading term on demand and replaces the measure without losing the selected vehicle scope', async () => {
+  await render('/stacks?stack=SA&by=auction&measure=typical&make=Chevrolet&model=Corvette&vehicleYear=2002&from=2026&to=2026');
+  expect(container.querySelector('.sx-term-panel')).toBeNull();
+  await click(container.querySelector('[aria-label="Explain or change Average record median raise"]'));
+  expect(container.querySelector('.sx-term-panel')?.textContent).toContain('median relative raise within each auction record');
+  await select('Replace measure','increment');
+  expect(container.querySelector('.sx-term-panel')).toBeNull();
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('Mean raise');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('5 auctions');
+  await click(container.querySelector('.sx-distribution-row'));
+  const back = new URLSearchParams(new URL(container.querySelector('.sx-contributors a')!.getAttribute('href')!,'https://nuke.ag').searchParams.get('back')!);
+  expect(back.get('measure')).toBe('increment'); expect(back.get('model')).toBe('Corvette'); expect(back.get('vehicleYear')).toBe('2002');
+});
+
+it('replaces the grouping from an overview keyword and keeps incompatible participant measures out of a market grouping', async () => {
+  await render(); await click(container.querySelector('.sx-preview[aria-label="Raise size by make"] [aria-label="Explain or change make"]'));
+  await select('Replace grouping','year');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('by bid calendar year');
+  await select('Group by','participant'); await select('Measure','winRate');
+  await click(container.querySelector('[aria-label="Explain or change participant"]'));
+  await select('Replace grouping','make');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('Average record median raise by make');
+});
+
+it('pages through additional makes with an unchanged axis and reference, then searches all groups', async () => {
+  const d=data();
+  ['Audi','Ferrari','Honda','Jaguar','Jeep','Mazda','Porsche'].forEach((make,i) => d.lots.push({...d.lots[0],id:`extra-${i}`,vehicleId:`extra-vehicle-${i}`,title:make,make}));
+  fixture.study={...fixture.study,data:d};
+  await render();
+  const plot=() => container.querySelector('.sx-preview[aria-label="Raise size by make"]')!;
+  const axis=plot().querySelector('.sx-comparison-axis')!.textContent, reference=plot().querySelector('.sx-reference-inspector summary')!.textContent;
+  const first=[...plot().querySelectorAll('.sx-distribution-row')].map(e => e.getAttribute('aria-label'));
+  await click(button('Next','.sx-make-pages button'));
+  expect([...plot().querySelectorAll('.sx-distribution-row')].map(e => e.getAttribute('aria-label'))).not.toEqual(first);
+  expect(plot().querySelector('.sx-comparison-axis')!.textContent).toBe(axis);
+  expect(plot().querySelector('.sx-reference-inspector summary')!.textContent).toBe(reference);
+  await click(button('All 9 makes'));
+  const before=container.querySelector('.sx-reference-inspector summary')!.textContent;
+  const input=container.querySelector('.sx-make-search input') as HTMLInputElement;
+  await act(async () => {Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'Jaguar');input.dispatchEvent(new Event('input',{bubbles:true}));});
+  expect(container.querySelectorAll('.sx-distribution-row')).toHaveLength(1);
+  expect(container.querySelector('.sx-distribution-row')?.textContent).toContain('Jaguar');
+  expect(container.querySelector('.sx-reference-inspector summary')!.textContent).toBe(before);
+});
+
+it('preserves an excluded subject vehicle through the cohort contributor drill until explicitly included', async () => {
+  await render('/stacks?stack=SA&by=auction&measure=bids&make=Chevrolet&excludeVehicle=vehicle-0&from=2026&to=2026');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('9 auctions');
+  expect(container.querySelector('.sx-selection-note')?.textContent).toContain('excludes selected vehicle');
+  await click(container.querySelector('.sx-distribution-row'));
+  const back=new URLSearchParams(new URL(container.querySelector('.sx-contributors a')!.getAttribute('href')!,'https://nuke.ag').searchParams.get('back')!);
+  expect(back.get('excludeVehicle')).toBe('vehicle-0');
+  await click(button('Include selected vehicle'));
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('10 auctions');
 });
