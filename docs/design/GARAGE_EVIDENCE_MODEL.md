@@ -2,9 +2,10 @@
 
 Status, 2026-10-07: the bounded private relationship/cover correction contract was
 owner-approved, admitted and deployed through PR 876. Its web reader shipped in
-PR 877. Native profile/source integration is implemented and locally tested, with
+PR 877. Native profile/source integration merged through PR 880, with
 phone delivery and real-library verification still pending. The broader physical
-identity and album/read synchronization contract remains incomplete.
+identity contract remains incomplete. The private native album intake described
+below is implemented and locally tested; its deployment is a separate stage.
 
 The garage currently projects one winning relationship from ownership periods,
 approved proofs and previous-owner discoveries. That projection cannot represent
@@ -111,8 +112,52 @@ Limited access preserves selected-photo coverage while album coverage stays unkn
 The own profile consumes exact serial candidates, account relationship statements,
 conflicts and unknown dates from this record and opens the original source viewer.
 These candidates are not canonical bindings. Remaining work includes independent
-appearance-based identity, owner confirmation of unresolved candidates and sanctioned
-album/read synchronization. It does not yet recognize every vehicle from appearance.
+appearance-based identity, owner confirmation of unresolved candidates and cloud
+retention of complete independent readings. It does not yet recognize every vehicle from appearance.
+
+### Native grouping intake (implemented 2026-10-08)
+
+`bulk_add_to_image_set(p_native_album, p_readings)` extends the existing album
+writer. One immutable `image_sets` row retains an observed source album state:
+native identifier, name, folder path, source kind, presence, exact local photo
+references and source versions. `source_capture_id` is the account-scoped replay
+key; `source_predecessor_id` is its typed predecessor; `source_observed_at` is the
+app's grouping-observation clock. It is neither album creation nor photo capture
+time. Source references remain even when no corresponding cloud image exists.
+
+The actual authenticated account admits its own private capture. Native source
+groups have no vehicle parent. An existing restrictive policy prevents reading
+another account's group through legacy public-album rules. `album_sync_map` holds
+the latest selector in an installation-specific `ios-source:` namespace, separate
+from the older Mac importer's approximate vehicle mapping. Explicit predecessor
+checks and immutable request content prevent delayed retries from restoring an
+older state. Removed albums append an absent state; limited Photos access never
+implies removal. The web personal-album reader uses this current selector while
+historical captures remain addressable by ID.
+Native source inserts also require the typed writer's definer context and actual
+account identity; ordinary direct album inserts cannot masquerade as this intake.
+
+Independent byte witnesses add `image_set_members` links only when a current
+local read identifies the same source reference/version and exactly one eligible
+uploaded original belongs to this account with that PhotoKit UUID and SHA-256.
+The source-image witness is retained in member notes; existing member writers
+cannot insert an unqualified link or edit it. This confirms source context, not
+the image's assigned physical vehicle. Unknown versions, missing uploads,
+documents and ambiguous cloud leaves remain unlinked. Source and unlinked counts
+are returned alongside linked membership. The RPC accepts at most 50,000 source
+references / 25 MB per source capture and 200 byte witnesses per call; larger
+captures remain locally retained and pending rather than being called complete.
+
+The native account-scoped outbox starts a new account at the current catalog,
+then drains later offline source changes in order. A stable request retries until
+its landed receipt; a failed network attempt cannot advance it. Bounded foreground
+and existing background passes rotate pending byte witnesses and retry after
+the tail wraps. This transport exports grouping metadata and byte witnesses;
+raw OCR/labels and source pixels retain their existing local/upload boundaries.
+It does not add a paid job or restart held analysis.
+Only native source albums enter this grouping writer. Unorganized accessible
+photos remain in the local full-library record and independent pass; the transport
+does not invent an album for them or claim cloud source coverage is complete.
 
 Hero selection must use an eligible image whose identity supports this vehicle:
 an explicit owner choice first, then independently supported whole-vehicle views.
@@ -127,12 +172,19 @@ verify web/native agreement, demonstrate offline album rendering with zero netwo
 and compare runtime results with the owner corrections. Full accessible-library
 coverage, unresolved identities, unread images and inferred work must be visible.
 
-Twelve native ledger/projection tests demonstrate actual SQLite reopening, account
+Sixteen native ledger/projection/outbox tests demonstrate actual SQLite reopening, account
 isolation, source/method invalidation, unalbumed coverage, duplicate-serial conflicts
-and correction-role/cover persistence. The Simulator build passes; native source
+and correction-role/cover persistence, stable retries, offline grouping history and
+limited-access removal safety. The Simulator build passes; native source
 navigation renders using actual simulator Photos. Apple Vision fails to initialize
 in that simulator, so complete independent readings there remain pending. No
 real-phone, full-library or Airplane Mode/zero-network proof is implied.
+
+The isolated PostgreSQL fixture `scripts/tests/native-album-source.sql` exercises
+source retention, same-account byte qualification, ambiguous originals, typed
+lineage, historical replay, privacy and immutability against the actual migration.
+Run it through `scripts/test-garage-owner-corrections.sh native-album-source`;
+the harness uses installed PostgreSQL and a disposable local Unix socket.
 
 The approved bounded production correction support and the website deployment
 have separate receipts. Private correction excerpts and identifiers stay outside

@@ -32,6 +32,78 @@ final class PhotoAlbumLedgerTests: XCTestCase {
         XCTAssertTrue(payloads[0].contains("Human grouping"))
     }
 
+    func testNativeOutboxRetriesIdenticalContentAndPreservesOrderedOfflineChanges() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        func save(_ name: String) throws {
+            try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [album(name: name)]))
+        }
+        try save("A")
+        let first = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account-one"))
+        XCTAssertEqual(try store.nextNativeAlbumCapture(userId: "account-one")?.payloadJSON, first.payloadJSON)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(first.payloadJSON.utf8)) as? [String: Any])
+        XCTAssertTrue(json["previous_capture_id"] is NSNull)
+        XCTAssertEqual(json.count, 7)
+        try save("B")
+        try save("A")
+        // A landed response, rather than a network attempt, acknowledges this state.
+        try store.acknowledgeNativeAlbumCapture(first, setId: "first-set", captureId: first.requestId)
+        let second = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account-one"))
+        XCTAssertTrue(second.payloadJSON.contains("\"name\":\"B\""))
+        XCTAssertTrue(second.payloadJSON.contains(first.requestId))
+        try store.acknowledgeNativeAlbumCapture(second, setId: "second-set", captureId: second.requestId)
+        let third = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account-one"))
+        XCTAssertTrue(third.payloadJSON.contains("\"name\":\"A\""))
+        XCTAssertNotEqual(third.requestId, first.requestId)
+        try store.acknowledgeNativeAlbumCapture(third, setId: "third-set", captureId: third.requestId)
+        XCTAssertNil(try store.nextNativeAlbumCapture(userId: "account-one"))
+        // A different account starts at the currently observed state, not B's history.
+        let other = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account-two"))
+        XCTAssertTrue(other.payloadJSON.contains("\"name\":\"A\""))
+        XCTAssertFalse(other.payloadJSON.contains(third.requestId))
+        XCTAssertTrue(other.payloadJSON.contains("\"previous_capture_id\":null"))
+    }
+
+    func testNativeOutboxLimitedAccessDoesNotDeleteAndFullRemovalAppendsTombstone() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [album()]))
+        let first = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account"))
+        try store.acknowledgeNativeAlbumCapture(first, setId: "set", captureId: first.requestId)
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: []))
+        XCTAssertNil(try store.nextNativeAlbumCapture(userId: "account"))
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: []))
+        let removed = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account"))
+        XCTAssertTrue(removed.payloadJSON.contains("\"present\":false"))
+        XCTAssertTrue(removed.payloadJSON.contains("\"photos\":[]"))
+        XCTAssertTrue(removed.payloadJSON.contains(first.requestId))
+    }
+
+    func testNativeOutboxDoesNotInventAnAlbumForUnorganizedPhotos() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [], photos: [photo]))
+        XCTAssertNil(try store.nextNativeAlbumCapture(userId: "account"))
+        XCTAssertEqual(try store.latestAlbumCatalog()?.photos, [photo])
+    }
+
+    func testNativeByteLinksRemainPendingOfflineAndExcludeStaleOrRejectedReads() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [album()]))
+        let request = try XCTUnwrap(store.nextNativeAlbumCapture(userId: "account"))
+        try store.acknowledgeNativeAlbumCapture(request, setId: "set", captureId: request.requestId)
+        try store.recordAlbumImageReview(review(LocalAlbumPhoto(localIdentifier: photo.localIdentifier, sourceVersion: "old-version")))
+        XCTAssertNil(try store.nextNativeAlbumLinks(userId: "account", methodVersion: method))
+        try store.recordAlbumImageReview(review(photo))
+        let first = try XCTUnwrap(store.nextNativeAlbumLinks(userId: "account", methodVersion: method))
+        let retry = try XCTUnwrap(store.nextNativeAlbumLinks(userId: "account", methodVersion: method))
+        XCTAssertEqual(first.witnesses.map(\.read_id), retry.witnesses.map(\.read_id))
+        XCTAssertEqual(first.capture.requestId, request.requestId)
+        XCTAssertNil(try store.nextNativeAlbumLinks(userId: "other-account", methodVersion: method))
+        store.setOwnerVerdict([photo.localIdentifier], verdict: "rejected")
+        XCTAssertNil(try store.nextNativeAlbumLinks(userId: "account", methodVersion: method))
+        let encoded = String(decoding: try JSONEncoder().encode(first.witnesses), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("textLines"))
+        XCTAssertFalse(encoded.contains("vinCandidates"))
+    }
+
     func testOverlappingAlbumsKeepSeparateHumanMembershipsAndShareOneRead() throws {
         let store = try LocalStore(databaseQueue: DatabaseQueue())
         let first = album("one", name: "Owned")

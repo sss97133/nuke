@@ -235,18 +235,19 @@ struct LibraryAlbumsView: View {
                 if store.albumCatalog?.accessScope == "full" || store.albumCatalog?.accessScope == "limited" {
                     Section("On-device pass") {
                         Button("Analyze library") {
-                            Task { await ingest.runAlbumReview(); await reloadEvidence() }
+                            Task { await ingest.runAlbumReview(); await ingest.syncNativeAlbums(); await reloadEvidence() }
                         }.disabled(ingest.running)
                         if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
                         if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                        if let summary = ingest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             }
             .navigationTitle("Albums")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
-            .task { await reloadEvidence(); await store.refreshAlbums(); await reloadEvidence() }
-            .refreshable { await store.refreshAlbums(); await reloadEvidence() }
+            .task { await reloadEvidence(); await store.refreshAlbums(); await reloadEvidence(); await ingest.syncNativeAlbums() }
+            .refreshable { await store.refreshAlbums(); await reloadEvidence(); await ingest.syncNativeAlbums() }
             .onChange(of: ingest.running) { _, running in if !running { Task { await reloadEvidence() } } }
         }
     }

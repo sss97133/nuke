@@ -47,6 +47,7 @@ final class LibraryIngest: ObservableObject {
     @Published private(set) var backlogComplete = false  // whole library walked at least once
     @Published private(set) var cloudCached = 0          // photos with a cached "Read by Nuke" verdict
     @Published private(set) var albumReviewSummary: String?
+    @Published private(set) var albumSyncSummary: String?
     @Published private(set) var albumReviewDone = 0
     @Published private(set) var albumReviewTarget = 0
     private var cloudRunning = false
@@ -191,6 +192,10 @@ final class LibraryIngest: ObservableObject {
         } catch {
             albumReviewSummary = "Analysis could not be saved. Remaining photos are still pending."
         }
+    }
+
+    func syncNativeAlbums(budget: Int = 8) async {
+        if let summary = await NativeAlbumPush.run(budget: budget) { albumSyncSummary = summary }
     }
 
     private struct AlbumPhotoReviewResult: Sendable {

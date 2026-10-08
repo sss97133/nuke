@@ -170,6 +170,13 @@ Updated: 2026-03-27
   `LocalStore.swift` (versioned local evidence and account projection),
   `LibraryView.swift`/`LibraryDetail.swift`/`LibraryInfo.swift` (original-source drill),
   `ProfileTab.swift` (own-user profile/garage consumer).
+- **Private native album source intake**: existing `bulk_add_to_image_set(jsonb,jsonb)`
+  overload; `image_sets` source capture/typed predecessor, `album_sync_map` current
+  selector and byte-qualified `image_set_members`. Native outbox/receipts:
+  `LocalStore.swift`, `LocalTagPush.swift`. Web current selector:
+  `nuke_frontend/src/services/imageSetService.ts`. Migration:
+  `20261008070000_native_album_source_capture.sql`; isolated assay:
+  `scripts/tests/native-album-source.sql`.
 - **Private garage correction intake/read**: `record_garage_owner_correction`,
   `get_my_garage_owner_corrections`; migration `20261008050000_garage_owner_corrections.sql`.
   Web fold: `nuke_frontend/src/hooks/garageOwnerCorrections.ts`. Contract and release
