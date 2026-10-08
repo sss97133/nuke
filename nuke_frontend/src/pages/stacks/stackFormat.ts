@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import type { BidMeasure } from './bidMeasurements';
 import type { LotRow, OrderBookRead, OrderBookView } from './orderBookReader';
 import type { LayerId, LayerState } from './stackDefinitions';
 
@@ -73,4 +75,20 @@ export function layerReadings(read: OrderBookRead, view: OrderBookView, baseline
     ...(baseline ? { baseline } : {}),
     ...(lot ? { outcome: view.window.open ? 'pending' : lot.winning_bid != null ? usd(Number(lot.winning_bid)) : outcomeWord(lot, false) } : {}),
   };
+}
+
+export function usePlotWidth() {
+  const [node, setNode] = useState<HTMLDivElement | null>(null), [width, setWidth] = useState(360);
+  useEffect(() => {
+    if (!node) return;
+    const resize = new ResizeObserver(([e]) => setWidth(Math.max(80, e.contentRect.width)));
+    resize.observe(node); return () => resize.disconnect();
+  }, [node]);
+  return { ref: setNode, width };
+}
+export function formatMeasure(metric: BidMeasure, v: number, compact = false) {
+  if (metric === 'amount' || metric === 'increment') return '$' + (compact && v >= 1000 ? (v / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'k' : v.toLocaleString('en-US', { maximumFractionDigits: compact ? 0 : 2 }));
+  if (['relative', 'typical', 'winRate', 'entry'].includes(metric)) return v.toLocaleString('en-US', { maximumFractionDigits: v > 0 && v < .1 ? 3 : compact ? 1 : 2 }) + '%';
+  if (metric === 'spacing') return v >= 86400 ? (v / 86400).toFixed(1) + 'd' : v >= 3600 ? (v / 3600).toFixed(1) + 'h' : v >= 60 ? (v / 60).toFixed(1) + 'm' : v.toLocaleString('en-US', { maximumFractionDigits: 1 }) + 's';
+  return v.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
