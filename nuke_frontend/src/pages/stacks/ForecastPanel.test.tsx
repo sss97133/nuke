@@ -52,8 +52,9 @@ it('signed out: no number, one line that says why, no request, and a way in', as
   expect(panel().dataset.forecast).toBe('signed-out');
   const text = panel().textContent!;
   expect(text).toContain('Signed out, so no forecast is shown.');
-  expect(text).toContain('service_role only');
-  expect(text).toContain('signed-in account or an API key');
+  expect(text).toContain("Sign in to read this lot's forecast");
+  expect(text).not.toContain('service_role');
+  expect(text).not.toContain('API key');
   expect(text).not.toMatch(/[$0-9]/);
   expect(panel().querySelectorAll('p')).toHaveLength(1);
   expect(panel().querySelector('a[href="/login"]')?.textContent).toBe('Sign in');

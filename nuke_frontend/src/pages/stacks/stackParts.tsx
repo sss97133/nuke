@@ -10,19 +10,16 @@ const COVERAGE_LAYER: Record<CoverageRow['id'], LayerId> = {
 };
 
 /** Every number with its denominator and the clock it is as of; an unknown denominator says so. */
-export function CoverageTable({ rows, readAt, caption, onOpen }: {
+export function CoverageTable({ rows, readAt, caption, onOpen, compact = false }: {
   rows: CoverageRow[];
   readAt: number;
   caption?: string;
   /** Opens the layer that holds a row's evidence. */
   onOpen?: (layer: LayerId) => void;
+  /** Keep the evidence limits visible while the full receipt opens in place. */
+  compact?: boolean;
 }) {
-  return (
-    <section className="stack-coverage" aria-label="Coverage">
-      <div className="stack-coverage-head">
-        <span className="stack-label">Coverage{caption ? ` · ${caption}` : ''}</span>
-        <span className="stack-label">Read {clock(readAt)}</span>
-      </div>
+  const table = (
       <table>
         <thead>
           <tr><th scope="col">Measure</th><th scope="col">Held / denominator</th><th scope="col">As of</th><th scope="col">Basis</th></tr>
@@ -58,6 +55,28 @@ export function CoverageTable({ rows, readAt, caption, onOpen }: {
           })}
         </tbody>
       </table>
+  );
+  return (
+    <section className="stack-coverage" aria-label="Coverage">
+      <div className="stack-coverage-head">
+        <span className="stack-label">Coverage{caption ? ` · ${caption}` : ''}</span>
+        <span className="stack-label">Read {clock(readAt)}</span>
+      </div>
+      {compact ? (
+        <details className="stack-coverage-receipt">
+          <summary>
+            <span className="stack-label">Evidence limits</span>
+            {rows.map((r) => (
+              <span key={r.id} className={r.id === 'key_conflicts' ? 'stack-coverage-conflict' : undefined}>
+                {r.label} <strong className="stack-mono">{r.numerator == null ? 'unknown' : count(r.numerator)} / {r.denominator == null ? 'unknown' : count(r.denominator)}</strong>
+                <span className="stack-basis"> {r.of}</span>
+              </span>
+            ))}
+            <span className="stack-label">Clocks & sources ↓</span>
+          </summary>
+          {table}
+        </details>
+      ) : table}
     </section>
   );
 }
