@@ -122,7 +122,7 @@
 .sx-page table { width:100%; border-collapse:collapse; font:12px Arial,sans-serif; text-align:left; }
 .sx-page th { color:var(--text-secondary); font-size:9px; letter-spacing:.05em; text-transform:uppercase; font-weight:700; padding:10px 8px; border-bottom:2px solid var(--border); }
 .sx-page td { padding:10px 8px; border-bottom:2px solid var(--border); }
-.sx-page td a { text-decoration:underline; text-underline-offset:3px; }
+.sx-page td a { display:inline-block; text-decoration:underline; text-underline-offset:3px; }
 .sx-page td small { display:block; margin-top:4px; color:var(--text-secondary); font-size:10px; }
 .sx-number { font-family:'Courier New',monospace; white-space:nowrap; text-align:right; }
 .sx-method { margin-top:28px; border-top:2px solid var(--border); }
