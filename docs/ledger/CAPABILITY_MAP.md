@@ -32,7 +32,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Image → make/model/angle (tier-0) | `yono-analyze` → `yono-classify` → local sidecar | analyze-image / vision-analyze-image / yono-batch-process (deleted; map still says analyze-image is "the gateway"), identify-vehicle-from-image (cloud — external MCP/cockpit only) |
 | Analysis engine / signals | `analysis-engine-coordinator` (drains analysis_queue → analysis_signals) | api-v1-analysis (unadvertised read wrapper) |
 | Comment analysis / sentiment | `analyze-comments-fast` + `batch-comment-discovery`; ledger = `comment_discoveries` | update-live-sentiment (dead), discover-comment-data (deleted); NEVER mint a new sentiment store — reuse vehicle_sentiment |
-| Description mining | `discover-description-data`; ledger = `description_discoveries` | analyze-vehicle-description (deleted) |
+| Description mining | `discover-description-data`; ledger = `description_discoveries`; bounded read-only operator `scripts/discovery/buying-evidence.mjs` locates exact retained description/comment/image-extraction excerpts for 1–10 named public vehicles, reuses `batParser` on digest-verified inline captures, and writes private comparison receipts. Search candidates only; no admission, inference, calibrated cost or reliability claim. See `scripts/discovery/buying-evidence.md`. | analyze-vehicle-description (deleted) |
 | User-billed AI chat (BYOK funnel) | `analyze-with-claude` (+ `set-ai-provider` config) | image-ai-chat (image-scoped only, not the general funnel) |
 | Public vision API | `api-v1-vision` | — |
 | Image validation | `validate-vehicle-image` † | validate-bat-image (deleted) |
