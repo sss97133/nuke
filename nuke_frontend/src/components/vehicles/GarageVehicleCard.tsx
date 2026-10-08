@@ -76,6 +76,10 @@ function optimizeImageUrl(url: string): string {
 }
 
 function ownershipPeriod(vehicle: GarageVehicle): string {
+  if (vehicle.relationship_source === 'owner_statement' &&
+      !['OWNER', 'VERIFIED OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'].includes(vehicle.relationship_type)) {
+    return vehicle.relationship_detail || 'DATES UNKNOWN';
+  }
   const start = vehicle.ownership_start_date ?? 'START UNKNOWN';
   const end = vehicle.ownership_end_date ??
     (['OWNER', 'VERIFIED OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'CURRENT' : 'END UNKNOWN');
@@ -83,7 +87,10 @@ function ownershipPeriod(vehicle: GarageVehicle): string {
 }
 
 function relationshipTooltip(vehicle: GarageVehicle): string {
-  return `${vehicle.relationship_type} | ${ownershipPeriod(vehicle)} | ${vehicle.relationship_source.toUpperCase()}`;
+  return [vehicle.relationship_roles?.join(', ') || vehicle.relationship_type,
+    ownershipPeriod(vehicle), vehicle.relationship_detail,
+    vehicle.relationship_source === 'owner_statement' ? 'ACCOUNT STATED' : vehicle.relationship_source.toUpperCase()]
+    .filter(Boolean).join(' | ');
 }
 
 function estimateTooltip(vehicle: GarageVehicle): string {

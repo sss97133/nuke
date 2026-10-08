@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { applyGarageOwnerCorrections, type GarageOwnerCorrection } from './garageOwnerCorrections';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,6 +18,12 @@ export type RelationshipType =
   | 'CO-OWNER'
   | 'PREVIOUSLY OWNED'
   | 'CONSIGNED'
+  | 'SHARED INTEREST'
+  | 'CLAIMED INTEREST'
+  | 'BUSINESS HANDLING'
+  | 'SALES REPRESENTATIVE'
+  | 'TRANSFER PENDING'
+  | 'RELATIONSHIP REVIEW'
   | 'OWNERSHIP CLAIM'
   | 'CONTRIBUTOR';
 
@@ -54,7 +61,9 @@ export interface GarageVehicle {
   created_at: string;
   updated_at: string;
   relationship_type: RelationshipType;
-  relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by';
+  relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by' | 'owner_statement';
+  relationship_roles?: RelationshipType[];
+  relationship_detail?: string;
   relationship_id?: string;
   ownership_start_date?: string | null;
   ownership_end_date?: string | null;
@@ -134,8 +143,14 @@ export interface VehiclesDashboardState {
 // ---------------------------------------------------------------------------
 
 const RELATIONSHIP_PRIORITY: RelationshipType[] = [
+  'RELATIONSHIP REVIEW',
   'CONTRIBUTOR',
+  'SALES REPRESENTATIVE',
+  'BUSINESS HANDLING',
   'OWNERSHIP CLAIM',
+  'TRANSFER PENDING',
+  'CLAIMED INTEREST',
+  'SHARED INTEREST',
   'PREVIOUSLY OWNED',
   'CONSIGNED',
   'CO-OWNER',
@@ -232,7 +247,7 @@ export function resolveGarageRelationships(
 
 function matchesFilter(v: GarageVehicle, filter: FilterMode): boolean {
   if (filter === 'ALL') return true;
-  if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'].includes(v.relationship_type);
+  if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'].includes(v.relationship_type);
   if (filter === 'CONTRIBUTED') return v.relationship_type === 'CONTRIBUTOR';
   return true;
 }
@@ -272,7 +287,7 @@ function garageToMyVehicle(v: GarageVehicle): MyVehicle {
   };
 }
 
-const MY_RELATIONSHIP_TYPES: RelationshipType[] = ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'];
+const MY_RELATIONSHIP_TYPES: RelationshipType[] = ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'];
 
 function buildDashboardData(
   sections: GarageSection[],
@@ -284,7 +299,7 @@ function buildDashboardData(
     const list = s.vehicles.map(garageToMyVehicle);
     if (MY_RELATIONSHIP_TYPES.includes(s.relationship_type)) {
       myVehicles.push(...list);
-    } else if (s.relationship_type === 'CONTRIBUTOR') {
+    } else if (['CONTRIBUTOR', 'CONSIGNED', 'SALES REPRESENTATIVE'].includes(s.relationship_type)) {
       clientVehicles.push(...list);
     }
   }
@@ -425,7 +440,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
       try {
         // Preserve the May 23 owner decision: import permissions, contributors
         // and uploaded_by are not evidence of ownership and stay excluded.
-        const [verifiedRes, prevOwnedRes, ownershipRes] = await Promise.all([
+        const [verifiedRes, prevOwnedRes, ownershipRes, correctionRes] = await Promise.all([
           supabase.from('ownership_verifications')
             .select('id, vehicle_id, status, expires_at')
             .eq('user_id', userId)
@@ -438,14 +453,21 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           supabase.from('vehicle_ownerships')
             .select('id, vehicle_id, role, is_current, start_date, end_date, verification_id, created_at')
             .eq('owner_profile_id', userId),
+          supabase.rpc('get_my_garage_owner_corrections'),
         ]);
         if (cancelled) return;
-        for (const res of [verifiedRes, prevOwnedRes, ownershipRes]) {
+        for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
           if (res.error) throw new Error('Garage relationships unavailable. Please retry.');
         }
         const relMap = resolveGarageRelationships(
           ownershipRes.data ?? [], verifiedRes.data ?? [], prevOwnedRes.data ?? [],
         );
+        const corrections = (correctionRes.data ?? []) as GarageOwnerCorrection[];
+        // Statements can concern a vehicle missing from the legacy ownership union.
+        for (const c of corrections) {
+          if (!relMap.has(c.vehicle_id)) relMap.set(c.vehicle_id, { type: 'RELATIONSHIP REVIEW',
+            source: 'owner_statement', id: c.id, start_date: null, end_date: null });
+        }
 
         // Hydrate all vehicle IDs in the relationship map
         const idsToFetch = Array.from(relMap.keys());
@@ -555,7 +577,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
         }
 
-        setRawVehicles(garage);
+        setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
       } catch (err: unknown) {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : 'Unknown error fetching vehicles';
