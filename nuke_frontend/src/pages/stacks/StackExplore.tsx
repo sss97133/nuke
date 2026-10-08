@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import catalog from './stackCatalog.json';
@@ -130,7 +130,15 @@ function DefinitionView({ id, change }: { id: string; change: Change }) {
 
 export default function StackExplore() {
   const [params, setParams] = useSearchParams(), [search, setSearch] = useState('');
-  const change: Change = changes => setParams(previous => { const next = new URLSearchParams(previous); for (const [k, v] of Object.entries(changes)) { if (v === null) next.delete(k); else next.set(k, v); } return next; });
+  // Router search-param callbacks do not queue like React state setters. Preserve rapid
+  // successive control patches while also accepting back/forward and shared-URL changes.
+  const pendingParams = useRef(params);
+  useEffect(() => { pendingParams.current = params; }, [params]);
+  const change: Change = changes => {
+    const next = new URLSearchParams(pendingParams.current);
+    for (const [k, v] of Object.entries(changes)) { if (v === null) next.delete(k); else next.set(k, v); }
+    pendingParams.current = next; setParams(next);
+  };
   const selectedStack = catalog.some(c => c.id === params.get('stack')) ? params.get('stack')! : 'overview', binding = bindings[selectedStack];
   const expression = useMemo(() => expressionFromParams(params), [params]), study = useBidStudy();
   const request: PopulationRequest | null = params.get('source') === 'read' ? { make: expression.make, model: null, year: expression.to } : null;

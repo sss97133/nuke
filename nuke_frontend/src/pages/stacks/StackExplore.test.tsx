@@ -64,6 +64,22 @@ it('changes measurement contributors by vehicle year independently of the bid ca
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('Mean raise');
   expect(container.querySelectorAll('.sx-distribution-row')).toHaveLength(5);
 });
+it('preserves scope when model and grouping controls change before navigation commits', async () => {
+  await render('/stacks?stack=SA&make=Chevrolet&by=make&from=2026&to=2026');
+  const selects = [...container.querySelectorAll('label')];
+  const model = selects.find(e => e.childNodes[0]?.textContent === 'Model label')!.querySelector('select')!;
+  const grouping = selects.find(e => e.childNodes[0]?.textContent === 'Group by')!.querySelector('select')!;
+  await act(async () => {
+    model.value = 'Corvette'; model.dispatchEvent(new Event('change',{bubbles:true}));
+    grouping.value = 'auction'; grouping.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  expect(container.querySelector('.sx-breadcrumb')?.textContent).toContain('Corvette');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('by auction');
+  await click(container.querySelector('.sx-distribution-row'));
+  const href = container.querySelector('.sx-contributors a')!.getAttribute('href')!;
+  const back = new URLSearchParams(new URL(href,'https://nuke.ag').searchParams.get('back')!);
+  expect(back.get('make')).toBe('Chevrolet'); expect(back.get('model')).toBe('Corvette'); expect(back.get('by')).toBe('auction');
+});
 it('restores selected contributors from a shared URL and labels a participant record as captured outcomes', async () => {
   await render('/stacks?stack=S03&by=participant&measure=typical&from=2026&to=2026&group=a');
   expect(container.querySelector('.sx-contributors')?.textContent).toContain('12 recorded wins / 12 known winner records in this sample');
