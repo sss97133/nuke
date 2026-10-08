@@ -387,6 +387,7 @@ function MissingTag({ label }: { label: string }) {
 }
 
 function HealthBar({ score, vehicle }: { score: number | null; vehicle: GarageVehicle }) {
+  if (score == null || !Number.isFinite(score)) return null;
   const pct = score != null ? Math.max(0, Math.min(100, score)) : null;
   const barColor =
     pct == null
