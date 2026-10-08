@@ -219,6 +219,12 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_taxonomy_ci -f supabase/sql/test_vehicle_taxonomy_fold.sql -f supabase/sql/test_vehicle_taxonomy_attacks.sql
       - name: Verify taxonomy intake under worker locks on real PostgreSQL backends
         run: python3 scripts/test-vehicle-taxonomy-concurrency.py dm_refinement_vehicle_taxonomy_ci
+      - name: Create disposable retained factory reference database
+        run: createdb dm_refinement_vin_reference_ci
+      - name: Verify typed factory source custody, replay, cached reader, bounded claims and API roles
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vin_reference_ci -f supabase/sql/test_retained_vin_reference_intake.sql
+      - name: Verify factory intake under real backend locks
+        run: python3 scripts/test-retained-vin-reference-concurrency.py dm_refinement_vin_reference_ci
       - name: Create disposable protected archived sale intake database
         run: createdb dm_refinement_bat_sale_intake_ci
       - name: Verify protected capture receipts, private work isolation, retries and bounds
@@ -405,6 +411,10 @@ jobs:
         run: node --test scripts/check-structure-review-closeout.test.mjs
       - name: Verify retained source account admission and conflict preservation
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
+      - name: Verify retained VIN qualifier, canonical HTTP intake and bounded worker
+        run: deno test --allow-env supabase/functions/ingest-observation/ supabase/functions/batch-vin-decode/retainedReferenceQueue.test.ts
+      - name: Type check the existing VIN worker
+        run: deno check supabase/functions/batch-vin-decode/index.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)

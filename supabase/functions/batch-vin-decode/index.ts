@@ -14,7 +14,8 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
+import { drainRetainedReferenceQueue } from "./retainedReferenceQueue.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,13 @@ Deno.serve(async (req) => {
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    if (body.use_retained_reference_queue !== undefined) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return okJson({ error: "Retained reference queue requires service role" }, 403);
+      }
+      return await drainRetainedReferenceQueue(supabase, body);
+    }
     const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 500);
     const dryRun = body.dry_run === true;
     const sourceFilter = body.source_filter || null;
