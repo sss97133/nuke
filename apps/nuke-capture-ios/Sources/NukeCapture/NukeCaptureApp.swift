@@ -71,6 +71,9 @@ struct NukeCaptureApp: App {
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "library" {
+                    // Actual on-device sources and album passes; no injected account.
+                    LibraryView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
                     DebugScreenDeepLink()
                 } else if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
@@ -119,6 +122,11 @@ struct NukeCaptureApp: App {
                 // keep this a small freshen; the deep backlog is the BGProcessingTask's job.
                 Task(priority: .background) {
                     try? await Task.sleep(for: .seconds(3))
+                    // The source record starts at intake, before opening Profile.
+                    // Bounded local originals only; deeper progress uses the
+                    // existing power/Wi-Fi backfill job.
+                    await LibraryStore.shared.refreshAlbums()
+                    await LibraryIngest.shared.runAlbumReview(budget: 24)
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
                 if !LibraryIngest.shared.backlogComplete {

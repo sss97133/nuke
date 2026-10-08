@@ -36,6 +36,16 @@ The system manages three entity types. These are universal across all verticals.
 - Has a profile that accumulates reputation from traced actions, not from declared identity.
 - May operate personal business entities (LLC, GmbH, estate) — those are organizations, not users.
 
+The native user profile starts with source image intake. Its garage is a projection
+of that user record: native album membership is human organization, independent
+original-byte readings supply candidate physical identity, and attributed role/title
+statements supply the person's relationship. An album, upload or work photograph
+does not establish ownership or the performer. Personal ownership, business handling,
+consignment, representation, shared/disputed interest and pending transfer remain
+distinct, with unknown period bounds and conflicts retained. See the current
+[garage evidence contract](../../../design/GARAGE_EVIDENCE_MODEL.md) for implemented
+stages and remaining identity/synchronization work.
+
 ### ORGANIZATION (gallery, auction house, museum, magazine, shop, foundation, estate, studio, publisher, racing team, dealer, freeport, university, shipping company)
 - CAN become an asset (a magazine's archive has value; a gallery's roster is intellectual property; an auction house's records are historical documents).
 - Accumulates value through the assets it touches and the actors it connects.

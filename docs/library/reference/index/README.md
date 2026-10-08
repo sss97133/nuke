@@ -165,6 +165,15 @@ Updated: 2026-03-27
 - **Spec**: Design Book Chapter 2 (Components), Chapter 3 (Interactions)
 
 ### Image Pipeline / YONO
+- **Native profile source record**: `apps/nuke-capture-ios/Sources/NukeCapture/LibraryStore.swift`
+  (Photos catalog), `LibraryIngest.swift` (independent original-byte reading),
+  `LocalStore.swift` (versioned local evidence and account projection),
+  `LibraryView.swift`/`LibraryDetail.swift`/`LibraryInfo.swift` (original-source drill),
+  `ProfileTab.swift` (own-user profile/garage consumer).
+- **Private garage correction intake/read**: `record_garage_owner_correction`,
+  `get_my_garage_owner_corrections`; migration `20261008050000_garage_owner_corrections.sql`.
+  Web fold: `nuke_frontend/src/hooks/garageOwnerCorrections.ts`. Contract and release
+  limits: `docs/design/GARAGE_EVIDENCE_MODEL.md`.
 - **Vehicle images table**: `vehicle_images`
 - **YONO classify**: `supabase/functions/yono-classify/index.ts` (make classification, $0/image)
 - **YONO analyze**: `supabase/functions/yono-analyze/index.ts` (condition/zone/damage via Florence-2)

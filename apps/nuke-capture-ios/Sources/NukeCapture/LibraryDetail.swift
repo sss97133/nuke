@@ -14,13 +14,15 @@ struct LibraryDetailView: View {
     /// library (the grid's behavior); a day drill passes that day's indices so the
     /// pager swipes only within the day. `startIndex` is always a global index.
     let indices: [Int]?
+    let localOnly: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var index: Int
     @State private var showInfo = false
 
-    init(startIndex: Int, indices: [Int]? = nil) {
+    init(startIndex: Int, indices: [Int]? = nil, localOnly: Bool = false) {
         self.startIndex = startIndex
         self.indices = indices
+        self.localOnly = localOnly
         _index = State(initialValue: startIndex)
     }
 
@@ -31,7 +33,7 @@ struct LibraryDetailView: View {
             Color.black.ignoresSafeArea()
             TabView(selection: $index) {
                 ForEach(pages, id: \.self) { idx in
-                    LibraryDetailPage(index: idx).tag(idx)
+                    LibraryDetailPage(index: idx, localOnly: localOnly).tag(idx)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -54,7 +56,7 @@ struct LibraryDetailView: View {
         }
         .sheet(isPresented: $showInfo) {
             if let asset = LibraryStore.shared.asset(at: index) {
-                LibraryInfoView(asset: asset)
+                LibraryInfoView(asset: asset, localOnly: localOnly)
             }
         }
     }
@@ -62,19 +64,26 @@ struct LibraryDetailView: View {
 
 private struct LibraryDetailPage: View {
     let index: Int
+    let localOnly: Bool
     @State private var image: UIImage?
+    @State private var loaded = false
 
     var body: some View {
         ZStack {
             if let image {
                 ZoomableImage(image: image)
+            } else if loaded {
+                Text("Original unavailable on this device")
+                    .foregroundStyle(.secondary)
             } else {
                 ProgressView().tint(.white)
             }
         }
         .task(id: index) {
-            guard let asset = LibraryStore.shared.asset(at: index) else { return }
-            image = await LibraryStore.shared.fullImage(for: asset)
+            image = nil; loaded = false
+            guard let asset = LibraryStore.shared.asset(at: index) else { loaded = true; return }
+            image = await LibraryStore.shared.fullImage(for: asset, allowNetwork: !localOnly, original: localOnly)
+            loaded = true
         }
     }
 }

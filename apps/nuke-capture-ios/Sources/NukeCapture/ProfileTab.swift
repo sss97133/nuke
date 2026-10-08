@@ -239,25 +239,6 @@ struct ProfileTab: View {
 
 // ─── The profile: name/handle · connections (own) · the day record ──────────
 
-/// One row from get_user_garage — the user's vehicle, enough to render a card
-/// and open VehicleDetailView.
-struct GarageVehicle: Decodable, Identifiable, Hashable {
-    let vehicle_id: String
-    let year: Int?
-    let make: String?
-    let model: String?
-    let trim_name: String?
-    let image_url: String?
-    let current_value: Double?
-    let image_count: Int
-    let relationship: String
-
-    var id: String { vehicle_id }
-    var title: String {
-        [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ")
-    }
-}
-
 struct ProfileView: View {
     let userId: String
     var isOwn: Bool = false
@@ -279,12 +260,19 @@ struct ProfileView: View {
     @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
     @State private var showPast = false           // "Past & contributions" stays collapsed
+    @State private var photoEvidence: LocalProfileEvidence?
+    @State private var photoEvidenceError: String?
+    @State private var showAlbums = false
+    @ObservedObject private var libraryIngest = LibraryIngest.shared
 
     // CURRENT stewardship headlines the garage; previously-owned / contributed-to
     // (departed — e.g. shipped-out trucks) are demoted to a collapsed section, not
     // mixed into "what I'm building now". Reads the relationship the RPC already returns.
     private var currentGarage: [GarageVehicle] { garage.filter { $0.relationship == "owner" } }
-    private var pastGarage: [GarageVehicle] { garage.filter { $0.relationship != "owner" } }
+    private var pastGarage: [GarageVehicle] { garage.filter { ["previously_owned", "contributor"].contains($0.relationship) } }
+    private var otherRelationships: [String] {
+        Array(Set(garage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
+    }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
@@ -310,6 +298,8 @@ struct ProfileView: View {
             Section { identityHeader }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+            if isOwn { photoEvidenceSection }
 
             // BARCODE — the proof-of-work graph, directly under the identity (the
             // labor story IS the headline; it belongs with the producer signals,
@@ -379,12 +369,58 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showAlbums) { LibraryAlbumsView(userId: userId) }
         // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
         .task(id: userId) { await loadLatest() }
         .task(id: userId) { await loadProducer() }
+        .task(id: userId) {
+            guard isOwn else { return }
+            await loadPhotoEvidence()
+            await LibraryStore.shared.refreshAlbums()
+            await loadPhotoEvidence()
+            await libraryIngest.runAlbumReview(budget: 24)
+            await loadPhotoEvidence()
+        }
+        .onChange(of: libraryIngest.running) { _, running in
+            if !running && isOwn { Task { await loadPhotoEvidence() } }
+        }
+    }
+
+    @ViewBuilder private var photoEvidenceSection: some View {
+        Section("Photo record") {
+            Button { showAlbums = true } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let evidence = photoEvidence {
+                        if let visible = evidence.catalog.photos?.count {
+                            Text("\(visible) accessible photos · \(evidence.reviewed) read on-device")
+                                .monospacedDigit()
+                        }
+                        if evidence.catalog.accessScope == "full" {
+                            Text("\(evidence.catalog.albums.count) albums · \(evidence.matched) serial matches")
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else { Text("Album coverage unknown").font(.caption).foregroundStyle(.secondary) }
+                        if evidence.unresolved > 0 {
+                            Text("\(evidence.unresolved) vehicle frames awaiting identity")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else { Label("Albums & source photos", systemImage: "photo.on.rectangle") }
+                }
+            }
+            if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func loadPhotoEvidence() async {
+        do {
+            let method = LibraryIngest.albumMethodVersion
+            photoEvidence = try await Task.detached {
+                try LocalStore.shared.profileEvidence(userId: userId, methodVersion: method)
+            }.value
+            photoEvidenceError = nil
+        } catch { photoEvidenceError = "Photo evidence unavailable" }
     }
 
     // ─── Latest work — recent understood days as stories (get_user_understanding) ─
@@ -593,6 +629,7 @@ struct ProfileView: View {
 
     // ─── Garage ──────────────────────────────────────────────────────────────
     @ViewBuilder private var garageSection: some View {
+      Group {
         if !currentGarage.isEmpty {
             Section {
                 // Offline mirror notice — never let cached rows silently pass as
@@ -616,8 +653,11 @@ struct ProfileView: View {
             // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
             // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
             // view is the SwiftUI pitfall where the second silently fails to present.
-            .sheet(item: $openVehicle) { v in
-                VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+        }
+        ForEach(otherRelationships, id: \.self) { role in
+            let rows = garage.filter { $0.relationship == role }
+            Section(rows.first?.relationshipLabel ?? role) {
+                ForEach(rows) { v in garageRow(v) }
             }
         }
         // Past & contributions — departed/peripheral, collapsed by default so the
@@ -628,7 +668,7 @@ struct ProfileView: View {
             } header: {
                 Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
                     HStack {
-                        Text("Past & contributions · \(pastGarage.count)")
+                        Text("History & other relationships · \(pastGarage.count)")
                         Spacer()
                         Image(systemName: showPast ? "chevron.up" : "chevron.down")
                             .font(.caption2)
@@ -638,6 +678,10 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
         }
+      }
+      .sheet(item: $openVehicle) { v in
+          VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+      }
     }
 
     @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
@@ -657,9 +701,15 @@ struct ProfileView: View {
                             .font(.caption2).monospacedDigit()
                             .foregroundStyle(.secondary)
                         if v.relationship != "owner" {
-                            Text(v.relationship.replacingOccurrences(of: "_", with: " "))
+                            Text(v.relationshipLabel)
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
+                    }
+                    if let detail = v.relationshipDetail {
+                        Text(detail).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let period = v.relationshipPeriod {
+                        Text(period).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
@@ -678,21 +728,42 @@ struct ProfileView: View {
     private func loadGarage() async {
         garageError = false
         do {
-            let rows: [GarageVehicle] = try await SupabaseService.client
+            async let legacyRows: [GarageVehicle] = SupabaseService.client
                 .rpc("get_user_garage", params: ["p_user_id": userId])
                 .execute()
                 .value
+            async let correctionRows = fetchOwnGarageCorrections()
+            var rows = try await legacyRows
+            let corrections = try await correctionRows
+            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.map(\.vehicle_id)))
+            if !ids.isEmpty {
+                let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
+                    .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
+                    .in("id", values: ids).execute().value
+                let byID = Dictionary(uniqueKeysWithValues: metadata.map { ($0.id, $0) })
+                let present = Set(rows.map(\.vehicle_id))
+                for m in metadata where !present.contains(m.id) {
+                    rows.append(GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
+                        model: m.normalized_model ?? m.model, trim_name: m.trim, image_url: m.primary_image_url,
+                        current_value: nil, image_count: m.image_count ?? 0, relationship: "relationship_review", vin: m.vin))
+                }
+                for index in rows.indices {
+                    if let m = byID[rows[index].id] {
+                        rows[index].vin = m.vin
+                        let normalized = m.normalized_model?.trimmingCharacters(in: .whitespaces)
+                        rows[index].model = normalized?.isEmpty == false ? normalized : m.model
+                    }
+                }
+            }
+            rows = GarageVehicle.applying(corrections, to: rows)
             garage = rows
             garageIsCached = false
             garageCachedAt = nil
             // Write-through: mirror the live rows into the offline cache (same
             // pattern as LocalStore's v4 cloud-verdict cache) so a later
             // network-down load can render this instead of the error card.
-            LocalStore.shared.cacheGarage(userId: userId, vehicles: rows.map {
-                (vehicleId: $0.vehicle_id, year: $0.year, make: $0.make, model: $0.model,
-                 trimName: $0.trim_name, imageUrl: $0.image_url, currentValue: $0.current_value,
-                 imageCount: $0.image_count, relationship: $0.relationship)
-            })
+            LocalStore.shared.cacheGarage(userId: userId, vehicles: rows)
+            if isOwn { await loadPhotoEvidence() }
         } catch {
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
             // No network (or a real server error) — fall back to the offline
@@ -700,12 +771,7 @@ struct ProfileView: View {
             // fresh account/device with nothing cached yet still surfaces the
             // honest "couldn't load" state, same as before this change.
             if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
-                garage = cached.vehicles.map {
-                    GarageVehicle(vehicle_id: $0.vehicleId, year: $0.year, make: $0.make,
-                                  model: $0.model, trim_name: $0.trimName, image_url: $0.imageUrl,
-                                  current_value: $0.currentValue, image_count: $0.imageCount,
-                                  relationship: $0.relationship)
-                }
+                garage = cached.vehicles.map(\.projection)
                 garageIsCached = true
                 garageCachedAt = cached.cachedAt
                 garageError = false
@@ -717,6 +783,23 @@ struct ProfileView: View {
             }
         }
         garageLoaded = true
+    }
+
+    private struct GarageMetadata: Decodable {
+        let id: String
+        let year: Int?
+        let make: String?
+        let model: String?
+        let normalized_model: String?
+        let trim: String?
+        let vin: String?
+        let primary_image_url: String?
+        let image_count: Int?
+    }
+
+    private func fetchOwnGarageCorrections() async throws -> [GarageOwnerCorrection] {
+        guard isOwn, SupabaseService.currentUserId == userId.lowercased() else { return [] }
+        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections").execute().value
     }
 
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
