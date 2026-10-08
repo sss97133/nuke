@@ -3,7 +3,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 fixture="${1:-garage-owner-corrections}"
-case "$fixture" in garage-owner-corrections|native-album-source) ;; *) echo "Unknown disposable fixture" >&2; exit 2 ;; esac
+case "$fixture" in garage-owner-corrections|native-album-source|garage-unresolved-source) ;; *) echo "Unknown disposable fixture" >&2; exit 2 ;; esac
 bindir="$(pg_config --bindir)"
 fixture_dir="$(mktemp -d "${TMPDIR:-/tmp}/nuke-garage-sql.XXXXXX")"
 cleanup() {

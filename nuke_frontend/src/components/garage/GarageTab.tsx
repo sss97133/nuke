@@ -335,6 +335,7 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
     filterMode,
     setFilterMode,
     refresh,
+    unresolvedSources = [],
   } = dashboard;
 
   const [draggingVehicle, setDraggingVehicle] = useState<GarageVehicle | null>(null);
@@ -374,11 +375,32 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
 
   return (
     <div style={s.wrap}>
+      {!isLoading && !error && unresolvedSources.length > 0 && (
+        <section style={{ padding: 12, border: '2px solid var(--border)', marginBottom: 16 }}>
+          <SectionHeaderRow title="IDENTITY PENDING" count={unresolvedSources.length} />
+          {unresolvedSources.map(source => (
+            <article key={source.id} style={{ padding: '8px 0' }}>
+              <strong>{source.label}</strong>
+              <p style={{ margin: '4px 0', fontSize: 12 }}>
+                {source.stated_roles.map(role => role.replaceAll('_', ' ')).join(' · ')} · account stated
+              </p>
+              <p style={{ margin: '4px 0', fontSize: 12 }}>Photo evidence still needs to identify this vehicle.</p>
+              {source.source_excerpt && (
+                <details style={{ fontSize: 12 }}>
+                  <summary>Source statement</summary>
+                  <p>{source.source_excerpt}</p>
+                  <p>Recorded <time dateTime={source.observed_at}>{source.observed_at.slice(0, 10)}</time></p>
+                </details>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
       {isLoading ? (
         <LoadingSkeleton viewMode={viewMode} />
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
-      ) : vehicles.length === 0 ? (
+      ) : vehicles.length === 0 && unresolvedSources.length === 0 ? (
         <EmptyState filterMode={filterMode} onClearFilter={clearFilter} />
       ) : (
         <div style={{ ...s.content, paddingBottom: draggingVehicle ? 132 : undefined }}>

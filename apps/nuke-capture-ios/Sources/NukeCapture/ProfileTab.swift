@@ -251,6 +251,7 @@ struct ProfileView: View {
     // The garage — the user's real vehicles (get_user_garage). The app had no
     // way in to a vehicle before this; each card opens VehicleDetailView.
     @State private var garage: [GarageVehicle] = []
+    @State private var unresolvedGarageSources: [GarageUnresolvedSource] = []
     @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var garageError = false        // a FAILED load must never read as "no vehicles"
     // Offline fallback (LocalStore garage_vehicle mirror, write-through cache of
@@ -315,7 +316,7 @@ struct ProfileView: View {
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
             // hidden section that reads as a dead profile (the cold-start gravestone).
-            if !garage.isEmpty {
+            if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
                 garageSection
             } else if garageError {
                 // A failed load is NOT an empty garage — say so, with a way back.
@@ -680,6 +681,25 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
         }
+        if isOwn && SupabaseService.currentUserId == userId.lowercased() && !unresolvedGarageSources.isEmpty {
+            Section("Identity pending") {
+                if garageIsCached { Text("Showing saved source statements — may be out of date").font(.caption).foregroundStyle(.secondary) }
+                ForEach(unresolvedGarageSources) { source in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(source.label).font(.subheadline.weight(.medium))
+                        Text(source.statedRoles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · ") + " · account stated")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Photo evidence still needs to identify this vehicle.").font(.caption).foregroundStyle(.secondary)
+                        if let quote = source.sourceExcerpt {
+                            DisclosureGroup("Source statement") {
+                                Text(quote).font(.caption)
+                                Text("Recorded \(source.observedAt.prefix(10))").font(.caption2).foregroundStyle(.secondary)
+                            }.font(.caption)
+                        }
+                    }
+                }
+            }
+        }
       }
       .sheet(item: $openVehicle) { v in
           VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
@@ -736,8 +756,10 @@ struct ProfileView: View {
                 .value
             async let correctionRows = fetchOwnGarageCorrections()
             var rows = try await legacyRows
-            let corrections = try await correctionRows
-            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.map(\.vehicle_id)))
+            let fetchedCorrections = try await correctionRows
+            let corrections = isOwn && SupabaseService.currentUserId == userId.lowercased() ? fetchedCorrections : []
+            let unresolved = GarageUnresolvedSource.from(corrections)
+            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.compactMap(\.vehicle_id)))
             if !ids.isEmpty {
                 let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
                     .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
@@ -759,15 +781,21 @@ struct ProfileView: View {
             }
             rows = GarageVehicle.applying(corrections, to: rows)
             garage = rows
+            unresolvedGarageSources = unresolved
             garageIsCached = false
             garageCachedAt = nil
             // Write-through: mirror the live rows into the offline cache (same
             // pattern as LocalStore's v4 cloud-verdict cache) so a later
             // network-down load can render this instead of the error card.
             LocalStore.shared.cacheGarage(userId: userId, vehicles: rows)
+            if isOwn && SupabaseService.currentUserId == userId.lowercased() {
+                try LocalStore.shared.cacheUnresolvedGarageSources(userId: userId, sources: unresolved)
+            }
             if isOwn { await loadPhotoEvidence() }
         } catch {
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
+            unresolvedGarageSources = isOwn && SupabaseService.currentUserId == userId.lowercased()
+                ? ((try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []) : []
             // No network (or a real server error) — fall back to the offline
             // mirror rather than the error card, IF we have one cached. A truly
             // fresh account/device with nothing cached yet still surfaces the
@@ -777,6 +805,8 @@ struct ProfileView: View {
                 garageIsCached = true
                 garageCachedAt = cached.cachedAt
                 garageError = false
+            } else if !unresolvedGarageSources.isEmpty {
+                garage = []; garageIsCached = true; garageError = false
             } else {
                 // Don't swallow: a failed load with nothing cached must surface as
                 // "couldn't load", never fall through to the empty state.
@@ -801,7 +831,7 @@ struct ProfileView: View {
 
     private func fetchOwnGarageCorrections() async throws -> [GarageOwnerCorrection] {
         guard isOwn, SupabaseService.currentUserId == userId.lowercased() else { return [] }
-        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections").execute().value
+        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections", params: ["p_include_unresolved": true]).execute().value
     }
 
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────

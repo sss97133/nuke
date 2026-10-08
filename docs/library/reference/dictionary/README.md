@@ -230,6 +230,12 @@ unknown coverage. Existing `image_sets` retains the source state and
 
 **Observation** — The fundamental unit of data in Nuke. Every piece of information is an observation from a source with a trust weight, confidence score, and timestamp. Comments, listings, images, metadata, user inputs — all observations.
 
+**Unresolved garage source** — An exact private account statement whose physical
+vehicle is not yet identified. Its bounded label and stated roles describe the
+source; `vehicle_id` and `property_id` remain NULL. It appears as identity pending,
+outside vehicle counts and asset value. A named, explicitly identified successor
+can supersede it without editing the original or guessing from model/year.
+
 **Observation Source** — A registered origin of observations. Each source has a slug, display name, category, base trust score, and list of supported observation kinds. BaT (trust: 0.85), Christie's (trust: 0.90), Instagram (trust: 0.40).
 
 **Ontology** — The formal specification of everything that can be true about entities in a domain. For vehicles: ~950 tables, ~5,000-8,000 columns. For art: comparable scale. The ontology IS the schema. The schema IS the prompt.

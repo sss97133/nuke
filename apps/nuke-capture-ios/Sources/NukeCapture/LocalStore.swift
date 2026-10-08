@@ -143,12 +143,32 @@ struct GarageOwnerCorrection: Decodable, Sendable {
     struct Correction: Decodable, Sendable {
         let relationship: GarageRelationshipStatement?
         let cover_image_id: String?
+        var unresolved_vehicle: UnresolvedSubject? = nil
     }
+    struct UnresolvedSubject: Decodable, Sendable { let label: String; let stated_roles: [String] }
     let id: String
-    let vehicle_id: String
+    let vehicle_id: String?
     let correction: Correction
     let observed_at: String
     let cover_image_url: String?
+    var source_excerpt: String? = nil
+}
+
+/// Raw account testimony, outside canonical vehicles and asset totals.
+struct GarageUnresolvedSource: Codable, Identifiable, Sendable {
+    let id: String
+    let label: String
+    let statedRoles: [String]
+    let sourceExcerpt: String?
+    let observedAt: String
+
+    static func from(_ corrections: [GarageOwnerCorrection]) -> [GarageUnresolvedSource] {
+        corrections.compactMap { row in
+            guard row.vehicle_id == nil, let source = row.correction.unresolved_vehicle else { return nil }
+            return GarageUnresolvedSource(id: row.id, label: source.label, statedRoles: source.stated_roles,
+                sourceExcerpt: row.source_excerpt, observedAt: row.observed_at)
+        }
+    }
 }
 
 struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
@@ -206,7 +226,11 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
 
     static func applying(_ corrections: [GarageOwnerCorrection], to vehicles: [GarageVehicle],
                          today: String = String(ISO8601DateFormatter().string(from: Date()).prefix(10))) -> [GarageVehicle] {
-        let groups = Dictionary(grouping: corrections, by: \.vehicle_id)
+        var groups: [String: [GarageOwnerCorrection]] = [:]
+        for correction in corrections {
+            guard let id = correction.vehicle_id else { continue }
+            groups[id, default: []].append(correction)
+        }
         return vehicles.map { vehicle in
             var result = vehicle
             let rows = groups[vehicle.id] ?? []
@@ -546,10 +570,32 @@ final class LocalStore {
                 t.primaryKey(["userId", "albumId"])
             }
         }
+        m.registerMigration("v9_unresolved_garage_source_cache") { db in
+            try db.create(table: "garage_unresolved_source_cache") { t in
+                t.column("userId", .text).primaryKey()
+                t.column("payloadJSON", .text).notNull()
+                t.column("cachedAt", .datetime).notNull()
+            }
+        }
         return m
     }
 
     // MARK: Album human pass and independent on-device pass
+
+    func cacheUnresolvedGarageSources(userId: String, sources: [GarageUnresolvedSource]) throws {
+        let payload = String(decoding: try JSONEncoder().encode(sources), as: UTF8.self)
+        try dbQueue.write { db in
+            try db.execute(sql: "INSERT INTO garage_unresolved_source_cache(userId,payloadJSON,cachedAt) VALUES (?,?,?) ON CONFLICT(userId) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt",
+                           arguments: [userId, payload, Date()])
+        }
+    }
+
+    func cachedUnresolvedGarageSources(userId: String) throws -> [GarageUnresolvedSource] {
+        try dbQueue.read { db in
+            guard let payload = try String.fetchOne(db, sql: "SELECT payloadJSON FROM garage_unresolved_source_cache WHERE userId=?", arguments: [userId]) else { return [] }
+            return try JSONDecoder().decode([GarageUnresolvedSource].self, from: Data(payload.utf8))
+        }
+    }
 
     /// Append only when the visible source state changes. Reappearing older states
     /// get a new event, so A → B → A never leaves B as the current catalog.

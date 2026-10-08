@@ -1,11 +1,15 @@
 # Garage evidence and relationships
 
-Status, 2026-10-07: the bounded private relationship/cover correction contract was
+Status, 2026-10-08: the bounded private relationship/cover correction contract was
 owner-approved, admitted and deployed through PR 876. Its web reader shipped in
 PR 877. Native profile/source integration merged through PR 880, with
 phone delivery and real-library verification still pending. The broader physical
-identity contract remains incomplete. The private native album intake described
-below is implemented and locally tested; its deployment is a separate stage.
+identity contract remains incomplete. Private native album intake merged through
+PR 885; its Supabase deployment and live columns, read policy and RPC grants were
+verified. Its Vercel production workflow completed successfully. No authenticated
+real-phone capture is implied. Raw unresolved source intake and its separate
+web/native presentation are implemented and locally tested; deployment remains a
+separate stage.
 
 The garage currently projects one winning relationship from ownership periods,
 approved proofs and previous-owner discoveries. That projection cannot represent
@@ -42,7 +46,20 @@ It preserves supersession and unknown dates, separates speaker from service acto
 and requires explicit source authorization for service intake. Its restrictive
 read policy, canonical-view exclusion and subscriber guard preserve privacy.
 It changes neither legacy title/access records nor global image-primary flags.
-It does not yet admit unresolved vehicle identities or general image/album claims.
+Its unresolved-source extension accepts a bounded label and stated roles with
+`vehicle_id` and `property_id` both NULL. That exact private source statement is
+not an assertion of the ratified identified-vehicle relationship property. It
+admits neither an approximate vehicle match nor legal title, dates or asset value.
+An explicitly identified relationship successor can supersede the named raw
+statement, retaining the original source and its unknown identity.
+
+`get_my_garage_owner_corrections` preserves identified-only results by default.
+Updated clients explicitly request `p_include_unresolved`; those results include
+the exact source excerpt. Web and native consumers separate these raw sources
+from physical vehicles and show an identity-pending section even when there are
+no identified vehicles. The native derived cache is account-keyed and read only
+for the actual signed-in own profile. Unknown identities do not enter physical
+vehicle hydration, current asset totals or source-to-vehicle evidence bindings.
 
 ## Required admission and grain
 
@@ -172,10 +189,11 @@ verify web/native agreement, demonstrate offline album rendering with zero netwo
 and compare runtime results with the owner corrections. Full accessible-library
 coverage, unresolved identities, unread images and inferred work must be visible.
 
-Sixteen native ledger/projection/outbox tests demonstrate actual SQLite reopening, account
+Seventeen native ledger/projection/outbox tests demonstrate actual SQLite reopening, account
 isolation, source/method invalidation, unalbumed coverage, duplicate-serial conflicts
 and correction-role/cover persistence, stable retries, offline grouping history and
-limited-access removal safety. The Simulator build passes; native source
+limited-access removal safety and exact unresolved-source retention outside assets.
+The Simulator build passes; native source
 navigation renders using actual simulator Photos. Apple Vision fails to initialize
 in that simulator, so complete independent readings there remain pending. No
 real-phone, full-library or Airplane Mode/zero-network proof is implied.
@@ -185,6 +203,11 @@ source retention, same-account byte qualification, ambiguous originals, typed
 lineage, historical replay, privacy and immutability against the actual migration.
 Run it through `scripts/test-garage-owner-corrections.sh native-album-source`;
 the harness uses installed PostgreSQL and a disposable local Unix socket.
+
+`scripts/tests/garage-unresolved-source.sql` extends the actual correction assay
+with raw NULL-identity admission, replay, legacy-reader compatibility, cross-account
+privacy, source bounds and named identified supersession. The web assay exercises
+a pending-only garage, exact source rendering and no physical hydration or value.
 
 The approved bounded production correction support and the website deployment
 have separate receipts. Private correction excerpts and identifiers stay outside

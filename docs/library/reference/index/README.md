@@ -181,6 +181,10 @@ Updated: 2026-03-27
   `get_my_garage_owner_corrections`; migration `20261008050000_garage_owner_corrections.sql`.
   Web fold: `nuke_frontend/src/hooks/garageOwnerCorrections.ts`. Contract and release
   limits: `docs/design/GARAGE_EVIDENCE_MODEL.md`.
+- **Unresolved garage source presentation**: same private correction writer and
+  opt-in reader; `20261008080000_garage_unresolved_source_statements.sql` and
+  `scripts/tests/garage-unresolved-source.sql`. Web `GarageTab.tsx` and native
+  `ProfileTab.swift` render raw source context outside identified vehicles.
 - **Vehicle images table**: `vehicle_images`
 - **YONO classify**: `supabase/functions/yono-classify/index.ts` (make classification, $0/image)
 - **YONO analyze**: `supabase/functions/yono-analyze/index.ts` (condition/zone/damage via Florence-2)
