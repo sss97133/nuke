@@ -49,6 +49,11 @@ CREATE SCHEMA cron;
 CREATE TABLE cron.job(jobid bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,jobname text UNIQUE,schedule text,active boolean DEFAULT true,command text);
 CREATE TABLE cron.job_run_details(runid bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,jobid bigint,status text,start_time timestamptz,end_time timestamptz,return_message text);
 CREATE FUNCTION cron.schedule(text,text,text) RETURNS bigint LANGUAGE sql AS $$ INSERT INTO cron.job(jobname,schedule,command) VALUES($1,$2,$3) RETURNING jobid $$;
+CREATE FUNCTION cron.alter_job(job_id bigint,schedule text DEFAULT NULL,command text DEFAULT NULL,
+ database text DEFAULT NULL,username text DEFAULT NULL,active boolean DEFAULT NULL) RETURNS void LANGUAGE sql AS $$
+ UPDATE cron.job j SET schedule=coalesce($2,j.schedule),command=coalesce($3,j.command),active=coalesce($6,j.active)
+ WHERE j.jobid=$1
+$$;
 CREATE FUNCTION public.assay_vehicle_taxonomy_fold() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"status":"passed"}'::jsonb $$;
 CREATE FUNCTION public.get_live_auction_health() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"closing_stream":{"status":"passed"}}'::jsonb $$;
 CREATE FUNCTION public.assay_vehicle_metric_fold() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"status":"passed"}'::jsonb $$;
