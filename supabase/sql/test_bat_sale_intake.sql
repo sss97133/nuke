@@ -5,6 +5,7 @@ SELECT fixture_capture(90,'{"is_public":false}');
 SELECT fixture_capture(91,'{"metadata":{"vehicle_matched":false}}');
 SELECT fixture_capture(92,'{"platform":"other"}');
 \ir ../migrations/20261008001520_automate_bat_archived_sale_intake.sql
+SELECT fixture_assert((SELECT pg_typeof(produces_kinds)::text='observation_kind[]' AND produces_kinds=ARRAY['sale_result']::observation_kind[] FROM observation_extractors WHERE slug='bat-archived-sale-v1'),'registered kinds use the actual production enum array');
 SELECT fixture_assert(assay_bat_sale_intake()->>'status'='partial','unstarted scan remains partial');
 UPDATE bat_sale_replay_state SET started_at=now()-interval '16 minutes';
 SELECT fixture_assert(assay_bat_sale_intake()->>'status'='failed','no fabricated startup progress');

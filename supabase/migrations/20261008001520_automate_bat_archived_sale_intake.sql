@@ -17,7 +17,7 @@ INSERT INTO public.observation_extractors(source_id,slug,display_name,extractor_
  extractor_config,produces_kinds,is_active,schedule_type,rate_limit_per_hour,min_interval_seconds)
 SELECT id,'bat-archived-sale-v1','Protected archived BaT sale intake','edge_function','batch-extract-snapshots',
  '{"mode":"source_sale_qualification","use_source_queue":true,"qualification_version":"v1","model_calls":0}'::jsonb,
- ARRAY['sale_result'],true,'cron',240,300 FROM public.observation_sources WHERE slug='bat';
+ ARRAY['sale_result']::public.observation_kind[],true,'cron',240,300 FROM public.observation_sources WHERE slug='bat';
 DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM public.observation_extractors WHERE slug='bat-archived-sale-v1') THEN
   RAISE EXCEPTION 'Canonical BaT source missing';

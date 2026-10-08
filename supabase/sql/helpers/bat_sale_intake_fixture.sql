@@ -9,13 +9,14 @@ CREATE TABLE public.vehicles(id uuid PRIMARY KEY,is_public boolean DEFAULT true,
 CREATE TABLE public.listing_page_snapshots(id uuid PRIMARY KEY,platform text,success boolean,http_status integer,html_sha256 text,metadata jsonb,
  html text,fetched_at timestamptz DEFAULT now(),created_at timestamptz DEFAULT now());
 CREATE TABLE public.observation_sources(id uuid PRIMARY KEY,slug text UNIQUE);
+CREATE TYPE public.observation_kind AS ENUM('sale_result','bid');
 INSERT INTO public.observation_sources VALUES('22222222-2222-2222-2222-222222222222','bat');
 CREATE TABLE public.observation_extractors(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_id uuid REFERENCES observation_sources,slug text UNIQUE,
- display_name text,extractor_type text,edge_function_name text,extractor_config jsonb,produces_kinds text[],is_active boolean,schedule_type text,
+ display_name text,extractor_type text,edge_function_name text,extractor_config jsonb,produces_kinds public.observation_kind[],is_active boolean,schedule_type text,
  rate_limit_per_hour integer,min_interval_seconds integer);
 INSERT INTO public.observation_extractors(slug) VALUES('fixture-private-reader'),('fixture-comment-reader');
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid REFERENCES vehicles,
- source_snapshot_id uuid REFERENCES listing_page_snapshots,source_id uuid REFERENCES observation_sources,kind text,extraction_method text,
+ source_snapshot_id uuid REFERENCES listing_page_snapshots,source_id uuid REFERENCES observation_sources,kind public.observation_kind,extraction_method text,
  is_superseded boolean DEFAULT false,structured_data jsonb,ingested_at timestamptz DEFAULT now());
 CREATE TABLE public.derivation_queue(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,
  evidence_type text NOT NULL CONSTRAINT derivation_queue_evidence_type_check CHECK(evidence_type IN
@@ -75,7 +76,7 @@ CREATE FUNCTION fixture_observation(sid uuid,d jsonb DEFAULT '{}'::jsonb) RETURN
 DECLARE oid uuid;
 BEGIN
  INSERT INTO vehicle_observations(vehicle_id,source_snapshot_id,source_id,kind,extraction_method,is_superseded,structured_data)
- SELECT (metadata->>'vehicle_id')::uuid,id,'22222222-2222-2222-2222-222222222222',coalesce(d->>'kind','sale_result'),
+ SELECT (metadata->>'vehicle_id')::uuid,id,'22222222-2222-2222-2222-222222222222',coalesce(d->>'kind','sale_result')::public.observation_kind,
  coalesce(d->>'method','protected_archived_sale_observation_v1'),coalesce((d->>'superseded')::boolean,false),
  jsonb_build_object('source_sale_receipt',jsonb_build_object('snapshot_id',id,'vehicle_id',metadata->>'vehicle_id',
  'method','protected_archived_sale_observation_v1','source_sha256',html_sha256,'original_parsed_at',metadata->>'parsed_at')||coalesce(d->'receipt','{}'))
