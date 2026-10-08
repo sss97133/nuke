@@ -682,3 +682,39 @@ Every screen in the application follows these rules:
 - Listing quality score (coverage of top buyer concerns)
 
 *Every screen is a view into the graph. The layout follows the data. The data IS the design.*
+
+## Stacks — working readings (owner direction, 2026-10-07)
+
+**Routes:** `/stacks`, `/stacks/order-book/:vehicleId`.
+**Files:** `pages/stacks/StacksIndex.tsx`, `OrderBookStack.tsx`, `stackParts.tsx`, `stacks.css`.
+**Lens:** the existing entity briefing, bound to a lot and its received bid log; the index composes available bindings.
+**Owner requirement:** “the stacks page is supposed to show the stacks in action.”
+
+The opening shows the calculation operating on attributed records. For the available auction order book,
+the sequence is coverage → bid replay → source bid / bidder / resulting book → price path and revealed demand.
+The forecast and recorded outcome follow where the existing readers support them. Layer definitions and the
+dated demonstration-selection receipt expand underneath the working reading. Reader availability is not a
+stack-wide evidence-completeness score.
+
+The replay control selects one received bid by ID. Source link, bidder, high-bid change, book and demand curve
+use that same selection. The index's inspect link preserves it in `?lot=…&at=…`. At latest, new received bids
+move the reading forward; selecting an older bid preserves that bid across refreshes. The existing reader
+refreshes an open lot once a minute. A closed lot is labeled **Recorded lot · replay**, with the recorded result
+linked to its Outcome layer. This reconstructs source-posted order from records currently held; it does not
+establish historical knowledge availability or replay historical forecasts.
+
+Coverage remains before the calculation, with all numerators and denominators visible. A disclosure opens the
+complete receipt, including source clocks, basis and evidence-layer links. Unknown denominators and key conflicts
+remain explicit. Selection-time counts live in the selection receipt rather than appearing as current readings.
+Absent bids show the reader's explanation without charts. Failed refreshes identify the previous reading when one
+is retained; initial failures offer a retry without showing an operating calculation.
+
+Use the canonical Arial/Courier typography, square 2px borders, theme tokens and native keyboard-accessible range
+and disclosure controls. On narrow screens the event sequence and charts become single-column. Shared `FoldLayer`
+and `CoverageTable` render the index and the lot drill; no second calculation or reader is introduced.
+
+**Current boundary:** the UI has one available stack binding. The production registry and coverage series are
+service-role-only (bounded atlas inspection, 2026-10-07). Catalog presence or registry coverage does not establish
+a working public reader. Future stacks should reuse this presentation with their existing sanctioned readers;
+registry access changes and new analytical readers require their own scope. This frontend pass changes no schema,
+intake, scoring, permissions or refresh cadence.

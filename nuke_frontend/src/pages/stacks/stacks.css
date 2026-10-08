@@ -26,6 +26,10 @@
 .stack-coverage th { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); }
 .stack-ratio { font: 700 13px 'Courier New', monospace; white-space: nowrap; }
 .stack-coverage-open { all: unset; cursor: pointer; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.stack-coverage-receipt summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 8px 10px; font-size: 10px; }
+.stack-coverage-receipt summary > span:not(.stack-label) { flex: 1 1 220px; }
+.stack-coverage-receipt[open] summary { border-bottom: 2px solid var(--border); }
+.stack-coverage-conflict { color: var(--warning); }
 .stack-ratio small { font-weight: 400; color: var(--text-secondary); font-size: 11px; }
 .stack-bar { display: block; height: 4px; background: var(--border); margin-top: 3px; width: 120px; }
 .stack-bar > span { display: block; height: 4px; background: var(--text); }
@@ -83,6 +87,13 @@
 .stack-asof button { border: 2px solid var(--border); background: var(--bg); color: var(--text); font: 12px 'Courier New', monospace; min-width: 32px; min-height: 28px; cursor: pointer; }
 .stack-asof button:disabled { opacity: .4; cursor: default; }
 .stack-fold-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.stack-scrubber { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.stack-scrubber input { flex: 1; min-width: 0; height: 28px; margin: 0; accent-color: var(--text); cursor: pointer; }
+.stack-scrubber input:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.stack-event-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 16px; border: 2px solid var(--border); background: var(--surface); }
+.stack-event-flow > div { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; min-width: 0; }
+.stack-event-flow > div + div { border-left: 2px solid var(--border); }
+.stack-event-value { font: 700 17px 'Courier New', monospace; }
 .stack-chart { display: block; width: 100%; height: auto; }
 .stack-chart text { fill: var(--text-secondary); font: 10px 'Courier New', monospace; }
 .stack-chart .grid { stroke: var(--border); stroke-width: 1; }
@@ -108,6 +119,19 @@
 .stack-card { border: 2px solid var(--text); padding: 12px; margin-top: 16px; }
 .stack-card h2 { margin: 2px 0 6px; font-size: 16px; }
 .stack-card-open { display: inline-block; margin-top: 10px; font-weight: 700; }
+.stack-card-heading, .stack-operation-context, .stack-operation-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
+.stack-mode { border: 2px solid var(--border); padding: 4px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.stack-operation-context { justify-content: flex-start; margin-top: 12px; }
+.stack-operation-context > a:first-child { font-weight: 700; }
+.stack-operation { padding: 12px 0 0; }
+.stack-operation-heading { margin-bottom: 8px; }
+.stack-operation-heading h3 { margin: 0; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.stack-operation-heading a { font-size: 10px; }
+.stack-method { margin-top: 14px; border-top: 2px solid var(--border); padding-top: 10px; }
+.stack-method > summary { cursor: pointer; font-size: 10px; font-weight: 700; }
+.stack-method > summary > span { margin-left: 12px; font-weight: 400; }
+.stack-result { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; padding: 10px 12px; margin-top: 12px; border: 2px solid var(--border); background: var(--surface); }
+.stack-result > span:last-child { margin-left: auto; font-size: 10px; }
 
 @media (max-width: 900px) {
   .stack-path { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -127,4 +151,9 @@
   .stack-forecast td { display: block; border-bottom: 0; padding: 3px 6px; }
   .stack-table .hide-narrow { display: none; }
   .stack-chart text { font-size: 20px; }
+  .stack-event-flow { grid-template-columns: minmax(0, 1fr); }
+  .stack-event-flow > div + div { border-left: 0; border-top: 2px solid var(--border); }
+  .stack-scrubber { flex-wrap: wrap; gap: 4px 8px; }
+  .stack-scrubber > .stack-label { flex-basis: 100%; }
+  .stack-coverage-receipt summary > span:not(.stack-label) { flex-basis: 100%; }
 }

@@ -263,7 +263,7 @@ export function ForecastPanel({ read, view }: { read: OrderBookRead; view: Order
     return (
       <Frame state="signed-out">
         <Note>
-          Signed out, so no forecast is shown. The reader is service_role only and answers through a route that needs a signed-in account or an API key.{' '}
+          Signed out, so no forecast is shown. Sign in to read this lot's forecast.{' '}
           <Link to="/login">Sign in</Link>
         </Note>
       </Frame>

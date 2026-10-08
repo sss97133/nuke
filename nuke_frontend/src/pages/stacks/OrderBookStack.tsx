@@ -387,12 +387,15 @@ function DemandCurve({ state, states }: { state: FoldState; states: FoldState[] 
   );
 }
 
-function FoldLayer({ view, selected, onSelect }: { view: OrderBookView; selected: number; onSelect: (i: number) => void }) {
+export function FoldLayer({ view, selected, onSelect, compact = false, sourceUrl }: {
+  view: OrderBookView; selected: number; onSelect: (i: number) => void; compact?: boolean; sourceUrl?: string;
+}) {
   const states = view.states;
   if (states.length === 0) {
     return <p className="stack-note">No bids in this lot's window, so the book is empty: no identity has revealed a price.</p>;
   }
   const s = states[selected];
+  const previous = states[selected - 1];
   const top = s.book[0]?.max ?? s.price;
   return (
     <>
@@ -407,6 +410,30 @@ function FoldLayer({ view, selected, onSelect }: { view: OrderBookView; selected
           {s.unresolved > 0 && <span className="stack-basis"> + {count(s.unresolved)} unkeyed bids</span>}</span>
         {selected !== states.length - 1 && <button type="button" onClick={() => onSelect(states.length - 1)} style={{ minWidth: 60 }}>Latest</button>}
       </div>
+      <label className="stack-scrubber">
+        <span className="stack-label">Replay received bids</span>
+        <input type="range" min={0} max={states.length - 1} value={selected} disabled={states.length === 1}
+          aria-label="Replay received bids" aria-valuetext={`Bid ${selected + 1} of ${states.length}: ${usd(s.price)}`}
+          onChange={(e) => onSelect(Number(e.target.value))} />
+        <span className="stack-mono">{selected + 1} / {states.length}</span>
+      </label>
+      <div className="stack-event-flow" aria-label="Selected bid and its effect on the book">
+        <div>
+          <span className="stack-label">Source bid</span>
+          <strong className="stack-event-value">{usd(s.bid.amount)}</strong>
+          {sourceUrl && <a href={sourceAnchor(sourceUrl, s.bid.batCommentId)} target="_blank" rel="noopener noreferrer">Bid at source ↗</a>}
+        </div>
+        <div>
+          <span className="stack-label">{s.bid.keyed ? 'Keyed bidder' : 'Unresolved bidder'}</span>
+          <IdentityName id={s.bid.identityId} handle={s.bid.handle} keyed={s.bid.keyed} />
+          <span className="stack-basis">{s.bid.landedAt == null ? 'Landing time unknown' : `Landed ${clock(s.bid.landedAt, true)}`}</span>
+        </div>
+        <div>
+          <span className="stack-label">Book after this bid</span>
+          <strong className="stack-event-value">{usd(s.price)}</strong>
+          <span className="stack-basis">{previous ? `${usd(s.price - previous.price)} change in the high bid` : 'First received bid'} · {count(s.identities)} keyed of {count(s.book.length)} book entries</span>
+        </div>
+      </div>
       <div className="stack-fold-grid">
         <BidPathChart states={states} selected={selected} onSelect={onSelect} />
         <DemandCurve state={s} states={states} />
@@ -416,7 +443,7 @@ function FoldLayer({ view, selected, onSelect }: { view: OrderBookView; selected
         depth at a price counts the entries at or above it. A bid reveals a willingness to pay at least that amount, so
         the curve is a lower bound on demand, not a measured reservation price.
       </p>
-      <table className="stack-table">
+      {!compact && <table className="stack-table">
         <thead>
           <tr><th scope="col" className="num">Depth</th><th scope="col">Identity</th><th scope="col" className="num">Highest revealed</th>
             <th scope="col" className="num hide-narrow">Posted before close</th><th scope="col" className="num">Bids</th><th scope="col" className="hide-narrow" style={{ width: '30%' }}>Against the top</th></tr>
@@ -433,7 +460,7 @@ function FoldLayer({ view, selected, onSelect }: { view: OrderBookView; selected
             </tr>
           ))}
         </tbody>
-      </table>
+      </table>}
     </>
   );
 }
@@ -594,7 +621,7 @@ export default function OrderBookStack() {
         </div>
       )}
 
-      <CoverageTable rows={view.coverage} readAt={readAt} caption="this lot" onOpen={(id) => setParam('layer', id === 'fold' ? null : id)} />
+      <CoverageTable rows={view.coverage} readAt={readAt} caption="this lot" compact onOpen={(id) => setParam('layer', id === 'fold' ? null : id)} />
 
       <ForecastPanel read={read} view={view} />
 
@@ -605,7 +632,7 @@ export default function OrderBookStack() {
           {layer === 'log' && <LogLayer read={read} view={view} onPickBid={pickBidFromLog} />}
           {layer === 'key' && <KeyLayer read={read} view={view} />}
           {layer === 'dimension' && (<><DimensionLayer read={read} view={view} /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
-          {layer === 'fold' && <FoldLayer view={view} selected={selected} onSelect={selectBid} />}
+          {layer === 'fold' && <FoldLayer view={view} selected={selected} onSelect={selectBid} sourceUrl={lot.source_url} />}
           {layer === 'baseline' && <BaselineLayer applies={baselineApplies} temperature={temperature} layer={current} />}
           {(layer === 'residual' || layer === 'feature' || layer === 'prediction') && <MissingNote layer={current} />}
           {layer === 'outcome' && <OutcomeLayer read={read} view={view} />}
