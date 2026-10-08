@@ -6,6 +6,23 @@ final class PhotoAlbumLedgerTests: XCTestCase {
     private let method = "synthetic-method-v1"
     private let photo = LocalAlbumPhoto(localIdentifier: "synthetic-photo", sourceVersion: "source-v1")
 
+    func testUnresolvedGarageSourceHasNoPhysicalAssetAndKeepsExactTestimonyOffline() throws {
+        let json = #"[{"id":"synthetic-source","vehicle_id":null,"correction":{"unresolved_vehicle":{"label":"Synthetic vehicle","stated_roles":["shared_interest"]}},"observed_at":"2026-10-08T00:00:00Z","cover_image_url":null,"source_excerpt":"Synthetic source: identity still unknown."}]"#
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(json.utf8))
+        XCTAssertNil(corrections[0].vehicle_id)
+        XCTAssertTrue(GarageVehicle.applying(corrections, to: []).isEmpty)
+        let sources = GarageUnresolvedSource.from(corrections)
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertEqual(sources[0].statedRoles, ["shared_interest"])
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.cacheUnresolvedGarageSources(userId: "account-one", sources: sources)
+        XCTAssertEqual(try store.cachedUnresolvedGarageSources(userId: "account-one").first?.sourceExcerpt,
+                       "Synthetic source: identity still unknown.")
+        XCTAssertTrue(try store.cachedUnresolvedGarageSources(userId: "account-two").isEmpty)
+        try store.cacheUnresolvedGarageSources(userId: "account-one", sources: [])
+        XCTAssertTrue(try store.cachedUnresolvedGarageSources(userId: "account-one").isEmpty)
+    }
+
     private func album(_ id: String = "synthetic-album", name: String = "Human grouping", photos: [LocalAlbumPhoto]? = nil) -> LocalPhotoAlbum {
         LocalPhotoAlbum(id: id, name: name, folderPath: ["Work"], sourceKind: "regular", photos: photos ?? [photo])
     }

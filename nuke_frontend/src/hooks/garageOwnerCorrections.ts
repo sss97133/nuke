@@ -2,7 +2,7 @@ import type { GarageVehicle, RelationshipType } from './useVehiclesDashboard';
 
 export interface GarageOwnerCorrection {
   id: string;
-  vehicle_id: string;
+  vehicle_id: string | null;
   correction: {
     relationship?: {
       roles: string[];
@@ -13,9 +13,29 @@ export interface GarageOwnerCorrection {
       end_date: string | null;
     };
     cover_image_id?: string;
+    unresolved_vehicle?: { label: string; stated_roles: string[] };
   };
   observed_at: string;
   cover_image_url: string | null;
+  source_excerpt?: string | null;
+}
+
+export interface UnresolvedGarageSource {
+  id: string;
+  label: string;
+  stated_roles: string[];
+  source_excerpt: string | null;
+  observed_at: string;
+}
+
+/** Raw subject testimony stays outside physical-vehicle and asset measures. */
+export function unresolvedGarageSources(corrections: GarageOwnerCorrection[]): UnresolvedGarageSource[] {
+  return corrections.flatMap(c => {
+    const source = c.correction.unresolved_vehicle;
+    if (c.vehicle_id !== null || !source) return [];
+    return [{ id: c.id, label: source.label, stated_roles: source.stated_roles,
+      source_excerpt: c.source_excerpt ?? null, observed_at: c.observed_at }];
+  });
 }
 
 const GROUPS: Record<string, RelationshipType> = {
@@ -31,6 +51,7 @@ export function applyGarageOwnerCorrections(
 ): GarageVehicle[] {
   const byVehicle = new Map<string, GarageOwnerCorrection[]>();
   for (const c of corrections) {
+    if (!c.vehicle_id) continue;
     const rows = byVehicle.get(c.vehicle_id) ?? [];
     rows.push(c); byVehicle.set(c.vehicle_id, rows);
   }

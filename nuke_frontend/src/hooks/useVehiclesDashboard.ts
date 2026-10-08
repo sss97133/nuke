@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { applyGarageOwnerCorrections, type GarageOwnerCorrection } from './garageOwnerCorrections';
+import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection, type UnresolvedGarageSource } from './garageOwnerCorrections';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -115,6 +115,7 @@ export interface DashboardSummary {
 }
 
 export interface VehiclesDashboardState {
+  unresolvedSources?: UnresolvedGarageSource[];
   sections: GarageSection[];
   vehicles: GarageVehicle[];
   totalEstimatedValue: number;
@@ -414,6 +415,7 @@ function rowToGarageVehicle(
 
 export function useVehiclesDashboard(userId: string | undefined | null): VehiclesDashboardState {
   const [rawVehicles, setRawVehicles] = useState<GarageVehicle[]>([]);
+  const [unresolvedSources, setUnresolvedSources] = useState<UnresolvedGarageSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
@@ -426,6 +428,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   useEffect(() => {
     if (!userId) {
       setRawVehicles([]);
+      setUnresolvedSources([]);
       setError(null);
       setIsLoading(false);
       return;
@@ -433,6 +436,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     let cancelled = false;
     setRawVehicles([]);
+    setUnresolvedSources([]);
     setIsLoading(true);
     setError(null);
 
@@ -453,7 +457,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           supabase.from('vehicle_ownerships')
             .select('id, vehicle_id, role, is_current, start_date, end_date, verification_id, created_at')
             .eq('owner_profile_id', userId),
-          supabase.rpc('get_my_garage_owner_corrections'),
+          supabase.rpc('get_my_garage_owner_corrections', { p_user_id: userId, p_include_unresolved: true }),
         ]);
         if (cancelled) return;
         for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
@@ -465,6 +469,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         const corrections = (correctionRes.data ?? []) as GarageOwnerCorrection[];
         // Statements can concern a vehicle missing from the legacy ownership union.
         for (const c of corrections) {
+          if (!c.vehicle_id) continue;
           if (!relMap.has(c.vehicle_id)) relMap.set(c.vehicle_id, { type: 'RELATIONSHIP REVIEW',
             source: 'owner_statement', id: c.id, start_date: null, end_date: null });
         }
@@ -578,6 +583,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         }
 
         setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
+        setUnresolvedSources(unresolvedGarageSources(corrections));
       } catch (err: unknown) {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : 'Unknown error fetching vehicles';
@@ -608,6 +614,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
   return {
     sections,
+    unresolvedSources,
     vehicles,
     totalEstimatedValue,
     isLoading,

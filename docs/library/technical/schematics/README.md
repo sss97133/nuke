@@ -6,6 +6,13 @@ This is the technical schematic book for the Nuke vehicle data platform. These d
 
 Each document covers one architectural dimension of the system. Together they form a complete engineering blueprint.
 
+The private garage source path also retains testimony without a physical identity:
+the existing account correction writer → `vehicle_observations` with NULL vehicle
+and property → explicit unresolved-reader opt-in → web/native identity-pending
+section. An account-keyed native derived cache preserves the source offline. No
+canonical asset is minted; named identified supersession retains the raw source.
+See [the garage evidence contract](../../../design/GARAGE_EVIDENCE_MODEL.md).
+
 ---
 
 ## Table of Contents

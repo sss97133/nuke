@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { applyGarageOwnerCorrections, type GarageOwnerCorrection } from './garageOwnerCorrections';
+import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection } from './garageOwnerCorrections';
 import type { GarageVehicle } from './useVehiclesDashboard';
 
 const old = { id: 'car', relationship_type: 'VERIFIED OWNER', relationship_source: 'verification',
@@ -10,6 +10,18 @@ function statement(roles: string[], extra = {}): GarageOwnerCorrection {
     correction: { relationship: { roles, ownership_denied: false, title_status: 'unknown',
       disputed: false, start_date: null, end_date: null, ...extra } } };
 }
+it('retains unresolved source testimony separately without minting a vehicle or changing asset measures', () => {
+  const source: GarageOwnerCorrection = { id: 'raw', vehicle_id: null, observed_at: '2026-10-08', cover_image_url: null,
+    source_excerpt: 'Synthetic shared interest; physical identity unknown.',
+    correction: { unresolved_vehicle: { label: 'Synthetic vehicle', stated_roles: ['shared_interest'] } } };
+  expect(applyGarageOwnerCorrections([], [source])).toEqual([]);
+  expect(applyGarageOwnerCorrections([old], [source])).toEqual([old]);
+  expect(unresolvedGarageSources([source, statement(['owner_past'])])).toEqual([{
+    id: 'raw', label: 'Synthetic vehicle', stated_roles: ['shared_interest'],
+    source_excerpt: source.source_excerpt, observed_at: '2026-10-08',
+  }]);
+  expect(unresolvedGarageSources([{ ...source, vehicle_id: 'approximate-match' }])).toEqual([]);
+});
 it('uses account corrections over a stale proof without inventing transfer or tenure dates', () => {
   const [car] = applyGarageOwnerCorrections([old], [statement(['owner_past'])]);
   expect(car.relationship_type).toBe('PREVIOUSLY OWNED');

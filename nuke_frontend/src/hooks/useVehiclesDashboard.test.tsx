@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rows: {} as Record<string, any[]>, fail: '', calls: [] as any[] }));
 vi.mock('../lib/supabase', () => ({ supabase: {
+  auth: { getUser: async () => ({ data: { user: { id: 'user' } } }) },
   from: (table: string) => {
     let rows = fixture.rows[table] ?? [];
     const q: any = { then: (fn: any) => Promise.resolve({
@@ -17,12 +18,16 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     q.in = (key: string, values: any[]) => { rows = rows.filter(r => values.includes(r[key])); return q; };
     return q;
   },
-  rpc: async (name: string) => ({ data: name === 'get_my_garage_owner_corrections'
-    ? fixture.rows.garage_owner_corrections ?? [] : [], error: null }),
+  rpc: async (name: string, params: unknown) => {
+    fixture.calls.push(['rpc', name, params]);
+    return { data: name === 'get_my_garage_owner_corrections'
+      ? fixture.rows.garage_owner_corrections ?? [] : [], error: null };
+  },
 } }));
 
 import { resolveGarageRelationships, useVehiclesDashboard } from './useVehiclesDashboard';
 import { GarageVehicleCard } from '../components/vehicles/GarageVehicleCard';
+import GarageTab from '../components/garage/GarageTab';
 
 const now = new Date('2026-10-07T12:00:00Z');
 const period = (changes: Record<string, unknown> = {}) => ({
@@ -181,4 +186,23 @@ it('loads private corrections into sections, personal assets and the selected ga
   expect(state.totalEstimatedValue).toBe(0);
   await act(async () => state.setFilterMode('OWNED'));
   expect(state.vehicles.map(v => v.id)).toEqual(['old']);
+});
+
+it('shows a pending-only garage with exact source context and no physical vehicle hydration or asset', async () => {
+  fixture.rows.garage_owner_corrections = [{ id: 'raw', vehicle_id: null, observed_at: '2026-10-08',
+    cover_image_url: null, source_excerpt: 'Synthetic shared interest, identity unknown.',
+    correction: { unresolved_vehicle: { label: 'Synthetic shared vehicle', stated_roles: ['shared_interest'] } } }];
+  await act(async () => root.render(<Harness />));
+  expect(fixture.calls.find(c => c[0] === 'rpc' && c[1] === 'get_my_garage_owner_corrections')?.[2])
+    .toEqual({ p_user_id: 'user', p_include_unresolved: true });
+  expect(fixture.calls.some(c => c[0] === 'vehicles')).toBe(false);
+  expect(state.vehicles).toEqual([]);
+  expect(state.totalEstimatedValue).toBe(0);
+  expect(state.data?.my_vehicles).toEqual([]);
+  await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));
+  expect(container.textContent).toContain('IDENTITY PENDING');
+  expect(container.textContent).toContain('Synthetic shared vehicle');
+  expect(container.querySelector('details')?.textContent).toContain('Synthetic shared interest, identity unknown.');
+  expect(container.textContent).not.toContain('YOUR GARAGE IS EMPTY');
+  expect(container.querySelector('a[href*="/vehicle/"]')).toBeNull();
 });
