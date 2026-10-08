@@ -1241,6 +1241,21 @@ it is not held together with the right glue. The data model is the glue."
 **Test cases the owner predicted:** ownership claims already present in BaT comments. Measure first (count, parseable
 windows, examples by id), then shape, then the pursuit flow.
 
+**Owner refinement, 2026-10-07: the garage starts in the app's image library.** Existing user albums, when
+available, are the first human organization pass. Preserve their exact names, folder context and image memberships;
+the autonomous pass analyzes the source images, confirms supported matches within those groups and organizes
+unalbumed images. Include already-assigned images in that pass. Preserve the grouping and the agent's findings as
+separate sourced, dated records; a disagreement does not erase the user's pass. An album's existence does not establish
+who created it, one physical vehicle per album, ownership or performed work. Same-model vehicles stay distinct until
+identity is supported; one resolved vehicle can carry several dated ownership, work and documentation relationships.
+
+The existing owners are `LibraryStore`, `LibraryIngest` and `LocalStore` on device, and `album_sync_map`, `image_sets`,
+`image_set_members`, the image spine and observation/relationship writers in the database. Local metadata and analysis
+must survive reopening offline. Declare accessible-library coverage (limited Photos access cannot expose user albums),
+unread images, source/method versions and unresolved vehicle/role matches. Cached analysis may be reused when its source
+and method still qualify. An image's existing `vehicle_id` is context, not an independent confirmation of itself.
+This direction authorizes the app-first workflow; it does not lift separate canonical-write, privacy or paid-intake holds.
+
 ### 13.4 The owner on the API, the name and the calculations (2026-10-07)
 
 **Owner direction (substance kept):** an API is "a definitive opportunity" and "the standard we need".

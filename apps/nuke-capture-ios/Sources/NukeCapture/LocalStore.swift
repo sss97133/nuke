@@ -26,6 +26,7 @@
 //  `.replace` (delete+reinsert nulls every other column). See docs/design/HARD_RULES.md.
 
 import Foundation
+import CryptoKit
 import GRDB
 
 // MARK: - Records (mirror the prod identity-first model)
@@ -142,6 +143,61 @@ struct ImageLedger {
     var cloudAnalyzedAt: Date? = nil
 }
 
+/// PhotoKit's grouping, retained independently of any vehicle assignment. IDs are
+/// local to this library; overlapping albums keep their own memberships and names.
+struct LocalAlbumPhoto: Codable, Equatable, Sendable {
+    let localIdentifier: String
+    let sourceVersion: String?
+}
+
+struct LocalPhotoAlbum: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let name: String?
+    let folderPath: [String]
+    let sourceKind: String
+    let photos: [LocalAlbumPhoto]
+}
+
+struct LocalAlbumCatalog: Codable, Sendable {
+    let accessScope: String
+    let observedAt: Date
+    let albums: [LocalPhotoAlbum]
+}
+
+/// An independent, versioned read of the original bytes. VIN-shaped OCR text is
+/// evidence to review, never a canonical vehicle, ownership or performed-work claim.
+struct LocalAlbumImageReview: Codable, FetchableRecord, PersistableRecord, Sendable {
+    static let databaseTableName = "photo_album_image_review"
+    let id: String
+    let localIdentifier: String
+    let sourceVersion: String?
+    let inputSHA256: String
+    let methodVersion: String
+    let analyzedAt: Date
+    let isVehicle: Bool
+    let hasPerson: Bool
+    let labelsJSON: String
+    let vinCandidatesJSON: String
+    let textLinesJSON: String
+
+    var vinCandidates: [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(vinCandidatesJSON.utf8))) ?? []
+    }
+
+    var textLines: [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(textLinesJSON.utf8))) ?? []
+    }
+}
+
+struct LocalAlbumCoverage: Sendable {
+    let total: Int
+    let reviewed: Int
+    let vehicleFrames: Int
+    let otherFrames: Int
+    let vinReadings: [String]
+    let cachedDeepReads: Int
+}
+
 // MARK: - The store
 
 final class LocalStore {
@@ -165,6 +221,13 @@ final class LocalStore {
         dbQueue = queue
         do { try Self.migrator.migrate(queue) }
         catch { NSLog("LocalStore: migrate failed: %@", String(describing: error)) }
+    }
+
+    /// Isolated stores exercise the real migrations and readers without an account
+    /// or a network connection (also useful for a device-local recovery).
+    init(databaseQueue: DatabaseQueue) throws {
+        dbQueue = databaseQueue
+        try Self.migrator.migrate(databaseQueue)
     }
 
     // MARK: Schema
@@ -260,7 +323,105 @@ final class LocalStore {
                 t.primaryKey(["userId", "vehicleId"])
             }
         }
+        m.registerMigration("v6_photo_album_passes") { db in
+            // Human/source grouping and agent reads have different grains and writers.
+            // Both logs append; neither can overwrite a prior grouping or owner verdict.
+            try db.create(table: "photo_album_catalog") { t in
+                t.column("id", .text).primaryKey()
+                t.column("digest", .text).notNull()
+                t.column("payload", .text).notNull()
+                t.column("observedAt", .datetime).notNull()
+            }
+            try db.create(table: "photo_album_image_review") { t in
+                t.column("id", .text).primaryKey()
+                t.column("localIdentifier", .text).notNull()
+                t.column("sourceVersion", .text)
+                t.column("inputSHA256", .text).notNull()
+                t.column("methodVersion", .text).notNull()
+                t.column("analyzedAt", .datetime).notNull()
+                t.column("isVehicle", .boolean).notNull()
+                t.column("hasPerson", .boolean).notNull()
+                t.column("labelsJSON", .text).notNull()
+                t.column("vinCandidatesJSON", .text).notNull()
+                t.column("textLinesJSON", .text).notNull()
+            }
+            try db.create(index: "photo_album_image_review_source", on: "photo_album_image_review",
+                          columns: ["localIdentifier", "sourceVersion", "methodVersion"])
+        }
         return m
+    }
+
+    // MARK: Album human pass and independent on-device pass
+
+    /// Append only when the visible source state changes. Reappearing older states
+    /// get a new event, so A → B → A never leaves B as the current catalog.
+    func recordAlbumCatalog(_ catalog: LocalAlbumCatalog) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        struct State: Encodable { let accessScope: String; let albums: [LocalPhotoAlbum] }
+        let state = try encoder.encode(State(accessScope: catalog.accessScope, albums: catalog.albums))
+        let digest = Self.albumDigest(state)
+        let payload = String(decoding: try encoder.encode(catalog), as: UTF8.self)
+        try dbQueue.write { db in
+            let last = try String.fetchOne(db, sql: "SELECT digest FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1")
+            guard last != digest else { return }
+            try db.execute(sql: "INSERT INTO photo_album_catalog (id, digest, payload, observedAt) VALUES (?, ?, ?, ?)",
+                           arguments: [UUID().uuidString, digest, payload, catalog.observedAt])
+        }
+    }
+
+    func latestAlbumCatalog() throws -> LocalAlbumCatalog? {
+        try dbQueue.read { db in
+            guard let payload = try String.fetchOne(db, sql: "SELECT payload FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1") else { return nil }
+            return try JSONDecoder().decode(LocalAlbumCatalog.self, from: Data(payload.utf8))
+        }
+    }
+
+    func recordAlbumImageReview(_ review: LocalAlbumImageReview) throws {
+        try dbQueue.write { db in try review.insert(db, onConflict: .ignore) }
+    }
+
+    /// Unknown source versions must be reread; a previous result cannot establish
+    /// that the current bytes are unchanged. A method change also invalidates reuse.
+    func albumImageReview(for photo: LocalAlbumPhoto, methodVersion: String) throws -> LocalAlbumImageReview? {
+        guard let version = photo.sourceVersion else { return nil }
+        return try dbQueue.read { db in
+            try LocalAlbumImageReview.fetchOne(db, sql: """
+                SELECT * FROM photo_album_image_review
+                WHERE localIdentifier = ? AND sourceVersion = ? AND methodVersion = ?
+                ORDER BY rowid DESC LIMIT 1
+                """, arguments: [photo.localIdentifier, version, methodVersion])
+        }
+    }
+
+    func albumCoverage(_ album: LocalPhotoAlbum, methodVersion: String) throws -> LocalAlbumCoverage {
+        let photos = Dictionary(album.photos.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        return try dbQueue.read { db in
+            var current: [String: LocalAlbumImageReview] = [:]
+            var deepReads = 0
+            for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
+                let rows = try LocalAlbumImageReview.fetchAll(db, sql: """
+                    SELECT * FROM photo_album_image_review
+                    WHERE methodVersion = ? AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    ORDER BY rowid
+                    """, arguments: StatementArguments([methodVersion] + chunk))
+                for row in rows where row.sourceVersion != nil && row.sourceVersion == photos[row.localIdentifier]?.sourceVersion {
+                    current[row.localIdentifier] = row
+                }
+                deepReads += try Int.fetchOne(db, sql: """
+                    SELECT COUNT(*) FROM appearance
+                    WHERE cloudNarrative IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    """, arguments: StatementArguments(chunk)) ?? 0
+            }
+            return LocalAlbumCoverage(total: photos.count, reviewed: current.count,
+                vehicleFrames: current.values.filter(\.isVehicle).count,
+                otherFrames: current.values.filter { !$0.isVehicle }.count,
+                vinReadings: Array(Set(current.values.flatMap(\.vinCandidates))).sorted(), cachedDeepReads: deepReads)
+        }
+    }
+
+    static func albumDigest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: Write — the local twin of prod ingest_image_identity_first()

@@ -931,11 +931,11 @@ final class SyncEngine: ObservableObject {
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
 
-    static func requestOriginalData(for asset: PHAsset) async throws -> Data {
+    static func requestOriginalData(for asset: PHAsset, allowNetwork: Bool = true) async throws -> Data {
         let options = PHImageRequestOptions()
         options.version = .original
         options.deliveryMode = .highQualityFormat
-        options.isNetworkAccessAllowed = true
+        options.isNetworkAccessAllowed = allowNetwork
         options.isSynchronous = false
 
         return try await withCheckedThrowingContinuation { continuation in

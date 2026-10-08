@@ -19,6 +19,7 @@ struct LibraryInfoView: View {
     @State private var ledger: ImageLedger?
     @State private var isAnalyzing = false
     @State private var loadingCloud = false
+    @ObservedObject private var library = LibraryStore.shared
 
     var body: some View {
         NavigationStack {
@@ -36,6 +37,21 @@ struct LibraryInfoView: View {
                                                loc.coordinate.latitude, loc.coordinate.longitude))
                     }
                     if asset.isFavorite { row("Favorite", "Yes") }
+                }
+
+                if library.albumCatalog?.accessScope == "full" {
+                    let albums = library.albumCatalog?.albums.filter { album in
+                        album.photos.contains { $0.localIdentifier == asset.localIdentifier }
+                    } ?? []
+                    if !albums.isEmpty {
+                        Section("Photos albums") {
+                            ForEach(albums) { album in
+                                Text(album.name ?? "Album name unavailable")
+                            }
+                            Text("Existing grouping; vehicle identity is assessed separately.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 // ── The Nuke ledger — each row is a rung the photo has ACTUALLY
