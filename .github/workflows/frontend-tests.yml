@@ -245,6 +245,10 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_sale_intake_ci -f supabase/sql/test_bat_sale_intake.sql -f supabase/sql/test_bat_sale_intake_attacks.sql
       - name: Verify capture deferral lineage and API roles
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_sale_intake_ci -f supabase/sql/test_bat_sale_parent_deferrals.sql
+      - name: Create disposable protected sale health database
+        run: createdb dm_refinement_sale_health_ci
+      - name: Verify bounded protected sale custody and honest coverage
+        run: python3 scripts/test-bat-sale-intake-health.py dm_refinement_sale_health_ci
       - name: Verify parallel worker and queue-lock contracts after deferral repair
         run: python3 scripts/test-bat-sale-intake-concurrency.py dm_refinement_bat_sale_intake_ci
       - name: Verify source intake and replay survive real vehicle parent FK locks
