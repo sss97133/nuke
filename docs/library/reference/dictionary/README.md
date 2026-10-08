@@ -36,6 +36,12 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## B
 
+**Byte-qualified album context** — An image-set member link supported by the same
+account's PhotoKit source identifier, known source version and SHA-256 of the
+uploaded original. It confirms that this source photograph was observed in the
+album. It does not confirm the vehicle assignment, ownership, performer or album
+author. Missing, held and ambiguous originals remain unlinked.
+
 **Badge** — A clickable data token in the UI. "1991", "GMC", "V3500", "Basquiat", "1982", "Acrylic" — each is a badge. Badges are portals, not labels. Clicking a badge explodes into the cluster it belongs to.
 
 **Briefing** — The user-facing intelligence summary rendered at the top of a vehicle profile. Inverts the query model: instead of the user asking questions, the system presents the most relevant computed intelligence unprompted. Structured as a pyramid: L0 headline (one sentence, highest-severity signal), L1 signal cards (3-5 dimension-specific insights), L2 evidence layer (expandable full-provenance backing for each signal). The briefing is a computation surface — it reads from the knowledge graph and computes on render. See Discourse: The Knowing System, Design Book Ch. 11.
@@ -213,6 +219,14 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Nuke Estimate** — The system's computed valuation for an asset. A Zestimate for collector vehicles and art. Derived from comparable sales, trajectory analysis, condition assessment, and provenance strength, with confidence scoring and source citations.
 
 ## O
+
+**Observed native album state** — An immutable private capture of an app-visible
+PhotoKit grouping: source identifier, name, folders, ordered references, source
+versions and presence. The grouping-observation clock is separate from the image
+capture clock. A changed or removed album appends a successor; limited access is
+unknown coverage. Existing `image_sets` retains the source state and
+`album_sync_map` selects the current capture.
+
 
 **Observation** — The fundamental unit of data in Nuke. Every piece of information is an observation from a source with a trust weight, confidence score, and timestamp. Comments, listings, images, metadata, user inputs — all observations.
 

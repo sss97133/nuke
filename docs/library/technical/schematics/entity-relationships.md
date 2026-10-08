@@ -32,6 +32,7 @@ This document catalogs every significant entity (table) in the Nuke system, docu
 22. [ER Diagram: Observation System](#22-er-diagram-observation-system)
 23. [ER Diagram: Extraction Pipeline](#23-er-diagram-extraction-pipeline)
 24. [Cardinality Summary](#24-cardinality-summary)
+25. [Native album source captures](#25-native-album-source-captures)
 
 ---
 
@@ -1085,3 +1086,36 @@ Contains: total_fields extracted, raw_extraction JSON, structured field catalog.
 | comment_discoveries | ~125,000 |
 | description_discoveries | ~107 (only 107 AI-extracted) |
 | observation_sources | ~30 |
+
+
+## 25. Native album source captures
+
+Implemented 2026-10-08; production deployment is a separate verification stage.
+Existing owners are extended, with no parallel garage/album table:
+
+```text
+PhotoKit source catalog (local append log)
+  -> account-scoped local outbox / landed receipt
+  -> bulk_add_to_image_set(jsonb,jsonb)
+  -> private immutable image_sets source capture
+       source_capture_id (account-scoped replay key)
+       source_predecessor_id -> image_sets.id (typed source lineage)
+       source_observed_at (group-observation clock)
+       metadata.capture.album.photos (includes unuploaded references)
+  -> album_sync_map (account + installation + album -> current set)
+
+Current independent local byte read + eligible same-account cloud original
+  -> image_set_members (context link, original-byte witness in notes)
+     -> vehicle_images.id
+```
+
+Source groups have `vehicle_id=NULL`; names and memberships never bind a physical
+vehicle. Ordinary public-album read permissions cannot expose native captures to
+other accounts. Source headers and qualified member witnesses are immutable.
+Explicit predecessor checks preserve changes and prevent historical replays from
+rolling back the current selector. Linked, unlinked and total source memberships
+are separate measures. Complete raw OCR/visual-reading cloud retention and
+appearance-based physical identity remain outstanding.
+
+See `docs/design/GARAGE_EVIDENCE_MODEL.md` and the actual isolated migration test
+`scripts/tests/native-album-source.sql` for the contract and evidence boundaries.

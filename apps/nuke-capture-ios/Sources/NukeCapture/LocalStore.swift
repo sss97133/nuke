@@ -326,6 +326,31 @@ struct LocalAlbumCoverage: Sendable {
     let cachedDeepReads: Int
 }
 
+/// Cloud intake transports the observed grouping separately from byte witnesses.
+/// The source JSON is stable across retries; no labels, OCR or pixels are exported.
+struct NativeAlbumCaptureRequest: Sendable {
+    let userId: String
+    let catalogRowId: Int64
+    let albumId: String
+    let requestId: String
+    let payloadJSON: String
+    let photos: [LocalAlbumPhoto]
+}
+
+struct NativeAlbumByteWitness: Encodable, Sendable {
+    let local_id: String
+    let source_version: String
+    let input_sha256: String
+    let method_version: String
+    let read_id: String
+}
+
+struct NativeAlbumLinkBatch: Sendable {
+    let capture: NativeAlbumCaptureRequest
+    let witnesses: [NativeAlbumByteWitness]
+    let lastReadRowId: Int64
+}
+
 /// Derived solely from the retained source snapshot and independent current
 /// reads. Serial matches are candidates; an album never binds all its members.
 struct LocalProfilePhotoEvidence: Sendable {
@@ -502,6 +527,25 @@ final class LocalStore {
                 t.add(column: "relationshipEvidenceJSON", .text)
             }
         }
+        m.registerMigration("v8_native_album_sync_receipts") { db in
+            try db.create(table: "native_album_installation") { t in t.column("id", .text).primaryKey() }
+            try db.execute(sql: "INSERT INTO native_album_installation(id) VALUES (?)", arguments: [UUID().uuidString])
+            try db.create(table: "native_album_account_cursor") { t in
+                t.column("userId", .text).primaryKey()
+                t.column("catalogRowId", .integer).notNull()
+            }
+            try db.create(table: "native_album_sync_receipt") { t in
+                t.column("userId", .text).notNull()
+                t.column("albumId", .text).notNull()
+                t.column("catalogRowId", .integer).notNull()
+                t.column("captureId", .text).notNull()
+                t.column("setId", .text).notNull()
+                t.column("payloadJSON", .text).notNull()
+                t.column("readAfterRowId", .integer).notNull().defaults(to: 0)
+                t.column("linkAttemptAt", .datetime)
+                t.primaryKey(["userId", "albumId"])
+            }
+        }
         return m
     }
 
@@ -529,6 +573,134 @@ final class LocalStore {
             guard let payload = try String.fetchOne(db, sql: "SELECT payload FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1") else { return nil }
             return try JSONDecoder().decode(LocalAlbumCatalog.self, from: Data(payload.utf8))
         }
+    }
+
+    /// Begin a new account at the currently visible source state. Subsequent
+    /// offline catalog events drain in order; another account's old history is
+    /// not automatically exported. Limited access never deletes known albums.
+    func nextNativeAlbumCapture(userId: String) throws -> NativeAlbumCaptureRequest? {
+        try dbQueue.write { db in
+            guard let latest = try Int64.fetchOne(db, sql: "SELECT rowid FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1"),
+                  let installation = try String.fetchOne(db, sql: "SELECT id FROM native_album_installation LIMIT 1") else { return nil }
+            try db.execute(sql: "INSERT OR IGNORE INTO native_album_account_cursor(userId,catalogRowId) VALUES (?,?)",
+                           arguments: [userId, latest - 1])
+            for _ in 0..<32 {
+                let after = try Int64.fetchOne(db, sql: "SELECT catalogRowId FROM native_album_account_cursor WHERE userId=?", arguments: [userId]) ?? 0
+                guard let row = try Row.fetchOne(db, sql: "SELECT rowid,id,payload FROM photo_album_catalog WHERE rowid>? ORDER BY rowid LIMIT 1", arguments: [after]) else { return nil }
+                let rowId: Int64 = row["rowid"], catalogId: String = row["id"], payload: String = row["payload"]
+                let catalog = try JSONDecoder().decode(LocalAlbumCatalog.self, from: Data(payload.utf8))
+                if catalog.accessScope == "full" {
+                    let albums = catalog.albums
+                    let known = try Row.fetchAll(db, sql: "SELECT * FROM native_album_sync_receipt WHERE userId=?", arguments: [userId])
+                    let byId = Dictionary(known.map { ($0["albumId"] as String, $0) }, uniquingKeysWith: { first, _ in first })
+                    let visible = Set(albums.map(\.id))
+                    var states: [(LocalPhotoAlbum, Bool)] = albums.map { ($0, true) }
+                    for old in known where !visible.contains(old["albumId"]) {
+                        let previous = try Self.nativeCapture(from: old, userId: userId)
+                        let source = try Self.nativeSourceJSON(previous.payloadJSON)
+                        states.append((LocalPhotoAlbum(id: previous.albumId, name: source["name"] as? String,
+                            folderPath: source["folder_path"] as? [String] ?? [], sourceKind: source["source_kind"] as? String ?? "unknown", photos: []), false))
+                    }
+                    for (album, present) in states.sorted(by: { $0.0.id < $1.0.id }) {
+                        let source: [String: Any] = ["local_id": album.id, "name": album.name as Any? ?? NSNull(),
+                            "folder_path": album.folderPath, "source_kind": album.sourceKind, "present": present,
+                            "photos": album.photos.map { ["local_id": $0.localIdentifier, "source_version": $0.sourceVersion as Any? ?? NSNull()] }]
+                        let prior = byId[album.id]
+                        if let prior {
+                            let oldJSON: String = prior["payloadJSON"]
+                            if try Self.nativeJSON(Self.nativeSourceJSON(oldJSON)) == Self.nativeJSON(source) { continue }
+                        }
+                        let requestId = Self.nativeRequestId(userId + ":" + catalogId + ":" + album.id)
+                        let previous: String? = prior?["captureId"]
+                        let date = ISO8601DateFormatter(); date.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let json: [String: Any] = ["contract": "photokit_album_v1", "request_id": requestId,
+                            "previous_capture_id": previous as Any? ?? NSNull(), "installation_id": installation,
+                            "observed_at": date.string(from: catalog.observedAt), "access_scope": "full", "album": source]
+                        return NativeAlbumCaptureRequest(userId: userId, catalogRowId: rowId, albumId: album.id,
+                            requestId: requestId, payloadJSON: try Self.nativeJSON(json), photos: album.photos)
+                    }
+                }
+                try db.execute(sql: "UPDATE native_album_account_cursor SET catalogRowId=? WHERE userId=?", arguments: [rowId, userId])
+            }
+            return nil
+        }
+    }
+
+    func acknowledgeNativeAlbumCapture(_ request: NativeAlbumCaptureRequest, setId: String, captureId: String) throws {
+        guard captureId.lowercased() == request.requestId.lowercased() else { throw CocoaError(.coderInvalidValue) }
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                INSERT INTO native_album_sync_receipt(userId,albumId,catalogRowId,captureId,setId,payloadJSON,readAfterRowId)
+                VALUES (?,?,?,?,?,?,0) ON CONFLICT(userId,albumId) DO UPDATE SET
+                catalogRowId=excluded.catalogRowId,captureId=excluded.captureId,setId=excluded.setId,
+                payloadJSON=excluded.payloadJSON,readAfterRowId=0,linkAttemptAt=NULL
+                """, arguments: [request.userId, request.albumId, request.catalogRowId, captureId, setId, request.payloadJSON])
+        }
+    }
+
+    /// Rotate source groups and current original reads in bounded batches. Pending
+    /// uploads are retried after the tail wraps; failed network calls never advance.
+    func nextNativeAlbumLinks(userId: String, methodVersion: String, limit: Int = 200) throws -> NativeAlbumLinkBatch? {
+        try dbQueue.write { db in
+            let receipts = try Row.fetchAll(db, sql: "SELECT * FROM native_album_sync_receipt WHERE userId=? ORDER BY linkAttemptAt,albumId", arguments: [userId])
+            for receipt in receipts {
+                let capture = try Self.nativeCapture(from: receipt, userId: userId)
+                let photos = Dictionary(capture.photos.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+                var after: Int64 = receipt["readAfterRowId"]
+                var witnesses: [NativeAlbumByteWitness] = []
+                var last = after
+                let rows = try Row.fetchAll(db, sql: "SELECT rowid,* FROM photo_album_image_review WHERE rowid>? AND methodVersion=? ORDER BY rowid LIMIT 1000", arguments: [after, methodVersion])
+                for row in rows {
+                    last = row["rowid"]
+                    let review = try LocalAlbumImageReview(row: row)
+                    guard review.isVehicle, !review.hasPerson, let version = review.sourceVersion,
+                          photos[review.localIdentifier]?.sourceVersion == version else { continue }
+                    let verdict = try String.fetchOne(db, sql: "SELECT ownerVerdict FROM appearance WHERE localIdentifier=?", arguments: [review.localIdentifier])
+                    guard verdict != "rejected", verdict != "personal" else { continue }
+                    witnesses.append(NativeAlbumByteWitness(local_id: review.localIdentifier, source_version: version,
+                        input_sha256: review.inputSHA256, method_version: review.methodVersion, read_id: review.id))
+                    if witnesses.count >= min(200, max(1, limit)) { break }
+                }
+                if !witnesses.isEmpty { return NativeAlbumLinkBatch(capture: capture, witnesses: witnesses, lastReadRowId: last) }
+                if rows.isEmpty { after = 0 } else { after = last }
+                try db.execute(sql: "UPDATE native_album_sync_receipt SET readAfterRowId=?,linkAttemptAt=? WHERE userId=? AND albumId=?",
+                               arguments: [after, Date(), userId, capture.albumId])
+            }
+            return nil
+        }
+    }
+
+    func acknowledgeNativeAlbumLinks(_ batch: NativeAlbumLinkBatch) throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE native_album_sync_receipt SET readAfterRowId=?,linkAttemptAt=? WHERE userId=? AND albumId=? AND captureId=?",
+                arguments: [batch.lastReadRowId, Date(), batch.capture.userId, batch.capture.albumId, batch.capture.requestId])
+        }
+    }
+
+    private static func nativeCapture(from row: Row, userId: String) throws -> NativeAlbumCaptureRequest {
+        let payload: String = row["payloadJSON"]
+        let source = try nativeSourceJSON(payload)
+        let photos = (source["photos"] as? [[String: Any]] ?? []).compactMap { p -> LocalAlbumPhoto? in
+            guard let id = p["local_id"] as? String else { return nil }
+            return LocalAlbumPhoto(localIdentifier: id, sourceVersion: p["source_version"] as? String)
+        }
+        return NativeAlbumCaptureRequest(userId: userId, catalogRowId: row["catalogRowId"], albumId: row["albumId"],
+            requestId: row["captureId"], payloadJSON: payload, photos: photos)
+    }
+
+    private static func nativeJSON(_ object: Any) throws -> String {
+        String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
+    }
+
+    private static func nativeSourceJSON(_ payload: String) throws -> [String: Any] {
+        guard let json = try JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any],
+              let source = json["album"] as? [String: Any] else { throw CocoaError(.coderReadCorrupt) }
+        return source
+    }
+
+    private static func nativeRequestId(_ seed: String) -> String {
+        let hex = albumDigest(Data(seed.utf8))
+        return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
     }
 
     func recordAlbumImageReview(_ review: LocalAlbumImageReview) throws {

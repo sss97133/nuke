@@ -127,6 +127,7 @@ struct NukeCaptureApp: App {
                     // existing power/Wi-Fi backfill job.
                     await LibraryStore.shared.refreshAlbums()
                     await LibraryIngest.shared.runAlbumReview(budget: 24)
+                    await LibraryIngest.shared.syncNativeAlbums()
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
                 if !LibraryIngest.shared.backlogComplete {
@@ -249,6 +250,7 @@ struct NukeCaptureApp: App {
             // Reverse of runCloudBackfill: push the on-device Apple Vision tags UP to
             // vehicle_images (exif-uuid bridge). Idempotent; resumes via its own cursor.
             await LocalTagPush.run()
+            await LibraryIngest.shared.syncNativeAlbums(budget: 32)
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.

@@ -382,6 +382,7 @@ struct ProfileView: View {
             await LibraryStore.shared.refreshAlbums()
             await loadPhotoEvidence()
             await libraryIngest.runAlbumReview(budget: 24)
+            await libraryIngest.syncNativeAlbums()
             await loadPhotoEvidence()
         }
         .onChange(of: libraryIngest.running) { _, running in
@@ -410,6 +411,7 @@ struct ProfileView: View {
                 }
             }
             if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
+            if let summary = libraryIngest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
         }
     }
 

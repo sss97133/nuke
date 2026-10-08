@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 
 export interface ImageSet {
   id: string;
-  vehicle_id: string;
+  vehicle_id: string | null;
   created_by: string;
   name: string;
   description?: string;
@@ -22,6 +22,12 @@ export interface ImageSet {
   created_at: string;
   updated_at: string;
   image_count?: number;
+  source_contract?: string | null;
+  source_capture_id?: string | null;
+  source_predecessor_id?: string | null;
+  source_observed_at?: string | null;
+  source_count?: number;
+  unlinked_count?: number;
 }
 
 export interface ImageSetMember {
@@ -75,7 +81,7 @@ export class ImageSetService {
 
     const userId = session.session.user.id;
 
-    const { data, error } = await supabase
+    const [setsResult, mapsResult] = await Promise.all([supabase
       .from('image_sets')
       .select(
         `
@@ -85,14 +91,17 @@ export class ImageSetService {
       )
       .eq('user_id', userId)
       .eq('is_personal', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }),
+      supabase.from('album_sync_map').select('image_set_id').eq('user_id', userId).like('apple_album_id', 'ios-source:%')]);
+    const { data, error } = setsResult;
 
     if (error) {
       console.error('Error fetching personal albums:', error);
       throw error;
     }
+    if (mapsResult.error) throw mapsResult.error;
 
-    return (data || []).map((set: any) => ({
+    return currentPersonalAlbums(data || [], mapsResult.data || []).map((set: any) => ({
       ...set,
       image_count: set.image_count?.[0]?.count || 0
     }));
@@ -456,3 +465,16 @@ export class ImageSetService {
   }
 }
 
+/** Retained source history stays inspectable by ID; the album list shows the
+ * current observed grouping and declares source photos that lack cloud links. */
+export function currentPersonalAlbums(sets: ImageSet[], maps: { image_set_id: string | null }[]): ImageSet[] {
+  const current = new Set(maps.map(map => map.image_set_id));
+  return sets.flatMap(set => {
+    if (set.source_contract !== 'photokit_album_v1') return [set];
+    if (!current.has(set.id) || set.metadata?.capture?.album?.present !== true) return [];
+    const sourceCount = set.metadata.capture.album.photos?.length;
+    if (typeof sourceCount !== 'number') return [];
+    const linked = Array.isArray(set.image_count) ? Number((set.image_count as any)[0]?.count || 0) : Number(set.image_count || 0);
+    return [{ ...set, source_count: sourceCount, unlinked_count: Math.max(0, sourceCount - linked) }];
+  });
+}
