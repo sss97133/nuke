@@ -75,6 +75,23 @@ function optimizeImageUrl(url: string): string {
   return sharedOptimizeImageUrl(url, 'small') || url;
 }
 
+function ownershipPeriod(vehicle: GarageVehicle): string {
+  const start = vehicle.ownership_start_date ?? 'START UNKNOWN';
+  const end = vehicle.ownership_end_date ??
+    (['OWNER', 'VERIFIED OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'CURRENT' : 'END UNKNOWN');
+  return `${start} → ${end}`;
+}
+
+function relationshipTooltip(vehicle: GarageVehicle): string {
+  return `${vehicle.relationship_type} | ${ownershipPeriod(vehicle)} | ${vehicle.relationship_source.toUpperCase()}`;
+}
+
+function estimateTooltip(vehicle: GarageVehicle): string {
+  return vehicle.estimated_value != null
+    ? `BUILD-CLASS ESTIMATE | ${vehicle.estimate_calculated_at ?? 'DATE UNKNOWN'}`
+    : 'CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE';
+}
+
 function relationshipAccent(rel: RelationshipType): { bg: string; border: string; color: string } {
   switch (rel) {
     case 'VERIFIED OWNER':
@@ -549,9 +566,7 @@ function ActionStrip({
   onRelationshipClick?: (e: React.MouseEvent) => void;
 }) {
   const primaryAction =
-    vehicle.estimated_value == null
-      ? 'SET VALUE'
-      : (vehicle.image_count ?? 0) < 3
+    (vehicle.image_count ?? 0) < 3
       ? 'ADD PHOTOS'
       : 'VIEW DETAILS';
 
@@ -584,7 +599,7 @@ function ActionStrip({
         alignItems: 'stretch',
       }}
     >
-      <HoverData tooltip={primaryAction === 'VIEW DETAILS' ? 'OPEN VEHICLE PROFILE' : primaryAction === 'SET VALUE' ? 'ADD ESTIMATED VALUE' : 'UPLOAD MORE PHOTOS'} style={{ flex: 1 }}>
+      <HoverData tooltip={primaryAction === 'VIEW DETAILS' ? 'OPEN VEHICLE PROFILE' : 'UPLOAD MORE PHOTOS'} style={{ flex: 1 }}>
         <div
           style={{
             flex: 1,
@@ -646,11 +661,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
   }, []);
 
   const yearAge = vehicle.year ? `${new Date().getFullYear() - vehicle.year} YEARS OLD` : '';
-  const valueTooltip = vehicle.estimated_value != null
-    ? vehicle.purchase_price != null && vehicle.purchase_price !== vehicle.estimated_value
-      ? `ESTIMATED VALUE | PAID ${formatCurrency(vehicle.purchase_price)}`
-      : 'ESTIMATED VALUE'
-    : 'NO VALUE SET';
+  const valueTooltip = estimateTooltip(vehicle);
   const deltaTooltip = vehicle.value_delta != null && vehicle.purchase_price != null
     ? `${formatCurrency(vehicle.purchase_price)} → ${formatCurrency(vehicle.estimated_value!)}`
     : '';
@@ -745,7 +756,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
 
           {/* Relationship badge — top-left, solid bg */}
           <HoverData
-            tooltip={`${vehicle.relationship_type} | ${vehicle.relationship_source.toUpperCase()}`}
+            tooltip={relationshipTooltip(vehicle)}
             style={{ position: 'absolute', top: 6, left: 6 }}
           >
             <div
@@ -760,8 +771,8 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             </div>
           </HoverData>
 
-          {/* Eject — top-right, hidden for VERIFIED OWNER (those go through formal revocation) */}
-          {vehicle.relationship_type !== 'VERIFIED OWNER' && (
+          {/* This RPC revokes discovery membership, not an ownership period. */}
+          {vehicle.relationship_source === 'discovered' && (
             <button
               type="button"
               title="NOT MINE — REMOVE FROM GARAGE"
@@ -838,6 +849,10 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             {!title && <span>UNKNOWN VEHICLE</span>}
           </div>
 
+          <span style={{ ...MONO, ...LABEL }} title={relationshipTooltip(vehicle)}>
+            {ownershipPeriod(vehicle)}
+          </span>
+
           {/* VIN + missing tags */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             {vehicle.vin ? (
@@ -866,8 +881,8 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               </HoverData>
             )}
             {vehicle.estimated_value == null && (
-              <HoverData tooltip="NO ESTIMATED VALUE SET">
-                <MissingTag label="NO PRICE" />
+              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
+                <MissingTag label="NOT ESTIMATED" />
               </HoverData>
             )}
           </div>
@@ -1014,7 +1029,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             >
               {title || 'UNKNOWN VEHICLE'}
             </span>
-            <HoverData tooltip={`${vehicle.relationship_type} | ${vehicle.relationship_source.toUpperCase()}`}>
+            <HoverData tooltip={relationshipTooltip(vehicle)}>
               <RelationshipBadge rel={vehicle.relationship_type} />
             </HoverData>
             {!vehicle.vin && (
@@ -1023,8 +1038,8 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               </HoverData>
             )}
             {vehicle.estimated_value == null && (
-              <HoverData tooltip="NO ESTIMATED VALUE SET">
-                <MissingTag label="NO PRICE" />
+              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
+                <MissingTag label="NOT ESTIMATED" />
               </HoverData>
             )}
           </div>
@@ -1049,7 +1064,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
           )}
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-            <HoverData tooltip={vehicle.estimated_value != null ? 'ESTIMATED VALUE' : 'NO VALUE SET'}>
+            <HoverData tooltip={estimateTooltip(vehicle)}>
               <span style={LABEL}>VALUE</span>
               <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, marginLeft: 4 }}>
                 {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
@@ -1138,7 +1153,7 @@ function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActi
             {title || 'UNKNOWN VEHICLE'}
           </span>
         </HoverData>
-        <HoverData tooltip={`${vehicle.relationship_type} | ${vehicle.relationship_source.toUpperCase()}`}>
+        <HoverData tooltip={relationshipTooltip(vehicle)}>
           <RelationshipBadge rel={vehicle.relationship_type} />
         </HoverData>
         {!vehicle.vin && (
@@ -1146,7 +1161,7 @@ function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActi
             <MissingTag label="NO VIN" />
           </HoverData>
         )}
-        <HoverData tooltip={vehicle.estimated_value != null ? 'ESTIMATED VALUE' : 'NO VALUE SET'}>
+        <HoverData tooltip={estimateTooltip(vehicle)}>
           <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
             {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
           </span>
