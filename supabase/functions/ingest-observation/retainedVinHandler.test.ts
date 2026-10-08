@@ -197,13 +197,13 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
   }
 }
 const selector = { mode: RETAINED_VIN_MODE, revision_id: "7", dry_run: false };
-Deno.test("canonical60selector batch reuses real leaf custody and source dedup without nested edge calls", async () => {
+Deno.test("canonical120selector batch reuses real leaf custody and source dedup without nested edge calls", async () => {
   const r = await run({
     mode: RETAINED_VIN_BATCH_MODE,
     dry_run: false,
-    revision_ids: Array.from({ length: 60 }, (_, i) => String(i + 7)),
+    revision_ids: Array.from({ length: 120 }, (_, i) => String(i + 7)),
   }, "batch_replay");
-  assert(r.status === 200 && r.data.results.length === 60);
+  assert(r.status === 200 && r.data.results.length === 120);
   assert(
     r.data.results.every((x: any) =>
       x.status_code === 200 && x.body.observation_id === OBS &&
@@ -222,7 +222,7 @@ Deno.test("canonical60selector batch reuses real leaf custody and source dedup w
   assert(r.calls.every((c) => c.path.startsWith("/rest/v1/")));
   assert(
     r.calls.filter((c) => c.path.endsWith("read_retained_vin_reference_input"))
-      .length === 60,
+      .length === 120,
   );
 });
 Deno.test("canonical VIN batch rejects anonymous and invalid selectors before any database request", async () => {
@@ -239,7 +239,7 @@ Deno.test("canonical VIN batch rejects anonymous and invalid selectors before an
       revision_ids: ["7", "7"],
     }, {
       ...batch,
-      revision_ids: Array.from({ length: 61 }, (_, i) => String(i + 7)),
+      revision_ids: Array.from({ length: 121 }, (_, i) => String(i + 7)),
     }, { ...batch, fields: { BodyClass: "Coupe" } }]
   ) {
     const r = await run(input);

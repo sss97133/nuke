@@ -16,7 +16,7 @@ async function run(
   const calls: any[] = [], originalFetch = globalThis.fetch;
   const originalNow = Date.now;
   let elapsed = 0;
-  if (scenario === "budget60") Date.now = () => originalNow() + elapsed;
+  if (scenario === "budget120") Date.now = () => originalNow() + elapsed;
   const oldUrl = Deno.env.get("SUPABASE_URL"),
     oldKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   Deno.env.set("SUPABASE_URL", "https://db.test");
@@ -29,9 +29,9 @@ async function run(
           ? {
             data: scenario === "empty"
               ? []
-              : ["large60", "budget60", "excess61"].includes(scenario)
+              : ["large120", "budget120", "excess121"].includes(scenario)
               ? Array.from(
-                { length: scenario === "excess61" ? 61 : 60 },
+                { length: scenario === "excess121" ? 121 : 120 },
                 (_, i) => ({ revision_id: String(i + 7), vehicle_id: VID }),
               )
               : [{ revision_id: "7", vehicle_id: VID }],
@@ -73,7 +73,7 @@ async function run(
         if (scenario === "physical_claim") {
           out.receipt.physical_configuration_verified = true;
         }
-        const deferred = scenario === "budget60" && index > 0;
+        const deferred = scenario === "budget120" && index > 0;
         return {
           revision_id: revision,
           status_code: deferred ? 503 : scenario === "refused" ? 422 : 200,
@@ -88,7 +88,7 @@ async function run(
     if (scenario === "missing_record") records.pop();
     if (scenario === "wrong_record") records[0].revision_id = "99";
     if (scenario === "duplicate_record") records.push(records[0]);
-    if (scenario === "budget60") elapsed = 40001;
+    if (scenario === "budget120") elapsed = 40001;
     return new Response(
       JSON.stringify({
         success: true,
@@ -118,7 +118,7 @@ Deno.test("retained worker demands explicit bounded mode before any claim", asyn
   for (
     const invalid of [
       { ...body, dry_run: true },
-      { ...body, batch_size: 61 },
+      { ...body, batch_size: 121 },
       { ...body, batch_size: NaN },
       { ...body, batch_size: "20" },
       { ...body, offset: 1 },
@@ -128,11 +128,11 @@ Deno.test("retained worker demands explicit bounded mode before any claim", asyn
     assert(r.status === 400 && r.calls.length === 0);
   }
 });
-Deno.test("larger retained batch completes60 canonical selectors without widening its write contract", async () => {
-  const r = await run({ ...body, batch_size: 60 }, "large60");
+Deno.test("larger retained batch completes120 canonical selectors without widening its write contract", async () => {
+  const r = await run({ ...body, batch_size: 120 }, "large120");
   assert(
-    r.status === 200 && r.data.claimed === 60 && r.data.stored === 60 &&
-      r.data.writes === 60,
+    r.status === 200 && r.data.claimed === 120 && r.data.stored === 120 &&
+      r.data.writes === 120,
   );
   assert(
     r.data.provider_calls === 0 && r.data.model_calls === 0 &&
@@ -140,20 +140,20 @@ Deno.test("larger retained batch completes60 canonical selectors without widenin
   );
   assert(r.calls.filter((c) => c.request).length === 1);
   assert(
-    new Set(r.calls.find((c) => c.request).payload.revision_ids).size === 60,
+    new Set(r.calls.find((c) => c.request).payload.revision_ids).size === 120,
   );
   assert(
     r.calls.filter((c) => c.name === "finish_vin_reference_intake").length ===
-      60,
+      120,
   );
-  const excess = await run({ ...body, batch_size: 60 }, "excess61");
+  const excess = await run({ ...body, batch_size: 120 }, "excess121");
   assert(excess.status === 503 && excess.calls.length === 1);
 });
-Deno.test("60item batch stops new intake at its existing40second budget and releases unstarted work", async () => {
-  const r = await run({ ...body, batch_size: 60 }, "budget60");
+Deno.test("120item batch stops new intake at its existing40second budget and releases unstarted work", async () => {
+  const r = await run({ ...body, batch_size: 120 }, "budget120");
   assert(
     r.status === 200 && r.data.stored === 1 && r.data.writes === 1 &&
-      r.data.retries === 59,
+      r.data.retries === 119,
   );
   assert(r.calls.filter((c) => c.request).length === 1);
   const deferred = r.calls.filter((c) =>
@@ -161,7 +161,7 @@ Deno.test("60item batch stops new intake at its existing40second budget and rele
     c.args.p_reason === "batch_budget_deferred"
   );
   assert(
-    deferred.length === 59 &&
+    deferred.length === 119 &&
       deferred.every((c) =>
         c.args.p_status === "retry" && c.args.p_observation === null
       ),

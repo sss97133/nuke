@@ -16,7 +16,7 @@ Deno.test("canonical batch budget defers unstarted selectors and transports no r
       {
         mode: RETAINED_VIN_BATCH_MODE,
         dry_run: false,
-        revision_ids: Array.from({ length: 60 }, (_, i) => String(i + 7)),
+        revision_ids: Array.from({ length: 120 }, (_, i) => String(i + 7)),
       },
       async (req) => {
         const body = await req.json();
@@ -39,7 +39,7 @@ Deno.test("canonical batch budget defers unstarted selectors and transports no r
       },
     );
     const out = await response.json();
-    assert(calls === 1 && out.results.length === 60);
+    assert(calls === 1 && out.results.length === 120);
     assert(out.results[0].body.receipt.raw_reference === undefined);
     assert(
       out.results.slice(1).every((x: any) =>
