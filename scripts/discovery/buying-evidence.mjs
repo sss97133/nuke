@@ -231,7 +231,7 @@ export function documentRegions(family, row, vehicle) {
       if (item.gap) { gaps.push({ reason: item.gap, path: item.path }); continue; }
       region(item.path, item.text, 'existing_image_extraction_unverified', row.vision_model_version || null);
     }
-    if (!regions.length) gaps.push({ reason: 'image_has_no_searchable_existing_extraction' });
+    if (!regions.length) gaps.push({ reason: 'image_ai_extractions_has_no_searchable_text', path: '/ai_extractions' });
   } else if (family === 'snapshots') {
     if (row.attested_vehicle_id !== vehicle.id || row.vehicle_matched !== 'true')
       gaps.push({ reason: 'capture_vehicle_binding_unverified' });
@@ -307,6 +307,10 @@ export function buildReport(capture, query = null) {
   return { schema_version: VERSION, generated_at: stamp(), retrieval_started_at: capture.started_at,
     retrieval_ended_at: capture.ended_at, selection_cutoff: capture.selection_cutoff,
     snapshot_semantics: capture.snapshot_semantics, query, scope: capture.options,
+    retrieval_boundary: { image_analysis_fields_searched: ['ai_extractions'],
+      other_image_analysis_fields: 'not_read', raw_image_pixels: 'not_interpreted',
+      snapshot_lookup: 'current_vehicle_listing_bat_and_discovery_urls_only',
+      offloaded_snapshot_bodies: 'locator_only' },
     model_calls: 0, database_writes: 0, monetary_weights: 'not_estimated',
     interpretation: 'Search candidates, not verified facts, diagnostic findings, or failure probabilities. Counts are excerpts, not independent witnesses.',
     vehicles };
@@ -320,6 +324,7 @@ export function renderReport(report) {
   <title>Buying evidence review</title><style>body{font:16px system-ui;max-width:1200px;margin:36px auto;padding:0 20px;color:#202623;background:#f6f6f0}h1,h2{font-weight:600}article{background:white;padding:20px;margin:20px 0;border:1px solid #ccd2c8}small{color:#536054}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #ddd}blockquote{margin:12px 0;padding:12px;border-left:3px solid #627558;white-space:pre-wrap}summary{cursor:pointer}code{overflow-wrap:anywhere}a{color:#315642}</style>
   <h1>Buying evidence review</h1><p>${escape(report.interpretation)}</p>
   <p>Captured ${escape(report.retrieval_started_at)} to ${escape(report.retrieval_ended_at)}. Separate current reads. No calibrated cost or reliability estimate.</p>
+  <p>Image search covers the existing ai_extractions field. Other analysis fields and raw pixels are unmeasured. Offloaded page captures remain locators.</p>
   <table><tr><th>Recorded vehicle</th><th>Recorded mileage · unit unqualified</th><th>Matching excerpts</th><th>Retrieval / evidence gaps</th></tr>
   ${report.vehicles.map(v => `<tr><td>${escape([v.year, v.make, v.model].filter(Boolean).join(' ') || v.id)}</td><td>${escape(v.mileage_current_projection ?? 'unknown')}</td><td>${v.candidates.length}</td><td>${v.gaps.length} · ${escape(v.state)}</td></tr>`).join('')}</table>
   ${report.vehicles.map(v => `<article><h2>${escape([v.year, v.make, v.model].filter(Boolean).join(' ') || v.id)}</h2>

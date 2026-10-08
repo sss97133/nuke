@@ -1708,7 +1708,8 @@ No database/schema writes, intake, new model calls, financial weights or failure
 continuation page. The default vocabulary returned 108 excerpts. A cache-only heater-core query returned
 6 excerpts including earlier questions and a later recorded seller statement of replacement. This is
 testimony with dates, not verified repair or automatic contradiction resolution. The selected images had
-no searchable existing extraction; one capture was offloaded and two lacked the required vehicle binding.
+no searchable text in the inspected `ai_extractions` field; other image-analysis fields remain unmeasured.
+One capture was offloaded and two lacked the required vehicle binding.
 These are reported gaps, not proof that the underlying history or condition evidence does not exist.
 Fourteen offline contracts and the existing ENFORCE gate passed; the private HTML rendered and was inspected.
 This entry establishes implemented, tested and bounded runtime-read stages; PR/CI establish merge status.

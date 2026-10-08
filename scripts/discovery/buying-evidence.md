@@ -68,7 +68,10 @@ is retained. Identical quote clusters are review aids, never independent witness
   cutoff, failure probability, maintenance completion, cost estimate or resale
   premium is inferred. Missing matches mean unknown, not absence or neglect.
 - Existing observation and image extractions remain attributed to their method and
-  path. Image taken_at has writer-dependent meaning and is not asserted as EXIF truth.
+  path. Image search currently reads only `ai_extractions`; `analysis_history`,
+  `ai_extraction_consensus` and other stores are unmeasured, so an empty selected field
+  does not establish no retained analysis elsewhere. Image taken_at has writer-dependent
+  meaning and is not asserted as EXIF truth.
   No new vision inference or raw photograph interpretation is performed.
 - Listing captures require same-vehicle protected metadata, successful BaT capture,
   and independently recomputed HTML SHA256. Their clock is capture, not publication.

@@ -141,7 +141,8 @@ test('raw capture parsing requires matching vehicle, parser, status and recomput
 
 test('existing image output is attributed as unverified; no analysis is not healthy condition', () => {
   const empty = documentRegions('images', { ai_extractions: [] }, { id: ID });
-  assert.equal(empty.gaps[0].reason, 'image_has_no_searchable_existing_extraction');
+  assert.equal(empty.gaps[0].reason, 'image_ai_extractions_has_no_searchable_text');
+  assert.equal(empty.gaps[0].path, '/ai_extractions');
   const found = documentRegions('images', { ai_extractions: { condition: { note: 'Rust on frame.' } } }, { id: ID });
   assert.equal(found.regions[0].path, '/ai_extractions/condition/note');
   assert.equal(found.regions[0].basis, 'existing_image_extraction_unverified');
@@ -166,6 +167,8 @@ test('reports preserve contradictory testimony, duplicates, missing clocks and u
   assert.equal(v.candidates[0].duplicate_text_key, v.candidates[2].duplicate_text_key);
   assert.equal(v.candidates[0].event_at, DATE);
   assert.equal(report.monetary_weights, 'not_estimated');
+  assert.deepEqual(report.retrieval_boundary.image_analysis_fields_searched, ['ai_extractions']);
+  assert.equal(report.retrieval_boundary.other_image_analysis_fields, 'not_read');
   assert.ok(v.next_evidence.some(n => n.facet === 'storage' && n.condition === 'unknown_not_absent'));
 });
 
