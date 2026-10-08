@@ -34,9 +34,10 @@ async function run(
     }),
   };
   globalThis.fetch = async (request, opts) => {
+    const init = opts as { body?: unknown } | undefined;
     calls.push({
       request: String(request),
-      payload: JSON.parse(String(opts?.body)),
+      payload: JSON.parse(String(init?.body)),
     });
     if (scenario === "network_error") throw new Error("unavailable");
     const out: any = {

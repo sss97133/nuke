@@ -108,6 +108,11 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
   const originalFetch = globalThis.fetch;
   let reads = 0;
   globalThis.fetch = async (request, options) => {
+    const init = options as {
+      method?: string;
+      body?: unknown;
+      headers?: HeadersInit;
+    } | undefined;
     const url = new URL(
       typeof request === "string"
         ? request
@@ -115,11 +120,11 @@ async function run(body: unknown, scenario = "success", token = "test-key") {
         ? request.href
         : request.url,
     );
-    const method = options?.method ?? "GET",
-      payload = typeof options?.body === "string"
-        ? JSON.parse(options.body)
+    const method = init?.method ?? "GET",
+      payload = typeof init?.body === "string"
+        ? JSON.parse(init.body)
         : undefined;
-    const headers = new Headers(options?.headers);
+    const headers = new Headers(init?.headers);
     calls.push({
       path: url.pathname,
       method,

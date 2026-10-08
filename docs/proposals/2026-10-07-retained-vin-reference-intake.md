@@ -58,3 +58,11 @@ a blocking whole-table scan. The new operational table is fully keyed/indexed
 and private; its11 columns plus7 added columns are described and owners are
 registered. Standing cadence is20 claims every15min, at most80/hour, with no
 paid inference or provider requests.
+
+The first CI attempt exposed the profile job's missing local Node type install.
+Run these Deno checks with node-modules-dir=none, preserving type checking and
+using Deno's dependency cache; fetch mocks explicitly describe the web request
+options they inspect. Pin both touched production SDK imports to2.117.3, the
+current version actually resolved by the fresh CI attempt and verified against
+the official October7 release. All59 tests and the worker check pass with that
+exact SDK. The new reviewed head still needs all actual PR checks to finish.

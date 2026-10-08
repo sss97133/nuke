@@ -13,7 +13,7 @@
  * }
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { drainRetainedReferenceQueue } from "./retainedReferenceQueue.ts";
 

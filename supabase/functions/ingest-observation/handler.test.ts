@@ -25,10 +25,11 @@ async function run(body: unknown, scenario: string, token = "test-key") {
   const originalFetch = globalThis.fetch;
   let observationReads = 0;
   globalThis.fetch = async (request, options) => {
+    const init = options as { method?: string; body?: unknown; headers?: HeadersInit } | undefined;
     const url = new URL(typeof request === "string" ? request : request instanceof URL ? request.href : request.url);
-    const method = options?.method || "GET";
-    const payload = typeof options?.body === "string" ? JSON.parse(options.body) : undefined;
-    const headers = new Headers(options?.headers ?? (request instanceof Request ? request.headers : undefined));
+    const method = init?.method || "GET";
+    const payload = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+    const headers = new Headers(init?.headers ?? (request instanceof Request ? request.headers : undefined));
     calls.push({ path: url.pathname, method, writer: headers.get("x-nuke-writer"), body: payload });
     const response = (data: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(data), {
       status, headers: { "Content-Type": "application/json" },
