@@ -10,7 +10,7 @@ DO $$ DECLARE v_job bigint; v_rows integer; BEGIN
   AND active AND schedule IN('*/15 * * * *','* * * * *')
   AND command LIKE '%/functions/v1/batch-vin-decode%'
   AND command LIKE '%"use_retained_reference_queue":true%' AND command LIKE '%"dry_run":false%'
-  AND command LIKE '%"batch_size":20%';
+  AND command LIKE '%"batch_size":20}%';
  IF v_job IS NULL THEN RAISE EXCEPTION 'Active bounded retained reference contract unavailable; do not revive a paused or changed job'; END IF;
  UPDATE public.observation_extractors e SET rate_limit_per_hour=1200,min_interval_seconds=60
  FROM public.observation_sources s WHERE e.source_id=s.id AND s.slug='nhtsa'
@@ -30,7 +30,7 @@ BEGIN
  SELECT jobid INTO v_job FROM cron.job WHERE jobname='qualify-retained-vin-references'
   AND schedule='* * * * *' AND command LIKE '%/functions/v1/batch-vin-decode%'
   AND command LIKE '%"use_retained_reference_queue":true%' AND command LIKE '%"dry_run":false%'
-  AND command LIKE '%"batch_size":20%';
+  AND command LIKE '%"batch_size":20}%';
  IF v_job IS NULL THEN RAISE EXCEPTION 'Installed retained reference job contract unavailable'; END IF;
  PERFORM cron.alter_job(job_id:=v_job,active:=true);
  RETURN true;

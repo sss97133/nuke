@@ -32,9 +32,10 @@ query(f"UPDATE cron.job SET active=false WHERE {job}")
 apply('do not revive a paused or changed job')
 assert query(f"SELECT active FROM cron.job WHERE {job}") == 'f'
 assert query(f"SELECT rate_limit_per_hour FROM observation_extractors WHERE {extractor}") == '80'
-query(f"UPDATE cron.job SET active=true,command=replace(command,'\"batch_size\":20','\"batch_size\":19') WHERE {job}")
-apply('do not revive a paused or changed job')
-query(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":19','\"batch_size\":20') WHERE {job}")
+for changed_batch in ('19', '200'):
+    query(f"UPDATE cron.job SET active=true,command=replace(command,'\"batch_size\":20}}','\"batch_size\":{changed_batch}}}') WHERE {job}")
+    apply('do not revive a paused or changed job')
+    query(f"UPDATE cron.job SET command=replace(command,'\"batch_size\":{changed_batch}}}','\"batch_size\":20}}') WHERE {job}")
 query(f"UPDATE observation_extractors SET min_interval_seconds=901 WHERE {extractor}")
 apply('capacity contract unavailable')
 assert query(f"SELECT schedule FROM cron.job WHERE {job}") == '*/15 * * * *'
