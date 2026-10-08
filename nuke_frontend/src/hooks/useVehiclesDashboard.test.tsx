@@ -127,17 +127,15 @@ it('shows the recorded period and unknown estimate without a scalar-value action
   expect(container.innerHTML).toContain('REMOVE FROM GARAGE');
 });
 
-it('separates trim from model and keeps data confidence out of mechanical health in every card view', async () => {
+it('keeps data confidence out of mechanical health in every card view', async () => {
   seedGarage();
-  fixture.rows.vehicles[0] = { ...fixture.rows.vehicles[0], trim: 'Touring', confidence_score: 50 };
+  fixture.rows.vehicles[0] = { ...fixture.rows.vehicles[0], confidence_score: 50 };
   await act(async () => root.render(<Harness />));
   const vehicle = state.vehicles.find(v => v.id === 'car')!;
   expect(vehicle.health_score).toBeNull();
   expect(state.data?.my_vehicles.find(v => v.vehicle_id === 'car')?.confidence_score).toBe(50);
   for (const viewMode of ['GRID', 'LIST', 'COMPACT'] as const) {
     await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} viewMode={viewMode} /></MemoryRouter>));
-    expect(container.textContent).toContain('TRIM: TOURING');
-    expect(container.textContent).not.toContain('CAR TOURING');
     expect(container.textContent).not.toContain('HEALTH');
   }
 });

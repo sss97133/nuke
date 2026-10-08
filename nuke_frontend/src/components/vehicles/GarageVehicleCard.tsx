@@ -39,7 +39,7 @@ export interface GarageVehicleCardProps {
 // ---------------------------------------------------------------------------
 
 function formatVehicleTitle(v: GarageVehicle): string {
-  return [v.year, v.make, v.model]
+  return [v.year, v.make, v.model, v.trim]
     .filter(Boolean)
     .join(' ')
     .toUpperCase();
@@ -842,14 +842,13 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               <HoverData tooltip={`MANUFACTURER: ${vehicle.make.toUpperCase()}`}>{vehicle.make.toUpperCase()}</HoverData>
             ) : null}
             {vehicle.model ? (
-              <HoverData tooltip={`MODEL: ${vehicle.model.toUpperCase()}`}>{vehicle.model.toUpperCase()}</HoverData>
+              <HoverData tooltip={`MODEL: ${vehicle.model.toUpperCase()}${vehicle.trim ? ' ' + vehicle.trim.toUpperCase() : ''}`}>{vehicle.model.toUpperCase()}</HoverData>
+            ) : null}
+            {vehicle.trim && vehicle.model !== vehicle.trim ? (
+              <HoverData tooltip={`TRIM: ${vehicle.trim.toUpperCase()}`}>{vehicle.trim.toUpperCase()}</HoverData>
             ) : null}
             {!title && <span>UNKNOWN VEHICLE</span>}
           </div>
-
-          {vehicle.trim && (
-            <span style={LABEL}>TRIM: {vehicle.trim.toUpperCase()}</span>
-          )}
 
           <span style={{ ...MONO, ...LABEL }} title={relationshipTooltip(vehicle)}>
             {ownershipPeriod(vehicle)}
@@ -1046,8 +1045,6 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             )}
           </div>
 
-          {vehicle.trim && <span style={LABEL}>TRIM: {vehicle.trim.toUpperCase()}</span>}
-
           {vehicle.vin && (
             <HoverData
               tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
@@ -1157,7 +1154,6 @@ function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActi
             {title || 'UNKNOWN VEHICLE'}
           </span>
         </HoverData>
-        {vehicle.trim && <span style={{ ...LABEL, flexShrink: 0 }}>TRIM: {vehicle.trim.toUpperCase()}</span>}
         <HoverData tooltip={relationshipTooltip(vehicle)}>
           <RelationshipBadge rel={vehicle.relationship_type} />
         </HoverData>
