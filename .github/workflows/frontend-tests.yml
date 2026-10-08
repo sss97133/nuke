@@ -53,6 +53,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Verify exact-file migration recovery scope
+        run: python3 scripts/test-dispatch-migration.py
       - name: Create disposable metric-fold assay database
         run: createdb dm_fold_assay_ci
       - name: Verify actual fold-health migration and operational failure contracts
