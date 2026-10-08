@@ -1,7 +1,10 @@
 # Garage evidence and relationships
 
-Status: proposed relationship contract, not ratified or deployed. The local album
-foundation is implemented separately; it does not repair production ownership.
+Status, 2026-10-07: the bounded private relationship/cover correction contract was
+owner-approved, admitted and deployed through PR 876. Its web reader shipped in
+PR 877. Native profile/source integration is implemented and locally tested, with
+phone delivery and real-library verification still pending. The broader physical
+identity and album/read synchronization contract remains incomplete.
 
 The garage currently projects one winning relationship from ownership periods,
 approved proofs and previous-owner discoveries. That projection cannot represent
@@ -31,11 +34,16 @@ correction intake. The legacy `update_vehicle_relationship` writes discoveries
 and supports only interested/discovered/curated/consigned/previously_owned; using
 it would erase distinctions and leave conflicting current-owner periods intact.
 
-The next production change needs a reviewed extension to the existing observation
-property/admission contract, following the schema proposal workflow. Do not encode
-missing roles as free-text notes and then treat them as canonical ownership.
+The deployed `garage_relationship` property follows the schema proposal/review
+workflow. `record_garage_owner_correction` admits exact account testimony against
+an already identified terminal vehicle, or an account-scoped eligible cover choice.
+It preserves supersession and unknown dates, separates speaker from service actor,
+and requires explicit source authorization for service intake. Its restrictive
+read policy, canonical-view exclusion and subscriber guard preserve privacy.
+It changes neither legacy title/access records nor global image-primary flags.
+It does not yet admit unresolved vehicle identities or general image/album claims.
 
-## Proposed admission and grain
+## Required admission and grain
 
 Keep three separate assertions, each with its own source and qualification:
 
@@ -97,10 +105,14 @@ do not fit the modern VIN detector. Unavailable originals remain pending. Reuse 
 reading only when its source and method still qualify. Existing cloud assignment
 cannot serve as the autonomous pass's answer key.
 
-The local implementation retains group history, Apple Vision labels and OCR, with
-album-first bounded progress. Remaining work includes qualified physical-vehicle
-matching, local review of conflicts, sanctioned synchronization and the shared
-relationship projection. It does not yet recognize every vehicle from appearance.
+The local implementation retains the whole accessible photo snapshot, overlapping
+group history, Apple Vision labels and raw OCR, with album-first bounded progress.
+Limited access preserves selected-photo coverage while album coverage stays unknown.
+The own profile consumes exact serial candidates, account relationship statements,
+conflicts and unknown dates from this record and opens the original source viewer.
+These candidates are not canonical bindings. Remaining work includes independent
+appearance-based identity, owner confirmation of unresolved candidates and sanctioned
+album/read synchronization. It does not yet recognize every vehicle from appearance.
 
 Hero selection must use an eligible image whose identity supports this vehicle:
 an explicit owner choice first, then independently supported whole-vehicle views.
@@ -108,14 +120,21 @@ Parts/work/detail frames are gallery evidence, not automatic main images. Reject
 a hero preserves it in the log. Show the unresolved state when no eligible image
 exists; do not substitute an unrelated photo. Present model and trim separately.
 
-## Release evidence and hold
+## Release evidence and remaining work
 
 Before calling the garage repaired: test the cases above against retained sources,
 verify web/native agreement, demonstrate offline album rendering with zero network,
 and compare runtime results with the owner corrections. Full accessible-library
 coverage, unresolved identities, unread images and inferred work must be visible.
 
-This document does not approve production schema/data/access changes, paid analysis,
-held jobs, or automatic public disclosure. Owner ratification of the concrete
-contract and production authorization remain separate from publishing code for
-review. Private correction receipts stay outside this public repository.
+Twelve native ledger/projection tests demonstrate actual SQLite reopening, account
+isolation, source/method invalidation, unalbumed coverage, duplicate-serial conflicts
+and correction-role/cover persistence. The Simulator build passes; native source
+navigation renders using actual simulator Photos. Apple Vision fails to initialize
+in that simulator, so complete independent readings there remain pending. No
+real-phone, full-library or Airplane Mode/zero-network proof is implied.
+
+The approved bounded production correction support and the website deployment
+have separate receipts. Private correction excerpts and identifiers stay outside
+this public repository. New paid analysis, held jobs and public disclosure remain
+outside this implementation.

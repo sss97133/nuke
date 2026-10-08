@@ -153,25 +153,67 @@ struct LibraryView: View {
 
 /// The human grouping and the agent pass share the original Photos grid. Album
 /// names and memberships remain visible even before a vehicle identity is known.
-private struct LibraryAlbumsView: View {
+struct LibraryAlbumsView: View {
+    var userId: String? = nil
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var ingest = LibraryIngest.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var evidence: LocalProfileEvidence?
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    Text("Your existing albums are the starting groups. Nuke reads each photo separately; an album can contain several vehicles.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    if let evidence, let total = evidence.catalog.photos?.count {
+                        NavigationLink {
+                            LibraryAlbumPhotosView(userId: userId)
+                        } label: { LabeledContent("Accessible photos", value: total.formatted()) }
+                        LabeledContent("Read on-device", value: evidence.reviewed.formatted())
+                        LabeledContent("Awaiting read", value: (total - evidence.reviewed).formatted())
+                    }
                     if let error = store.albumError { Text(error).foregroundStyle(.secondary) }
                     if store.refreshingAlbums && store.albumCatalog == nil { ProgressView("Reading albums…") }
+                }
+                if let evidence {
+                    let supported = evidence.vehicles.filter { v in evidence.photos.contains { $0.candidateVehicleIds == [v.id] } }
+                    if !supported.isEmpty {
+                        Section("Vehicle identity · serial evidence") {
+                            ForEach(supported) { vehicle in
+                                NavigationLink {
+                                    LibraryAlbumPhotosView(userId: userId, candidateVehicleId: vehicle.id)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(vehicle.title)
+                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) exact serial reads · \(vehicle.relationshipLabel)")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Section("Identity review") {
+                        if evidence.reviewed > 0 {
+                            NavigationLink {
+                                LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
+                            } label: {
+                                LabeledContent("Unresolved vehicle frames", value: evidence.unresolved.formatted())
+                            }
+                        }
+                        if evidence.conflicted > 0 {
+                            NavigationLink {
+                                LibraryAlbumPhotosView(userId: userId, conflictingIdentity: true)
+                            } label: { LabeledContent("Conflicting serial matches", value: evidence.conflicted.formatted()) }
+                        }
+                        NavigationLink {
+                            LibraryAlbumPhotosView(userId: userId, unreadOnly: true)
+                        } label: { Text("Unread source photos") }
+                    }
                 }
                 if let catalog = store.albumCatalog, catalog.accessScope == "full" {
                     Section("Photos albums · \(catalog.albums.count)") {
                         ForEach(catalog.albums.sorted { ($0.name ?? "").localizedStandardCompare($1.name ?? "") == .orderedAscending }) { album in
                             NavigationLink {
-                                LibraryAlbumPhotosView(albumId: album.id)
+                                LibraryAlbumPhotosView(albumId: album.id, userId: userId)
                             } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(album.name ?? "Album name unavailable")
@@ -183,15 +225,6 @@ private struct LibraryAlbumsView: View {
                             }
                         }
                     }
-                    Section("On-device pass") {
-                        Button("Analyze library") {
-                            Task { await ingest.runAlbumReview() }
-                        }.disabled(ingest.running)
-                        Text("Albums first, then ungrouped photos. Each run makes bounded progress and reuses unchanged reads. Vehicle identity and your relationship stay open until supported.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
-                        if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
-                    }
                 } else if let catalog = store.albumCatalog {
                     Section {
                         Text(catalog.accessScope == "limited"
@@ -199,38 +232,85 @@ private struct LibraryAlbumsView: View {
                             : "Albums are unavailable with the current Photos access.")
                     }
                 }
+                if store.albumCatalog?.accessScope == "full" || store.albumCatalog?.accessScope == "limited" {
+                    Section("On-device pass") {
+                        Button("Analyze library") {
+                            Task { await ingest.runAlbumReview(); await reloadEvidence() }
+                        }.disabled(ingest.running)
+                        if ingest.running { ProgressView("\(ingest.albumReviewDone) photos read this pass") }
+                        if let summary = ingest.albumReviewSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+                    }
+                }
             }
             .navigationTitle("Albums")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
-            .task { await store.refreshAlbums() }
-            .refreshable { await store.refreshAlbums() }
+            .task { await reloadEvidence(); await store.refreshAlbums(); await reloadEvidence() }
+            .refreshable { await store.refreshAlbums(); await reloadEvidence() }
+            .onChange(of: ingest.running) { _, running in if !running { Task { await reloadEvidence() } } }
         }
+    }
+
+    private func reloadEvidence() async {
+        let owner = userId ?? ""
+        let method = LibraryIngest.albumMethodVersion
+        evidence = try? await Task.detached { try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) }.value
     }
 }
 
 private struct LibraryAlbumPhotosView: View {
-    let albumId: String
+    var albumId: String? = nil
+    var userId: String? = nil
+    var candidateVehicleId: String? = nil
+    var needsIdentity = false
+    var conflictingIdentity = false
+    var unreadOnly = false
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var ingest = LibraryIngest.shared
     @State private var indices: [String: Int] = [:]
     @State private var coverage: LocalAlbumCoverage?
     @State private var readError: String?
     @State private var detailIndex: Int?
+    @State private var evidence: LocalProfileEvidence?
 
     private var album: LocalPhotoAlbum? {
         guard store.albumCatalog?.accessScope == "full" else { return nil }
         return store.albumCatalog?.albums.first { $0.id == albumId }
     }
 
+    private var scopedPhotos: [LocalAlbumPhoto] {
+        if let album { return album.photos }
+        // A removed/inaccessible named album never falls through to the whole
+        // library. Its recorded grouping remains, but this scope is unavailable.
+        if albumId != nil { return [] }
+        return evidence?.photos.filter {
+            if let candidateVehicleId { return $0.candidateVehicleIds == [candidateVehicleId] }
+            if needsIdentity { return $0.review?.isVehicle == true && $0.candidateVehicleIds.isEmpty }
+            if conflictingIdentity { return $0.candidateVehicleIds.count > 1 }
+            if unreadOnly { return $0.review == nil }
+            return true
+        }.map(\.photo) ?? []
+    }
+
+    private var scopeTitle: String {
+        if let album { return album.name ?? "Album" }
+        if let id = candidateVehicleId { return evidence?.vehicles.first { $0.id == id }?.title ?? "Serial matches" }
+        if albumId != nil { return "Album unavailable" }
+        return needsIdentity ? "Unresolved identity" : (conflictingIdentity ? "Conflicting identity" : (unreadOnly ? "Unread photos" : "Source photos"))
+    }
+
     var body: some View {
         ScrollView {
-            if let album {
+            if album != nil || (albumId == nil && evidence != nil) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Photos album grouping").font(.caption).foregroundStyle(.secondary)
+                    Text(album == nil ? "On-device source evidence" : "Photos album grouping").font(.caption).foregroundStyle(.secondary)
                     if let coverage {
-                        Text("\(coverage.reviewed) / \(coverage.total) photos read on-device · \(coverage.vehicleFrames) vehicle/work frames")
+                        Text("\(coverage.reviewed) / \(coverage.total) photos read on-device")
                             .font(.subheadline).monospacedDigit()
+                        if coverage.reviewed > 0 {
+                            Text("\(coverage.vehicleFrames) vehicle/work frames among the read photos")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         if coverage.otherFrames > 0 {
                             Text("\(coverage.otherFrames) other frames to review").font(.caption).foregroundStyle(.secondary)
                         }
@@ -244,44 +324,44 @@ private struct LibraryAlbumPhotosView: View {
                         }
                     }
                     if let readError { Text(readError).font(.caption).foregroundStyle(.secondary) }
-                    Button(ingest.running ? "Reading photos…" : "Analyze album") {
+                    Button(ingest.running ? "Reading photos…" : (album == nil ? "Analyze library" : "Analyze album")) {
                         Task { await ingest.runAlbumReview(albumId: albumId); await reload() }
-                    }.disabled(ingest.running || album.photos.isEmpty)
-                    Text("The pass preserves your grouping and owner corrections. Visual tags and VIN text do not establish ownership or who performed work.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    }.disabled(ingest.running || scopedPhotos.isEmpty)
                 }.padding()
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
-                    ForEach(album.photos, id: \.localIdentifier) { photo in
+                    ForEach(scopedPhotos, id: \.localIdentifier) { photo in
                         if let index = indices[photo.localIdentifier] {
-                            LibraryCell(index: index, selecting: false, isSelected: false)
+                            LibraryCell(index: index, selecting: false, isSelected: false, localOnly: true)
                                 .onTapGesture { detailIndex = index }
                         }
                     }
                 }
-                if indices.count < album.photos.count {
-                    Text("\(album.photos.count - indices.count) photos are currently unavailable.")
+                if indices.count < scopedPhotos.count {
+                    Text("\(scopedPhotos.count - indices.count) photos are currently unavailable.")
                         .font(.caption).foregroundStyle(.secondary).padding()
                 }
             } else {
                 Text("This album is currently unavailable.").foregroundStyle(.secondary).padding()
             }
         }
-        .navigationTitle(album?.name ?? "Album")
+        .navigationTitle(scopeTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
         .onReceive(store.$albumCatalog) { _ in Task { await reload() } }
         .onChange(of: ingest.running) { _, running in if !running { Task { await reload() } } }
         .fullScreenCover(item: Binding(get: { detailIndex.map(IndexBox.init) }, set: { detailIndex = $0?.id })) {
-            LibraryDetailView(startIndex: $0.id)
+            LibraryDetailView(startIndex: $0.id, indices: scopedPhotos.compactMap { indices[$0.localIdentifier] }, localOnly: true)
         }
     }
 
     @MainActor private func reload() async {
-        guard let album else { indices = [:]; coverage = nil; return }
-        indices = store.indexMap(forLocalIdentifiers: album.photos.map(\.localIdentifier))
         let method = LibraryIngest.albumMethodVersion
+        let owner = userId ?? ""
         do {
-            coverage = try await Task.detached { try LocalStore.shared.albumCoverage(album, methodVersion: method) }.value
+            evidence = try await Task.detached { try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) }.value
+            indices = store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
+            let scope = album ?? LocalPhotoAlbum(id: "derived-scope", name: nil, folderPath: [], sourceKind: "derived", photos: scopedPhotos)
+            coverage = try await Task.detached { try LocalStore.shared.albumCoverage(scope, methodVersion: method) }.value
             readError = nil
         } catch { coverage = nil; readError = "Analysis coverage could not load. Totals are unknown." }
     }
@@ -301,11 +381,11 @@ final class LibraryThumbLoader: ObservableObject {
     @Published var image: UIImage?
     private var requestID: PHImageRequestID?
 
-    func load(index: Int) {
+    func load(index: Int, allowNetwork: Bool = true) {
         guard image == nil else { return }            // already have it → instant on re-appear
         cancel()
         guard let asset = LibraryStore.shared.asset(at: index) else { return }
-        requestID = LibraryStore.shared.requestThumbnail(for: asset) { [weak self] img in
+        requestID = LibraryStore.shared.requestThumbnail(for: asset, allowNetwork: allowNetwork) { [weak self] img in
             self?.image = img
         }
     }
@@ -321,6 +401,7 @@ struct LibraryCell: View {
     let index: Int
     var selecting: Bool = false
     var isSelected: Bool = false
+    var localOnly: Bool = false
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
@@ -402,9 +483,11 @@ struct LibraryCell: View {
             .onAppear {
                 let asset = LibraryStore.shared.asset(at: index)
                 localID = asset?.localIdentifier
-                LibraryStore.shared.updateCache(around: index)   // slide the cache window
-                if let lid = asset?.localIdentifier { overlay.note(lid) }  // async glasses; never blocks
-                loader.load(index: index)
+                if !localOnly {
+                    LibraryStore.shared.updateCache(around: index)
+                    if let lid = asset?.localIdentifier { overlay.note(lid) }
+                }
+                loader.load(index: index, allowNetwork: !localOnly)
             }
             .onDisappear { loader.cancel() }
     }

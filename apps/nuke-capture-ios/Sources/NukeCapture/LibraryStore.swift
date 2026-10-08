@@ -38,6 +38,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         assets = result
         count = result.count
         super.init()
+        albumCatalog = try? LocalStore.shared.latestAlbumCatalog()
         PHPhotoLibrary.shared().register(self)
     }
 
@@ -94,9 +95,18 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
 
     private nonisolated static func readAlbums() -> LocalAlbumCatalog {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        guard status == .authorized else {
-            return LocalAlbumCatalog(accessScope: status == .limited ? "limited" : "unavailable",
-                                     observedAt: Date(), albums: [])
+        guard status == .authorized || status == .limited else {
+            return LocalAlbumCatalog(accessScope: "unavailable", observedAt: Date(), albums: [], photos: [])
+        }
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        var visible: [LocalAlbumPhoto] = []
+        PHAsset.fetchAssets(with: options).enumerateObjects { asset, _, _ in
+            visible.append(LocalAlbumPhoto(localIdentifier: asset.localIdentifier,
+                sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) }))
+        }
+        if status == .limited {
+            return LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: [], photos: visible)
         }
         var paths: [String: [String]] = [:]
         func walk(_ collections: PHFetchResult<PHCollection>, path: [String]) {
@@ -112,8 +122,6 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         walk(PHCollectionList.fetchTopLevelUserCollections(with: nil), path: [])
         let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: nil)
         var albums: [LocalPhotoAlbum] = []
-        let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         collections.enumerateObjects { album, _, _ in
             var photos: [LocalAlbumPhoto] = []
             PHAsset.fetchAssets(in: album, options: options).enumerateObjects { asset, _, _ in
@@ -125,7 +133,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 folderPath: paths[album.localIdentifier] ?? [],
                 sourceKind: String(album.assetCollectionSubtype.rawValue), photos: photos))
         }
-        return LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: albums.sorted { $0.id < $1.id })
+        return LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: albums.sorted { $0.id < $1.id }, photos: visible)
     }
 
     /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
@@ -146,9 +154,13 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     /// sharp); the caller applies each. Returns the request id so the cell can
     /// cancel it the instant it scrolls off — no wasted decode on a fast flick.
     @discardableResult
-    func requestThumbnail(for asset: PHAsset, _ completion: @escaping (UIImage?) -> Void) -> PHImageRequestID {
-        imageManager.requestImage(
-            for: asset, targetSize: thumbSize, contentMode: .aspectFill, options: gridOptions
+    func requestThumbnail(for asset: PHAsset, allowNetwork: Bool = true, _ completion: @escaping (UIImage?) -> Void) -> PHImageRequestID {
+        let options = PHImageRequestOptions()
+        options.deliveryMode = gridOptions.deliveryMode
+        options.resizeMode = gridOptions.resizeMode
+        options.isNetworkAccessAllowed = allowNetwork
+        return imageManager.requestImage(
+            for: asset, targetSize: thumbSize, contentMode: .aspectFill, options: options
         ) { image, _ in if let image { completion(image) } }
     }
 
@@ -176,11 +188,12 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     }
 
     /// Full-resolution image for the detail pager (large target, not the raw original).
-    func fullImage(for asset: PHAsset) async -> UIImage? {
+    func fullImage(for asset: PHAsset, allowNetwork: Bool = true, original: Bool = false) async -> UIImage? {
         let o = PHImageRequestOptions()
+        if original { o.version = .original }
         o.deliveryMode = .highQualityFormat
         o.resizeMode = .fast
-        o.isNetworkAccessAllowed = true
+        o.isNetworkAccessAllowed = allowNetwork
         let side = max(UIScreen.main.bounds.width, UIScreen.main.bounds.height) * scale
         let target = CGSize(width: side, height: side)
         return await withCheckedContinuation { cont in

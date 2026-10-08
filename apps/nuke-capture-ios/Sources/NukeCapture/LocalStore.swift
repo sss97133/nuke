@@ -116,6 +116,128 @@ struct LocalGarageVehicle: Codable, FetchableRecord, PersistableRecord {
     var imageCount: Int
     var relationship: String
     var cachedAt: Date              // when WE last pulled this row down
+    var vin: String?
+    var relationshipEvidenceJSON: String?
+
+    var projection: GarageVehicle {
+        if let json = relationshipEvidenceJSON,
+           let row = try? JSONDecoder().decode(GarageVehicle.self, from: Data(json.utf8)) { return row }
+        return GarageVehicle(vehicle_id: vehicleId, year: year, make: make, model: model,
+            trim_name: trimName, image_url: imageUrl, current_value: currentValue,
+            image_count: imageCount, relationship: relationship, vin: vin)
+    }
+}
+
+/// Shared transport and offline projection. An account statement is a separate
+/// dimension from physical identity, title verification and authorization.
+struct GarageRelationshipStatement: Codable, Hashable, Sendable {
+    let roles: [String]
+    let ownership_denied: Bool
+    let title_status: String
+    let disputed: Bool
+    let start_date: String?
+    let end_date: String?
+}
+
+struct GarageOwnerCorrection: Decodable, Sendable {
+    struct Correction: Decodable, Sendable {
+        let relationship: GarageRelationshipStatement?
+        let cover_image_id: String?
+    }
+    let id: String
+    let vehicle_id: String
+    let correction: Correction
+    let observed_at: String
+    let cover_image_url: String?
+}
+
+struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
+    let vehicle_id: String
+    let year: Int?
+    let make: String?
+    var model: String?
+    let trim_name: String?
+    var image_url: String?
+    let current_value: Double?
+    let image_count: Int
+    var relationship: String
+    var vin: String? = nil
+    var relationshipStatement: GarageRelationshipStatement? = nil
+    var statementConflict: Bool? = nil
+    var relationshipEvidenceIds: [String]? = nil
+    var relationshipObservedAt: String? = nil
+
+    var id: String { vehicle_id }
+    var title: String {
+        [year.map(String.init), make, model, trim_name].compactMap { $0 }
+            .filter { !$0.isEmpty }.joined(separator: " ")
+    }
+    var relationshipLabel: String {
+        switch relationship {
+        case "owner": return "Owned"
+        case "previously_owned": return "Previously owned"
+        case "consignment": return "Consignment"
+        case "business_handling": return "Business handling"
+        case "sales_representative": return "Sales representative"
+        case "claimed_interest": return "Claimed interest"
+        case "shared_interest": return "Shared interest"
+        case "transfer_pending": return "Transfer pending"
+        case "relationship_review": return "Relationship review"
+        default: return relationship.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+    var relationshipDetail: String? {
+        if statementConflict == true { return "Conflicting account statements" }
+        guard let r = relationshipStatement else { return nil }
+        let pieces = [r.ownership_denied ? "Personal ownership rejected" : nil,
+            r.disputed ? "Disputed interest" : nil,
+            r.title_status == "not_in_name" ? "Title not in your name" : nil,
+            r.title_status == "transfer_pending" ? "Title transfer pending" : nil]
+            .compactMap { $0 }
+        let roles = r.roles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
+        return ([pieces.isEmpty ? "Account stated" : pieces.joined(separator: " · "),
+            roles.isEmpty ? nil : roles].compactMap { $0 }).joined(separator: " · ")
+    }
+    var relationshipPeriod: String? {
+        guard let r = relationshipStatement else { return nil }
+        let end = r.end_date ?? (r.roles.contains("owner_past") ? "End unknown" : "End unspecified")
+        return "\(r.start_date ?? "Start unknown") → \(end)"
+    }
+
+    static func applying(_ corrections: [GarageOwnerCorrection], to vehicles: [GarageVehicle],
+                         today: String = String(ISO8601DateFormatter().string(from: Date()).prefix(10))) -> [GarageVehicle] {
+        let groups = Dictionary(grouping: corrections, by: \.vehicle_id)
+        return vehicles.map { vehicle in
+            var result = vehicle
+            let rows = groups[vehicle.id] ?? []
+            if !rows.isEmpty { result.relationshipEvidenceIds = rows.map(\.id).sorted() }
+            let covers = rows.filter { $0.correction.cover_image_id != nil }
+            if !covers.isEmpty { result.image_url = covers.count == 1 ? covers[0].cover_image_url : nil }
+            let relationships = rows.compactMap { $0.correction.relationship }
+            if relationships.count > 1 {
+                result.relationship = "relationship_review"
+                result.relationshipStatement = nil; result.statementConflict = true
+                result.relationshipObservedAt = nil
+            } else if let r = relationships.first {
+                result.relationshipStatement = r; result.statementConflict = false
+                result.relationshipObservedAt = rows.first { $0.correction.relationship != nil }?.observed_at
+                let roles = r.roles.filter { ["owner_current", "owner_past", "shared_interest", "claimed_interest",
+                    "consignment", "business_handling", "sales_representative", "transfer_pending"].contains($0) }
+                switch roles.first {
+                case "owner_current": result.relationship = "owner"
+                case "owner_past": result.relationship = "previously_owned"
+                case let role?: result.relationship = role
+                default: result.relationship = "relationship_review"
+                }
+                if r.ownership_denied && roles.contains(where: { $0 == "owner_current" || $0 == "owner_past" }) {
+                    result.relationship = "relationship_review"
+                }
+                if result.relationship == "owner" && (r.disputed || r.title_status == "transfer_pending" ||
+                    (r.start_date.map { $0 > today } ?? false)) { result.relationship = "claimed_interest" }
+            }
+            return result
+        }
+    }
 }
 
 /// The back-of-the-photo ledger for one image — what the local store knows about it.
@@ -162,6 +284,12 @@ struct LocalAlbumCatalog: Codable, Sendable {
     let accessScope: String
     let observedAt: Date
     let albums: [LocalPhotoAlbum]
+    let photos: [LocalAlbumPhoto]?
+
+    init(accessScope: String, observedAt: Date, albums: [LocalPhotoAlbum], photos: [LocalAlbumPhoto]? = nil) {
+        self.accessScope = accessScope; self.observedAt = observedAt
+        self.albums = albums; self.photos = photos
+    }
 }
 
 /// An independent, versioned read of the original bytes. VIN-shaped OCR text is
@@ -196,6 +324,26 @@ struct LocalAlbumCoverage: Sendable {
     let otherFrames: Int
     let vinReadings: [String]
     let cachedDeepReads: Int
+}
+
+/// Derived solely from the retained source snapshot and independent current
+/// reads. Serial matches are candidates; an album never binds all its members.
+struct LocalProfilePhotoEvidence: Sendable {
+    let photo: LocalAlbumPhoto
+    let review: LocalAlbumImageReview?
+    let candidateVehicleIds: [String]
+    let takenAt: Date?
+}
+
+struct LocalProfileEvidence: Sendable {
+    let catalog: LocalAlbumCatalog
+    let photos: [LocalProfilePhotoEvidence]
+    let vehicles: [GarageVehicle]
+    var reviewed: Int { photos.filter { $0.review != nil }.count }
+    var vehicleFrames: Int { photos.filter { $0.review?.isVehicle == true }.count }
+    var matched: Int { photos.filter { $0.candidateVehicleIds.count == 1 }.count }
+    var conflicted: Int { photos.filter { $0.candidateVehicleIds.count > 1 }.count }
+    var unresolved: Int { photos.filter { $0.review?.isVehicle == true && $0.candidateVehicleIds.isEmpty }.count }
 }
 
 // MARK: - The store
@@ -348,6 +496,12 @@ final class LocalStore {
             try db.create(index: "photo_album_image_review_source", on: "photo_album_image_review",
                           columns: ["localIdentifier", "sourceVersion", "methodVersion"])
         }
+        m.registerMigration("v7_profile_relationship_evidence") { db in
+            try db.alter(table: "garage_vehicle") { t in
+                t.add(column: "vin", .text)
+                t.add(column: "relationshipEvidenceJSON", .text)
+            }
+        }
         return m
     }
 
@@ -358,8 +512,8 @@ final class LocalStore {
     func recordAlbumCatalog(_ catalog: LocalAlbumCatalog) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        struct State: Encodable { let accessScope: String; let albums: [LocalPhotoAlbum] }
-        let state = try encoder.encode(State(accessScope: catalog.accessScope, albums: catalog.albums))
+        struct State: Encodable { let accessScope: String; let albums: [LocalPhotoAlbum]; let photos: [LocalAlbumPhoto]? }
+        let state = try encoder.encode(State(accessScope: catalog.accessScope, albums: catalog.albums, photos: catalog.photos))
         let digest = Self.albumDigest(state)
         let payload = String(decoding: try encoder.encode(catalog), as: UTF8.self)
         try dbQueue.write { db in
@@ -418,6 +572,59 @@ final class LocalStore {
                 otherFrames: current.values.filter { !$0.isVehicle }.count,
                 vinReadings: Array(Set(current.values.flatMap(\.vinCandidates))).sorted(), cachedDeepReads: deepReads)
         }
+    }
+
+    func profileEvidence(userId: String, methodVersion: String) throws -> LocalProfileEvidence? {
+        guard let catalog = try latestAlbumCatalog() else { return nil }
+        let source = catalog.photos ?? catalog.albums.flatMap(\.photos)
+        let photos = Dictionary(source.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        let known = cachedGarage(userId: userId)?.vehicles.map(\.projection) ?? []
+        return try dbQueue.read { db in
+            var reviews: [String: LocalAlbumImageReview] = [:]
+            var clocks: [String: Date] = [:]
+            for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
+                for row in try LocalAlbumImageReview.fetchAll(db, sql: """
+                    SELECT * FROM photo_album_image_review
+                    WHERE methodVersion = ? AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    ORDER BY rowid
+                    """, arguments: StatementArguments([methodVersion] + chunk))
+                    where row.sourceVersion != nil && row.sourceVersion == photos[row.localIdentifier]?.sourceVersion {
+                    reviews[row.localIdentifier] = row
+                }
+                for row in try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier, takenAt FROM appearance
+                    WHERE localIdentifier IN (\(databaseQuestionMarks(count: chunk.count))) AND takenAt IS NOT NULL
+                    """, arguments: StatementArguments(chunk)) {
+                    clocks[row["localIdentifier"] as String] = row["takenAt"] as Date
+                }
+            }
+            let evidence = photos.values.map { photo -> LocalProfilePhotoEvidence in
+                let review = reviews[photo.localIdentifier]
+                let tokens = review.map { Self.serialTokens($0.vinCandidates + $0.textLines) } ?? []
+                let matches = known.filter { v in
+                    guard let vin = v.vin?.uppercased(), vin.count >= 10, vin.count <= 17 else { return false }
+                    return tokens.contains(vin)
+                }.map(\.vehicle_id).sorted()
+                return LocalProfilePhotoEvidence(photo: photo, review: review,
+                    candidateVehicleIds: matches, takenAt: clocks[photo.localIdentifier])
+            }.sorted { $0.photo.localIdentifier < $1.photo.localIdentifier }
+            return LocalProfileEvidence(catalog: catalog, photos: evidence, vehicles: known)
+        }
+    }
+
+    /// Exact complete tokens only: no fuzzy recovery, album-title identity,
+    /// same-model grouping or inheritance from an image's assigned vehicle.
+    private static func serialTokens(_ lines: [String]) -> Set<String> {
+        var result = Set<String>()
+        for line in lines {
+            let words = line.uppercased().components(separatedBy: CharacterSet.alphanumerics.inverted)
+            for word in words where (10...17).contains(word.count) { result.insert(word) }
+            let compact = line.uppercased().filter { !$0.isWhitespace && $0 != "-" }
+            if (10...17).contains(compact.count), compact.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) {
+                result.insert(compact)
+            }
+        }
+        return result
     }
 
     static func albumDigest(_ data: Data) -> String {
@@ -904,19 +1111,18 @@ final class LocalStore {
     /// transaction (see the v5 migration note on why full-replace is correct here,
     /// unlike the disjoint-column pattern used elsewhere in this file).
     func cacheGarage(userId: String,
-                     vehicles: [(vehicleId: String, year: Int?, make: String?, model: String?,
-                                 trimName: String?, imageUrl: String?, currentValue: Double?,
-                                 imageCount: Int, relationship: String)],
+                     vehicles: [GarageVehicle],
                      now: Date = Date()) {
         do {
             try dbQueue.write { db in
                 try db.execute(sql: "DELETE FROM garage_vehicle WHERE userId = ?", arguments: [userId])
                 for v in vehicles {
-                    try LocalGarageVehicle(userId: userId, vehicleId: v.vehicleId, year: v.year,
-                                           make: v.make, model: v.model, trimName: v.trimName,
-                                           imageUrl: v.imageUrl, currentValue: v.currentValue,
-                                           imageCount: v.imageCount, relationship: v.relationship,
-                                           cachedAt: now)
+                    let payload = String(decoding: try JSONEncoder().encode(v), as: UTF8.self)
+                    try LocalGarageVehicle(userId: userId, vehicleId: v.vehicle_id, year: v.year,
+                                           make: v.make, model: v.model, trimName: v.trim_name,
+                                           imageUrl: v.image_url, currentValue: v.current_value,
+                                           imageCount: v.image_count, relationship: v.relationship,
+                                           cachedAt: now, vin: v.vin, relationshipEvidenceJSON: payload)
                         .insert(db)
                 }
             }
@@ -938,7 +1144,7 @@ final class LocalStore {
                 // as the live one did, not reshuffled.
                 let rows = try LocalGarageVehicle.fetchAll(db, sql: """
                     SELECT userId, vehicleId, year, make, model, trimName, imageUrl,
-                           currentValue, imageCount, relationship, cachedAt
+                           currentValue, imageCount, relationship, cachedAt, vin, relationshipEvidenceJSON
                     FROM garage_vehicle WHERE userId = ? ORDER BY rowid ASC
                     """, arguments: [userId])
                 guard !rows.isEmpty, let oldest = rows.map(\.cachedAt).min() else { return nil }

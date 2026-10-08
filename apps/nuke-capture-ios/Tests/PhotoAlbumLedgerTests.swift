@@ -109,4 +109,109 @@ final class PhotoAlbumLedgerTests: XCTestCase {
         XCTAssertEqual(try reopened.latestAlbumCatalog()?.albums.first?.folderPath, ["Work"])
         XCTAssertEqual(try reopened.albumCoverage(album(), methodVersion: method).reviewed, 1)
     }
+
+    private func vehicle(_ id: String, vin: String? = "SYNTHETIC12345") -> GarageVehicle {
+        GarageVehicle(vehicle_id: id, year: 1973, make: "Synthetic", model: "Same model",
+            trim_name: nil, image_url: "old-cover", current_value: nil, image_count: 1, relationship: "owner", vin: vin)
+    }
+
+    func testProfileIncludesUnalbumedPhotosWithoutDoubleCountingHumanGroups() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        let ungrouped = LocalAlbumPhoto(localIdentifier: "ungrouped", sourceVersion: "v1")
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(),
+            albums: [album("one"), album("two")], photos: [photo, ungrouped]))
+        try store.recordAlbumImageReview(review(photo))
+        store.cacheGarage(userId: "account", vehicles: [vehicle("one")])
+        let evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
+        XCTAssertEqual(evidence.photos.count, 2)
+        XCTAssertEqual(evidence.reviewed, 1)
+        XCTAssertEqual(evidence.matched, 1)
+        XCTAssertEqual(evidence.photos.first { $0.photo == ungrouped }?.candidateVehicleIds, [])
+        XCTAssertNil(evidence.photos.first { $0.photo == photo }?.takenAt)
+        XCTAssertEqual(evidence.catalog.albums.count, 2)
+    }
+
+    func testSerialConflictAndChangedSourceRemainOpenWithoutInheritedAssignment() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(),
+            albums: [album(name: "Synthetic same model")], photos: [photo]))
+        try store.recordAlbumImageReview(review(photo))
+        store.cacheGarage(userId: "account", vehicles: [vehicle("one"), vehicle("two")])
+        var evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
+        XCTAssertEqual(evidence.conflicted, 1)
+        XCTAssertEqual(evidence.matched, 0)
+        XCTAssertEqual(evidence.photos[0].candidateVehicleIds, ["one", "two"])
+        store.cacheGarage(userId: "account", vehicles: [vehicle("one", vin: "OTHER123456789")])
+        store.cacheCloudVerdict(localIdentifier: photo.localIdentifier, narrative: "Existing assignment",
+            intent: "labor", scene: nil, confidence: 1, buildPhase: nil, vehicleId: "one", agentModel: "model", analyzedAt: Date())
+        evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
+        XCTAssertEqual(evidence.unresolved, 1)
+        XCTAssertEqual(evidence.matched, 0)
+        let edited = LocalAlbumPhoto(localIdentifier: photo.localIdentifier, sourceVersion: "source-v2")
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [], photos: [edited]))
+        evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
+        XCTAssertEqual(evidence.reviewed, 0)
+        XCTAssertNil(evidence.photos[0].review)
+    }
+
+    func testLimitedLibraryRetainsAccessibleReadCoverageAndAccountIsolation() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: [], photos: [photo]))
+        try store.recordAlbumImageReview(review(photo))
+        store.cacheGarage(userId: "first", vehicles: [vehicle("one")])
+        let first = try XCTUnwrap(store.profileEvidence(userId: "first", methodVersion: method))
+        let second = try XCTUnwrap(store.profileEvidence(userId: "second", methodVersion: method))
+        XCTAssertEqual(first.catalog.accessScope, "limited")
+        XCTAssertEqual(first.catalog.albums.count, 0)
+        XCTAssertEqual(first.reviewed, 1)
+        XCTAssertEqual(first.matched, 1)
+        XCTAssertEqual(second.matched, 0)
+        XCTAssertTrue(second.vehicles.isEmpty)
+    }
+
+    func testActualCorrectionTransportAndOfflineMirrorPreserveRolesDatesAndCover() throws {
+        let json = """
+        [{"id":"statement","vehicle_id":"one","observed_at":"2026-10-07","cover_image_url":null,
+          "correction":{"relationship":{"roles":["claimed_interest","shared_interest"],
+          "ownership_denied":false,"title_status":"not_in_name","disputed":true,"start_date":null,"end_date":null}}},
+         {"id":"cover","vehicle_id":"one","observed_at":"2026-10-07","cover_image_url":"chosen-cover",
+          "correction":{"cover_image_id":"chosen-image"}}]
+        """
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(json.utf8))
+        let projected = GarageVehicle.applying(corrections, to: [vehicle("one")])
+        XCTAssertEqual(projected[0].relationship, "claimed_interest")
+        XCTAssertEqual(projected[0].image_url, "chosen-cover")
+        XCTAssertEqual(projected[0].relationshipStatement?.roles, ["claimed_interest", "shared_interest"])
+        XCTAssertNil(projected[0].relationshipStatement?.end_date)
+        XCTAssertEqual(projected[0].relationshipEvidenceIds, ["cover", "statement"])
+        XCTAssertEqual(projected[0].relationshipObservedAt, "2026-10-07")
+        XCTAssertTrue(projected[0].relationshipDetail?.contains("shared interest") == true)
+        XCTAssertEqual(projected[0].relationshipPeriod, "Start unknown → End unspecified")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("ledger.sqlite").path
+        do {
+            let store = try LocalStore(databaseQueue: DatabaseQueue(path: path))
+            store.cacheGarage(userId: "first", vehicles: projected)
+        }
+        let reopened = try LocalStore(databaseQueue: DatabaseQueue(path: path))
+        XCTAssertEqual(reopened.cachedGarage(userId: "first")?.vehicles.map(\.projection), projected)
+        XCTAssertNil(reopened.cachedGarage(userId: "second"))
+    }
+
+    func testConflictingAccountStatementsAndUnavailableChosenImageNeverRestoreOldClaims() throws {
+        let relationship = GarageRelationshipStatement(roles: ["owner_past"], ownership_denied: false,
+            title_status: "unknown", disputed: false, start_date: nil, end_date: nil)
+        let statement = GarageOwnerCorrection(id: "one", vehicle_id: "one",
+            correction: .init(relationship: relationship, cover_image_id: nil), observed_at: "today", cover_image_url: nil)
+        let fork = GarageOwnerCorrection(id: "fork", vehicle_id: "one",
+            correction: .init(relationship: relationship, cover_image_id: nil), observed_at: "later", cover_image_url: nil)
+        let cover = GarageOwnerCorrection(id: "cover", vehicle_id: "one",
+            correction: .init(relationship: nil, cover_image_id: "unavailable"), observed_at: "today", cover_image_url: nil)
+        let result = GarageVehicle.applying([statement, fork, cover], to: [vehicle("one")])[0]
+        XCTAssertEqual(result.relationship, "relationship_review")
+        XCTAssertTrue(result.statementConflict == true)
+        XCTAssertNil(result.image_url)
+    }
 }
