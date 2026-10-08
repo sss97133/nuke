@@ -50,6 +50,7 @@ const sources = new Map([
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
   ['retainedIdentity',compile('../supabase/functions/ingest-observation/retainedIdentity.ts')],
+  ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -207,6 +208,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
+        if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');

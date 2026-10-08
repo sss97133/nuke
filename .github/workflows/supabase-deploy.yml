@@ -196,6 +196,25 @@ jobs:
           npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt
           echo "✅ functions deployed"
 
+      - name: Activate installed retained VIN intake
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
+        run: |
+          # This migration initially pauses its job: an older VIN worker ignores
+          # the new mode. Activate only after this exact migration and both edge
+          # owners successfully deploy in this run. Partial rollouts stay paused.
+          if ! grep -Fxq 'supabase/migrations/20261008023725_retained_vin_reference_intake.sql' /tmp/migrations.txt; then exit 0; fi
+          if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+            echo 'Retained VIN intake remains paused: both edge owners must deploy.'
+            exit 1
+          fi
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'Retained VIN intake remains paused: deployment DB unavailable.'
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT public.activate_retained_vin_reference_intake();'
+
       - name: Summary
         if: always()
         run: |

@@ -24,7 +24,7 @@
  * }
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
@@ -33,6 +33,8 @@ import { observationContentHash, observationClockMicroseconds } from "../_shared
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
+  qualifyRetainedVinReference } from "./retainedVinReference.ts";
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
@@ -43,6 +45,9 @@ const corsHeaders = {
 };
 
 interface ObservationInput {
+  /** Internal source links derived by retained-reference mode; generic callers cannot bind them. */
+  source_vin?: string;
+  source_vin_taxonomy_revision_id?: string;
   mode?: string;
   snapshot_id?: string;
   dry_run?: boolean;
@@ -324,6 +329,41 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Retained projection requires its source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    let retainedVin: Awaited<ReturnType<typeof qualifyRetainedVinReference>> | undefined;
+    if (input.mode === RETAINED_VIN_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained VIN admission requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const revisionId = retainedVinSelector(input as unknown as Record<string, unknown>);
+      if (!revisionId) return new Response(JSON.stringify({ error: "Expected an explicit retained VIN source selector", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const context = await supabase.rpc("read_retained_vin_reference_input", { p_revision_id: revisionId })
+        .abortSignal(AbortSignal.timeout(5000));
+      if (context.error) return new Response(JSON.stringify({ error: "retained_reference_read_failed", writes: 0, model_calls: 0 }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      retainedVin = await qualifyRetainedVinReference(context.data);
+      if (!retainedVin.ok) return new Response(JSON.stringify({ success: false, reason: retainedVin.reason, writes: 0, model_calls: 0 }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (typeof context.data.extractor_id !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(context.data.extractor_id)) {
+        return new Response(JSON.stringify({ error: "retained_reference_extractor_unavailable", writes: 0, model_calls: 0 }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (input.dry_run) return new Response(JSON.stringify({ success: true, dry_run: true,
+        requested_taxonomy_revision_id: revisionId, receipt: retainedVin.receipt, writes: 0, model_calls: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      input = { ...retainedVin.input, extractor_id: context.data.extractor_id };
+    } else if (input.extraction_method === RETAINED_VIN_METHOD || input.structured_data?.vin_reference_receipt !== undefined) {
+      return new Response(JSON.stringify({ error: "Protected VIN references require the retained source selector" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } else if (input.mode?.startsWith("retained_vin_")) {
+      return new Response(JSON.stringify({ error: "Retained VIN recipe not installed", writes: 0, model_calls: 0 }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     let archivedSale: Awaited<ReturnType<typeof deriveArchivedSale>> | undefined;
     if (input.mode === "source_sale_qualification") {
       const denied = await requireWriteAuth(req);
@@ -360,6 +400,32 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const protectedReply = (row: any, duplicate: boolean) => {
+      if (retainedVin?.ok) {
+        const saved = row?.structured_data?.vin_reference_receipt;
+        const ordered = (value: any): any => Array.isArray(value) ? value.map(ordered)
+          : value !== null && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key,ordered(value[key])])) : value;
+        if (row?.is_superseded === true) return new Response(JSON.stringify({ success: false,
+          reason: "retained_reference_superseded", writes: 0, model_calls: 0 }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!row?.id || row.vehicle_id !== input.vehicle_id || row.source_vin !== input.source_vin ||
+            !retainedVinSelector({ mode: RETAINED_VIN_MODE, revision_id: row.source_vin_taxonomy_revision_id, dry_run: true }) ||
+            row.kind !== "specification" || row.is_superseded !== false || row.source_id !== source?.id ||
+            row.extraction_method !== RETAINED_VIN_METHOD || row.extractor_id !== input.extractor_id ||
+            row.source_identifier !== input.source_identifier || row.raw_source_ref !== input.raw_source_ref ||
+            row.source_url !== input.source_url || row.content_hash !== contentHash ||
+            observationClockMicroseconds(row.observed_at) !== observationClockMicroseconds(input.observed_at) ||
+            observationClockMicroseconds(row.ingested_at) === null ||
+            JSON.stringify(ordered(saved)) !== JSON.stringify(ordered(retainedVin.receipt))) {
+          return new Response(JSON.stringify({ error: "Persisted protected VIN reference unavailable", writes: 0, model_calls: 0 }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify({ success: true, dry_run: false, duplicate, observation_id: row.id,
+          vehicle_id: row.vehicle_id, requested_taxonomy_revision_id: retainedVin.revision_id,
+          supporting_taxonomy_revision_id: String(row.source_vin_taxonomy_revision_id), receipt: saved,
+          derived_ingested_at: row.ingested_at, physical_configuration_verified: false,
+          writes: duplicate ? 0 : 1, model_calls: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (!archivedSale?.ok) return null;
       const saved = row?.structured_data?.source_sale_receipt;
       const exactTuple = saved && Object.entries(archivedSale.receipt).every(([key,value]) => saved[key] === value);
@@ -375,7 +441,7 @@ Deno.serve(async (req) => {
         }));
       if (!row?.id || row.vehicle_id !== input.vehicle_id || row.source_snapshot_id !== archivedSale.receipt.snapshot_id || !Number.isFinite(Date.parse(row.ingested_at)) || !exactTuple
         || !episodeExact
-        || row.kind !== "sale_result" || row.is_superseded !== false || row.source_id !== source.id
+        || row.kind !== "sale_result" || row.is_superseded !== false || row.source_id !== source?.id
         || row.extraction_method !== ARCHIVED_SALE_METHOD || row.extractor_id !== null
         || row.raw_source_ref !== input.raw_source_ref || row.source_identifier !== input.source_identifier
         || row.source_url !== input.source_url || Date.parse(row.observed_at) !== Date.parse(input.observed_at)) {
@@ -497,13 +563,14 @@ Deno.serve(async (req) => {
     // Check for duplicate
     const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at";
     const replayQuery = () => {
-      let query = supabase.from("vehicle_observations").select(archivedSale?.ok
+      let query = supabase.from("vehicle_observations").select(retainedVin?.ok
+        ? protectedColumns + ",source_vin,source_vin_taxonomy_revision_id,content_hash" : archivedSale?.ok
         ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "") : "id").eq("content_hash",contentHash);
-      if (archivedSale?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
-      return query.maybeSingle();
+      if (archivedSale?.ok || retainedVin?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
+      return query.maybeSingle().returns<Record<string, unknown> | null>();
     };
     const { data: existing, error: replayError } = await replayQuery();
-    if (input.source_vehicle_event_id && archivedSale?.ok && replayError) {
+    if ((input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok) && replayError) {
       return new Response(JSON.stringify({ error: "Typed sale replay unavailable" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -673,6 +740,8 @@ Deno.serve(async (req) => {
         // Only freshly verified protected admission sets the typed source key.
         // Generic input, including caller-provided source_snapshot_id, is ignored.
         ...(archivedSale?.ok ? { source_snapshot_id: archivedSale.receipt.snapshot_id } : {}),
+        ...(retainedVin?.ok ? { source_vin: input.source_vin,
+          source_vin_taxonomy_revision_id: input.source_vin_taxonomy_revision_id } : {}),
         ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
         ...(retainedSourceId ? { source_observation_id: retainedSourceId } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,

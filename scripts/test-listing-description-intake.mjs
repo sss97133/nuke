@@ -172,7 +172,8 @@ function canonicalIntake(options = {}) {
         handlers.set(filename.pathname.includes('/extract-bat-core/') ? 'core' : 'intake', callback);
       } },
       require: name => {
-        if (['https://esm.sh/@supabase/supabase-js@2', 'https://esm.sh/@supabase/supabase-js@2.45.4'].includes(name)) return { createClient: client };
+        if (['https://esm.sh/@supabase/supabase-js@2', 'https://esm.sh/@supabase/supabase-js@2.45.4',
+          'https://esm.sh/@supabase/supabase-js@2.117.3'].includes(name)) return { createClient: client };
         assert.ok(name.startsWith('.'), `No downloaded import: ${name}`);
         if (filename.pathname.endsWith('/extract-bat-core/index.ts') &&
           ['../_shared/listingUrl.ts','../_shared/parseLocation.ts','../_shared/normalizeVehicle.ts',
