@@ -27,6 +27,10 @@ on:
       - 'supabase/functions/**'
   workflow_dispatch:
     inputs:
+      migration_file:
+        description: 'One tracked migration filename, overriding migrations_since (blank = use prefix)'
+        required: false
+        default: ''
       migrations_since:
         description: 'Apply migrations with filename >= this prefix (blank = none)'
         required: false
@@ -71,10 +75,14 @@ jobs:
 
       - name: Determine migrations + functions to deploy
         id: plan
+        env:
+          REQUESTED_MIGRATION_FILE: ${{ github.event.inputs.migration_file }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SINCE="${{ github.event.inputs.migrations_since }}"
-            if [ -n "$SINCE" ]; then
+            if [ -n "$REQUESTED_MIGRATION_FILE" ]; then
+              bash scripts/ci/select-dispatch-migration.sh "$REQUESTED_MIGRATION_FILE" > /tmp/migrations.txt
+            elif [ -n "$SINCE" ]; then
               ls supabase/migrations/ | awk -v s="$SINCE" '$0 >= s' | sed 's|^|supabase/migrations/|' > /tmp/migrations.txt
             else
               : > /tmp/migrations.txt
