@@ -243,6 +243,8 @@ jobs:
         run: python3 scripts/test-bat-sale-intake-concurrency.py dm_refinement_bat_sale_intake_ci
       - name: Verify source intake and replay survive real vehicle parent FK locks
         run: python3 scripts/test-bat-sale-parent-locks.py dm_refinement_bat_sale_intake_ci
+      - name: Verify protected sale cadence guards and unchanged intake ownership
+        run: python3 scripts/test-bat-sale-intake-cadence.py dm_refinement_bat_sale_intake_ci
       - name: Create disposable vin decode policy database
         run: createdb dm_refinement_vin_policy_ci
       - name: Verify vin_decoded_data's write policy is scoped to service_role (anon reads, cannot insert or delete; service_role writes; registry row; re-apply a no-op)
