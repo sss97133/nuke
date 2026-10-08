@@ -126,6 +126,8 @@ it('opens the exact reference contributors on demand and keeps selected auction 
 it('opens an annual overview mark with that year’s contributor context', async () => {
   await render();await click(button('2026','.sx-year-buttons button'));
   expect(container.querySelector('.sx-contributors')?.textContent).toContain('2026');
+  expect(container.querySelector('.sx-contributors .sx-chart-note')?.textContent).toContain('12 auction-year records');
+  expect(container.querySelector('.sx-contributors .sx-chart-note')?.textContent).toContain('not a rank among year averages');
   expect(container.querySelector('.sx-contributors tbody tr')).toBeTruthy();
 });
 
