@@ -81,6 +81,7 @@ query("""ALTER TABLE listing_page_snapshots RENAME TO fixture_source_snapshots;
  CREATE FUNCTION fixture_sale_health_probe() RETURNS jsonb LANGUAGE plpgsql AS $$ DECLARE r jsonb;BEGIN
  PERFORM set_config('nuke_test.sale_reads','0',true);r:=assay_bat_sale_intake();
  RETURN r||jsonb_build_object('test_source_reads',current_setting('nuke_test.sale_reads')::integer);END $$;""")
+query('ANALYZE derivation_queue;ANALYZE vehicles;ANALYZE fixture_source_snapshots;ANALYZE vehicle_observations')
 
 
 def read():
@@ -98,11 +99,13 @@ assert query("SELECT assay_status FROM v_job_health WHERE jobname='qualify-bat-a
 for order in ('ASC', 'DESC'):
     vehicle = query(f'SELECT source_vehicle_id FROM derivation_queue ORDER BY completed_at {order},id {order} LIMIT 1')
     query(f"UPDATE vehicles SET is_public=false WHERE id='{vehicle}'")
-    assert read()['status'] == 'failed' and read()['counts']['stale_qualified'] == 1
+    reading = read()
+    assert reading['status'] == 'failed' and reading['counts']['stale_qualified'] == 1, (order, reading)
     query(f"UPDATE vehicles SET is_public=true WHERE id='{vehicle}'")
 snapshot_id = query('SELECT source_snapshot_id FROM derivation_queue ORDER BY completed_at DESC,id DESC LIMIT 1')
 query(f"UPDATE fixture_source_snapshots SET html_sha256=repeat('b',64) WHERE id='{snapshot_id}'")
-assert read()['status'] == 'failed' and read()['counts']['stale_qualified'] == 1
+reading = read()
+assert reading['status'] == 'failed' and reading['counts']['stale_qualified'] == 1, reading
 query(f"UPDATE fixture_source_snapshots SET html_sha256=repeat('a',64) WHERE id='{snapshot_id}'")
 query(f"UPDATE fixture_source_snapshots SET metadata=jsonb_set(metadata,'{{parsed_at}}','\"changed\"') WHERE id='{snapshot_id}'")
 assert read()['status'] == 'failed'

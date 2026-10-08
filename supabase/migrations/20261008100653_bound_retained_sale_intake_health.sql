@@ -6,7 +6,7 @@ SET LOCAL statement_timeout='10s';
 SET LOCAL lock_timeout='1s';
 DO $$ BEGIN
  IF encode(sha256(convert_to(pg_get_functiondef('public.assay_bat_sale_intake()'::regprocedure),'UTF8')),'base64')
-  NOT IN('wlrrOm/estP1hrNr8jSpPbT5D1K33tU4i2p5/cWrOsc=','9YaLVWNSDwhnH/w41ajqIxtQAiiaY+zitfx1fuEeDus=') THEN
+  NOT IN('wlrrOm/estP1hrNr8jSpPbT5D1K33tU4i2p5/cWrOsc=','C3xQpVlxXaWvBbNspTxuPOVl/XFSOyYNjLcUoRoHTLw=') THEN
   RAISE EXCEPTION 'Protected sale assay owner changed';
  END IF;
 END $$;
@@ -38,8 +38,17 @@ BEGIN
     OR lower(s.metadata->>'vehicle_id') IS DISTINCT FROM q.source_vehicle_id::text
     OR lower(s.html_sha256) IS DISTINCT FROM o.structured_data#>>'{source_sale_receipt,source_sha256}'
     OR s.metadata->>'parsed_at' IS DISTINCT FROM o.structured_data#>>'{source_sale_receipt,original_parsed_at}') stale_qualified
-  FROM sampled q LEFT JOIN public.listing_page_snapshots s ON s.id=q.source_snapshot_id
-   LEFT JOIN public.vehicles v ON v.id=q.source_vehicle_id LEFT JOIN public.vehicle_observations o ON o.id=q.source_sale_observation_id
+  -- Parameterized PK probes keep planner statistics from expanding a bounded
+  -- sample into full source scans. OFFSET0 preserves each lateral boundary.
+  FROM sampled q LEFT JOIN LATERAL (
+   SELECT platform,success,http_status,metadata,html_sha256 FROM public.listing_page_snapshots
+   WHERE id=q.source_snapshot_id OFFSET 0) s ON true
+  LEFT JOIN LATERAL (
+   SELECT is_public,deleted_at,listing_kind,status FROM public.vehicles
+   WHERE id=q.source_vehicle_id OFFSET 0) v ON true
+  LEFT JOIN LATERAL (
+   SELECT id,is_superseded,structured_data FROM public.vehicle_observations
+   WHERE id=q.source_sale_observation_id OFFSET 0) o ON true
  ), deferred_work AS (SELECT count(*) deferred FROM public.bat_sale_capture_deferrals),
  state AS (SELECT * FROM public.bat_sale_replay_state WHERE id)
  SELECT jsonb_build_object('status',CASE WHEN work.failed+custody.stale_qualified>0 THEN 'failed'
