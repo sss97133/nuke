@@ -8,40 +8,58 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
   status, headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
 
-export async function drainBatSaleQueue(supabase: any, body: any): Promise<Response> {
+export async function drainBatSaleQueue(supabase: any, body: any,
+  canonical?: { request: Request; admit: (request: Request) => Promise<Response> },
+): Promise<Response> {
+  // The existing outer worker keeps its20-call bound. The canonical owner can
+  // reuse this same queue/receipt loop in process without nested Edge requests.
+  const limit = body.batch_size === undefined ? 20 : body.batch_size, ceiling = canonical ? 40 : 20;
   const allowed = new Set(["mode", "use_source_queue", "dry_run", "batch_size", "platform", "qualification_version"]);
-  if (Object.keys(body).some(key => !allowed.has(key)) || body.dry_run !== false
+  if (body.mode !== "source_sale_qualification" || body.use_source_queue !== true
+    || Object.keys(body).some(key => !allowed.has(key)) || body.dry_run !== false
     || (body.qualification_version !== undefined && body.qualification_version !== "v1")
     || body.vehicle_ids !== undefined || body.snapshot_id !== undefined
     || body.force || body.use_queue || (body.platform !== undefined && body.platform !== "bat")
-    || (body.batch_size !== undefined && (!Number.isInteger(body.batch_size) || body.batch_size < 1 || body.batch_size > 20))) {
+    || !Number.isInteger(limit) || limit < 1 || limit > ceiling) {
     return json({ success: false, error: "source_queue_requires_explicit_bounded_write", writes: 0, model_calls: 0 }, 400);
   }
   const worker = `bat-sale-${crypto.randomUUID()}`;
   const started = Date.now();
   const { data: items, error } = await supabase.rpc("claim_bat_sale_snapshots", {
-    p_worker: worker, p_limit: body.batch_size ?? 20,
+    p_worker: worker, p_limit: limit,
   }).abortSignal(AbortSignal.timeout(10000));
   if (error || !Array.isArray(items)) return json({ success: false, error: "source_queue_claim_failed" }, 503);
+  if (items.length > limit || new Set(items.map(item => item.id)).size !== items.length) {
+    return json({ success: false, error: "invalid_claimed_sale_work", writes: 0, model_calls: 0 }, 503);
+  }
   let stored = 0, refused = 0, retries = 0, writes = 0, verifiedWrites = 0, completionFailures = 0;
   const results: Record<string, unknown>[] = [];
   for (const item of items) {
     let status = "retry", reason = "intake_request_failed", observationId: string | null = null, recordWrites = 0;
-    const unstarted = Date.now() - started >= 40000;
+    const unstarted = canonical?.request.signal.aborted || Date.now() - started >= 40000;
     if (unstarted) reason = "batch_budget_deferred";
     else if (!UUID.test(item.id) || !UUID.test(item.source_snapshot_id) || !UUID.test(item.source_vehicle_id)) {
       reason = "source_queue_locator_invalid";
     } else {
       try {
-        const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-        if (!key) throw new Error("credential_unavailable");
-        const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`, {
-          method: "POST", signal: AbortSignal.timeout(10000),
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key,
-            "x-nuke-internal": key },
-          body: JSON.stringify({ mode: "source_sale_qualification", qualification_version: "v1", dry_run: false,
-            vehicle_id: item.source_vehicle_id, snapshot_id: item.source_snapshot_id }),
-        });
+        const selector = JSON.stringify({ mode: "source_sale_qualification", qualification_version: "v1", dry_run: false,
+          vehicle_id: item.source_vehicle_id, snapshot_id: item.source_snapshot_id });
+        let response: Response;
+        if (canonical) {
+          response = await canonical.admit(new Request(canonical.request.url, {
+            method: "POST", headers: canonical.request.headers,
+            signal: AbortSignal.any([canonical.request.signal, AbortSignal.timeout(Math.max(1,
+              Math.min(10000, 40000 - (Date.now() - started))))]), body: selector,
+          }));
+        } else {
+          const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          if (!key) throw new Error("credential_unavailable");
+          response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`, {
+            method: "POST", signal: AbortSignal.timeout(10000),
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key,
+              "x-nuke-internal": key }, body: selector,
+          });
+        }
         const out = await response.json().catch(() => null);
         if (response.ok && out?.success === true && out.dry_run === false && out.model_calls === 0
           && (out.writes === 0 || out.writes === 1) && UUID.test(out.observation_id ?? "")

@@ -255,6 +255,10 @@ jobs:
         run: python3 scripts/test-bat-sale-parent-locks.py dm_refinement_bat_sale_intake_ci
       - name: Verify protected sale cadence guards and unchanged intake ownership
         run: python3 scripts/test-bat-sale-intake-cadence.py dm_refinement_bat_sale_intake_ci
+      - name: Verify direct protected sale40 staging, canonical custody and parallel leases
+        run: |
+          createdb dm_refinement_sale_direct_ci
+          python3 scripts/test-bat-sale-direct-drain.py dm_refinement_sale_direct_ci
       - name: Create disposable vin decode policy database
         run: createdb dm_refinement_vin_policy_ci
       - name: Verify vin_decoded_data's write policy is scoped to service_role (anon reads, cannot insert or delete; service_role writes; registry row; re-apply a no-op)
@@ -444,7 +448,7 @@ jobs:
       - name: Verify retained source account admission and conflict preservation
         run: deno test supabase/functions/ingest-observation/retainedIdentity.test.ts
       - name: Verify retained VIN qualifier, canonical HTTP intake and bounded worker
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/ingest-observation/ supabase/functions/batch-vin-decode/retainedReferenceQueue.test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/ingest-observation/ supabase/functions/batch-vin-decode/retainedReferenceQueue.test.ts supabase/functions/batch-extract-snapshots/batSaleQueue.test.ts
       - name: Type check the existing VIN worker
         run: deno check --node-modules-dir=none supabase/functions/batch-vin-decode/index.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
