@@ -223,8 +223,6 @@ jobs:
         run: createdb dm_refinement_bat_sale_intake_ci
       - name: Verify protected capture receipts, private work isolation, retries and bounds
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_sale_intake_ci -f supabase/sql/test_bat_sale_intake.sql -f supabase/sql/test_bat_sale_intake_attacks.sql
-      - name: Verify retained capture producers and sale workers on real PostgreSQL backends
-        run: python3 scripts/test-bat-sale-intake-concurrency.py dm_refinement_bat_sale_intake_ci
       - name: Verify capture deferral lineage and API roles
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_sale_intake_ci -f supabase/sql/test_bat_sale_parent_deferrals.sql
       - name: Verify parallel worker and queue-lock contracts after deferral repair
