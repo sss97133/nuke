@@ -325,6 +325,10 @@ jobs:
         run: |
           createdb dm_refinement_listing_intake_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_intake_ci
+      - name: Verify retained listing replay reaches recent claims and exhausts both fronts
+        run: |
+          createdb dm_refinement_listing_two_front_ci
+          python3 scripts/test-retained-listing-intake.py dm_refinement_listing_two_front_ci --two-front
       - name: Create disposable bounded provenance database
         run: createdb dm_refinement_bounded_provenance_ci
       - name: Verify provenance collection limits and preserved source visibility
