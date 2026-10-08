@@ -473,3 +473,126 @@ SELECT pg_temp.assert_true(current_setting('lock_timeout') = '0',
   'lock_timeout is transaction-local and resets after the run');
 SELECT dblink_exec('lock_holder', 'ROLLBACK');
 SELECT dblink_disconnect('lock_holder');
+
+-- 9. Faster intake and the same installed controller. A second backend starts
+-- its transaction before these synthetic sources commit. READ COMMITTED sees
+-- them, but the old fold's now() still records BEGIN and falsely predates input.
+SELECT pg_temp.reset_fixture(0,0);
+ALTER TABLE public.vehicle_observations ADD COLUMN ingested_at timestamptz;
+CREATE SCHEMA cron;
+CREATE TABLE cron.job(jobid bigint PRIMARY KEY,jobname text,schedule text,active boolean,command text);
+CREATE FUNCTION cron.alter_job(job_id bigint,schedule text) RETURNS void LANGUAGE sql AS
+$$ UPDATE cron.job SET schedule=$2 WHERE jobid=$1 $$;
+INSERT INTO cron.job VALUES (500,'drain-vehicle-derived-queues','*/5 * * * *',true,
+ 'SET statement_timeout = ''55s''; SELECT public.drain_vehicle_derived_queues(p_include_value := false);');
+CREATE TEMP TABLE clock_contract AS
+ SELECT p.oid,p.proacl,p.proowner,p.prosecdef,p.proconfig,pg_get_functiondef(p.oid) AS body
+ FROM pg_proc p WHERE p.oid IN ('public.drain_vehicle_metric_queue(integer)'::regprocedure,
+ 'public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure);
+SELECT pg_temp.assert_true(
+ encode(sha256(convert_to(pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure),'UTF8')),'base64')
+ = 'oQzzspRSSBOuW0GTD2pyzSC5488n+lNEWe7RX/YkHoM=', 'Metric fixture is the measured current owner');
+SELECT dblink_connect('clock_reader',format('host=%s port=%s dbname=%s user=%s',
+ split_part(current_setting('unix_socket_directories'),',',1),current_setting('port'),current_database(),current_user));
+SELECT dblink_exec('clock_reader','BEGIN');
+CREATE TEMP TABLE old_begin AS SELECT * FROM dblink('clock_reader','SELECT now()') AS t(tx_start timestamptz);
+INSERT INTO public.vehicle_observations(vehicle_id,kind,observed_at,ingested_at)
+ VALUES(pg_temp.vid(1),'listing','2020-01-01',clock_timestamp());
+INSERT INTO public.vehicle_metric_recompute_queue(vehicle_id,live_metrics_dirty,observation_count_dirty)
+ VALUES(pg_temp.vid(1),true,true);
+SELECT * FROM dblink('clock_reader','SELECT * FROM public.drain_vehicle_metric_queue(1)') AS t(processed int,errored int);
+SELECT dblink_exec('clock_reader','COMMIT');
+SELECT pg_temp.assert_true((SELECT m.observation_count=1 AND v.observation_count=1 AND m.comment_count=0
+ AND m.last_observation_at=o.observed_at AND m.updated_at=b.tx_start AND m.updated_at<o.ingested_at
+ FROM public.vehicle_live_metrics m JOIN public.vehicles v ON v.id=m.vehicle_id
+ JOIN public.vehicle_observations o ON o.vehicle_id=m.vehicle_id CROSS JOIN old_begin b),
+ 'Negative control: correct counts but transaction-start fold clock predates its included committed source');
+
+-- Execute the production migration on actual paused/changed-owner controls.
+UPDATE cron.job SET active=false;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT NOT active AND schedule='*/5 * * * *' FROM cron.job)
+ AND pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)=
+ (SELECT body FROM clock_contract WHERE oid='public.drain_vehicle_metric_queue(integer)'::regprocedure),
+ 'Owner pause refuses the migration atomically');
+UPDATE cron.job SET active=true,command='SELECT public.drain_vehicle_derived_queues(p_include_value := true);';
+\set ON_ERROR_STOP off
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT schedule='*/5 * * * *' AND command LIKE '%true%' FROM cron.job)
+ AND pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)=
+ (SELECT body FROM clock_contract WHERE oid='public.drain_vehicle_metric_queue(integer)'::regprocedure),
+ 'Changed value contract refuses without clock or cadence changes');
+UPDATE cron.job SET command='SET statement_timeout = ''55s''; SELECT public.drain_vehicle_derived_queues(p_include_value := false);';
+DO $$ BEGIN EXECUTE replace((SELECT body FROM clock_contract
+ WHERE oid='public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+ 'chunk = rows per inner call','chunk = altered owner'); END $$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT schedule='*/5 * * * *' FROM cron.job)
+ AND pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)=
+ (SELECT body FROM clock_contract WHERE oid='public.drain_vehicle_metric_queue(integer)'::regprocedure),
+ 'Controller drift refuses atomically');
+DO $$ BEGIN EXECUTE (SELECT body FROM clock_contract
+ WHERE oid='public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure); END $$;
+DO $$ BEGIN EXECUTE replace((SELECT body FROM clock_contract
+ WHERE oid='public.drain_vehicle_metric_queue(integer)'::regprocedure),
+ 'metric fold failed','metric fold owner changed'); END $$;
+CREATE TEMP TABLE clock_drift AS SELECT pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure) body;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT schedule='*/5 * * * *' FROM cron.job)
+ AND pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure)=(SELECT body FROM clock_drift),
+ 'Metric owner drift refuses and preserves that owner');
+DO $$ BEGIN EXECUTE (SELECT body FROM clock_contract
+ WHERE oid='public.drain_vehicle_metric_queue(integer)'::regprocedure); END $$;
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+\ir ../migrations/20261008080147_repair_metric_fold_clock_and_cadence.sql
+SELECT pg_temp.assert_true((SELECT active AND schedule='*/2 * * * *'
+ AND command='SET statement_timeout = ''55s''; SELECT public.drain_vehicle_derived_queues(p_include_value := false);' FROM cron.job)
+ AND (SELECT count(*)=1 FROM cron.job)
+ AND (SELECT bool_and(p.proacl IS NOT DISTINCT FROM c.proacl AND p.proowner=c.proowner
+ AND p.prosecdef=c.prosecdef AND p.proconfig IS NOT DISTINCT FROM c.proconfig)
+ FROM clock_contract c JOIN pg_proc p USING(oid))
+ AND (SELECT body=pg_get_functiondef(oid) FROM clock_contract
+ WHERE oid='public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+ 'Replay preserves identity/ACL/config/controller/caps/budgets/value OFF and changes only the existing cadence');
+
+-- Positive control repeats the real two-backend ordering after the repair.
+SELECT dblink_exec('clock_reader','BEGIN');
+CREATE TEMP TABLE new_begin AS SELECT * FROM dblink('clock_reader','SELECT now()') AS t(tx_start timestamptz);
+INSERT INTO public.vehicle_observations(vehicle_id,kind,observed_at,ingested_at)
+ VALUES(pg_temp.vid(1),'comment','2021-01-01',clock_timestamp());
+CREATE TEMP TABLE source_clocks AS SELECT id,observed_at,ingested_at FROM public.vehicle_observations;
+INSERT INTO public.vehicle_metric_recompute_queue(vehicle_id,live_metrics_dirty,observation_count_dirty)
+ VALUES(pg_temp.vid(1),true,true);
+SELECT * FROM dblink('clock_reader','SELECT * FROM public.drain_vehicle_metric_queue(1)') AS t(processed int,errored int);
+SELECT dblink_exec('clock_reader','COMMIT');
+SELECT pg_temp.assert_true((SELECT m.observation_count=2 AND v.observation_count=2 AND m.comment_count=1
+ AND m.last_observation_at='2021-01-01'::timestamptz AND m.updated_at>=s.latest AND s.latest>b.tx_start
+ FROM public.vehicle_live_metrics m JOIN public.vehicles v ON v.id=m.vehicle_id
+ CROSS JOIN (SELECT max(ingested_at) latest FROM public.vehicle_observations) s CROSS JOIN new_begin b)
+ AND NOT EXISTS(SELECT 1 FROM public.vehicle_metric_recompute_queue)
+ AND (SELECT count(*)=2 AND bool_and(o.observed_at=c.observed_at AND o.ingested_at=c.ingested_at)
+ FROM source_clocks c JOIN public.vehicle_observations o USING(id)),
+ 'After repair source committed after BEGIN has a current fold, exact counts/event maximum and unchanged original clocks');
+SELECT dblink_disconnect('clock_reader');
+
+-- The repaired owner still durably retries failed parent computation.
+UPDATE public.fixture_behavior SET fail=true WHERE vehicle_id=pg_temp.vid(1);
+INSERT INTO public.vehicle_metric_recompute_queue(vehicle_id,live_metrics_dirty,observation_count_dirty,attempts)
+ VALUES(pg_temp.vid(1),true,true,2);
+CREATE TEMP TABLE retry_result AS SELECT * FROM public.drain_vehicle_metric_queue(1);
+SELECT pg_temp.assert_true((SELECT processed=0 AND errored=1 FROM retry_result)
+ AND (SELECT attempts=3 AND live_metrics_dirty AND observation_count_dirty AND last_error LIKE '%synthetic metric%'
+ FROM public.vehicle_metric_recompute_queue)
+ AND (SELECT observation_count=2 FROM public.vehicle_live_metrics),
+ 'Repaired clock keeps per-parent error rollback and durable retry flags/attempts');
+UPDATE public.fixture_behavior SET fail=false WHERE vehicle_id=pg_temp.vid(1);
+CREATE TEMP TABLE recovered_result AS SELECT * FROM public.drain_vehicle_metric_queue(1);
+SELECT pg_temp.assert_true((SELECT processed=1 AND errored=0 FROM recovered_result)
+ AND NOT EXISTS(SELECT 1 FROM public.vehicle_metric_recompute_queue), 'A successful retry clears only materialized work');
