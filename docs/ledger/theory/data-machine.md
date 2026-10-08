@@ -150,6 +150,13 @@ fed by the cron `bat-live-pull` (live lots) and the `import_queue` backfill; `ve
 (`BAT-LIVE-BIDS`, hourly); `scripts/discovery/repair-backlog.sql` (the ranked model backlog from the atlas,
 read-only; case ledger §12).
 
+**Owner buying question, 2026-10-08 (§13.10).** Separate the mileage number's reassurance to a later buyer
+from confidence in a vehicle bought for personal use. Maintenance, usage, storage, exposure and condition
+testimony must become reachable from retained descriptions, comments and images before assigning economic
+weights. The bounded `scripts/discovery/buying-evidence.mjs` finder (PR #900) exposes exact attributed regions,
+source clocks and retrieval gaps; its lexical candidates are not admitted work, diagnoses or reliability
+predictions. No matches mean unknown. Reliability and resale have different outcomes and need separate calibration.
+
 **Do NOT:** feed a lifetime aggregate into a past moment; build a feature that cannot be replayed from the log; mint a
 second identity, geography or cohort table beside an existing one; store a derived number without its as-of time;
 describe a column in a doc but not in the database.
