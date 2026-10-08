@@ -30,6 +30,7 @@ async function select(label:string,value:string) {
 beforeEach(() => {
   (globalThis as {IS_REACT_ACT_ENVIRONMENT?:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
   vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
+  vi.stubGlobal('scrollTo',vi.fn());
   fixture.study={data:data(),isPending:false,isError:false};fixture.read={data:undefined,isPending:false,isError:false,isFetching:false,refetch:vi.fn()};fixture.requests=[];
   container=document.createElement('div');document.body.append(container);root=createRoot(container);
 });
@@ -43,12 +44,12 @@ it('opens on four measured corpus views and never auto-loads or displays a demon
   expect(container.querySelector('.sx-expression')).toBeNull();
 });
 it('carries make→model→auction comparison into its contributing source drill', async () => {
-  await render();await click(button('How strongly do they raise?','.sx-preview'));
+  await render();await click(button('Raise size by make','.sx-preview-title'));
   await click(button('Chevrolet','.sx-distribution-row'));
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('10 auctions');
   await click(button('Corvette','.sx-distribution-row'));
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('by auction');
-  expect(container.querySelector('.sx-distribution-row')?.textContent).toContain('sample · 10 records');
+  expect(container.querySelector('.sx-reference-inspector summary')?.textContent).toContain('10 auction records');
   await click(container.querySelector('.sx-distribution-row'));
   const href = container.querySelector('.sx-contributors a')?.getAttribute('href') ?? '';
   expect(href).toContain('/stacks/order-book/vehicle-');expect(href).toContain('lot=lot-');
@@ -83,7 +84,7 @@ it('preserves scope when model and grouping controls change before navigation co
 it('restores selected contributors from a shared URL and labels a participant record as captured outcomes', async () => {
   await render('/stacks?stack=S03&by=participant&measure=typical&from=2026&to=2026&group=a');
   expect(container.querySelector('.sx-contributors')?.textContent).toContain('12 recorded wins / 12 known winner records in this sample');
-  expect(container.querySelector('.sx-distribution-row')?.textContent).toContain('12 auctions');
+  expect(container.querySelector('.sx-distribution-row')?.getAttribute('aria-label')).toContain('12 auctions');
 });
 it('selects a new bounded reader and shows no retained measurement as a substitute while it loads or fails', async () => {
   fixture.read={isPending:true,isFetching:true};
@@ -97,4 +98,54 @@ it('shows the actual definition for an unsupported question without fabricating 
   expect(container.querySelector('.sx-definition')?.textContent).toContain('Funding opportunity fit');
   expect(container.querySelector('.sx-definition')?.textContent).toContain('not connected');
   expect(container.querySelector('.sx-expression')).toBeNull();
+});
+
+it('opens the clicked overview make directly, with recognizable local logos and no nested buttons', async () => {
+  await render();
+  const overview = container.querySelector('.sx-overview')!;
+  expect(overview.querySelectorAll('button button')).toHaveLength(0);
+  expect(overview.querySelector('img[src="/stacks/makes/chevrolet.svg"]')?.getAttribute('width')).toBe('24');
+  await click(button('Chevrolet','.sx-preview[aria-label="Raise size by make"] .sx-distribution-row'));
+  expect(container.querySelector('.sx-breadcrumb')?.textContent).toContain('Chevrolet');
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('by model');
+});
+it('opens the exact reference contributors on demand and keeps selected auction evidence beside its row', async () => {
+  await render('/stacks?stack=SA&by=auction&measure=amount&make=Chevrolet&model=Corvette&from=2026&to=2026');
+  expect(container.querySelector('.sx-contributors')).toBeNull();
+  const reference = container.querySelector('.sx-reference-inspector') as HTMLDetailsElement;
+  await act(async () => {reference.open=true;reference.dispatchEvent(new Event('toggle'));});
+  expect(reference.textContent).toContain('10 auction records');
+  expect(reference.querySelectorAll('tbody tr')).toHaveLength(10);
+  await act(async () => {reference.open=false;reference.dispatchEvent(new Event('toggle'));});
+  await click(container.querySelector('.sx-distribution-row'));
+  expect(container.querySelector('.sx-distribution-row')?.nextElementSibling?.className).toBe('sx-inspection-head');
+  expect(container.querySelector('.sx-contributors tbody tr')).toBeTruthy();
+  await click(button('Close inspection'));
+  expect(container.querySelector('.sx-contributors')).toBeNull();
+});
+it('opens an annual overview mark with that year’s contributor context', async () => {
+  await render();await click(button('2026','.sx-year-buttons button'));
+  expect(container.querySelector('.sx-contributors')?.textContent).toContain('2026');
+  expect(container.querySelector('.sx-contributors tbody tr')).toBeTruthy();
+});
+
+it('keeps a shared auction selection beyond the default page immediately inspectable', async () => {
+  await render('/stacks?stack=SA&by=auction&measure=amount&from=2026&to=2026&group=lot-0');
+  expect(container.querySelector('.sx-distribution-row')?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('.sx-contributors a')?.getAttribute('href')).toContain('lot=lot-0');
+  expect(container.querySelector('.sx-comparison-axis')?.textContent).toContain('Percentile / 12 auctions');
+});
+
+it('keeps a scatter drill on its paired denominator until the user explicitly broadens it', async () => {
+  const d = data(), lot = d.lots[0];
+  const sums = {bids:1,bidSum:100,raises:0,raiseSum:0,relativeSum:0,gaps:[],relativeValues:[],identityIds:['a'],unresolvedBids:0};
+  d.lots.push({...lot,id:'single-bid',vehicleId:'single-vehicle',hammer:100,sums,years:{'2026':sums},actors:[{identity:'a',handle:'A',entrySeconds:0,topBid:100,medianSpacing:null,medianRelative:null,bids:1,bidSum:100,raises:0,raiseSum:0,relativeSum:0,identityIds:['a'],unresolvedBids:0}]});
+  fixture.study={...fixture.study,data:d};
+  await render('/stacks?stack=S03&by=participant&measure=winRate&from=2026&to=2026&group=a&paired=entry-outcome');
+  expect(container.querySelector('.sx-selection-note')?.textContent).toContain('paired entry/outcome records');
+  expect(container.querySelector('.sx-contributors')?.textContent).toContain('12 recorded wins / 12 known winner records');
+  const back = new URLSearchParams(new URL(container.querySelector('.sx-contributors a')!.getAttribute('href')!,'https://nuke.ag').searchParams.get('back')!);
+  expect(back.get('paired')).toBe('entry-outcome');
+  await click(button('All captured outcomes'));
+  expect(container.querySelector('.sx-contributors')?.textContent).toContain('13 recorded wins / 13 known winner records');
 });
