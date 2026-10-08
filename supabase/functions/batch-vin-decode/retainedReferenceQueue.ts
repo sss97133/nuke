@@ -25,7 +25,7 @@ export async function drainRetainedReferenceQueue(
     ) ||
     body.use_retained_reference_queue !== true || body.dry_run !== false ||
     (body.batch_size !== undefined && (!Number.isInteger(body.batch_size) ||
-      Number(body.batch_size) < 1 || Number(body.batch_size) > 20))
+      Number(body.batch_size) < 1 || Number(body.batch_size) > 60))
   ) {
     return json({
       success: false,

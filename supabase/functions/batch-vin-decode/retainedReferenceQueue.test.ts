@@ -14,6 +14,9 @@ async function run(
   scenario = "success",
 ) {
   const calls: any[] = [], originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  let elapsed = 0;
+  if (scenario === "budget60") Date.now = () => originalNow() + elapsed;
   const oldUrl = Deno.env.get("SUPABASE_URL"),
     oldKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   Deno.env.set("SUPABASE_URL", "https://db.test");
@@ -26,6 +29,11 @@ async function run(
           ? {
             data: scenario === "empty"
               ? []
+              : ["large60", "budget60", "excess61"].includes(scenario)
+              ? Array.from(
+                { length: scenario === "excess61" ? 61 : 60 },
+                (_, i) => ({ revision_id: String(i + 7), vehicle_id: VID }),
+              )
               : [{ revision_id: "7", vehicle_id: VID }],
             error: scenario === "claim_error" ? {} : null,
           }
@@ -47,7 +55,8 @@ async function run(
       writes: scenario === "duplicate" ? 0 : 1,
       observation_id: OBS,
       vehicle_id: VID,
-      requested_taxonomy_revision_id: "7",
+      requested_taxonomy_revision_id:
+        JSON.parse(String(init?.body)).revision_id,
       physical_configuration_verified: false,
       receipt: {
         method: "protected_retained_vin_reference_v1",
@@ -60,6 +69,7 @@ async function run(
     if (scenario === "physical_claim") {
       out.receipt.physical_configuration_verified = true;
     }
+    if (scenario === "budget60") elapsed = 40001;
     return new Response(
       JSON.stringify(
         scenario === "refused" ? { reason: "reference_error_code" } : out,
@@ -72,6 +82,7 @@ async function run(
     return { status: response.status, data: await response.json(), calls };
   } finally {
     globalThis.fetch = originalFetch;
+    Date.now = originalNow;
     oldUrl === undefined
       ? Deno.env.delete("SUPABASE_URL")
       : Deno.env.set("SUPABASE_URL", oldUrl);
@@ -84,7 +95,7 @@ Deno.test("retained worker demands explicit bounded mode before any claim", asyn
   for (
     const invalid of [
       { ...body, dry_run: true },
-      { ...body, batch_size: 21 },
+      { ...body, batch_size: 61 },
       { ...body, batch_size: NaN },
       { ...body, batch_size: "20" },
       { ...body, offset: 1 },
@@ -93,6 +104,46 @@ Deno.test("retained worker demands explicit bounded mode before any claim", asyn
     const r = await run(invalid);
     assert(r.status === 400 && r.calls.length === 0);
   }
+});
+Deno.test("larger retained batch completes60 canonical selectors without widening its write contract", async () => {
+  const r = await run({ ...body, batch_size: 60 }, "large60");
+  assert(
+    r.status === 200 && r.data.claimed === 60 && r.data.stored === 60 &&
+      r.data.writes === 60,
+  );
+  assert(
+    r.data.provider_calls === 0 && r.data.model_calls === 0 &&
+      r.data.completion_failures === 0,
+  );
+  assert(r.calls.filter((c) => c.request).length === 60);
+  assert(
+    new Set(r.calls.filter((c) => c.request).map((c) => c.payload.revision_id))
+      .size === 60,
+  );
+  assert(
+    r.calls.filter((c) => c.name === "finish_vin_reference_intake").length ===
+      60,
+  );
+  const excess = await run({ ...body, batch_size: 60 }, "excess61");
+  assert(excess.status === 503 && excess.calls.length === 1);
+});
+Deno.test("60item batch stops new intake at its existing40second budget and releases unstarted work", async () => {
+  const r = await run({ ...body, batch_size: 60 }, "budget60");
+  assert(
+    r.status === 200 && r.data.stored === 1 && r.data.writes === 1 &&
+      r.data.retries === 59,
+  );
+  assert(r.calls.filter((c) => c.request).length === 1);
+  const deferred = r.calls.filter((c) =>
+    c.name === "finish_vin_reference_intake" &&
+    c.args.p_reason === "batch_budget_deferred"
+  );
+  assert(
+    deferred.length === 59 &&
+      deferred.every((c) =>
+        c.args.p_status === "retry" && c.args.p_observation === null
+      ),
+  );
 });
 Deno.test("retained worker calls canonical selector, finalizes persisted result and never calls provider", async () => {
   for (const scenario of ["success", "duplicate"]) {
