@@ -74,3 +74,30 @@ stay unqualified. Existing historical/native intake, episode-v2, privacy and
 publication holds remain. This closes automatic admission of currently supported
 protected v1 testimony; it does not establish new historical event facts,
 sale-time configuration, source independence or whole-market coverage.
+
+## Earned runtime repair: parent foreign-key contention
+
+The first natural batch admitted 14 new observations with all typed/hash/clock
+checks passing. The second tick returned 503 before claiming work. PostgreSQL
+logs at 01:25:01Z identify 55P03 while acquiring the vehicles KEY SHARE lock for a
+new queue FK; that single busy parent rolled back the complete seed page.
+
+Preserve both FKs and canonical admission. Enqueue prelocks an eligible parent
+with KEY SHARE SKIP LOCKED. Busy parents or insert lock races append a capture
+retry event, so raw snapshot arrival can commit and the source cursor can
+advance without losing the capture. One additional three-column append buffer
+is earned by this observation; existing vehicle/snapshot extraction queues have
+the wrong grain and taxonomy invalidations have a different owner. Each event
+retains a capture FK. Distinct event PKs avoid producer/consumer lost wakeups.
+
+The existing claim retries at most 20 events before seeding. A still-busy capture
+appends a successor before its old event is consumed. Ordinary queue work drains
+in the same tick; qualification and immutable parent/result bindings retain
+their original owner. The assay includes actual deferred work. No direct API
+mutation or internal-helper EXECUTE is granted to service/anon/authenticated.
+
+Reproduce the real parent FOR UPDATE lock: source trigger commits unchanged
+capture testimony, unrelated work claims, concurrent producer appends while a
+deferred event is locked, a 500-key source page advances, and later unlocked retry
+earns exactly one typed work row and canonical completion. Ship the forward
+migration through normal checked CI and verify further natural ticks.
