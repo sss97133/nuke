@@ -394,14 +394,31 @@ BEGIN
  IF position(a IN v)=0 THEN RAISE EXCEPTION 'Job health decision differs'; END IF; v:=replace(v,a,b);
  EXECUTE 'CREATE OR REPLACE VIEW public.v_job_health AS '||v;
 END $health$;
-DO $$ BEGIN
+DO $$ DECLARE v_job bigint; BEGIN
  IF EXISTS(SELECT 1 FROM cron.job WHERE jobname='qualify-retained-vin-references') THEN RAISE EXCEPTION 'Reference job exists'; END IF;
- PERFORM cron.schedule('qualify-retained-vin-references','*/15 * * * *',$cmd$
+ v_job:=cron.schedule('qualify-retained-vin-references','*/15 * * * *',$cmd$
  SELECT net.http_post(url:='https://qkgaybvrernstplzjaam.supabase.co/functions/v1/batch-vin-decode',
   headers:=jsonb_build_object('Content-Type','application/json','Authorization','Bearer '||public.get_service_role_key_for_cron()),
   body:='{"use_retained_reference_queue":true,"dry_run":false,"batch_size":20}'::jsonb,timeout_milliseconds:=60000);
  $cmd$);
+ PERFORM cron.alter_job(job_id:=v_job,active:=false);
 END $$;
+-- CI calls this only after both updated edge owners deploy successfully. An old
+-- batch-vin-decode would otherwise ignore the new option and use its legacy lane.
+CREATE FUNCTION public.activate_retained_vin_reference_intake() RETURNS boolean
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp SET lock_timeout='1s' SET statement_timeout='5s' AS $$
+DECLARE v_job bigint;
+BEGIN
+ SELECT jobid INTO v_job FROM cron.job WHERE jobname='qualify-retained-vin-references'
+  AND schedule='*/15 * * * *' AND command LIKE '%/functions/v1/batch-vin-decode%'
+  AND command LIKE '%"use_retained_reference_queue":true%' AND command LIKE '%"dry_run":false%'
+  AND command LIKE '%"batch_size":20%';
+ IF v_job IS NULL THEN RAISE EXCEPTION 'Installed retained reference job contract unavailable'; END IF;
+ PERFORM cron.alter_job(job_id:=v_job,active:=true);
+ RETURN true;
+END $$;
+REVOKE ALL ON FUNCTION public.activate_retained_vin_reference_intake() FROM PUBLIC,anon,authenticated,service_role;
+COMMENT ON FUNCTION public.activate_retained_vin_reference_intake() IS 'Deployment-owner-only activation of the fixed bounded cron contract after successful deployment of both existing edge owners; no API execution.';
 COMMENT ON TABLE public.vin_reference_intake_queue IS 'Operational queue, grain one accepted immutable vehicle_taxonomy_revisions PK, with same-parent FK. Existing batch-vin-decode claims at most20 every15min and invokes canonical ingest-observation. Canonical receipt/result lives in vehicle_observations, factory reference only; no physical scalar overwrite or provider/model calls. Service SELECT only, leased function writes, refusal24h/retry15min/pause3. Cached consumer read_vehicle_taxonomy_fold; assay_vin_reference_intake.';
 COMMENT ON COLUMN public.vehicle_observations.source_vin IS 'Retained vin_decoded_data source FK; original raw evidence and decode clock are preserved in the immutable factory reference receipt.';
 COMMENT ON COLUMN public.vehicle_observations.source_vin_taxonomy_revision_id IS 'Same-parent FK to first supporting immutable taxonomy revision; processing-only revisions deduplicate to this source claim.';

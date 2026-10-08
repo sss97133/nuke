@@ -45,7 +45,7 @@ existing CI deploy, then observe natural arrival, replay and cached consumer.
 The bounded offline prototype qualified20 of20 sampled public parents from
 the latest200 accepted taxonomy revisions, including displacement/cylinders,
 horsepower/fuel/trim. This is source selection evidence, not fleet yield.
-Local validation passes59 Deno tests,53 PostgreSQL assertions and actual
+Local validation passes59 Deno tests,59 PostgreSQL assertions and actual
 multi-backend producer/claim/state/parent/result lock tests. The enforced local
 repository gate passes. Deployment and natural runtime verification are pending.
 
@@ -65,4 +65,12 @@ using Deno's dependency cache; fetch mocks explicitly describe the web request
 options they inspect. Pin both touched production SDK imports to2.117.3, the
 current version actually resolved by the fresh CI attempt and verified against
 the official October7 release. All59 tests and the worker check pass with that
-exact SDK. The new reviewed head still needs all actual PR checks to finish.
+exact SDK. The legacy Node HTTP harness explicitly recognizes this pinned
+import; all76 existing intake tests pass, preserving their source/refusal checks.
+
+The migration creates its cron inactive. Existing automatic deployment activates
+the fixed contract only after both edge owners successfully deploy in that run.
+The activation function is deployment-owner-only and rejects a changed cadence,
+route or body; API roles cannot activate a partial rollout. This prevents old
+worker versions from interpreting a new queue request as ordinary VIN decoding.
+All actual PR checks and natural runtime remain required before delivery.

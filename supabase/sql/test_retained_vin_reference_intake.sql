@@ -17,6 +17,11 @@ CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 GRANT SELECT,INSERT,UPDATE ON vehicle_observations TO service_role;
 GRANT SELECT ON observation_sources,observation_extractors TO service_role;
 \ir ../migrations/20261007223203_vehicle_taxonomy_recompute.sql
+CREATE FUNCTION cron.alter_job(job_id bigint,schedule text DEFAULT NULL,command text DEFAULT NULL,
+ database text DEFAULT NULL,username text DEFAULT NULL,active boolean DEFAULT NULL) RETURNS void LANGUAGE sql AS $$
+ UPDATE cron.job j SET active=coalesce(alter_job.active,j.active),schedule=coalesce(alter_job.schedule,j.schedule),
+ command=coalesce(alter_job.command,j.command) WHERE jobid=job_id;
+$$;
 -- Exercise the same already-extended health CTE prefix as production.
 DO $$ BEGIN EXECUTE 'CREATE OR REPLACE VIEW v_job_health AS '||replace(pg_get_viewdef('v_job_health'::regclass,true),
  'WITH taxonomy_assay AS MATERIALIZED (','WITH bat_sale_assay AS MATERIALIZED (SELECT ''partial''::text AS status), taxonomy_assay AS MATERIALIZED ('); END $$;
@@ -42,8 +47,17 @@ SELECT fixture_assert((SELECT count(*)=2 FROM pg_constraint WHERE conrelid='vehi
 SELECT fixture_assert((SELECT source_id=(SELECT id FROM observation_sources WHERE slug='nhtsa') AND
  produces_kinds=ARRAY['specification']::observation_kind[] AND edge_function_name='batch-vin-decode'
  FROM observation_extractors WHERE slug='retained-vin-reference-v1'),'registered typed existing worker route');
-SELECT fixture_assert((SELECT schedule='*/15 * * * *' AND active AND command LIKE '%"batch_size":20%'
- FROM cron.job WHERE jobname='qualify-retained-vin-references'),'bounded natural15min job');
+SELECT fixture_assert((SELECT schedule='*/15 * * * *' AND NOT active AND command LIKE '%"batch_size":20%'
+ FROM cron.job WHERE jobname='qualify-retained-vin-references'),'new bounded job paused until edge deployment');
+SELECT fixture_assert((SELECT health_status='paused' FROM v_job_health WHERE jobname='qualify-retained-vin-references'),'partial rollout cannot invoke old worker');
+SELECT fixture_assert(NOT has_function_privilege('service_role','activate_retained_vin_reference_intake()','EXECUTE') AND
+ NOT has_function_privilege('anon','activate_retained_vin_reference_intake()','EXECUTE'),'API cannot activate incomplete deployment');
+UPDATE cron.job SET schedule='* * * * *' WHERE jobname='qualify-retained-vin-references';
+SELECT fixture_reject('SELECT activate_retained_vin_reference_intake()','changed job contract cannot activate');
+SELECT fixture_assert((SELECT NOT active FROM cron.job WHERE jobname='qualify-retained-vin-references'),'rejected activation leaves job paused');
+UPDATE cron.job SET schedule='*/15 * * * *' WHERE jobname='qualify-retained-vin-references';
+SELECT fixture_assert(activate_retained_vin_reference_intake(),'deployment owner activates exact installed contract');
+SELECT fixture_assert(activate_retained_vin_reference_intake(),'deployment activation idempotent');
 SELECT fixture_assert((SELECT assay_status='partial' AND health_status='failed' FROM v_job_health
  WHERE jobname='qualify-retained-vin-references'),'health requires natural execution');
 SELECT fixture_assert((SELECT count(*)=18 FROM pg_attribute a WHERE a.attrelid IN
