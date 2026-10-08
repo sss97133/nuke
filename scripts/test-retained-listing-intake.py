@@ -10,7 +10,9 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-database = sys.argv[1] if len(sys.argv) == 2 else 'dm_refinement_listing_intake_ci'
+assert len(sys.argv)<=3 and (len(sys.argv)<3 or sys.argv[2]=='--two-front')
+database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
+two_front = len(sys.argv)==3
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
 def sql(text):
@@ -66,14 +68,57 @@ for name in ('assay_bat_sale_intake','assay_vehicle_taxonomy_fold','assay_sale_r
 sql("CREATE FUNCTION get_live_auction_health() RETURNS jsonb LANGUAGE sql AS $$ SELECT '{\"closing_stream\":{\"status\":\"passed\"}}'::jsonb $$")
 sql(Path('scripts/discovery/fixtures/v_job_health_20261008.sql').read_text())
 migration = Path('supabase/migrations/20261008071324_retained_listing_property_intake.sql').read_text()
+if two_front:
+    sql("""INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data)
+    SELECT ('50000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,
+     ('60000001-0000-4000-8000-'||lpad(((i-1)%600+1)::text,12,'0'))::uuid,'listing',
+     '4cdc735c-f117-42f2-889f-ba33805639a5','https://bringatrailer.com/listing/unsupported-'||i,NULL,
+     '2026-01-01'::timestamptz,'llm_extraction',0.7,'{}'::jsonb FROM generate_series(1,1500)i;""")
 assert sql("SELECT encode(sha256(convert_to(pg_get_functiondef('validate_retained_listing_property_source()'::regprocedure),'UTF8')),'base64')") == 'SWMULpmuOum3+TVBNd+ZsReIk9lCqTFx/Vsa1IoqSOQ='
 sql(migration)
 assert sql("SELECT active FROM cron.job") == 'f'
 assert sql("SELECT count(*) FROM retained_listing_property_work") == '0'
+if two_front:
+    assert sql('SELECT seed_retained_listing_properties()')=='500'
+    assert sql('SELECT count(*) FROM retained_listing_property_work')=='0'
+    before_front = read('SELECT to_jsonb(r) FROM retained_listing_property_replay r')
+    passed('oldest-first negative control visits500 unsupported tied-clock sources with0work')
+    repair = Path('supabase/migrations/20261008082930_prioritize_retained_listing_replay.sql').read_text()
+    before_seed = sql("SELECT pg_get_functiondef('seed_retained_listing_properties()'::regprocedure)")
+    before_enqueue = sql("SELECT pg_get_functiondef('enqueue_retained_listing_properties(uuid)'::regprocedure)")
+    before_command = read('SELECT to_jsonb(command) FROM cron.job')
+    rejects(repair)  # staged existing job is paused
+    assert sql("SELECT count(*) FROM pg_attribute WHERE attrelid='retained_listing_property_replay'::regclass AND attname='scan_direction'")=='0'
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    sql("UPDATE cron.job SET command=command||' SELECT 1;'")
+    rejects(repair)
+    sql("UPDATE cron.job SET command="+"'"+before_command.replace("'","''")+"'")
+    sql(before_seed.replace('keys_seen=keys_seen+n','keys_seen=keys_seen+n+0'))
+    rejects(repair)
+    sql(before_seed)
+    sql(before_enqueue.replace("p.kind='listing'","p.kind='listing' AND true"))
+    rejects(repair)
+    sql(before_enqueue)
+    assert read('SELECT to_jsonb(r) FROM retained_listing_property_replay r')==before_front
+    assert sql("SELECT count(*) FROM pg_attribute WHERE attrelid='retained_listing_property_replay'::regclass AND attname='scan_direction'")=='0'
+    before_acl = read("SELECT jsonb_build_object('oid',oid,'acl',proacl,'owner',proowner,'security',prosecdef,'config',proconfig) FROM pg_proc WHERE oid='seed_retained_listing_properties()'::regprocedure")
+    sql(repair)
+    seed_sha=sql("SELECT encode(sha256(convert_to(pg_get_functiondef('seed_retained_listing_properties()'::regprocedure),'UTF8')),'base64')")
+    print('REPAIRED_SEED_SHA',seed_sha,flush=True)
+    assert read("SELECT jsonb_build_object('oid',oid,'acl',proacl,'owner',proowner,'security',prosecdef,'config',proconfig) FROM pg_proc WHERE oid='seed_retained_listing_properties()'::regprocedure")==before_acl
+    after_front = read('SELECT to_jsonb(r) FROM retained_listing_property_replay r')
+    assert all(after_front[k]==v for k,v in before_front.items())
+    rejects("UPDATE retained_listing_property_replay SET reverse_cursor_source_id=upper_source_id")
+    assert sql("SELECT count(*) FROM pg_constraint WHERE conrelid='retained_listing_property_replay'::regclass AND contype='f' AND pg_get_constraintdef(oid) LIKE '%reverse_cursor_source_id%'")=='1'
+    passed('paused/command/seed/qualification drift rolls back; existing cursor/highwater/ACL preserved; reverse cursor typed and paired')
 assert sql("SELECT seed_retained_listing_properties()") == '500'
 assert sql("SELECT count(*) FROM retained_listing_property_work") == '1000'
 assert sql("SELECT seed_retained_listing_properties()") == '0'
-assert sql("SELECT keys_seen FROM retained_listing_property_replay") == '500'
+assert sql("SELECT keys_seen FROM retained_listing_property_replay") == ('1000' if two_front else '500')
+if two_front:
+    assert sql("SELECT scan_direction FROM retained_listing_property_replay")=='oldest'
+    assert sql("SELECT reverse_cursor_recorded_at>'2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
+    passed('first new500-key page reaches recent supported sources despite1500old unsupported keys; backpressure does not move either front')
 assert sql("SELECT assay_status FROM v_job_health WHERE jobname='project-retained-listing-properties'") == 'partial'
 passed('real staged migration, exact owner fingerprint, 500-key scan/backpressure without canonical writes')
 
@@ -121,10 +166,16 @@ while True:
     for row in batch:
         complete(row, 'replay')
 assert counter == 1202
-assert sql("SELECT keys_seen FROM retained_listing_property_replay") == '601'
+assert sql("SELECT keys_seen FROM retained_listing_property_replay") == ('2101' if two_front else '601')
 assert sql("SELECT scan_completed_at IS NOT NULL FROM retained_listing_property_replay") == 't'
 assert sql("SELECT count(*) FROM vehicle_observations WHERE kind='listing' AND source_observation_id IS NOT NULL") == '0'
 passed('1202 protected canonical source-property results; wrong worker/result/replayed finish refused; original testimony retained')
+if two_front:
+    assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
+    assert sql('SELECT seed_retained_listing_properties()')=='0'
+    sql(repair)
+    assert sql('SELECT keys_seen FROM retained_listing_property_replay')=='2101'
+    passed('both fronts converge across tied-clock gap:2101unique visits/1202canonical results, no duplicate visit and idempotent replay')
 
 reading = read('SELECT assay_retained_listing_properties()')
 assert reading['canonical_observations'] == 1202 and reading['custody_sampled'] == 200 and reading['sample_stale'] == 0
@@ -161,6 +212,7 @@ for i in range(3):
     assert sql(f"SELECT finish_retained_listing_property('{rr['source_observation_id']}','{rr['property_id']}','retry','retry')") == 't'
 assert read('SELECT assay_retained_listing_properties()')['failed'] == 1
 assert sql("SELECT assay_status FROM v_job_health WHERE jobname='project-retained-listing-properties'") == 'failed'
+sql('UPDATE cron.job SET active=false')
 assert sql("SELECT health_status FROM v_job_health WHERE jobname='project-retained-listing-properties'") == 'paused'
 assert sql('SELECT activate_retained_listing_property_intake()') == 't'
 sql("INSERT INTO cron.job_run_details SELECT jobid,'succeeded',now(),NULL FROM cron.job")
@@ -189,5 +241,5 @@ assert sql("SELECT has_function_privilege('service_role','claim_retained_listing
 assert sql("SELECT count(*) FROM pg_attribute WHERE attrelid IN('retained_listing_property_work'::regclass,'retained_listing_property_replay'::regclass) AND attnum>0 AND NOT attisdropped AND col_description(attrelid,attnum) IS NULL") == '0'
 sql("DELETE FROM retained_listing_property_replay")
 assert read('SELECT assay_retained_listing_properties()')['status'] == 'unavailable'
-passed('changed activation contract/repeated migration roll back; API activation/raw writes denied; all 21 owned columns described')
+passed(f'changed activation contract/repeated migration roll back; API activation/raw writes denied; all {24 if two_front else 21} owned columns described')
 print('PASS retained listing intake actual PostgreSQL proof', flush=True)
