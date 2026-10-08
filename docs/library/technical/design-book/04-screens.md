@@ -683,38 +683,34 @@ Every screen in the application follows these rules:
 
 *Every screen is a view into the graph. The layout follows the data. The data IS the design.*
 
-## Stacks — working readings (owner direction, 2026-10-07)
+## Stacks — corpus exploration (owner realignment, 2026-10-07)
 
 **Routes:** `/stacks`, `/stacks/order-book/:vehicleId`.
-**Files:** `pages/stacks/StacksIndex.tsx`, `OrderBookStack.tsx`, `stackParts.tsx`, `stacks.css`.
-**Lens:** the existing entity briefing, bound to a lot and its received bid log; the index composes available bindings.
-**Owner requirement:** “the stacks page is supposed to show the stacks in action.”
+**Files:** `pages/stacks/StackExplore.tsx`, `StackExploreOverview.tsx`, `bidMeasurements.ts`, `bidPopulationReader.ts`, `OrderBookStack.tsx`.
+**Owner requirement:** show stacks in action across the corpus. The list of questions is the entry; an individual auction is an evidence drill. Raw amounts, handles and timestamps are secondary to relative position, behavior and departures from a declared reference.
 
-The opening shows the calculation operating on attributed records. For the available auction order book,
-the sequence is coverage → bid replay → source bid / bidder / resulting book → price path and revealed demand.
-The forecast and recorded outcome follow where the existing readers support them. Layer definitions and the
-dated demonstration-selection receipt expand underneath the working reading. Reader availability is not a
-stack-wide evidence-completeness score.
+The opening combines a searchable public definition catalogue with four measured views of the same retained source study: relative raises by make, bid calendar-year changes, participant outcome records and bid spacing. It opens without choosing a vehicle. The tracked seed defines 65 questions; four partial descriptive bindings operate here. Catalogue presence does not establish registry coverage, readiness, a complete analytical stack or a trained predictor.
 
-The replay control selects one received bid by ID. Source link, bidder, high-bid change, book and demand curve
-use that same selection. The index's inspect link preserves it in `?lot=…&at=…`. At latest, new received bids
-move the reading forward; selecting an older bid preserves that bid across refreshes. The existing reader
-refreshes an open lot once a minute. A closed lot is labeled **Recorded lot · replay**, with the recorded result
-linked to its Outcome layer. This reconstructs source-posted order from records currently held; it does not
-establish historical knowledge availability or replay historical forecasts.
+The path is **question → measured graphic → change measure/group/window → contributors → source evidence**. Make → model label → auction drills carry the expression in the URL. The contributor's lot reader links back to that expression. Grouping by participant or calendar year uses the same operator, not a second implementation. Vehicle model year is a separate filter from the bid event's UTC calendar year.
 
-Coverage remains before the calculation, with all numerators and denominators visible. A disclosure opens the
-complete receipt, including source clocks, basis and evidence-layer links. Unknown denominators and key conflicts
-remain explicit. Selection-time counts live in the selection receipt rather than appearing as current readings.
-Absent bids show the reader's explanation without charts. Failed refreshes identify the previous reading when one
-is retained; initial failures offer a retry without showing an operating calculation.
+### Measurement contract
 
-Use the canonical Arial/Courier typography, square 2px borders, theme tokens and native keyboard-accessible range
-and disclosure controls. On narrow screens the event sequence and charts become single-column. Shared `FoldLayer`
-and `CoverageTable` render the index and the lot drill; no second calculation or reader is introduced.
+A reading declares its source population, selection, measurement, grouping, window, weighting, units, capture clock and exclusions. A complete sold sequence must match the exact lot/vehicle/source URL, reproduce the reported bid count and hammer, increase strictly in source order, and resolve simultaneous events through source event IDs. Ingestion time never substitutes for source order. Conflicting or incomplete sequences are withheld, not measured as zeros.
 
-**Current boundary:** the UI has one available stack binding. The production registry and coverage series are
-service-role-only (bounded atlas inspection, 2026-10-07). Catalog presence or registry coverage does not establish
-a working public reader. Future stacks should reuse this presentation with their existing sanctioned readers;
-registry access changes and new analytical readers require their own scope. This frontend pass changes no schema,
-intake, scoring, permissions or refresh cadence.
+Opening bids have no increment. Form increments and gaps inside the complete episode before selecting the later bid's calendar year. Arithmetic mean bid, mean raise, mean relative raise, median spacing, bid count and canonical participant count remain distinct. Typical relative raise uses the median of valid bid-level percentages inside each record, then the mean of those record medians within a group. Keep bid/raise weighting distinct from equal-record weighting.
+
+Participant records are canonical participant × auction records. Win conversion uses only outcomes where the recorded winner key agrees with the terminal bidder key. Preserve the original winner testimony and its conflict flag in the reading; withhold disagreement from win conversion. Its percentile reference is participant mean rates with at least five attributed outcomes. Other participant mean comparisons require at least two contributed episodes. Neither is a skill estimate or lifetime record. Entry timing normalizes first placement to the completed, observed first-to-terminal bid span. The participant map pairs entry and win conversion over the exact same attributed episodes (at least five pairs); it does not use unmatched denominators or claim timing causes wins.
+
+Other percentile references are empirical midranks among record measurements in the selected sample. Display the reference denominator. Percentiles are descriptive sample positions, not estimated population standings. Shared auction reference distributions appear once; do not repeat a population interval as though each auction owns it. Intervals show observed spread, not uncertainty around a mean. Do not connect sparse or missing calendar years into a trend.
+
+### Population and evidence boundary
+
+The retained public sold BaT study selects up to 32 most recent public episodes in each calendar quarter, 2016–2026. It is a bounded, quarter-stratified captured sample, not a census or probability sample. The current year is partial. Selection and eligibility vary with source capture and vehicle/participant mix; differences do not establish causal market change.
+
+A new bounded anonymous reader can request up to 120 most recently closed public sold episodes by make and bid calendar year. It reads complete child sequences through an empty primary-key continuation boundary. Both episode and child requests gate to public, non-deleted, non-vehicle-item-excluded parents. A failed or truncated sequence read cannot substitute a retained population under the new request's label. Complete-sequence eligibility, exclusions, cap and per-year candidate/eligible counts expand in the receipt.
+
+Model groups use normalized model labels when present, otherwise source labels. This does not qualify common generation, trim, condition or configuration. Dollar measurements are source-listed nominal USD. These are source-order reconstructions from records held at capture, not historical knowledge snapshots. Final-bid prediction, incremental predictive value and calibrated bidder effects require separate chronological outcome testing.
+
+The deterministic producer is `nuke_frontend/scripts/build-stacks-study.mjs`. It uses anonymous SELECTs and preserves capture manifests/raw cache files outside the repository. Cached recomputation retains the capture clock. It does not run automatically in builds or jobs. Only the derived public study is bundled; no protected registry metadata, service credentials, schema changes, intake changes or new paid capacity are part of this surface.
+
+Use canonical Arial/Courier typography, theme tokens, square 2px structural borders and native keyboard controls. Desktop discovery comes first. Readability, meaningful axes, empirical reference and contributor context are acceptance requirements; polishing one showcase lot cannot replace corpus exploration.
