@@ -122,6 +122,10 @@ struct NukeCaptureApp: App {
                 // keep this a small freshen; the deep backlog is the BGProcessingTask's job.
                 Task(priority: .background) {
                     try? await Task.sleep(for: .seconds(3))
+                    // The source record starts at intake, before opening Profile.
+                    // Bounded local originals only; deeper progress uses the
+                    // existing power/Wi-Fi backfill job.
+                    await LibraryIngest.shared.runAlbumReview(budget: 24)
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
                 if !LibraryIngest.shared.backlogComplete {
