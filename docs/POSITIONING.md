@@ -47,7 +47,7 @@ and moves with it. The figures quoted in prose further down (objective 0, the sc
 2026-10-07 09:00Z and match the block at that date.
 
 <!-- evidence:start -->
-Measured 2026-10-07 10:23 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
+Measured 2026-10-08 06:53 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
 
 | Model | Sold lots graded, of lots ended | Median absolute error | Bias (mean signed error) | Hammer inside its stated band | Close: scheduled / final / predicted |
 |---|---|---|---|---|---|
@@ -56,9 +56,9 @@ Measured 2026-10-07 10:23 UTC from the live database by [`scripts/data/readme-st
 | 24 | 747 of 995 | 24.3% | −13.2% | 193 of 747 = 25.8% (50% band) | 0 / 244 / 503 |
 | 13 | 10 of 13 | 12.0% | −15.4% | 2 of 10 = 20.0% (band width unknown) | 0 / 0 / 10 |
 
-- **Lots predicted:** 2,289 distinct lots, in 46,093 of 53,922 prediction rows; 7,829 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
+- **Lots predicted:** 2,289 distinct lots, in 46,093 of 54,103 prediction rows; 8,010 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
 - **Lots graded:** 1,482 distinct sold lots, and 1,997 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
-- **Stacks:** 65 registered, 64 at status measured; 5 at coverage 0.9 or above; mean coverage 0.11 (`v_stacks`). Order book SA v2: coverage 0.50, 8 of 16 needs present, 2 partial, 6 missing; status showable.
+- **Stacks:** 65 registered, 64 at status measured; 6 at coverage 0.9 or above; mean coverage 0.19 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
 - **Thesis vein V012 v1** (cited by S03; `vein_ledger`, status active): 68,957 distinct buyers, the top 1% took 14% of lots, 39 won 50 or more (discovery run, as of 2026-09-30). Runs that can grade it: 0 of 1 (`vein_runs`).
 - **Live-lot reader replay** (cited from PR #771, 2026-10-07; a replay, not a view, so not recomputed here): 2 minutes before the scheduled close the hammer sat inside its 80% band on 257 of 311 lots the live collector followed (closes 2026-10-05 to 06) = 82.6%. Not out-of-sample: the band's shape was chosen after seeing these lots.
 <!-- evidence:end -->
