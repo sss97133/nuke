@@ -29,7 +29,7 @@ export async function loadPopulationQuery(file) {
 }
 
 export async function analyzePopulation(args) {
-  const prefixes = ['--input=','--expression=','--size=','--cursor=','--group='];
+  const prefixes = ['--input=','--expression=','--size=','--cursor=','--group=','--group-json='];
   if (args.some(a => !['--analyze','--reference'].includes(a) && !prefixes.some(p => a.startsWith(p)))) throw new Error('Unknown analytical option.');
   for (const prefix of prefixes) if (args.filter(a => a.startsWith(prefix)).length > 1) throw new Error('Duplicate analytical option.');
   const value = name => args.find(a => a.startsWith(`${name}=`))?.slice(name.length + 1);
@@ -42,9 +42,13 @@ export async function analyzePopulation(args) {
   const expression = expressionFromParams(params), scope = { paired:expression.grouping === 'participant' && params.get('paired') === 'entry-outcome', excludeVehicle:params.get('excludeVehicle') };
   const options = { size:value('--size') === undefined ? undefined : Number(value('--size')),
     cursor:value('--cursor') === undefined ? undefined : JSON.parse(value('--cursor')) };
-  const query = await loadPopulationQuery(input), group = value('--group');
+  const rawGroup = value('--group'), encodedGroup = value('--group-json');
+  if (rawGroup !== undefined && encodedGroup !== undefined) throw new Error('Choose one group selector.');
+  const group = encodedGroup === undefined ? rawGroup : JSON.parse(encodedGroup);
+  if (group !== undefined && typeof group !== 'string') throw new Error('The JSON group selector must be a string.');
+  if (args.includes('--reference') && group !== undefined) throw new Error('Reference and contributor inspection are separate cursor kinds.');
+  const query = await loadPopulationQuery(input);
   if (args.includes('--reference')) {
-    if (group !== undefined) throw new Error('Reference and contributor inspection are separate cursor kinds.');
     return query.references(expression,options,scope);
   }
   return group === undefined ? query.groups(expression,options,scope) : query.contributors(expression,group,options,scope);
