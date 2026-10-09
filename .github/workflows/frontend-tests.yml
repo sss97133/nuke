@@ -583,6 +583,9 @@ jobs:
       - name: Verify public-reader coverage failure detection without network or writes
         run: node --test scripts/assays/public-reader-coverage.test.mjs
 
+      - name: Verify complete Stacks population capture and resumable reads (offline)
+        run: node --test nuke_frontend/scripts/stacks-population-capture.test.mjs
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test
