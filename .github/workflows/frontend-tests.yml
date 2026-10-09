@@ -584,7 +584,7 @@ jobs:
         run: node --test scripts/assays/public-reader-coverage.test.mjs
 
       - name: Verify complete Stacks population capture and resumable reads (offline)
-        run: node --test nuke_frontend/scripts/stacks-population-capture.test.mjs
+        run: node --test nuke_frontend/scripts/test-stacks-population-capture.mjs
 
       - name: Run Vitest
         working-directory: ./nuke_frontend

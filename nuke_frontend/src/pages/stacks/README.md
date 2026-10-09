@@ -34,7 +34,7 @@ If the REST transport repeatedly times out, `--sql-reader=/absolute/path/to/exis
 
 Changing canonical fold code normally refuses cache reuse. Explicit `--refresh-method` records the former hash and deterministically remeasures retained inputs with the new fold source; it preserves source pages and retrieval clocks, recording a separate folding time. It does not change the population or acquire testimony. Changing the scope still requires a new capture.
 
-Offline contracts: `node --test scripts/stacks-population-capture.test.mjs`. They verify interruption/resume, pages shorter than the transport cap, more than 120 parents and 8,000 children, batch splitting, changed scope/cache bytes, false completion, public gates and exact reuse of the existing fold/exclusion operators.
+Offline contracts: `node --test scripts/test-stacks-population-capture.mjs`. They verify interruption/resume, pages shorter than the transport cap, more than 120 parents and 8,000 children, batch splitting, changed scope/cache bytes, false completion, public gates and exact reuse of the existing fold/exclusion operators.
 
 The shipped October 8, 2026 05:29Z retained study has 1,408 selected candidates, 1,338 eligible episodes and 36,524 bids. It samples up to 32 recent public sold BaT episodes per calendar quarter, 2016–2026. This is not a census, probability sample or historical knowledge snapshot. See the page's expandable receipt and the design book's Stacks measurement contract.
 
