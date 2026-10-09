@@ -58,6 +58,17 @@ The JSON selector accepts only a string, rejects conflicting or duplicate select
 
 This operator prototype establishes no production endpoint or storage architecture. The shipped workbench still reads its retained sample. Offline contracts: `node --test scripts/test-stacks-study-query.mjs`, including exhaustive page traversal, source/percentile equivalence, receipt refusal and a **synthetic** 130,837-record scale regression.
 
+The same verified operator returns compact corpus and filter projections for a future complete-population reader:
+
+```
+node scripts/build-stacks-study.mjs --analyze --input=/private/review.json --corpus
+node scripts/build-stacks-study.mjs --analyze --input=/private/review.json --facets --expression='make=chevrolet&model=Corvette'
+```
+
+Corpus counts reconcile selected, usable and excluded episodes and close years, and separate distinct usable vehicles, canonical identities, unresolved bids, known/recorded/conflicting winners and source-label model fallbacks. Unknown close years stay explicit when present in the retained dataset. Source freshness and the wider market denominator remain the receipt's unknowns. Neither projection serializes member or identity arrays.
+
+Facets preserve the workbench's choice scopes: all captured usable makes, models within the selected make, and vehicle years within the selected make/model. Their episode counts use the entire retained usable population independently of analytical bid years, paired records, presentation pages and excluded vehicles. A shared URL's absent selected choice remains visible with zero captured episodes. Make matching is case-insensitive; model labels remain exact. These choices are separate from analytical eligibility and do not change any denominator. Corpus/facets refuse presentation cursors, sizes and group selectors; corpus also refuses expression scope. Calendar and paired-map adapters, public eligibility revalidation and production reader delivery remain open.
+
 The shipped October 8, 2026 05:29Z retained study has 1,408 selected candidates, 1,338 eligible episodes and 36,524 bids. It samples up to 32 recent public sold BaT episodes per calendar quarter, 2016–2026. This is not a census, probability sample or historical knowledge snapshot. See the page's expandable receipt and the design book's Stacks measurement contract.
 
 `bidMeasurements.test.ts` verifies episode ordering/eligibility, calendar partitions, weighting, attribution, percentile references and transfer round trips. `bidPopulationReader.test.ts` checks public-parent gating, caps, primary-key continuation and failed-page behavior. `StackExplore.test.tsx` checks entry, scope changes, contributor context, sharing and absence of substituted results.
