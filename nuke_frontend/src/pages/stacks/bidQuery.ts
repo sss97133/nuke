@@ -24,6 +24,10 @@ export function createBidQuery(dataset: StudyDataset, snapshot: string) {
   if (!/^[0-9a-f]{64}$/.test(snapshot)) throw new Error('A verified study hash is required.');
   const byLot = new Map(dataset.lots.map(l => [l.id,l]));
   let cached: { key: string; result: MeasurementResult; sortedRecords:number[] | null } | null = null;
+  let corpus: {
+    counts: Record<string,number>; closeYears: Array<{ year:number|null; candidates:number; usable:number; excluded:number }>;
+    exclusionReasons: Record<string,number>;
+  } | null = null;
   const evaluate = (expression: BidExpression, scope: BidQueryScope) => {
     validateExpression(expression);
     if (scope.paired != null && typeof scope.paired !== 'boolean') throw new Error('Invalid paired scope.');
@@ -50,6 +54,51 @@ export function createBidQuery(dataset: StudyDataset, snapshot: string) {
     return { offset, end, size, total:n, nextCursor:end < n ? { snapshot, query:key, kind, group, offset:end } : null };
   };
   return {
+    corpus() {
+      if (!corpus) {
+        const vehicles = new Set<string>(), identities = new Set<string>();
+        const years = new Map<number|null,{ year:number|null; candidates:number; usable:number; excluded:number }>();
+        for (const [year,candidates] of Object.entries(dataset.candidatesByYear)) years.set(Number(year),{year:Number(year),candidates,usable:0,excluded:0});
+        const unknown = dataset.candidateN - Object.values(dataset.candidatesByYear).reduce((n,v) => n+v,0);
+        if (unknown) years.set(null,{year:null,candidates:unknown,usable:0,excluded:0});
+        const counts = { studyCandidates:dataset.candidateN, studyUsable:dataset.lots.length, studyExcluded:dataset.exclusions.length,
+          usableVehicles:0, canonicalIdentities:0, bids:0, raises:0, unresolvedBids:0, knownWinners:0, recordedWinners:0, winnerConflicts:0, modelFallbackEpisodes:0 };
+        for (const lot of dataset.lots) {
+          vehicles.add(lot.vehicleId); for (const actor of lot.actors) identities.add(actor.identity);
+          counts.bids += lot.sums.bids; counts.raises += lot.sums.raises; counts.unresolvedBids += lot.sums.unresolvedBids;
+          counts.knownWinners += Number(Boolean(lot.winner)); counts.recordedWinners += Number(Boolean(lot.recordedWinner));
+          counts.winnerConflicts += Number(lot.winnerConflict); counts.modelFallbackEpisodes += Number(lot.modelBasis === 'source-label');
+          years.get(new Date(lot.end).getUTCFullYear())!.usable++;
+        }
+        const exclusionReasons: Record<string,number> = {};
+        for (const row of dataset.exclusions) { years.get(row.year)!.excluded++; exclusionReasons[row.reason] = (exclusionReasons[row.reason] ?? 0)+1; }
+        counts.usableVehicles = vehicles.size; counts.canonicalIdentities = identities.size;
+        corpus = { counts,closeYears:[...years.values()].sort((a,b) => (a.year ?? Infinity)-(b.year ?? Infinity)),exclusionReasons };
+      }
+      return { contract:'bid-corpus-v1',snapshot,readAt:dataset.readAt,method:dataset.method,selection:dataset.selection,knowledgeMode:dataset.knowledgeMode,
+        capped:dataset.capped,counts:{...corpus.counts},closeYears:corpus.closeYears.map(row => ({...row})),exclusionReasons:{...corpus.exclusionReasons} };
+    },
+    /** Choices span retained usable episodes; close/bid-year and paired scopes do not sample them. */
+    facets(expression: BidExpression) {
+      validateExpression(expression);
+      const makes = new Map<string,{value:string;episodes:number}>(), models = new Map<string,number>(), years = new Map<number,number>();
+      if (expression.make) makes.set(expression.make.toLowerCase(),{value:expression.make,episodes:0});
+      if (expression.model) models.set(expression.model,0);
+      if (expression.vehicleYear != null) years.set(expression.vehicleYear,0);
+      for (const lot of dataset.lots) {
+        const key = lot.make.toLowerCase(); makes.set(key,{value:lot.make,episodes:(makes.get(key)?.episodes ?? 0)+1});
+        if (expression.make && key !== expression.make.toLowerCase()) continue;
+        models.set(lot.model,(models.get(lot.model) ?? 0)+1);
+        if (expression.model && lot.model !== expression.model) continue;
+        if (lot.vehicleYear !== null) years.set(lot.vehicleYear,(years.get(lot.vehicleYear) ?? 0)+1);
+      }
+      return { contract:'bid-facets-v1',snapshot,readAt:dataset.readAt,method:dataset.method,
+        population:'retained usable episodes; makes across the capture, models within selected make, vehicle years within selected make/model',
+        make:expression.make,model:expression.model,studyUsable:dataset.lots.length,
+        makes:[...makes.values()].sort((a,b) => a.value.localeCompare(b.value)),
+        models:[...models].sort(([a],[b]) => a.localeCompare(b)).map(([value,episodes]) => ({value,episodes})),
+        vehicleYears:[...years].sort(([a],[b]) => b-a).map(([value,episodes]) => ({value,episodes})) };
+    },
     groups(expression: BidExpression, options: BidQueryPage = {}, scope: BidQueryScope = {}) {
       const { key, result:r } = evaluate(expression,scope);
       const rows = expression.grouping === 'participant' ? r.groups.filter(g => g.lotIds.length >= (expression.measure === 'winRate' ? 5 : 2)) : r.groups;

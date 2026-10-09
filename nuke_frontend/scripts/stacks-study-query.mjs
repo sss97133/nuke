@@ -22,6 +22,8 @@ export async function loadPopulationQuery(file) {
     sourceFreshness:receipt.sourceFreshness, marketDenominator:receipt.marketDenominator,
     eligibility:'captured public eligibility; current eligibility requires revalidation before release' };
   return {
+    corpus:() => ({ ...query.corpus(), coverage }),
+    facets:(...args) => ({ ...query.facets(...args), coverage }),
     groups:(...args) => ({ ...query.groups(...args), coverage }),
     contributors:(...args) => ({ ...query.contributors(...args), coverage }),
     references:(...args) => ({ ...query.references(...args), coverage }),
@@ -30,7 +32,7 @@ export async function loadPopulationQuery(file) {
 
 export async function analyzePopulation(args) {
   const prefixes = ['--input=','--expression=','--size=','--cursor=','--group=','--group-json='];
-  if (args.some(a => !['--analyze','--reference'].includes(a) && !prefixes.some(p => a.startsWith(p)))) throw new Error('Unknown analytical option.');
+  if (args.some(a => !['--analyze','--reference','--corpus','--facets'].includes(a) && !prefixes.some(p => a.startsWith(p)))) throw new Error('Unknown analytical option.');
   for (const prefix of prefixes) if (args.filter(a => a.startsWith(prefix)).length > 1) throw new Error('Duplicate analytical option.');
   const value = name => args.find(a => a.startsWith(`${name}=`))?.slice(name.length + 1);
   const input = value('--input');
@@ -47,7 +49,12 @@ export async function analyzePopulation(args) {
   const group = encodedGroup === undefined ? rawGroup : JSON.parse(encodedGroup);
   if (group !== undefined && typeof group !== 'string') throw new Error('The JSON group selector must be a string.');
   if (args.includes('--reference') && group !== undefined) throw new Error('Reference and contributor inspection are separate cursor kinds.');
+  const summary = args.filter(a => ['--corpus','--facets'].includes(a));
+  if (summary.length > 1 || (summary.length && (args.includes('--reference') || group !== undefined || value('--size') !== undefined || value('--cursor') !== undefined))) throw new Error('Corpus and facet inspection do not use analytical paging or group selectors.');
+  if (args.includes('--corpus') && value('--expression') !== undefined) throw new Error('Corpus inspection describes the complete capture, without an expression scope.');
   const query = await loadPopulationQuery(input);
+  if (args.includes('--corpus')) return query.corpus();
+  if (args.includes('--facets')) return query.facets(expression);
   if (args.includes('--reference')) {
     return query.references(expression,options,scope);
   }
