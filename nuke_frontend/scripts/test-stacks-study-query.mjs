@@ -162,8 +162,9 @@ test('130837 synthetic records retain full group extrema and reference without a
   const {dataset} = await fixture(t), base = dataset.lots[0], n = 130837;
   const lots = Array.from({length:n},(_,i) => ({...base,id:uuid('1',i+1),vehicleId:uuid('3',i+1),
     sums:{...base.sums,relativeSum:i+1}, years:{2026:{...base.sums,relativeSum:i+1}}}));
+  lots[0].vehicleId = 'abcdef01-0000-4000-8000-000000000001';
   const large = {...dataset,lots,candidateN:n,exclusions:[]};
-  const page = createBidQuery(large,'0'.repeat(64)).groups(expression,{size:1});
+  const query = createBidQuery(large,'0'.repeat(64)), page = query.groups(expression,{size:1});
   assert.equal(page.counts.contributingEpisodes,n);
   assert.equal(page.reference.records,n);
   assert.equal(page.groups[0].mean,(n+1)/2);
@@ -172,4 +173,17 @@ test('130837 synthetic records retain full group extrema and reference without a
   assert.equal(page.groups[0].records,n);
   assert.equal(page.reference.median,(n+1)/2);
   assert.ok(Buffer.byteLength(JSON.stringify(page)) < 5000,'presentation response must not serialize the full reference vector');
+  const group = page.groups[0].key;
+  for (const cursor of [null,query.contributors(expression,group,{size:100}).page.nextCursor]) {
+    const drill = query.contributors(expression,group,{size:100,cursor});
+    assert.equal(drill.reference.recordReferenceN,n);
+    for (const member of drill.contributors) assert.equal(member.recordPercentile,100*(member.value-.5)/n);
+  }
+  // A new expression must replace its record reference; all equal values have midrank50.
+  const amount = query.contributors({...expression,measure:'amount'},group,{size:100});
+  assert.ok(amount.contributors.every(m => m.recordPercentile === 50));
+  const excluded = query.contributors(expression,group,{size:100},{excludeVehicle:lots[0].vehicleId.toUpperCase()});
+  assert.equal(excluded.reference.recordReferenceN,n-1);
+  for (const member of excluded.contributors) assert.equal(member.recordPercentile,100*(member.value-1.5)/(n-1));
+  assert.equal(excluded.query,query.contributors(expression,group,{size:100},{excludeVehicle:lots[0].vehicleId}).query);
 });
