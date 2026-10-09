@@ -158,6 +158,30 @@ test('operator mode stays offline and refuses capture/unknown options', async t 
   await assert.rejects(analyzePopulation(['--analyze']),/explicit private/);
 });
 
+test('JSON group transport inspects composite model keys and continues their exact source drill through the real CLI', async t => {
+  const {output,query} = await fixture(t), e={...expression,grouping:'model'};
+  const group=query.groups(e).groups[0].key;
+  assert.ok(group.includes('\u0000'));
+  const args=['--analyze',`--input=${output}`,'--expression=by=model&measure=relative',`--group-json=${JSON.stringify(group)}`,'--size=11'];
+  const run = extra => {
+    const cli=spawnSync(process.execPath,['scripts/build-stacks-study.mjs',...args,...extra],{cwd:new URL('..',import.meta.url),encoding:'utf8'});
+    assert.equal(cli.status,0,cli.stderr);
+    return JSON.parse(cli.stdout);
+  };
+  const first=run([]), expected=query.contributors(e,group,{size:11});
+  assert.deepEqual(first,expected);
+  assert.equal(first.group.episodes,149);
+  assert.ok(first.contributors.every(m => m.sourceUrl && m.lotId && m.vehicleId));
+  const second=run([`--cursor=${JSON.stringify(first.page.nextCursor)}`]);
+  assert.deepEqual(second,query.contributors(e,group,{size:11,cursor:first.page.nextCursor}));
+  assert.equal(new Set([...first.contributors,...second.contributors].map(m => m.id)).size,22);
+  await assert.rejects(analyzePopulation([...args,'--group=chevrolet']),/one group/);
+  await assert.rejects(analyzePopulation([...args,'--reference']),/separate cursor/);
+  await assert.rejects(analyzePopulation([...args,'--group-json="duplicate"']),/Duplicate/);
+  for (const encoded of ['null','42','{}','[]']) await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist',`--group-json=${encoded}`]),/must be a string/);
+  await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist','--group-json={']),/JSON/);
+});
+
 test('130837 synthetic records retain full group extrema and reference without argument-stack overflow', async t => {
   const {dataset} = await fixture(t), base = dataset.lots[0], n = 130837;
   const lots = Array.from({length:n},(_,i) => ({...base,id:uuid('1',i+1),vehicleId:uuid('3',i+1),

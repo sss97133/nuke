@@ -48,6 +48,14 @@ Every query evaluates the entire declared eligible population. Only presentation
 
 Pass the returned `page.nextCursor` as quoted JSON in `--cursor='JSON'` to continue. Cursors bind to the verified artifact hash, normalized expression, paired/excluded scope and inspection kind/group; a changed context is refused. Expressions use the existing URL parameters, including `paired=entry-outcome` and `excludeVehicle=UUID`. Scope, original retrieval clocks, input/fold/output hashes, exclusion reasons and unknown market denominator accompany each response. Captured eligibility is dated evidence and must be revalidated before public release.
 
+Composite model-group keys contain a NUL separator between make and model. Shell arguments cannot contain that byte; pass the returned key as a JSON string with `--group-json` instead of `--group`. For example:
+
+```
+node scripts/build-stacks-study.mjs --analyze --input=/private/review.json --expression='by=model&measure=relative' --group-json='"chevrolet\u0000Corvette"' --size=25
+```
+
+The JSON selector accepts only a string, rejects conflicting or duplicate selectors, and preserves the exact key through contributor cursors. It also accepts ordinary group keys when JSON encoding is more convenient. No new source reads or analytical scope changes are introduced.
+
 This operator prototype establishes no production endpoint or storage architecture. The shipped workbench still reads its retained sample. Offline contracts: `node --test scripts/test-stacks-study-query.mjs`, including exhaustive page traversal, source/percentile equivalence, receipt refusal and a **synthetic** 130,837-record scale regression.
 
 The shipped October 8, 2026 05:29Z retained study has 1,408 selected candidates, 1,338 eligible episodes and 36,524 bids. It samples up to 32 recent public sold BaT episodes per calendar quarter, 2016–2026. This is not a census, probability sample or historical knowledge snapshot. See the page's expandable receipt and the design book's Stacks measurement contract.
