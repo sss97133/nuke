@@ -52,6 +52,12 @@ describe('complete sequence measurements', () => {
 });
 
 describe('grouping and reference population', () => {
+  it('withholds unsupported participant ranks when no record meets the comparison minimum', () => {
+    const result = evaluateBidExpression(dataset(sequence('one',[100,200,300])),{...expression,measure:'winRate',grouping:'participant'});
+    expect(result.rankValues).toEqual([]);
+    expect(result.groups.length).toBeGreaterThan(0);
+    expect(result.groups.every(g => g.percentile === 0 && !g.supported)).toBe(true);
+  });
   it('reduces a tiny-opening jump with a record median while preserving the arithmetic mean as a separate measure', () => {
     const d = dataset(sequence('one',[1,10000,11000,12000]));
     const typical = evaluateBidExpression(d,{...expression,measure:'typical'});

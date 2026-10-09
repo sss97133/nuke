@@ -194,7 +194,10 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
       ...(grouping === 'participant' ? { knownOutcomes: outcomes.length, wins: outcomes.filter(l => l.winner === key).length } : {}) };
   });
   const rankValues = grouping === 'participant' ? groups.filter(g => g.lotIds.length >= (measure === 'winRate' ? 5 : 2)).map(g => g.mean) : values;
-  if (grouping === 'participant') for (const g of groups) { g.percentile = percentile(rankValues,g.mean) ?? 0; g.supported = rankValues.length >= MIN_DISTRIBUTION && g.lotIds.length >= (measure === 'winRate' ? 5 : 2); }
+  if (grouping === 'participant') {
+    const sortedRanks = [...rankValues].sort((a, b) => a - b);
+    for (const g of groups) { g.percentile = sortedRanks.length ? sortedPercentile(sortedRanks,g.mean) : 0; g.supported = rankValues.length >= MIN_DISTRIBUTION && g.lotIds.length >= (measure === 'winRate' ? 5 : 2); }
+  }
   groups.sort(grouping === 'year' ? (a, b) => (a.year ?? 0) - (b.year ?? 0) : (a, b) => b.lotIds.length - a.lotIds.length || a.label.localeCompare(b.label));
   return { expression, method: dataset.method, readAt: dataset.readAt, selection: dataset.selection,
     eligibleLots: scoped.filter(l => scopeSums(l, from, to).bids > 0).length, contributingLots: contributing.size,

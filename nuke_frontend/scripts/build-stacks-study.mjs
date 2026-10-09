@@ -3,14 +3,44 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../src/lib/env.ts';
 import { encodeStudy, makeStudy } from '../src/pages/stacks/bidMeasurements.ts';
+import { capturePopulation, populationReader, sqlPopulationReader } from './stacks-population-capture.mjs';
 
 const args = process.argv.slice(2), argument = name => args.find(a => a.startsWith(`${name}=`))?.slice(name.length + 1);
+if (args.includes('--population') && (!argument('--cache') || !argument('--output'))) throw new Error('Full-population mode requires explicit private --cache and --output paths.');
+if (args.includes('--population') && args.some(a => !['--population','--select-only','--refresh-method'].includes(a)
+  && !['--cache=','--output=','--from=','--before=','--requests=','--sql-reader=','--parent-page-size='].some(prefix => a.startsWith(prefix)))) throw new Error('Unknown full-population option.');
 const cache = argument('--cache') || path.join(os.tmpdir(), `nuke-stacks-study-${Date.now()}`);
 const output = argument('--output') || fileURLToPath(new URL('../public/stacks/bid-study-v1.json', import.meta.url));
 fs.mkdirSync(cache, { recursive:true });
+const publicKey = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+if (publicKey.startsWith('sb_secret_')) throw new Error('This producer refuses secret API keys.');
+if (publicKey.startsWith('eyJ') && JSON.parse(Buffer.from(publicKey.split('.')[1],'base64url')).role !== 'anon') throw new Error('This producer accepts only the public anonymous role.');
+const db = createClient(process.env.VITE_SUPABASE_URL || SUPABASE_URL,publicKey,{auth:{persistSession:false,autoRefreshToken:false}});
+const lotSelect = 'id,vehicle_id,source,source_url,auction_end_date,total_bids,winning_bid,winning_bidder_external_identity_id,vehicles!inner(id,year,make,model,normalized_model)';
+const bidSelect = 'id,auction_event_id,vehicle_id,source_url,posted_at,created_at,bid_amount,external_identity_id,bat_comment_id,author_username,vehicles!inner(id)';
+const gate = q => q.eq('vehicles.is_public',true).is('vehicles.deleted_at',null).or('listing_kind.is.null,listing_kind.neq.non_vehicle_item',{referencedTable:'vehicles'});
+const readCache = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file,'utf8')) : null;
+if (args.includes('--population')) {
+  let lastProgress = 0;
+  const queryReader = argument('--sql-reader');
+  if (queryReader && !path.isAbsolute(queryReader)) throw new Error('--sql-reader requires the absolute path to the existing trusted q.sh.');
+  const reader = queryReader ? sqlPopulationReader(async query => {
+    const result = await promisify(execFile)('bash', [queryReader, query], { timeout:65_000, maxBuffer:16 * 1024 * 1024 });
+    return result.stdout;
+  }) : populationReader(db);
+  const result = await capturePopulation({ cache, output, reader,
+    from:argument('--from'), before:argument('--before'), maxRequests:Number(argument('--requests') ?? 100), selectOnly:args.includes('--select-only'), refreshMethod:args.includes('--refresh-method'),
+    parentPageSize:argument('--parent-page-size') ? Number(argument('--parent-page-size')) : undefined,
+    onProgress:receipt => { if (Date.now() - lastProgress >= 5000) { console.log(JSON.stringify(receipt)); lastProgress = Date.now(); } },
+  });
+  console.log(JSON.stringify(result));
+  process.exitCode = result.complete ? 0 : 2;
+} else {
 const manifestFile = path.join(cache,'capture.json');
 const oldFiles = fs.readdirSync(cache).filter(f => /^public-study-(candidates|bids)-.+\.json$/.test(f));
 if (oldFiles.length && !fs.existsSync(manifestFile) && !args.includes('--adopt-retained')) throw new Error('Existing capture needs its manifest. --adopt-retained records cache-file times explicitly; it does not claim a new read.');
@@ -20,15 +50,8 @@ const original = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manife
   startedAt:new Date(times.length ? Math.min(...times) : Date.now()).toISOString(), completedAt:times.length ? new Date(Math.max(...times)).toISOString() : null,
   clockBasis:times.length ? 'Retained cache-file completion times; no new source read.' : 'Sequential public API capture, not an atomic point-in-time snapshot.',
 };
+if (original.contract !== 1) throw new Error('This cache is a population capture, not a legacy sample. Use --population.');
 const cutoff = Date.parse(original.selectionEnd), lastYear = new Date(cutoff).getUTCFullYear();
-const publicKey = process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
-if (publicKey.startsWith('sb_secret_')) throw new Error('This producer refuses secret API keys.');
-if (publicKey.startsWith('eyJ') && JSON.parse(Buffer.from(publicKey.split('.')[1],'base64url')).role !== 'anon') throw new Error('This producer accepts only the public anonymous role.');
-const db = createClient(process.env.VITE_SUPABASE_URL || SUPABASE_URL,publicKey,{auth:{persistSession:false,autoRefreshToken:false}});
-const lotSelect = 'id,vehicle_id,source,source_url,auction_end_date,total_bids,winning_bid,winning_bidder_external_identity_id,vehicles!inner(id,year,make,model,normalized_model)';
-const bidSelect = 'id,auction_event_id,vehicle_id,source_url,posted_at,created_at,bid_amount,external_identity_id,bat_comment_id,author_username,vehicles!inner(id)';
-const gate = q => q.eq('vehicles.is_public',true).is('vehicles.deleted_at',null).or('listing_kind.is.null,listing_kind.neq.non_vehicle_item',{referencedTable:'vehicles'});
-const readCache = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file,'utf8')) : null;
 const candidates = []; let capped = false, madeRead = false;
 for (let year = 2016; year <= lastYear; year++) {
   for (let quarter = 0; quarter < 4; quarter++) {
@@ -74,3 +97,4 @@ const study = makeStudy(unique,bids,completedAt,
 study.knowledgeMode += ` Capture: ${original.startedAt} through ${completedAt}. ${manifest.clockBasis}`;
 fs.mkdirSync(path.dirname(output),{recursive:true}); fs.writeFileSync(output,JSON.stringify(encodeStudy(study)));
 console.log(JSON.stringify({cache,output,candidates:study.candidateN,eligible:study.lots.length,bids:study.lots.reduce((n,l) => n + l.sums.bids,0),captureCompletedAt:completedAt,usedCachedInputs:!madeRead,bytes:fs.statSync(output).size}));
+}
