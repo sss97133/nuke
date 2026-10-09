@@ -36,6 +36,20 @@ Changing canonical fold code normally refuses cache reuse. Explicit `--refresh-m
 
 Offline contracts: `node --test scripts/test-stacks-population-capture.mjs`. They verify interruption/resume, pages shorter than the transport cap, more than 120 parents and 8,000 children, batch splitting, changed scope/cache bytes, false completion, public gates and exact reuse of the existing fold/exclusion operators.
 
+## Offline population analysis
+
+Inspect a completed private population artifact with the same operator. This mode verifies the companion receipt, output bytes/hash and candidate/usable/excluded accounting before evaluating the existing canonical measurement expression. It creates no source client, capture directory or public output:
+
+```
+node scripts/build-stacks-study.mjs --analyze --input=/private/review.json --expression='by=participant&measure=relative' --size=25
+```
+
+Every query evaluates the entire declared eligible population. Only presentation pages are limited (1–100 rows); counts, means, quantiles, reference population and axis domain use the complete expression. `--group=CANONICAL_GROUP_KEY` pages its source contributors, including episode/vehicle/actor keys and empirical record percentiles. `--reference` pages every eligible reference reading, with source links for record references and canonical group keys for participant references. These are exhaustive inspection pages, with no sampling or statistical downweighting. Group responses carry a reference summary rather than embedding the full vector.
+
+Pass the returned `page.nextCursor` as quoted JSON in `--cursor='JSON'` to continue. Cursors bind to the verified artifact hash, normalized expression, paired/excluded scope and inspection kind/group; a changed context is refused. Expressions use the existing URL parameters, including `paired=entry-outcome` and `excludeVehicle=UUID`. Scope, original retrieval clocks, input/fold/output hashes, exclusion reasons and unknown market denominator accompany each response. Captured eligibility is dated evidence and must be revalidated before public release.
+
+This operator prototype establishes no production endpoint or storage architecture. The shipped workbench still reads its retained sample. Offline contracts: `node --test scripts/test-stacks-study-query.mjs`, including exhaustive page traversal, source/percentile equivalence, receipt refusal and a **synthetic** 130,837-record scale regression.
+
 The shipped October 8, 2026 05:29Z retained study has 1,408 selected candidates, 1,338 eligible episodes and 36,524 bids. It samples up to 32 recent public sold BaT episodes per calendar quarter, 2016–2026. This is not a census, probability sample or historical knowledge snapshot. See the page's expandable receipt and the design book's Stacks measurement contract.
 
 `bidMeasurements.test.ts` verifies episode ordering/eligibility, calendar partitions, weighting, attribution, percentile references and transfer round trips. `bidPopulationReader.test.ts` checks public-parent gating, caps, primary-key continuation and failed-page behavior. `StackExplore.test.tsx` checks entry, scope changes, contributor context, sharing and absence of substituted results.
