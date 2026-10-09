@@ -11,6 +11,14 @@ Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css
 - Arial only. Courier New for data/monospace.
 - ALL CAPS labels at 8-9px
 
+### Brand identity rendering (owner rule, 2026-10-08)
+
+- A structured brand/make label uses available identity artwork programmatically. Vehicle makes use `components/common/MakeIdentity.tsx`; organization identity uses the existing `OrgLogo` renderer. This applies wherever brand identity is relevant, including discovery, filters, group headings and drill paths.
+- `MakeIdentity` resolves the brand against the sourced artwork catalogue: wordmark first, otherwise emblem with readable name, otherwise plain text. Catalogue additions must become available to every consumer without adding page-specific brand lists. Preserve accessible names and text on asset failure.
+- Treat lettering as identity artwork, not a replacement UI font. Arial/Courier remain the interface fonts. Compact labels and prose retain readable text; an adjacent emblem uses `MakeLogo`. Do not guess brands from arbitrary text or rewrite vehicle titles into logos.
+- Reuse local attributed artwork and its theme variants. Reserve image dimensions, preserve contrast on selected surfaces, and do not infer historical logo variants from vehicle/bid years. New surfaces consume the shared rule instead of inventing artwork or fetching logos independently.
+- The local artwork catalogue uses a light/dark pair for colored wordmarks, or one verified monochrome wordmark that can be inverted. Keep that convention when registering artwork; absent theme metadata is not permission to recolor arbitrary logos.
+
 ## Visual
 - Zero border-radius. Zero shadows. Zero gradients.
 - 2px solid borders.

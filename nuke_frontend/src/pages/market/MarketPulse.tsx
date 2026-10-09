@@ -8,6 +8,7 @@ import { squarify } from '../../lib/squarify';
 import AuctionEvidence from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
+import { MakeIdentity, MakeLogo } from '../../components/common/MakeIdentity';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their
@@ -510,7 +511,7 @@ function MarketMap({ auctions, selected, onSelect, models = false }: {
         style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) minmax(0, 2fr) 40px', gap: 8, alignItems: 'center', minHeight: 44,
           padding: '4px 8px', border: '2px solid var(--border)', fontFamily: 'Arial, sans-serif', fontSize: 12, textAlign: 'left',
           background: selected === group.make ? 'var(--text)' : 'var(--bg)', color: selected === group.make ? 'var(--bg)' : 'var(--text)' }}>
-        <span style={{ overflowWrap: 'anywhere' }}>{group.make}</span>
+        <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{models ? group.make : <MakeIdentity make={group.make} inverse={selected === group.make} />}</span>
         <span aria-hidden="true" style={{ height: 12, width: `${group.count / Math.max(1, ranked[0]?.count ?? 1) * 100}%`,
           background: selected === group.make ? 'var(--bg)' : 'var(--text-secondary)' }} />
         <span style={{ ...mono, textAlign: 'right' }}>{group.count}</span>
@@ -576,7 +577,7 @@ function MarketMap({ auctions, selected, onSelect, models = false }: {
             {roomy && (
               <>
                 <span style={{ ...label, color: 'inherit', fontSize: w > 140 ? 10 : 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-                  {node.make}
+                  {w >= 120 && h >= 64 ? <MakeIdentity make={node.make} inverse={active} /> : node.make}
                 </span>
                 <span style={{ ...mono, fontSize: w > 140 ? 13 : 10, whiteSpace: 'nowrap' }}>
                   {node.count} <span style={{ opacity: 0.7 }}>live lots</span>
@@ -853,7 +854,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </div>
       <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
         <button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('make', null)}>All captured makes</button>
-        {make && <><span aria-hidden="true">→</span><button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}>{make}</button></>}
+        {make && <><span aria-hidden="true">→</span><button style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}><MakeLogo make={make} />{make}</button></>}
         {model && <><span aria-hidden="true">→</span><span>Recorded model: {model}</span></>}
       </div>
 
