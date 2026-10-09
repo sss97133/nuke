@@ -149,7 +149,17 @@ export function makeStudy(lots: BidLot[], bids: StudyBid[], readAt: string, sele
     candidateN: unique.length, candidatesByYear, capped, exclusions, lots: readings };
 }
 function scopeSums(lot: LotReading, from: number, to: number) {
-  return Object.entries(lot.years).filter(([year]) => Number(year) >= from && Number(year) <= to).reduce((a, [, b]) => mergeSums(a, b), emptySums());
+  let selected:Sums|null = null;
+  for (const [year,s] of Object.entries(lot.years)) {
+    if (!(Number(year)>=from && Number(year)<=to)) continue;
+    // Measurements only read these vectors; quantile sorts its own copy. Preserve
+    // identity deduplication and scalar addition even for a single selected year.
+    selected = selected ? mergeSums(selected,s) : {
+      bids:0+s.bids,bidSum:0+s.bidSum,raises:0+s.raises,raiseSum:0+s.raiseSum,relativeSum:0+s.relativeSum,
+      gaps:s.gaps,relativeValues:s.relativeValues,identityIds:[...new Set(s.identityIds)],unresolvedBids:0+s.unresolvedBids,
+    };
+  }
+  return selected ?? emptySums();
 }
 function matchesScope(lot: LotReading, expression: BidExpression) {
   return (!expression.make || lot.make.toLowerCase() === expression.make.toLowerCase())
@@ -163,12 +173,13 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
   const scoped = dataset.lots.filter(l => matchesScope(l,expression));
   const lotById = new Map(scoped.map(l => [l.id, l]));
   const buckets = new Map<string, { label: string; make?: string; model?: string; year?: number; members: MeasurementMember[] }>();
-  let bidN = 0, raiseN = 0, missing = 0, modelFallbackLots = 0; const contributing = new Set<string>();
+  let bidN = 0, raiseN = 0, missing = 0, modelFallbackLots = 0, eligibleLots = 0; const contributing = new Set<string>();
   const append = (key: string, label: string, m: MeasurementMember, extra: { make?: string; model?: string; year?: number } = {}) => {
     const bucket = buckets.get(key) ?? { label, members: [], ...extra }; bucket.members.push(m); buckets.set(key, bucket); contributing.add(m.lotId);
   };
   for (const l of scoped) {
     const s = scopeSums(l, from, to); if (!s.bids) continue;
+    if (s.bids>0) eligibleLots++;
     bidN += s.bids; raiseN += s.raises; if (l.modelBasis === 'source-label') modelFallbackLots++;
     if (grouping === 'year') {
       for (let year = from; year <= to; year++) { const ys = l.years[String(year)]; if (!ys) continue; const m = measured(ys, measure);
@@ -207,7 +218,7 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
   }
   groups.sort(grouping === 'year' ? (a, b) => (a.year ?? 0) - (b.year ?? 0) : (a, b) => b.lotIds.length - a.lotIds.length || a.label.localeCompare(b.label));
   return { expression, method: dataset.method, readAt: dataset.readAt, selection: dataset.selection,
-    eligibleLots: scoped.filter(l => scopeSums(l, from, to).bids > 0).length, contributingLots: contributing.size,
+    eligibleLots, contributingLots: contributing.size,
     bidN, raiseN, withheldRecordN: missing, modelFallbackLots, groups, values, median: quantile(rankValues, .5), rankValues, rankGrain: grouping === 'participant' ? 'participant' : 'record' };
 }
 

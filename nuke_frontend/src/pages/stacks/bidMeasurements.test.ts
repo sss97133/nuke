@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeStudy, encodeStudy, evaluateBidExpression, foldSoldLot, makeStudy, measured, percentile, participantBehaviorMap, type BidExpression, type BidLot, type StudyBid } from './bidMeasurements';
+import { decodeStudy, encodeStudy, evaluateBidExpression, foldSoldLot, makeStudy, measured, emptySums, mergeSums, percentile, participantBehaviorMap, type BidExpression, type BidLot, type StudyBid } from './bidMeasurements';
 import { expressionFromParams } from './bidExpression';
 
 const expression: BidExpression = { measure:'increment', grouping:'make', from:2016, to:2026, make:null, model:null, weighting:'auction' };
@@ -171,5 +171,41 @@ describe('grouping and reference population', () => {
       .toMatchObject({measure:'amount',grouping:'model',from:2016,to:2026,make:'Chevrolet',model:'Corvette',vehicleYear:2002,weighting:'bid'});
     expect(expressionFromParams(new URLSearchParams('measure=participants&by=participant&from=1900&to=9999&vehicleYear=-1')))
       .toMatchObject({measure:'typical',grouping:'participant',from:2014,to:new Date().getUTCFullYear(),vehicleYear:null});
+  });
+});
+
+
+describe('scoped measurement vector reuse',()=>{
+  it('preserves canonical year merges, duplicate identities, unsupported records and input vectors across measures',()=>{
+    const cross=sequence('cross',[100,175,325],{posted:['2025-12-31T23:50:00Z','2026-01-01T00:01:00Z','2026-01-01T00:21:00Z']});
+    const d=dataset(cross,sequence('single',[100,170,280]),sequence('opening',[100]));
+    for(const lot of d.lots)for(const sums of Object.values(lot.years))sums.identityIds.push(...sums.identityIds);
+    // This encoding is admitted by the existing decoder; identity dedup remains required.
+    const held=decodeStudy(JSON.parse(JSON.stringify(encodeStudy(d)))),before=structuredClone(held);
+    for(const lot of held.lots)for(const sums of Object.values(lot.years)){
+      Object.freeze(sums.gaps);Object.freeze(sums.relativeValues);Object.freeze(sums.identityIds);
+    }
+    for(const [from,to] of [[2025,2025],[2026,2026],[2025,2026],[2024,2024]]){
+      const scoped=held.lots.map(l=>({lot:l,sums:Object.entries(l.years).filter(([year])=>Number(year)>=from && Number(year)<=to)
+        .reduce((a,[,b])=>mergeSums(a,b),emptySums())}));
+      for(const measure of ['amount','increment','relative','typical','spacing','participants','bids'] as const){
+        const r=evaluateBidExpression(held,{...expression,measure,grouping:'auction',from,to});
+        const eligible=scoped.filter(l=>l.sums.bids>0),supported=eligible.flatMap(l=>{const m=measured(l.sums,measure);return m?[{lot:l.lot,m}]:[];});
+        expect(r.eligibleLots).toBe(eligible.length);expect(r.contributingLots).toBe(supported.length);
+        expect(r.bidN).toBe(eligible.reduce((n,l)=>n+l.sums.bids,0));expect(r.raiseN).toBe(eligible.reduce((n,l)=>n+l.sums.raises,0));
+        expect(r.withheldRecordN).toBe(eligible.length-supported.length);
+        expect(r.groups.map(g=>[g.key,g.mean,g.observations]).sort()).toEqual(supported.map(l=>[l.lot.id,l.m.value,l.m.observations]).sort());
+      }
+      for(const grouping of ['make','model','year','participant'] as const)evaluateBidExpression(held,{...expression,grouping,from,to});
+    }
+    expect(held).toEqual(before);
+    expect(evaluateBidExpression(held,{...expression,measure:'participants',grouping:'auction',from:2026,to:2026}).groups.find(g=>g.key==='single')?.mean).toBe(2);
+  });
+  it('counts supported-window episodes independently of a withheld participant crossing-year record',()=>{
+    const cross=sequence('cross',[100,200,300],{posted:['2025-12-31T23:59:00Z','2026-01-01T00:01:00Z','2026-01-01T00:04:00Z']});
+    const d=dataset(cross,sequence('same-year',[100,200,300]));
+    const r=evaluateBidExpression(d,{...expression,grouping:'participant',measure:'winRate',from:2026,to:2026});
+    expect(r.eligibleLots).toBe(2);expect(r.contributingLots).toBe(1);expect(r.withheldRecordN).toBe(d.lots[0].actors.length);
+    expect(r.groups.flatMap(g=>g.lotIds)).toEqual(['same-year','same-year']);
   });
 });
