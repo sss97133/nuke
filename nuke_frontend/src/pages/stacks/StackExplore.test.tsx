@@ -207,3 +207,15 @@ it('preserves an excluded subject vehicle through the cohort contributor drill u
   await click(button('Include selected vehicle'));
   expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('10 auctions');
 });
+
+it('excludes the same canonical vehicle UUID in uppercase while preserving the shared return URL', async () => {
+  const d=data(), id='abcdef01-0000-4000-8000-000000000001';
+  d.lots[0].vehicleId=id;fixture.study={...fixture.study,data:d};
+  await render(`/stacks?stack=SA&by=auction&measure=bids&make=Chevrolet&excludeVehicle=${id.toUpperCase()}&from=2026&to=2026`);
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('9 auctions');
+  await click(container.querySelector('.sx-distribution-row'));
+  const back=new URLSearchParams(new URL(container.querySelector('.sx-contributors a')!.getAttribute('href')!,'https://nuke.ag').searchParams.get('back')!);
+  expect(back.get('excludeVehicle')).toBe(id.toUpperCase());
+  await click(button('Include selected vehicle'));
+  expect(container.querySelector('.sx-measure-heading')?.textContent).toContain('10 auctions');
+});

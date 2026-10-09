@@ -1,4 +1,4 @@
-import { evaluateBidExpression, percentile, quantile, type BidExpression, type MeasurementResult, type StudyDataset } from './bidMeasurements.ts';
+import { evaluateBidExpression, sortedPercentile, quantile, type BidExpression, type MeasurementResult, type StudyDataset } from './bidMeasurements.ts';
 
 /** Presentation pagination never limits the population passed to the canonical operator. */
 export interface BidQueryCursor {
@@ -23,19 +23,20 @@ function validateExpression(e: BidExpression) {
 export function createBidQuery(dataset: StudyDataset, snapshot: string) {
   if (!/^[0-9a-f]{64}$/.test(snapshot)) throw new Error('A verified study hash is required.');
   const byLot = new Map(dataset.lots.map(l => [l.id,l]));
-  let cached: { key: string; result: MeasurementResult } | null = null;
+  let cached: { key: string; result: MeasurementResult; sortedRecords:number[] | null } | null = null;
   const evaluate = (expression: BidExpression, scope: BidQueryScope) => {
     validateExpression(expression);
     if (scope.paired != null && typeof scope.paired !== 'boolean') throw new Error('Invalid paired scope.');
     if (scope.excludeVehicle != null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope.excludeVehicle)) throw new Error('Invalid excluded vehicle.');
+    const excludedVehicle = scope.excludeVehicle?.toLowerCase() ?? null;
     const e: BidExpression = { measure:expression.measure, grouping:expression.grouping, from:expression.from, to:expression.to,
       make:expression.make, model:expression.model, vehicleYear:expression.vehicleYear ?? null, weighting:expression.weighting };
-    const key = JSON.stringify({ expression:e, paired:scope.paired === true, excludeVehicle:scope.excludeVehicle ?? null });
+    const key = JSON.stringify({ expression:e, paired:scope.paired === true, excludeVehicle:excludedVehicle });
     if (cached?.key !== key) {
       cached = null;
-      const selected = scope.paired || scope.excludeVehicle ? { ...dataset, lots:dataset.lots.filter(l => l.vehicleId !== scope.excludeVehicle
+      const selected = scope.paired || excludedVehicle ? { ...dataset, lots:dataset.lots.filter(l => l.vehicleId !== excludedVehicle
         && (!scope.paired || (l.winner && l.sums.gaps.some(gap => gap > 0)))) } : dataset;
-      cached = { key, result:evaluateBidExpression(selected,e) };
+      cached = { key, result:evaluateBidExpression(selected,e), sortedRecords:null };
     }
     return cached;
   };
@@ -99,17 +100,19 @@ export function createBidQuery(dataset: StudyDataset, snapshot: string) {
         grain:r.rankGrain, records:r.rankValues.length,median:r.median,page:paging,readings };
     },
     contributors(expression: BidExpression, group: string, options: BidQueryPage = {}, scope: BidQueryScope = {}) {
-      const { key, result:r } = evaluate(expression,scope), selected = r.groups.find(g => g.key === group);
+      const evaluated = evaluate(expression,scope), { key, result:r } = evaluated, selected = r.groups.find(g => g.key === group);
       if (!selected) throw new Error('The selected group is absent from this completed expression.');
       const members = [...selected.members].sort((a,b) => b.value - a.value);
       const paging = page(key,'contributors',group,members.length,options);
+      // Full record reference, distinct from qualified participant-average ranks.
+      const sortedRecords = evaluated.sortedRecords ??= [...r.values].sort((a,b) => a-b);
       return { contract:'bid-contributors-page-v1', snapshot, query:key, expression:r.expression, readAt:r.readAt, method:r.method,
         group:{ key:selected.key, label:selected.label, mean:selected.mean, percentile:selected.percentile, supported:selected.supported,
           episodes:selected.lotIds.length, records:selected.members.length },
         reference:{ groupGrain:r.rankGrain, groupReferenceN:r.rankValues.length, recordReferenceN:r.values.length },
         page:paging, contributors:members.slice(paging.offset,paging.end).map(m => {
           const lot = byLot.get(m.lotId)!;
-          return { ...m, sourceUrl:lot.sourceUrl, end:lot.end, recordPercentile:percentile(r.values,m.value) };
+          return { ...m, sourceUrl:lot.sourceUrl, end:lot.end, recordPercentile:sortedRecords.length ? sortedPercentile(sortedRecords,m.value) : null };
         }) };
     },
   };

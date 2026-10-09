@@ -204,6 +204,9 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
     bidN, raiseN, withheldRecordN: missing, modelFallbackLots, groups, values, median: quantile(rankValues, .5), rankValues, rankGrain: grouping === 'participant' ? 'participant' : 'record' };
 }
 
+// Reuse the canonical midrank lookup when a reader keeps a sorted reference.
+export { sortedPercentile };
+
 // A transfer encoding, not a second identity model. Canonical keys survive the round trip;
 // single-calendar-year lots share their full sums instead of sending those sums twice.
 export function encodeStudy(data: StudyDataset) {
