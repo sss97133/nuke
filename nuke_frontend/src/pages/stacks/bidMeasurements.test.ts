@@ -15,6 +15,17 @@ function sequence(id: string, amounts: number[], options: { make?: string; model
   return {lot,bids};
 }
 const dataset = (...episodes: ReturnType<typeof sequence>[]) => makeStudy(episodes.map(e => e.lot),episodes.flatMap(e => e.bids),capture,'Synthetic unit population',false);
+function pairedReference(d: ReturnType<typeof dataset>, e: BidExpression) {
+  const entries=evaluateBidExpression(d,{...e,grouping:'participant',measure:'entry',weighting:'auction'});
+  const wins=evaluateBidExpression(d,{...e,grouping:'participant',measure:'winRate',weighting:'auction'});
+  const byIdentity=new Map(entries.groups.map(g=>[g.key,new Map(g.members.map(m=>[m.lotId,m.value]))]));
+  return wins.groups.flatMap(g=>{
+    const times=byIdentity.get(g.key),pairs=g.members.filter(m=>times?.has(m.lotId));
+    if(pairs.length<5)return [];
+    return [{identity:g.key,n:pairs.length,entryPct:pairs.reduce((n,m)=>n+times!.get(m.lotId)!,0)/pairs.length,
+      winRate:pairs.reduce((n,m)=>n+m.value,0)/pairs.length,lotIds:pairs.map(m=>m.lotId)}];
+  });
+}
 
 describe('complete sequence measurements', () => {
   it('forms increments inside an exact episode; the opening bid has no invented raise', () => {
@@ -115,6 +126,31 @@ describe('grouping and reference population', () => {
     expect(map.find(p => p.identity === 'a')).toMatchObject({n:5,entryPct:0,winRate:100});
     expect(map.find(p => p.identity === 'b')).toMatchObject({n:5,entryPct:50,winRate:0});
     expect(map[0].lotIds).not.toContain('0');
+  });
+  it('preserves the independent entry/outcome join across full-year, make, model, vehicle-year and empty scopes', () => {
+    const d=dataset(...Array.from({length:18},(_,i)=>sequence(String(i),[100,213,521],{make:i<9?'Chevrolet':'Porsche',year:i%2?2002:2003})),
+      sequence('cross',[100,213,521],{posted:['2025-12-31T23:59:00Z','2026-01-01T00:01:00Z','2026-01-01T00:03:00Z']}));
+    d.lots[0].winner=null;d.lots[1].winnerConflict=true;d.lots[1].winner=null;
+    d.lots[2].sums.gaps=[0,0];d.lots[3].model='Other model';
+    for(const lot of d.lots)for(const actor of lot.actors)actor.handle=actor.identity==='a'?'Zulu':'Alpha';
+    for(const patch of [{},{from:2026},{from:2016,to:2025},{make:'CHEVROLET'},{make:'porsche'},
+      {model:'Corvette'},{model:'Other model'},{vehicleYear:2002},{vehicleYear:2003},{make:'Absent'}]) {
+      const e={...expression,...patch};
+      expect(participantBehaviorMap(d,e)).toEqual(pairedReference(d,e));
+    }
+    expect(participantBehaviorMap(d,{...expression,from:2026}).every(p=>!p.lotIds.includes('cross'))).toBe(true);
+  });
+  it('keeps all known-outcome ordering while requiring five paired records and preserving repeated-projection joins', () => {
+    const d=dataset(...Array.from({length:5},(_,i)=>sequence(String(i),[100,200,300])),sequence('opening',[100]));
+    for(const lot of d.lots)for(const actor of lot.actors)actor.handle=actor.identity==='a'?'Zulu':'Alpha';
+    const points=participantBehaviorMap(d,expression);
+    expect(points.map(p=>p.identity)).toEqual(['a','b']);
+    expect(points.every(p=>p.n===5 && !p.lotIds.includes('opening'))).toBe(true);
+    expect(points).toEqual(pairedReference(d,expression));
+    expect(participantBehaviorMap({...d,lots:d.lots.slice(0,4)},expression)).toEqual([]);
+    // The legacy join keeps the final entry for an identity/episode while wins retain record order.
+    d.lots.push({...d.lots[0],actors:d.lots[0].actors.map(a=>({...a,entrySeconds:a.entrySeconds+13.25}))});
+    expect(participantBehaviorMap(d,expression)).toEqual(pairedReference(d,expression));
   });
   it('uses midranks and preserves exact ties; one auction can have a supported population percentile', () => {
     expect(percentile([1,2,2,4],2)).toBe(50);
