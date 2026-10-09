@@ -586,6 +586,9 @@ jobs:
       - name: Verify complete Stacks population capture and resumable reads (offline)
         run: node --test nuke_frontend/scripts/test-stacks-population-capture.mjs
 
+      - name: Verify full-population analytical pagination and source inspection (offline)
+        run: node --test nuke_frontend/scripts/test-stacks-study-query.mjs
+
       - name: Run Vitest
         working-directory: ./nuke_frontend
         run: npm run test

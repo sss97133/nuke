@@ -9,8 +9,14 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../src/lib/env.ts';
 import { encodeStudy, makeStudy } from '../src/pages/stacks/bidMeasurements.ts';
 import { capturePopulation, populationReader, sqlPopulationReader } from './stacks-population-capture.mjs';
+import { analyzePopulation } from './stacks-study-query.mjs';
 
 const args = process.argv.slice(2), argument = name => args.find(a => a.startsWith(`${name}=`))?.slice(name.length + 1);
+// Offline inspection returns before constructing the source client or creating capture directories.
+if (args.includes('--analyze')) {
+  console.log(JSON.stringify(await analyzePopulation(args)));
+  process.exit(0);
+}
 if (args.includes('--population') && (!argument('--cache') || !argument('--output'))) throw new Error('Full-population mode requires explicit private --cache and --output paths.');
 if (args.includes('--population') && args.some(a => !['--population','--select-only','--refresh-method'].includes(a)
   && !['--cache=','--output=','--from=','--before=','--requests=','--sql-reader=','--parent-page-size='].some(prefix => a.startsWith(prefix)))) throw new Error('Unknown full-population option.');

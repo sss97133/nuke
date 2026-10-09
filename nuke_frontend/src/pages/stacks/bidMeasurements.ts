@@ -189,7 +189,7 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
     const lotIds = [...new Set(b.members.map(m => m.lotId))];
     const outcomes = grouping === 'participant' ? lotIds.map(id => lotById.get(id)!).filter(l => l.winner) : [];
     return { key, ...b, lotIds, values: v, mean: avg,
-      median: quantile(v, .5)!, q25: quantile(v, .25)!, q75: quantile(v, .75)!, min: Math.min(...v), max: Math.max(...v), observations,
+      median: quantile(v, .5)!, q25: quantile(v, .25)!, q75: quantile(v, .75)!, min: v.reduce((a,b) => Math.min(a,b),Infinity), max: v.reduce((a,b) => Math.max(a,b),-Infinity), observations,
       percentile: sortedPercentile(sortedValues, avg), supported: v.length >= MIN_DISTRIBUTION,
       ...(grouping === 'participant' ? { knownOutcomes: outcomes.length, wins: outcomes.filter(l => l.winner === key).length } : {}) };
   });
