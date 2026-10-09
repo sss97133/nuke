@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PrefetchLink } from '../../components/PrefetchLink';
+import { MakeIdentity } from '../../components/common/MakeIdentity';
 import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes,
   type SalesDrill, type SalesPoint, type SalesSeries } from './useRecordedSales';
 import './RecordedSalesComparison.css';
@@ -86,6 +87,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   return <section className="market-sales-comparison" aria-label="Recorded sales comparison" style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12, minWidth: 0 }}>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px 16px', flexWrap: 'wrap', marginBottom: 8 }}>
       <h2 style={{ ...label, margin: 0 }}>{view === 'sales' ? 'Recorded sales over time' : 'Market explorer'}</h2>
+      {requestedMake && <MakeIdentity make={option?.make ?? requestedMake} />}
       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Bring a Trailer · {view === 'sales' ? 'partial capture · daily UTC listing episodes' : 'captured open vehicle lots'}</span>
     </div>
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
