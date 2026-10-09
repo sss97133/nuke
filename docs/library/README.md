@@ -97,7 +97,7 @@ The code is an implementation of the library. The library is the source of truth
 ## CURRENT STATE
 
 <!-- library-stats:start -->
-Measured 2026-10-08 06:52 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
+Measured 2026-10-09 06:53 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
 
 | Shelf | Files | Lines |
 |---|---:|---:|
@@ -112,15 +112,15 @@ Measured 2026-10-08 06:52 UTC from the files in this directory by [`scripts/data
 | `reference/almanac` | 4 | 564 |
 | `reference/atlas` | 3 | 628 |
 | `reference/cockpit` | 5 | 381 |
-| `reference/dictionary` | 11 | 21,391 |
+| `reference/dictionary` | 11 | 21,411 |
 | `reference/encyclopedia` | 8 | 5,851 |
-| `reference/index` | 1 | 509 |
+| `reference/index` | 1 | 520 |
 | `reference/thesaurus` | 1 | 90 |
 | `technical` | 3 | 3,991 |
-| `technical/design-book` | 24 | 8,245 |
+| `technical/design-book` | 24 | 8,241 |
 | `technical/engineering-manual` | 25 | 9,178 |
-| `technical/schematics` | 6 | 4,998 |
-| **Total** | **181** | **76,891** |
+| `technical/schematics` | 6 | 5,039 |
+| **Total** | **181** | **76,959** |
 <!-- library-stats:end -->
 
 The target is 100,000+ lines. The table above is the measurement; the judgments below are from 2026-03-20 and have not been re-graded since.

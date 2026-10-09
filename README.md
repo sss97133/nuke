@@ -97,20 +97,20 @@ outcome row is a thesis. A stack with an outcome ledger has a track record.
 <summary>Daily measurements</summary>
 
 <!-- stats:start -->
-Measured 2026-10-08 06:52 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
+Measured 2026-10-09 06:53 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
 
 | | Rows | Coverage (sampled) |
 |---|---|---|
-| Auction comments (the auction log) | 20.0M | 100% author keyed to an identity · 11% sentiment-scored (n=39,554) |
+| Auction comments (the auction log) | 20.1M | 100% author keyed to an identity · 11% sentiment-scored (n=39,855) |
 | Bids | 4.27M |  |
 | Observations (the fact log) | 11.2M |  |
-| Images | 52.5M | 0.7% zone-classified · 0.5% vision-analyzed · 11% AI-processed (n=52,987) |
-| Vehicles | 1.01M | 45% active · 36% with a VIN · 68% public (n=20,358) |
+| Images | 52.5M | 0.7% zone-classified · 0.5% vision-analyzed · 11% AI-processed (n=52,536) |
+| Vehicles | 1.01M | 45% active · 36% with a VIN · 68% public (n=20,291) |
 | Listings (BaT) | 175K |  |
 | External identities | 698K |  |
 | Organizations | 5.73K |  |
 
-The database describing itself (`v_schema_atlas`, `v_job_health`): 942 tables (664 non-empty) · 5,193 of 16,594 columns described (31%) · 184 non-empty tables with no foreign key in or out · 7 tables with an undeclared writer in the last 30 days · 31 scheduled jobs active, 3 with a failure in the last 24 h · Postgres 17.6.
+The database describing itself (`v_schema_atlas`, `v_job_health`): 944 tables (671 non-empty) · 5,221 of 16,622 columns described (31%) · 184 non-empty tables with no foreign key in or out · 7 tables with an undeclared writer in the last 30 days · 32 scheduled jobs active, 3 with a failure in the last 24 h · Postgres 17.6.
 <!-- stats:end -->
 
 </details>
