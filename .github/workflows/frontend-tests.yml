@@ -177,6 +177,10 @@ jobs:
         run: createdb dm_refinement_grade_hammer_predictions_ci
       - name: Verify hammer predictions are keyed to their lot and graded by it (hammer from auction_events only, scheduled/final/predicted close named, held rows counted by reason), idempotent, receipted under the declared writer, service_role only, lots as the unit in the views, a changed prediction_accuracy refused
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_grade_hammer_predictions_ci -f supabase/sql/test_grade_hammer_predictions_by_lot.sql
+      - name: Create disposable vehicle grade key database
+        run: createdb dm_refinement_vehicle_grades_fk_ci
+      - name: Verify vehicle grades are keyed to an existing vehicle (NOT VALID keeps old orphans, the writer refuses a missing vehicle, the regrade triggers never block their insert, deletion cascades), applied as a non-superuser owner
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_grades_fk_ci -f supabase/sql/test_vehicle_grades_vehicle_fk.sql
       - name: Create disposable projection_outcomes key database
         run: createdb dm_refinement_projection_outcomes_key_ci
       - name: Verify projection_outcomes.vehicle_id keys vehicles NOT VALID (old orphans kept and still gradable, new or re-keyed orphans refused, vehicle delete refused, no row written, re-apply a no-op)
