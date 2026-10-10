@@ -7,7 +7,7 @@ import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auction
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { BidsPopup } from '../../components/popups/BidsPopup';
 
-interface BarcodeTimelineProps { selectedAuctionUrl?: string | null; onSelectAuction?: (url: string) => void }
+interface BarcodeTimelineProps { selectedAuctionUrl?: string | null; onSelectAuction?: (url: string) => void; selectionPending?: boolean }
 
 
 interface EventDay {
@@ -292,7 +292,7 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
   }},
 ];
 
-const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction }) => {
+const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction, selectionPending = false }) => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
   const popup = useContext(PopupStackContext);
 
@@ -892,7 +892,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
           </div>
 
           </details>
-          {availableAuctions.length > 1 && <label className="timeline-auction-select">Auction episode <select
+          {availableAuctions.length > 1 && !onSelectAuction && <label className="timeline-auction-select">Auction episode <select
             aria-label="Timeline auction episode" value={selectedAuction?.key ?? ''}
             onChange={event => { setSelectedAuctionKey(event.target.value); closeDay(); const selected = availableAuctions.find(a => a.key === event.target.value); if (selected) onSelectAuction?.(selected.lotUrl); }}>
             {availableAuctions.map(a => <option key={a.key} value={a.key}>
@@ -903,9 +903,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
               time, the close and result, post-close comments. Each mark opens its source. */}
           {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
           {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
-          {(selectedAuction ? [selectedAuction] : []).map(a => (
+          {selectionPending && <p role="status">Reading selected auction…</p>}
+          {(!selectionPending && selectedAuction ? [selectedAuction] : []).map(a => (
             <React.Suspense key={a.key} fallback={null}>
-              <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay}
+              <AuctionSequenceBand auction={a} showResult={!onSelectAuction} activeDay={receiptDate} onOpenDay={openDay}
                 onOpenBidReports={popup && vehicleId ? () => popup.push(<BidsPopup vehicleId={vehicleId} listingUrl={a.lotUrl} />, 'Recorded vehicle bid amounts', 420) : undefined} />
             </React.Suspense>
           ))}

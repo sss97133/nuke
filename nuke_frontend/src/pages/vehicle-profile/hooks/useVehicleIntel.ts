@@ -71,6 +71,10 @@ export interface CompSale {
   sale_date: string | null;
   thumbnail: string | null;
   mileage: number | null;
+  source_url?: string | null;
+  platform?: string | null;
+  sold_basis?: string | null;
+  sold_amount_from?: string | null;
 }
 
 export function useVehicleIntel(vehicleId: string | undefined) {

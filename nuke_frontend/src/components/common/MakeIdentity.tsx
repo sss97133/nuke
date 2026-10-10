@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import artwork from '../../../public/stacks/makes/wordmarks.json';
+import vehicleArtwork from '../../../public/stacks/makes/vehicle-identities.json';
 import './MakeIdentity.css';
 
-// Sourced vector artwork, not downloaded fonts or inferred vehicle-era lettering.
+// Sourced identity artwork; period matches require explicit catalogued year ranges.
 // Provenance and unmodified upstream hashes: /stacks/makes/wordmarks.json.
 const legacyEmblems: Record<string, string> = {
   chevrolet: 'chevrolet.svg', porsche: 'porsche-emblem.svg', toyota: 'toyota.svg',
@@ -42,5 +43,52 @@ export function MakeIdentity({ make, inverse = false }: { make: string; inverse?
     {darkFile && <img className="sx-make-wordmark sx-make-wordmark-dark"
       src={`/stacks/makes/${darkFile}`} alt="" width="104" height="24" onError={() => setFailed(key)} />}
     <span className="sr-only">{make}</span>
+  </span>;
+}
+
+type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; children?: ReactNode };
+type VehicleArtwork = (typeof vehicleArtwork)[number];
+
+/** Match structured identity only. Unknown years/models never inherit another era's badge. */
+export function resolveVehicleArtwork({ make, model, year }: VehicleIdentityProps) {
+  const numericYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
+  if (numericYear === null) return [];
+  return vehicleArtwork.filter(asset => keyFor(asset.make) === keyFor(make)
+    && numericYear >= asset.years[0] && numericYear <= asset.years[1]
+    && (!asset.models.length || asset.models.some(value => keyFor(value) === keyFor(model))));
+}
+
+function VehicleArtworkImage({ asset, fallback }: { asset: VehicleArtwork; fallback?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return fallback ? <span>{fallback}</span> : null;
+  // A source viewport preserves the photographed metal and lettering without redrawing it.
+  // The complete, unmodified source file and its hash remain in the attributed catalogue.
+  return <span className={`vehicle-identity__art vehicle-identity__art--${asset.role}`}>
+    <svg viewBox={asset.viewport} width={asset.width} height={asset.height} aria-hidden="true" focusable="false">
+      <image href={`/stacks/makes/${asset.file}`} width={asset.sourceWidth} height={asset.sourceHeight}
+        onError={() => setFailed(true)} />
+    </svg>
+  </span>;
+}
+
+/** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
+export function VehicleIdentity({ make, model, year, children }: VehicleIdentityProps) {
+  const assets = resolveVehicleArtwork({ make, model, year });
+  const maker = assets.find(asset => asset.role === 'make');
+  const script = assets.find(asset => asset.role === 'model');
+  const emblem = assets.find(asset => asset.role === 'emblem');
+  return <span className="vehicle-identity" data-period-artwork={assets.length > 0}>
+    <span className="vehicle-identity__maker" aria-hidden="true">
+      {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} /> : <span>{make}</span>}
+      <span className="vehicle-identity__year">{year}</span>
+    </span>
+    {emblem && <VehicleArtworkImage key={emblem.file} asset={emblem} />}
+    <span className="vehicle-identity__name">
+      <span className="vehicle-identity__model" aria-hidden="true">
+        {script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} /> : model}
+      </span>
+      {children}
+    </span>
+    <span className="sr-only">{[year, make, model].filter(Boolean).join(' ')}</span>
   </span>;
 }

@@ -7,6 +7,7 @@
  */
 
 import React, { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface HeaderPopoverProps {
@@ -57,7 +58,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
 
   // Mobile: bottom sheet
   if (isMobile) {
-    return (
+    return createPortal(
       <>
         {/* Backdrop */}
         <div
@@ -65,7 +66,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.4)',
-            zIndex: 999,
+            zIndex: 1001,
           }}
           onClick={onClose}
         />
@@ -78,7 +79,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 1000,
+            zIndex: 1002,
             background: 'var(--bg)',
             borderTop: '2px solid var(--border)', maxHeight: '70vh',
             overflowY: 'auto', }}
@@ -113,7 +114,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
           </div>
           <div style={{ padding: '12px 16px', fontSize: '11px' }}>{children}</div>
         </div>
-      </>
+      </>, document.body
     );
   }
 

@@ -79,45 +79,40 @@ export function useAuctionCommentStats(
   return useQuery({
     queryKey: ['auction-comment-stats', vehicleId, listingUrl ?? null],
     queryFn: async (): Promise<AuctionCommentStats> => {
-      const base = () => {
-        let q = supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId!);
-        if (listingUrl) q = q.eq('source_url', listingUrl);
-        return q;
-      };
-
       const [bidCountRes, commentCountRes, lastBidRes, lastCommentRes, sellerRes] = await Promise.all([
         // bid count
         (() => {
           let q = supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId!);
-          if (listingUrl) q = q.eq('source_url', listingUrl);
+          if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.not('bid_amount', 'is', null);
         })(),
         // comment count (non-bid)
         (() => {
           let q = supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId!);
-          if (listingUrl) q = q.eq('source_url', listingUrl);
+          if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.or('bid_amount.is.null,comment_type.neq.bid');
         })(),
         // last bid
         (() => {
           let q = supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicleId!);
-          if (listingUrl) q = q.eq('source_url', listingUrl);
+          if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
         // last comment
         (() => {
           let q = supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicleId!);
-          if (listingUrl) q = q.eq('source_url', listingUrl);
+          if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
         // seller
         (() => {
           let q = supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicleId!);
-          if (listingUrl) q = q.eq('source_url', listingUrl);
+          if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
       ]);
 
+      for (const result of [bidCountRes, commentCountRes, lastBidRes, lastCommentRes, sellerRes]) { if (result.error) throw result.error; }
       return {
         bidCount: typeof bidCountRes.count === 'number' ? bidCountRes.count : 0,
         commentCount: typeof commentCountRes.count === 'number' ? commentCountRes.count : 0,

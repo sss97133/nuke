@@ -32,8 +32,6 @@ const VenueSkinPreviewCard = React.lazy(() => import('./VenueSkinPreviewCard'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
-const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
-const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
 const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
@@ -188,27 +186,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Vehicle Dossier — provenance-rich field panel */}
-          <React.Suspense fallback={null}>
-            <VehicleDossierPanel />
-          </React.Suspense>
+          <CollapsibleWidget variant="profile" title="Source claims & specifications" defaultCollapsed={true}>
+            <React.Suspense fallback={null}><VehicleDossierPanel /></React.Suspense>
+          </CollapsibleWidget>
 
           {/* Build Workspace — harness build tracking, wire status, integration decisions */}
           <React.Suspense fallback={null}>
             <BuildManifestPanel vehicleId={vehicle.id} />
           </React.Suspense>
-
-          {/* Price History Chart — scatter plot of this vehicle + cohort comps */}
-          {vehicle.year && vehicle.make && vehicle.model && (
-            <React.Suspense fallback={null}>
-              <PriceHistoryChart
-                vehicleId={vehicle.id}
-                make={vehicle.make}
-                model={(vehicle as any).normalized_model || vehicle.model}
-                year={vehicle.year}
-                salePrice={vehicle.sale_price}
-              />
-            </React.Suspense>
-          )}
 
           {/* Analysis Signals — computed alerts from analysis engine */}
           <React.Suspense fallback={null}>
@@ -258,18 +243,17 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           </React.Suspense>
 
           {/* Description */}
-          <VehicleDescriptionCard
-            vehicleId={vehicle.id}
-            initialDescription={vehicle.description}
-            isEditable={canEdit}
-            onUpdate={() => {}}
-          />
+          <CollapsibleWidget variant="profile" title="Source description" defaultCollapsed={true}>
+            <React.Suspense fallback={null}><VehicleDescriptionCard
+              vehicleId={vehicle.id} initialDescription={vehicle.description} isEditable={canEdit} onUpdate={() => {}}
+            /></React.Suspense>
+          </CollapsibleWidget>
 
           {/* Comments & Bids — right after description for natural reading flow */}
           {/* The legacy profile count covers a different collection. Let the
               subject-gated comment reader establish presence, absence or failure. */}
           <React.Suspense fallback={null}>
-            <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} hideWhenEmpty />
+            <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed maxVisible={0} hideWhenEmpty />
           </React.Suspense>
 
           {/* Buyer Questions — what buyers will ask about this vehicle (hidden post-sale) */}
@@ -286,23 +270,9 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <VehicleListingDetailsCard vehicle={vehicle} />
           </React.Suspense>
 
-          {/* Comparable Sales */}
-          {vehicle.year && vehicle.make && vehicle.model && (
-            <CollapsibleWidget variant="profile" title="Comparable Sales" defaultCollapsed={true}>
-              <React.Suspense fallback={null}>
-                <SimilarSalesSection
-                  vehicleId={vehicle.id}
-                  vehicleYear={vehicle.year}
-                  vehicleMake={vehicle.make}
-                  vehicleModel={vehicle.model}
-                />
-              </React.Suspense>
-            </CollapsibleWidget>
-          )}
-
           {/* Observation History — all observations for this vehicle, chronological */}
           {observationCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={observationCount > 50}>
+            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
               <React.Suspense fallback={null}>
                 <ObservationTimeline />
               </React.Suspense>
@@ -358,8 +328,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           })()}
 
           {/* Auction History — ExternalListingCard self-guards: returns null when no listings */}
-          {/* Collapse by default for post-sale vehicles (has sale_price) */}
-          <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={!!vehicle.sale_price}>
+          {/* Source listing detail is available on request. */}
+          <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed>
             <React.Suspense fallback={null}>
               <ExternalListingCard vehicleId={vehicle.id} />
             </React.Suspense>

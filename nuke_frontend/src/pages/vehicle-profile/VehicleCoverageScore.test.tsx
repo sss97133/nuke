@@ -77,32 +77,14 @@ function renderSurface(render: () => React.ReactElement) {
   return dom.window.document.querySelector('[data-testid="data-coverage-score"]');
 }
 
-describe.each(surfaces)('stored coverage display: %s', (_name, render) => {
-  it('keeps a 100 score qualified even beside conflicting accepted/pending mileage', () => {
+describe.each(surfaces)('unsupported coverage score: %s', (_name, render) => {
+  it.each([0, 80, 100, null, undefined, NaN, Infinity])('does not surface an unexplained score: %s', value => {
+    fixture.vehicle.data_quality_score = value;
     const before = JSON.stringify({ vehicle: fixture.vehicle, evidence: fixture.evidence });
-    const score = renderSurface(render)!;
-    expect(score.textContent).toContain('100/100');
-    expect(score.textContent?.toLowerCase()).toContain('stored coverage heuristic');
-    expect(score.textContent?.toLowerCase()).toContain('assessment time unknown');
-    expect(score.outerHTML).not.toMatch(/data quality|badge--dq-green|badge--dq-orange|var\(--success\)|var\(--warning\)|var\(--error\)/i);
-    // Mobile tooltips are hidden; the key qualification must remain outside one.
-    score.querySelector('.badge__tooltip')?.remove();
-    expect(score.textContent?.toLowerCase()).toContain('verification unknown');
+    expect(renderSurface(render)).toBeNull();
     expect(JSON.stringify({ vehicle: fixture.vehicle, evidence: fixture.evidence })).toBe(before);
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  it('preserves a genuine zero without a truth or failure color', () => {
-    fixture.vehicle.data_quality_score = 0;
-    const score = renderSurface(render)!;
-    expect(score.textContent).toContain('0/100');
-    expect(score.outerHTML).not.toMatch(/badge--dq-orange|var\(--error\)/);
-  });
-
-  it.each([null, undefined, NaN, Infinity, -1, 101, '100'])('does not invent a score for unknown or invalid input: %s', value => {
-    fixture.vehicle.data_quality_score = value;
-    expect(renderSurface(render)).toBeNull();
   });
 });
 

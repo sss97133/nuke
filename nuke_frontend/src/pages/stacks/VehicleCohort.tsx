@@ -41,6 +41,8 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
   if (!read?.lot) return facet ? <p>Auction performance unavailable.</p> : null;
   if (!study.data || (facet && !configurations.data)) return <p role="status" className="vp-performance">Reading performance…</p>;
   const lot = read.lot;
+  // A single live lot owns its clock-matched readings in the live banner.
+  if (!facet && lot.outcome === 'live' && read.lots.length === 1) return null;
   const selected = analyses[0]?.analysis;
   const subject = selected?.subject;
   const effectiveScope = selected?.effectiveScope ?? scope;
@@ -63,25 +65,35 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
   if (selected?.expression.vehicleYear) back.set('vehicleYear', String(selected.expression.vehicleYear));
   const inspect = `/stacks/order-book/${vehicleId}?${new URLSearchParams({ lot: lot.id, back: back.toString() })}`;
   return <section className={`vp-performance${facet ? ' vp-performance--facet' : ''}`} aria-label={facet ? `${facet.label} performance stack` : 'Vehicle performance stack'}>
-    {!facet && <div className="vp-performance__head"><h2>Auction performance</h2><label>Episode <select aria-label="Performance auction episode" value={lot.id} onChange={event => { const next = new URLSearchParams(params); next.set('performanceLot', event.target.value); setParams(next, { replace: true }); }}>
-      {read.lots.map(l => <option key={l.id} value={l.id}>{dayLabel(l.auction_end_date)} · {l.outcome ?? 'Unknown result'}{l.lot_number ? ` · lot ${l.lot_number}` : ''}</option>)}
-    </select></label></div>}
-    <div className="vp-performance__scope">
-      <select aria-label="Performance comparison scope" value={effectiveScope} onChange={event => setScope(event.target.value)}>
-        <option value="vehicleYear" disabled={!vehicleYear || !selected?.model}>{vehicleYear} {modelLabel}</option>
-        <option value="model" disabled={!selected?.model}>{modelLabel} · all model years</option>
-        <option value="make">{read.vehicle.make} · all models</option>
-      </select><span>{facet ? 'Current-label match · BaT' : 'BaT sample'} · bid years {selected?.expression.from}–{selected?.expression.to}</span>
+    <div className="vp-performance__head">
+      {!facet && <h2>Performance</h2>}
+      {!facet && <select aria-label="Performance auction episode" value={lot.id} onChange={event => { const next = new URLSearchParams(params); next.set('performanceLot', event.target.value); setParams(next, { replace: true }); }}>
+        {read.lots.map(l => <option key={l.id} value={l.id}>{dayLabel(l.auction_end_date)}</option>)}
+      </select>}
     </div>
-    {!facet && change !== null && <p className="vp-performance__change"><strong>{change >= 0 ? '+' : ''}{change.toFixed(1)}%</strong> sale amount since {olderSale!.auction_end_date?.slice(0,4)}</p>}
-    {measured.length > 0 ? <table className="vp-performance__table"><thead><tr><th>Measure</th><th>Standing</th><th>Percentile</th></tr></thead><tbody>{measured.map(({ measure, label, analysis }) => {
+    <p className="vp-performance__scope">
+      Against {effectiveScope === 'vehicleYear' ? `${vehicleYear} ${modelLabel}` : effectiveScope === 'model' ? `${modelLabel} · all model years` : `${read.vehicle.make} · all models`}
+      <span>{facet ? 'Current-label match · BaT' : 'BaT sample'} · bid years {selected?.expression.from}–{selected?.expression.to}</span>
+    </p>
+    {measured.length > 0 ? <dl className="vp-performance__readings">{measured.map(({ measure, label, analysis }) => {
       const rawRank = percentile(analysis.result.rankValues, analysis.reading!)!;
       const rank = measure === 'spacing' ? 100 - rawRank : rawRank;
       const standing = rank >= 75 ? measure === 'participants' ? 'Many bidders' : measure === 'typical' ? 'Large steps' : 'Fast' : rank < 25 ? measure === 'participants' ? 'Few bidders' : measure === 'typical' ? 'Small steps' : 'Slow' : 'Typical';
-      return <tr key={measure}><th scope="row">{label}</th><td>{standing}</td><td><strong>P{Math.round(rank)}</strong><small>{analysis.result.rankValues.length} auctions</small><div className="vp-performance__scale" aria-hidden="true"><span style={{ left: `${Math.min(98, Math.max(2, rank))}%` }} /></div></td></tr>;
-    })}</tbody></table> : <p className="vp-performance__unranked">{selected?.admissionFailure ? 'Episode unranked' : 'Reference too small'} <span>· {eligible} auction{eligible === 1 ? '' : 's'}</span></p>}
-    <p className="vp-performance__context">{lot.outcome === 'live' ? 'Recorded live' : Number.isFinite(end) && end <= Date.now() ? 'Historical auction' : 'Auction record'} · {dayLabel(lot.auction_end_date)} <span>· snapshot {dayLabel(study.data.readAt)}</span></p>
-    <details className="vp-performance__reference"><summary>Evidence & method</summary>
+      return <div key={measure}><dt>{label}</dt><dd><strong>P{Math.round(rank)}</strong><span>{standing}</span><div className="vp-performance__scale" aria-hidden="true"><span style={{ left: `${Math.min(98, Math.max(2, rank))}%` }} /></div></dd></div>;
+    })}</dl> : <p className="vp-performance__unranked">{selected?.admissionFailure ? 'Episode unranked' : 'Reference too small'} <span>· {eligible} auction{eligible === 1 ? '' : 's'}</span></p>}
+    <div className="vp-performance__footer">
+      {measured.length > 0 && <span>{new Set(measured.map(item => item.analysis.result.rankValues.length)).size === 1
+        ? `${measured[0].analysis.result.rankValues.length} measured peer auctions`
+        : measured.map(item => `${item.label}: ${item.analysis.result.rankValues.length} peers`).join(' · ')} · percentile · study {dayLabel(study.data.readAt)}</span>}
+      {!facet && change !== null && <span className="vp-performance__change"><strong>{change >= 0 ? '+' : ''}{change.toFixed(1)}%</strong> resale change since {olderSale!.auction_end_date?.slice(0,4)}</span>}
+    </div>
+    <details className="vp-performance__reference"><summary>Comparison settings & evidence</summary>
+      <label>Reference <select aria-label="Performance comparison scope" value={effectiveScope} onChange={event => setScope(event.target.value)}>
+        <option value="vehicleYear" disabled={!vehicleYear || !selected?.model}>{vehicleYear} {modelLabel}</option>
+        <option value="model" disabled={!selected?.model}>{modelLabel} · all model years</option>
+        <option value="make">{read.vehicle.make} · all models</option>
+      </select></label>
+      <p className="vp-performance__context">{lot.outcome === 'live' ? 'Recorded live' : Number.isFinite(end) && end <= Date.now() ? 'Historical auction' : 'Auction record'}</p>
       {facet && knownFacets.length > 0 && <p><strong>Exact recorded label share: {(100 * matchingN / knownFacets.length).toFixed(1)}% ({matchingN}/{knownFacets.length})</strong>. {effectiveScope === 'vehicleYear' ? `${vehicleYear} ` : ''}{scopeLabel} vehicles with known current labels in this captured study. This is label incidence, not measured configuration rarity or all vehicles in Nuke.</p>}
       {!measured.length && <p>{selected?.admissionFailure ?? `At least ${MIN_DISTRIBUTION} measured peer episodes are required. Choose a wider reference above.`}</p>}
       <label><input type="checkbox" checked={sameYear} onChange={event => setSameYear(event.target.checked)} /> Bid year of this auction’s close</label>
@@ -89,8 +101,8 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
       <table className="vp-performance__evidence-table"><thead><tr><th>Measure</th><th>This episode</th><th>Peer median</th><th>Measured / eligible</th></tr></thead><tbody>{analyses.map(({measure,label,analysis})=><tr key={label}><th scope="row">{label}</th><td>{analysis.reading === null ? 'Unmeasured' : formatMeasure(measure,analysis.reading)}</td><td>{analysis.result.median === null ? 'Unmeasured' : formatMeasure(measure,analysis.result.median)}</td><td>{analysis.result.rankValues.length}/{analysis.result.eligibleLots}</td></tr>)}</tbody></table>
       {facet && <p>{matchingN} matching current labels / {knownFacets.length} known / {readableFacets.length} readable {scopeLabel} reference vehicles. Unknown labels are excluded. Recorded configuration share is not factory rarity, and current labels do not prove equipment or location at sale.</p>}
       {facet && configurations.dataUpdatedAt > 0 && <p>Current labels read {dayLabel(new Date(configurations.dataUpdatedAt).toISOString())}; source capture clocks are not supplied by this metadata reader.</p>}
-      {change !== null && <p>Sale-amount change uses the two recorded sold episodes in nominal USD: {Number(olderSale?.winning_bid).toLocaleString()} to {Number(lot.winning_bid).toLocaleString()}. Fees, maintenance, modifications and inflation are not included; this is not an investment return.</p>}
-      <p>{study.data.selection} Auction end: {dayLabel(lot.auction_end_date)}. Lot record updated: {dayLabel(lot.updated_at)} (a write clock, not proof of a fresh source capture).</p>
+      {change !== null && <p>Resale change compares the two recorded sold episodes in nominal USD. Fees, maintenance, modifications and inflation are not included; this is not an investment return.</p>}
+      <p>{study.data.selection} Lot record updated: {dayLabel(lot.updated_at)} (a write clock, not proof of a fresh source capture).</p>
       {facet && <p>Factory production totals and configuration premiums are not established by this auction study.</p>}
       <Link to={inspect}>Open full auction stack →</Link>
       {facet && <small>Full stack compares the selected model/year scope without the attribute filter.</small>}

@@ -39,14 +39,14 @@ async function band(auction: AuctionSequence) { await act(async () => root.rende
 
 describe('visible auction clock and outcome qualification', () => {
   it.each([
-    [null, null, 'CLOSE not recorded'],
+    [null, null, 'CLOSEnot recorded'],
     ['2025-01-10T00:00:00Z', null, 'END DAY (time unknown)'],
     [null, '2025-01-10T20:30:00Z', 'SALE RECORDED'],
   ])('keeps %s / sale %s unclassified after the last observed bid', async (end, sale, label) => {
     await band(sequence(end, sale));
     expect(container.querySelector('.auction-band__facts')!.textContent).toContain(label);
-    expect(container.textContent).toContain('LAST OBSERVED BID');
-    expect(container.textContent).toContain('auction end clock unknown');
+    expect(container.textContent).toContain('Last observed bid');
+    expect(container.textContent).toContain('End clock unknown');
     expect(container.textContent).not.toContain('within two minutes');
     expect(container.querySelector('rect[fill-opacity="0.25"]')).toBeNull();
     expect(container.querySelector('a[href="https://bringatrailer.com/listing/synthetic-cohort-lot/#comment-101"]')).not.toBeNull();
@@ -56,7 +56,7 @@ describe('visible auction clock and outcome qualification', () => {
     await band(sequence('2025-01-10T20:30:00Z'));
     expect(container.querySelector('.auction-band__facts')!.textContent).toContain('CLOSE');
     expect(container.querySelector('rect[fill-opacity="0.25"]')).not.toBeNull();
-    expect(container.textContent).toContain('shaded: after the recorded end');
+    expect(container.textContent).toContain('Shading follows the recorded end');
     expect(container.textContent).toContain('● last observed bid');
   });
 
@@ -113,7 +113,7 @@ it('distinguishes retained unclocked testimony from missing extraction', async()
   fixture.auction={...sequence('2025-01-10T20:30:00Z',null,'sold',null,'2025-01-01T12:00:00Z'),items:[],days:[],lastObservedBid:null,activityExtracted:false};
   await act(async()=>root.render(<BarcodeTimeline />));
   expect(container.textContent).toContain('lack usable posting times');
-  expect(container.textContent).toContain('no timed bid or comment entries in this read');
+  expect(container.textContent).toContain('No timed interactions in this read');
   expect(container.textContent).not.toContain('bids and comments not extracted yet');
 });
 
@@ -125,12 +125,12 @@ it('keeps the bidding week readable while retaining later commentary with its so
   const bid = container.querySelector('svg circle')!;
   expect(Number(bid.getAttribute('cx'))).toBeGreaterThan(700);
   expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
-  const laterSource = container.querySelector('details a[href$="#comment-103"]')!;
+  const laterSource = container.querySelector<HTMLAnchorElement>('details a[href$="#comment-103"]')!;
   expect(laterSource).not.toBeNull();
-  expect(container.querySelector('details')!.textContent).toContain('Later testimony');
+  expect(container.querySelector('.auction-band__later')!.textContent).toContain('Later testimony');
   expect(container.textContent).not.toContain('Bidding window');
   expect(container.textContent).not.toContain('All activity');
-  container.querySelector('details')!.open = true;
+  container.querySelector<HTMLDetailsElement>('.auction-band__later')!.open = true;
   laterSource.focus();
   expect(document.activeElement).toBe(laterSource);
   expect(Number(container.querySelector('svg circle')!.getAttribute('cx'))).toBeGreaterThan(700);
@@ -163,4 +163,32 @@ it('opens one selected auction, keeps the calendar optional, and does not reopen
   await act(async()=>toggle.click());
   await act(async()=>window.dispatchEvent(new Event('scroll')));
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
+});
+
+it('uses the parent auction selector and leaves the sale result with its primary owner', async () => {
+  fixture.auction = sequence('2025-01-10T20:30:00Z');
+  fixture.otherAuction = {...sequence('2024-01-10T20:30:00Z'), key:'older', lotUrl:'https://bringatrailer.com/listing/synthetic-older/'};
+  await act(async () => root.render(<BarcodeTimeline selectedAuctionUrl={fixture.otherAuction.lotUrl} onSelectAuction={vi.fn()} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Vehicle timeline"]')!.click());
+  expect(container.querySelector('[aria-label="Timeline auction episode"]')).toBeNull();
+  expect(container.querySelectorAll('.auction-band')).toHaveLength(1);
+  expect(container.querySelector('.auction-band__lot')!.getAttribute('href')).toBe(fixture.otherAuction.lotUrl);
+  expect(container.querySelector('.auction-band__source')).not.toBeNull();
+  expect(container.querySelector('svg')!.textContent).not.toContain('SOLD');
+});
+
+it('withholds the default latest band while the selected parent episode is loading', async () => {
+  fixture.auction = sequence('2025-01-10T20:30:00Z');
+  await act(async () => root.render(<BarcodeTimeline selectionPending selectedAuctionUrl={null} onSelectAuction={vi.fn()} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Vehicle timeline"]')!.click());
+  expect(container.querySelectorAll('.auction-band')).toHaveLength(0);
+  expect(container.querySelector('[role="status"]')!.textContent).toContain('Reading selected auction');
+});
+
+it('does not use a sale clock as an auction cutoff or hide the later observed bid', async () => {
+  await band(sequence(null, '2025-01-10T19:00:00Z'));
+  expect(container.querySelector('svg a[href$="#comment-101"]')).not.toBeNull();
+  expect(container.querySelector('rect[fill-opacity="0.25"]')).toBeNull();
+  expect(container.querySelector('svg')!.textContent).not.toContain('CLOSE');
+  expect(container.querySelector('.auction-band__source')!.textContent).toContain('auction end unknown');
 });

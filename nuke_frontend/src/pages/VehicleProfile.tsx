@@ -13,6 +13,9 @@ import '../styles/barcode-timeline.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
+import { useVehiclePriceFacts, priceKindLabel } from './vehicle-profile/hooks/useVehiclePriceFacts';
+import { getVehicleIdentityTokens } from '../utils/vehicleIdentity';
+import VehicleMasthead from './vehicle-profile/VehicleMasthead';
 import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
@@ -35,6 +38,7 @@ const VehicleProfileInner: React.FC = () => {
 
   // Aliases from context — single source of truth
   const { vehicleId, vehicle, session, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { priceFacts } = useVehiclePriceFacts(vehicleId ?? undefined);
   const selectedEpisode = useOrderBook(vehicleId ?? '', new URLSearchParams(location.search).get('performanceLot') ?? 'latest');
 
   // Local-only state (not in context)
@@ -213,12 +217,15 @@ const VehicleProfileInner: React.FC = () => {
         <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
           <React.Suspense fallback={null}>
             <VehicleHeader
+              primaryPriceElsewhere={!!priceKindLabel(priceFacts) && (vehicle as any).listing_kind !== 'non_vehicle_item' && getVehicleIdentityTokens(vehicle).primary.some(token => token.kind === 'model')}
               onClaimClick={() => setShowOwnershipClaim(true)}
             />
           </React.Suspense>
         </div>
 
-        <h1 className="vp-identity">{getVehicleTitle(vehicle)}</h1>
+        <VehicleMasthead key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
+          priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
+        )?.id} />
 
         {/* Vehicle Sub-Header — sticky badge bar */}
         <React.Suspense fallback={null}>
@@ -239,7 +246,7 @@ const VehicleProfileInner: React.FC = () => {
 
         {/* Optional timeline — one episode, with calendar controls on request */}
         <React.Suspense fallback={null}>
-          <BarcodeTimeline selectedAuctionUrl={selectedEpisode.data?.lot?.source_url ?? null} onSelectAuction={(url: string) => {
+          <BarcodeTimeline selectionPending={selectedEpisode.isPending} selectedAuctionUrl={selectedEpisode.data?.lot?.source_url ?? null} onSelectAuction={(url: string) => {
             const selected = selectedEpisode.data?.lots.find(lot => lot.source_url.replace(/\/+$/, '') === url.replace(/\/+$/, ''));
             if (!selected) return;
             const next = new URLSearchParams(location.search); next.set('performanceLot', selected.id);

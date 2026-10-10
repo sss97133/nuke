@@ -14,9 +14,9 @@ function formatPrice(n: number | null | undefined): string {
 /**
  * Supplementary badge bar -- shows engagement metrics that VehicleHeader doesn't display.
  * VehicleHeader already renders: SOLD, source, price, seller, buyer, location, mileage, time.
- * This bar adds: BIDS, COMMENTS, WATCHERS, stored coverage score.
+ * This bar adds: BIDS, COMMENTS, WATCHERS.
  *
- * Engagement badges open full-data popups; coverage describes the stored heuristic.
+ * Engagement badges open full-data popups.
  */
 const VehicleBadgeBar: React.FC = () => {
   const { vehicle, auctionPulse } = useVehicleProfile();
@@ -28,15 +28,12 @@ const VehicleBadgeBar: React.FC = () => {
   const { data: commentStats } = useAuctionCommentStats(v?.id);
   const commentCount = commentStats?.commentCount || auctionPulse?.comment_count || v.comment_count;
   const watcherCount = auctionPulse?.watcher_count || v.bat_watchers;
-  const dqScore = typeof v.data_quality_score === 'number' && Number.isFinite(v.data_quality_score) &&
-    v.data_quality_score >= 0 && v.data_quality_score <= 100 ? v.data_quality_score : null;
   const highBid = v.high_bid || auctionPulse?.current_bid;
   const listingUrl = (auctionPulse as any)?.listing_url || v.bat_auction_url || v.discovery_url || null;
 
   const hasBadges = (bidCount != null && bidCount > 0) ||
     (commentCount != null && commentCount > 0) ||
-    (watcherCount != null && watcherCount > 0) ||
-    dqScore != null;
+    (watcherCount != null && watcherCount > 0);
 
   if (!hasBadges) return null;
 
@@ -137,17 +134,7 @@ const VehicleBadgeBar: React.FC = () => {
         </span>
       )}
 
-      {/* Stored coverage heuristic; verification remains unknown. */}
-      {dqScore != null && (
-        <span data-testid="data-coverage-score" className="badge badge--dq">
-          COVERAGE {dqScore}/100 · VERIFICATION UNKNOWN
-          <span className="badge__tooltip">
-            Stored coverage heuristic: {dqScore}/100<br />
-            Inputs: images, identity fields, observations, price and VIN length.<br />
-            Assessment time unknown.
-          </span>
-        </span>
-      )}
+
     </div>
   );
 };

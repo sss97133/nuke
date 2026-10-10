@@ -59,7 +59,7 @@ it.each([0, undefined, 73])('opens the subject reader independently of the legac
   fixture.context.totalCommentCount = count;
   await mount();
   expect(fixture.comments).toHaveBeenCalled();
-  expect(fixture.comments.mock.calls.at(-1)?.[0]).toMatchObject({ vehicleId: 'offline-subject', session: null, hideWhenEmpty: true });
+  expect(fixture.comments.mock.calls.at(-1)?.[0]).toMatchObject({ vehicleId: 'offline-subject', session: null, hideWhenEmpty: true, maxVisible: 0, collapsed: true });
   expect(host.querySelector('[data-testid=comment-reader]')).not.toBeNull();
   expect([...host.querySelectorAll('h3')].some(h => h.textContent === 'Comments & Bids')).toBe(false);
   expect(host.querySelector('[data-testid=comment-reader]')?.closest('.collapsible-widget--profile')).toBeNull();

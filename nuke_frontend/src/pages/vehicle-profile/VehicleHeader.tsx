@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
 import { useVehicleProfile } from './VehicleProfileContext';
@@ -53,6 +54,7 @@ import {
 // Extracted data-fetching hooks
 import {
   usePopoverData,
+  summarizeSellerLots,
   useOwnerPopoverData,
   useOwnerGuess,
   usePriceData,
@@ -72,6 +74,7 @@ import {
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   onClaimClick,
+  primaryPriceElsewhere = false,
 }) => {
   const navigate = useNavigate();
   const {
@@ -1512,13 +1515,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     );
   }, [trendPct, trendPeriod, trendBaselineValue, trendBaselineAsOf, trendBaselineSource, trendOutlierCount]);
 
-  const handleViewValuation = () => {
-    setPriceMenuOpen(false);
-    if (onPriceClick && typeof onPriceClick === 'function') {
-    onPriceClick();
-    }
-  };
-
   const handleTradeClick = () => {
     setPriceMenuOpen(false);
     setShowTrade(true);
@@ -2113,33 +2109,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{headerSeller.roleLabel}</div>
                             </div>
                           </div>
-                          {popoverData.identity && (
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Platform</span>
-                                <span>{popoverData.identity.platform || '—'}</span>
-                              </div>
-                              {popoverData.identity.first_seen_at && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span style={{ color: 'var(--text-muted)' }}>First seen</span>
-                                  <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>{new Date(popoverData.identity.first_seen_at).toLocaleDateString()}</span>
-                                </div>
-                              )}
-                              {popoverData.identity.claimed_by && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span style={{ color: 'var(--text-muted)' }}>Claimed</span>
-                                  <span style={{ fontWeight: 700, color: 'var(--success)' }}>Yes</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Auctions listed</span>
-                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.auctionCount || 0}</span>
-                            </div>
-                          </div>
+                          {popoverData.sellerEvidence && <SellerEvidenceView evidence={popoverData.sellerEvidence} make={vehicle?.make} model={vehicle?.model} />}
+                          {(popoverData.unavailable || popoverData.sellerUnavailable) && <div>Seller history could not be resolved.</div>}
                           {headerSeller.href && (
                             <a
                               href={headerSeller.href}
@@ -2152,7 +2123,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           )}
                         </div>
                       ) : (
-                        <div style={{ color: 'var(--text-muted)' }}>No seller data available</div>
+                        <div style={{ color: 'var(--text-muted)' }}>Seller history unavailable</div>
                       )}
                     </HeaderPopover>
                   </div>
@@ -4103,7 +4074,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               border: 'none',
               padding: 0,
               cursor: 'pointer',
-              display: 'flex',
+              display: primaryPriceElsewhere ? 'none' : 'flex',
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
@@ -4447,16 +4418,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               )}
 
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {Boolean(onPriceClick) && (
-                  <button
-                    type="button"
-                    className="button button-small"
-                    style={{ fontSize: '11px' }}
-                    onClick={handleViewValuation}
-                  >
-                    View valuation details
-                  </button>
-                )}
                 <button
                   type="button"
                   className="button button-small"
@@ -4914,5 +4875,38 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     </div>
   );
 };
+
+
+function SellerEvidenceView({ evidence, make, model }: { evidence: ReturnType<typeof summarizeSellerLots>; make?: string | null; model?: string | null }) {
+                            const e = evidence;
+                            return <div className="vp-seller-evidence">
+                              <dl>
+                                {e.resolved > 0 && <div><dt>Recorded sell-through</dt><dd><strong>{Math.round(e.sold / e.resolved * 100)}%</strong><small>{e.sold} sold / {e.resolved} resolved lots</small></dd></div>}
+                                {e.sameModel != null && <div><dt>Same model label</dt><dd><strong>{e.sameModel}</strong><small>of {e.n} retained lots · all years</small></dd></div>}
+                                <div><dt>Repeat vehicle listings</dt><dd><strong>{e.repeatLots}</strong></dd></div>
+                              </dl>
+                              <small>{e.n} keyed lots{e.capped ? ' · capped recent sample' : ''} · this vehicle excluded · {e.unresolved} unresolved outcomes</small>
+                              <small>Current {make} {model} labels. Seller price premium is unmeasured.</small>
+                              {e.rows.map((row: any) => <Link key={row.id} to={`/stacks/order-book/${row.vehicle_id}?lot=${row.id}`}>{new Date(row.auction_end_date).toLocaleDateString()} · {String(row.outcome || 'unknown').replace(/_/g, ' ')} →</Link>)}
+                            </div>;
+}
+
+/** The existing seller reader, surfaced beside live metrics instead of the hidden legacy header. */
+export function SellerStackButton() {
+  const { vehicle, auctionPulse } = useVehicleProfile();
+  const [open, setOpen] = useState(false);
+  const boundary = useRef<HTMLDivElement>(null);
+  const { popoverData, popoverLoading } = usePopoverData(open ? 'seller' : null, vehicle, auctionPulse);
+  useEffect(() => setOpen(false), [vehicle?.id, auctionPulse?.listing_url]);
+  const handle = normalizePartyHandle((auctionPulse as any)?.seller_username || (auctionPulse as any)?.metadata?.seller_username || (vehicle as any)?.bat_seller || (vehicle as any)?.origin_metadata?.bat_seller);
+  if (!handle || !vehicle) return null;
+  return <div ref={boundary} className="vp-live-seller">
+    <button type="button" aria-label="Inspect seller stack" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(value => !value)}>Seller · {handle} ▾</button>
+    <HeaderPopover open={open} title="Seller stack" width={320} align="right" dismissBoundaryRef={boundary} onClose={() => setOpen(false)}>
+      {popoverLoading ? <p>Reading keyed seller history…</p> : popoverData?.sellerEvidence ?
+        <SellerEvidenceView evidence={popoverData.sellerEvidence} make={vehicle?.make} model={vehicle?.model} /> : <p>Seller history could not be resolved.</p>}
+    </HeaderPopover>
+  </div>;
+}
 
 export default VehicleHeader;
