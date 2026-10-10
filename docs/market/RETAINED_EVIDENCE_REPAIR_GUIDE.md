@@ -15,6 +15,23 @@ live atlas and writer/reader behavior before engineering; do not repeat the whol
 
 ## What was delivered
 
+**2026-10-10 powertrain increment — implemented and locally tested; rollout pending.**
+An indexed 30-parent listing sample retained `engine_size` in 30, `transmission` in 29 and
+`drivetrain` in three JSON envelopes. The existing `ingest-observation` selector now supports
+four already ratified core keys: `engine_configuration`, `engine_displacement_l`,
+`transmission_type` and `drivetrain_layout`. The typed parent, original text, separate clocks,
+normalization version and unknown factory/current roles remain attached. Database admission
+and both existing readers enforce the normalized value against the current parent. The
+provenance reader exposes the source text beside the normalized value. No new property
+catalog, fact log or paid extraction is introduced.
+
+The private preview yields 87 properties (28 configuration, 30 displacement, 26 transmission,
+three drivetrain), with 33 absent or unresolved values. This is sample eligibility, not
+production admission or fleet coverage. Checkpoints are: discovered fields → deterministic
+JSON projection → canonical writer/DB guards → reader proof → owner-approved rollout and
+bounded admission. Existing color replay/cron remains unchanged; automatic powertrain
+backfill and retained raw documents that have not yet become JSON remain open work.
+
 | Repair | Delivery and demonstrated behavior | Remaining boundary |
 |---|---|---|
 | [PR600](https://github.com/sss97133/nuke/pull/600) | Existing `valuation_by_ymm` adds public `source_context`; implemented, tested, merged, deployed and anonymous-runtime-verified across three vehicle cohorts. | No new price admission, configuration matching or public UI. URL groups are not verified unique sales. |

@@ -331,6 +331,7 @@ jobs:
         run: |
           node scripts/discovery/retained-listing-property-test.mjs
           RETAINED_PROPERTY_TEST_EXTERIOR=1 node scripts/discovery/retained-listing-property-test.mjs
+          RETAINED_PROPERTY_TEST_POWERTRAIN=1 node scripts/discovery/retained-listing-property-test.mjs
       - name: Verify retained listing scheduled intake and canonical completion
         run: |
           createdb dm_refinement_listing_intake_ci

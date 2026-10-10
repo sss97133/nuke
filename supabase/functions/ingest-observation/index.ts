@@ -37,7 +37,7 @@ import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
   qualifyRetainedVinReference } from "./retainedVinReference.ts";
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
 import { ingestBatLive } from "./batLive.ts";
-import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
+import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties } from "./retainedListingDrain.ts";
 import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
@@ -282,7 +282,7 @@ Deno.serve(async function handleObservation(req) {
 
   try {
     let input: ObservationInput = await req.json();
-    retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, RETAINED_INTERIOR_MODE, RETAINED_EXTERIOR_MODE].includes(input.mode ?? "");
+    retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, ...RETAINED_PROPERTY_MODES].includes(input.mode ?? "");
     // Direct sale leaves must carry the worker's10s record cancellation through
     // every SDK query/download; creating a Request signal alone does not do so.
     retainedSaleBudget = input.mode === "source_sale_qualification";
@@ -342,7 +342,7 @@ Deno.serve(async function handleObservation(req) {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let retainedSourceId: string | null = null;
-    if (input.mode === RETAINED_INTERIOR_MODE || input.mode === RETAINED_EXTERIOR_MODE) {
+    if (RETAINED_PROPERTY_MODES.includes(input.mode ?? "")) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
       const writer = await authenticateWriter(req);
@@ -582,7 +582,7 @@ Deno.serve(async function handleObservation(req) {
     let propertyRow = null;
     if (input.property_key !== undefined) {
       if (!isSupportedImagePropertyKey(input.property_key) &&
-          !(retainedSourceId && ["interior_color", "exterior_color"].includes(input.property_key))) {
+          !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

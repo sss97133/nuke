@@ -1,3 +1,4 @@
+import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -50,7 +51,7 @@ export function validateObservationProperty(
     return invalid("property_key must be a nonempty string");
   }
   if (!isSupportedImagePropertyKey(input.property_key) &&
-      !(retainedPropertyVerified && ["interior_color", "exterior_color"].includes(input.property_key))) {
+      !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
   if (!property || property.namespace !== "core" || property.deprecated_at != null) {
