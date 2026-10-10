@@ -240,7 +240,8 @@ jobs:
         run: |
           if ! grep -Fxq 'supabase/migrations/20261008071324_retained_listing_property_intake.sql' /tmp/migrations.txt &&
              ! grep -Fxq 'supabase/migrations/20261008104856_raise_retained_listing_batch_ceiling.sql' /tmp/migrations.txt &&
-             ! grep -Fxq 'supabase/migrations/20261010164331_expand_retained_listing_property_replay.sql' /tmp/migrations.txt; then
+             ! grep -Fxq 'supabase/migrations/20261010164331_expand_retained_listing_property_replay.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261010175046_retained_description_powertrain_projection.sql' /tmp/migrations.txt; then
             exit 0
           fi
           if ! grep -Fxq 'ingest-observation' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then
