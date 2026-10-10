@@ -40,6 +40,7 @@ it('shows concise rank rows, explicitly names the population, and keeps counts/m
 it('defaults a configuration door to the same model year and keeps label incidence out of the headline',async()=>{
   await mount({dimension:'body_style',value:'COUPE',label:'Coupe'});
   expect(host.querySelector<HTMLSelectElement>('select')!.value).toBe('vehicleYear');
+  expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('Current-label match · BaT');
   expect(host.querySelectorAll('.vp-performance__table tbody tr')).toHaveLength(3);
   const evidence=host.querySelector('details')!;
   expect(evidence.textContent).toContain('100.0% (7/7)');
@@ -56,7 +57,7 @@ it('defaults a configuration door to the same model year and keeps label inciden
 it('withholds a sparse exact-label rank rather than borrowing the wider model percentile',async()=>{
   await mount({dimension:'engine',value:'Exact Engine',label:'Exact Engine'});
   expect(host.querySelector('.vp-performance__table')).toBeNull();
-  expect(host.querySelector('.vp-performance__unranked')!.textContent).toContain('1 peers');
+  expect(host.querySelector('.vp-performance__unranked')!.textContent).toContain('1 auction');
   expect(host.querySelector('details')!.textContent).toContain('100.0% (1/1)');
 });
 it('a scope control changes the denominator and identifies all model years explicitly',async()=>{

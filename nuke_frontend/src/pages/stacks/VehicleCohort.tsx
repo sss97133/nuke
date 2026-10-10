@@ -71,15 +71,15 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
         <option value="vehicleYear" disabled={!vehicleYear || !selected?.model}>{vehicleYear} {modelLabel}</option>
         <option value="model" disabled={!selected?.model}>{modelLabel} · all model years</option>
         <option value="make">{read.vehicle.make} · all models</option>
-      </select><span>BaT sample · {selected?.expression.from}–{selected?.expression.to} auctions</span>
+      </select><span>{facet ? 'Current-label match · BaT' : 'BaT sample'} · {selected?.expression.from}–{selected?.expression.to} auctions</span>
     </div>
     {!facet && change !== null && <p className="vp-performance__change"><strong>{change >= 0 ? '+' : ''}{change.toFixed(1)}%</strong> sale amount since {olderSale!.auction_end_date?.slice(0,4)}</p>}
     {measured.length > 0 ? <table className="vp-performance__table"><thead><tr><th>Measure</th><th>Standing</th><th>Percentile</th></tr></thead><tbody>{measured.map(({ measure, label, analysis }) => {
       const rawRank = percentile(analysis.result.rankValues, analysis.reading!)!;
       const rank = measure === 'spacing' ? 100 - rawRank : rawRank;
       const standing = rank >= 75 ? measure === 'participants' ? 'Many bidders' : measure === 'typical' ? 'Large steps' : 'Fast' : rank < 25 ? measure === 'participants' ? 'Few bidders' : measure === 'typical' ? 'Small steps' : 'Slow' : 'Typical';
-      return <tr key={measure}><th scope="row">{label}</th><td>{standing}</td><td><strong>P{Math.round(rank)}</strong><small>{analysis.result.rankValues.length} peers</small><div className="vp-performance__scale" aria-hidden="true"><span style={{ left: `${Math.min(98, Math.max(2, rank))}%` }} /></div></td></tr>;
-    })}</tbody></table> : <p className="vp-performance__unranked">{selected?.admissionFailure ? 'Episode unranked' : 'Reference too small'} <span>· {eligible} peers</span></p>}
+      return <tr key={measure}><th scope="row">{label}</th><td>{standing}</td><td><strong>P{Math.round(rank)}</strong><small>{analysis.result.rankValues.length} auctions</small><div className="vp-performance__scale" aria-hidden="true"><span style={{ left: `${Math.min(98, Math.max(2, rank))}%` }} /></div></td></tr>;
+    })}</tbody></table> : <p className="vp-performance__unranked">{selected?.admissionFailure ? 'Episode unranked' : 'Reference too small'} <span>· {eligible} auction{eligible === 1 ? '' : 's'}</span></p>}
     <p className="vp-performance__context">{lot.outcome === 'live' ? 'Open auction' : 'Historical auction'} · {dayLabel(lot.auction_end_date)} <span>· snapshot {dayLabel(study.data.readAt)}</span></p>
     <details className="vp-performance__reference"><summary>Evidence & method</summary>
       {facet && knownFacets.length > 0 && <p><strong>Exact recorded label share: {(100 * matchingN / knownFacets.length).toFixed(1)}% ({matchingN}/{knownFacets.length})</strong>. {effectiveScope === 'vehicleYear' ? `${vehicleYear} ` : ''}{scopeLabel} vehicles with known current labels in this captured study. This is label incidence, not measured configuration rarity or all vehicles in Nuke.</p>}
