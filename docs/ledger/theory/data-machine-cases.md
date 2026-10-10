@@ -1064,6 +1064,18 @@ This increment does **not** close C28: worker consolidation, unattended repair d
 source-to-consumer coverage, per-source cost/rate qualification and reader dependency discovery
 remain separate work.
 
+**Production follow-up, 2026-10-10 07:38Z.** PR #917 merged and both existing CI deployments
+succeeded. The new reader refused an anonymous request with 401 and `private, no-store`. Parallel
+coverage/model/jobs requests coincided with five-second coverage and health timeouts; model and
+configuration still returned. Sequential probes returned 10 coverage rows in 1.197 s and all five
+health rows (including configuration, 2.598 s). The signed-in page reproduced the partial reading.
+The follow-up consumer change dispatches metadata, coverage and jobs one at a time, with a separate
+20 s request deadline for each and cancellation of queued reads on unmount. Missing health/owner
+readings remain unmeasured rather than claiming an undeclared writer or absent owner match.
+Twenty-nine focused UI contracts and the existing ENFORCE/build gate pass. This is a bounded
+contention mitigation; the follow-up merge, deployment and signed-in successful reading remain
+separate delivery stages until recorded in the private receipt.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing

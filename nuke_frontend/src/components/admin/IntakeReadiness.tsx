@@ -15,7 +15,8 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
   config?: { status: string; measured_at: string; rows: Job[] };
   health?: { status: string; measured_at: string | null; rows: Health[] }; health_scope?: string[] };
 
-const sections: Section[] = ['coverage', 'model', 'jobs'];
+// Start with bounded metadata, then avoid overlapping the two aggregate readers.
+const sections: Section[] = ['model', 'coverage', 'jobs'];
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString() : 'Unmeasured';
 const time = (s: string | null | undefined) => s && Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleString() : 'Unmeasured';
 const sourceValid = (s: Source) => typeof s.source_slug === 'string' && s.source_slug.length > 0
@@ -53,9 +54,9 @@ export default function IntakeReadiness() {
     const controller = new AbortController();
     let cancelled = false;
     setLoading(true);
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]);
     const load = async (section: Section) => {
       try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]);
         const { data, error } = await supabase.functions.invoke(`db-stats?intake=${section}`, { method: 'GET', signal });
         if (error || !validReading(data, section)) throw new Error('unavailable');
         if (!cancelled) {
@@ -66,7 +67,13 @@ export default function IntakeReadiness() {
         if (!cancelled) setFailed(previous => [...new Set([...previous, section])]);
       }
     };
-    void Promise.all(sections.map(load)).then(() => { if (!cancelled) setLoading(false); });
+    void (async () => {
+      for (const section of sections) {
+        if (cancelled) break;
+        await load(section);
+      }
+      if (!cancelled) setLoading(false);
+    })();
     const interval = setInterval(() => setRefresh(n => n + 1), 300_000);
     return () => { cancelled = true; controller.abort(); clearInterval(interval); };
   }, [refresh]);
@@ -119,7 +126,7 @@ export default function IntakeReadiness() {
             <td style={cell}>{h?.last_status ?? 'Unmeasured'}{h?.last_run_at && <div>{time(h.last_run_at)}</div>}</td>
             <td style={cell}>{h?.assay_status ?? 'Unmeasured'}</td>
             <td style={cell}>{h?.health_status ?? 'Unmeasured'}</td>
-            <td style={cell}>{h?.declared_writer ?? 'Undeclared'}<div>{owned.length ? owned.join(', ') : 'No exact owner match in the table scope'}</div></td>
+            <td style={cell}>{h ? h.declared_writer ?? 'Undeclared' : 'Unmeasured'}<div>{!h || !model ? 'Owner mapping unmeasured' : owned.length ? owned.join(', ') : 'No exact owner match in the table scope'}</div></td>
           </tr>;
         })}</tbody>
       </table></div>
