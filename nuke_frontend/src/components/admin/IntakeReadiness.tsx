@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import PrefetchLink from '../PrefetchLink';
 import { OrgLogo } from '../common/OrgLogo';
+import { ORDER_BOOK_STACK } from '../../pages/stacks/stackDefinitions';
 
 type Section = 'coverage' | 'model' | 'jobs' | 'consumers';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number;
@@ -21,7 +22,8 @@ type Consumer = { stack_id: string; version: number; name: string; question: str
 type Reading = { contract: string; section: Section; status?: string; measured_at?: string; complete?: boolean;
   rows?: Source[] | Table[] | Consumer[]; links?: Edge[]; links_complete?: boolean;
   config?: { status: string; measured_at: string; rows: Job[] };
-  health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean }; health_scope?: string[];
+  health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean;
+    readings?: { jobname: string; status: string; measured_at: string | null; reason: string | null }[] }; health_scope?: string[];
   feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
   controls?: { status: string; value?: { enabled: boolean; max_feeds: number; max_ingests: number;
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
@@ -61,10 +63,16 @@ const validControls = (controls: any) => controls === undefined || ['invalid', '
 function validReading(data: any, section: Section): data is Reading {
   if (data?.contract !== 'intake_status_v1' || data.section !== section) return false;
   if (section === 'jobs') return data.config?.status === 'measured'
-    && Number.isFinite(Date.parse(data.config.measured_at)) && names(data.config.rows, 'jobname', 14)
+    && Number.isFinite(Date.parse(data.config.measured_at)) && names(data.config.rows, 'jobname', 18)
     && data.health && ['measured', 'unavailable'].includes(data.health.status)
     && (data.health.status === 'unavailable' || Number.isFinite(Date.parse(data.health.measured_at))
-      && names(data.health.rows, 'jobname', 6))
+      && names(data.health.rows, 'jobname', 10))
+    && (data.health.readings === undefined || names(data.health.readings, 'jobname', 10)
+      && data.health.readings.every((r: any) => ['measured', 'unavailable'].includes(r.status)
+        && (r.measured_at === null || Number.isFinite(Date.parse(r.measured_at)))
+        && (r.status !== 'measured' || r.measured_at !== null)
+        && (r.status === 'measured' ? r.reason === null : r.reason !== null)
+        && [null, 'reading_budget_exhausted', 'query_unavailable', 'assay_unavailable', 'job_absent'].includes(r.reason)))
     && validControls(data.controls)
     && (data.feeds === undefined || data.feeds.status === 'unavailable' || data.feeds.status === 'measured'
       && Number.isFinite(Date.parse(data.feeds.measured_at)) && names(data.feeds.rows, 'source_slug', 60)
@@ -141,6 +149,7 @@ export default function IntakeReadiness() {
   const activeJobs = config.filter(j => j.present && j.active === true);
   const pausedJobs = config.filter(j => j.present && j.active === false);
   const executionReadings = activeJobs.filter(j => health.some(h => h.jobname === j.jobname && typeof h.last_status === 'string')).length;
+  const unavailableChecks = jobs?.health?.readings?.filter(r => r.status === 'unavailable') ?? [];
   const failedJobs = activeJobs.filter(j => {
     const h = health.find(h => h.jobname === j.jobname);
     return h?.last_status === 'failed' || h?.assay_status === 'failed' || h?.health_status === 'failed';
@@ -201,7 +210,9 @@ export default function IntakeReadiness() {
         {failedJobs.map(j => <p key={j.jobname}><a href="#status-jobs" onClick={() => setJobsOpen(true)}>{j.jobname}</a> · {health.find(h => h.jobname === j.jobname)?.last_status === 'failed' ? 'Execution failed' : 'Output or health check failed'}</p>)}
         {feedProblems.length > 0 && <p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p>}
         {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
-        {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <p>Output assays unavailable. {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p>}
+        {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <p>{unavailableChecks.length > 0
+          ? `Health readings unavailable for ${unavailableChecks.map(r => r.jobname).join(', ')}. Other checks retain their own results.`
+          : 'Output assays unavailable.'} {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p>}
       </div>}
 
     {coverage && <details id="status-sources" open={sourcesOpen} onToggle={e => setSourcesOpen(e.currentTarget.open)} style={box}>
@@ -257,7 +268,8 @@ export default function IntakeReadiness() {
       <details id="status-job-readings" open={jobsOpen} onToggle={e => setJobsOpen(e.currentTarget.open)}>
       <summary style={label}>JOB EXECUTIONS · {activeJobs.length} ENABLED / {config.length} IN SCOPE</summary>
       <h3 style={label}>INTAKE AND FOLD JOBS</h3>
-      <p style={{ color: 'var(--text-secondary)' }}>Configuration {time(jobs.config?.measured_at)} · Executions {time(jobs.health?.measured_at)}. Six named jobs in health scope; other readings are unmeasured. Paused jobs remain paused.</p>
+      <p style={{ color: 'var(--text-secondary)' }}>Configuration {time(jobs.config?.measured_at)} · Executions {time(jobs.health?.measured_at)}. {jobs.health_scope?.length ?? 6} named jobs in health scope; other readings are unmeasured. Paused jobs remain paused.</p>
+      {jobs.health?.readings && <p>{jobs.health.readings.filter(r => r.status === 'measured').length} / {jobs.health.readings.length} job health readings measured independently. A null output assay means no output check was returned.</p>}
       <div role="group" aria-label="Filter jobs" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
         {['all', 'active', 'paused', 'failures'].map(filter => <button key={filter} type="button" aria-pressed={jobFilter === filter}
           onClick={() => setJobFilter(filter)} style={{ fontSize: 11, padding: '5px 10px', border: '2px solid var(--border)',
@@ -267,12 +279,14 @@ export default function IntakeReadiness() {
         <thead><tr>{['Job / UTC schedule', 'Enabled', 'Last execution', 'Output assay', 'Reported health', 'Declared writer → tables'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
         <tbody>{visibleJobs.map(j => {
           const h = health.find(h => h.jobname === j.jobname);
+          const check = jobs.health?.readings?.find(r => r.jobname === j.jobname);
           const owned = h?.declared_writer ? tables.filter(t => t.registry_owners?.includes(h.declared_writer!)).map(t => t.table_name) : [];
           return <tr key={j.jobname}>
             <th scope="row" style={cell}>{j.jobname}<div style={{ fontFamily: 'Courier New', fontWeight: 400 }}>{j.present ? j.schedule : 'Missing job'}</div></th>
             <td style={cell}>{j.present && typeof j.active === 'boolean' ? j.active ? 'Active' : 'Paused' : 'Unmeasured'}</td>
             <td style={cell}>{h?.last_status ?? <span aria-label="Unmeasured">—</span>}{h?.last_run_at && <div>{time(h.last_run_at)}</div>}</td>
-            <td style={cell}>{h?.assay_status ?? <span aria-label="Unmeasured">—</span>}</td>
+            <td style={cell}>{h?.assay_status ?? <span aria-label="Unmeasured">—</span>}{check?.measured_at
+              && <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>{time(check.measured_at)}</div>}</td>
             <td style={cell}>{h?.health_status ?? <span aria-label="Unmeasured">—</span>}</td>
             <td style={cell}><details><summary>{h ? h.declared_writer ?? 'Undeclared' : 'Unmeasured'}</summary><div>{!h || !model ? 'Owner mapping unmeasured' : owned.length ? owned.join(', ') : 'No exact owner match in the table scope'}</div></details></td>
           </tr>;
@@ -304,6 +318,9 @@ export default function IntakeReadiness() {
                 <td style={cell}>{n.verdict}</td><td style={cell}>{n.reason ?? '—'}</td></tr>)}</tbody>
             </table>
             <p><PrefetchLink to={`/stacks?stack=${encodeURIComponent(q.stack_id)}`}>Open stack workbench →</PrefetchLink></p>
+            {q.stack_id === ORDER_BOOK_STACK.stackId && <p><PrefetchLink
+              to={`${ORDER_BOOK_STACK.route}/${ORDER_BOOK_STACK.demonstration.vehicleId}?lot=${ORDER_BOOK_STACK.demonstration.auctionEventId}`}>
+              Replay retained demonstration →</PrefetchLink> · The reader shows its own evidence coverage and missing layers.</p>}
           </details></td>
           <td style={cell}>{q.status}</td><td style={cell}>{count(q.n_present)} / {count(q.n_needs)}</td>
           <td style={cell}>{count(q.n_partial)}</td><td style={cell}>{count(q.n_missing)}</td>

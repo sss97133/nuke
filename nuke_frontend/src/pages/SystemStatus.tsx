@@ -11,6 +11,9 @@ const validPulsePoint = (point: any) => point?.status === 'exact'
   : point?.status === 'unavailable' && point.n === null && point.lower_bound === null;
 const pulseCount = (point: any) => !validPulsePoint(point) ? 'Unmeasured'
   : point.status === 'capped' ? `≥${point.lower_bound.toLocaleString()}` : measuredCount(point.n);
+const organLabels: Record<string, string> = {
+  vehicles: 'VEHICLES', images: 'IMAGES', observations: 'OBSERVATIONS', auction_comments: 'AUCTION COMMENTS',
+};
 
 type ExpandedSection = 'tier1' | 'catalog' | 'vehicles' | 'auctions' | null;
 
@@ -28,10 +31,10 @@ export default function SystemStatus() {
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [pulse, setPulse] = useState<any>(null);
   const [pulseError, setPulseError] = useState(false);
+  const [pulsePending, setPulsePending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [statsError, setStatsError] = useState(false);
   const statsLoading = useRef(false);
-  const pulseLoading = useRef(false);
 
   useEffect(() => {
     loadStats();
@@ -41,23 +44,28 @@ export default function SystemStatus() {
 
   // Row arrivals measure throughput; neither throughput nor job exits verify data quality.
   useEffect(() => {
+    const days = showHistory ? 14 : 3;
+    const controller = new AbortController();
+    let cancelled = false;
+    let loading = false;
     const loadPulse = async () => {
-      if (pulseLoading.current) return;
-      pulseLoading.current = true;
+      if (loading) return;
+      loading = true;
+      setPulsePending(true);
       try {
-        const { data, error } = await supabase.rpc('get_pipeline_pulse', { p_days: 14 }).abortSignal(AbortSignal.timeout(10_000));
-        if (error || !data || data.error || !data.organs || !Number.isInteger(data.days) || data.days < 1 || data.days > 31
+        const { data, error } = await supabase.rpc('get_pipeline_pulse', { p_days: days })
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]));
+        if (error || !data || data.error || !data.organs || data.days !== days
           || !Number.isFinite(Date.parse(data.generated_at))
           || (data.degraded != null && (!Array.isArray(data.degraded) || !data.degraded.every((item: unknown) => typeof item === 'string')))) throw new Error('pulse unavailable');
-        setPulse(data);
-        setPulseError(false);
-      } catch { setPulseError(true); }
-      finally { pulseLoading.current = false; }
+        if (!cancelled) { setPulse(data); setPulseError(false); }
+      } catch { if (!cancelled) setPulseError(true); }
+      finally { loading = false; if (!cancelled) setPulsePending(false); }
     };
     loadPulse();
     const t = setInterval(loadPulse, 60_000);
-    return () => clearInterval(t);
-  }, []);
+    return () => { cancelled = true; controller.abort(); clearInterval(t); };
+  }, [showHistory]);
 
   const loadListData = async (section: ExpandedSection) => {
     if (!section) return;
@@ -251,6 +259,7 @@ export default function SystemStatus() {
       {stats?.incomplete && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Some totals are unmeasured. Missing readings do not mean zero.</p>}
       {stats && statsError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>System totals unavailable. Showing the last received estimates.</p>}
       {pulseError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Pipeline measurements unavailable.{pulse ? ' Showing the last received reading.' : ''}</p>}
+      {pulsePending && <p role="status" style={{ fontSize: 11 }}>Reading {showHistory ? '14-day history' : 'recent pipeline arrivals'}…</p>}
       {/* Pipeline Pulse — measured arrivals, with explicit partial coverage */}
       {pulse?.organs && (
         <div style={{ border: '2px solid var(--text)', padding: '12px', marginBottom: '16px', background: 'var(--bg)' }}>
@@ -258,9 +267,13 @@ export default function SystemStatus() {
             PIPELINE PULSE — NEW ROWS / DAY · UTC
           </div>
           {pulse.degraded?.length > 0 && <p role="status" style={{ fontSize: '11px' }}>Some pipeline measurements are capped or unavailable.</p>}
+          {Object.keys(organLabels).some(key => pulse.coverage?.organs?.[key]?.supported_time_index === false)
+            && <p style={{ fontSize: 11 }}>Arrival counts unavailable for {Object.keys(organLabels)
+              .filter(key => pulse.coverage?.organs?.[key]?.supported_time_index === false)
+              .map(key => organLabels[key]).join(', ')}: no usable index for arrival timestamps.</p>}
           <p style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Recorded arrivals measure flow, not data quality. Reading: {pulse.generated_at ? new Date(pulse.generated_at).toLocaleString() : 'time unmeasured'}.</p>
           <button type="button" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)} style={{ fontSize: 11, marginBottom: 12 }}>
-            {showHistory ? 'Show recent days' : `Show ${pulse.days}-day history`}
+            {showHistory ? 'Show recent days' : 'Show 14-day history'}
           </button>
           {(() => {
             const cappedPulse = pulse.coverage?.contract === 'pipeline_pulse_capped_v1';
@@ -270,9 +283,6 @@ export default function SystemStatus() {
               dayKeys.push(d.toISOString().slice(0, 10));
             }
             const visibleDays = showHistory ? dayKeys : dayKeys.slice(-3);
-            const organLabels: Record<string, string> = {
-              vehicles: 'VEHICLES', images: 'IMAGES', observations: 'OBSERVATIONS', auction_comments: 'AUCTION COMMENTS',
-            };
             return (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'Courier New', monospace", fontSize: '12px' }}>

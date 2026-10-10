@@ -13,7 +13,7 @@ function connection(results = {}) {
   const calls = [];
   return { calls, async queryObject(sql, args) {
     calls.push({ sql, args });
-    const result = results[sql];
+    const result = typeof results[sql] === 'function' ? await results[sql](args) : results[sql];
     if (result instanceof Error) throw result;
     return { rows: result ?? [] };
   } };
@@ -33,7 +33,7 @@ test('timeout/refusal loses only that reading and never exposes private SQL erro
   assert.equal(result.config.rows[0].active, false);
   assert.equal(result.health.measured_at, null); assert.deepEqual(result.health.rows, []);
   assert(!JSON.stringify(result).includes('PRIVATE_'));
-  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, 4);
+  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, HEALTH_JOBS.length + 3);
   assert.deepEqual(result.scope, INTAKE_JOBS); assert.deepEqual(result.health_scope, HEALTH_JOBS);
 });
 test('an output timeout preserves execution evidence without claiming output health', async () => {
@@ -48,6 +48,49 @@ test('an output timeout preserves execution evidence without claiming output hea
   assert.equal(result.health.rows[0].health_status, null);
   assert(!JSON.stringify(result).includes('PRIVATE'));
   assert.deepEqual(db.calls.find(c => c.sql === EXECUTION_SQL).args, [HEALTH_JOBS]);
+});
+
+test('one timed-out assay cannot erase another canonical check or its independent clock', async () => {
+  const exec = HEALTH_JOBS.map(jobname => ({ jobname, declared_writer: null, last_status: 'succeeded',
+    last_run_at: clock, assay_status: null, health_status: null }));
+  const db = connection({ [EXECUTION_SQL]: [{ measured_at: clock, rows: exec }],
+    [HEALTH_SQL]: args => args[0][0] === 'bat-live-pull' ? new Error('PRIVATE_ASSAY_TIMEOUT')
+      : [{ measured_at: '2026-10-10T12:00:02Z', rows: [{ ...exec.find(r => r.jobname === args[0][0]),
+        last_status: 'failed', assay_status: 'passed', health_status: 'passed' }] }] });
+  const result = await readIntakeSection(db, 'jobs');
+  const failed = result.health.rows.find(r => r.jobname === 'bat-live-pull');
+  const survivor = result.health.rows.find(r => r.jobname === 'drain-sale-residual-fold');
+  assert.equal(failed.last_status, 'succeeded'); assert.equal(failed.assay_status, null);
+  assert.equal(survivor.last_status, 'succeeded'); assert.equal(survivor.assay_status, 'passed');
+  assert.equal(result.health.measured_at, clock);
+  assert.equal(result.health.readings.find(r => r.jobname === 'drain-sale-residual-fold').measured_at, '2026-10-10T12:00:02Z');
+  assert.equal(result.health.readings.find(r => r.jobname === 'bat-live-pull').reason, 'query_unavailable');
+  assert.equal(result.health.output_measured, false);
+  assert(db.calls.filter(c => c.sql === HEALTH_SQL).every(c => c.args[0].length === 1));
+  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '1500ms'").length, HEALTH_JOBS.length);
+  assert(!JSON.stringify(result).includes('PRIVATE'));
+});
+
+test('an assay returning unavailable is kept unknown even when its SQL finishes', async () => {
+  const db = connection({ [HEALTH_SQL]: args => [{ measured_at: clock, rows: [{ jobname: args[0][0],
+    assay_status: 'unavailable', health_status: 'unknown', last_status: 'succeeded' }] }] });
+  const result = await readIntakeSection(db, 'jobs');
+  assert.equal(result.health.status, 'measured'); assert.equal(result.health.output_measured, false);
+  assert(result.health.readings.every(r => r.status === 'unavailable' && r.reason === 'assay_unavailable'));
+});
+
+test('the section budget stops starting assays while retaining execution evidence', async t => {
+  let now = 0;
+  t.mock.method(Date, 'now', () => now);
+  const db = connection({ [EXECUTION_SQL]: [{ measured_at: clock, rows: HEALTH_JOBS.map(jobname => ({
+    jobname, last_status: 'succeeded', assay_status: null, health_status: null })) }],
+    [HEALTH_SQL]: args => { now = 25_000; return [{ measured_at: clock, rows: [{ jobname: args[0][0],
+      assay_status: 'passed', health_status: 'passed' }] }]; } });
+  const result = await readIntakeSection(db, 'jobs');
+  assert.equal(db.calls.filter(c => c.sql === HEALTH_SQL).length, 1);
+  assert.equal(result.health.rows.length, HEALTH_JOBS.length);
+  assert.equal(result.health.readings.filter(r => r.reason === 'reading_budget_exhausted').length, HEALTH_JOBS.length - 1);
+  assert.equal(result.health.output_measured, false);
 });
 test('coverage preserves known-target queue counts and refuses totals after source overflow', async () => {
   const rows = Array.from({ length: 31 }, (_, i) => ({ source_slug: `source-${i}`, total_targets: 100, extracted: 0 }));

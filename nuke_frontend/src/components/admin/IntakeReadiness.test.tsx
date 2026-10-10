@@ -3,7 +3,6 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
 
 const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null }));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
@@ -164,6 +163,25 @@ it('shows execution-only fallback as an observability gap, not passed output', a
   expect(container.textContent).toContain('Output assays unavailable. Execution readings remain available');
   expect(container.querySelector('#status-jobs')!.textContent).toContain('succeeded');
   expect(container.querySelector('#status-jobs')!.textContent).not.toContain('passed');
+});
+
+it('preserves an independently measured fold while naming only the unavailable checks', async () => {
+  const jobs = fixture.responses.jobs.data;
+  jobs.config.rows.push({ jobname: 'synthetic-fold', present: true, active: true, schedule: '* * * * *' });
+  jobs.health.rows[0].assay_status = null; jobs.health.rows[0].health_status = null;
+  jobs.health.rows.push({ jobname: 'synthetic-fold', last_status: 'succeeded', assay_status: 'passed',
+    health_status: 'passed', declared_writer: 'synthetic-writer', last_run_at: clock });
+  jobs.health.output_measured = false;
+  jobs.health_scope = ['synthetic-pull', 'synthetic-fold'];
+  jobs.health.readings = [
+    { jobname: 'synthetic-pull', status: 'unavailable', measured_at: null, reason: 'query_unavailable' },
+    { jobname: 'synthetic-fold', status: 'measured', measured_at: clock, reason: null },
+  ];
+  await render();
+  expect(container.textContent).toContain('Health readings unavailable for synthetic-pull. Other checks retain their own results.');
+  expect(container.textContent).toContain('1 / 2 job health readings measured independently');
+  const fold = [...container.querySelectorAll('#status-jobs tr')].find(row => row.textContent?.includes('synthetic-fold'))!;
+  expect(fold.textContent).toContain('passed');
 });
 
 it('opens source details from the summary and navigates declared table relationships', async () => {

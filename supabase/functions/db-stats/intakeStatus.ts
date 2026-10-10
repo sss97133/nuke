@@ -9,9 +9,12 @@ export const INTAKE_JOBS = ['poll-listing-feeds', 'source-monitor-poll', 'bat-li
   'process-import-queue-batch-2', 'rmsothebys-discovery', 'mecum-snapshot-parser',
   'batch-extract-barrett-jackson', 'enrich-bonhams-10min', 'collecting-cars-discovery',
   'batch-vin-decode-backfill', 'drain-vehicle-derived-queues', 'derivation-queue-drain',
-  'drain-vehicle-taxonomy'];
+  'drain-vehicle-taxonomy', 'project-retained-listing-properties', 'qualify-retained-vin-references',
+  'qualify-bat-archived-sales', 'drain-sale-residual-fold'];
 export const HEALTH_JOBS = ['poll-listing-feeds', 'bat-live-pull', 'batch-vin-decode-backfill',
-  'drain-vehicle-derived-queues', 'derivation-queue-drain', 'rmsothebys-discovery'];
+  'drain-vehicle-derived-queues', 'derivation-queue-drain', 'rmsothebys-discovery',
+  'project-retained-listing-properties', 'qualify-retained-vin-references',
+  'qualify-bat-archived-sales', 'drain-sale-residual-fold'];
 export type IntakeSection = 'coverage' | 'model' | 'jobs' | 'consumers';
 export interface IntakeConnection {
   queryObject<T = Record<string, unknown>>(query: string, args?: unknown[]): Promise<{ rows: T[] }>;
@@ -138,10 +141,11 @@ export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
   (SELECT config_value FROM public.platform_config WHERE config_key = 'source_intake') AS controls`;
 
 // Pooler-safe transaction-local limits; rollback on both success and failure.
-export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = []) {
+export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = [], timeout: '5s' | '1500ms' = '5s') {
   await conn.queryObject('BEGIN READ ONLY');
   try {
-    await conn.queryObject("SET LOCAL statement_timeout = '5s'");
+    await conn.queryObject(timeout === '1500ms'
+      ? "SET LOCAL statement_timeout = '1500ms'" : "SET LOCAL statement_timeout = '5s'");
     await conn.queryObject("SET LOCAL lock_timeout = '1s'");
     const result = await conn.queryObject<{ measured_at: string; rows: Record<string, unknown>[]; links?: Record<string, unknown>[]; controls?: unknown }>(sql, args);
     const row = result.rows[0];
@@ -154,11 +158,32 @@ export async function boundedRead(conn: IntakeConnection, sql: string, args: unk
 
 export async function readIntakeSection(conn: IntakeConnection, section: IntakeSection) {
   if (section === 'jobs') {
+    const deadline = Date.now() + 20_000;
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);
-    const output = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
-    const health = output.status === 'measured' ? output
-      : await boundedRead(conn, EXECUTION_SQL, [HEALTH_JOBS]);
+    const executions = await boundedRead(conn, EXECUTION_SQL, [HEALTH_JOBS]);
     const feeds = await boundedRead(conn, FEEDS_SQL);
+    // Read canonical checks independently. A slow assay loses its own result,
+    // while the execution reading and other checks survive. Leave headroom for
+    // transport inside the frontend's 25-second request limit.
+    const rows = new Map(executions.rows.map(row => [row.jobname, row]));
+    const readings: { jobname: string; status: 'measured' | 'unavailable'; measured_at: string | null; reason: string | null }[] = [];
+    for (const jobname of HEALTH_JOBS) {
+      if (Date.now() + 1500 >= deadline) {
+        readings.push({ jobname, status: 'unavailable', measured_at: null, reason: 'reading_budget_exhausted' });
+        continue;
+      }
+      const reading = await boundedRead(conn, HEALTH_SQL, [[jobname]], '1500ms');
+      const row = reading.rows.find(row => row.jobname === jobname);
+      if (row) rows.set(jobname, { ...row, ...rows.get(jobname),
+        assay_status: row.assay_status, health_status: row.health_status });
+      const measured = reading.status === 'measured' && !!row && row.assay_status !== 'unavailable';
+      readings.push({ jobname, status: measured ? 'measured' : 'unavailable', measured_at: reading.measured_at,
+        reason: measured ? null : reading.status === 'unavailable' ? 'query_unavailable'
+          : row ? 'assay_unavailable' : 'job_absent' });
+    }
+    const measured_at = executions.measured_at ?? readings.find(r => r.measured_at)?.measured_at ?? null;
+    const health = { status: rows.size > 0 && measured_at ? 'measured' : 'unavailable', measured_at,
+      rows: [...rows.values()], readings, output_measured: readings.every(r => r.status === 'measured') };
     let controls: { status: string; value?: ReturnType<typeof intakeThrottle> } = { status: 'unavailable' };
     if (feeds.status === 'measured') {
       try { controls = { status: 'measured', value: intakeThrottle(feeds.controls ?? {}) }; }
@@ -166,7 +191,7 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
     }
     const { controls: _rawControls, ...feedReading } = feeds.status === 'measured' ? feeds : { ...feeds, controls: undefined };
     return { contract: 'intake_status_v1', section, config,
-      health: { ...health, output_measured: output.status === 'measured' }, controls,
+      health, controls,
       feeds: { ...feedReading, rows: feeds.rows.slice(0, 60), complete: feeds.status === 'measured' && feeds.rows.length <= 60 },
       scope: INTAKE_JOBS, health_scope: HEALTH_JOBS };
   }
