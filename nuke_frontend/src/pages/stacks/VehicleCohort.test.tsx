@@ -79,3 +79,11 @@ it('does not leave a settled denied or absent vehicle in an endless loading shel
   await mount();
   expect(host.textContent).toBe('');
 });
+
+it('does not present a stored live outcome as proof the source is active now',async()=>{
+  state.read.lot.outcome='live';
+  await mount();
+  expect(host.querySelector('.vp-performance__table')).toBeNull();
+  expect(host.querySelector('.vp-performance__context')!.textContent).toContain('Recorded live');
+  expect(host.querySelector('.vp-performance__context')!.textContent).not.toContain('Open auction');
+});
