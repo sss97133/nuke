@@ -578,8 +578,12 @@ async function recordConditionObservation(
 async function matchOrCreateVehicle(
   parsed: ParsedVehicle & VehicleEnrichment,
   platform?: string | null,
-  opts?: { identityUncertain?: boolean },
+  opts?: { identityUncertain?: boolean; extractorVehicleId?: string },
 ): Promise<MatchResult> {
+  // Only tryAutoEnrich's successful database read-back supplies this id. The
+  // source writer has already resolved and written the entity; do not create
+  // another one or relabel its sold/high-bid amount as an asking price.
+  if (opts?.extractorVehicleId) return { vehicleId: opts.extractorVehicleId, isNew: false, matchTier: 2, matchConfidence: 0.99 };
   // Canonicalize the listing URL once for matching + storage. Per Entity
   // Resolution Rules ("Add URL normalization to entity resolution... extract
   // platform-specific listing IDs"): URL variants (trailing slash, www,
@@ -931,6 +935,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 // ── Auto-Enrichment via Existing Extractors ──────────────────────
 
 interface EnrichedData {
+  vehicle_id?: string;
   year?: number | null;
   make?: string | null;
   model?: string | null;
@@ -1068,10 +1073,21 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
   const extractors: Record<string, string> = {
     cars_and_bids: "extract-cars-and-bids-core",
     hagerty: "extract-hagerty-listing",
+    pcarmarket: "import-pcarmarket-listing",
+    mecum: "extract-mecum",
+    barrett_jackson: "extract-barrett-jackson",
   };
 
   // Use dedicated extractor if available, otherwise fall back to generic AI extraction
-  const extractorName = extractors[platform] || "extract-vehicle-data-ai";
+  const hostExtractors: Record<string, string> = {
+    "goodingco.com": "extract-gooding",
+    "rmsothebys.com": "extract-rmsothebys",
+    "bonhams.com": "extract-bonhams",
+    "cars.bonhams.com": "extract-bonhams",
+    "broadarrowauctions.com": "extract-broad-arrow",
+  };
+  const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
 
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/${extractorName}`, {
@@ -1080,7 +1096,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         "Authorization": `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, save_to_db: true, ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
       signal: AbortSignal.timeout(75_000),
     });
 
@@ -1104,7 +1120,19 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     //   extract-craigslist      → { success, extracted: {...} }
     //   complete-bat-import     → { success, listing: {...} }
     //   others                  → { vehicle: {...} } or flat
-    const vehicle = result.data || result.extracted || result.vehicle || result.listing || result;
+    let vehicle = result.data || result.extracted || result.vehicle || result.listing || result;
+    // Dedicated writers return summaries (Mecum's images is a count and its
+    // description is "N chars"). Read their persisted row, never ingest that
+    // summary as source testimony. Adopt the writer's URL to avoid a second
+    // entity when it canonicalized www/trailing slashes.
+    const writtenId = result.vehicle_id || result._db?.vehicle_id;
+    if (writtenId) {
+      const { data: row, error } = await supabaseAdmin.from("vehicles")
+        .select("year,make,model,vin,mileage,color,transmission,body_style,title_status,description,sale_price,high_bid,price,asking_price,listing_location,primary_image_url,listing_url")
+        .eq("id", writtenId).maybeSingle();
+      if (error || !row) return { ok: false, error: `${extractorName} vehicle read-back failed: ${error?.message || "no row"}` };
+      vehicle = row;
+    }
 
     // Extraction that produced no identity is a failure, not an enrichment
     if (!vehicle || (!vehicle.year && !vehicle.make && !vehicle.vin)) {
@@ -1120,7 +1148,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         price: vehicle.sale_price || vehicle.sold_price || vehicle.asking_price || vehicle.price || null,
         description: vehicle.description || vehicle.listing_description || null,
         image_url: vehicle.primary_image_url || vehicle.image_url || vehicle.images?.[0] || vehicle.image_urls?.[0] || null,
-        image_urls: vehicle.image_urls || vehicle.images || null,
+        image_urls: Array.isArray(vehicle.image_urls) ? vehicle.image_urls : Array.isArray(vehicle.images) ? vehicle.images : null,
         vin: vehicle.vin || null,
         mileage: vehicle.mileage || null,
         engine: vehicle.engine || vehicle.engine_type || null,
@@ -1129,8 +1157,10 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         body_style: vehicle.body_style || vehicle.body_type || null,
         title_status: vehicle.title_status || null,
         condition: vehicle.condition || null,
-        location: vehicle.location || null,
+        location: vehicle.location || vehicle.listing_location || null,
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
+        listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
+        vehicle_id: writtenId || undefined,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1360,12 +1390,14 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
+    let extractorVehicleId: string | undefined;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        extractorVehicleId = enriched.vehicle_id;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1612,7 +1644,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       bodyStyle: input.body_style,
       titleStatus: input.title_status,
       sellerName: input.seller_name,
-    }, platform, { identityUncertain });
+    }, platform, { identityUncertain, extractorVehicleId });
 
     // Condition is free text with no home on the vehicles table — record it
     // as an observation so it's not silently discarded (see

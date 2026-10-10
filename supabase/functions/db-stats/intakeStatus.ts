@@ -1,15 +1,16 @@
 // Read-only operator sections for the existing db-stats / SystemStatus owners.
 // Each statement has its own clock and timeout. No source bodies or job commands.
+import { intakeThrottle } from '../poll-listing-feeds/ledger.ts';
 export const INTAKE_TABLES = ['source_targets', 'import_queue', 'listing_page_snapshots',
   'vehicle_events', 'auction_events', 'auction_comments', 'external_identities',
   'vehicle_observations', 'vehicles', 'vehicle_images', 'vehicle_field_consensus',
   'work_sessions', 'receipts', 'pipeline_registry'];
-export const INTAKE_JOBS = ['bat-live-pull', 'enrich-gooding-sitemap',
+export const INTAKE_JOBS = ['poll-listing-feeds', 'source-monitor-poll', 'bat-live-pull', 'enrich-gooding-sitemap',
   'process-import-queue-batch-2', 'rmsothebys-discovery', 'mecum-snapshot-parser',
   'batch-extract-barrett-jackson', 'enrich-bonhams-10min', 'collecting-cars-discovery',
   'batch-vin-decode-backfill', 'drain-vehicle-derived-queues', 'derivation-queue-drain',
   'drain-vehicle-taxonomy'];
-export const HEALTH_JOBS = ['bat-live-pull', 'batch-vin-decode-backfill',
+export const HEALTH_JOBS = ['poll-listing-feeds', 'bat-live-pull', 'batch-vin-decode-backfill',
   'drain-vehicle-derived-queues', 'derivation-queue-drain', 'rmsothebys-discovery'];
 export type IntakeSection = 'coverage' | 'model' | 'jobs';
 export interface IntakeConnection {
@@ -59,13 +60,26 @@ export const HEALTH_SQL = `SELECT statement_timestamp() AS measured_at,
 FROM (SELECT jobname, declared_writer, last_status, last_run_at, assay_status, health_status
   FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
 
+export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
+  coalesce((SELECT jsonb_agg(to_jsonb(f)) FROM (
+    SELECT source_slug, count(*)::int AS feeds,
+      count(*) FILTER (WHERE enabled)::int AS enabled_feeds,
+      count(*) FILTER (WHERE enabled AND last_error IS NOT NULL)::int AS errored_feeds,
+      max(last_polled_at) FILTER (WHERE enabled) AS last_polled_at,
+      min(poll_interval_minutes) FILTER (WHERE enabled) AS shortest_interval_minutes,
+      bool_or(last_error ILIKE '%credits%' OR last_error ILIKE '%billing%') FILTER (WHERE enabled) AS billing_blocked,
+      bool_or(last_error ILIKE '%rate limit%' OR last_error ILIKE '%429%') FILTER (WHERE enabled) AS rate_limited
+    FROM public.listing_feeds GROUP BY source_slug ORDER BY source_slug LIMIT 61
+  ) f), '[]'::jsonb) AS rows,
+  (SELECT config_value FROM public.platform_config WHERE config_key = 'source_intake') AS controls`;
+
 // Pooler-safe transaction-local limits; rollback on both success and failure.
 export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = []) {
   await conn.queryObject('BEGIN READ ONLY');
   try {
     await conn.queryObject("SET LOCAL statement_timeout = '5s'");
     await conn.queryObject("SET LOCAL lock_timeout = '1s'");
-    const result = await conn.queryObject<{ measured_at: string; rows: Record<string, unknown>[]; links?: Record<string, unknown>[] }>(sql, args);
+    const result = await conn.queryObject<{ measured_at: string; rows: Record<string, unknown>[]; links?: Record<string, unknown>[]; controls?: unknown }>(sql, args);
     const row = result.rows[0];
     if (!row || !Array.isArray(row.rows)) throw new Error('invalid_reading');
     return { status: 'measured' as const, ...row };
@@ -78,7 +92,15 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
   if (section === 'jobs') {
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);
     const health = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
-    return { contract: 'intake_status_v1', section, config, health,
+    const feeds = await boundedRead(conn, FEEDS_SQL);
+    let controls: { status: string; value?: ReturnType<typeof intakeThrottle> } = { status: 'unavailable' };
+    if (feeds.status === 'measured') {
+      try { controls = { status: 'measured', value: intakeThrottle(feeds.controls ?? {}) }; }
+      catch { controls = { status: 'invalid' }; }
+    }
+    const { controls: _rawControls, ...feedReading } = feeds.status === 'measured' ? feeds : { ...feeds, controls: undefined };
+    return { contract: 'intake_status_v1', section, config, health, controls,
+      feeds: { ...feedReading, rows: feeds.rows.slice(0, 60), complete: feeds.status === 'measured' && feeds.rows.length <= 60 },
       scope: INTAKE_JOBS, health_scope: HEALTH_JOBS };
   }
   const result = await boundedRead(conn, section === 'coverage' ? COVERAGE_SQL : MODEL_SQL,
