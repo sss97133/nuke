@@ -268,7 +268,7 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
 // Main component
 // ---------------------------------------------------------------------------
 
-const VehicleBriefing: React.FC = () => {
+const VehicleBriefing: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }) => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
@@ -336,7 +336,7 @@ const VehicleBriefing: React.FC = () => {
   // Self-guard: nothing to show
   if (!headline && pills.length === 0) return null;
 
-  return (
+  const content = (
     <div style={{ margin: '0 12px 8px' }}>
       {/* L0: Headline */}
       {headline && (
@@ -400,6 +400,7 @@ const VehicleBriefing: React.FC = () => {
       )}
     </div>
   );
+  return collapsed ? <details className="vp-stored-interpretations"><summary>Stored model interpretations</summary>{content}</details> : content;
 };
 
 export default VehicleBriefing;
