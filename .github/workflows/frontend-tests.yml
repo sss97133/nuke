@@ -347,7 +347,7 @@ jobs:
       - name: Verify full retained listing powertrain replay and measured yield
         run: |
           createdb dm_refinement_listing_powertrain_ci
-          python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain
+          python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain --description
       - name: Create disposable bounded provenance database
         run: createdb dm_refinement_bounded_provenance_ci
       - name: Verify provenance collection limits and preserved source visibility

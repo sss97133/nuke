@@ -354,7 +354,7 @@ Deno.serve(async function handleObservation(req) {
       if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const parent = await supabase.from("vehicle_observations")
-        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data,content_text")
         .eq("id", sourceId).maybeSingle();
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
