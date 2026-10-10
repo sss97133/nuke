@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   if (section !== null) {
     const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
     if (req.method !== 'GET') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers });
-    if (!['coverage', 'model', 'jobs'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
+    if (!['coverage', 'model', 'jobs', 'consumers'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
     // Reuse cryptographically verified callers. Privileged metadata also needs
     // an active admin_users membership, matching the existing admin UI guard.
     const auth = await authenticateWriter(req);

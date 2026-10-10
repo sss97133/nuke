@@ -22,9 +22,13 @@ export default function SystemStatus() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [expandedSection, setExpandedSection] = useState<ExpandedSection>(null);
   const [listData, setListData] = useState<any[]>([]);
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState(false);
+  const listRequest = useRef(0);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [pulse, setPulse] = useState<any>(null);
   const [pulseError, setPulseError] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [statsError, setStatsError] = useState(false);
   const statsLoading = useRef(false);
   const pulseLoading = useRef(false);
@@ -57,44 +61,51 @@ export default function SystemStatus() {
 
   const loadListData = async (section: ExpandedSection) => {
     if (!section) return;
-    
+    const request = ++listRequest.current;
+    const signal = AbortSignal.timeout(8_000);
+    setListData([]); setListLoading(true); setListError(false);
     try {
       if (section === 'tier1') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('vehicle_images')
           .select('id, image_url, ai_processing_status, ai_scan_metadata, created_at')
           .order('created_at', { ascending: false })
-          .limit(100);
-        setListData(data || []);
+          .limit(100).abortSignal(signal);
+        if (error) throw error;
+        if (request === listRequest.current) setListData(data || []);
       } else if (section === 'catalog') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('catalog_parts')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(100);
-        setListData(data || []);
+          .limit(100).abortSignal(signal);
+        if (error) throw error;
+        if (request === listRequest.current) setListData(data || []);
       } else if (section === 'vehicles') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('vehicles')
           .select('id, year, make, model, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(100);
-        setListData(data || []);
+          .limit(100).abortSignal(signal);
+        if (error) throw error;
+        if (request === listRequest.current) setListData(data || []);
       } else if (section === 'auctions') {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('auction_events')
           .select('id, listing_url, outcome, high_bid, created_at')
           .order('created_at', { ascending: false })
-          .limit(100);
-        setListData(data || []);
+          .limit(100).abortSignal(signal);
+        if (error) throw error;
+        if (request === listRequest.current) setListData(data || []);
       }
-    } catch (error) {
-      console.error('Error loading list:', error);
-    }
+    } catch {
+      if (request === listRequest.current) setListError(true);
+    } finally { if (request === listRequest.current) setListLoading(false); }
   };
 
   const handlePanelClick = (section: ExpandedSection) => {
     if (expandedSection === section) {
+      listRequest.current++;
       setExpandedSection(null);
       setListData([]);
     } else {
@@ -221,42 +232,36 @@ export default function SystemStatus() {
     } finally { statsLoading.current = false; }
   }
 
-  if (!stats) {
-    return (
-      <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
-        <IntakeReadiness />
-        <p role="status">{statsError ? 'System totals unavailable. Retrying each minute.' : 'Loading system status...'}</p>
-      </div>
-    );
-  }
-
-  const imagePercent = typeof stats.images.analyzed === 'number' && stats.images.total > 0 && stats.images.analyzed <= stats.images.total
+  const imagePercent = typeof stats?.images.analyzed === 'number' && stats.images.total > 0 && stats.images.analyzed <= stats.images.total
     ? stats.images.analyzed / stats.images.total * 100 : null;
 
   return (
-    <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
-      <IntakeReadiness />
+    <div style={{ padding: '16px 12px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '8px' }}>
-        <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <h1 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           ADMIN SYSTEM STATUS
         </h1>
         <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-          Estimated totals • Refreshes every minute • Last: {stats.lastUpdate}
+          Flow, scheduled work and evidence coverage. Estimated totals refresh each minute{stats ? ` • Last: ${stats.lastUpdate}` : ''}
         </p>
       </div>
 
-      {stats.incomplete && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Some totals are unmeasured. Missing readings do not mean zero.</p>}
-      {statsError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>System totals unavailable. Showing the last received estimates.</p>}
+      {!stats && <p role="status">{statsError ? 'System totals unavailable. Retrying each minute.' : 'Loading system totals…'}</p>}
+      {stats?.incomplete && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Some totals are unmeasured. Missing readings do not mean zero.</p>}
+      {stats && statsError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>System totals unavailable. Showing the last received estimates.</p>}
       {pulseError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Pipeline measurements unavailable.{pulse ? ' Showing the last received reading.' : ''}</p>}
       {/* Pipeline Pulse — measured arrivals, with explicit partial coverage */}
       {pulse?.organs && (
         <div style={{ border: '2px solid var(--text)', padding: '12px', marginBottom: '16px', background: 'var(--bg)' }}>
           <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
-            PIPELINE PULSE — NEW ROWS / DAY (LAST {pulse.days}D)
+            PIPELINE PULSE — NEW ROWS / DAY · UTC
           </div>
           {pulse.degraded?.length > 0 && <p role="status" style={{ fontSize: '11px' }}>Some pipeline measurements are capped or unavailable.</p>}
           <p style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Recorded arrivals measure flow, not data quality. Reading: {pulse.generated_at ? new Date(pulse.generated_at).toLocaleString() : 'time unmeasured'}.</p>
+          <button type="button" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)} style={{ fontSize: 11, marginBottom: 12 }}>
+            {showHistory ? 'Show recent days' : `Show ${pulse.days}-day history`}
+          </button>
           {(() => {
             const cappedPulse = pulse.coverage?.contract === 'pipeline_pulse_capped_v1';
             const dayKeys: string[] = [];
@@ -264,16 +269,18 @@ export default function SystemStatus() {
               const d = new Date(pulse.generated_at || Date.now()); d.setUTCDate(d.getUTCDate() - i);
               dayKeys.push(d.toISOString().slice(0, 10));
             }
+            const visibleDays = showHistory ? dayKeys : dayKeys.slice(-3);
             const organLabels: Record<string, string> = {
               vehicles: 'VEHICLES', images: 'IMAGES', observations: 'OBSERVATIONS', auction_comments: 'AUCTION COMMENTS',
             };
             return (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', fontFamily: "'Courier New', monospace", fontSize: '10px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'Courier New', monospace", fontSize: '12px' }}>
+                  <caption style={{ textAlign: 'left', fontSize: 11, marginBottom: 8 }}>Today is still in progress. Counts capped at ≥10,001 are lower bounds.</caption>
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left', paddingRight: 10, fontFamily: 'Arial, sans-serif', fontSize: '8px', letterSpacing: '0.1em' }}>ORGAN</th>
-                      {dayKeys.map((d) => (
+                      {visibleDays.map((d) => (
                         <th key={d} style={{ padding: '0 4px', fontWeight: 400, color: 'var(--text-secondary)', fontSize: '8px' }}>{d.slice(5)}</th>
                       ))}
                     </tr>
@@ -292,16 +299,16 @@ export default function SystemStatus() {
                       return (
                         <tr key={key}>
                           <td style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em', paddingRight: 10, whiteSpace: 'nowrap' }}>{label}</td>
-                          {dayKeys.map((d) => {
+                          {visibleDays.map((d) => {
                             const point = available ? series[d] : null;
                             const n = cappedPulse ? (point?.status === 'exact' ? point.n : null)
                               : available ? (point?.n ?? 0) : null;
                             return (
                               <td key={d} style={{
                                 padding: '2px 4px', textAlign: 'right', border: '1px solid var(--border)',
-                                color: n === 0 ? 'var(--bg)' : 'var(--text)',
-                                background: n === 0 ? 'var(--error, #a00)' : 'transparent',
-                                fontWeight: n === 0 ? 700 : 400,
+                                color: 'var(--text)',
+                                background: n === 0 && d !== dayKeys.at(-1) ? 'var(--surface)' : 'transparent',
+                                fontWeight: 400,
                               }}>
                                 {cappedPulse ? pulseCount(point) : measuredCount(n)}
                               </td>
@@ -327,11 +334,17 @@ export default function SystemStatus() {
         </div>
       )}
 
+      <IntakeReadiness />
+      {stats && <details style={{ border: '2px solid var(--border)', padding: 12, marginBottom: 16 }}>
+        <summary style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em' }}>INVENTORY ESTIMATES & RECENT RECORDS</summary>
+        <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Planner estimates of stored rows. These totals do not measure processing health or verified consumer delivery.</p>
       {/* Main Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         
         {/* Tier 1 Analysis */}
         <div 
+          role="button" tabIndex={0} aria-expanded={expandedSection === 'tier1'}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePanelClick('tier1'); } }}
           onClick={() => handlePanelClick('tier1')}
           style={{ 
             background: expandedSection === 'tier1' ? 'var(--surface-hover)' : 'var(--bg)',
@@ -372,6 +385,8 @@ export default function SystemStatus() {
 
         {/* LMC Catalog */}
         <div 
+          role="button" tabIndex={0} aria-expanded={expandedSection === 'catalog'}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePanelClick('catalog'); } }}
           onClick={() => handlePanelClick('catalog')}
           style={{ 
             background: expandedSection === 'catalog' ? 'var(--surface-hover)' : 'var(--bg)',
@@ -403,6 +418,8 @@ export default function SystemStatus() {
 
         {/* Vehicles */}
         <div 
+          role="button" tabIndex={0} aria-expanded={expandedSection === 'vehicles'}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePanelClick('vehicles'); } }}
           onClick={() => handlePanelClick('vehicles')}
           style={{ 
             background: expandedSection === 'vehicles' ? 'var(--surface-hover)' : 'var(--bg)',
@@ -434,6 +451,8 @@ export default function SystemStatus() {
 
         {/* Auctions */}
         <div 
+          role="button" tabIndex={0} aria-expanded={expandedSection === 'auctions'}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePanelClick('auctions'); } }}
           onClick={() => handlePanelClick('auctions')}
           style={{ 
             background: expandedSection === 'auctions' ? 'var(--surface-hover)' : 'var(--bg)',
@@ -449,7 +468,7 @@ export default function SystemStatus() {
             {estimate(stats.auctions.comments)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            comments analyzed
+            comments stored
           </div>
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -465,21 +484,24 @@ export default function SystemStatus() {
         <div style={{ marginBottom: '16px', background: 'var(--surface)', border: '2px solid var(--text)', padding: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' }}>
-              {expandedSection === 'tier1' && 'ALL IMAGES'}
-              {expandedSection === 'catalog' && 'ALL CATALOG PARTS'}
-              {expandedSection === 'vehicles' && 'ALL VEHICLES'}
-              {expandedSection === 'auctions' && 'ALL AUCTIONS'}
+              {expandedSection === 'tier1' && 'LATEST 100 IMAGES'}
+              {expandedSection === 'catalog' && 'LATEST 100 CATALOG PARTS'}
+              {expandedSection === 'vehicles' && 'LATEST 100 VEHICLES'}
+              {expandedSection === 'auctions' && 'LATEST 100 AUCTIONS'}
             </h3>
             <button 
-              onClick={() => setExpandedSection(null)}
+              onClick={() => { listRequest.current++; setExpandedSection(null); }}
               style={{ fontSize: '11px', fontWeight: 700, border: '1px solid var(--text)', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
             >
               CLOSE
             </button>
           </div>
           <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border)' }}>
-            {listData.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-disabled)' }}>Loading...</div>
+            {listLoading || listError || listData.length === 0 ? (
+              <div role="status" style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {listLoading ? 'Reading recent records…' : listError ? 'Recent records unavailable.' : 'No records returned.'}
+                {listError && <button type="button" onClick={() => loadListData(expandedSection)} style={{ marginLeft: 8, fontSize: 11 }}>Retry records</button>}
+              </div>
             ) : (
               <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                 <tbody>
@@ -543,7 +565,7 @@ export default function SystemStatus() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
         
         {/* Recent Tier 1 Analysis */}
-        <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
+        {recentImages.length > 0 && <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
           <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Recent Tier 1 Analysis
           </h2>
@@ -592,10 +614,10 @@ export default function SystemStatus() {
               );
             })}
           </div>
-        </div>
+        </div>}
 
         {/* Recent Catalog Parts */}
-        <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
+        {recentParts.length > 0 && <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
           <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Recent Catalog Parts
           </h2>
@@ -642,8 +664,9 @@ export default function SystemStatus() {
               );
             })}
           </div>
-        </div>
+        </div>}
       </div>
+      </details>}
 
       {/* Quick Actions */}
       <div style={{ display: 'flex', gap: '8px', borderTop: '2px solid var(--text)', paddingTop: '12px' }}>
