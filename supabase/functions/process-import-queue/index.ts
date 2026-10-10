@@ -29,6 +29,8 @@ Deno.serve(async (req) => {
     const { data: control, error: controlError } = await supabase.from('platform_config')
       .select('config_value').eq('config_key', 'source_intake').maybeSingle();
     if (controlError) throw new Error('Intake throttle unavailable; no work claimed');
+    // Rebundle the shared validator with retained-target controls. A malformed
+    // shared config must refuse this drain before it claims any work as well.
     const throttle = intakeThrottle(control?.config_value ?? {});
     const budget = createIntakeBudget(throttle, startedAt);
     if (!throttle.enabled || batch_size === 0 || throttle.max_ingests === 0) return new Response(

@@ -22,7 +22,8 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
   health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean }; health_scope?: string[];
   feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
   controls?: { status: string; value?: { enabled: boolean; max_feeds: number; max_ingests: number;
-    sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
+    sources: Record<string, { enabled?: boolean; max_ingests?: number }>;
+    targets?: { enabled: boolean; max_ingests: number; scan_limit: number } } } };
 
 // Start with bounded metadata, then avoid overlapping the two aggregate readers.
 const sections: Section[] = ['model', 'coverage', 'jobs', 'consumers'];
@@ -55,7 +56,10 @@ const validControls = (controls: any) => controls === undefined || ['invalid', '
     && [controls.value.max_feeds, controls.value.max_ingests].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 100)
     && controls.value.sources && typeof controls.value.sources === 'object' && !Array.isArray(controls.value.sources)
     && Object.values(controls.value.sources).every((s: any) => s && typeof s.enabled === 'boolean'
-      && Number.isSafeInteger(s.max_ingests) && s.max_ingests >= 0 && s.max_ingests <= 100);
+      && Number.isSafeInteger(s.max_ingests) && s.max_ingests >= 0 && s.max_ingests <= 100)
+    && (controls.value.targets === undefined || typeof controls.value.targets?.enabled === 'boolean'
+      && Number.isSafeInteger(controls.value.targets.max_ingests) && controls.value.targets.max_ingests >= 0 && controls.value.targets.max_ingests <= 20
+      && Number.isSafeInteger(controls.value.targets.scan_limit) && controls.value.targets.scan_limit >= 0 && controls.value.targets.scan_limit <= 2000);
 function validReading(data: any, section: Section): data is Reading {
   if (data?.contract !== 'intake_status_v1' || data.section !== section) return false;
   if (section === 'jobs') return data.config?.status === 'measured'
@@ -224,6 +228,12 @@ export default function IntakeReadiness() {
         Intake {jobs.controls.value.enabled && jobs.controls.value.max_ingests > 0 ? 'open within capacity limits' : 'paused'} ·
         Ceiling {count(jobs.controls.value.max_feeds)} feeds / {count(jobs.controls.value.max_ingests)} admissions per invocation.
         Source rotation and measured extraction latency reduce actual work to fit the worker deadline. Monetary cost is unmeasured.
+      </p>}
+      {jobs.controls?.status === 'measured' && jobs.controls.value?.targets && <p>
+        Retained sitemap targets: {jobs.controls.value.enabled && jobs.controls.value.max_feeds > 0 && jobs.controls.value.max_ingests > 0
+          && jobs.controls.value.targets.enabled && jobs.controls.value.targets.max_ingests > 0 && jobs.controls.value.targets.scan_limit > 0
+          ? `${count(Math.min(jobs.controls.value.targets.max_ingests, jobs.controls.value.max_ingests))} admissions within the shared invocation ceiling` : 'paused'}.
+        {' '}Fresh feeds run first; archived work uses remaining capacity. Registered source switches and provider holds apply.
       </p>}
       {jobs.controls?.status === 'invalid' && <p role="status">Invalid throttle configuration: source work is refused.</p>}
       {jobs.feeds?.status === 'measured' && <details><summary>Scheduled source feeds · {time(jobs.feeds.measured_at)}</summary>

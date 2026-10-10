@@ -41,6 +41,20 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
 
+it('shows archive admissions within the shared ceiling and preserves the paused default', async () => {
+  fixture.responses.jobs.data.controls = { status: 'measured', value: { enabled: true, max_feeds: 40, max_ingests: 20,
+    sources: {}, targets: { enabled: true, max_ingests: 2, scan_limit: 200 } } };
+  await render(); await tick(1500);
+  expect(container.textContent).toContain('Retained sitemap targets: 2 admissions within the shared invocation ceiling');
+});
+
+it('does not present a zero archive throttle as an operating backlog dispatcher', async () => {
+  fixture.responses.jobs.data.controls = { status: 'measured', value: { enabled: true, max_feeds: 40, max_ingests: 20,
+    sources: {}, targets: { enabled: true, max_ingests: 0, scan_limit: 200 } } };
+  await render(); await tick(1500);
+  expect(container.textContent).toContain('Retained sitemap targets: paused');
+});
+
 it('keeps URL denominators, queue completion and model delivery distinct', async () => {
   await render();
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');

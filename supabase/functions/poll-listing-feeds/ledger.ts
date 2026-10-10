@@ -380,6 +380,7 @@ export interface IntakeThrottle {
   max_feeds: number;
   max_ingests: number;
   sources: Record<string, { enabled?: boolean; max_ingests?: number }>;
+  targets: { enabled: boolean; max_ingests: number; scan_limit: number };
 }
 
 export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
@@ -400,8 +401,14 @@ export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
     normalized[slug] = { enabled: config.enabled !== false, max_ingests: limit(config.max_ingests, 20, 100) };
   }
   if (value.enabled !== undefined && typeof value.enabled !== "boolean") throw new Error("invalid intake switch");
+  const targets = value.targets ?? {};
+  if (!targets || typeof targets !== "object" || Array.isArray(targets)) throw new Error("invalid target controls");
+  const target = targets as Record<string, unknown>;
+  if (target.enabled !== undefined && typeof target.enabled !== "boolean") throw new Error("invalid target switch");
   return { enabled: value.enabled !== false, max_feeds: limit(value.max_feeds, 40, 100),
-    max_ingests: limit(value.max_ingests, 20, 100), sources: normalized };
+    max_ingests: limit(value.max_ingests, 20, 100), sources: normalized,
+    targets: { enabled: target.enabled === true, max_ingests: limit(target.max_ingests, 0, 20),
+      scan_limit: limit(target.scan_limit, 200, 2000) } };
 }
 
 export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null }>(
