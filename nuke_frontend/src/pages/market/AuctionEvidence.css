@@ -60,3 +60,55 @@
   .auction-evidence-links span { margin-left: 0; }
   .auction-evidence-discussion { max-height: none; overflow: visible; padding-right: 0; }
 }
+.market-lot-row { display: grid; grid-template-columns: 76px 72px minmax(0,1fr) 205px; gap: 12px; align-items: center; min-height: 88px; padding: 10px 12px; box-sizing: border-box; border-bottom: 2px solid var(--border); font: 12px/1.4 Arial,sans-serif; color: var(--text); background: var(--bg); }
+.market-lot-row[data-expanded=true] { background: var(--surface); }
+.market-lot-row button { font: inherit; text-align: left; color: inherit; border: 0; border-radius: 0; background: transparent; padding: 0; cursor: pointer; }
+.market-lot-row button:hover { text-decoration: underline; }
+.market-lot-close { display: flex; flex-direction: column; gap: 3px; }
+.market-lot-label { display: block; font: 700 9px/1.4 Arial,sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); }
+.market-lot-image { display: flex; }
+.market-lot-identity { min-width: 0; }
+.market-lot-row .market-lot-name { display: block; font-size: 13px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.market-lot-facts { display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; margin-top: 4px; font-size: 11px; }
+.market-lot-facts:empty { display: none; }
+.market-lot-facts button { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-lot-context { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 4px; font-size: 10px; color: var(--text-secondary); }
+.market-lot-row .market-lot-metrics { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; font: 12px/1.4 'Courier New',monospace; }
+.market-lot-metrics > span:first-child { display: flex; align-items: baseline; gap: 8px; }
+.market-lot-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; font-size: 11px; }
+.market-lot-counts:empty { display: none; }
+.market-lot-last-bid { font-size: 10px; color: var(--text-secondary); }
+.market-lot-inspection { padding: 12px 16px 16px 100px; background: var(--surface); color: var(--text); border-bottom: 2px solid var(--text); font: 12px/1.5 Arial,sans-serif; overflow-wrap: anywhere; }
+.market-inspection-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.market-inspection-header nav { display: flex; gap: 16px; }
+.market-inspection-header button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 4px 0; color: var(--text-secondary); font: 700 10px Arial,sans-serif; cursor: pointer; }
+.market-inspection-header button[aria-pressed=true] { color: var(--text); border-bottom-color: var(--text); }
+.market-inspection-reading { display: flex; gap: 16px 40px; flex-wrap: wrap; }
+.market-inspection-reading p { margin: 0 0 8px; }
+.market-inspection-caption { display: block; font-size: 10px; color: var(--text-secondary); font-weight: 400; margin: 4px 0; }
+.market-inspection-counts > span:not(.market-inspection-caption) { margin-right: 12px; }
+.market-inspection-bids { display: flex; gap: 0; margin: 6px 0 12px; max-width: 500px; }
+.market-inspection-bids > div { flex: 1; display: flex; flex-direction: column; gap: 2px; border-left: 2px solid var(--border); padding: 0 12px; font: 12px 'Courier New',monospace; }
+.market-inspection-bids time { font-size: 10px; color: var(--text-secondary); }
+.market-inspection-more { margin-top: 10px; }
+.market-inspection-more > summary { cursor: pointer; font-size: 11px; }
+.market-inspection-more > div { margin: 10px 0; }
+.market-inspection-more p { white-space: pre-wrap; }
+.market-inspection-facts { margin: 12px 0; }
+.market-inspection-facts > div { display: grid; grid-template-columns: 100px minmax(0,1fr); padding: 8px 0; border-top: 1px solid var(--border); gap: 8px; }
+.market-inspection-facts dt { color: var(--text-secondary); }
+.market-inspection-facts dd { margin: 0; }
+.market-inspection-facts a, .market-inspection-sources { font-size: 11px; }
+.market-inspection-facts a { margin-left: 12px; }
+@media (max-width: 760px) {
+  .market-lot-row { grid-template-columns: 60px 56px minmax(0,1fr); gap: 8px; padding: 10px 8px; }
+  .market-lot-image img { width: 56px !important; height: 38px !important; }
+  .market-lot-row .market-lot-metrics { grid-column: 2 / -1; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; gap: 4px 12px; text-align: left; }
+  .market-lot-metrics > span:first-child { gap: 6px; }
+  .market-lot-inspection { padding: 12px; }
+  .market-inspection-header nav { gap: 14px; }
+}
+@media (pointer: coarse) {
+  .market-lot-name, .market-lot-image, .market-lot-metrics, .market-inspection-header button { min-height: 44px; }
+  .market-lot-facts button, .market-lot-context button, .market-inspection-more > summary { padding-block: 8px; }
+}

@@ -16,7 +16,7 @@ export interface EpisodeInteraction {
 export const EPISODE_READ_LIMIT = 100;
 
 /** Existing public relations, one exact current listing URL, no semantic/analytical fold. */
-export async function readAuctionEpisode(vehicleId: string) {
+export async function readAuctionEpisode(vehicleId: string, expectedSourceUrl?: string | null) {
   const parent = await supabase.from('vehicles')
     .select('id,title,year,make,model,listing_url,auction_end_date')
     .eq('id', vehicleId).eq('is_public', true).is('deleted_at', null)
@@ -27,6 +27,7 @@ export async function readAuctionEpisode(vehicleId: string) {
   const vehicle = parent.data;
   if (!/^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/.test(vehicle.listing_url ?? '')) return null;
   const url = vehicle.listing_url!.replace(/\/$/, '');
+  if (expectedSourceUrl && expectedSourceUrl.replace(/\/$/, '') !== url) return null;
   const [comments, specs] = await Promise.all([
     supabase.from('auction_comments')
       .select('id,posted_at,comment_type,comment_text,bid_amount,is_seller,media_urls,bat_comment_id,source_url,vehicles!inner(id)')
@@ -49,10 +50,10 @@ export async function readAuctionEpisode(vehicleId: string) {
   };
 }
 
-export function useAuctionEpisode(vehicleId: string) {
+export function useAuctionEpisode(vehicleId: string, expectedSourceUrl?: string | null) {
   return useQuery({
-    queryKey: ['auction-episode-evidence', vehicleId],
-    queryFn: () => readAuctionEpisode(vehicleId),
+    queryKey: ['auction-episode-evidence', vehicleId, expectedSourceUrl?.replace(/\/$/, '') ?? null],
+    queryFn: () => readAuctionEpisode(vehicleId, expectedSourceUrl),
     enabled: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId),
     staleTime: 30_000, refetchInterval: 60_000, retry: 1,
   });

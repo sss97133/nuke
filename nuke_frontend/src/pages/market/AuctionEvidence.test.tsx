@@ -100,3 +100,27 @@ it('connects recorded identity to sale context with subject exclusion, without l
   expect(params.has('price')).toBe(false);
   expect(params.has('currency')).toBe(false);
 });
+
+it('keeps the first inspection concise and puts the outbound listing behind Sources', async () => {
+  const scroll = vi.fn(); const previous = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scroll;
+  fixture.query.data.vehicle = { id, year: 1937, make: 'Packard', model: '115-C', title: 'Promotional source headline' };
+  fixture.query.data.specs[0].rooted = true;
+  try {
+    await act(async () => root.render(<AuctionEvidence vehicleId={id} compact onClose={() => {}} />));
+    expect(container.querySelector('section')?.id).toBe(`lot-inspection-${id}`);
+    expect(container.textContent).toContain('Latest recorded bid 2,000');
+    expect(container.textContent).toContain('+1,000 from the previous retained bid');
+    expect(container.querySelector('a[href^="https://bringatrailer.com"]')).toBeNull();
+    expect(container.querySelector('.auction-evidence-layout')).toBeNull();
+    expect(container.querySelector('svg')?.closest('details')?.open).toBe(false);
+    expect(scroll).not.toHaveBeenCalled();
+    await act(async () => [...container.querySelectorAll('nav button')].find(b => b.textContent === 'Vehicle')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.textContent).toContain('1937 Packard 115-C');
+    expect(container.textContent).toContain('Reports differ');
+    expect(container.textContent).not.toContain('Promotional source headline');
+    await act(async () => [...container.querySelectorAll('nav button')].find(b => b.textContent === 'Sources')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('a[href^="https://bringatrailer.com"]')?.getAttribute('href')).toBe(source);
+    expect(container.textContent).toContain('Promotional source headline');
+  } finally { HTMLElement.prototype.scrollIntoView = previous; }
+});

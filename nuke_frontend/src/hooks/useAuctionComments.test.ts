@@ -52,3 +52,8 @@ it('does not report zero engagement when a retained-statistic query fails', asyn
   const options = useAuctionCommentStats('public','https://bringatrailer.com/listing/public/') as any;
   await expect(options.queryFn()).rejects.toThrow('source read failed');
 });
+it('does not switch an open market inspection to a different relisting', async () => {
+  expect(await readAuctionEpisode('public', 'https://bringatrailer.com/listing/previous/')).toBeNull();
+  expect(fixture.from.mock.calls.map(c => c[0])).toEqual(['vehicles']);
+  expect(fixture.rpc).not.toHaveBeenCalled();
+});

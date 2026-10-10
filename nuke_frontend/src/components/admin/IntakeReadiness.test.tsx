@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null }));
@@ -13,13 +14,18 @@ vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
 import IntakeReadiness from './IntakeReadiness';
 let root: Root, container: HTMLDivElement;
 const clock = '2026-10-10T12:00:00Z';
-async function render() { await act(async () => root.render(<IntakeReadiness />)); }
+async function render() { await act(async () => root.render(<MemoryRouter><IntakeReadiness /></MemoryRouter>)); }
 async function tick(ms: number) { await act(async () => vi.advanceTimersByTimeAsync(ms)); }
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date(clock)); (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.requests = []; fixture.held = null;
   fixture.responses = {
+    consumers: { data: { contract: 'intake_status_v1', section: 'consumers', status: 'measured', measured_at: clock, complete: true,
+      rows: [{ stack_id: 'SA', version: 1, name: 'Synthetic question', question: 'Which retained observations support the answer?', status: 'building',
+        coverage: 0.5, n_needs: 2, n_present: 1, n_partial: 0, n_missing: 1, needs_complete: true,
+        needs: [{ layer: 'log', kind: 'table', object: 'vehicle_observations', related_table: 'vehicle_observations', verdict: 'present', reason: null },
+          { layer: 'fold', kind: 'abstract', object: 'synthetic fold', related_table: null, verdict: 'missing', reason: 'no table declared for this substrate' }] }] } },
     coverage: { data: { contract: 'intake_status_v1', section: 'coverage', status: 'measured', measured_at: clock, complete: true,
       rows: [{ source_slug: 'synthetic-source', total_targets: 100, in_queue: 20, extracted: 10, gap: 80, failed: 2, skipped: 8 }] } },
     jobs: { data: { contract: 'intake_status_v1', section: 'jobs',
@@ -40,7 +46,7 @@ it('keeps URL denominators, queue completion and model delivery distinct', async
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
   expect(container.textContent).toContain('Zero matches can coexist with retained source data');
   expect(container.textContent).toContain('does not prove a vehicle, sale or downstream answer');
-  expect(fixture.requests).toHaveLength(3);
+  expect(fixture.requests).toHaveLength(4);
   expect(fixture.requests.every(r => r.options.method === 'GET' && r.options.signal instanceof AbortSignal)).toBe(true);
 });
 it('preserves successful execution alongside failed output and paused unmeasured jobs', async () => {
@@ -84,8 +90,8 @@ it('finishes the metadata read before issuing aggregate reads and gives each a s
   expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model']);
   fixture.held = null;
   await act(async () => release(fixture.responses.model));
-  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=coverage', 'db-stats?intake=jobs']);
-  expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(3);
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=coverage', 'db-stats?intake=jobs', 'db-stats?intake=consumers']);
+  expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(4);
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
 });
 it('does not turn unavailable job declarations into undeclared writers or absent owner matches', async () => {
@@ -123,4 +129,86 @@ it('shows configured zero separately from provider failure and polling evidence'
   expect(container.textContent).toContain('Held at zero');
   expect(container.textContent).toContain('Monetary cost is unmeasured');
   expect(container.textContent).toContain('does not prove new data landed');
+});
+
+it('surfaces failed output and filters jobs without treating paused jobs as incidents', async () => {
+  await render();
+  const attention = [...container.querySelectorAll('h3')].find(h => h.textContent === 'NEEDS ATTENTION')!.parentElement!;
+  expect(attention.textContent).toContain('synthetic-pull');
+  expect(attention.textContent).not.toContain('synthetic-paused');
+  const filter = [...container.querySelectorAll('button')].find(b => b.textContent === 'FAILURES')!;
+  await act(async () => filter.click());
+  expect(filter.getAttribute('aria-pressed')).toBe('true');
+  const jobs = container.querySelector('#status-jobs')!;
+  expect(jobs.textContent).toContain('synthetic-pull');
+  expect(jobs.textContent).not.toContain('synthetic-paused');
+});
+
+it('shows execution-only fallback as an observability gap, not passed output', async () => {
+  fixture.responses.jobs.data.health.output_measured = false;
+  fixture.responses.jobs.data.health.rows[0].assay_status = null;
+  fixture.responses.jobs.data.health.rows[0].health_status = null;
+  await render();
+  expect(container.textContent).toContain('Output assays unavailable. Execution readings remain available');
+  expect(container.querySelector('#status-jobs')!.textContent).toContain('succeeded');
+  expect(container.querySelector('#status-jobs')!.textContent).not.toContain('passed');
+});
+
+it('opens source details from the summary and navigates declared table relationships', async () => {
+  fixture.responses.model.data.rows.push({ ...fixture.responses.model.data.rows[0], table_name: 'vehicle_events' });
+  await render();
+  await act(async () => (container.querySelector('a[href="#status-sources"]') as HTMLAnchorElement).click());
+  expect((container.querySelector('#status-sources') as HTMLDetailsElement).open).toBe(true);
+  const relationship = [...container.querySelectorAll('button')].find(b => b.textContent === 'vehicle_events →')!;
+  await act(async () => relationship.click());
+  expect((container.querySelector('select') as HTMLSelectElement).value).toBe('vehicle_events');
+  expect(container.textContent).toContain('Referenced by');
+  expect(container.textContent).toContain('vehicle_observations →');
+});
+
+it('exposes declared consumer gaps and drills a dependency into its table owners', async () => {
+  await render();
+  expect(container.textContent).toContain('1 present · 0 partial · 1 missing / 2 dependency declarations');
+  expect(container.textContent).toContain('Registry structure, not verified answers');
+  expect(container.textContent).toContain('no table declared for this substrate');
+  const link = container.querySelector('#status-consumers a[href="#status-model"]') as HTMLAnchorElement;
+  await act(async () => link.click());
+  expect((container.querySelector('#status-model') as HTMLDetailsElement).open).toBe(true);
+  expect((container.querySelector('select[aria-label="Inspect table"]') as HTMLSelectElement).value).toBe('vehicle_observations');
+  const search = container.querySelector('input[type="search"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'no matching question');
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container.querySelector('#status-consumers')!.textContent).toContain('No question matches');
+});
+
+it('does not count paused jobs as execution readings for enabled jobs', async () => {
+  fixture.responses.jobs.data.health.rows.push({ jobname: 'synthetic-paused', last_status: 'succeeded',
+    assay_status: null, health_status: 'paused', declared_writer: null });
+  await render();
+  expect(container.textContent).toContain('1 execution readings / 1 enabled jobs');
+  expect(container.textContent).not.toContain('2 execution readings / 1 enabled jobs');
+});
+
+it('keeps execution tables folded until requested and leads with declared live or showable questions', async () => {
+  fixture.responses.consumers.data.rows.push({ ...structuredClone(fixture.responses.consumers.data.rows[0]),
+    stack_id: 'S03', name: 'Synthetic showable question', status: 'showable' });
+  await render();
+  expect((container.querySelector('#status-job-readings') as HTMLDetailsElement).open).toBe(false);
+  expect(container.querySelector('#status-consumers > div > table > tbody > tr')!.textContent).toContain('Synthetic showable question');
+  await act(async () => (container.querySelector('a[href="#status-jobs"]') as HTMLAnchorElement).click());
+  expect((container.querySelector('#status-job-readings') as HTMLDetailsElement).open).toBe(true);
+});
+
+it('withholds consumer aggregates on overflow and rejects malformed declared counts', async () => {
+  fixture.responses.consumers.data.complete = false;
+  await render();
+  expect(container.textContent).toContain('aggregate totals withheld');
+  expect(container.textContent).not.toContain('1 present · 0 partial · 1 missing / 2');
+  fixture.responses.consumers.data = structuredClone(fixture.responses.consumers.data);
+  fixture.responses.consumers.data.rows[0].n_present = 20;
+  await tick(300_000);
+  expect(container.textContent).toContain('Unavailable: consumers');
+  expect(container.textContent).not.toContain('20 / 2');
 });
