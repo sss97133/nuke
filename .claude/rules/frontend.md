@@ -92,3 +92,7 @@ Rules:
 ## Reference Files
 - Design reference: `~/Downloads/nuke-session-files/`
 - Design book: `docs/library/technical/design-book/`
+
+## Vehicle profile fact ownership — owner instruction, 2026-10-10
+
+State each datum once on the page. Give it one primary owner; other sections should link to that owner or add a distinct computation. Do not repeat identity, sale result, dates, counts or scores across a masthead, chart label and evidence card. Before adding a tool, assay its population, units, clock and supported interpretation. An unexplained stored score or an average of unmatched configurations does not earn profile space; remove the surface rather than surrounding it with caveats.

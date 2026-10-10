@@ -8,15 +8,36 @@ import { formatCurrency as formatUsdCurrency } from '../../../services/priceSign
 import vinDecoderService from '../../../services/vinDecoder';
 import { useVINProofs } from '../../../hooks/useVINProofs';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import type { Vehicle, VehicleHeaderProps } from '../types';
+import type { Vehicle, AuctionPulse } from '../types';
 import { parseMoneyNumber, normalizePartyHandle, isValidUsername, formatRemaining } from '../vehicleHeaderUtils';
 import { useSecondClock } from '../../../hooks/useSecondClock';
+
+/** Recent keyed seller lots, one per source URL; unresolved outcomes stay outside sell-through. */
+export function summarizeSellerLots(rows: any[], make?: string | null, model?: string | null) {
+  const seen = new Set<string>();
+  const lots = rows.filter(row => {
+    const key = String(row.source_url || '').replace(/[#?].*$/, '').replace(/\/$/, '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key); return true;
+  }).slice(0, 50);
+  const resolved = lots.filter(row => ['sold', 'reserve_not_met', 'unsold', 'no_sale'].includes(row.outcome));
+  const vehicles = new Set(lots.map(row => row.vehicle_id));
+  return {
+    n: lots.length, capped: rows.length > 50,
+    sold: resolved.filter(row => row.outcome === 'sold').length, resolved: resolved.length,
+    unresolved: lots.length - resolved.length,
+    sameModel: make && model ? lots.filter(row => row.vehicle?.make === make && row.vehicle?.model === model).length : null,
+    repeatLots: lots.length - vehicles.size,
+    firstClose: lots[lots.length - 1]?.auction_end_date, lastClose: lots[0]?.auction_end_date,
+    rows: lots.slice(0, 3),
+  };
+}
 
 // ---- Popover data hook ----
 export function usePopoverData(
   activePopover: 'year' | 'make' | 'model' | 'seller' | 'auction' | null,
   vehicle: Vehicle | null,
-  auctionPulse: VehicleHeaderProps['auctionPulse']
+  auctionPulse: AuctionPulse | null
 ) {
   const [popoverData, setPopoverData] = useState<any>(null);
   const [popoverLoading, setPopoverLoading] = useState(false);
@@ -50,20 +71,34 @@ export function usePopoverData(
             null
           );
           if (sellerHandle) {
-            const { data: identity } = await supabase
+            const rawPlatform = String(auctionPulse?.platform || '').toLowerCase();
+            const platform = ['bat', 'bringatrailer', 'bring_a_trailer'].includes(rawPlatform) ? 'bat' : rawPlatform;
+            const { data: identities, error: identityError } = await supabase
               .from('external_identities')
-              .select('id, platform, handle, proof_url, claimed_by, first_seen_at, last_seen_at')
-              .ilike('handle', sellerHandle)
-              .limit(1)
-              .maybeSingle();
-            const { count: auctionCount } = await supabase
+              .select('id, platform, handle, profile_url')
+              .eq('platform', platform)
+              .ilike('handle', sellerHandle.replace(/[\\%_]/g, '\\$&'))
+              .limit(2);
+            if (identityError) throw identityError;
+            // A handle collision needs identity resolution, not an arbitrary LIMIT 1 choice.
+            const identity = identities?.length === 1 ? identities[0] : null;
+            if (!identity) {
+              if (!cancelled) setPopoverData({ handle: sellerHandle, sellerUnavailable: true });
+              return;
+            }
+            const { data: lots, error: lotsError } = await supabase
               .from('auction_events')
-              .select('id', { count: 'exact', head: true })
-              .or(`seller_username.ilike.%${sellerHandle}%`);
-            if (!cancelled) setPopoverData({
-              handle: sellerHandle,
-              identity,
-              auctionCount: auctionCount || 0,
+              .select('id, vehicle_id, source_url, outcome, auction_end_date, scraped_at, vehicle:vehicles!auction_events_vehicle_id_fkey!inner(make, model)')
+              .eq('seller_external_identity_id', identity.id)
+              .neq('vehicle_id', vehicle.id)
+              .eq('vehicle.is_public', true).is('vehicle.deleted_at', null).is('vehicle.merged_into_vehicle_id', null)
+              .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicle' })
+              .lt('auction_end_date', new Date().toISOString())
+              .order('auction_end_date', { ascending: false })
+              .limit(51);
+            if (lotsError) throw lotsError;
+            if (!cancelled) setPopoverData({ handle: sellerHandle, identity,
+              sellerEvidence: summarizeSellerLots(lots || [], vehicle.make, vehicle.model),
             });
           } else {
             if (!cancelled) setPopoverData({ handle: null });
@@ -84,7 +119,7 @@ export function usePopoverData(
         }
       } catch (err) {
         console.warn('Popover data fetch failed:', err);
-        if (!cancelled) setPopoverData({});
+        if (!cancelled) setPopoverData({ unavailable: true });
       } finally {
         if (!cancelled) setPopoverLoading(false);
       }
@@ -220,7 +255,7 @@ export function useOwnerPopoverData(
 }
 
 // ---- Owner guess derivation ----
-export function useOwnerGuess(vehicle: Vehicle | null, auctionPulse: VehicleHeaderProps['auctionPulse']) {
+export function useOwnerGuess(vehicle: Vehicle | null, auctionPulse: AuctionPulse | null) {
   return useMemo(() => {
     const v = vehicle as any;
     if (!v) return null;
@@ -823,7 +858,7 @@ export function useLocationDisplay(vehicle: Vehicle | null) {
 }
 
 // ---- Currency formatting hook ----
-export function useAuctionCurrency(vehicle: Vehicle | null, auctionPulse: VehicleHeaderProps['auctionPulse']) {
+export function useAuctionCurrency(vehicle: Vehicle | null, auctionPulse: AuctionPulse | null) {
   const auctionCurrency = useMemo(() => {
     const v: any = vehicle as any;
     if (!v) return null;

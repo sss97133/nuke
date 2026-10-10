@@ -1286,51 +1286,110 @@
   }
 }
 
-/* Identity, then computed readings, then optional source detail. */
-.vp-identity { margin: 0; padding: 12px; font: 700 20px/1.2 Arial, sans-serif; border-bottom: 2px solid var(--border); }
-.vp-facet-button { flex-shrink: 0; padding: 4px 6px; font: 700 10px/1 Arial, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: var(--text); background: var(--surface); border: 2px solid var(--border); cursor: pointer; }
-.vp-facet-button[aria-expanded="true"] { background: var(--text); color: var(--surface); }
+/* One identity masthead; one primary owner for each fact. */
+.vp-masthead { display: flex; align-items: center; gap: 20px; padding: 16px 12px; border-bottom: 2px solid var(--border); background: var(--surface); }
+.vp-masthead__brand { flex-shrink: 0; }
+.vp-masthead .sx-make-wordmark { width: 112px; height: 24px; object-fit: contain; }
+.vp-masthead .sx-make-logo { width: 28px; height: 28px; }
+.vp-masthead__identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0; font-family: Arial, sans-serif; }
+.vp-masthead__year { font: 12px 'Courier New', monospace; color: var(--text-secondary); }
+.vp-masthead__model { font-size: clamp(28px, 4vw, 44px); line-height: 1; letter-spacing: -.04em; }
+.vp-masthead__variant { font-size: clamp(18px, 2.5vw, 28px); font-style: italic; font-weight: 400; }
+.vp-masthead__result { position: relative; margin-left: auto; flex-shrink: 0; text-align: right; }
+.vp-masthead__result > span { display: block; color: var(--text-secondary); font: 9px Arial, sans-serif; }
+.vp-masthead__result strong { font: 700 20px 'Courier New', monospace; }
+.vp-masthead__result button { padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.vp-price-source { display: flex; flex-direction: column; gap: 8px; font: 11px/1.4 Arial, sans-serif; text-align: left; }
+.vp-price-source p { margin: 0; }
+.vp-price-source small { color: var(--text-secondary); font-size: 9px; }
+.vp-masthead__result button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.vp-masthead__fallback { margin: 0; padding: 12px; font: 700 20px/1.2 Arial, sans-serif; }
+.vp-facet-button { flex-shrink: 0; padding: 5px 4px; font: 700 9px/1 Arial, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: var(--text); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.vp-facet-button[aria-expanded="true"] { border-bottom-color: var(--text); }
 .vp-facet-button:focus-visible, .vp-performance :focus-visible, .vehicle-profile-page .barcode-bar:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.vp-performance { padding: 12px; border-bottom: 2px solid var(--border); font: 12px/1.4 Arial, sans-serif; background: var(--surface); }
+.vp-performance { padding: 12px; border-bottom: 2px solid var(--border); font: 11px/1.4 Arial, sans-serif; background: var(--surface); }
 .vp-performance--facet { padding: 0; border: 0; }
-.vp-performance__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.vp-performance h2 { margin: 0; font-size: 14px; }
-.vp-performance__head label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.vp-performance select { max-width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 2px solid var(--border); padding: 4px; }
-.vp-performance__context, .vp-performance__basis { margin: 8px 0; color: var(--text-secondary); font-size: 11px; }
-.vp-performance__change { margin: 10px 0; }
-.vp-performance__change strong { font: 700 20px 'Courier New', monospace; }
-.vp-performance__change span { color: var(--text-secondary); }
-.vp-performance__scale { position: relative; height: 8px; margin: 5px 0; background: var(--border); }
-.vp-performance__scale span { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--text); transform: translateX(-1px); }
-.vp-performance__reference summary, .timeline-view-options summary { cursor: pointer; font-size: 11px; font-weight: 700; padding: 6px 0; }
+.vp-performance__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vp-performance h2 { margin: 0; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
+.vp-performance select { max-width: 100%; min-width: 0; font: 10px Arial, sans-serif; color: var(--text); background: var(--surface); border: 0; border-bottom: 2px solid var(--border); padding: 3px 0; }
+.vp-performance__head > select { width: auto; flex: 0 1 auto; min-height: 0; }
+.vp-performance__scope { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 10px; color: var(--text-secondary); font-size: 10px; }
+.vp-performance__scope span { font-size: 9px; }
+.vp-performance__readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.vp-performance__readings > div { padding: 0 12px; border-left: 2px solid var(--border); }
+.vp-performance__readings > div:first-child { padding-left: 0; border-left: 0; }
+.vp-performance__readings > div:last-child { padding-right: 0; }
+.vp-performance__readings dt { font-size: 9px; color: var(--text-secondary); }
+.vp-performance__readings dd { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.vp-performance__readings strong { font: 700 24px/1 'Courier New', monospace; }
+.vp-performance__readings dd > span { font-size: 11px; }
+.vp-performance__scale { position: relative; width: 100%; height: 3px; margin: 6px 0; background: var(--border); }
+.vp-performance__scale span { position: absolute; top: -3px; width: 2px; height: 9px; background: var(--text); transform: translateX(-1px); }
+.vp-performance__footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 9px; color: var(--text-secondary); }
+.vp-performance__change strong { font-family: 'Courier New', monospace; color: var(--text); }
+.vp-performance__reference { margin-top: 6px; font-size: 10px; }
+.vp-performance__reference summary, .timeline-view-options summary { cursor: pointer; font-size: 9px; padding: 4px 0; color: var(--text-secondary); }
 .vp-performance__reference label { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 12px 8px 0; }
+.vp-performance__context { color: var(--text-secondary); }
+.vp-performance__unranked { margin: 8px 0; font-weight: 700; }
+.vp-performance__unranked span { font-weight: 400; color: var(--text-secondary); }
+.vp-performance__evidence-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
+.vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .barcode-bar { border: 0; background: var(--vp-surface); text-align: left; }
 .vehicle-profile-page .barcode-bar__label-left { color: var(--vp-ink); }
 .timeline-auction-select { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: 11px; }
 .timeline-auction-select select { max-width: 100%; font: inherit; background: var(--vp-surface); color: var(--vp-ink); border: 2px solid var(--vp-ghost); padding: 4px; }
-@media (max-width: 600px) {
-  .vp-performance__head label { width: 100%; }
+.vp-stored-interpretations, .vp-sold-context { padding: 6px 12px; border-bottom: 2px solid var(--border); font: 10px/1.4 Arial, sans-serif; }
+.vp-stored-interpretations > summary, .vp-sold-context > summary { cursor: pointer; }
+.vp-sold-context > summary { font-weight: 700; }
+.vp-sold-context > summary span { margin-left: 12px; font-weight: 400; color: var(--text-secondary); }
+.vp-stored-interpretations[open] > summary { margin-bottom: 8px; }
+.vp-sold-context__basis { margin: 6px 0; color: var(--text-secondary); font-size: 9px; }
+.vp-sold-context__interpretation { max-width: 60ch; }
+.vp-sold-context__group { margin-top: 12px; }
+.vp-sold-context__group h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 0 0 4px; font-size: 11px; }
+.vp-sold-context__group h3 small { font-size: 9px; color: var(--text-secondary); font-weight: 400; }
+.vp-sold-context__sale { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.vp-sold-context__sale strong { font: 700 12px 'Courier New', monospace; margin-left: auto; }
+.vp-sold-context__record { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.vp-sold-context__record img { object-fit: cover; }
+.vp-sold-context__record small { display: block; font-size: 9px; color: var(--text-secondary); }
+.auction-band__facts--compact { display: flex; justify-content: space-between; align-items: flex-start; }
+.auction-band__source { max-width: 360px; font: 9px/1.5 Arial, sans-serif; }
+.auction-band__source summary { cursor: pointer; color: var(--text-secondary); }
+.auction-band__source dl { margin: 8px 0; }
+.auction-band__source dl > div { display: grid; grid-template-columns: 100px 1fr; gap: 8px; }
+.auction-band__source dd { margin: 0; font-family: 'Courier New', monospace; }
+.auction-band__source small { display: block; color: var(--text-secondary); }
+@media (max-width: 768px) {
+  .vehicle-profile-page { --h-hero: clamp(220px, 65vw, 420px); }
+  .vp-sub-header__left { width: auto !important; }
+  .vp-sub-header__badges { flex-wrap: nowrap !important; overflow-x: auto !important; }
+  .vp-masthead { gap: 12px; }
+}
+@media (max-width: 420px) {
+  .vp-masthead { flex-wrap: wrap; gap: 8px 12px; }
+  .vp-masthead__brand { width: 100%; }
+  .vp-masthead__identity { flex: 1; }
+  .vp-masthead__result strong { font-size: 16px; }
+  .vp-performance__readings > div { padding: 0 8px; }
+  .vp-performance__readings dd { flex-direction: column; align-items: flex-start; }
+  .vp-performance__readings strong { font-size: 22px; }
+  .vp-sold-context > summary span { display: block; margin-left: 12px; }
 }
 
-.vp-stored-interpretations { padding: 8px 12px; border-bottom: 2px solid var(--border); font-size: 11px; }
-.vp-stored-interpretations > summary { cursor: pointer; }
-.vp-stored-interpretations[open] > summary { margin-bottom: 8px; }
+/* Period nameplates retain their photographed metal/enamel in either theme. */
+.vp-masthead:has(.vehicle-identity[data-period-artwork="true"]) { background: #f1f1ee; color: #202020; flex-wrap: wrap; }
+.vp-masthead:has(.vehicle-identity[data-period-artwork="true"]) .vp-masthead__identity { min-width: 0; max-width: 100%; }
+.vp-masthead:has(.vehicle-identity[data-period-artwork="true"]) .vehicle-identity { padding: 0; }
+.vp-masthead:has(.vehicle-identity[data-period-artwork="true"]) .vp-masthead__result > span { color: #505050; }
 
-.vp-performance__scope { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; font-size: 10px; color: var(--text-secondary); }
-.vp-performance__scope select { font-size: 11px; padding: 3px; }
-.vp-performance__table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-.vp-performance__table th, .vp-performance__table td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 2px solid var(--border); font-size: 12px; }
-.vp-performance__table thead th { color: var(--text-secondary); font-size: 9px; font-weight: 400; text-transform: uppercase; }
-.vp-performance__table td:last-child { width: 76px; padding-right: 0; }
-.vp-performance__table strong { font: 700 18px 'Courier New', monospace; }
-.vp-performance__table .vp-performance__scale { height: 3px; margin: 3px 0; }
-.vp-performance__table .vp-performance__scale span { height: 7px; top: -2px; }
-.vp-performance__context { font-size: 10px; }
-.vp-performance__context span { display: inline-block; }
-.vp-performance__unranked { margin: 12px 0; font-weight: 700; }
-.vp-performance__unranked span { font-weight: 400; color: var(--text-secondary); }
-.vp-performance__evidence-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
-.vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
+.vp-seller-evidence { display: grid; gap: 8px; font-size: 11px; }
+.vp-seller-evidence dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+.vp-seller-evidence dt { font-size: 9px; text-transform: uppercase; color: var(--text-secondary); }
+.vp-seller-evidence dd { margin: 4px 0; display: grid; gap: 3px; }
+.vp-seller-evidence strong { font: bold 24px 'Courier New', monospace; }
+.vp-seller-evidence small { color: var(--text-secondary); }
 
-.vp-performance__table td:last-child small { display: block; font-size: 9px; color: var(--text-secondary); }
+.vp-live-seller { position: relative; }
+.vp-live-seller > button { background: transparent; border: 0; padding: 4px; font: 11px Arial, sans-serif; color: var(--text); cursor: pointer; }

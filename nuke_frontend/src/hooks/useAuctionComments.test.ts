@@ -1,14 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), calls: [] as any[], parent: null as any, comments: [] as any[] }));
+const fixture = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), calls: [] as any[], parent: null as any, comments: [] as any[], error: null as any }));
 vi.mock('../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: fixture.rpc } }));
-import { readAuctionEpisode } from './useAuctionComments';
+vi.mock('@tanstack/react-query', () => ({ useQuery: (options: any) => options }));
+import { readAuctionEpisode, useAuctionCommentStats } from './useAuctionComments';
 beforeEach(() => {
   fixture.calls = []; fixture.parent = { id: 'public', listing_url: 'https://bringatrailer.com/listing/public/' };
-  fixture.comments = [];
+  fixture.comments = []; fixture.error = null;
   fixture.rpc.mockReset().mockResolvedValue({ data: [], error: null });
   fixture.from.mockReset().mockImplementation((table: string) => {
-    const q: any = { then: (fn: any) => Promise.resolve({ data: table === 'vehicles' ? fixture.parent : fixture.comments, error: null }).then(fn) };
-    for (const method of ['select', 'eq', 'is', 'or', 'in', 'order', 'limit', 'maybeSingle']) {
+    const q: any = { then: (fn: any) => Promise.resolve({ data: table === 'vehicles' ? fixture.parent : fixture.comments, error: fixture.error, count: 8 }).then(fn) };
+    for (const method of ['select', 'eq', 'is', 'or', 'in', 'order', 'limit', 'maybeSingle', 'not']) {
       q[method] = (...args: any[]) => { fixture.calls.push([table, method, ...args]); return q; };
     }
     return q;
@@ -37,4 +38,17 @@ it('does not borrow comments from other sources or malformed URLs', async () => 
   fixture.parent.listing_url = 'https://example.com/listing/public/';
   expect(await readAuctionEpisode('public')).toBeNull();
   expect(fixture.from.mock.calls.map(c => c[0])).toEqual(['vehicles']);
+});
+
+it('scopes every live statistic to both slash aliases of the selected listing', async () => {
+  const options = useAuctionCommentStats('public','https://bringatrailer.com/listing/public/') as any;
+  const read = await options.queryFn();
+  expect(read.commentCount).toBe(8);
+  expect(fixture.calls.filter(c => c[1] === 'in' && c[2] === 'source_url')).toHaveLength(5);
+  expect(fixture.calls.filter(c => c[1] === 'in').every(c => c[3].join(',') === 'https://bringatrailer.com/listing/public,https://bringatrailer.com/listing/public/')).toBe(true);
+});
+it('does not report zero engagement when a retained-statistic query fails', async () => {
+  fixture.error = new Error('source read failed');
+  const options = useAuctionCommentStats('public','https://bringatrailer.com/listing/public/') as any;
+  await expect(options.queryFn()).rejects.toThrow('source read failed');
 });

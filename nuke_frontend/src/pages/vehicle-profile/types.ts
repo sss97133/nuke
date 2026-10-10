@@ -635,6 +635,7 @@ export interface VehicleBaseProps {
 /** Props that VehicleHeader can't get from context (modal callbacks). */
 export interface VehicleHeaderProps {
   onClaimClick?: () => void;
+  primaryPriceElsewhere?: boolean;
 }
 
 export interface HeroMeta {

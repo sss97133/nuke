@@ -78,10 +78,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   onEditClick,
   onOpenVINProofImages,
 }) => {
-  const coverageScore = typeof (vehicle as any).data_quality_score === 'number' &&
-    Number.isFinite((vehicle as any).data_quality_score) &&
-    (vehicle as any).data_quality_score >= 0 && (vehicle as any).data_quality_score <= 100
-    ? (vehicle as any).data_quality_score : null;
+
   // Ensure onDataPointClick is always a function - defensive wrapper
   const safeOnDataPointClick = React.useMemo(() => {
     if (onDataPointClick && typeof onDataPointClick === 'function') {
@@ -941,37 +938,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           {/* Additional details */}
           {renderVehicleDetails()}
 
-          {/* Stored coverage heuristic; does not assess fact verification. */}
-          {coverageScore !== null && (
-            <div data-testid="data-coverage-score" title="Inputs: images, identity fields, observations, price and VIN length." className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid transparent', flexWrap: 'wrap' }}>
-              <span>Data Coverage</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{
-                  fontWeight: 700,
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  fontFamily: "'Courier New', monospace"
-                }}>
-                  {coverageScore}/100
-                </span>
-                <span style={{
-                  display: 'inline-block',
-                  width: '48px',
-                  height: '4px',
-                  background: 'var(--border)', overflow: 'hidden'
-                }}>
-                  <span style={{
-                    display: 'block',
-                    height: '100%',
-                    width: `${coverageScore}%`,
-                    background: 'var(--text-secondary)'}} />
-                </span>
-              </span>
-              <span style={{ width: '100%', fontSize: '9px', color: 'var(--text-secondary)' }}>
-                Stored coverage heuristic · verification unknown. Assessment time unknown.
-              </span>
-            </div>
-          )}
+
         </div>
       </div>
 

@@ -54,19 +54,14 @@ it('leaves the empty briefing absent', async () => {
   await mount(null); expect(host.textContent).toBe('');
 });
 
-it('preserves the existing sold-context scope and unmatched-condition label', async () => {
-  fixture.context.vehicleIntel = { recent_comps: [{ id: 'offline-sale', year: 1966, make: 'Ford', model: 'Mustang', sale_price: 20000 }],
+it('shows valid sold context without requiring an unrelated headline or raw observation count', async () => {
+  fixture.context.vehicleIntel = { recent_comps: [{ id: 'offline-sale', year: 1966, model: 'Mustang', sale_price: 20000, sale_date: '2026-09-01', mileage: 30000 }],
     recent_comps_scope: { label: 'Registered source scope' } };
   await act(async () => root.render(<VehicleBriefing />));
-  const button = host.querySelector('button');
-  // A comps-only record stays behind the existing meaningful-intelligence guard.
-  expect(button).toBeNull();
-  fixture.context.observationCount = 1;
-  await act(async () => root.render(<VehicleBriefing />));
-  await act(async () => { host.querySelector('button')!.click(); });
-  expect(host.textContent).toContain('RECENT SOLD RECORD');
+  expect(host.querySelector('.vp-sold-context')).not.toBeNull();
   expect(host.textContent).toContain('Registered source scope');
-  expect(host.textContent).toContain('Condition not matched');
+  expect(host.textContent).toContain('condition unmatched');
+  expect(host.querySelector('a[href="/vehicle/offline-sale"]')).not.toBeNull();
 });
 
 it.each([10000, 25000, 50000])('preserves the stored range without interpreting price %s as a proved deal', async amount => {
