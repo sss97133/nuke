@@ -9,7 +9,7 @@ await import("./index.ts");Deno.serve=serve;
 Deno.test("real powertrain selector uses registered keys, canonical hash/dedup and typed parent; no model calls",async()=>{
  Deno.env.set("SUPABASE_URL","https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY","test-key");
  const original=globalThis.fetch,rows=new Map<string,any>();let writes=0;let native=false;
- const nativeText="This vehicle is offered with service records and a clean title. The car is powered by a 1.8-liter inline-four paired with a five-speed manual transmission. The digital odometer indicates 53k miles.";
+ const nativeText="This vehicle is offered with service records and a clean title. The car is powered by a 1.8-liter inline-four paired with a five-speed manual transmission. The digital odometer indicates 53k miles. The car is finished in Guards Red over black leather. Power is sent to the rear wheels through a five-speed manual gearbox.";
  const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json"}});
  globalThis.fetch=async(resource,init)=>{
   const url=new URL(typeof resource==="string"?resource:resource instanceof URL?resource.href:resource.url);
@@ -23,8 +23,8 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
    if(options?.method==="POST"){
     assert(body.source_observation_id===PARENT && body.vehicle_id===VID && body.property_id===VID);
     assert(body.confidence_score<=.6 && body.agent_cost_cents===0 && body.agent_model===null);
-    assert(body.structured_data.source_value && body.structured_data.normalization_version===(body.kind==="condition"?"retained_odometer_miles_v1":"retained_powertrain_v1"));
-    if(native)assert(body.structured_data.source_field==="content_text" && body.structured_data.source_witness_version===(body.kind==="condition"?"retained_description_odometer_v1":"retained_description_powertrain_v1"));
+    assert(body.structured_data.source_value && body.structured_data.normalization_version===(["year","make","model"].includes(body.structured_data.property_key)?"retained_listing_identity_labels_v1":body.kind==="condition"?"retained_odometer_miles_v1":["interior_color","exterior_color"].includes(body.structured_data.property_key)?"retained_color_text_v1":"retained_powertrain_v1"));
+    if(native)assert(body.structured_data.source_field==="content_text" && body.structured_data.source_witness_version===(body.kind==="condition"?"retained_description_odometer_v1":["interior_color","exterior_color","drivetrain_layout"].includes(body.structured_data.property_key)?"retained_description_presentation_v1":"retained_description_powertrain_v1"));
     if(body.kind==="condition")assert(body.structured_data.mileage_miles===53000 && body.structured_data.true_mileage_status==="unknown" && body.structured_data.value_is_approximate===true);
     const row={...body,id:`77777777-7777-4777-8777-${String(++writes).padStart(12,"0")}`};rows.set(body.content_hash,row);return respond(row,201);
    }
@@ -35,7 +35,7 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
     structured_data:{extractor:"extract-bat-core",source_text_field:"extract-bat-core.extractDescription",description_capture:true,
     source_capture_basis:"direct_fetch",source_capture_sha256:"a".repeat(64),source_captured_at:"2026-10-05T00:20:04.123456Z",
     observation_time_basis:"source_capture",source_event_time_status:"unknown",extractor_input_truncated:false}}:
-    {structured_data:{engine_size:"302ci V8",transmission:"Four-Speed Manual",drivetrain:"4WD"}})}]);
+    {structured_data:{engine_size:"302ci V8",transmission:"Four-Speed Manual",drivetrain:"4WD",year:2001,make:"Example Manufacturer",model:"Prototype GT"}})}]);
    const hash=url.searchParams.get("content_hash")?.slice(3);return respond(hash&&rows.has(hash)?[rows.get(hash)]:[]);
   }
   throw Error(`unexpected route ${url.pathname}`);
@@ -43,7 +43,7 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
  try{
   for(const nativeMode of [false,true]){
    native=nativeMode;
-   for(const key of [...Object.keys(RETAINED_POWERTRAIN_FIELDS),...(native?["mileage_miles"]:[])].filter(k=>!native || k!=="drivetrain_layout")){
+   for(const key of [...Object.keys(RETAINED_POWERTRAIN_FIELDS),...(native?["mileage_miles","interior_color","exterior_color"]:["year","make","model"])]){
    const request=(extra={})=>new Request("https://db.test/functions/v1/ingest-observation",{method:"POST",
     headers:{Authorization:"Bearer test-key","Content-Type":"application/json"},
     body:JSON.stringify({mode:`retained_listing_${key}_v1`,source_observation_id:PARENT,...extra})});
@@ -52,7 +52,7 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
    assert((await handler(request({structured_data:{[key]:"forged"}}))).status===400);
   }
   }
-  assert(writes===8 && rows.size===8);
+  assert(writes===14 && rows.size===14);
  }finally{
   globalThis.fetch=original;
   for(const [i,key] of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()){

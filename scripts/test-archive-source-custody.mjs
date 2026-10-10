@@ -52,6 +52,8 @@ const sources = new Map([
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
+  ['retainedListingIdentity',compile('../supabase/functions/ingest-observation/retainedListingIdentity.ts')],
+  ['retainedDescriptionPresentation',compile('../supabase/functions/ingest-observation/retainedDescriptionPresentation.ts')],
   ['retainedIdentity',compile('../supabase/functions/ingest-observation/retainedIdentity.ts')],
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
@@ -236,6 +238,8 @@ function fixture(options = {}) {
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
+        if(specifier==='./retainedListingIdentity.ts')return load('retainedListingIdentity');
+        if(specifier==='./retainedDescriptionPresentation.ts')return load('retainedDescriptionPresentation');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
