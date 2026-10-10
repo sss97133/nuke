@@ -521,7 +521,8 @@ Deno.serve(async (req) => {
             "Authorization": `Bearer ${serviceKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ mode: "condition_backfill", batch_size: backfillBatch, continue: true }),
+          body: JSON.stringify({ mode: "condition_backfill", batch_size: backfillBatch, continue: true,
+            cached_conditions_only: body.cached_conditions_only === true }),
         }).catch(e => console.error("[discover-desc] Backfill chain failed:", e));
       }
 
