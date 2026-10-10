@@ -103,6 +103,7 @@ function fixture(options = {}) {
       return Response.json({ success: true, observation_id: id, duplicate: false });
     }
     if (url.pathname.endsWith('/functions/v1/discover-description-data')) {
+      if (options.allowContinuation) return Response.json({ success: true });
       assert.fail('A single-vehicle or refused batch must not start continuation');
     }
     if (url.pathname.endsWith('/rpc/observation_is_public')) {
@@ -496,6 +497,27 @@ test('matching cached condition output works with no model key; changed source c
     assert.match(result.result.error_details[0], /retry refused without inference/);
     assert.equal(stale.modelPrompts.length + stale.intake.length + stale.cacheWrites.length, 0);
   }
+});
+
+test('cached-only backfill preserves its inference restriction across continuation', async () => {
+  const seed = fixture({ noModelKey: true });
+  const input = { text: fullText, sourceRef: 'vehicle_observations:original-capture', sourceUrl: listingUrl,
+    observedAt: eventTime, ingestedAt: captureTime, textField: 'vehicle_observations.content_text' };
+  const artifact = await seed.input.conditionExtractionArtifact(input, [{ quote }], 'original-model');
+  const first = fixture({ cacheArtifact: artifact, allowContinuation: true });
+  const { result } = await first.run({ mode: 'condition_backfill', batch_size: 1,
+    continue: true, cached_conditions_only: true });
+  assert.equal(result.conditions_ingested, 1);
+  assert.equal(result.continued, true);
+  assert.equal(first.modelPrompts.length, 0);
+  const next = first.requests.find(r => r.url.pathname.endsWith('/functions/v1/discover-description-data'));
+  assert.equal(next.body.cached_conditions_only, true);
+  assert.equal(next.body.batch_size, 1);
+  const missing = fixture(); // A provider key is present, but the artifact is missing.
+  const refused = await missing.run(next.body);
+  assert.match(refused.result.error_details[0], /retry refused without inference/);
+  assert.equal(refused.result.continued, false);
+  assert.equal(missing.modelPrompts.length + missing.intake.length + missing.cacheWrites.length, 0);
 });
 
 test('truncated or malformed model output cannot become a successful cache record', async () => {
