@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { defaultRangeExtractor, useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import { squarify } from '../../lib/squarify';
@@ -9,6 +9,7 @@ import AuctionEvidence from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeIdentity, MakeLogo } from '../../components/common/MakeIdentity';
+import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their
@@ -67,8 +68,13 @@ function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 }
 
+function elapsed(at: string): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(at)) / 60_000));
+  return minutes < 1 ? 'within 1m' : minutes < 60 ? `${minutes}m ago` : minutes < 1440 ? `${Math.floor(minutes / 60)}h ago` : `${Math.floor(minutes / 1440)}d ago`;
+}
+
 function title(a: LiveAuction): string {
-  return a.title ?? [a.year, a.make === NO_MAKE ? null : a.make, a.model].filter(Boolean).join(' ');
+  return vehicleIdentity(a);
 }
 
 // Every countdown ticks by the second on the page's one shared clock (useSecondClock).
@@ -77,7 +83,7 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
   const remaining = endsAt - now;
   return (
     <span style={{ ...mono, fontWeight: strong || remaining < HOUR ? 700 : 400, color: remaining < HOUR ? 'var(--text)' : 'var(--text-secondary)' }}>
-      {left(remaining)}
+      {remaining <= 0 ? 'Awaiting result' : left(remaining)}
     </span>
   );
 }
@@ -350,44 +356,7 @@ function heatParts(a: LiveAuction, heat: Heat) {
   };
 }
 
-function explainHeat(a: LiveAuction, heat: Heat): string {
-  const x = heatParts(a, heat);
-  return `Bid ${x.bid} with ${x.left} left. ${x.comps} comparable BaT sales (same model page, weighted toward the same version, year, mileage and gearbox) put the middle at ${x.middle}, 80% range ${x.range}. With this much time left, cars at this price are usually bid to about ${x.share}% of their final, so a typical bid now is about ${x.typical}; this one is at ${x.multiple} that.${x.beyond ? ` ${x.beyond}` : ''}${x.outcome ? ` ${x.outcome}` : ''}`;
-}
-
-// A phone has no hover, so a tag is also a button: tapping it opens the reasoning (ExplainSheet). The title
-// attribute stays for mouse users. Tags sit inside row links, so the tap must not open the car.
 const ExplainContext = createContext<((a: LiveAuction, heat: Heat) => void) | null>(null);
-
-// The tag carries its why: the measure, where in the auction it was taken, and the comparison set's size.
-function heatWhy(a: LiveAuction, heat: Heat): string {
-  return `${heat.state === 'hot' ? 'Hot' : 'Cold'} · bid ${multiple(heat.ratio)} typical at ${out(heat.hoursLeft)} · ${a.band?.comps ?? 0} comps`;
-}
-
-function HeatTag({ a, heat, style }: { a: LiveAuction; heat: Heat | null | undefined; style?: React.CSSProperties }) {
-  const explain = useContext(ExplainContext);
-  if (!heat || heat.state === 'in line') return null;
-  const hot = heat.state === 'hot';
-  const text = heatWhy(a, heat);
-  const open = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    explain?.(a, heat);
-  };
-  return (
-    <span
-      title={explainHeat(a, heat)}
-      role={explain ? 'button' : undefined}
-      tabIndex={explain ? 0 : undefined}
-      aria-label={explain ? `${text}: why` : undefined}
-      onClick={explain ? open : undefined}
-      onKeyDown={explain ? (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); } : undefined}
-      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', minWidth: 0, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: explain ? 'pointer' : undefined, ...style }}
-    >
-      {text}
-    </span>
-  );
-}
 
 // The reasoning behind one tag, opened by tapping it: bottom sheet on a phone, a panel bottom-right on desktop.
 function ExplainSheet({ item, onClose, narrow }: { item: { a: LiveAuction; heat: Heat } | null; onClose: () => void; narrow: boolean }) {
@@ -615,7 +584,7 @@ const STALE_MS = 45 * 60_000;
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
     <span
-      title={`Recorded current bid. Vehicle record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
+      title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       style={{
         ...mono,
         fontWeight: 700,
@@ -630,53 +599,64 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   );
 }
 
-// Fixed row heights so the board can render only the rows on screen.
-const ROW_H = 52;
-const ROW_H_NARROW = 50;
+// The virtualizer measures expanded rows; these are estimates for closed rows.
+const ROW_H = 88;
+const ROW_H_NARROW = 134;
 
-function BoardRow({ a, risen, narrow, stale, heat, onActivity }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean; heat: Heat | null | undefined; onActivity: (a: LiveAuction) => void }) {
-  const nr = a.noReserve && <span style={{ ...label, color: 'var(--text)', border: '2px solid var(--text)', padding: '0 3px', flexShrink: 0 }}>NR</span>;
-  const tagged = (heat != null && heat.state !== 'in line') || a.noReserve;
-  const name = <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>;
+function BoardRow({ a, risen, stale, detail, visible, expanded, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; visible: boolean; expanded: boolean;
+  onInspect: (a: LiveAuction, view: LotInspection) => void;
+}) {
+  const specs = useMarketRowSpecs(a.id, visible && !!detail);
+  const facts = selectRowFacts(specs.data ?? [], title(a));
+  const bidReading = detail?.currentBid != null ? { ...a, currentBid: detail.currentBid,
+    updatedAt: detail.recordedAt ? Date.parse(detail.recordedAt) : a.updatedAt } : a;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 8 : 10, padding: '0 8px', height: narrow ? ROW_H_NARROW : ROW_H, boxSizing: 'border-box', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
-      <div style={{ width: narrow ? 74 : 84, flexShrink: 0 }}>
+    <div className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
+      <div className="market-lot-close">
+        <span className="market-lot-label">Closes in</span>
         <Countdown endsAt={a.endsAt} />
       </div>
-      <Link to={`/vehicle/${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, textDecoration: 'none', color: 'var(--text)' }}>
-        <Thumb src={a.imageUrl} size={narrow ? 40 : 60} />
-        {narrow ? (
-          // A phone has no room for tags beside the title: they go under it.
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            {name}
-            {tagged && <span style={{ display: 'flex', gap: 4, minWidth: 0 }}><HeatTag a={a} heat={heat} />{nr}</span>}
-          </span>
-        ) : name}
-      </Link>
-      {!narrow && <HeatTag a={a} heat={heat} style={{ flexShrink: 0 }} />}
-      {!narrow && nr}
-      <div style={{ width: narrow ? 76 : 104, textAlign: 'right', flexShrink: 0 }}>
-        <BidCell auction={a} risen={risen} stale={stale} />
-        <button aria-label={`Inspect activity for ${title(a)}`} onClick={() => onActivity(a)} style={{ ...label, display: 'block', marginLeft: 'auto',
-          padding: '3px 0', background: 'var(--bg)', color: 'var(--text)', border: 'none', textDecoration: 'underline' }}>Activity</button>
+      <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
+        aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
+        <Thumb src={a.imageUrl} size={72} />
+      </button>
+      <div className="market-lot-identity">
+        <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
+          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>{title(a)}</button>
+        <div className="market-lot-facts">
+          {facts.map(f => <button type="button" key={f.field} onClick={() => onInspect(a, 'vehicle')}
+            title={`${f.label}: ${f.value}${f.conflict ? ' · differing reports' : ''}`}
+            aria-label={`Inspect ${f.label.toLowerCase()} for ${title(a)}: ${f.value}${f.conflict ? ', differing reports' : ''}`}>
+            {f.value}{f.conflict && <span aria-hidden="true"> †</span>}
+          </button>)}
+          {!facts.length && specs.isError && <span>Specifications unavailable</span>}
+        </div>
+        <div className="market-lot-context">
+          {detail?.location && <span>{detail.location}</span>}
+          {a.noReserve && <span>No reserve</span>}
+          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}>Source: BaT</button>
+        </div>
       </div>
-      {a.listingUrl && !narrow && (
-        <a
-          href={a.listingUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="The listing on Bring a Trailer"
-          style={{ ...label, color: 'var(--text-secondary)', textDecoration: 'none', flexShrink: 0 }}
-        >
-          BAT ↗
-        </a>
-      )}
+      <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
+        aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
+        <span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>
+        <span className="market-lot-counts">
+          {detail?.bidCount != null && <span>{detail.bidCount.toLocaleString('en-US')} bids</span>}
+          {detail?.watchers != null && <span>{detail.watchers.toLocaleString('en-US')} watching</span>}
+        </span>
+        {detail?.lastBidAt && <span className="market-lot-last-bid">Last bid <time dateTime={detail.lastBidAt} title={new Date(detail.lastBidAt).toLocaleString()}>{elapsed(detail.lastBidAt)}</time></span>}
+      </button>
     </div>
   );
 }
 
 // Every row stays reachable by scrolling; only the ones near the viewport are in the DOM.
-function Board({ rows, risenIds, narrow, stale, heat, onActivity }: { rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; heat: Map<string, Heat | null>; onActivity: (a: LiveAuction) => void }) {
+function Board({ rows, risenIds, narrow, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; activityId: string | null;
+  inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
+  onInspectionChange: (view: LotInspection) => void; onClose: () => void;
+}) {
   const listRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
   useLayoutEffect(() => {
@@ -689,14 +669,40 @@ function Board({ rows, risenIds, narrow, stale, heat, onActivity }: { rows: Live
     return () => ro.disconnect();
   }, []);
   const rowH = narrow ? ROW_H_NARROW : ROW_H;
-  const v = useWindowVirtualizer({ count: rows.length, estimateSize: () => rowH, overscan: 12, scrollMargin: offset });
+  const selectedIndex = rows.findIndex(a => a.id === activityId);
+  const initialSelection = useRef(activityId);
+  const v = useWindowVirtualizer({ count: rows.length, estimateSize: () => rowH, overscan: 3, scrollMargin: offset, scrollPaddingStart: 64,
+    getItemKey: index => rows[index].id,
+    rangeExtractor: range => Array.from(new Set([...defaultRangeExtractor(range), ...(selectedIndex >= 0 ? [selectedIndex] : [])])).sort((a, b) => a - b),
+  });
+  useLayoutEffect(() => {
+    if (initialSelection.current === activityId && activityId && selectedIndex >= 0 && offset > 0) {
+      v.scrollToIndex(selectedIndex, { align: 'start' });
+      initialSelection.current = null;
+    }
+  }, [activityId, selectedIndex, offset, v]);
+  const items = v.getVirtualItems();
+  // Metadata is batched by stable 24-row pages; scrolling does not launch one request per cell.
+  const firstVisible = v.range?.startIndex ?? items[0]?.index ?? 0;
+  const pageStart = Math.floor(firstVisible / 24) * 24;
+  const page = rows.slice(pageStart, pageStart + 24);
+  const nextPage = rows.slice(pageStart + 24, pageStart + 48);
+  const details = useMarketRowDetails(page);
+  const following = useMarketRowDetails(items.some(i => i.index >= pageStart + 24) ? nextPage : []);
+  const selected = useMarketRowDetails(selectedIndex >= 0 && (selectedIndex < pageStart || selectedIndex >= pageStart + 48) ? [rows[selectedIndex]] : []);
   return (
     <div ref={listRef} style={{ height: v.getTotalSize(), position: 'relative' }}>
-      {v.getVirtualItems().map((item) => {
+      {items.map((item) => {
         const a = rows[item.index];
+        const detail = details.data?.get(a.id) ?? following.data?.get(a.id) ?? selected.data?.get(a.id);
+        const expanded = a.id === activityId;
         return (
-          <div key={a.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} narrow={narrow} stale={stale} heat={heat.get(a.id)} onActivity={onActivity} />
+          <div key={a.id} data-index={item.index} ref={v.measureElement} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail}
+              visible={expanded || (item.index >= firstVisible && item.index <= (v.range?.endIndex ?? firstVisible + 12))}
+              expanded={expanded} onInspect={onInspect} />
+            {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
+              sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
         );
       })}
@@ -732,11 +738,28 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const model = make ? params.get('model') : null;
   const lotParam = params.get('lot');
   const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
-  const openActivity = (auction: LiveAuction) => {
-    const next = new URLSearchParams(params); next.set('lot', auction.id); setParams(next);
+  const [pinnedAuction, setPinnedAuction] = useState<LiveAuction | null>(null);
+  useEffect(() => {
+    const current = data?.auctions.find(a => a.id === activityId);
+    if (current) setPinnedAuction(current);
+    else if (!activityId) setPinnedAuction(null);
+  }, [activityId, data]);
+  const inspection: LotInspection = params.get('inspect') === 'vehicle' ? 'vehicle' : params.get('inspect') === 'sources' ? 'sources' : 'auction';
+  const openActivity = (auction: LiveAuction, view: LotInspection) => {
+    const next = new URLSearchParams(params);
+    if (activityId === auction.id && inspection === view) { next.delete('lot'); next.delete('inspect'); }
+    else { setPinnedAuction(auction); next.set('lot', auction.id); next.set('inspect', view); }
+    setParams(next, { preventScrollReset: true });
+  };
+  const setInspection = (view: LotInspection) => {
+    const next = new URLSearchParams(params); next.set('inspect', view);
+    setParams(next, { replace: true, preventScrollReset: true });
   };
   const closeActivity = () => {
-    const next = new URLSearchParams(params); next.delete('lot'); setParams(next);
+    const active = activityId;
+    const next = new URLSearchParams(params); next.delete('lot'); next.delete('inspect'); setParams(next, { preventScrollReset: true });
+    if (active) requestAnimationFrame(() => (document.querySelector<HTMLButtonElement>(`[data-vehicle-id="${active}"] .market-lot-name`)
+      ?? document.querySelector<HTMLButtonElement>('.market-lot-name'))?.focus({ preventScroll: true }));
   };
   const salesDay = params.get('day');
   const salesLens: MarketSalesLens = {
@@ -810,6 +833,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const board = useMemo(() => {
     const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid) === selectedBid)
       && (model == null || recordedModel(a) === model));
+    // Keep an inspected lot reachable while the board rolls past its deadline.
+    if (pinnedAuction?.id === activityId && !rows.some(a => a.id === activityId)) rows.push(pinnedAuction);
     const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
@@ -817,7 +842,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [scoped, selectedBid, sort, heat, model]);
+  }, [scoped, selectedBid, sort, heat, model, pinnedAuction, activityId]);
 
   if (!data && isError && view === 'inventory' && !activityId) return <>
     <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
@@ -842,7 +867,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
 
-      {activityId && <AuctionEvidence vehicleId={activityId} onClose={closeActivity} />}
+      {activityId && (view !== 'inventory' || !board.some(a => a.id === activityId)) &&
+        <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
 
       <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
 
@@ -895,11 +921,12 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
-            {board.length.toLocaleString('en-US')} lots · source bid units unverified
+            {board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots · source bid units unverified
             {make ? ` · ${make}` : ''}
             {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
             {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
+            <span style={{ marginLeft: 12, fontWeight: 400 }}>† differing specification reports</span>
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {SORTS.map((s) => (
@@ -928,7 +955,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}>Clear market filters</button></div>}
-        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={openActivity} />}
+        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind}
+          activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
       </section>
       </div>
       </>}

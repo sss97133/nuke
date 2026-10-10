@@ -38,3 +38,9 @@ it('does not borrow comments from other sources or malformed URLs', async () => 
   expect(await readAuctionEpisode('public')).toBeNull();
   expect(fixture.from.mock.calls.map(c => c[0])).toEqual(['vehicles']);
 });
+
+it('does not switch an open market inspection to a different relisting', async () => {
+  expect(await readAuctionEpisode('public', 'https://bringatrailer.com/listing/previous/')).toBeNull();
+  expect(fixture.from.mock.calls.map(c => c[0])).toEqual(['vehicles']);
+  expect(fixture.rpc).not.toHaveBeenCalled();
+});

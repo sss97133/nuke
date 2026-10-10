@@ -3,6 +3,7 @@ import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { listingDescriptionsFromSpecs } from '../../components/vehicle/listingDescriptions';
 import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '../../hooks/useAuctionComments';
 import { useLotMovement } from './useLotMovement';
+import { selectRowFacts, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import './AuctionEvidence.css';
 
 function stamp(value: string | null | undefined) {
@@ -86,22 +87,26 @@ function BidPath({ rows, selected, onSelect }: {
   </>;
 }
 
-export default function AuctionEvidence({ vehicleId, onClose }: { vehicleId: string; onClose: () => void }) {
-  const query = useAuctionEpisode(vehicleId);
+export default function AuctionEvidence({ vehicleId, onClose, compact = false, inspection = 'auction', summary, onInspectionChange, sourceUrl }: {
+  vehicleId: string; onClose: () => void; compact?: boolean; inspection?: LotInspection; summary?: MarketRowDetails;
+  onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null;
+}) {
+  const query = useAuctionEpisode(vehicleId, sourceUrl);
   const ids = useMemo(() => query.data ? [vehicleId] : [], [query.data, vehicleId]);
   const activity = useLotMovement(ids);
   const receipt = activity.coverage?.lots.find(l => l.vehicle_id === vehicleId
     && l.source_url?.replace(/\/$/, '') === query.data?.sourceUrl.replace(/\/$/, ''));
   const [selected, setSelected] = useState<string | null>(null);
   const [allDiscussion, setAllDiscussion] = useState(false);
+  const [view, setView] = useState<LotInspection>(inspection);
+  useEffect(() => setView(inspection), [inspection]);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     setSelected(null); setAllDiscussion(false);
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.focus({ preventScroll: true });
-    ref.current?.scrollIntoView?.({ block: 'start' });
+    if (!compact) ref.current?.focus({ preventScroll: true });
     return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
-  }, [vehicleId]);
+  }, [vehicleId, compact]);
   const evidence = query.data;
   const rows = evidence?.interactions ?? [];
   const event = rows.find(r => r.id === selected) ?? rows.find(r => r.comment_type === 'bid'
@@ -113,7 +118,81 @@ export default function AuctionEvidence({ vehicleId, onClose }: { vehicleId: str
   const description = evidence?.specs.find(s => s.field === 'description');
   const native = descriptions.find(d => d.source_url.replace(/\/$/, '') === evidence?.sourceUrl.replace(/\/$/, ''));
   const specs = evidence?.specs.filter(s => s.field !== 'description' && (s.value != null || s.reported_value != null)) ?? [];
-  const name = evidence ? evidence.vehicle.title || [evidence.vehicle.year, evidence.vehicle.make, evidence.vehicle.model].filter(Boolean).join(' ') : 'Listing evidence';
+  const name = evidence ? vehicleIdentity(evidence.vehicle) : 'Auction';
+  if (compact) {
+    const facts = selectRowFacts(specs, name);
+    const bids = rows.filter(r => r.comment_type === 'bid' && r.bid_amount != null && Number.isFinite(Number(r.bid_amount))
+      && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')))
+      .sort((a, b) => Date.parse(b.posted_at!) - Date.parse(a.posted_at!) || a.id.localeCompare(b.id));
+    const recent = bids.slice(0, 3);
+    const change = bids.length > 1 ? Number(bids[0].bid_amount) - Number(bids[1].bid_amount) : null;
+    const seller = rows.find(r => r.is_seller || r.comment_type === 'seller_response');
+    const question = rows.find(r => r.comment_type === 'question');
+    return <section className="market-lot-inspection" id={`lot-inspection-${vehicleId}`} ref={ref}
+      aria-label={`Inspect ${name}`} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+      <header className="market-inspection-header">
+        <nav aria-label="Inspect this lot">{(['auction', 'vehicle', 'sources'] as const).map(v =>
+          <button type="button" key={v} aria-pressed={view === v} onClick={() => { setView(v); onInspectionChange?.(v); }}>{v === 'auction' ? 'Auction' : v === 'vehicle' ? 'Vehicle' : 'Sources'}</button>)}</nav>
+        <button type="button" onClick={onClose} aria-label="Close lot inspection">Close ×</button>
+      </header>
+      {query.isPending && <p role="status">Reading this auction…</p>}
+      {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
+      {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
+      {evidence && view === 'auction' && <>
+        <div className="market-inspection-reading">
+          {recent.length ? <p><strong>Latest recorded bid {amount(Number(recent[0].bid_amount))}</strong>
+            {change != null && <> · {change >= 0 ? '+' : ''}{amount(change)} from the previous retained bid</>}
+            <span className="market-inspection-caption">Posted <time dateTime={recent[0].posted_at!}>{stamp(recent[0].posted_at)}</time> · currency unverified</span></p>
+            : <p>No dated bid records are available for this listing.</p>}
+          {(summary?.bidCount != null || summary?.watchers != null) && <p className="market-inspection-counts">
+            {summary.bidCount != null && <span><strong>{summary.bidCount.toLocaleString('en-US')}</strong> bids recorded</span>}
+            {summary.watchers != null && <span><strong>{summary.watchers.toLocaleString('en-US')}</strong> watching</span>}
+            <span className="market-inspection-caption">Listing counts; latest record write {stamp(summary.recordedAt)}. Source freshness is separate.</span>
+          </p>}
+        </div>
+        {recent.length > 1 && <div className="market-inspection-bids" aria-label="Recent retained bids">
+          {recent.slice().reverse().map(r => <div key={r.id}><strong>{amount(Number(r.bid_amount))}</strong>
+            <time dateTime={r.posted_at!}>{new Date(r.posted_at!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</time></div>)}
+        </div>}
+        <p className="market-inspection-caption">{receipt?.source_read_at && receipt.source_read_basis !== 'unknown'
+          ? <>Source {receipt.source_read_basis === 'cached_snapshot' ? 'snapshot' : 'read'}: <time dateTime={receipt.source_read_at}>{stamp(receipt.source_read_at)}</time>.</>
+          : 'Source read time unavailable.'} {evidence.truncated ? 'Earlier records are outside this read.' : 'Capture completeness is unknown.'}</p>
+        {(question || seller) && <details className="market-inspection-more"><summary>Latest question & seller update</summary>
+          {[question, seller].filter((r): r is EpisodeInteraction => !!r).map(r => <div key={r.id}>
+            <strong>{kind(r)}</strong><p>{r.comment_text?.trim() || 'Media statement; text not recorded.'}</p>
+            <time dateTime={r.posted_at || undefined}>{stamp(r.posted_at)}</time></div>)}
+          <p className="market-inspection-caption">Separate source statements; a reply relationship is not established.</p>
+        </details>}
+        {bids.length > 0 && <details className="market-inspection-more"><summary>Inspect the recorded bid sequence</summary>
+          <BidPath rows={rows} selected={event?.id ?? null} onSelect={setSelected} />
+          {event && <p className="market-inspection-caption">Selected: {amount(Number(event.bid_amount))} · {stamp(event.posted_at)}</p>}
+        </details>}
+      </>}
+      {evidence && view === 'vehicle' && <>
+        <strong>{name}</strong>
+        {summary?.location && <p>Listing location: {summary.location}</p>}
+        {facts.length ? <dl className="market-inspection-facts">{facts.map(f => <div key={f.field}>
+          <dt>{f.label}</dt><dd><strong>{f.value}</strong>
+            {f.conflict && <span className="market-inspection-caption">Reports differ; compare the supporting evidence.</span>}
+            {f.observationId && <Link to={`/vehicle/${vehicleId}/observation/${f.observationId}`}>Evidence →</Link>}</dd>
+        </div>)}</dl> : <p>No attributed distinguishing specifications are available in this read.</p>}
+        {facts.length > 0 && <details className="market-inspection-more"><summary>Why these facts?</summary>
+          <p>Disagreements come first, then powertrain, body and appearance. Facts already in the identity are omitted.
+            These are attributed vehicle reports; rarity and current installed configuration have not been established.</p>
+        </details>}
+        <Link to={`/vehicle/${vehicleId}`}>Explore the vehicle record →</Link>
+      </>}
+      {evidence && view === 'sources' && <div className="market-inspection-sources">
+        <p><strong>Bring a Trailer</strong>{evidence.vehicle.title && <span className="market-inspection-caption">Published headline: {evidence.vehicle.title}</span>}</p>
+        <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Open original listing ↗</a>
+        <p>{rows.length} retained interactions in this read{evidence.truncated ? '; earlier records omitted' : '; capture completeness unknown'}.</p>
+        <p>Source read: {receipt?.source_read_at && receipt.source_read_basis !== 'unknown' ? stamp(receipt.source_read_at) : 'unavailable'}.
+          Browser read: {stamp(evidence.fetchedAt)}.</p>
+        {summary?.location && <p>Listing location: {summary.location} · {summary.locationSource}.</p>}
+        <p>Amounts retain their source numbers; currency is unverified. Record-write time does not establish source freshness.</p>
+      </div>}
+    </section>;
+  }
   return <section className="auction-evidence" ref={ref} tabIndex={-1} aria-label="Listing activity evidence"
     onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
     <header className="auction-evidence-header">
