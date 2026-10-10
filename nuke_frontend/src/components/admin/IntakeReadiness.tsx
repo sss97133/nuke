@@ -136,6 +136,7 @@ export default function IntakeReadiness() {
   const config = jobs?.config?.rows ?? [];
   const activeJobs = config.filter(j => j.present && j.active === true);
   const pausedJobs = config.filter(j => j.present && j.active === false);
+  const executionReadings = activeJobs.filter(j => health.some(h => h.jobname === j.jobname && typeof h.last_status === 'string')).length;
   const failedJobs = activeJobs.filter(j => {
     const h = health.find(h => h.jobname === j.jobname);
     return h?.last_status === 'failed' || h?.assay_status === 'failed' || h?.health_status === 'failed';
@@ -178,7 +179,7 @@ export default function IntakeReadiness() {
       </a>
       <a href="#status-jobs" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
         <div style={label}>Jobs reporting failure</div><div style={metric}>{health.length > 0 ? count(failedJobs.length) : 'Unmeasured'}</div>
-        <div>{health.length} execution readings / {activeJobs.length} enabled jobs</div>
+        <div>{executionReadings} execution readings / {activeJobs.length} enabled jobs</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Output {jobs?.health?.output_measured === false || jobs?.health?.status !== 'measured' ? 'unmeasured' : 'assays below'} · not fleet health</div>
       </a>
       <a href="#status-consumers" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>

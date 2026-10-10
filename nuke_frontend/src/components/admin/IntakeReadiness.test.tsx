@@ -183,6 +183,14 @@ it('exposes declared consumer gaps and drills a dependency into its table owners
   expect(container.querySelector('#status-consumers')!.textContent).toContain('No question matches');
 });
 
+it('does not count paused jobs as execution readings for enabled jobs', async () => {
+  fixture.responses.jobs.data.health.rows.push({ jobname: 'synthetic-paused', last_status: 'succeeded',
+    assay_status: null, health_status: 'paused', declared_writer: null });
+  await render();
+  expect(container.textContent).toContain('1 execution readings / 1 enabled jobs');
+  expect(container.textContent).not.toContain('2 execution readings / 1 enabled jobs');
+});
+
 it('withholds consumer aggregates on overflow and rejects malformed declared counts', async () => {
   fixture.responses.consumers.data.complete = false;
   await render();
