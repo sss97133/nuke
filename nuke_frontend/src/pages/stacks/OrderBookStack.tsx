@@ -11,6 +11,7 @@ import {
 import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
+import { stackBackParams } from './bidExpression';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
 import './stacks.css';
 
@@ -569,8 +570,9 @@ export default function OrderBookStack() {
   if (!UUID_RE.test(vehicleId)) {
     return <main className="stack-page"><p className="stack-status" role="status">This address does not name a vehicle. Nothing was read.</p></main>;
   }
+  const back = stackBackParams(params.get('back')).toString();
   const header = (
-    <div className="stack-eyebrow"><Link to={params.get('back')?.startsWith('/stacks?') ? params.get('back')! : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
+    <div className="stack-eyebrow"><Link to={back ? `/stacks?${back}` : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
   );
   if (query.isPending) return <main className="stack-page">{header}<p className="stack-status" role="status">Reading the lot…</p></main>;
   if (query.isError) {

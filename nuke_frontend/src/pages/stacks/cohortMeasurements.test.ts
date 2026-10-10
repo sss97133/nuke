@@ -1,7 +1,13 @@
 import { expect, it } from 'vitest';
 import { makeStudy, type BidLot, type StudyBid } from './bidMeasurements';
 import { cohortReadings } from './cohortMeasurements';
+import { expressionFromParams, stackBackParams } from './bidExpression';
 import type { OrderBookRead } from './orderBookReader';
+
+it.each(['', '/stacks?'])('inherits the contributor study from either return encoding %s', prefix => {
+  const expression = expressionFromParams(stackBackParams(`${prefix}stack=SA&by=auction&measure=spacing&from=2018&to=2018&make=Porsche&model=911`));
+  expect(expression).toMatchObject({from:2018,to:2018,measure:'spacing',make:'Porsche',model:'911'});
+});
 
 function fixture() {
   const lots:BidLot[] = [], bids:StudyBid[] = [];

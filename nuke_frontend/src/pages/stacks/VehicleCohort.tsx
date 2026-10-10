@@ -5,7 +5,7 @@ import { useBidStudy } from './bidPopulationReader';
 import { MIN_DISTRIBUTION, percentile, quantile, type BidMeasure } from './bidMeasurements';
 import type { OrderBookRead } from './orderBookReader';
 import AnalyticalHeading from './AnalyticalHeading';
-import { expressionFromParams, measures } from './bidExpression';
+import { expressionFromParams, measures, stackBackParams } from './bidExpression';
 import { cohortReadings } from './cohortMeasurements';
 import { formatMeasure, usePlotWidth } from './stackFormat';
 import './stackExplore.css';
@@ -13,7 +13,7 @@ import './stackExplore.css';
 export default function VehicleCohort({ read }: { read: OrderBookRead }) {
   const study = useBidStudy(), [params,setParams] = useSearchParams(), navigate = useNavigate(), {ref,width} = usePlotWidth();
   const back = params.get('back');
-  const inherited = expressionFromParams(new URLSearchParams(back?.startsWith('/stacks?') ? back.slice('/stacks?'.length) : ''));
+  const inherited = expressionFromParams(stackBackParams(back));
   const inheritedMeasure = inherited.measure === 'entry' || inherited.measure === 'winRate' ? 'typical' : inherited.measure;
   const metricParam = params.get('cohortMeasure'), measure: BidMeasure = metricParam === 'spacing' || metricParam === 'bids' || metricParam === 'typical' ? metricParam : inheritedMeasure;
   const from = inherited.from, to = inherited.to;
