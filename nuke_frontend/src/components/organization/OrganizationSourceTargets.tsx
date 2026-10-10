@@ -44,14 +44,14 @@ export default function OrganizationSourceTargets({ organizationId }: { organiza
   return <section id="source-targets" aria-labelledby="source-targets-heading"
     style={{ border: '2px solid var(--border)', padding: 12, marginBottom: 16, fontSize: 11 }}>
     <h3 id="source-targets-heading" style={{ fontSize: 11 }}>KNOWN SOURCE TARGETS</h3>
-    <p>Read {date(reading.measured_at)}. Known listing URLs from source sitemaps; discovery does not prove extraction, a verified vehicle or a sale.</p>
+    <p>Read {date(reading.measured_at)}. Known target URLs from source sitemaps; discovery does not prove extraction, a verified vehicle or a sale.</p>
     {!reading.complete && <p>First 30 source keys only.</p>}
     {sources.map(source => <div key={source.source_slug}>
       <p><strong>{source.display_name}</strong> · {source.total_targets.toLocaleString()} known target URLs</p>
       <details>
         <summary>View {source.targets.length} retained target URLs · bounded sample, unranked</summary>
         <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Source listing', 'First discovered', 'Last seen in inventory'].map(label => <th key={label} scope="col" style={cell}>{label}</th>)}</tr></thead>
+          <thead><tr>{['Source page', 'First discovered', 'Last seen in inventory'].map(label => <th key={label} scope="col" style={cell}>{label}</th>)}</tr></thead>
           <tbody>{source.targets.map(target => <tr key={target.listing_url}>
             <td style={{ ...cell, overflowWrap: 'anywhere' }}><a href={target.listing_url} target="_blank" rel="noopener noreferrer">{target.listing_url}</a></td>
             <td style={cell}>{date(target.first_discovered_at)}</td><td style={cell}>{date(target.last_seen_at)}</td>
