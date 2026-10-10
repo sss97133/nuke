@@ -114,12 +114,15 @@ export default function JournalPage() {
 
   useEffect(() => {
     if (!date) return;
+    let cancelled = false;
+    setData(null);
     setLoading(true);
     setError(null);
     callTool<Response>("project_work_log", { date })
-      .then(setData)
-      .catch((e) => setError(String(e?.message || e)))
-      .finally(() => setLoading(false));
+      .then((result) => { if (!cancelled) setData(result); })
+      .catch((e) => { if (!cancelled) setError(String(e?.message || e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [date]);
 
   if (!date) return <div style={styles.page}>missing date</div>;

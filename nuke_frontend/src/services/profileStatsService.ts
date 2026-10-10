@@ -233,7 +233,8 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     avatar_url: null,
     bio: null,
     location: null,
-    created_at: externalIdentity.first_seen_at || new Date().toISOString(),
+    created_at: externalIdentity.created_at ?? null,
+    member_since: null as string | null,
   };
 
   // Get listings where this identity is seller
@@ -244,18 +245,6 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
       vehicle:vehicles(*)
     `)
     .eq('seller_external_identity_id', externalIdentity.id)
-    .eq('source_platform', 'bat')
-    .order('ended_at', { ascending: false })
-    .limit(100);
-
-  // Get listings where this identity is buyer
-  const { data: batBids } = await supabase
-    .from('vehicle_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .eq('buyer_external_identity_id', externalIdentity.id)
     .eq('source_platform', 'bat')
     .order('ended_at', { ascending: false })
     .limit(100);
@@ -273,6 +262,18 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .order('posted_at', { ascending: false })
     .limit(100);
   if (commentsError) throw commentsError;
+  const [bidRead, firstActivityRead] = await Promise.all([
+    supabase.from('auction_comments')
+      .select('id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events(*, vehicle:vehicles(*))', { count: 'exact' })
+      .eq('external_identity_id', externalIdentity.id).not('bid_amount', 'is', null)
+      .order('posted_at', { ascending: false }).limit(100),
+    supabase.from('auction_comments').select('posted_at')
+      .eq('external_identity_id', externalIdentity.id).not('posted_at', 'is', null)
+      .order('posted_at', { ascending: true }).limit(1),
+  ]);
+  if (bidRead.error) throw bidRead.error;
+  if (firstActivityRead.error) throw firstActivityRead.error;
+  syntheticProfile.member_since = firstActivityRead.data?.[0]?.posted_at ?? null;
   // Preserve the existing BaT source-link shape without duplicating comments.
   const comments = (auctionComments || []).map(comment => comment.platform === 'bat'
     ? { ...comment, listing: comment.auction }
@@ -294,18 +295,18 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   // Calculate stats
   const stats: ProfileStats = {
     total_listings: listings?.length || 0,
-    total_bids: batBids?.length || 0,
+    total_bids: bidRead.count ?? bidRead.data?.length ?? 0,
     total_comments: comments.length,
     total_auction_wins: auctionWins?.length || 0,
     total_success_stories: 0,
-    member_since: externalIdentity.first_seen_at || externalIdentity.created_at,
+    member_since: syntheticProfile.member_since,
   };
 
   return {
     profile: syntheticProfile,
     stats,
     listings: listings || [],
-    bids: batBids || [],
+    bids: bidRead.data || [],
     comments,
     auction_wins: auctionWins || [],
     success_stories: [],

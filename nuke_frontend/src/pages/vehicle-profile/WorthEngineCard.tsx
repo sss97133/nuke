@@ -45,20 +45,22 @@ const WorthEngineCard: React.FC<Props> = ({ vehicleId }) => {
 
   if (isLoading) return null;
   if (error || !data || data.error) return null;
-  if (data.substrate.images === 0 && data.substrate.atoms === 0) return null;
 
   const { inferred_value: iv, substrate, documented_costs: doc, existence_confidence, magnitude_confidence } = data;
+  if (substrate.work_sessions_independent === 0 && substrate.burst_active_min === 0 && doc.total_documented === 0) return null;
+  const bracket = iv.available_method_count > 1;
   const low = iv.range_low_USD;
   const high = iv.range_high_USD;
   const widthPct = high > 0 ? Math.min(100, (low / high) * 100) : 0;
 
   return (
-    <CollapsibleWidget variant="profile" title="Worth Engine — Labor Substrate" defaultCollapsed={false}>
+    <CollapsibleWidget variant="profile" title="Labor evidence & model proxies" defaultCollapsed={false}>
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: 1.6 }}>
+        <p>Model proxies do not establish performed hours or verified labor cost. Documented costs are shown separately.</p>
         {/* Top row: bracket bar */}
-        <div style={{ marginBottom: '10px' }}>
+        {iv.available_method_count > 0 ? <div style={{ marginBottom: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span style={LABEL}>BRACKETED LABOR VALUE (PHOTO SUBSTRATE)</span>
+            <span style={LABEL}>{bracket ? 'AVAILABLE PROXY RANGE' : 'SINGLE AVAILABLE PROXY'}</span>
             <span style={{ ...MONO, fontSize: '8px' }}>
               {MAGNITUDE_COPY[magnitude_confidence] || magnitude_confidence}
             </span>
@@ -66,21 +68,21 @@ const WorthEngineCard: React.FC<Props> = ({ vehicleId }) => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: bracket ? '1fr 1fr' : '1fr',
               gap: '2px',
               marginBottom: '4px',
             }}
           >
             <div style={CELL}>
-              <div style={LABEL}>LOW (CONSERVATIVE / v3)</div>
+              <div style={LABEL}>{bracket ? 'LOWEST AVAILABLE PROXY' : 'MODEL PROXY'}</div>
               <div style={MONO}>{fmt(low)}</div>
             </div>
-            <div style={CELL}>
-              <div style={LABEL}>HIGH (OPTIMISTIC / v2)</div>
+            {bracket && <div style={CELL}>
+              <div style={LABEL}>HIGHEST AVAILABLE PROXY</div>
               <div style={MONO}>{fmt(high)}</div>
-            </div>
+            </div>}
           </div>
-          <div
+          {bracket && <div
             style={{
               position: 'relative',
               height: '6px',
@@ -98,8 +100,8 @@ const WorthEngineCard: React.FC<Props> = ({ vehicleId }) => {
                 background: 'var(--vp-ink)',
               }}
             />
-          </div>
-        </div>
+          </div>}
+        </div> : <p>No available labor model proxy.</p>}
 
         {/* Methods detail */}
         <div style={{ marginBottom: '10px' }}>
@@ -114,17 +116,17 @@ const WorthEngineCard: React.FC<Props> = ({ vehicleId }) => {
             }}
           >
             <span>v1 · work_session minutes × $160 × 0.92</span>
-            <span style={{ textAlign: 'right' }}>{fmt(iv.v1_time_span_clamped_USD)}</span>
+            <span style={{ textAlign: 'right' }}>{iv.v1_available ? fmt(iv.v1_time_span_clamped_USD) : '—'}</span>
             <span style={{ textAlign: 'right', color: 'var(--vp-pencil)' }}>
               {iv.v1_independent ? 'independent' : iv.v1_available ? 'baseline_only' : 'unavailable'}
             </span>
-            <span>v2 · images × 10min × $160 × 0.92</span>
-            <span style={{ textAlign: 'right' }}>{fmt(iv.v2_photo_count_USD)}</span>
+            <span>v2 · photo-volume proxy · images × 10min × $160 × 0.92</span>
+            <span style={{ textAlign: 'right' }}>{iv.v2_available ? fmt(iv.v2_photo_count_USD) : '—'}</span>
             <span style={{ textAlign: 'right', color: 'var(--vp-pencil)' }}>
               {iv.v2_available ? 'available' : 'unavailable'}
             </span>
             <span>v3 · burst-clustered active min × $160 × 0.92</span>
-            <span style={{ textAlign: 'right' }}>{fmt(iv.v3_burst_active_USD)}</span>
+            <span style={{ textAlign: 'right' }}>{iv.v3_available ? fmt(iv.v3_burst_active_USD) : '—'}</span>
             <span style={{ textAlign: 'right', color: 'var(--vp-pencil)' }}>
               {iv.v3_available ? 'available' : 'unavailable'}
             </span>

@@ -1278,7 +1278,7 @@ export default function HomePage() {
   };
 
   // Preserve the existing explicit treemap entry and its filtered feed drill.
-  if (!authLoading && !user && searchParams.get('force_treemap') === '1') {
+  if (!authLoading && searchParams.get('force_treemap') === '1') {
     return <TreemapHomePage onBrowse={() => {
       const next = new URLSearchParams(searchParams);
       next.delete('force_treemap');

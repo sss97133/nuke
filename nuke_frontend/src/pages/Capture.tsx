@@ -17,6 +17,15 @@ const Capture: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [captured, setCaptured] = useState<Array<{ file: File; preview: string }>>([]);
   const [useCaptured, setUseCaptured] = useState(false);
+  const capturedRef = useRef(captured);
+  capturedRef.current = captured;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!cameraOpen || !video || !streamRef.current) return;
+    video.srcObject = streamRef.current;
+    void video.play().catch((e) => setCameraError(String(e?.message || e)));
+  }, [cameraOpen]);
 
   useEffect(() => {
     let mounted = true;
@@ -44,7 +53,7 @@ const Capture: React.FC = () => {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
-      captured.forEach((c) => {
+      capturedRef.current.forEach((c) => {
         try {
           URL.revokeObjectURL(c.preview);
         } catch {
@@ -62,10 +71,6 @@ const Capture: React.FC = () => {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
       setCameraOpen(true);
     } catch (e: any) {
       setCameraError(e?.message ? String(e.message) : 'Camera permission denied');

@@ -1,0 +1,13 @@
+# Reader evidence boundaries
+
+2026-10-10. The owner clarified that the site should surface computed stack readings and their evidence, rather than optimize for a visitor shopping for a vehicle. Raw identifiers and counts remain useful as supporting detail.
+
+The UI review found recurring failures at reader boundaries: an auction detail silently widened the originating study window; feed timeouts substituted global records; source profiles used ingestion dates as membership dates; and photo-volume proxies resembled verified labor estimates. These were concrete implementation failures, not reasons to add another scoring system.
+
+The repair preserves the originating period and measure in the existing cohort reader, excludes the selected vehicle from its peers, retains lot and replay state through vehicle-record navigation, and makes Stacks available in mobile navigation. Segment definition membership is enforced in the existing feed reader alongside user filters. A failed scoped read returns an error rather than a different population.
+
+External profiles label their earliest retained event as observed activity and expose canonical captured bids with event-clock and lot links. Loaded sample counts remain distinct from all retained records. Unknown build totals stay unknown; asset value is not a build budget. Photo-only records do not establish labor, and unavailable model methods do not produce a dollar bracket. Dense card tier explanations describe their actual loaded-field basis without claiming verified condition.
+
+Focused offline checks cover camera stream attachment, notification source writes, delayed hover events, Library grouping, browsing scope, segment definition intersection, inherited cohort periods, canonical profile bids and model-proxy presentation. Public browser checks establish the reader behavior separately from tests. Mocked camera and notification checks are not live permission or write verification.
+
+This is a bounded repair of audited flows. It does not establish global sampling, factory production denominators, condition verification, completed stack layers, or a finished design across every route. Those require explicit reader contracts and coherent page composition, not more decorative metrics.

@@ -76,7 +76,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'signal', label: 'Data Signal' },
   { key: 'vehicles', label: 'Vehicles' },
   { key: 'gmv', label: 'GMV' },
-  { key: 'revenue', label: 'Revenue' },
   { key: 'recent', label: 'Recent' },
   { key: 'name', label: 'Name' },
 ];
@@ -168,6 +167,7 @@ export default function Organizations() {
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [typeFilter, setTypeFilter] = useState(urlType);
   const [sortKey, setSortKey] = useState<SortKey>(urlSort);
@@ -177,6 +177,7 @@ export default function Organizations() {
   const loadOrganizations = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
 
       const { data: orgs, error } = await supabase
         .from('businesses')
@@ -206,6 +207,7 @@ export default function Organizations() {
       setOrganizations(enriched);
     } catch {
       setOrganizations([]);
+      setLoadError('Organization records could not be read.');
     } finally {
       setLoading(false);
     }
@@ -339,6 +341,7 @@ export default function Organizations() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      {loadError && <div role="alert">{loadError} <button type="button" onClick={loadOrganizations}>Read again</button></div>}
       {/* Header */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -346,7 +349,7 @@ export default function Organizations() {
             Organizations
           </h1>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-            Auction houses, dealerships, shops, and collections as investable commodities
+            Attributed activity from auction houses, dealerships, shops and collections
           </p>
         </div>
         <Link
@@ -372,7 +375,6 @@ export default function Organizations() {
           { label: 'With Vehicles', value: stats.withVehicles.toLocaleString() },
           { label: 'Total Vehicles', value: formatNum(stats.totalVehicles) },
           { label: 'Platform GMV', value: stats.totalGmv > 0 ? formatCompact(stats.totalGmv) : '—' },
-          { label: 'Revenue Tracked', value: stats.totalRevenue > 0 ? formatCompact(stats.totalRevenue) : '—' },
         ].map((stat, i) => (
           <div key={i} style={{
             background: 'var(--white)',

@@ -42,12 +42,14 @@ export function useLiveFloor(initial: LiveParams = {}) {
   const [params, setParams] = useState<LiveParams>({ sortBy: 'newest', sortDir: 'desc', ...initial });
   const [rows, setRows] = useState<LiveRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newCount, setNewCount] = useState(0);
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
   const run = useCallback(async (p: LiveParams) => {
     setLoading(true);
+    setError(null);
     try {
       const rpcParams: Record<string, unknown> = {
         p_page: 1,
@@ -95,6 +97,7 @@ export function useLiveFloor(initial: LiveParams = {}) {
       setNewCount(0);
     } catch {
       setRows([]);
+      setError('The captured inventory could not be read. Try again.');
     } finally {
       setLoading(false);
     }
@@ -122,5 +125,5 @@ export function useLiveFloor(initial: LiveParams = {}) {
 
   const refresh = useCallback(() => run(paramsRef.current), [run]);
 
-  return { params, setParams, rows, loading, newCount, refresh };
+  return { params, setParams, rows, loading, error, newCount, refresh };
 }

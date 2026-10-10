@@ -31,7 +31,7 @@ export const MobileBottomNav: React.FC = () => {
 
   const items = [
     { to: '/', label: 'Home', match: (p: string) => p === '/' },
-    { to: '/search', label: 'Search', match: (p: string) => p.startsWith('/search') },
+    { to: '/stacks', label: 'Stacks', match: (p: string) => p.startsWith('/stacks') },
     { to: '/capture', label: '+', match: (p: string) => p === '/capture', isAdd: true },
     { to: '/inbox', label: 'Inbox', match: (p: string) => p.startsWith('/inbox') || p.startsWith('/photo-library'), badge: inboxCount },
     { to: '/profile', label: 'Profile', match: (p: string) => p.startsWith('/profile') },

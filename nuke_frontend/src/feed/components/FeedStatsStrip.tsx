@@ -157,10 +157,10 @@ export function FeedStatsStrip({
     >
       {/* SHOWING: filtered / total */}
       <Stat
-        label="SHOWING"
-        value={isFiltered
+        label={filteredStats ? 'LOADED' : 'ALL RECORDS'}
+        value={!filteredStats ? formatCompact(stats.total_vehicles) : isFiltered
           ? `${formatCompact(filtered.count)} / ${formatCompact(stats.total_vehicles)}`
-          : formatCompact(filtered.count > 0 ? filtered.count : stats.total_vehicles)}
+          : formatCompact(filtered.count)}
         onClick={() => onMetricClick?.('vehicles')}
         active={activeMetric === 'vehicles'}
         hoverHint="Reset to all vehicles"
@@ -168,7 +168,7 @@ export function FeedStatsStrip({
 
       {/* VALUE: filtered set total */}
       <Stat
-        label="VALUE"
+        label={isFiltered ? 'LOADED VALUE' : 'ALL RECORD VALUE'}
         value={formatDollarCompact(isFiltered ? filtered.totalValue : stats.total_value)}
         onClick={() => onMetricClick?.('value')}
         active={activeMetric === 'value'}
