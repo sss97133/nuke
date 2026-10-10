@@ -15,6 +15,32 @@ live atlas and writer/reader behavior before engineering; do not repeat the whol
 
 ## What was delivered
 
+**2026-10-10 rollout and scale correction.** PR923 merged and CI deployed its
+canonical powertrain writer and readers. The approved validation batch admitted
+87 claims on30 existing vehicles, and all87 were checked against their source
+rows; anonymous provenance reads passed for all four property types. That is
+validation evidence, not dataset-scale completion. Thirty vehicles represent
+about0.003% of the live catalog estimate of1.01million vehicles.
+
+The measured scale bottleneck is the existing retained-listing queue: its
+constraint, enqueue function, completion proof and edge drain recognize only
+the two color properties. Its finite replay completed714675 source-key visits
+before this expansion. A separate indexed newest2000-listing dry run found350
+qualified BaT html_match envelopes and994 supported powertrain projections;
+1408 rows used html_description_capture and do not meet this property contract.
+These are bounded eligibility measurements, not new production admissions or
+whole-corpus coverage estimates.
+
+The next repair extends that same queue/drain to the four already ratified
+powertrain properties and restarts the finite baseline below a new recording
+highwater. Completed color work and the exact prior scan receipt survive.
+Future eligible inserts enqueue independently of their recording-clock order.
+The existing120-attempt/minute ceiling and load/backpressure budgets stay in
+place; attempted capacity is not measured yield. The assay adds per-property
+work counts and separates recent completed work from newly stored claims.
+Full replay rollout, sustained production yield and raw-description extraction
+remain separate checkpoints; this description does not establish those stages.
+
 **2026-10-10 powertrain increment — implemented and locally tested; rollout pending.**
 An indexed 30-parent listing sample retained `engine_size` in 30, `transmission` in 29 and
 `drivetrain` in three JSON envelopes. The existing `ingest-observation` selector now supports
