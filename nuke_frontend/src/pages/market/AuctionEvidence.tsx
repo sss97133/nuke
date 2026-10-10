@@ -105,7 +105,8 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, i
     setSelected(null); setAllDiscussion(false);
     const previous = document.activeElement as HTMLElement | null;
     if (!compact) ref.current?.focus({ preventScroll: true });
-    return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+    // Inline inspection focus belongs to its row owner, including effect replay.
+    return () => { if (!compact && previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, [vehicleId, compact]);
   const evidence = query.data;
   const rows = evidence?.interactions ?? [];

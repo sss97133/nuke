@@ -124,3 +124,23 @@ it('keeps the first inspection concise and puts the outbound listing behind Sour
     expect(container.textContent).toContain('Promotional source headline');
   } finally { HTMLElement.prototype.scrollIntoView = previous; }
 });
+
+it('preserves the row owner focus when compact inspection effects replay', async () => {
+  const tile = document.createElement('button');
+  const vehicle = document.createElement('button');
+  document.body.append(tile, vehicle); tile.focus();
+  function Owner() {
+    const reveal = React.useRef(true);
+    React.useEffect(() => {
+      if (reveal.current) { vehicle.focus(); reveal.current = false; }
+    }, []);
+    return <AuctionEvidence vehicleId={id} compact onClose={() => {}} />;
+  }
+  try {
+    await act(async () => root.render(<React.StrictMode><Owner /></React.StrictMode>));
+    expect(document.activeElement).toBe(vehicle);
+  } finally {
+    await act(async () => root.render(null));
+    tile.remove(); vehicle.remove();
+  }
+});
