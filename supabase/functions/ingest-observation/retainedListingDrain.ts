@@ -1,10 +1,16 @@
-import { RETAINED_EXTERIOR_MODE, RETAINED_INTERIOR_MODE } from "./retainedInterior.ts";
+import { RETAINED_PROPERTY_MODES } from "./retainedInterior.ts";
 
 export const RETAINED_LISTING_DRAIN_MODE = "retained_listing_property_drain_v1";
 export const RETAINED_LISTING_DRAIN_LIMIT = 120;
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const INTERIOR = "514cacd3-82b4-4330-b3df-e292612ee718";
-const EXTERIOR = "efcb8c61-1ff5-4790-890e-2e09118e87e3";
+const PROPERTY_KEYS: Record<string, string> = {
+  "514cacd3-82b4-4330-b3df-e292612ee718": "interior_color",
+  "efcb8c61-1ff5-4790-890e-2e09118e87e3": "exterior_color",
+  "c0f743ae-dc94-4dfd-98ef-514b76f74a9b": "engine_configuration",
+  "66b2f1f6-b714-4ac0-85b6-60ba89529c1a": "engine_displacement_l",
+  "235aed17-9bd3-4886-90be-9b1a8e2d1844": "transmission_type",
+  "32b51f19-e5cf-4f67-81d9-96c2d30885a1": "drivetrain_layout",
+};
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
 });
@@ -30,10 +36,11 @@ export async function drainRetainedListingProperties(
   }
   const rows = claimed.data, keys = new Set();
   if (rows.length > Number(limit) || rows.some((row: any) => {
-    const expected = row?.property_id === INTERIOR ? RETAINED_INTERIOR_MODE
-      : row?.property_id === EXTERIOR ? RETAINED_EXTERIOR_MODE : null;
+    const property = PROPERTY_KEYS[row?.property_id];
+    const expected = property ? `retained_listing_${property}_v1` : null;
     const key = `${row?.source_observation_id}:${row?.property_id}`;
-    if (!UUID.test(row?.source_observation_id ?? "") || expected === null || row.mode !== expected || keys.has(key)) return true;
+    if (!UUID.test(row?.source_observation_id ?? "") || expected === null || row.mode !== expected ||
+      !RETAINED_PROPERTY_MODES.includes(row.mode) || keys.has(key)) return true;
     keys.add(key);return false;
   })) return json({ success: false, error: "invalid_claimed_listing_work", writes: 0, model_calls: 0 }, 503);
   const summary = { claimed: rows.length, stored: 0, writes: 0, duplicates: 0, refused: 0,

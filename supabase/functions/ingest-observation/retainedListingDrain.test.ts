@@ -28,6 +28,23 @@ async function run(input: Record<string, unknown>, claimed: unknown, scenario = 
   return { response, body: await response.json(), calls, selectors };
 }
 const input = { mode: RETAINED_LISTING_DRAIN_MODE, batch_size: 60 };
+Deno.test("powertrain replay drains all four exact existing property selectors", async () => {
+  const properties = [
+    ["c0f743ae-dc94-4dfd-98ef-514b76f74a9b", "engine_configuration"],
+    ["66b2f1f6-b714-4ac0-85b6-60ba89529c1a", "engine_displacement_l"],
+    ["235aed17-9bd3-4886-90be-9b1a8e2d1844", "transmission_type"],
+    ["32b51f19-e5cf-4f67-81d9-96c2d30885a1", "drivetrain_layout"],
+  ];
+  const work = properties.map(([property_id, key]) => ({ source_observation_id: source,
+    property_id, mode: `retained_listing_${key}_v1` }));
+  const r = await run(input, work);
+  assert(r.body.stored === 4 && r.body.writes === 4 && r.body.completion_failures === 0);
+  assert(r.selectors.every((s, i) => s.mode === work[i].mode && s.source_observation_id === source));
+  for (const row of work) {
+    const invalid = await run(input, [{ ...row, mode: "retained_listing_interior_color_v1" }]);
+    assert(invalid.response.status === 503 && invalid.selectors.length === 0);
+  }
+});
 Deno.test("listing drain refuses arbitrary input before claim", async () => {
   for (const patch of [{ batch_size: 121 }, { batch_size: 0 }, { batch_size: null }, { batch_size: 1.5 },
     { observations: [] }, { source_observation_id: source }, { dry_run: false }]) {
