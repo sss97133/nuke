@@ -49,6 +49,7 @@ const sources = new Map([
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
+  ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedIdentity',compile('../supabase/functions/ingest-observation/retainedIdentity.ts')],
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
@@ -230,6 +231,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
+        if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
