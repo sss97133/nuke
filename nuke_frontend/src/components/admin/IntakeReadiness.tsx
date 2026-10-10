@@ -81,6 +81,7 @@ const cell = { padding: '6px 8px', textAlign: 'left' as const, borderBottom: '1p
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 };
 const label = { fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontWeight: 700 };
 const metric = { fontFamily: 'Courier New', fontSize: 24, fontWeight: 700, margin: '8px 0' };
+const lifecycleOrder = ['live', 'showable', 'building', 'measured', 'proposed', 'retired'];
 
 export default function IntakeReadiness() {
   const [readings, setReadings] = useState<Partial<Record<Section, Reading>>>({});
@@ -91,6 +92,7 @@ export default function IntakeReadiness() {
   const [jobFilter, setJobFilter] = useState('all');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [jobsOpen, setJobsOpen] = useState(false);
   const [consumerSearch, setConsumerSearch] = useState('');
   const [consumerTableOnly, setConsumerTableOnly] = useState(false);
   const [consumerLimit, setConsumerLimit] = useState(8);
@@ -153,7 +155,9 @@ export default function IntakeReadiness() {
     ? questions.reduce((sum, q) => ({ total: sum.total + q.n_needs, present: sum.present + q.n_present,
       partial: sum.partial + q.n_partial, missing: sum.missing + q.n_missing }), { total: 0, present: 0, partial: 0, missing: 0 }) : null;
   const matchingQuestions = questions.filter(q => (!consumerTableOnly || q.needs.some(n => n.related_table === selectedTable))
-    && `${q.stack_id} ${q.name} ${q.question} ${q.needs.map(n => n.object).join(' ')}`.toLowerCase().includes(consumerSearch.toLowerCase().trim()));
+    && `${q.stack_id} ${q.name} ${q.question} ${q.needs.map(n => n.object).join(' ')}`.toLowerCase().includes(consumerSearch.toLowerCase().trim()))
+    .sort((a, b) => lifecycleOrder.indexOf(a.status) - lifecycleOrder.indexOf(b.status)
+      || b.n_present - a.n_present || a.stack_id.localeCompare(b.stack_id));
 
   return <section aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -172,12 +176,12 @@ export default function IntakeReadiness() {
         <div>{totals ? `${count(totals.completed)} / ${count(totals.targets)} target URLs` : 'Waiting for source coverage'}</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Queue completion · inspect sources ↓</div>
       </a>
-      <a href="#status-jobs" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+      <a href="#status-jobs" onClick={() => setJobsOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
         <div style={label}>Scheduled jobs</div><div style={metric}>{jobs ? count(activeJobs.length) : 'Unmeasured'}</div>
         <div>{jobs ? `${count(pausedJobs.length)} paused · ${count(config.length)} in scope` : 'Waiting for job configuration'}</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Enabled configuration · inspect jobs ↓</div>
       </a>
-      <a href="#status-jobs" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+      <a href="#status-jobs" onClick={() => setJobsOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
         <div style={label}>Jobs reporting failure</div><div style={metric}>{health.length > 0 ? count(failedJobs.length) : 'Unmeasured'}</div>
         <div>{executionReadings} execution readings / {activeJobs.length} enabled jobs</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Output {jobs?.health?.output_measured === false || jobs?.health?.status !== 'measured' ? 'unmeasured' : 'assays below'} · not fleet health</div>
@@ -192,7 +196,7 @@ export default function IntakeReadiness() {
     {(failedJobs.length > 0 || feedProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
       <div style={{ ...box, borderLeft: '4px solid var(--warning, var(--text))' }}>
         <h3 style={label}>NEEDS ATTENTION</h3>
-        {failedJobs.map(j => <p key={j.jobname}><a href="#status-jobs">{j.jobname}</a> · {health.find(h => h.jobname === j.jobname)?.last_status === 'failed' ? 'Execution failed' : 'Output or health check failed'}</p>)}
+        {failedJobs.map(j => <p key={j.jobname}><a href="#status-jobs" onClick={() => setJobsOpen(true)}>{j.jobname}</a> · {health.find(h => h.jobname === j.jobname)?.last_status === 'failed' ? 'Execution failed' : 'Output or health check failed'}</p>)}
         {feedProblems.length > 0 && <p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p>}
         {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
         {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <p>Output assays unavailable. {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p>}
@@ -240,6 +244,8 @@ export default function IntakeReadiness() {
         </table></div>
         <p>Feed discovery and polling only; a poll timestamp does not prove new data landed. {jobs.feeds.complete ? '' : 'First 60 source keys only.'}</p>
       </details>}
+      <details id="status-job-readings" open={jobsOpen} onToggle={e => setJobsOpen(e.currentTarget.open)}>
+      <summary style={label}>JOB EXECUTIONS · {activeJobs.length} ENABLED / {config.length} IN SCOPE</summary>
       <h3 style={label}>INTAKE AND FOLD JOBS</h3>
       <p style={{ color: 'var(--text-secondary)' }}>Configuration {time(jobs.config?.measured_at)} · Executions {time(jobs.health?.measured_at)}. Six named jobs in health scope; other readings are unmeasured. Paused jobs remain paused.</p>
       <div role="group" aria-label="Filter jobs" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -264,6 +270,7 @@ export default function IntakeReadiness() {
       </table></div>
       {visibleJobs.length === 0 && <p>No jobs match this filter in the measured configuration.</p>}
       <p style={{ color: 'var(--text-secondary)' }}>— = Unmeasured. An execution can succeed while its output assay fails. Owner matches are registry declarations, not observed job-to-reader flow.</p>
+      </details>
     </div>}
 
     {consumers && <section id="status-consumers" style={box} aria-labelledby="status-consumers-title">
@@ -292,7 +299,7 @@ export default function IntakeReadiness() {
           <td style={cell}>{count(q.n_partial)}</td><td style={cell}>{count(q.n_missing)}</td>
         </tr>)}</tbody>
       </table></div>
-      <p style={{ color: 'var(--text-secondary)' }}>Showing {Math.min(consumerLimit, matchingQuestions.length)} of {matchingQuestions.length} matching questions. Dependencies shared across questions count once per declaration.</p>
+      <p style={{ color: 'var(--text-secondary)' }}>Showing {Math.min(consumerLimit, matchingQuestions.length)} of {matchingQuestions.length} matching questions, ordered by declared lifecycle status, then present dependencies. Shared dependencies count once per declaration.</p>
       {matchingQuestions.length > consumerLimit && <button type="button" onClick={() => setConsumerLimit(n => n + 8)} style={{ fontSize: 11 }}>Show more questions</button>}
       {matchingQuestions.length === 0 && <p>No question matches this filter in the returned registry scope.</p>}
     </section>}

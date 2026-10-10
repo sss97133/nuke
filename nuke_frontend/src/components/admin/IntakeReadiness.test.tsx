@@ -191,6 +191,16 @@ it('does not count paused jobs as execution readings for enabled jobs', async ()
   expect(container.textContent).not.toContain('2 execution readings / 1 enabled jobs');
 });
 
+it('keeps execution tables folded until requested and leads with declared live or showable questions', async () => {
+  fixture.responses.consumers.data.rows.push({ ...structuredClone(fixture.responses.consumers.data.rows[0]),
+    stack_id: 'S03', name: 'Synthetic showable question', status: 'showable' });
+  await render();
+  expect((container.querySelector('#status-job-readings') as HTMLDetailsElement).open).toBe(false);
+  expect(container.querySelector('#status-consumers > div > table > tbody > tr')!.textContent).toContain('Synthetic showable question');
+  await act(async () => (container.querySelector('a[href="#status-jobs"]') as HTMLAnchorElement).click());
+  expect((container.querySelector('#status-job-readings') as HTMLDetailsElement).open).toBe(true);
+});
+
 it('withholds consumer aggregates on overflow and rejects malformed declared counts', async () => {
   fixture.responses.consumers.data.complete = false;
   await render();
