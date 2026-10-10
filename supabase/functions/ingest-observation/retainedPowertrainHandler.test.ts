@@ -9,7 +9,7 @@ await import("./index.ts");Deno.serve=serve;
 Deno.test("real powertrain selector uses registered keys, canonical hash/dedup and typed parent; no model calls",async()=>{
  Deno.env.set("SUPABASE_URL","https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY","test-key");
  const original=globalThis.fetch,rows=new Map<string,any>();let writes=0;let native=false;
- const nativeText="This vehicle is offered with service records and a clean title. The car is powered by a 1.8-liter inline-four paired with a five-speed manual transmission.";
+ const nativeText="This vehicle is offered with service records and a clean title. The car is powered by a 1.8-liter inline-four paired with a five-speed manual transmission. The digital odometer indicates 53k miles.";
  const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json"}});
  globalThis.fetch=async(resource,init)=>{
   const url=new URL(typeof resource==="string"?resource:resource instanceof URL?resource.href:resource.url);
@@ -17,14 +17,15 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
   const options=init as {method?:string;body?:unknown}|undefined;
   const body=typeof options?.body==="string"?JSON.parse(options.body):null;
   if(url.pathname.endsWith("vehicles"))return respond([{id:VID,is_public:true,deleted_at:null,listing_kind:"vehicle"}]);
-  if(url.pathname.endsWith("observation_sources"))return respond([{id:SID,slug:"bat",base_trust_score:.85,supported_observations:["listing","specification"]}]);
-  if(url.pathname.endsWith("observation_properties"))return respond([{id:VID,namespace:"core",deprecated_at:null,applies_to_kinds:["specification"]}]);
+  if(url.pathname.endsWith("observation_sources"))return respond([{id:SID,slug:"bat",base_trust_score:.85,supported_observations:["listing","specification","condition"]}]);
+  if(url.pathname.endsWith("observation_properties"))return respond([{id:VID,namespace:"core",deprecated_at:null,applies_to_kinds:["specification","condition"]}]);
   if(url.pathname.endsWith("vehicle_observations")){
    if(options?.method==="POST"){
     assert(body.source_observation_id===PARENT && body.vehicle_id===VID && body.property_id===VID);
     assert(body.confidence_score<=.6 && body.agent_cost_cents===0 && body.agent_model===null);
-    assert(body.structured_data.source_value && body.structured_data.normalization_version==="retained_powertrain_v1");
-    if(native)assert(body.structured_data.source_field==="content_text" && body.structured_data.source_witness_version==="retained_description_powertrain_v1");
+    assert(body.structured_data.source_value && body.structured_data.normalization_version===(body.kind==="condition"?"retained_odometer_miles_v1":"retained_powertrain_v1"));
+    if(native)assert(body.structured_data.source_field==="content_text" && body.structured_data.source_witness_version===(body.kind==="condition"?"retained_description_odometer_v1":"retained_description_powertrain_v1"));
+    if(body.kind==="condition")assert(body.structured_data.mileage_miles===53000 && body.structured_data.true_mileage_status==="unknown" && body.structured_data.value_is_approximate===true);
     const row={...body,id:`77777777-7777-4777-8777-${String(++writes).padStart(12,"0")}`};rows.set(body.content_hash,row);return respond(row,201);
    }
    if(url.searchParams.has("id"))return respond([{id:PARENT,vehicle_id:VID,source_id:SID,kind:"listing",is_superseded:false,
@@ -42,7 +43,7 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
  try{
   for(const nativeMode of [false,true]){
    native=nativeMode;
-   for(const key of Object.keys(RETAINED_POWERTRAIN_FIELDS).filter(k=>!native || k!=="drivetrain_layout")){
+   for(const key of [...Object.keys(RETAINED_POWERTRAIN_FIELDS),...(native?["mileage_miles"]:[])].filter(k=>!native || k!=="drivetrain_layout")){
    const request=(extra={})=>new Request("https://db.test/functions/v1/ingest-observation",{method:"POST",
     headers:{Authorization:"Bearer test-key","Content-Type":"application/json"},
     body:JSON.stringify({mode:`retained_listing_${key}_v1`,source_observation_id:PARENT,...extra})});
@@ -51,7 +52,7 @@ Deno.test("real powertrain selector uses registered keys, canonical hash/dedup a
    assert((await handler(request({structured_data:{[key]:"forged"}}))).status===400);
   }
   }
-  assert(writes===7 && rows.size===7);
+  assert(writes===8 && rows.size===8);
  }finally{
   globalThis.fetch=original;
   for(const [i,key] of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()){

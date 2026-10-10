@@ -10,6 +10,7 @@ const PROPERTY_KEYS: Record<string, string> = {
   "66b2f1f6-b714-4ac0-85b6-60ba89529c1a": "engine_displacement_l",
   "235aed17-9bd3-4886-90be-9b1a8e2d1844": "transmission_type",
   "32b51f19-e5cf-4f67-81d9-96c2d30885a1": "drivetrain_layout",
+  "abdd7a7a-02c1-4b09-afc6-1a288207dd2d": "mileage_miles",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
