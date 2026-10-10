@@ -7,8 +7,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({
   pulse: {} as any, pulseError: null as any, transportFailure: false,
   results: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null,
+  intake: null as any, intakeRequests: [] as string[],
 }));
 vi.mock('../lib/supabase', () => ({ supabase: {
+  functions: { invoke: async (name: string) => {
+    fixture.intakeRequests.push(name);
+    return { data: fixture.intake, error: fixture.intake ? null : { message: 'unavailable' } };
+  } },
   rpc: vi.fn(() => ({ abortSignal: async () => ({ data: fixture.pulse, error: fixture.pulseError }) })),
   from(table: string) {
     const request: any = { table, filter: '' };
@@ -40,6 +45,7 @@ beforeEach(() => {
     organs: { vehicles: [{ d: '2026-10-05', n: 4 }], images: [], observations: [], auction_comments: [] },
     backlogs: { import_queue_pending: 0, images_analysis_pending_capped: 10001, images_analysis_failed_capped: 7, cap: 10001 } };
   fixture.pulseError = null; fixture.transportFailure = false; fixture.results = {}; fixture.requests = []; fixture.held = null;
+  fixture.intake = null; fixture.intakeRequests = [];
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
@@ -123,6 +129,17 @@ it('reports a transport failure instead of leaving an endless loading message', 
   fixture.transportFailure = false;
   await tick(60_000);
   expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
+});
+it('shows intake coverage through a failed totals read and does not re-fetch it when totals recover', async () => {
+  fixture.transportFailure = true;
+  fixture.intake = { contract: 'intake_status_v1', section: 'coverage', status: 'measured', measured_at: '2026-10-05T12:00:00Z', complete: true,
+    rows: [{ source_slug: 'synthetic-source', total_targets: 10, in_queue: 0, extracted: 0, gap: 10, failed: 0, skipped: 0 }] };
+  await render();
+  expect(container.textContent).toContain('System totals unavailable');
+  expect(container.textContent).toContain('0 completed queue matches / 10 known target URLs');
+  fixture.transportFailure = false; await tick(60_000);
+  expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
+  expect(fixture.intakeRequests).toHaveLength(3);
 });
 
 it('keeps exact capped and unavailable days separate within one degraded organ', async () => {

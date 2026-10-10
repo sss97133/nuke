@@ -1030,6 +1030,40 @@ the pass runs between shifts, taking its gap from a queue the database computes.
 **Closure.** C28 closes when the ranked backlog is a view read by the pulse and by the worker, one runner replaces the
 per-lane plists, and a dated delivery row lands here from an unattended pass.
 
+**Bounded intake visibility increment, 2026-10-10 UTC.** The owner requested implementation of
+the intake-to-consumer visibility milestone. The existing `/admin/status` / `db-stats` owners now
+carry three independent read-only sections; active admin membership is checked server-side using
+the existing verified-caller guard, and service callers retain operator access. The legacy stats
+response and database permissions are unchanged. No source activation, admission, migration or
+standing worker is part of this increment.
+
+- Coverage is `source_target_coverage`'s **known target URL → exact import_queue URL match**.
+  Complete means the queue status, not verified extraction, unique vehicles or consumer delivery.
+  At most 30 sources are returned; overflow withholds aggregate totals. A source's zero queue matches
+  must not be interpreted as absent retained source data.
+- Model scope is fourteen named atlas tables. The first live query exceeded its 5 s limit because
+  selecting the atlas's 30-day writer totals required sorting about 906,793 receipt rows. The reader
+  retains atlas structure/owners while selecting at most 32 recent receipts per table through the
+  existing `(tbl, at DESC)` index; sample counts/writers are labeled as samples, not 30-day totals.
+  A subsequent same-scope read returned 14 tables and 422 public-to-public FK edges in 1.391 s including
+  transport. At most 500 edges are exposed; historical validation status remains distinct.
+- Twelve named job configurations remain available independently of five named health readings.
+  A scoped health read returned 5 rows in 3.045 s including transport. Successful execution, output
+  assay and reported health stay separate; missing assays stay unmeasured. The initial wider
+  health selection was unavailable within 5 s; the unmeasured taxonomy job retains its configuration.
+- System totals cannot suppress the intake sections. A failed refresh preserves a prior section's
+  original clock, and one unavailable section does not hide the others. No command, SQL error body,
+  source body, contact, credential or raw assay payload is exposed by the new sections.
+
+Acceptance lives in `scripts/test-db-stats-intake.mjs`,
+`nuke_frontend/src/components/admin/IntakeReadiness.test.tsx` and the existing SystemStatus tests;
+the PR validation workflow runs the reader and consumer contracts. Private timing and delivery
+receipts are under `~/nuke-logs/intake-consumer-status-20261010/`. These measurements are preparation
+evidence; implementation, tests, merge, deployment and browser runtime require separate receipts.
+This increment does **not** close C28: worker consolidation, unattended repair delivery, semantic
+source-to-consumer coverage, per-source cost/rate qualification and reader dependency discovery
+remain separate work.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
