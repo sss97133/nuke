@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import IntakeReadiness from '../components/admin/IntakeReadiness';
 
 const estimate = (value: number | null) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `≈${value.toLocaleString()}` : 'Unmeasured';
 const measuredCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : 'Unmeasured';
@@ -222,8 +223,9 @@ export default function SystemStatus() {
 
   if (!stats) {
     return (
-      <div role="status" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-disabled)' }}>
-        {statsError ? 'System totals unavailable. Retrying each minute.' : 'Loading system status...'}
+      <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
+        <IntakeReadiness />
+        <p role="status">{statsError ? 'System totals unavailable. Retrying each minute.' : 'Loading system status...'}</p>
       </div>
     );
   }
@@ -233,7 +235,7 @@ export default function SystemStatus() {
 
   return (
     <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
-      
+      <IntakeReadiness />
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '8px' }}>
         <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
