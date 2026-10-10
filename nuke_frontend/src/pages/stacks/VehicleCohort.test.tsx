@@ -30,7 +30,7 @@ async function mount(facet?:any){await act(async()=>root.render(<VehiclePerforma
 it('shows concise rank rows, explicitly names the population, and keeps counts/methods under disclosure',async()=>{
   await mount();
   expect(host.querySelectorAll('.vp-performance__table tbody tr')).toHaveLength(3);
-  expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('BaT sample · 2016–2026 auctions');
+  expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('BaT sample · bid years 2016–2026');
   expect(host.querySelectorAll('.vp-performance__table td:last-child strong')[2].textContent).toBe('P50');
   const evidence=host.querySelector<HTMLDetailsElement>('details')!;
   expect(evidence.open).toBe(false);

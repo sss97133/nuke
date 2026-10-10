@@ -71,7 +71,7 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
         <option value="vehicleYear" disabled={!vehicleYear || !selected?.model}>{vehicleYear} {modelLabel}</option>
         <option value="model" disabled={!selected?.model}>{modelLabel} · all model years</option>
         <option value="make">{read.vehicle.make} · all models</option>
-      </select><span>{facet ? 'Current-label match · BaT' : 'BaT sample'} · {selected?.expression.from}–{selected?.expression.to} auctions</span>
+      </select><span>{facet ? 'Current-label match · BaT' : 'BaT sample'} · bid years {selected?.expression.from}–{selected?.expression.to}</span>
     </div>
     {!facet && change !== null && <p className="vp-performance__change"><strong>{change >= 0 ? '+' : ''}{change.toFixed(1)}%</strong> sale amount since {olderSale!.auction_end_date?.slice(0,4)}</p>}
     {measured.length > 0 ? <table className="vp-performance__table"><thead><tr><th>Measure</th><th>Standing</th><th>Percentile</th></tr></thead><tbody>{measured.map(({ measure, label, analysis }) => {
@@ -84,7 +84,7 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
     <details className="vp-performance__reference"><summary>Evidence & method</summary>
       {facet && knownFacets.length > 0 && <p><strong>Exact recorded label share: {(100 * matchingN / knownFacets.length).toFixed(1)}% ({matchingN}/{knownFacets.length})</strong>. {effectiveScope === 'vehicleYear' ? `${vehicleYear} ` : ''}{scopeLabel} vehicles with known current labels in this captured study. This is label incidence, not measured configuration rarity or all vehicles in Nuke.</p>}
       {!measured.length && <p>{selected?.admissionFailure ?? `At least ${MIN_DISTRIBUTION} measured peer episodes are required. Choose a wider reference above.`}</p>}
-      <label><input type="checkbox" checked={sameYear} onChange={event => setSameYear(event.target.checked)} /> Same auction calendar year</label>
+      <label><input type="checkbox" checked={sameYear} onChange={event => setSameYear(event.target.checked)} /> Bid year of this auction’s close</label>
       <p>Each percentile ranks this episode against measured peer auctions. Every episode of this vehicle is excluded. Higher means more bidder identities, larger median raises, or shorter median gaps respectively; these are separate measures, not an overall vehicle grade.</p>
       <table className="vp-performance__evidence-table"><thead><tr><th>Measure</th><th>This episode</th><th>Peer median</th><th>Measured / eligible</th></tr></thead><tbody>{analyses.map(({measure,label,analysis})=><tr key={label}><th scope="row">{label}</th><td>{analysis.reading === null ? 'Unmeasured' : formatMeasure(measure,analysis.reading)}</td><td>{analysis.result.median === null ? 'Unmeasured' : formatMeasure(measure,analysis.result.median)}</td><td>{analysis.result.rankValues.length}/{analysis.result.eligibleLots}</td></tr>)}</tbody></table>
       {facet && <p>{matchingN} matching current labels / {knownFacets.length} known / {readableFacets.length} readable {scopeLabel} reference vehicles. Unknown labels are excluded. Recorded configuration share is not factory rarity, and current labels do not prove equipment or location at sale.</p>}
