@@ -16,6 +16,8 @@ describe('inventory map grain and grouping', () => {
     expect(inventoryGroups(lots, 'model', new Map())).toHaveLength(2);
     expect(mapValue(lots[2], 'era', new Map())).toBe('Year unrecorded');
     expect(mapValue(lot('boundary', 'FORD', 2000), 'era', new Map())).toBe('2000–2009');
+    expect(mapValue(lot('early-vehicle', 'RECORDED MAKE', 1880), 'year', new Map())).toBe('1880');
+    expect(mapValue(lot('early-vehicle', 'RECORDED MAKE', 1880), 'era', new Map())).toBe('1880–1889');
     expect(mapValue(lot('invalid', 'FORD', NaN), 'year', new Map())).toBe('Year unrecorded');
   });
   it('binds taxonomy to the same listing, preserves unknowns, and intersects parent and child', () => {

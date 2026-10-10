@@ -9,7 +9,7 @@ import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, ty
 import AuctionEvidence from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
-import { MakeIdentity, MakeLogo } from '../../components/common/MakeIdentity';
+import { MakeLogo } from '../../components/common/MakeIdentity';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their

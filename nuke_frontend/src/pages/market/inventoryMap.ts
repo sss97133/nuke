@@ -35,7 +35,7 @@ export function mapValue(a: LiveAuction, dimension: MapDimension | 'lot', taxono
   // Include the make in model keys so identically named models from different brands never collapse.
   if (dimension === 'model') return JSON.stringify([a.make, recordedModel(a)]);
   if (dimension === 'year' || dimension === 'era') {
-    if (a.year == null || !Number.isInteger(a.year) || a.year < 1886 || a.year > new Date().getFullYear() + 2) return 'Year unrecorded';
+    if (a.year == null || !Number.isInteger(a.year) || a.year <= 0 || a.year > 9999) return 'Year unrecorded';
     return dimension === 'year' ? String(a.year) : `${Math.floor(a.year / 10) * 10}–${Math.floor(a.year / 10) * 10 + 9}`;
   }
   const row = taxonomy.get(listingKey(a) ?? '');
