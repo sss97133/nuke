@@ -60,6 +60,14 @@ export const HEALTH_SQL = `SELECT statement_timestamp() AS measured_at,
 FROM (SELECT jobname, declared_writer, last_status, last_run_at, assay_status, health_status
   FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
 
+// Preserve executions and declarations when an output assay exceeds its budget.
+// Omitting assay/health expressions avoids evaluating the view's expensive assays.
+export const EXECUTION_SQL = `SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(to_jsonb(j) ORDER BY j.jobname), '[]'::jsonb) AS rows
+FROM (SELECT jobname, declared_writer, last_status, last_run_at,
+  NULL::text AS assay_status, NULL::text AS health_status
+  FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
+
 export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
   coalesce((SELECT jsonb_agg(to_jsonb(f)) FROM (
     SELECT source_slug, count(*)::int AS feeds,
@@ -91,7 +99,9 @@ export async function boundedRead(conn: IntakeConnection, sql: string, args: unk
 export async function readIntakeSection(conn: IntakeConnection, section: IntakeSection) {
   if (section === 'jobs') {
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);
-    const health = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
+    const output = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
+    const health = output.status === 'measured' ? output
+      : await boundedRead(conn, EXECUTION_SQL, [HEALTH_JOBS]);
     const feeds = await boundedRead(conn, FEEDS_SQL);
     let controls: { status: string; value?: ReturnType<typeof intakeThrottle> } = { status: 'unavailable' };
     if (feeds.status === 'measured') {
@@ -99,7 +109,8 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
       catch { controls = { status: 'invalid' }; }
     }
     const { controls: _rawControls, ...feedReading } = feeds.status === 'measured' ? feeds : { ...feeds, controls: undefined };
-    return { contract: 'intake_status_v1', section, config, health, controls,
+    return { contract: 'intake_status_v1', section, config,
+      health: { ...health, output_measured: output.status === 'measured' }, controls,
       feeds: { ...feedReading, rows: feeds.rows.slice(0, 60), complete: feeds.status === 'measured' && feeds.rows.length <= 60 },
       scope: INTAKE_JOBS, health_scope: HEALTH_JOBS };
   }

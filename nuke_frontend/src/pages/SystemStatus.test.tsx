@@ -175,3 +175,56 @@ it('rejects a capped sentinel mislabeled as an exact number', async () => {
   expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
     .toEqual(['Unmeasured', 'Unmeasured']);
 });
+
+it('keeps pipeline flow available when totals fail and hides empty recent widgets', async () => {
+  fixture.transportFailure = true;
+  await render();
+  expect(row('VEHICLES')?.textContent).toContain('4');
+  expect(container.querySelector('h1')?.textContent).toBe('ADMIN SYSTEM STATUS');
+  expect(container.textContent).not.toContain('RECENT TIER 1 ANALYSIS');
+  expect(container.textContent).not.toContain('RECENT CATALOG PARTS');
+});
+
+it('starts with recent UTC days and expands the full dated history', async () => {
+  fixture.pulse.days = 14;
+  await render();
+  expect(row('VEHICLES')!.querySelectorAll('td')).toHaveLength(4);
+  const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'Show 14-day history')!;
+  await act(async () => button.click());
+  expect(row('VEHICLES')!.querySelectorAll('td')).toHaveLength(15);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(container.textContent).toContain('Today is still in progress');
+});
+
+it('finishes empty or failed record drilldowns and offers a bounded retry', async () => {
+  await render();
+  const panel = [...container.querySelectorAll('[role="button"]')].find(b => b.textContent?.includes('TIER 1 ANALYSIS')) as HTMLElement;
+  await act(async () => panel.click());
+  expect(container.textContent).toContain('No records returned.');
+  expect(container.textContent).not.toContain('Reading recent records');
+  await act(async () => panel.click());
+  fixture.results.vehicle_images = { data: null, error: { message: 'private records error' } };
+  await act(async () => panel.click());
+  expect(container.textContent).toContain('Recent records unavailable.');
+  expect(container.textContent).not.toContain('private records error');
+  const retry = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry records')!;
+  fixture.results.vehicle_images = { data: [], error: null };
+  await act(async () => retry.click());
+  expect(container.textContent).toContain('No records returned.');
+  const request = fixture.requests.find(r => r.table === 'vehicle_images' && r.limit === 100);
+  expect(request.signal).toBeInstanceOf(AbortSignal);
+});
+
+it('does not let a slower record request replace a newer drilldown', async () => {
+  await render();
+  let release!: (value: any) => void;
+  fixture.held = new Promise(resolve => { release = resolve; });
+  const panels = [...container.querySelectorAll('[role="button"]')] as HTMLElement[];
+  await act(async () => panels.find(b => b.textContent?.includes('TIER 1 ANALYSIS'))!.click());
+  fixture.held = null;
+  fixture.results.catalog_parts = { data: [{ id: 'part', part_number: 'CURRENT-PART' }], error: null };
+  await act(async () => panels.find(b => b.textContent?.includes('LMC CATALOG'))!.click());
+  await act(async () => release({ data: [{ id: 'STALE-IMAGE' }], error: null }));
+  expect(container.textContent).toContain('CURRENT-PART');
+  expect(container.textContent).not.toContain('STALE-IMAGE');
+});

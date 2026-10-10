@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null }));
@@ -13,7 +14,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
 import IntakeReadiness from './IntakeReadiness';
 let root: Root, container: HTMLDivElement;
 const clock = '2026-10-10T12:00:00Z';
-async function render() { await act(async () => root.render(<IntakeReadiness />)); }
+async function render() { await act(async () => root.render(<MemoryRouter><IntakeReadiness /></MemoryRouter>)); }
 async function tick(ms: number) { await act(async () => vi.advanceTimersByTimeAsync(ms)); }
 
 beforeEach(() => {
@@ -123,4 +124,39 @@ it('shows configured zero separately from provider failure and polling evidence'
   expect(container.textContent).toContain('Held at zero');
   expect(container.textContent).toContain('Monetary cost is unmeasured');
   expect(container.textContent).toContain('does not prove new data landed');
+});
+
+it('surfaces failed output and filters jobs without treating paused jobs as incidents', async () => {
+  await render();
+  const attention = [...container.querySelectorAll('h3')].find(h => h.textContent === 'NEEDS ATTENTION')!.parentElement!;
+  expect(attention.textContent).toContain('synthetic-pull');
+  expect(attention.textContent).not.toContain('synthetic-paused');
+  const filter = [...container.querySelectorAll('button')].find(b => b.textContent === 'FAILURES')!;
+  await act(async () => filter.click());
+  expect(filter.getAttribute('aria-pressed')).toBe('true');
+  const jobs = container.querySelector('#status-jobs')!;
+  expect(jobs.textContent).toContain('synthetic-pull');
+  expect(jobs.textContent).not.toContain('synthetic-paused');
+});
+
+it('shows execution-only fallback as an observability gap, not passed output', async () => {
+  fixture.responses.jobs.data.health.output_measured = false;
+  fixture.responses.jobs.data.health.rows[0].assay_status = null;
+  fixture.responses.jobs.data.health.rows[0].health_status = null;
+  await render();
+  expect(container.textContent).toContain('Output assays unavailable. Execution readings remain available');
+  expect(container.querySelector('#status-jobs')!.textContent).toContain('succeeded');
+  expect(container.querySelector('#status-jobs')!.textContent).not.toContain('passed');
+});
+
+it('opens source details from the summary and navigates declared table relationships', async () => {
+  fixture.responses.model.data.rows.push({ ...fixture.responses.model.data.rows[0], table_name: 'vehicle_events' });
+  await render();
+  await act(async () => (container.querySelector('a[href="#status-sources"]') as HTMLAnchorElement).click());
+  expect((container.querySelector('#status-sources') as HTMLDetailsElement).open).toBe(true);
+  const relationship = [...container.querySelectorAll('button')].find(b => b.textContent === 'vehicle_events →')!;
+  await act(async () => relationship.click());
+  expect((container.querySelector('select') as HTMLSelectElement).value).toBe('vehicle_events');
+  expect(container.textContent).toContain('Referenced by');
+  expect(container.textContent).toContain('vehicle_observations →');
 });

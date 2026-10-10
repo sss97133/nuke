@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import PrefetchLink from '../PrefetchLink';
 
 type Section = 'coverage' | 'model' | 'jobs';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number };
@@ -15,7 +16,7 @@ type Feed = { source_slug: string; feeds: number; enabled_feeds: number; errored
 type Reading = { contract: string; section: Section; status?: string; measured_at?: string; complete?: boolean;
   rows?: Source[] | Table[]; links?: Edge[]; links_complete?: boolean;
   config?: { status: string; measured_at: string; rows: Job[] };
-  health?: { status: string; measured_at: string | null; rows: Health[] }; health_scope?: string[];
+  health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean }; health_scope?: string[];
   feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
   controls?: { status: string; value?: { enabled: boolean; max_feeds: number; max_ingests: number;
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
@@ -57,6 +58,9 @@ function validReading(data: any, section: Section): data is Reading {
 }
 const box = { border: '2px solid var(--border)', padding: 12, marginBottom: 16 };
 const cell = { padding: '6px 8px', textAlign: 'left' as const, borderBottom: '1px solid var(--border)', verticalAlign: 'top' as const };
+const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 };
+const label = { fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontWeight: 700 };
+const metric = { fontFamily: 'Courier New', fontSize: 24, fontWeight: 700, margin: '8px 0' };
 
 export default function IntakeReadiness() {
   const [readings, setReadings] = useState<Partial<Record<Section, Reading>>>({});
@@ -64,6 +68,9 @@ export default function IntakeReadiness() {
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState('vehicle_observations');
+  const [jobFilter, setJobFilter] = useState('all');
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,7 +78,7 @@ export default function IntakeReadiness() {
     setLoading(true);
     const load = async (section: Section) => {
       try {
-        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]);
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
         const { data, error } = await supabase.functions.invoke(`db-stats?intake=${section}`, { method: 'GET', signal });
         if (error || !validReading(data, section)) throw new Error('unavailable');
         if (!cancelled) {
@@ -103,31 +110,81 @@ export default function IntakeReadiness() {
   const edges = (model?.links ?? []).filter(e => e.child_table === selectedTable || e.parent_table === selectedTable);
   const jobs = readings.jobs;
   const health = jobs?.health?.status === 'measured' ? jobs.health.rows : [];
+  const config = jobs?.config?.rows ?? [];
+  const activeJobs = config.filter(j => j.present && j.active === true);
+  const pausedJobs = config.filter(j => j.present && j.active === false);
+  const failedJobs = activeJobs.filter(j => {
+    const h = health.find(h => h.jobname === j.jobname);
+    return h?.last_status === 'failed' || h?.assay_status === 'failed' || h?.health_status === 'failed';
+  });
+  const visibleJobs = config.filter(j => jobFilter === 'all' || (jobFilter === 'active' ? j.active === true
+    : jobFilter === 'paused' ? j.active === false : failedJobs.includes(j)));
+  const feedProblems = jobs?.feeds?.status === 'measured' ? jobs.feeds.rows.filter(f => f.errored_feeds > 0) : [];
+  const receiptProblems = tables.filter(t => t.receipt_undeclared_stmts > 0);
+  const parents = [...new Set(edges.filter(e => e.child_table === selectedTable).map(e => e.parent_table))];
+  const children = [...new Set(edges.filter(e => e.parent_table === selectedTable).map(e => e.child_table))];
 
   return <section aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-      <h2 id="intake-readiness-title" style={{ fontSize: 11, margin: 0 }}>INTAKE → MODEL → CONSUMER</h2>
+      <h2 id="intake-readiness-title" style={{ fontSize: 14, margin: 0 }}>OPERATIONS</h2>
       <button type="button" disabled={loading} onClick={() => setRefresh(n => n + 1)} style={{ fontSize: 11 }}>
         {loading ? 'Reading…' : 'Refresh intake readings'}
       </button>
     </div>
-    <p>Refreshes every five minutes. Independent reading clocks; row arrivals, job exits and relationships have separate meanings.</p>
+    <p style={{ color: 'var(--text-secondary)' }}>Source coverage, scheduled work and model relationships. Readings refresh every five minutes.</p>
     {failed.length > 0 && <p role="status">Unavailable: {failed.join(', ')}. Retained readings below keep their original dates.</p>}
 
-    {coverage && <div style={box}>
+    <div style={grid}>
+      <a href="#status-sources" onClick={() => setSourcesOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+        <div style={label}>Known targets complete</div>
+        <div style={metric}>{totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}%` : 'Unmeasured'}</div>
+        <div>{totals ? `${count(totals.completed)} / ${count(totals.targets)} target URLs` : 'Waiting for source coverage'}</div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Queue completion · inspect sources ↓</div>
+      </a>
+      <a href="#status-jobs" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+        <div style={label}>Scheduled jobs</div><div style={metric}>{jobs ? count(activeJobs.length) : 'Unmeasured'}</div>
+        <div>{jobs ? `${count(pausedJobs.length)} paused · ${count(config.length)} in scope` : 'Waiting for job configuration'}</div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Enabled configuration · inspect jobs ↓</div>
+      </a>
+      <a href="#status-jobs" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+        <div style={label}>Jobs reporting failure</div><div style={metric}>{health.length > 0 ? count(failedJobs.length) : 'Unmeasured'}</div>
+        <div>{health.length} execution readings / {activeJobs.length} enabled jobs</div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Output {jobs?.health?.output_measured === false || jobs?.health?.status !== 'measured' ? 'unmeasured' : 'assays below'} · not fleet health</div>
+      </a>
+      <a href="#status-model" onClick={() => setModelOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+        <div style={label}>Model relationships</div><div style={metric}>{model ? count(model.links?.length) : 'Unmeasured'}</div>
+        <div>{model ? `${count(tables.length)} tables · ${count(model.links?.length)} declared links` : 'Waiting for model metadata'}</div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Declared structure · inspect writer receipts ↓</div>
+      </a>
+    </div>
+
+    {(failedJobs.length > 0 || feedProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
+      <div style={{ ...box, borderLeft: '4px solid var(--warning, var(--text))' }}>
+        <h3 style={label}>NEEDS ATTENTION</h3>
+        {failedJobs.map(j => <p key={j.jobname}><a href="#status-jobs">{j.jobname}</a> · {health.find(h => h.jobname === j.jobname)?.last_status === 'failed' ? 'Execution failed' : 'Output or health check failed'}</p>)}
+        {feedProblems.length > 0 && <p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p>}
+        {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
+        {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <p>Output assays unavailable. {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p>}
+      </div>}
+
+    {coverage && <details id="status-sources" open={sourcesOpen} onToggle={e => setSourcesOpen(e.currentTarget.open)} style={box}>
+      <summary style={label}>SOURCE COVERAGE · {sources.length} sources · {totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}% queue complete` : 'Unmeasured'}</summary>
       <h3 style={{ fontSize: 11 }}>KNOWN SOURCE TARGETS · {time(coverage.measured_at)}</h3>
       <p>{totals ? `${count(totals.completed)} completed queue matches / ${count(totals.targets)} known target URLs`
         : 'Overall target coverage unmeasured.'}{coverage.complete === false ? ' First 30 sources only; totals withheld.' : ''}</p>
       <p>Target URLs matched to import_queue by exact URL. A completed queue entry does not prove a vehicle, sale or downstream answer. Zero matches can coexist with retained source data.</p>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <caption style={{ textAlign: 'left' }}>Coverage within the known URL inventory, rather than the whole market</caption>
-        <thead><tr>{['Source', 'Known targets', 'In queue', 'Complete', 'Not queued', 'Failed', 'Skipped'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
+        <thead><tr>{['Source', 'Known targets', 'In queue', 'Complete', 'Completion', 'Not queued', 'Failed', 'Skipped'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
         <tbody>{sources.map(s => <tr key={s.source_slug}><th scope="row" style={cell}>{s.source_slug}</th>
-          {[s.total_targets, s.in_queue, s.extracted, s.gap, s.failed, s.skipped].map((n, i) => <td key={i} style={cell}>{sourceValid(s) ? count(n) : 'Unmeasured'}</td>)}</tr>)}</tbody>
+          {[s.total_targets, s.in_queue, s.extracted].map((n, i) => <td key={i} style={cell}>{sourceValid(s) ? count(n) : 'Unmeasured'}</td>)}
+          <td style={cell}>{sourceValid(s) && s.total_targets > 0 ? `${(100 * s.extracted / s.total_targets).toFixed(2)}%` : 'Unmeasured'}</td>
+          {[s.gap, s.failed, s.skipped].map((n, i) => <td key={i} style={cell}>{sourceValid(s) ? count(n) : 'Unmeasured'}</td>)}</tr>)}</tbody>
       </table></div>
-    </div>}
+      <p><PrefetchLink to="/admin/sources">Source management →</PrefetchLink></p>
+    </details>}
 
-    {jobs && <div style={box}>
+    {jobs && <div id="status-jobs" style={box}>
       {jobs.controls?.status === 'measured' && jobs.controls.value && <p>
         Intake {jobs.controls.value.enabled && jobs.controls.value.max_ingests > 0 ? 'open within capacity limits' : 'paused'} ·
         Ceiling {count(jobs.controls.value.max_feeds)} feeds / {count(jobs.controls.value.max_ingests)} admissions per invocation.
@@ -152,27 +209,34 @@ export default function IntakeReadiness() {
         </table></div>
         <p>Feed discovery and polling only; a poll timestamp does not prove new data landed. {jobs.feeds.complete ? '' : 'First 60 source keys only.'}</p>
       </details>}
-      <h3 style={{ fontSize: 11 }}>INTAKE AND FOLD JOBS · CONFIGURATION {time(jobs.config?.measured_at)}</h3>
-      <p>Output health: {time(jobs.health?.measured_at)}. Six named jobs assayed here; other output readings are unmeasured. Paused jobs remain paused.</p>
+      <h3 style={label}>INTAKE AND FOLD JOBS</h3>
+      <p style={{ color: 'var(--text-secondary)' }}>Configuration {time(jobs.config?.measured_at)} · Executions {time(jobs.health?.measured_at)}. Six named jobs in health scope; other readings are unmeasured. Paused jobs remain paused.</p>
+      <div role="group" aria-label="Filter jobs" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        {['all', 'active', 'paused', 'failures'].map(filter => <button key={filter} type="button" aria-pressed={jobFilter === filter}
+          onClick={() => setJobFilter(filter)} style={{ fontSize: 11, padding: '5px 10px', border: '2px solid var(--border)',
+            color: jobFilter === filter ? 'var(--bg)' : 'var(--text)', background: jobFilter === filter ? 'var(--text)' : 'var(--bg)' }}>{filter.toUpperCase()}</button>)}
+      </div>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{['Job / UTC schedule', 'Enabled', 'Last execution', 'Output assay', 'Reported health', 'Declared writer → tables'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
-        <tbody>{jobs.config?.rows.map(j => {
+        <tbody>{visibleJobs.map(j => {
           const h = health.find(h => h.jobname === j.jobname);
           const owned = h?.declared_writer ? tables.filter(t => t.registry_owners?.includes(h.declared_writer!)).map(t => t.table_name) : [];
           return <tr key={j.jobname}>
             <th scope="row" style={cell}>{j.jobname}<div style={{ fontFamily: 'Courier New', fontWeight: 400 }}>{j.present ? j.schedule : 'Missing job'}</div></th>
             <td style={cell}>{j.present && typeof j.active === 'boolean' ? j.active ? 'Active' : 'Paused' : 'Unmeasured'}</td>
-            <td style={cell}>{h?.last_status ?? 'Unmeasured'}{h?.last_run_at && <div>{time(h.last_run_at)}</div>}</td>
-            <td style={cell}>{h?.assay_status ?? 'Unmeasured'}</td>
-            <td style={cell}>{h?.health_status ?? 'Unmeasured'}</td>
-            <td style={cell}>{h ? h.declared_writer ?? 'Undeclared' : 'Unmeasured'}<div>{!h || !model ? 'Owner mapping unmeasured' : owned.length ? owned.join(', ') : 'No exact owner match in the table scope'}</div></td>
+            <td style={cell}>{h?.last_status ?? <span aria-label="Unmeasured">—</span>}{h?.last_run_at && <div>{time(h.last_run_at)}</div>}</td>
+            <td style={cell}>{h?.assay_status ?? <span aria-label="Unmeasured">—</span>}</td>
+            <td style={cell}>{h?.health_status ?? <span aria-label="Unmeasured">—</span>}</td>
+            <td style={cell}><details><summary>{h ? h.declared_writer ?? 'Undeclared' : 'Unmeasured'}</summary><div>{!h || !model ? 'Owner mapping unmeasured' : owned.length ? owned.join(', ') : 'No exact owner match in the table scope'}</div></details></td>
           </tr>;
         })}</tbody>
       </table></div>
-      <p>An execution can succeed while its output assay fails. Owner matches are registry declarations, not observed job-to-reader flow.</p>
+      {visibleJobs.length === 0 && <p>No jobs match this filter in the measured configuration.</p>}
+      <p style={{ color: 'var(--text-secondary)' }}>— = Unmeasured. An execution can succeed while its output assay fails. Owner matches are registry declarations, not observed job-to-reader flow.</p>
     </div>}
 
-    {model && <div style={box}>
+    {model && <details id="status-model" open={modelOpen} onToggle={e => setModelOpen(e.currentTarget.open)} style={box}>
+      <summary style={label}>MODEL RELATIONSHIPS · {tables.length} tables · {model.links?.length} declared links</summary>
       <h3 style={{ fontSize: 11 }}>MODEL RELATIONSHIPS · {time(model.measured_at)}</h3>
       <label>Inspect table <select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} style={{ fontSize: 11 }}>
         {tables.map(t => <option key={t.table_name} value={t.table_name}>{t.table_name}</option>)}
@@ -181,6 +245,13 @@ export default function IntakeReadiness() {
         <p>{table.atlas_present ? `≈${count(table.est_rows)} estimated rows · ${count(table.n_cols_described)} / ${count(table.n_cols)} columns described · ${count(table.triggers)} triggers` : 'Atlas metadata unavailable for this table.'}</p>
         <p>Declared owners: {table.registry_owners?.join(', ') || 'Unregistered'}</p>
         <p>Latest {count(table.receipt_sample_count)} receipts within 30 days{table.receipt_sample_complete === false ? ' · capped at 32' : ''}: {table.receipt_writers?.join(', ') || 'Unmeasured'} · Undeclared in sample: {count(table.receipt_undeclared_stmts)} · Latest receipt: {time(table.last_write)}</p>
+        <div style={grid}>{[['References', parents], ['Referenced by', children]].map(([heading, nodes]) =>
+          <div key={heading as string} style={box}><h4 style={label}>{heading as string}</h4>
+            {(nodes as string[]).length > 0 ? (nodes as string[]).map(name => <div key={name} style={{ marginBottom: 6 }}>
+              {tables.some(t => t.table_name === name) ? <button type="button" onClick={() => setSelectedTable(name)} style={{ fontSize: 11, fontFamily: 'Courier New' }}>{name} →</button>
+                : <span style={{ fontFamily: 'Courier New' }}>{name} · outside inspector scope</span>}
+            </div>) : <p>No links in this reading.</p>}
+          </div>)}</div>
         <details><summary>Foreign-key relationships{model.links_complete === false ? ' · first 500 only' : ''}</summary>
           {edges.length ? <ul>{edges.map(e => <li key={`${e.child_table}:${e.constraint_name}`}>
             {e.child_table} → {e.parent_table} · {e.validated ? 'Validated' : 'Historical validation pending'} · {e.constraint_name}
@@ -188,6 +259,7 @@ export default function IntakeReadiness() {
         </details>
       </>}
       <p>Fourteen named tables. Foreign keys establish declared structure. Trigger counts, description coverage and receipts do not prove semantic correctness, replay or consumer delivery.</p>
-    </div>}
+      <p><PrefetchLink to="/stacks">Inspect downstream stacks →</PrefetchLink></p>
+    </details>}
   </section>;
 }
