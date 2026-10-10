@@ -15,11 +15,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
 });
 
+/** Successful, qualified DB inputs live only for one bounded service drain.
+ * Admission and completion still prove current custody in Postgres. */
+export class RetainedBatchLookups {
+  private rows = new Map<string, any>();
+  private bytes = 0;
+  get(key: string): any { return this.rows.get(key); }
+  remember(key: string, result: any): void {
+    if (result?.error || !result?.data || this.rows.has(key) || this.rows.size >= 256) return;
+    const size = new TextEncoder().encode(JSON.stringify(result.data)).length;
+    if (this.bytes + size > 4 * 1024 * 1024) return;
+    this.rows.set(key, result); this.bytes += size;
+  }
+}
+
 /** Service-authorized scheduled work enters the existing selector handler in
  * process. No caller-supplied testimony and no nested Edge request per item. */
 export async function drainRetainedListingProperties(
   req: Request, input: Record<string, unknown>, db: any,
-  admit: (request: Request) => Promise<Response>,
+  admit: (request: Request, lookups?: RetainedBatchLookups) => Promise<Response>,
 ): Promise<Response> {
   const limit = input.batch_size;
   if (input.mode !== RETAINED_LISTING_DRAIN_MODE ||
@@ -43,6 +57,7 @@ export async function drainRetainedListingProperties(
       !RETAINED_PROPERTY_MODES.includes(row.mode) || keys.has(key)) return true;
     keys.add(key);return false;
   })) return json({ success: false, error: "invalid_claimed_listing_work", writes: 0, model_calls: 0 }, 503);
+  const lookups = new RetainedBatchLookups();
   const summary = { claimed: rows.length, stored: 0, writes: 0, duplicates: 0, refused: 0,
     retries: 0, deferred: 0, completion_failures: 0, model_calls: 0, provider_calls: 0 };
   for (const row of rows) {
@@ -52,7 +67,7 @@ export async function drainRetainedListingProperties(
       try {
         const response = await admit(new Request(req.url, { method: "POST", headers: req.headers,
           signal: AbortSignal.any([req.signal, AbortSignal.timeout(40000 - (Date.now() - started))]),
-          body: JSON.stringify({ mode: row.mode, source_observation_id: row.source_observation_id }) }));
+          body: JSON.stringify({ mode: row.mode, source_observation_id: row.source_observation_id }) }), lookups);
         const body = await response.json();
         if (response.status === 200 && body.success === true && UUID.test(body.observation_id ?? "") &&
           typeof body.duplicate === "boolean") {

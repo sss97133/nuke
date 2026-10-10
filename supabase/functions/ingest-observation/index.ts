@@ -38,7 +38,7 @@ import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
 import { ingestBatLive } from "./batLive.ts";
 import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
-import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties } from "./retainedListingDrain.ts";
+import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBatchLookups } from "./retainedListingDrain.ts";
 import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
 
@@ -249,7 +249,8 @@ async function allowShareVerdict(supabase: any, req: Request, input: Observation
   return rl.allowed;
 }
 
-Deno.serve(async function handleObservation(req) {
+Deno.serve(async function handleObservation(req, internal?: unknown) {
+  const batchLookups = internal instanceof RetainedBatchLookups ? internal : null;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -353,19 +354,23 @@ Deno.serve(async function handleObservation(req) {
       const sourceId = retainedInteriorSelector(input as unknown as Record<string, unknown>);
       if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const parent = await supabase.from("vehicle_observations")
+      const parent = batchLookups?.get(`parent:${sourceId}`) ?? await supabase.from("vehicle_observations")
         .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data,content_text")
         .eq("id", sourceId).maybeSingle();
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
       if (!row) return new Response(JSON.stringify({ error: "Retained source unavailable" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const vehicle = await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle();
-      const source = await supabase.from("observation_sources").select("id,slug").eq("id", row.source_id).maybeSingle();
+      const vehicle = batchLookups?.get(`vehicle:${row.vehicle_id}`) ?? await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle();
+      const source = batchLookups?.get(`source-id:${row.source_id}`) ?? await supabase.from("observation_sources").select("id,slug,base_trust_score,supported_observations").eq("id", row.source_id).maybeSingle();
       if (vehicle.error || source.error) throw new Error("Retained source qualification unavailable");
       const derived = deriveRetainedInterior(row, vehicle.data, source.data, input.mode);
       if (!derived) return new Response(JSON.stringify({ error: "Retained source ineligible" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      batchLookups?.remember(`parent:${sourceId}`, parent);
+      batchLookups?.remember(`vehicle:${row.vehicle_id}`, vehicle);
+      batchLookups?.remember(`source-id:${row.source_id}`, source);
+      batchLookups?.remember(`source-slug:${source.data.slug}`, source);
       input = derived;
       retainedSourceId = sourceId;
     } else if (input.extraction_method === RETAINED_INTERIOR_METHOD ||
@@ -540,7 +545,7 @@ Deno.serve(async function handleObservation(req) {
     }
 
     // Look up source
-    const { data: source, error: sourceError } = await supabase
+    const { data: source, error: sourceError } = (retainedSourceId && batchLookups?.get(`source-slug:${input.source_slug}`)) || await supabase
       .from("observation_sources")
       .select("id, base_trust_score, supported_observations")
       .eq("slug", input.source_slug)
@@ -586,7 +591,7 @@ Deno.serve(async function handleObservation(req) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const lookup = await supabase.from("observation_properties")
+      const lookup = (retainedSourceId && batchLookups?.get(`property:${input.property_key}`)) || await supabase.from("observation_properties")
         .select("id, property_key, applies_to_kinds, namespace, deprecated_at")
         .eq("property_key", input.property_key).maybeSingle();
       if (lookup.error) {
@@ -599,6 +604,9 @@ Deno.serve(async function handleObservation(req) {
     if (!property.ok) {
       return new Response(JSON.stringify({ error: property.error }),
         { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (retainedSourceId && input.property_key && propertyRow) {
+      batchLookups?.remember(`property:${input.property_key}`, { data: propertyRow, error: null });
     }
 
     // Compute content hash for deduplication.

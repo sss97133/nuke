@@ -1,4 +1,4 @@
-import { drainRetainedListingProperties, RETAINED_LISTING_DRAIN_MODE } from "./retainedListingDrain.ts";
+import { drainRetainedListingProperties, RETAINED_LISTING_DRAIN_MODE, RetainedBatchLookups } from "./retainedListingDrain.ts";
 const assert = (ok: unknown) => { if (!ok) throw new Error("assertion failed"); };
 const source = "11111111-1111-4111-8111-111111111111", interior = "514cacd3-82b4-4330-b3df-e292612ee718";
 const rows = (n: number) => Array.from({ length: n }, (_, i) => ({
@@ -105,4 +105,14 @@ Deno.test("aborted and elapsed-budget records defer before admission", async () 
 });
 Deno.test("claim failure is unavailable rather than healthy empty", async () => {
   const r = await run(input, [], "claim_error");assert(r.response.status === 503 && r.selectors.length === 0);
+});
+
+Deno.test("batch inputs omit failures and stop retaining rows at the byte/entry bounds",()=>{
+ const lookups=new RetainedBatchLookups();
+ lookups.remember("missing",{data:null,error:null});lookups.remember("error",{data:{id:source},error:{}});
+ assert(lookups.get("missing")===undefined && lookups.get("error")===undefined);
+ lookups.remember("oversize",{data:"x".repeat(4*1024*1024),error:null});assert(lookups.get("oversize")===undefined);
+ for(let i=0;i<257;i++)lookups.remember(`row:${i}`,{data:{id:i},error:null});
+ assert(lookups.get("row:255").data.id===255 && lookups.get("row:256")===undefined);
+ assert(new RetainedBatchLookups().get("row:0")===undefined);
 });
