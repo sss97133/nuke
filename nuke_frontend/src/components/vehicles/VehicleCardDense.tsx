@@ -145,18 +145,17 @@ const getTierColor = (tier: string) => {
   }
 };
 
-const getTierDescription = (tier: string) => {
+const getTierDescription = (tier: string, stored = false) => {
+  if (stored) return 'Stored tier — its computation basis is not supplied to this card; loaded fields are shown below';
   switch (tier) {
-    case 'SSS': return 'Legendary — museum-grade, historically significant';
-    case 'SS': return 'Exceptional — near-perfect documentation and provenance';
-    case 'S': return 'Outstanding — comprehensive data, high engagement';
-    case 'A': return 'Strong — well-documented with active history';
-    case 'B': return 'Good — solid data, verified details';
-    case 'C': return 'Standard — VIN, price, and photos confirmed';
-    case 'D': return 'Partial — some key data present';
-    case 'E': return 'Minimal — basic info only';
-    case 'F': return 'Incomplete — needs more data';
-    default: return 'Data completeness grade';
+    case 'SSS': case 'SS': case 'S': return 'Assigned tier — verification method not supplied';
+    case 'A': return '65+ completeness points from loaded fields and quantity thresholds';
+    case 'B': return '50–64 completeness points from loaded fields and quantity thresholds';
+    case 'C': return '35–49 completeness points from loaded fields and quantity thresholds';
+    case 'D': return '20–34 completeness points from loaded fields and quantity thresholds';
+    case 'E': return '10–19 completeness points from loaded fields and quantity thresholds';
+    case 'F': return 'Under 10 completeness points from loaded fields';
+    default: return 'Loaded-field completeness grade; not a verification or vehicle-quality rating';
   }
 };
 
@@ -1868,9 +1867,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   return (
                     <span
                       style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Coverage grade ${tierLabel}: ${getTierDescription(tierLabel, Boolean(vehicle.tier_label))}. Does not verify details or vehicle quality.`}
+                      title={`${getTierDescription(tierLabel, Boolean(vehicle.tier_label))}. Does not verify details or vehicle quality.`}
                       onMouseEnter={(e) => onBadgeEnter('tier', e)}
                       onMouseLeave={onBadgeLeave}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onFocus={(e) => onBadgeEnter('tier', e)}
+                      onBlur={onBadgeLeave}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onBadgeEnter('tier', e); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onBadgeEnter('tier', e); } }}
                     >
                       <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                         {tierLabel}
@@ -1952,7 +1958,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
                       </div>
                       <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
-                        {getTierDescription(tierLabel)}
+                        {getTierDescription(tierLabel, Boolean(vehicle.tier_label))}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '9px' }}>
                         <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>
@@ -2609,7 +2615,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <span style={{ color: getTierColor(tierLabel) }}>{tierLabel}</span> Data Profile
                       </div>
                       <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '6px' }}>
-                        {getTierDescription(tierLabel)}
+                        {getTierDescription(tierLabel, Boolean(vehicle.tier_label))}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.85)', fontSize: '9px' }}>
                         <div>{vehicle.year && vehicle.make && vehicle.model ? '\u2705' : '\u274C'} Year / Make / Model</div>

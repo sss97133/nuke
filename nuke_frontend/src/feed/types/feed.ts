@@ -158,6 +158,7 @@ export interface ResolvedPrice {
 // ---------------------------------------------------------------------------
 
 export interface FeedQueryParams {
+  segment_id?: string;
   q?: string;
   year_min?: number;
   year_max?: number;

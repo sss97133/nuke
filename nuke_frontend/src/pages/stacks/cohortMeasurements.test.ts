@@ -1,7 +1,13 @@
 import { expect, it } from 'vitest';
 import { makeStudy, type BidLot, type StudyBid } from './bidMeasurements';
 import { cohortReadings } from './cohortMeasurements';
+import { expressionFromParams, stackBackParams } from './bidExpression';
 import type { OrderBookRead } from './orderBookReader';
+
+it.each(['', '/stacks?'])('inherits the contributor study from either return encoding %s', prefix => {
+  const expression = expressionFromParams(stackBackParams(`${prefix}stack=SA&by=auction&measure=spacing&from=2018&to=2018&make=Porsche&model=911`));
+  expect(expression).toMatchObject({from:2018,to:2018,measure:'spacing',make:'Porsche',model:'911'});
+});
 
 function fixture() {
   const lots:BidLot[] = [], bids:StudyBid[] = [];
@@ -25,6 +31,13 @@ it('changes the vehicle model year cohort independently of the bid calendar year
   expect(a.result.rankValues).toHaveLength(2);
   const broad=cohortReadings(dataset,read,'make','spacing');
   expect(broad.expression.model).toBeNull();expect(broad.result.rankValues).toHaveLength(5);
+});
+it('keeps the inherited bid calendar window instead of silently using all retained years', () => {
+  const {dataset,read}=fixture();
+  const a=cohortReadings(dataset,read,'model','amount',{from:2025,to:2025});
+  expect(a.expression.from).toBe(2025);expect(a.expression.to).toBe(2025);
+  expect(a.expression.measure).toBe('amount');
+  expect(a.result.rankValues).toHaveLength(0);expect(a.reading).toBeNull();
 });
 it('admits an uncaptured source episode through the same complete-sequence gate without changing the study',() => {
   const {dataset,read}=fixture(); dataset.lots=dataset.lots.filter(l => l.vehicleId !== read.vehicle.id);

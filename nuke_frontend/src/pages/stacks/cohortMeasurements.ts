@@ -3,7 +3,7 @@ import type { OrderBookRead } from './orderBookReader';
 
 /** Admit the selected episode through the existing complete-sold-sequence gate.
  * Never merge it into the retained study or label live partial bids as a completed reading. */
-export function cohortReadings(dataset: StudyDataset, read: OrderBookRead, scope: string, measure: BidMeasure) {
+export function cohortReadings(dataset: StudyDataset, read: OrderBookRead, scope: string, measure: BidMeasure, period?: Pick<BidExpression, 'from' | 'to'>) {
   const held = dataset.lots.find(l => l.id === read.lot?.id && l.vehicleId === read.vehicle.id && l.sourceUrl.replace(/\/+$/, '') === read.lot?.source_url.replace(/\/+$/, ''));
   const admitted = held ? null : makeStudy(read.lot ? [{
     id:read.lot.id, vehicle_id:read.vehicle.id, source:read.lot.source, source_url:read.lot.source_url,
@@ -18,7 +18,7 @@ export function cohortReadings(dataset: StudyDataset, read: OrderBookRead, scope
   const make = subject?.make ?? read.vehicle.make, model = subject?.model ?? null;
   const vehicleYear = subject?.vehicleYear ?? read.vehicle.year;
   const effectiveScope = scope === 'make' || !model ? 'make' : scope === 'vehicleYear' && vehicleYear !== null ? 'vehicleYear' : 'model';
-  const expression: BidExpression = { measure, grouping:'auction', from:2016, to:new Date(dataset.readAt).getUTCFullYear(),
+  const expression: BidExpression = { measure, grouping:'auction', from:period?.from ?? 2016, to:period?.to ?? new Date(dataset.readAt).getUTCFullYear(),
     make, model:effectiveScope === 'make' ? null : model, vehicleYear:effectiveScope === 'vehicleYear' ? vehicleYear : null, weighting:'auction' };
   // All other episodes of this vehicle are withheld from its reference too.
   const peers = {...dataset,lots:dataset.lots.filter(l => l.vehicleId !== read.vehicle.id)};

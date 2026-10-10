@@ -46,9 +46,11 @@ const fmtPriceFull = (n: number | null | undefined) => {
 function useBrands() {
   const [data, setData] = useState<TreemapNode[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [readError, setReadError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
+      if (!cancelled && error) setReadError('Make coverage could not be read.');
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
@@ -56,17 +58,21 @@ function useBrands() {
     });
     return () => { cancelled = true; };
   }, []);
-  return { data, loading };
+  return { data, loading, readError };
 }
 
 function useModels(make: string | null) {
   const [data, setData] = useState<TreemapNode[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
   useEffect(() => {
     if (!make) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
+    setData(null);
+    setReadError(null);
     supabase.rpc('treemap_models_by_brand', { p_make: make }).then(({ data: result, error }) => {
+      if (!cancelled && error) setReadError('Model coverage could not be read.');
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
@@ -74,7 +80,7 @@ function useModels(make: string | null) {
     });
     return () => { cancelled = true; };
   }, [make]);
-  return { data, loading };
+  return { data, loading, readError };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -346,7 +352,7 @@ const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }
 // ────────────────────────────────────────────────────────────
 
 const MakesGrid: React.FC = () => {
-  const { data: brands, loading } = useBrands();
+  const { data: brands, loading, readError } = useBrands();
   const [filter, setFilter] = useState('');
   const [topModelsMap, setTopModelsMap] = useState<Record<string, TreemapNode[]>>({});
 
@@ -389,6 +395,8 @@ const MakesGrid: React.FC = () => {
     const q = filter.toLowerCase();
     return brands.filter(b => b.name.toLowerCase().includes(q));
   }, [brands, filter]);
+
+  if (readError) return <div role="alert" style={{ padding: 24 }}>{readError}</div>;
 
   if (loading) {
     return (
@@ -455,7 +463,7 @@ const MakesGrid: React.FC = () => {
 // ────────────────────────────────────────────────────────────
 
 const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
-  const { data: models, loading } = useModels(make);
+  const { data: models, loading, readError } = useModels(make);
   const [filter, setFilter] = useState('');
 
   const filtered = useMemo(() => {
@@ -466,6 +474,8 @@ const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
   }, [models, filter]);
 
   const totalVehicles = models?.reduce((s, m) => s + m.count, 0) || 0;
+
+  if (readError) return <div role="alert" style={{ padding: 24 }}>{readError}</div>;
 
   if (loading) {
     return (
@@ -607,6 +617,11 @@ const VehicleResultCard: React.FC<{ v: BrowseResult }> = ({ v }) => {
 };
 
 const VehicleList: React.FC<{ make: string; model: string }> = ({ make, model }) => {
+  const [params] = useSearchParams();
+  const yearMin = Number(params.get('yearMin')) || undefined;
+  const yearMax = Number(params.get('yearMax')) || undefined;
+  const bodyStyle = params.get('bodyStyle') || undefined;
+  const era = params.get('era') || undefined;
   const search = useSearch();
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState('sold_price');
@@ -623,8 +638,9 @@ const VehicleList: React.FC<{ make: string; model: string }> = ({ make, model })
     sortDir,
     make,
     model,
+    yearMin, yearMax, bodyStyle, era,
     hasImage: false,
-  }), [make, model, sortBy, sortDir]);
+  }), [make, model, sortBy, sortDir, yearMin, yearMax, bodyStyle, era]);
 
   // Reset on filter change
   useEffect(() => {
@@ -632,7 +648,7 @@ const VehicleList: React.FC<{ make: string; model: string }> = ({ make, model })
     setAllResults([]);
     isInitialLoad.current = true;
     search.executeBrowse(buildParams(1));
-  }, [make, model, sortBy, sortDir]);
+  }, [buildParams, search.executeBrowse]);
 
   // Append results
   useEffect(() => {
@@ -669,6 +685,8 @@ const VehicleList: React.FC<{ make: string; model: string }> = ({ make, model })
 
   const total = search.totalCount;
   const loading = search.browseLoading && allResults.length === 0;
+
+  if (search.browseError) return <div role="alert" style={{ padding: 12 }}>{search.browseError}</div>;
 
   return (
     <>
@@ -805,7 +823,8 @@ const BrowseVehicles: React.FC = () => {
   const model = searchParams.get('model') || '';
 
   // Determine depth: 0 = all makes, 1 = models for a make, 2 = vehicles for make+model
-  const depth = model ? 2 : make ? 1 : 0;
+  const hasScope = ['yearMin', 'yearMax', 'bodyStyle', 'era'].some(key => searchParams.has(key));
+  const depth = model || hasScope ? 2 : make ? 1 : 0;
 
   return (
     <div style={{

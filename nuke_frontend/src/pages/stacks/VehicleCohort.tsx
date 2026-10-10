@@ -5,15 +5,20 @@ import { useBidStudy } from './bidPopulationReader';
 import { MIN_DISTRIBUTION, percentile, quantile, type BidMeasure } from './bidMeasurements';
 import type { OrderBookRead } from './orderBookReader';
 import AnalyticalHeading from './AnalyticalHeading';
-import { measures } from './bidExpression';
+import { expressionFromParams, measures, stackBackParams } from './bidExpression';
 import { cohortReadings } from './cohortMeasurements';
 import { formatMeasure, usePlotWidth } from './stackFormat';
 import './stackExplore.css';
 
 export default function VehicleCohort({ read }: { read: OrderBookRead }) {
   const study = useBidStudy(), [params,setParams] = useSearchParams(), navigate = useNavigate(), {ref,width} = usePlotWidth();
-  const metricParam = params.get('cohortMeasure'), measure: BidMeasure = metricParam === 'spacing' || metricParam === 'bids' ? metricParam : 'typical';
-  const analysis = useMemo(() => study.data ? cohortReadings(study.data,read,params.get('cohort') ?? 'model',measure) : null,[study.data,read,params,measure]);
+  const back = params.get('back');
+  const inherited = expressionFromParams(stackBackParams(back));
+  const inheritedMeasure = inherited.measure === 'entry' || inherited.measure === 'winRate' ? 'typical' : inherited.measure;
+  const metricParam = params.get('cohortMeasure'), measure: BidMeasure = metricParam === 'spacing' || metricParam === 'bids' || metricParam === 'typical' ? metricParam : inheritedMeasure;
+  const from = inherited.from, to = inherited.to;
+  const scope = params.get('cohort') ?? (back ? inherited.vehicleYear ? 'vehicleYear' : inherited.model ? 'model' : 'make' : 'model');
+  const analysis = useMemo(() => study.data ? cohortReadings(study.data,read,scope,measure,{from,to}) : null,[study.data,read,scope,measure,from,to]);
   if (!study.data || !analysis) return <section className="sx-cohort" aria-label="Vehicle cohort"><h2>Vehicle cohort</h2><p role="status">{study.isError ? <>The captured study could not be read. <button type="button" onClick={() => void study.refetch()}>Try again</button></> : 'Reading the captured comparison population…'}</p></section>;
   const {result,expression,subject,reading,make,model,vehicleYear,effectiveScope} = analysis;
   if (!make) return null;
@@ -38,11 +43,12 @@ export default function VehicleCohort({ read }: { read: OrderBookRead }) {
   const change = (key:string,value:string) => {const next=new URLSearchParams(params);next.set(key,value);setParams(next);};
   return <section className="sx-cohort" aria-label="Vehicle cohort">
     <div className="sx-section-head"><h2>Vehicle cohort</h2><Link to={query()}>Explore cohort →</Link></div>
+    {inherited.measure !== inheritedMeasure && <p>Participant entry/conversion does not rank auction records. This comparison uses record median raise size in the same study window.</p>}
     <div className="sx-cohort-membership" aria-label="Cohort membership">
       <button type="button" aria-pressed={effectiveScope === 'make'} onClick={() => change('cohort','make')}>{make}</button>
       {model && <><span>›</span><button type="button" aria-pressed={effectiveScope === 'model'} onClick={() => change('cohort','model')}>{model}</button></>}
       {model && vehicleYear !== null && <><span>›</span><button type="button" aria-pressed={effectiveScope === 'vehicleYear'} onClick={() => change('cohort','vehicleYear')}>{vehicleYear} model year</button></>}
-      <small>{effectiveScope === 'make' ? 'All captured model labels' : subject?.modelBasis === 'source-label' ? 'Source model label' : 'Normalized model label'} · {effectiveScope === 'vehicleYear' ? 'same vehicle model year' : 'all vehicle model years'}</small>
+      <small>{effectiveScope === 'make' ? 'All captured model labels' : subject?.modelBasis === 'source-label' ? 'Source model label' : 'Normalized model label'} · {effectiveScope === 'vehicleYear' ? 'same vehicle model year' : 'all vehicle model years'} · UTC bid years {expression.from}–{expression.to}</small>
     </div>
     <dl className="sx-cohort-population"><div><dt>Measured peer sample</dt><dd>{n.toLocaleString()} <small>auction records · {uniqueVehicles} vehicles</small></dd></div><div><dt>Captured make</dt><dd>{makeN.toLocaleString()} <small>{make} episodes in the study</small></dd></div><div><dt>Retained study</dt><dd>{study.data.lots.length.toLocaleString()} <small>episodes · {study.data.lots.reduce((sum,l) => sum+l.sums.bids,0).toLocaleString()} bids</small></dd></div></dl>
     <div className="sx-cohort-measures" aria-label="Cohort measurement"><button type="button" aria-pressed={measure === 'typical'} onClick={() => change('cohortMeasure','typical')}>Raise size</button><button type="button" aria-pressed={measure === 'spacing'} onClick={() => change('cohortMeasure','spacing')}>Bid spacing</button><button type="button" aria-pressed={measure === 'bids'} onClick={() => change('cohortMeasure','bids')}>Bid count</button></div>

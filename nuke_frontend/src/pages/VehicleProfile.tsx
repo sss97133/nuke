@@ -28,6 +28,7 @@ const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEv
 const VehicleProfileInner: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = new URLSearchParams(location.search).get('returnTo');
   const ctx = useVehicleProfile();
 
   // Aliases from context — single source of truth
@@ -200,6 +201,11 @@ const VehicleProfileInner: React.FC = () => {
   }
   return (
       <div className="vehicle-profile-page">
+        {returnTo?.startsWith(`/stacks/order-book/${vehicleId}?`) && (
+          <div role="status" style={{ padding: '8px 12px', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
+            This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
+          </div>
+        )}
         {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
         <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
           <React.Suspense fallback={null}>

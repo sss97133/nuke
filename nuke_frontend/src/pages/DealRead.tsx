@@ -567,7 +567,7 @@ export default function DealRead() {
         </Expansion>
         <div className="dr-status-line">
           <span>SUBJECT {shortId(subject.id)}{listingObs ? ` · LISTING OBSERVATION ${shortId(listingObs.id)}` : ''}</span>
-          <span>{compSet ? `as of ${compSet.asOf.slice(0, 16).replace('T', ' ')}Z` : 'reading the sales record…'}</span>
+          <span>{compSet ? `as of ${compSet.asOf.slice(0, 16).replace('T', ' ')}Z` : data.isLoading ? 'reading the sales record…' : 'Sales comparison unavailable'}</span>
         </div>
       </div>
 

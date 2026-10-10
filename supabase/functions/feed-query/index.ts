@@ -96,6 +96,7 @@ function json(data: unknown, status = 200, extraHeaders: Record<string, string> 
 // ---------------------------------------------------------------------------
 
 interface FeedRequest {
+  segment_id?: string;
   q?: string;
   year_min?: number;
   year_max?: number;
@@ -240,6 +241,25 @@ Deno.serve(async (req) => {
 
     // ----- User Filters -----
 
+    // Definition membership remains in force when a visitor narrows or resets
+    // the feed. Keyword membership is OR within the definition, AND with user filters.
+    if (body.segment_id) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.segment_id)) {
+        return json({ error: "Invalid segment id" }, 400);
+      }
+      const { data: segment, error: segmentError } = await supabase
+        .from("market_segments_index")
+        .select("year_min, year_max, makes, model_keywords")
+        .eq("segment_id", body.segment_id).maybeSingle();
+      if (segmentError) return json({ error: "Segment definition unavailable" }, 503);
+      if (!segment) return json({ error: "Segment not found" }, 404);
+      if (segment.year_min != null) query = query.gte("year", segment.year_min);
+      if (segment.year_max != null) query = query.lte("year", segment.year_max);
+      const safe = (value: string) => value.replace(/[%_"\\]/g, "");
+      if (segment.makes?.length) query = query.or(segment.makes.map((make: string) => `make.ilike."${safe(make)}"`).join(","));
+      if (segment.model_keywords?.length) query = query.or(segment.model_keywords.map((model: string) => `model.ilike."%${safe(model)}%"`).join(","));
+    }
+
     if (typeof body.year_min === "number" && Number.isFinite(body.year_min)) {
       query = query.gte("year", body.year_min);
     }
@@ -259,7 +279,7 @@ Deno.serve(async (req) => {
       query = query.in("make", [...new Set(variants)]);
     }
 
-    if (body.models && body.models.length > 0 && body.models.length <= 10) {
+    if (body.models && body.models.length > 0 && body.models.length <= 50) {
       const modelFilters = body.models
         .map((m) => `model.ilike.%${m.replace(/[%_]/g, "")}%`)
         .join(",");
@@ -370,39 +390,8 @@ Deno.serve(async (req) => {
         queryError.code === "57014";
 
       if (isTimeout) {
-        console.warn("[feed-query] Main query timed out, using fallback");
-        const { data: fallbackRows, error: fallbackError } = await supabase
-          .from(feedView)
-          .select(`
-            vehicle_id, year, make, model, series, trim,
-            transmission, drivetrain, body_style, canonical_body_style,
-            mileage, vin, is_for_sale, sale_status, sale_date,
-            created_at, updated_at, auction_end_at, event_at,
-            discovery_url, discovery_source, profile_origin, origin_organization_id,
-            city, state, listing_location,
-            canonical_vehicle_type, has_photos,
-            primary_image_url, thumbnail_url, medium_url, full_image_url,
-            description_snippet,
-            display_price, price_source, is_sold,
-            asking_price, sale_price, current_value,
-            nuke_estimate, nuke_estimate_low, nuke_estimate_high, nuke_estimate_confidence,
-            price_tier, deal_score, deal_score_label,
-            heat_score, heat_score_label,
-            is_record_price, segment_record_price, feed_rank_score
-          `)
-          .or(
-            "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
-            "canonical_vehicle_type.is.null"
-          )
-          .or("has_photos.eq.true,primary_image_url.not.is.null")
-          .order("feed_rank_score", { ascending: false })
-          .limit(limit + 1);
-
-        if (fallbackError) {
-          console.error("[feed-query] Fallback also failed:", fallbackError);
-          return json({ error: fallbackError.message }, 500);
-        }
-        rows = fallbackRows ?? [];
+        console.warn("[feed-query] Selected query timed out; scope preserved");
+        return json({ error: "The selected records could not be read in time. Try again; the requested scope has not been changed." }, 503);
       } else {
         console.error("[feed-query] Query error:", queryError);
         return json({ error: queryError.message }, 500);
@@ -556,6 +545,7 @@ Deno.serve(async (req) => {
 
     // Cache-Control
     const isFiltered = !!(
+      body.segment_id ||
       isSearching ||
       body.cursor ||
       body.makes?.length ||
