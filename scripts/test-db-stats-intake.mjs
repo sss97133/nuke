@@ -5,7 +5,7 @@ import * as intakeLedger from '../supabase/functions/poll-listing-feeds/ledger.t
 import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
-  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, EXECUTION_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -55,6 +55,16 @@ test('coverage preserves known-target queue counts and refuses totals after sour
   assert.equal(result.rows.length, 30); assert.equal(result.complete, false);
   assert.equal(result.rows[0].extracted, 0); assert.equal(result.rows[0].total_targets, 100);
   assert.equal(result.scope.basis, 'known_target_url_queue_status');
+});
+test('consumer structure reuses the registry with explicit bounds and no raw evidence payloads', async () => {
+  const rows = Array.from({ length: 101 }, (_, i) => ({ stack_id: `S${i}` }));
+  const result = await readIntakeSection(connection({ [CONSUMERS_SQL]: [{ measured_at: clock, rows }] }), 'consumers');
+  assert.equal(result.rows.length, 100); assert.equal(result.complete, false);
+  assert.equal(result.scope.basis, 'declared_stack_structure');
+  assert(CONSUMERS_SQL.includes('public.stack_coverage(NULL)'));
+  assert(CONSUMERS_SQL.includes('n.ordinality <= 64'));
+  assert(!CONSUMERS_SQL.includes("'evidence',"));
+  assert(!CONSUMERS_SQL.includes('c.needs AS needs'));
 });
 test('relationship slice is explicit and uses fixed parameterized table scope', async () => {
   const db = connection({ [MODEL_SQL]: [{ measured_at: clock, rows: [], links: Array.from({ length: 501 }, () => ({ validated: false })) }] });
@@ -108,6 +118,14 @@ test('active admins and service callers receive only the requested read-only sec
     assert.deepEqual(await response.json(), { contract: 'intake_status_v1', section: 'model' });
     assert.equal(h.counts().reads, 1);
   }
+});
+test('consumer metadata uses the same active-admin guard and refuses anonymous callers', async () => {
+  assert.equal((await handler().request('consumers')).status, 401);
+  assert.equal((await handler({ verdict: { ok: true, caller: { kind: 'user', userId: 'synthetic-user' } } }).request('consumers')).status, 403);
+  const h = handler({ verdict: { ok: true, caller: { kind: 'service_role' } } });
+  const response = await h.request('consumers');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).section, 'consumers');
 });
 test('arbitrary sections, POSTs and API-key callers cannot choose a privileged query', async () => {
   const h = handler({ verdict: { ok: true, caller: { kind: 'api_key', userId: 'synthetic-admin' } }, admin: true });

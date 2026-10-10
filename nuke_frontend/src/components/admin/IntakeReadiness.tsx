@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import PrefetchLink from '../PrefetchLink';
 
-type Section = 'coverage' | 'model' | 'jobs';
+type Section = 'coverage' | 'model' | 'jobs' | 'consumers';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number };
 type Table = { table_name: string; atlas_present: boolean; est_rows: number; n_cols: number; n_cols_described: number;
   registry_owners: string[] | null; receipt_writers: string[] | null; receipt_undeclared_stmts: number;
@@ -13,8 +13,11 @@ type Health = { jobname: string; declared_writer: string | null; last_status: st
   assay_status: string | null; health_status: string | null };
 type Feed = { source_slug: string; feeds: number; enabled_feeds: number; errored_feeds: number;
   last_polled_at: string | null; shortest_interval_minutes: number | null; billing_blocked: boolean | null; rate_limited: boolean | null };
+type Need = { layer: string; kind: string; object: string; verdict: 'present' | 'partial' | 'missing'; reason: string | null; related_table: string | null };
+type Consumer = { stack_id: string; version: number; name: string; question: string; status: string; coverage: number | null;
+  n_needs: number; n_present: number; n_partial: number; n_missing: number; needs_complete: boolean; needs: Need[] };
 type Reading = { contract: string; section: Section; status?: string; measured_at?: string; complete?: boolean;
-  rows?: Source[] | Table[]; links?: Edge[]; links_complete?: boolean;
+  rows?: Source[] | Table[] | Consumer[]; links?: Edge[]; links_complete?: boolean;
   config?: { status: string; measured_at: string; rows: Job[] };
   health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean }; health_scope?: string[];
   feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
@@ -22,7 +25,7 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
 
 // Start with bounded metadata, then avoid overlapping the two aggregate readers.
-const sections: Section[] = ['model', 'coverage', 'jobs'];
+const sections: Section[] = ['model', 'coverage', 'jobs', 'consumers'];
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString() : 'Unmeasured';
 const time = (s: string | null | undefined) => s && Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleString() : 'Unmeasured';
 const sourceValid = (s: Source) => typeof s.source_slug === 'string' && s.source_slug.length > 0
@@ -32,6 +35,21 @@ const names = (rows: any[], key: string, limit: number) => Array.isArray(rows) &
   && rows.every(r => r && typeof r[key] === 'string' && r[key].length > 0)
   && new Set(rows.map(r => r[key])).size === rows.length;
 const strings = (value: unknown) => value === null || Array.isArray(value) && value.every(s => typeof s === 'string');
+const consumerValid = (c: Consumer) => /^[A-Z0-9]+$/.test(c.stack_id)
+  && Number.isSafeInteger(c.version) && c.version > 0 && typeof c.name === 'string' && typeof c.question === 'string'
+  && ['proposed', 'measured', 'building', 'showable', 'live', 'retired'].includes(c.status)
+  && [c.n_needs, c.n_present, c.n_partial, c.n_missing].every(n => Number.isSafeInteger(n) && n >= 0)
+  && c.n_present + c.n_partial + c.n_missing === c.n_needs
+  && (c.n_needs === 0 ? c.coverage === null : typeof c.coverage === 'number'
+    && Number.isFinite(c.coverage) && Math.abs(c.coverage - c.n_present / c.n_needs) <= 0.0001)
+  && typeof c.needs_complete === 'boolean' && Array.isArray(c.needs) && c.needs.length <= 64
+  && (c.needs_complete ? c.needs.length === c.n_needs : c.needs.length === 64 && c.n_needs > 64)
+  && (!c.needs_complete || c.needs.filter(n => n?.verdict === 'present').length === c.n_present
+    && c.needs.filter(n => n?.verdict === 'partial').length === c.n_partial
+    && c.needs.filter(n => n?.verdict === 'missing').length === c.n_missing)
+  && c.needs.every(n => n && typeof n.object === 'string' && typeof n.layer === 'string' && typeof n.kind === 'string'
+    && ['present', 'partial', 'missing'].includes(n.verdict) && (n.reason === null || typeof n.reason === 'string')
+    && (n.related_table === null || typeof n.related_table === 'string' && /^[a-z_][a-z0-9_]*$/.test(n.related_table)));
 const validControls = (controls: any) => controls === undefined || ['invalid', 'unavailable'].includes(controls?.status)
   || controls?.status === 'measured' && typeof controls.value?.enabled === 'boolean'
     && [controls.value.max_feeds, controls.value.max_ingests].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 100)
@@ -51,6 +69,8 @@ function validReading(data: any, section: Section): data is Reading {
       && typeof data.feeds.complete === 'boolean');
   if (data.status !== 'measured' || !Number.isFinite(Date.parse(data.measured_at))) return false;
   if (section === 'coverage') return names(data.rows, 'source_slug', 30) && typeof data.complete === 'boolean';
+  if (section === 'consumers') return names(data.rows, 'stack_id', 100) && typeof data.complete === 'boolean'
+    && data.rows.every(consumerValid);
   return names(data.rows, 'table_name', 14) && data.rows.every((t: Table) => strings(t.registry_owners) && strings(t.receipt_writers))
     && Array.isArray(data.links) && data.links.length <= 500 && typeof data.links_complete === 'boolean'
     && data.links.every((e: Edge) => e && typeof e.constraint_name === 'string' && typeof e.child_table === 'string'
@@ -71,6 +91,9 @@ export default function IntakeReadiness() {
   const [jobFilter, setJobFilter] = useState('all');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [consumerSearch, setConsumerSearch] = useState('');
+  const [consumerTableOnly, setConsumerTableOnly] = useState(false);
+  const [consumerLimit, setConsumerLimit] = useState(8);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -123,6 +146,13 @@ export default function IntakeReadiness() {
   const receiptProblems = tables.filter(t => t.receipt_undeclared_stmts > 0);
   const parents = [...new Set(edges.filter(e => e.child_table === selectedTable).map(e => e.parent_table))];
   const children = [...new Set(edges.filter(e => e.parent_table === selectedTable).map(e => e.child_table))];
+  const consumers = readings.consumers;
+  const questions = (consumers?.rows ?? []) as Consumer[];
+  const needsTotals = consumers?.complete && questions.length > 0
+    ? questions.reduce((sum, q) => ({ total: sum.total + q.n_needs, present: sum.present + q.n_present,
+      partial: sum.partial + q.n_partial, missing: sum.missing + q.n_missing }), { total: 0, present: 0, partial: 0, missing: 0 }) : null;
+  const matchingQuestions = questions.filter(q => (!consumerTableOnly || q.needs.some(n => n.related_table === selectedTable))
+    && `${q.stack_id} ${q.name} ${q.question} ${q.needs.map(n => n.object).join(' ')}`.toLowerCase().includes(consumerSearch.toLowerCase().trim()));
 
   return <section aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -151,10 +181,10 @@ export default function IntakeReadiness() {
         <div>{health.length} execution readings / {activeJobs.length} enabled jobs</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Output {jobs?.health?.output_measured === false || jobs?.health?.status !== 'measured' ? 'unmeasured' : 'assays below'} · not fleet health</div>
       </a>
-      <a href="#status-model" onClick={() => setModelOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
-        <div style={label}>Model relationships</div><div style={metric}>{model ? count(model.links?.length) : 'Unmeasured'}</div>
-        <div>{model ? `${count(tables.length)} tables · ${count(model.links?.length)} declared links` : 'Waiting for model metadata'}</div>
-        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Declared structure · inspect writer receipts ↓</div>
+      <a href="#status-consumers" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
+        <div style={label}>Consumer dependencies</div><div style={metric}>{needsTotals ? `${count(needsTotals.present)} / ${count(needsTotals.total)}` : 'Unmeasured'}</div>
+        <div>{consumers ? `${count(questions.length)} registered questions` : 'Waiting for dependency readings'}</div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Structure present · inspect missing needs ↓</div>
       </a>
     </div>
 
@@ -235,10 +265,41 @@ export default function IntakeReadiness() {
       <p style={{ color: 'var(--text-secondary)' }}>— = Unmeasured. An execution can succeed while its output assay fails. Owner matches are registry declarations, not observed job-to-reader flow.</p>
     </div>}
 
+    {consumers && <section id="status-consumers" style={box} aria-labelledby="status-consumers-title">
+      <h3 id="status-consumers-title" style={label}>QUESTIONS & MISSING DEPENDENCIES</h3>
+      <p>{needsTotals ? `${count(needsTotals.present)} present · ${count(needsTotals.partial)} partial · ${count(needsTotals.missing)} missing / ${count(needsTotals.total)} dependency declarations`
+        : 'First 100 questions only; aggregate totals withheld.'}</p>
+      <p style={{ color: 'var(--text-secondary)' }}>Reading {time(consumers.measured_at)}. Registry structure, not verified answers. A present table or function does not prove correct processing, replay or delivery.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+        <label>Find a question or dependency <input type="search" value={consumerSearch} onChange={e => { setConsumerSearch(e.target.value); setConsumerLimit(8); }} style={{ fontSize: 11 }} /></label>
+        <label><input type="checkbox" checked={consumerTableOnly} onChange={e => { setConsumerTableOnly(e.target.checked); setConsumerLimit(8); }} /> Uses {selectedTable}</label>
+      </div>
+      <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>{['Question / declared dependencies', 'Registry status', 'Present', 'Partial', 'Missing'].map(name => <th scope="col" key={name} style={cell}>{name}</th>)}</tr></thead>
+        <tbody>{matchingQuestions.slice(0, consumerLimit).map(q => <tr key={q.stack_id}>
+          <td style={cell}><details><summary>{q.stack_id} · {q.name}</summary><p>{q.question}</p>
+            <p>Definition v{q.version} · {q.needs_complete ? 'All declared needs shown' : 'First 64 needs only'}</p>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{['Layer', 'Dependency', 'Structure', 'Reason'].map(name => <th scope="col" key={name} style={cell}>{name}</th>)}</tr></thead>
+              <tbody>{q.needs.map((n, i) => <tr key={`${n.layer}:${n.object}:${i}`}><td style={cell}>{n.layer}</td>
+                <td style={cell}>{n.related_table && tables.some(t => t.table_name === n.related_table)
+                  ? <a href="#status-model" onClick={() => { setSelectedTable(n.related_table!); setModelOpen(true); }}>{n.object} →</a> : n.object}</td>
+                <td style={cell}>{n.verdict}</td><td style={cell}>{n.reason ?? '—'}</td></tr>)}</tbody>
+            </table>
+            <p><PrefetchLink to={`/stacks?stack=${encodeURIComponent(q.stack_id)}`}>Open stack workbench →</PrefetchLink></p>
+          </details></td>
+          <td style={cell}>{q.status}</td><td style={cell}>{count(q.n_present)} / {count(q.n_needs)}</td>
+          <td style={cell}>{count(q.n_partial)}</td><td style={cell}>{count(q.n_missing)}</td>
+        </tr>)}</tbody>
+      </table></div>
+      <p style={{ color: 'var(--text-secondary)' }}>Showing {Math.min(consumerLimit, matchingQuestions.length)} of {matchingQuestions.length} matching questions. Dependencies shared across questions count once per declaration.</p>
+      {matchingQuestions.length > consumerLimit && <button type="button" onClick={() => setConsumerLimit(n => n + 8)} style={{ fontSize: 11 }}>Show more questions</button>}
+      {matchingQuestions.length === 0 && <p>No question matches this filter in the returned registry scope.</p>}
+    </section>}
+
     {model && <details id="status-model" open={modelOpen} onToggle={e => setModelOpen(e.currentTarget.open)} style={box}>
       <summary style={label}>MODEL RELATIONSHIPS · {tables.length} tables · {model.links?.length} declared links</summary>
       <h3 style={{ fontSize: 11 }}>MODEL RELATIONSHIPS · {time(model.measured_at)}</h3>
-      <label>Inspect table <select value={selectedTable} onChange={e => setSelectedTable(e.target.value)} style={{ fontSize: 11 }}>
+      <label>Inspect table <select aria-label="Inspect table" value={selectedTable} onChange={e => setSelectedTable(e.target.value)} style={{ fontSize: 11 }}>
         {tables.map(t => <option key={t.table_name} value={t.table_name}>{t.table_name}</option>)}
       </select></label>
       {table && <>
@@ -259,6 +320,7 @@ export default function IntakeReadiness() {
         </details>
       </>}
       <p>Fourteen named tables. Foreign keys establish declared structure. Trigger counts, description coverage and receipts do not prove semantic correctness, replay or consumer delivery.</p>
+      <p><a href="#status-consumers" onClick={() => { setConsumerTableOnly(true); setConsumerSearch(''); setConsumerLimit(8); }}>Show registered questions using {selectedTable} →</a></p>
       <p><PrefetchLink to="/stacks">Inspect downstream stacks →</PrefetchLink></p>
     </details>}
   </section>;

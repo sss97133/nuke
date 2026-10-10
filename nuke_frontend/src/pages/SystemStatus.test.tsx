@@ -139,7 +139,7 @@ it('shows intake coverage through a failed totals read and does not re-fetch it 
   expect(container.textContent).toContain('0 completed queue matches / 10 known target URLs');
   fixture.transportFailure = false; await tick(60_000);
   expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
-  expect(fixture.intakeRequests).toHaveLength(3);
+  expect(fixture.intakeRequests).toHaveLength(4);
 });
 
 it('keeps exact capped and unavailable days separate within one degraded organ', async () => {
