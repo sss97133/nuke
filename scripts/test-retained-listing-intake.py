@@ -10,10 +10,12 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=4 and set(sys.argv[2:]) <= {'--two-front','--bulk120'}
+assert len(sys.argv)<=5 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
 two_front = '--two-front' in sys.argv[2:]
 bulk120 = '--bulk120' in sys.argv[2:]
+powertrain = '--powertrain' in sys.argv[2:]
+assert not powertrain or (two_front and bulk120)
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
 def sql(text):
@@ -215,6 +217,96 @@ assert sql("SELECT keys_seen FROM retained_listing_property_replay") == ('2101' 
 assert sql("SELECT scan_completed_at IS NOT NULL FROM retained_listing_property_replay") == 't'
 assert sql("SELECT count(*) FROM vehicle_observations WHERE kind='listing' AND source_observation_id IS NOT NULL") == '0'
 passed('1202 protected canonical source-property results; wrong worker/result/replayed finish refused; original testimony retained')
+if powertrain:
+    # Extend the same real intake/replay fixture after its entire color scan.
+    # Historical completions stay present while a new projection epoch replays.
+    sql("""INSERT INTO observation_properties(id,property_key,namespace,applies_to_kinds) VALUES
+    ('c0f743ae-dc94-4dfd-98ef-514b76f74a9b','engine_configuration','core',ARRAY['specification']),
+    ('66b2f1f6-b714-4ac0-85b6-60ba89529c1a','engine_displacement_l','core',ARRAY['specification']),
+    ('235aed17-9bd3-4886-90be-9b1a8e2d1844','transmission_type','core',ARRAY['specification']),
+    ('32b51f19-e5cf-4f67-81d9-96c2d30885a1','drivetrain_layout','core',ARRAY['specification']);
+    UPDATE vehicle_observations SET structured_data=structured_data||'{"engine_size":"302ci V8","transmission":"Four-Speed Manual","drivetrain":"4WD"}'::jsonb
+     WHERE kind='listing' AND extraction_method='html_match';""")
+    garage = Path('supabase/migrations/20261008050000_garage_owner_corrections.sql').read_text()
+    sql(garage[garage.index('CREATE OR REPLACE VIEW public.vehicle_canonical'):garage.index('CREATE OR REPLACE FUNCTION public.notify_subscribers_on_observation')])
+    sql(Path('supabase/migrations/20261010150757_retained_listing_powertrain_properties.sql').read_text())
+    scale = Path('supabase/migrations/20261010164331_expand_retained_listing_property_replay.sql').read_text()
+    prior_scan = read('SELECT to_jsonb(r) FROM retained_listing_property_replay r')
+    prior_colors = sql("SELECT md5(jsonb_agg(to_jsonb(q) ORDER BY source_observation_id,property_id)::text) FROM retained_listing_property_work q")
+    owners = read("SELECT jsonb_agg(jsonb_build_object('name',proname,'oid',oid,'owner',proowner,'acl',proacl,'security',prosecdef,'config',proconfig) ORDER BY proname) FROM pg_proc WHERE oid IN('enqueue_retained_listing_properties(uuid)'::regprocedure,'claim_retained_listing_properties(text,integer)'::regprocedure,'retained_listing_property_result_matches(uuid,uuid,uuid)'::regprocedure,'seed_retained_listing_properties()'::regprocedure,'assay_retained_listing_properties()'::regprocedure)")
+    sql('UPDATE cron.job SET active=false')
+    rejects(scale)
+    assert sql("SELECT count(*) FROM pg_attribute WHERE attrelid='retained_listing_property_replay'::regclass AND attname='projection_version'")=='0'
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    fn = sql("SELECT pg_get_functiondef('retained_powertrain_value(text,jsonb)'::regprocedure)")
+    sql(fn.replace("p_key='drivetrain_layout'", "p_key='drivetrain_layout' AND true"))
+    rejects(scale)
+    sql(fn)
+    sql(scale)
+    assert sql('SELECT active FROM cron.job')=='f'
+    assert read('SELECT previous_scan_receipt FROM retained_listing_property_replay')==prior_scan
+    assert sql("SELECT keys_seen=0 AND work_seeded=0 AND projection_version='retained_listing_six_properties_v1' AND scan_completed_at IS NULL AND cursor_source_id IS NULL AND reverse_cursor_source_id IS NULL FROM retained_listing_property_replay")=='t'
+    assert sql("SELECT md5(jsonb_agg(to_jsonb(q) ORDER BY source_observation_id,property_id)::text) FROM retained_listing_property_work q")==prior_colors
+    assert read("SELECT jsonb_agg(jsonb_build_object('name',proname,'oid',oid,'owner',proowner,'acl',proacl,'security',prosecdef,'config',proconfig) ORDER BY proname) FROM pg_proc WHERE oid IN('enqueue_retained_listing_properties(uuid)'::regprocedure,'claim_retained_listing_properties(text,integer)'::regprocedure,'retained_listing_property_result_matches(uuid,uuid,uuid)'::regprocedure,'seed_retained_listing_properties()'::regprocedure,'assay_retained_listing_properties()'::regprocedure)")==owners
+    passed('six-property epoch preserves all1202 color completions, prior scan/OIDs/ACL; pause and normalizer drift roll back atomically')
+    assert sql('SELECT activate_retained_listing_property_intake()')=='t'
+    sql("""INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data)
+    VALUES('90000000-0000-4000-8000-000000000001','22222222-2222-4222-8222-222222222222','listing',
+    '4cdc735c-f117-42f2-889f-ba33805639a5','https://bringatrailer.com/listing/late-powertrain',NULL,'2026-08-01','html_match',0.7,
+    '{"engine_size":"302ci V8","transmission":"Manual or Automatic","drivetrain":"unknown"}');""")
+    assert sql("SELECT count(*) FROM retained_listing_property_work WHERE source_observation_id='90000000-0000-4000-8000-000000000001'")=='2'
+    assert sql("SELECT enqueue_retained_listing_properties('90000000-0000-4000-8000-000000000001')")=='0'
+    projected = 0
+    while True:
+        batch = claim('powertrain-replay')
+        if not batch:
+            if sql('SELECT scan_completed_at IS NOT NULL FROM retained_listing_property_replay')=='t': break
+            continue
+        for row in batch:
+            source, prop, mode = row['source_observation_id'], row['property_id'], row['mode']
+            key = mode[len('retained_listing_'):-3]
+            field = 'transmission' if key=='transmission_type' else 'drivetrain' if key=='drivetrain_layout' else 'engine_size'
+            projected += 1
+            output=f'91000000-0000-4000-8000-{projected:012d}'
+            sql(f"""INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,source_url,property_id,source_identifier,raw_source_ref,
+             observed_at,extraction_method,confidence_score,structured_data,source_observation_id,content_hash,content_text)
+             SELECT '{output}',vehicle_id,'specification',source_id,source_url,'{prop}','{mode}:'||id::text,'vehicle_observations:'||id::text,
+             ingested_at,'retained_listing_property_projection_v1',0.6,jsonb_build_object('{key}',retained_powertrain_value('{key}',structured_data->'{field}'),
+             'source_observation_id',id,'claim_role','listing_claim','observed_at_basis','source_testimony_recorded_at','source_field','{field}',
+             'property_key','{key}','projection_version','{mode}','analysis_kind','retained_listing_property_projection','source_recorded_at',ingested_at,
+             'source_observed_at',observed_at,'source_confidence_score',confidence_score,'source_extraction_method',extraction_method,
+             'factory_configuration_status','unknown','current_configuration_status','unknown','independent_source',false,
+             'source_value',structured_data->'{field}','normalization_version','retained_powertrain_v1'),id,'powertrain-canonical-{projected}',
+             'Retained powertrain claim. Unknown factory/current configuration.' FROM vehicle_observations WHERE id='{source}';""")
+            assert sql(f"SELECT finish_retained_listing_property('{source}','{prop}','wrong-worker','done','{output}')")=='f'
+            assert sql(f"SELECT finish_retained_listing_property('{source}','{prop}','powertrain-replay','done','{source}')")=='f'
+            assert sql(f"SELECT finish_retained_listing_property('{source}','{prop}','powertrain-replay','done','{output}')")=='t'
+    assert projected==2406 #601 baseline parents x4, plus2 from the late ambiguous source
+    assert sql('SELECT keys_seen=2102 AND work_seeded=2404 AND scan_completed_at IS NOT NULL FROM retained_listing_property_replay')=='t'
+    assert sql("SELECT count(*) FROM retained_listing_property_work WHERE status='done'")=='3608'
+    assert sql('SELECT seed_retained_listing_properties()')=='0'
+    assay=read('SELECT assay_retained_listing_properties()')
+    assert assay['sample_stale']==0 and assay['completed_work']==3608
+    assert sum(x['work_items'] for x in assay['property_work'])==3608
+    assert assay['recent_new_claims']==3608 and assay['recent_completed_work']==3608
+    assert sql("SELECT count(*) FROM vehicle_canonical WHERE vehicle_id='22222222-2222-4222-8222-222222222222'")=='6'
+    assert any(x.get('source_value')=='302ci V8' for x in read("SELECT get_field_provenance('22222222-2222-4222-8222-222222222222','engine_configuration')")['observations'])
+    passed('full2102-key replay reaches all601baseline eligible parents plus late arrival, adds2404powertrain work; exact per-property/30min yield and real public readers')
+    # Withdrawing/altering parent testimony invalidates persisted completion too.
+    source='60000000-0000-4000-8000-000000000001'
+    prop='c0f743ae-dc94-4dfd-98ef-514b76f74a9b'
+    result=sql(f"SELECT observation_id FROM retained_listing_property_work WHERE source_observation_id='{source}' AND property_id='{prop}'")
+    sql(f"UPDATE vehicle_observations SET structured_data=structured_data||'{{\"engine_size\":\"302ci Small-Block V8\"}}'::jsonb WHERE id='{source}'")
+    assert sql(f"SELECT retained_listing_property_result_matches('{source}','{prop}','{result}')")=='f'
+    sql('UPDATE vehicles SET is_public=false')
+    assert sql('SELECT count(*) FROM vehicle_canonical')=='0'
+    assert read('SELECT assay_retained_listing_properties()')['sample_stale']==200
+    for role in ('anon','authenticated'):
+        assert sql(f"SELECT has_function_privilege('{role}','claim_retained_listing_properties(text,integer)','EXECUTE')")=='f'
+    rejects(scale)
+    assert sql("SELECT count(*) FROM retained_listing_property_work WHERE status='done'")=='3608'
+    passed('changed raw parent invalidates canonical completion; private withdrawals remove readers; public dispatch/raw writes denied; repeat epoch migration refuses')
+    sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
     assert sql('SELECT seed_retained_listing_properties()')=='0'
