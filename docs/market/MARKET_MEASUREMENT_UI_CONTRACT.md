@@ -4,6 +4,34 @@ This supersedes the price-histogram-first presentation. The owner wants market m
 
 ## Public experience
 
+**Owner steering, October 10 — market rows and inspection.** A row answers what the vehicle is,
+what distinguishes this example, where its listing places it, and what its auction is doing.
+Lead with structured year/make/model. Preserve the source headline under attribution; do not
+parse its promotional wording into specifications or quietly normalize an unresolved model.
+Source attribution is secondary. The original listing is reached deliberately through Sources,
+not a repeated outbound primary action. Clicking identity or an auction measure opens a compact
+inspection immediately beneath that row, preserving scroll position, filters and keyboard focus.
+An inspected lot stays reachable when its deadline passes; elapsed time alone cannot establish
+the result. A different listing URL on the same vehicle must not replace the inspected episode.
+
+The initial display policy selects at most three attributed vehicle reports: disagreements first,
+then powertrain, body and appearance, suppressing repeated identity and duplicate engine fields.
+Unrooted scalar values and unknown mileage units do not become distinguishing claims. This is a
+versioned presentation priority, not empirical rarity, price impact or verified installation.
+Existing specification readers own evidence eligibility; the browser only selects and formats
+their output. Listing-supplied state/ZIP must retain their location basis; venue, registration and
+private sighting coordinates cannot substitute. Broader differentiation still needs qualified
+condition, history, configuration and conditional-frequency readers.
+
+Keep auction measures in consistent positions. The initial row can expose the exact episode's
+recorded bid, positive source-reported bid/watcher counts and a supported latest bid-event time.
+Default zero counts are unknown. The short drill shows actual retained bid records and their
+numeric changes, with currency/capture limits. It does not manufacture recent bidder counts,
+interval rates, peer-relative pace or forecasts from a truncated interaction window. Those
+remain dependencies of the qualified measurement owner described below. Vehicle facts and
+Sources have their own concise inspections; full records and bid sequences require a deliberate
+deeper drill. Same question, same episode, same evidence context through each step.
+
 **Owner steering, October 4:** inventory counts, bid-price bins and raw model-label groups do not answer how a market or a vehicle is performing. PR558 passed technical checks and was rejected by the owner for its analytical design. Its controls and count charts are not the target design. This direction supersedes the earlier single-cohort-dropdown prescription. Implementation, deployment, runtime correctness and analytical usefulness are separate acceptance stages.
 
 Arrival establishes the boundary of the view: the whole market, a named venue, a captured subset of that venue, or one listing episode. BaT is a venue within the market. Captured open inventory is not all BaT inventory; stored auction history is not all BaT history. Show supported coverage and dates, with unknown platform/whole-market denominators stated explicitly. Do not promote an illustrative platform sales count into a headline.

@@ -12,16 +12,72 @@ export const INTAKE_JOBS = ['poll-listing-feeds', 'source-monitor-poll', 'bat-li
   'drain-vehicle-taxonomy'];
 export const HEALTH_JOBS = ['poll-listing-feeds', 'bat-live-pull', 'batch-vin-decode-backfill',
   'drain-vehicle-derived-queues', 'derivation-queue-drain', 'rmsothebys-discovery'];
-export type IntakeSection = 'coverage' | 'model' | 'jobs';
+export type IntakeSection = 'coverage' | 'model' | 'jobs' | 'consumers';
 export interface IntakeConnection {
   queryObject<T = Record<string, unknown>>(query: string, args?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-export const COVERAGE_SQL = `SELECT statement_timestamp() AS measured_at,
+// Prefer the recorded FK. A missing FK may resolve only by BOTH the source's
+// exact observed name and canonical origin, and only to one public organization.
+// Collections sharing an auction house's domain are not the source organization.
+export const SOURCE_PROFILES_SQL = `source_profiles AS (
+  SELECT s.slug AS source_slug, s.display_name, s.base_url,
+    (SELECT CASE WHEN count(*) = 1 THEN min(o.id::text) END
+      FROM public.organizations o WHERE o.is_public = true AND (
+        (s.business_id IS NOT NULL AND o.id = s.business_id) OR
+        (s.business_id IS NULL AND lower(trim(o.business_name)) = lower(trim(s.display_name))
+          AND lower(regexp_replace(rtrim(o.website, '/'), '^https?://(www[.])?', ''))
+            = lower(regexp_replace(rtrim(s.base_url, '/'), '^https?://(www[.])?', '')))
+      )) AS organization_id
+  FROM public.observation_sources s
+)`;
+
+export const COVERAGE_SQL = `WITH ${SOURCE_PROFILES_SQL}
+SELECT statement_timestamp() AS measured_at,
   coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) AS rows
-FROM (SELECT source_slug, total_targets, in_queue, extracted, pending, failed,
-  skipped, duplicate, gap FROM public.source_target_coverage
+FROM (SELECT c.source_slug, total_targets, in_queue, extracted, pending, failed,
+  skipped, duplicate, gap, p.organization_id, p.display_name, p.base_url
+  FROM public.source_target_coverage c LEFT JOIN source_profiles p USING (source_slug)
   ORDER BY total_targets DESC, source_slug LIMIT 31) s`;
+
+// Public provenance inventory only: no queue state, commands, contacts or bodies.
+// One indexed count per matched source; sample reads stop after 25 URLs.
+export const ORG_TARGETS_SQL = `WITH ${SOURCE_PROFILES_SQL}
+SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) AS rows
+FROM (SELECT p.source_slug, p.display_name, p.base_url,
+    (SELECT count(*) FROM public.source_targets t WHERE t.source_slug = p.source_slug) AS total_targets,
+    coalesce((SELECT jsonb_agg(to_jsonb(t)) FROM (
+      SELECT listing_url, first_discovered_at, last_seen_at FROM public.source_targets
+      WHERE source_slug = p.source_slug LIMIT 25) t), '[]'::jsonb) AS targets
+  FROM source_profiles p WHERE p.organization_id = $1 ORDER BY p.source_slug LIMIT 31) s`;
+
+export async function readOrganizationTargets(conn: IntakeConnection, organizationId: string) {
+  const result = await boundedRead(conn, ORG_TARGETS_SQL, [organizationId]);
+  return { contract: 'organization_targets_v1', organization_id: organizationId, ...result,
+    rows: result.rows.slice(0, 30), complete: result.status === 'measured' && result.rows.length <= 30,
+    sample_limit: 25 };
+}
+// The existing registry measures declared structure, not end-to-end delivery.
+// Project only dependency names/verdicts and reasons, never raw evidence payloads.
+export const CONSUMERS_SQL = `SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(to_jsonb(s) ORDER BY s.stack_id), '[]'::jsonb) AS rows
+FROM (SELECT c.stack_id, c.version, s.name, s.question, s.status, c.coverage,
+  c.n_needs, c.n_present, c.n_partial, c.n_missing,
+  jsonb_array_length(c.needs) <= 64 AS needs_complete,
+  coalesce((SELECT jsonb_agg(jsonb_build_object(
+    'layer', n.value->>'layer', 'kind', n.value->>'kind',
+    'object', n.value->>'object', 'verdict', n.value->>'verdict',
+    'reason', n.value->'evidence'->>'reason',
+    'related_table', CASE WHEN n.value->>'kind' = 'table' THEN n.value->>'object'
+      WHEN n.value->>'kind' IN ('column','intake') THEN split_part(n.value->>'object','.',1)
+      WHEN n.value->>'kind' = 'abstract' THEN n.value->'evidence'->>'declared_table' END)
+    ORDER BY n.ordinality) FROM jsonb_array_elements(c.needs) WITH ORDINALITY n(value, ordinality)
+    WHERE n.ordinality <= 64), '[]'::jsonb) AS needs
+  FROM public.stack_coverage(NULL) c
+  JOIN public.stacks s USING (stack_id, version)
+  ORDER BY c.stack_id LIMIT 101) s`;
+
 
 export const MODEL_SQL = `WITH scope AS (SELECT unnest($1::text[]) AS table_name),
 tables AS (SELECT s.table_name, a.activity, a.est_rows, a.n_cols, a.n_cols_described,
@@ -60,6 +116,14 @@ export const HEALTH_SQL = `SELECT statement_timestamp() AS measured_at,
 FROM (SELECT jobname, declared_writer, last_status, last_run_at, assay_status, health_status
   FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
 
+// Preserve executions and declarations when an output assay exceeds its budget.
+// Omitting assay/health expressions avoids evaluating the view's expensive assays.
+export const EXECUTION_SQL = `SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(to_jsonb(j) ORDER BY j.jobname), '[]'::jsonb) AS rows
+FROM (SELECT jobname, declared_writer, last_status, last_run_at,
+  NULL::text AS assay_status, NULL::text AS health_status
+  FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
+
 export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
   coalesce((SELECT jsonb_agg(to_jsonb(f)) FROM (
     SELECT source_slug, count(*)::int AS feeds,
@@ -91,7 +155,9 @@ export async function boundedRead(conn: IntakeConnection, sql: string, args: unk
 export async function readIntakeSection(conn: IntakeConnection, section: IntakeSection) {
   if (section === 'jobs') {
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);
-    const health = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
+    const output = await boundedRead(conn, HEALTH_SQL, [HEALTH_JOBS]);
+    const health = output.status === 'measured' ? output
+      : await boundedRead(conn, EXECUTION_SQL, [HEALTH_JOBS]);
     const feeds = await boundedRead(conn, FEEDS_SQL);
     let controls: { status: string; value?: ReturnType<typeof intakeThrottle> } = { status: 'unavailable' };
     if (feeds.status === 'measured') {
@@ -99,18 +165,21 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
       catch { controls = { status: 'invalid' }; }
     }
     const { controls: _rawControls, ...feedReading } = feeds.status === 'measured' ? feeds : { ...feeds, controls: undefined };
-    return { contract: 'intake_status_v1', section, config, health, controls,
+    return { contract: 'intake_status_v1', section, config,
+      health: { ...health, output_measured: output.status === 'measured' }, controls,
       feeds: { ...feedReading, rows: feeds.rows.slice(0, 60), complete: feeds.status === 'measured' && feeds.rows.length <= 60 },
       scope: INTAKE_JOBS, health_scope: HEALTH_JOBS };
   }
-  const result = await boundedRead(conn, section === 'coverage' ? COVERAGE_SQL : MODEL_SQL,
+  const result = await boundedRead(conn, section === 'coverage' ? COVERAGE_SQL : section === 'consumers' ? CONSUMERS_SQL : MODEL_SQL,
     section === 'model' ? [INTAKE_TABLES] : []);
-  const cap = section === 'coverage' ? 30 : 500;
+  const cap = section === 'coverage' ? 30 : section === 'consumers' ? 100 : 500;
   const links = 'links' in result ? result.links ?? [] : [];
   return { contract: 'intake_status_v1', section, ...result,
-    rows: section === 'coverage' ? result.rows.slice(0, cap) : result.rows,
+    rows: section === 'model' ? result.rows : result.rows.slice(0, cap),
     ...(section === 'model' ? { links: links.slice(0, cap), links_complete: result.status === 'measured' && links.length <= cap } : {}),
-    complete: result.status === 'measured' && (section !== 'coverage' || result.rows.length <= cap),
-    scope: section === 'model' ? INTAKE_TABLES : { source_limit: cap, basis: 'known_target_url_queue_status' },
+    complete: result.status === 'measured' && (section === 'model' || result.rows.length <= cap),
+    scope: section === 'model' ? INTAKE_TABLES : section === 'consumers'
+      ? { stack_limit: cap, needs_limit_per_stack: 64, basis: 'declared_stack_structure' }
+      : { source_limit: cap, basis: 'known_target_url_queue_status' },
     ...(section === 'model' ? { receipt_limit_per_table: 32, receipt_window_days: 30 } : {}) };
 }

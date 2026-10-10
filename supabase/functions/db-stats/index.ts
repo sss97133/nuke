@@ -13,19 +13,27 @@
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticateWriter } from '../_shared/writeGuard.ts';
-import { readIntakeSection, type IntakeSection } from './intakeStatus.ts';
+import { readIntakeSection, readOrganizationTargets, type IntakeSection } from './intakeStatus.ts';
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const section = new URL(req.url).searchParams.get('intake');
+  const params = new URL(req.url).searchParams;
+  const section = params.get('intake');
+  const organizationId = params.get('organization_targets');
+  if (organizationId !== null) {
+    const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+    if (req.method !== 'GET') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers });
+    if (section !== null || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId))
+      return new Response(JSON.stringify({ error: 'invalid_organization' }), { status: 400, headers });
+  }
   let intakeCaller: string | 'service' | null = null;
   if (section !== null) {
     const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
     if (req.method !== 'GET') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers });
-    if (!['coverage', 'model', 'jobs'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
+    if (!['coverage', 'model', 'jobs', 'consumers'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
     // Reuse cryptographically verified callers. Privileged metadata also needs
     // an active admin_users membership, matching the existing admin UI guard.
     const auth = await authenticateWriter(req);
@@ -51,6 +59,11 @@ Deno.serve(async (req) => {
     const conn1 = await pool.connect();
 
     try {
+      if (organizationId !== null) {
+        const data = await readOrganizationTargets(conn1, organizationId);
+        return new Response(JSON.stringify(data), { status: data.status === 'measured' ? 200 : 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      }
       if (section !== null) {
         const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
         if (intakeCaller !== 'service') {
@@ -322,6 +335,9 @@ Deno.serve(async (req) => {
     }
 
   } catch (e) {
+    if (organizationId !== null) return new Response(JSON.stringify({ error: 'organization_targets_unavailable' }), {
+      status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
     if (section !== null) return new Response(JSON.stringify({ error: 'intake_status_unavailable' }), {
       status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
     });

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, retry: vi.fn() }));
+const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn() }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
   useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }), useInventoryTaxonomy: () => fixture.taxonomy,
@@ -12,7 +12,11 @@ vi.mock('./useMarketPulse', async importOriginal => ({
 vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
 }));
-vi.mock('./AuctionEvidence', () => ({ default: ({ vehicleId, onClose }: any) => <section aria-label="Listing activity evidence">{vehicleId}<button onClick={onClose}>Close listing evidence</button></section> }));
+vi.mock('./AuctionEvidence', () => ({ default: ({ vehicleId, onClose }: any) => <section id={`lot-inspection-${vehicleId}`} aria-label="Listing activity evidence">{vehicleId}<button onClick={onClose}>Close listing evidence</button></section> }));
+vi.mock('./useMarketRowDetails', async importOriginal => ({
+  ...await importOriginal<typeof import('./useMarketRowDetails')>(),
+  useMarketRowDetails: () => ({ data: fixture.details }), useMarketRowSpecs: () => ({ data: fixture.specs }),
+}));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
 vi.mock('./RecordedSalesComparison', () => ({ default: ({ make, onMakeChange, onViewChange }: any) => <section aria-label="Recorded sales comparison">
   <span>Comparison scope {make ?? 'all'}</span>
@@ -22,8 +26,8 @@ vi.mock('./RecordedSalesComparison', () => ({ default: ({ make, onMakeChange, on
   <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
 </section> }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
-vi.mock('@tanstack/react-virtual', () => ({ useWindowVirtualizer: ({ count, estimateSize }: any) => ({
-  getTotalSize: () => count * estimateSize(),
+vi.mock('@tanstack/react-virtual', () => ({ defaultRangeExtractor: () => [], useWindowVirtualizer: ({ count, estimateSize }: any) => ({
+  getTotalSize: () => count * estimateSize(), measureElement: () => {}, range: { startIndex: 0, endIndex: count - 1 },
   getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ index, start: index * estimateSize() })),
 }) }));
 
@@ -50,7 +54,7 @@ function button(prefix: string) {
   expect(b).toBeTruthy(); return b!;
 }
 async function click(prefix: string) { await act(async () => button(prefix).click()); }
-function boardTitles() { return [...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.textContent); }
+function boardTitles() { return [...container.querySelectorAll<HTMLElement>('.market-lot-row')].map(a => a.dataset.vehicleId); }
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -60,8 +64,10 @@ beforeEach(() => {
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
-  fixture.retry.mockReset();
+  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = [];
   fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
+  vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   fixture.movement = { data: [], coverage: undefined, dataUpdatedAt: Date.now() };
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
@@ -122,6 +128,10 @@ describe('market answer -> supporting lots', () => {
     await act(async () => container.querySelector<HTMLButtonElement>(`[data-map-lot="${id}"]`)!.click());
     expect(window.location.search).toContain(`lot=${id}`);
     expect(container.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
     await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
@@ -215,18 +225,18 @@ describe('market answer -> supporting lots', () => {
   it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
     await render('make=PORSCHE'); await click('25,000–49,999:');
     expect(window.location.search).toContain('make=PORSCHE');
-    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/later']);
+    expect(boardTitles()).toEqual(['later']);
     expect(button('25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
     await click('25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
     await render('make=PORSCHE'); await click('Unrecorded:');
-    expect([...container.querySelectorAll('a[href^="/vehicle/"]')].map(a => a.getAttribute('href'))).toEqual(['/vehicle/unknown']);
+    expect(boardTitles()).toEqual(['unknown']);
     await click('Ending < 24 h');
     expect(window.location.search).not.toContain('bidRange');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('1 of 2 lots');
     expect(container.querySelector('button[aria-label="Local fixture: 2 captured lots. Filter this recorded model"]')).toBeTruthy();
-    expect(container.querySelector('a[title="The listing on Bring a Trailer"]')?.getAttribute('href')).toContain('local-fixture-first');
+    expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
     expect(container.textContent).toContain('Source read time and bid event time are unavailable');
   });
   it('makes an empty scope recoverable and does not display a zero median', async () => {
@@ -257,5 +267,47 @@ describe('market answer -> supporting lots', () => {
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
     await click('All captured makes');
     expect(container.textContent).toContain('area = captured lot count');
+  });
+});
+
+
+describe('inline market row inspection', () => {
+  it('keeps the inspected row under its panel when its deadline passes and a refresh removes it', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    const selected = { ...lot(id, 'BMW', 42000, .01), year: 2004, model: 'M3' };
+    fixture.pulse.data.auctions = [selected, lot('later', 'BMW', 5000, 4)];
+    await render(); await click('Inspect auction for 2004 BMW M3');
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    fixture.pulse.data = { ...fixture.pulse.data, auctions: [fixture.pulse.data.auctions[1]] };
+    await render(window.location.search.slice(1));
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.textContent).toContain('Awaiting result');
+    expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
+    await click('Close listing evidence');
+    expect(container.querySelector(`[data-vehicle-id="${id}"]`)).toBeNull();
+  });
+  it('uses structured identity and opens beneath the clicked row without an outbound primary action', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions[1] = { ...lot(id, 'BMW', 42000, 2), year: 2004, model: 'M3', title: 'Arbitrary promotional headline' };
+    fixture.details.set(id, { id, location: 'CA · 90210', bidCount: 24, watchers: 432, lastBidAt: '2026-10-03T11:58:00Z' });
+    fixture.specs = [{ field: 'transmission', value: '6-speed manual', rooted: true }];
+    await render();
+    expect(container.textContent).toContain('2004 BMW M3');
+    expect(container.textContent).not.toContain('Arbitrary promotional headline');
+    expect(container.textContent).toContain('6-speed manual');
+    expect(container.textContent).toContain('CA · 90210');
+    expect(container.textContent).toContain('24 bids');
+    expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
+    await click('Inspect auction for 2004 BMW M3');
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.nextElementSibling?.getAttribute('id')).toBe(`lot-inspection-${id}`);
+    expect(window.location.search).toContain('inspect=auction');
+    await click('Inspect transmission for 2004 BMW M3');
+    expect(window.location.search).toContain('inspect=vehicle');
+    await click('Sources for 2004 BMW M3');
+    expect(window.location.search).toContain('inspect=sources');
+    await click('Close listing evidence');
+    expect(window.location.search).not.toContain('lot=');
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
   });
 });

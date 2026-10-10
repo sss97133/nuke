@@ -5,7 +5,8 @@ import * as intakeLedger from '../supabase/functions/poll-listing-feeds/ledger.t
 import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
-  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
+  ORG_TARGETS_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -32,8 +33,21 @@ test('timeout/refusal loses only that reading and never exposes private SQL erro
   assert.equal(result.config.rows[0].active, false);
   assert.equal(result.health.measured_at, null); assert.deepEqual(result.health.rows, []);
   assert(!JSON.stringify(result).includes('PRIVATE_'));
-  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, 3);
+  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, 4);
   assert.deepEqual(result.scope, INTAKE_JOBS); assert.deepEqual(result.health_scope, HEALTH_JOBS);
+});
+test('an output timeout preserves execution evidence without claiming output health', async () => {
+  const db = connection({ [HEALTH_SQL]: new Error('PRIVATE_ASSAY_TIMEOUT'),
+    [EXECUTION_SQL]: [{ measured_at: clock, rows: [{ jobname: 'bat-live-pull', declared_writer: 'bat-live-pull',
+      last_status: 'succeeded', last_run_at: clock, assay_status: null, health_status: null }] }] });
+  const result = await readIntakeSection(db, 'jobs');
+  assert.equal(result.health.status, 'measured');
+  assert.equal(result.health.output_measured, false);
+  assert.equal(result.health.rows[0].last_status, 'succeeded');
+  assert.equal(result.health.rows[0].assay_status, null);
+  assert.equal(result.health.rows[0].health_status, null);
+  assert(!JSON.stringify(result).includes('PRIVATE'));
+  assert.deepEqual(db.calls.find(c => c.sql === EXECUTION_SQL).args, [HEALTH_JOBS]);
 });
 test('coverage preserves known-target queue counts and refuses totals after source overflow', async () => {
   const rows = Array.from({ length: 31 }, (_, i) => ({ source_slug: `source-${i}`, total_targets: 100, extracted: 0 }));
@@ -42,6 +56,16 @@ test('coverage preserves known-target queue counts and refuses totals after sour
   assert.equal(result.rows.length, 30); assert.equal(result.complete, false);
   assert.equal(result.rows[0].extracted, 0); assert.equal(result.rows[0].total_targets, 100);
   assert.equal(result.scope.basis, 'known_target_url_queue_status');
+});
+test('consumer structure reuses the registry with explicit bounds and no raw evidence payloads', async () => {
+  const rows = Array.from({ length: 101 }, (_, i) => ({ stack_id: `S${i}` }));
+  const result = await readIntakeSection(connection({ [CONSUMERS_SQL]: [{ measured_at: clock, rows }] }), 'consumers');
+  assert.equal(result.rows.length, 100); assert.equal(result.complete, false);
+  assert.equal(result.scope.basis, 'declared_stack_structure');
+  assert(CONSUMERS_SQL.includes('public.stack_coverage(NULL)'));
+  assert(CONSUMERS_SQL.includes('n.ordinality <= 64'));
+  assert(!CONSUMERS_SQL.includes("'evidence',"));
+  assert(!CONSUMERS_SQL.includes('c.needs AS needs'));
 });
 test('relationship slice is explicit and uses fixed parameterized table scope', async () => {
   const db = connection({ [MODEL_SQL]: [{ measured_at: clock, rows: [], links: Array.from({ length: 501 }, () => ({ validated: false })) }] });
@@ -64,7 +88,10 @@ function handler({ verdict, admin = false } = {}) {
     require(name) {
       if (name.endsWith('/cors.ts')) return { corsHeaders: { 'Access-Control-Allow-Origin': '*' } };
       if (name.endsWith('/writeGuard.ts')) return { authenticateWriter: async () => verdict ?? { ok: false } };
-      if (name.endsWith('/intakeStatus.ts')) return { readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; } };
+      if (name.endsWith('/intakeStatus.ts')) return {
+        readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; },
+        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] }; },
+      };
       if (name.includes('postgres@')) return { Pool: class {
         constructor() { pools++; }
         async connect() { return { async queryObject(sql, args) { queries++; queryCalls.push({ sql, args }); return { rows: [{ allowed: admin }] }; }, release() {} }; }
@@ -75,11 +102,41 @@ function handler({ verdict, admin = false } = {}) {
   };
   vm.runInNewContext(code, context);
   return { request: (section = 'coverage', method = 'GET') => serve(new Request(`https://synthetic.invalid/db-stats?intake=${section}`, { method })),
+    publicRequest: (query, method = 'GET') => serve(new Request(`https://synthetic.invalid/db-stats?${query}`, { method })),
     counts: () => ({ pools, queries, reads }), queryCalls };
 }
 test('anonymous/forged callers are refused before opening a database pool', async () => {
   const h = handler(); const response = await h.request();
   assert.equal(response.status, 401); assert.deepEqual(h.counts(), { pools: 0, queries: 0, reads: 0 });
+});
+
+test('public organization targets reject arbitrary scopes before opening a pool', async () => {
+  const h = handler();
+  for (const query of ['organization_targets=not-a-uuid', 'organization_targets=11111111-1111-1111-1111-111111111111&intake=jobs'])
+    assert.equal((await h.publicRequest(query)).status, 400);
+  assert.equal((await h.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111', 'POST')).status, 405);
+  assert.deepEqual(h.counts(), { pools: 0, queries: 0, reads: 0 });
+});
+test('anonymous target requests use only the organization-scoped public reader', async () => {
+  const h = handler(); const id = '11111111-1111-1111-1111-111111111111';
+  const response = await h.publicRequest(`organization_targets=${id}`);
+  assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] });
+  assert.deepEqual(h.counts(), { pools: 1, queries: 0, reads: 1 });
+});
+test('target inventory is parameterized, bounded, public-only and distinct from queue completion', async () => {
+  const db = connection({ [ORG_TARGETS_SQL]: [{ measured_at: clock, rows: [{ source_slug: 'synthetic', total_targets: 2, targets: [] }] }] });
+  const result = await readOrganizationTargets(db, 'synthetic-id');
+  assert.deepEqual(db.calls.find(c => c.sql === ORG_TARGETS_SQL).args, ['synthetic-id']);
+  assert.equal(result.sample_limit, 25); assert.equal(result.rows[0].total_targets, 2);
+  assert(SOURCE_PROFILES_SQL.includes('o.is_public = true'));
+  assert(SOURCE_PROFILES_SQL.includes('s.business_id IS NOT NULL AND o.id = s.business_id'));
+  assert(SOURCE_PROFILES_SQL.includes('s.business_id IS NULL AND lower(trim(o.business_name)) = lower(trim(s.display_name))'));
+  assert(SOURCE_PROFILES_SQL.includes('WHEN count(*) = 1'));
+  assert(ORG_TARGETS_SQL.includes('p.organization_id = $1'));
+  assert(ORG_TARGETS_SQL.includes('WHERE source_slug = p.source_slug LIMIT 25'));
+  assert(!/import_queue|extracted|phone|email|contact|metadata/i.test(ORG_TARGETS_SQL));
+  assert.equal(db.calls.at(-1).sql, 'ROLLBACK');
 });
 test('signed-in non-admin gets no privileged metadata; membership is parameterized', async () => {
   const h = handler({ verdict: { ok: true, caller: { kind: 'user', userId: 'synthetic-user' } } });
@@ -95,6 +152,14 @@ test('active admins and service callers receive only the requested read-only sec
     assert.deepEqual(await response.json(), { contract: 'intake_status_v1', section: 'model' });
     assert.equal(h.counts().reads, 1);
   }
+});
+test('consumer metadata uses the same active-admin guard and refuses anonymous callers', async () => {
+  assert.equal((await handler().request('consumers')).status, 401);
+  assert.equal((await handler({ verdict: { ok: true, caller: { kind: 'user', userId: 'synthetic-user' } } }).request('consumers')).status, 403);
+  const h = handler({ verdict: { ok: true, caller: { kind: 'service_role' } } });
+  const response = await h.request('consumers');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).section, 'consumers');
 });
 test('arbitrary sections, POSTs and API-key callers cannot choose a privileged query', async () => {
   const h = handler({ verdict: { ok: true, caller: { kind: 'api_key', userId: 'synthetic-admin' } }, admin: true });
