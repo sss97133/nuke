@@ -4,10 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn() }));
+const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn() }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
-  useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }),
+  useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }), useInventoryTaxonomy: () => fixture.taxonomy,
 }));
 vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
@@ -65,7 +65,9 @@ beforeEach(() => {
     disconnect() {}
   });
   fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = [];
+  fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   fixture.movement = { data: [], coverage: undefined, dataUpdatedAt: Date.now() };
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
@@ -95,6 +97,75 @@ describe('shareable listing evidence on the existing market route', () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('market answer -> supporting lots', () => {
+  async function choose(label: string, value: string) {
+    await act(async () => {
+      const select = container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+      select.value = value; select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  it('nests years inside their own brand, shares the selection, and restores it from the URL', async () => {
+    fixture.pulse.data.auctions[0].year = 1995;
+    await render(); await choose('Inventory sub-boxes', 'year');
+    const region = container.querySelector('[data-map-group="PORSCHE"]')!;
+    await act(async () => region.querySelector<HTMLButtonElement>('button[aria-label^="2000:"]')!.click());
+    expect(window.location.search).toContain('mapFocus=PORSCHE');
+    expect(window.location.search).toContain('mapChild=2000');
+    expect(boardTitles()).toEqual(['first', 'unknown']);
+    await render(window.location.search.slice(1));
+    expect(boardTitles()).toEqual(['first', 'unknown']);
+    await click('Clear sub-box selection');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    await choose('Group inventory by', 'era');
+    expect(window.location.search).not.toContain('mapFocus');
+    expect(window.location.search).not.toContain('mapChild');
+    await click('1990–1999:'); expect(boardTitles()).toEqual(['later']);
+  });
+  it('opens an individual lot in the existing evidence route without a nested button', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions[0].id = id;
+    await render(); await choose('Inventory sub-boxes', 'lot');
+    expect(container.querySelector('.inventory-map button button')).toBeNull();
+    await act(async () => container.querySelector<HTMLButtonElement>(`[data-map-lot="${id}"]`)!.click());
+    expect(window.location.search).toContain(`lot=${id}`);
+    expect(container.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+  });
+  it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
+    await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
+    await click('Local fixture: 3 captured lots');
+    expect(window.location.search).not.toContain('mapChild');
+    expect(window.location.search).not.toContain('mapFocus');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    await render('mapBy=year&mapFocus=1901');
+    expect(container.textContent).toContain('No captured lots remain in this map group');
+    await click('Show all map groups');
+    expect(boardTitles()).toEqual(['other-make', 'first', 'unknown', 'later']);
+  });
+  it('keeps unrecorded taxonomy visible and distinguishes a failed metadata read', async () => {
+    fixture.taxonomy.data = [{ id: 'later', listing_url: fixture.pulse.data.auctions[0].listingUrl, canonical_vehicle_type: 'CAR', canonical_body_style: 'COUPE' }];
+    await render(); await choose('Group inventory by', 'type');
+    await click('Unrecorded: 3'); expect(boardTitles()).toEqual(['other-make', 'first', 'unknown']);
+    fixture.taxonomy.isError = true; fixture.taxonomy.isSuccess = false;
+    await render('mapBy=type');
+    expect(container.textContent).toContain('classifications could not be loaded');
+    expect(container.querySelector('.inventory-map-canvas button')).toBeNull();
+    await click('Retry classifications'); expect(fixture.retry).toHaveBeenCalledOnce();
+  });
+  it('pulses changed lots without moving them and allows motion to be disabled', async () => {
+    await render('mapInside=lot');
+    const positions = () => [...container.querySelectorAll('[data-map-lot]')].map(el => [el.getAttribute('data-map-lot'), el.getAttribute('style')]);
+    const before = positions();
+    fixture.pulse.data = { ...fixture.pulse.data, auctions: [...fixture.pulse.data.auctions].reverse() };
+    fixture.pulse.risenIds = new Set(['later']);
+    await render('mapInside=lot');
+    expect(positions()).toEqual(before);
+    expect(container.querySelector('[data-map-lot="later"]')?.classList.contains('inventory-map-pulse')).toBe(true);
+    await act(async () => container.querySelector<HTMLInputElement>('.inventory-map-pulse-control input')!.click());
+    expect(container.querySelector('.inventory-map-pulse')).toBeNull();
+  });
   it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';

@@ -180,7 +180,61 @@ export function useSameHourReadings(hourUtc: string, todayUtc: string) {
   });
 }
 
-// The live sync reads BaT every 15 minutes; a one-minute poll shows a new sync within a minute of it landing.
+export interface InventoryTaxonomy {
+  id: string;
+  listing_url: string | null;
+  canonical_vehicle_type: string | null;
+  canonical_body_style: string | null;
+}
+
+// Current recorded taxonomy, read only when that lens is requested. Keep unknowns in the map;
+// do not infer a body/type from a title, model name, or a different listing episode.
+export async function readInventoryTaxonomy(ids: string[], signal?: AbortSignal): Promise<InventoryTaxonomy[]> {
+  const rows: InventoryTaxonomy[] = [];
+  // At most three bounded PK reads in flight; no unbounded URL or per-lot request.
+  for (let offset = 0; offset < ids.length; offset += 300) {
+    const batches = [0, 100, 200].map(start => ids.slice(offset + start, offset + start + 100)).filter(batch => batch.length);
+    const results = await Promise.all(batches.map(async batch => {
+      let query = supabase.from('vehicles')
+        .select('id,listing_url,canonical_vehicle_type,canonical_body_style')
+        .in('id', batch).eq('is_public', true).is('deleted_at', null)
+        .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').limit(100);
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    }));
+    rows.push(...results.flat());
+  }
+  return rows;
+}
+
+export function useInventoryTaxonomy(auctions: LiveAuction[], enabled: boolean) {
+  const ids = [...new Set(auctions.map(a => a.id))].sort();
+  return useQuery({
+    queryKey: ['market-inventory-taxonomy', ids],
+    queryFn: ({ signal }) => readInventoryTaxonomy(ids, signal),
+    enabled: enabled && ids.length > 0,
+    staleTime: 5 * 60_000, retry: 1,
+  });
+}
+
+export function listingKey(auction: Pick<LiveAuction, 'id' | 'listingUrl'>): string | null {
+  if (!/^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/.test(auction.listingUrl ?? '')) return null;
+  return `${auction.id}:${auction.listingUrl!.replace(/\/$/, '')}`;
+}
+
+/** A snapshot increase is not an individual bid event or evidence of source freshness. */
+export function increasedBids(previous: LiveAuction[], current: LiveAuction[]): Set<string> {
+  const before = new Map(previous.map(a => [listingKey(a), a.currentBid]));
+  return new Set(current.filter(a => {
+    const key = listingKey(a), prior = key ? before.get(key) : null;
+    return prior != null && Number.isFinite(prior) && prior >= 0 && a.currentBid != null
+      && Number.isFinite(a.currentBid) && a.currentBid > prior;
+  }).map(a => a.id));
+}
+
+// This polls recorded state, not the source or a complete stream of bid events.
 const REFETCH_MS = 60_000;
 
 export function useMarketPulse() {
@@ -193,22 +247,16 @@ export function useMarketPulse() {
   });
 
   // Bids that rose since the previous fetch. Motion on the page is driven by this set only.
-  const prevBids = useRef<Map<string, number | null> | null>(null);
+  const prevBids = useRef<LiveAuction[] | null>(null);
   const [risenIds, setRisenIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     const auctions = query.data?.auctions;
     if (!auctions) return;
-    const next = new Map(auctions.map((a) => [a.id, a.currentBid]));
     const prev = prevBids.current;
-    if (prev) {
-      const risen = new Set<string>();
-      for (const a of auctions) {
-        const before = prev.get(a.id);
-        if (before != null && a.currentBid != null && a.currentBid > before) risen.add(a.id);
-      }
-      setRisenIds(risen);
-    }
-    prevBids.current = next;
+    setRisenIds(prev ? increasedBids(prev, auctions) : new Set());
+    prevBids.current = auctions;
+    const timer = window.setTimeout(() => setRisenIds(new Set()), 1800);
+    return () => window.clearTimeout(timer);
   }, [query.data]);
 
   return { ...query, risenIds };
