@@ -6,6 +6,7 @@ import { FaviconIcon } from '../components/common/FaviconIcon';
 // Always loaded — used in the overview tab or global page structure
 import OrganizationTimelineHeatmap from '../components/organization/OrganizationTimelineHeatmap';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
+import OrganizationSourceTargets from '../components/organization/OrganizationSourceTargets';
 import { ServiceVehicleCardRich, type ServiceVehicleStatsRow } from '../components/organization/ServiceVehicleCardRich';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
@@ -43,9 +44,6 @@ const StorefrontSettings = React.lazy(() => import('../components/organization/S
 const ProfileSuccessStoriesTab = React.lazy(() => import('../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab })));
 const CollectionIntelligenceTab = React.lazy(() => import('../components/organization/CollectionIntelligenceTab'));
 
-// Canonical Bring a Trailer org – we show extraction coverage (target 222k, queue) and turnover/metrics note
-const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
-
 interface ProfileLite {
   id: string;
   full_name: string | null;
@@ -71,15 +69,6 @@ async function fetchProfilesByIds(ids: Array<string | null | undefined>): Promis
     .select('id, full_name, username, avatar_url')
     .in('id', unique);
   return new Map(((data ?? []) as ProfileLite[]).map((p) => [p.id, p]));
-}
-
-interface OrgExtractionCoverage {
-  org_id: string;
-  label: string | null;
-  extracted: number | null;
-  queue_pending: number | null;
-  target: number | null;
-  metrics_note?: string;
 }
 
 // Types for sorting and controls
@@ -366,7 +355,6 @@ export default function OrganizationProfile() {
   const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
   const [dataRoomAccessGranted, setDataRoomAccessGranted] = useState(false);
   const [showDataRoomGate, setShowDataRoomGate] = useState(false);
-  const [extractionCoverage, setExtractionCoverage] = useState<OrgExtractionCoverage | null>(null);
   const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
   const [primaryHeroSrcIndex, setPrimaryHeroSrcIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1998,33 +1986,6 @@ export default function OrganizationProfile() {
     }
   }, [loading, organizationId]);
 
-  // Fetch extraction coverage for this org (BAT, C&B, Craigslist, etc.) – poll so numbers update in real time
-  useEffect(() => {
-    if (!organizationId) {
-      setExtractionCoverage(null);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const url = `${SUPABASE_URL}/functions/v1/org-extraction-coverage?org_id=${encodeURIComponent(organizationId)}`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as OrgExtractionCoverage;
-        if (!cancelled && data?.org_id && (data.extracted != null || data.target != null)) setExtractionCoverage(data);
-        else if (!cancelled) setExtractionCoverage(null);
-      } catch {
-        if (!cancelled) setExtractionCoverage(null);
-      }
-    };
-    load();
-    const interval = setInterval(load, 45_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [organizationId]);
-
   if (loading) {
     return (
       <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -2624,47 +2585,7 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            {/* Data coverage: what we have + what we're loading in (scraping in real time) */}
-            {extractionCoverage && (extractionCoverage.extracted != null || extractionCoverage.target != null) && (
-              <div style={{
-                marginBottom: '16px',
-                padding: '12px 16px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                borderLeft: '4px solid var(--blue-500)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Data coverage
-                  </span>
-                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
-                    <span style={{
-                      fontSize: '9px',
-                      fontWeight: 600,
-                      color: 'var(--blue-600)',
-                      background: 'rgba(59, 130, 246, 0.12)',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      animation: 'pulse 2s ease-in-out infinite',
-                    }}>
-                      Scraping in progress
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.5 }}>
-                  {extractionCoverage.extracted != null && `${(extractionCoverage.extracted / 1000).toFixed(0)}k listings`}
-                  {extractionCoverage.queue_pending != null && extractionCoverage.queue_pending > 0 && (
-                    <span> · {extractionCoverage.queue_pending.toLocaleString()} in queue · <strong style={{ color: 'var(--blue-600)' }}>loading in…</strong></span>
-                  )}
-                </div>
-                {extractionCoverage.metrics_note && (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    {extractionCoverage.metrics_note}
-                  </div>
-                )}
-              </div>
-            )}
+            {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
 
             {/* Activity Heatmap — only render when there's data to show */}
             {auctionHeatmapEvents.length > 0 && (

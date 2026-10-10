@@ -537,7 +537,7 @@ jobs:
       - name: Create disposable org-creator database
         run: createdb dm_refinement_create_organization_batch_ci
       - name: Verify create_organization_batch keys by canonical domain then DUNS, COALESCE-fills, counts conflicts, is_public false, service_role-only
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_create_organization_batch_ci -f supabase/sql/test_create_organization_batch_contract.sql
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_create_organization_batch_ci -f supabase/sql/test_source_public_organization_profiles.sql
       - name: Setup Node.js for source-episode concurrency controls
         uses: actions/setup-node@v4
         with:

@@ -5,7 +5,8 @@ import * as intakeLedger from '../supabase/functions/poll-listing-feeds/ledger.t
 import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
-  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
+  ORG_TARGETS_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -87,7 +88,10 @@ function handler({ verdict, admin = false } = {}) {
     require(name) {
       if (name.endsWith('/cors.ts')) return { corsHeaders: { 'Access-Control-Allow-Origin': '*' } };
       if (name.endsWith('/writeGuard.ts')) return { authenticateWriter: async () => verdict ?? { ok: false } };
-      if (name.endsWith('/intakeStatus.ts')) return { readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; } };
+      if (name.endsWith('/intakeStatus.ts')) return {
+        readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; },
+        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] }; },
+      };
       if (name.includes('postgres@')) return { Pool: class {
         constructor() { pools++; }
         async connect() { return { async queryObject(sql, args) { queries++; queryCalls.push({ sql, args }); return { rows: [{ allowed: admin }] }; }, release() {} }; }
@@ -98,11 +102,41 @@ function handler({ verdict, admin = false } = {}) {
   };
   vm.runInNewContext(code, context);
   return { request: (section = 'coverage', method = 'GET') => serve(new Request(`https://synthetic.invalid/db-stats?intake=${section}`, { method })),
+    publicRequest: (query, method = 'GET') => serve(new Request(`https://synthetic.invalid/db-stats?${query}`, { method })),
     counts: () => ({ pools, queries, reads }), queryCalls };
 }
 test('anonymous/forged callers are refused before opening a database pool', async () => {
   const h = handler(); const response = await h.request();
   assert.equal(response.status, 401); assert.deepEqual(h.counts(), { pools: 0, queries: 0, reads: 0 });
+});
+
+test('public organization targets reject arbitrary scopes before opening a pool', async () => {
+  const h = handler();
+  for (const query of ['organization_targets=not-a-uuid', 'organization_targets=11111111-1111-1111-1111-111111111111&intake=jobs'])
+    assert.equal((await h.publicRequest(query)).status, 400);
+  assert.equal((await h.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111', 'POST')).status, 405);
+  assert.deepEqual(h.counts(), { pools: 0, queries: 0, reads: 0 });
+});
+test('anonymous target requests use only the organization-scoped public reader', async () => {
+  const h = handler(); const id = '11111111-1111-1111-1111-111111111111';
+  const response = await h.publicRequest(`organization_targets=${id}`);
+  assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] });
+  assert.deepEqual(h.counts(), { pools: 1, queries: 0, reads: 1 });
+});
+test('target inventory is parameterized, bounded, public-only and distinct from queue completion', async () => {
+  const db = connection({ [ORG_TARGETS_SQL]: [{ measured_at: clock, rows: [{ source_slug: 'synthetic', total_targets: 2, targets: [] }] }] });
+  const result = await readOrganizationTargets(db, 'synthetic-id');
+  assert.deepEqual(db.calls.find(c => c.sql === ORG_TARGETS_SQL).args, ['synthetic-id']);
+  assert.equal(result.sample_limit, 25); assert.equal(result.rows[0].total_targets, 2);
+  assert(SOURCE_PROFILES_SQL.includes('o.is_public = true'));
+  assert(SOURCE_PROFILES_SQL.includes('s.business_id IS NOT NULL AND o.id = s.business_id'));
+  assert(SOURCE_PROFILES_SQL.includes('s.business_id IS NULL AND lower(trim(o.business_name)) = lower(trim(s.display_name))'));
+  assert(SOURCE_PROFILES_SQL.includes('WHEN count(*) = 1'));
+  assert(ORG_TARGETS_SQL.includes('p.organization_id = $1'));
+  assert(ORG_TARGETS_SQL.includes('WHERE source_slug = p.source_slug LIMIT 25'));
+  assert(!/import_queue|extracted|phone|email|contact|metadata/i.test(ORG_TARGETS_SQL));
+  assert.equal(db.calls.at(-1).sql, 'ROLLBACK');
 });
 test('signed-in non-admin gets no privileged metadata; membership is parameterized', async () => {
   const h = handler({ verdict: { ok: true, caller: { kind: 'user', userId: 'synthetic-user' } } });
