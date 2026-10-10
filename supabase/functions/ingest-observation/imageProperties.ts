@@ -75,6 +75,11 @@ export function validateObservationProperty(
       (input.kind !== "specification" || typeof value !== "string" || !value.trim())) {
     return invalid("Retained interior color requires exact nonempty specification text");
   }
+  if (input.property_key === "mileage_miles" && (input.kind !== "condition" ||
+      typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || value >= 10000000 ||
+      fields.reading_role !== "odometer_display" || fields.true_mileage_status !== "unknown")) {
+    return invalid("Retained mileage requires an attributed integer odometer display; true mileage remains unknown");
+  }
   if (Object.prototype.hasOwnProperty.call(IMAGE_PROPERTY_VALUES, input.property_key)) {
     if (input.kind !== "condition" || input.agent_inferred !== true) {
       return invalid("Image properties require condition observations with agent_inferred=true");

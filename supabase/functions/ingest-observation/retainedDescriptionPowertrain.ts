@@ -30,7 +30,7 @@ export function descriptionPowertrainWitness(key: string, text: unknown): { sour
   return witness;
 }
 
-export function retainedDescriptionWitness(source: Record<string, any>, key: string) {
+export function retainedDescriptionCaptureQualified(source: Record<string, any>): boolean {
   const d = source.structured_data;
   const captured = observationClockMicroseconds(d?.source_captured_at);
   const observed = observationClockMicroseconds(source.observed_at);
@@ -42,6 +42,9 @@ export function retainedDescriptionWitness(source: Record<string, any>, key: str
       !/^[0-9a-f]{64}$/.test(d.source_capture_sha256 ?? "") ||
       d.observation_time_basis !== "source_capture" || d.source_event_time_status !== "unknown" ||
       typeof d.source_captured_at !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$/.test(d.source_captured_at) ||
-      captured === null || observed === null || recorded === null || captured !== observed || captured > recorded) return null;
-  return descriptionPowertrainWitness(key, source.content_text);
+      captured === null || observed === null || recorded === null || captured !== observed || captured > recorded) return false;
+  return true;
+}
+export function retainedDescriptionWitness(source: Record<string, any>, key: string) {
+  return retainedDescriptionCaptureQualified(source) ? descriptionPowertrainWitness(key, source.content_text) : null;
 }

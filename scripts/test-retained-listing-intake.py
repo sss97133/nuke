@@ -10,13 +10,15 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=6 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description'}
+assert len(sys.argv)<=7 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
 two_front = '--two-front' in sys.argv[2:]
 bulk120 = '--bulk120' in sys.argv[2:]
 powertrain = '--powertrain' in sys.argv[2:]
 description = '--description' in sys.argv[2:]
 assert not description or powertrain
+odometer = '--odometer' in sys.argv[2:]
+assert not odometer or description
 assert not powertrain or (two_front and bulk120)
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
@@ -311,6 +313,9 @@ if powertrain:
     if description:
         from test_retained_description_powertrain import run_description_checks
         run_description_checks(sql, read, rejects, claim, passed)
+    if odometer:
+        from test_retained_odometer import run_odometer_checks
+        run_odometer_checks(sql, read, rejects, claim, passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
