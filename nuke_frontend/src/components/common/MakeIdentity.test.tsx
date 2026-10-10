@@ -21,6 +21,17 @@ it('does not give another model Corvette artwork or guess an absent/invalid year
   expect(resolveVehicleArtwork({ year: '1963', make: ' chevrolet ', model: 'Corvette Sting Ray' })).toHaveLength(3);
 });
 
+it('uses the original 993 script only for the complete recorded Turbo designation and documented years', () => {
+  const subject = { make: 'Porsche', model: '911', variants: [{ kind: 'series' as const, value: 'Turbo' }] };
+  const script = (year: number, variants = subject.variants) => resolveVehicleArtwork({ ...subject, year, variants }).find(a => a.role === 'variant');
+  for (const year of [1995, 1996, 1997, 1998]) expect(script(year)?.file).toBe('porsche-turbo-script-1995-1998.jpg');
+  for (const year of [1994, 1999, 2001, 2026]) expect(script(year)).toBeUndefined();
+  for (const value of ['Carrera', 'Turbo S', 'Turbo-look', 'GT2']) expect(script(1997, [{ kind: 'series', value }])).toBeUndefined();
+  expect(resolveVehicleArtwork({ ...subject, year: 1997, variants: [...subject.variants, { kind: 'trim', value: 'S' }] }).some(a => a.role === 'variant')).toBe(false);
+  expect(script(1997, [])).toBeUndefined();
+  expect(resolveVehicleArtwork({ ...subject, year: 1997, model: 'Boxster' })).toEqual([]);
+});
+
 it('keeps the recorded name readable when source artwork fails and when identity changes', async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div');
@@ -31,9 +42,15 @@ it('keeps the recorded name readable when source artwork fails and when identity
     await act(async () => host.querySelectorAll('image').forEach(image => image.dispatchEvent(new Event('error'))));
     expect(host.querySelector('.vehicle-identity__maker')?.textContent).toContain('Chevrolet');
     expect(host.querySelector('.vehicle-identity__model')?.textContent).toBe('Corvette');
-    await act(async () => root.render(<VehicleIdentity year={1997} make="Porsche" model="911"><span>Turbo</span></VehicleIdentity>));
+    await act(async () => root.render(<VehicleIdentity year={1997} make="Porsche" model="911" variants={[{ kind: 'series', value: 'Turbo' }]} />));
+    expect(host.querySelectorAll('image')).toHaveLength(3);
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1997 Porsche 911 Turbo');
+    await act(async () => host.querySelectorAll('image').forEach(image => image.dispatchEvent(new Event('error'))));
+    expect(host.querySelector('.vehicle-identity__variant')?.textContent).toBe('Turbo');
+    expect(host.querySelector('.vehicle-identity__maker')?.textContent).toContain('Porsche');
+    await act(async () => root.render(<VehicleIdentity year={2006} make="Porsche" model="911" variants={[{ kind: 'series', value: 'Turbo' }]} />));
     expect(host.querySelector('image')).toBeNull();
     expect(host.textContent).toContain('911Turbo');
-    expect(host.querySelector('.sr-only')?.textContent).toBe('1997 Porsche 911');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('2006 Porsche 911 Turbo');
   } finally { await act(async () => root.unmount()); }
 });

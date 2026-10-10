@@ -21,11 +21,12 @@ async function mount() { await act(async () => root.render(<VehicleMasthead pric
 it('uses recorded model/series tokens and the shared brand catalogue with a complete accessible identity', async () => {
   await mount();
   expect(host.querySelector('.vehicle-identity__model')!.textContent).toBe('911');
-  expect(host.querySelector('.vp-masthead__variant')!.textContent).toBe('Turbo');
+  expect(host.querySelector('.vehicle-identity__variant image')!.getAttribute('href')).toContain('porsche-turbo-script-1995-1998.jpg');
   expect(host.querySelector('h1')!.getAttribute('aria-label')).toContain('Porsche');
   expect(host.querySelector('h1')!.getAttribute('aria-label')).toContain('manual');
-  expect(host.querySelector('.vehicle-identity__maker')!.textContent).toContain('Porsche');
-  expect(host.querySelector('.vehicle-identity image')).toBeNull();
+  expect(host.querySelector('.vehicle-identity__maker image')!.getAttribute('href')).toContain('porsche-wordmark.svg');
+  expect(host.querySelector('.vehicle-identity__art--emblem image')!.getAttribute('href')).toContain('porsche-crest-1994-2005.png');
+  expect(host.querySelector('.vehicle-identity .sr-only')!.textContent).toBe('1997 Porsche 911 Turbo');
 });
 it('supports another make and a readable fallback without introducing a page-specific brand list', async () => {
   fixture.vehicle = { id:'ford', year:1966, make:'Ford', model:'Mustang' };

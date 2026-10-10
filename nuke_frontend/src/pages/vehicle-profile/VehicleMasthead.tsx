@@ -22,9 +22,7 @@ export default function VehicleMasthead({ priceLotId }: { priceLotId?: string })
   }
   return <><header className="vp-masthead">
     <h1 className="vp-masthead__identity" aria-label={getVehicleTitle(vehicle)}>
-      <VehicleIdentity year={vehicle.year} make={vehicle.make ?? ''} model={model}>
-      {tokens.differentiators.map(token => <span key={token.kind} className="vp-masthead__variant">{token.value}</span>)}
-      </VehicleIdentity>
+      <VehicleIdentity year={vehicle.year} make={vehicle.make ?? ''} model={model} variants={tokens.differentiators} />
     </h1>
     {!priceOwnedByLiveStack && priceFacts?.price_amount != null && priceKindLabel(priceFacts) && <div ref={priceBoundary} className="vp-masthead__result">
       <span>{priceFacts.price_kind === 'sold' ? 'Last recorded sale' : priceKindLabel(priceFacts)}</span>
