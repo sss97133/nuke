@@ -176,6 +176,7 @@ describe('lot choice and the public gate', () => {
     const b = lot({ id: 'b', source_url: URL });
     expect(chooseLot([a, b], `${URL}/`, null)?.id).toBe('b');
     expect(chooseLot([a, b], `${URL}/`, 'a')?.id).toBe('a');
+    expect(chooseLot([a, b], `${URL}/`, 'latest')?.id).toBe('a');
     expect(chooseLot([a, b], null, 'missing')?.id).toBe('a');
     expect(chooseLot([], URL, null)).toBeNull();
   });

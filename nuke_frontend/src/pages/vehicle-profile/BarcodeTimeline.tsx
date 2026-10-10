@@ -7,7 +7,7 @@ import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auction
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { BidsPopup } from '../../components/popups/BidsPopup';
 
-interface BarcodeTimelineProps {}
+interface BarcodeTimelineProps { selectedAuctionUrl?: string | null; onSelectAuction?: (url: string) => void }
 
 
 interface EventDay {
@@ -292,7 +292,7 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
   }},
 ];
 
-const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
+const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction }) => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
   const popup = useContext(PopupStackContext);
 
@@ -320,7 +320,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
     return () => { cancelled = true; };
   }, [vehicleId]);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [selectedAuctionKey, setSelectedAuctionKey] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
@@ -721,36 +722,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [weeks.length]);
 
-  // Collapse on scroll past the hero area, re-expand when scrolled back near top.
-  // Hysteresis: expand threshold (40) is lower than collapse threshold (320) so the
-  // timeline doesn't strobe open/closed during normal page interaction. Prior threshold
-  // of 10 caused the timeline to slam shut on the slightest scroll.
-  useEffect(() => {
-    const COLLAPSE_AT = 320;
-    const EXPAND_AT = 40;
-    const onScroll = () => {
-      // Never auto-collapse while the user is reading a day document.
-      if (receiptDate) return;
-      const y = window.scrollY;
-      if (y <= EXPAND_AT && !expanded) {
-        setExpanded(true);
-      } else if (y > COLLAPSE_AT && expanded) {
-        setExpanded(false);
-        setReceiptDate(null);
-        setHighlightGroup(null);
-        setGalleryFilter(null);
-      }
-    };
-    // Defer so the expand click's own scroll doesn't immediately collapse
-    const raf = requestAnimationFrame(() => {
-      window.addEventListener('scroll', onScroll, { passive: true });
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', onScroll);
-    };
-  }, [expanded, receiptDate, setGalleryFilter]);
-
   // Escape: close the day drawer first, then the strip (mirrors the
   // user-profile drawer contract — reversible, layer by layer).
   useEffect(() => {
@@ -813,6 +784,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return null;
   }
 
+  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
+  const selectedAuction = availableAuctions.find(a => selectedAuctionUrl && a.lotUrl.replace(/\/+$/, '') === selectedAuctionUrl.replace(/\/+$/, ''))
+    ?? availableAuctions.find(a => a.key === selectedAuctionKey) ?? availableAuctions[0];
+
   return (
     <>
       <div
@@ -820,8 +795,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         className={`barcode-strip ${expanded ? 'barcode-strip--expanded' : 'barcode-strip--collapsed'}`}
       >
         {/* Collapsed bar */}
-        <div className="barcode-bar" onClick={toggleExpand}>
-          <span className="barcode-bar__label-left">TIMELINE</span>
+        <button type="button" className="barcode-bar" onClick={toggleExpand} aria-expanded={expanded} aria-label="Vehicle timeline">
+          <span className="barcode-bar__label-left">TIMELINE {expanded ? '▴' : '▾'}</span>
           <div className="barcode-canvas">
             {weeks.map((w, i) => (
               <div
@@ -838,10 +813,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             ))}
           </div>
           <span className="barcode-bar__label-right">{yearRange}</span>
-        </div>
+        </button>
 
         {/* Expanded heatmap — full timeline from vehicle year to present */}
         <div className="barcode-heatmap" ref={heatmapRef}>
+          <details className="timeline-view-options">
+            <summary>Calendar & view options</summary>
           {/* Filter pills — one data source, filtered views */}
           <div className="timeline-filter-pills">
             {TIMELINE_FILTERS.map((f) => (
@@ -914,11 +891,19 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
+          </details>
+          {availableAuctions.length > 1 && <label className="timeline-auction-select">Auction episode <select
+            aria-label="Timeline auction episode" value={selectedAuction?.key ?? ''}
+            onChange={event => { setSelectedAuctionKey(event.target.value); closeDay(); const selected = availableAuctions.find(a => a.key === event.target.value); if (selected) onSelectAuction?.(selected.lotUrl); }}>
+            {availableAuctions.map(a => <option key={a.key} value={a.key}>
+              {a.close?.at?.slice(0, 10) ?? a.open?.at?.slice(0, 10) ?? 'Date unknown'} · {a.outcome.replace(/_/g, ' ')}{a.lotNumber ? ` · lot ${a.lotNumber}` : ''}
+            </option>)}
+          </select></label>}
           {/* Each BaT listing's week, newest first: open, every bid and comment at its
               time, the close and result, post-close comments. Each mark opens its source. */}
           {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
           {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
-          {auctions.filter(a => a.activityExtracted || a.open || a.close).map(a => (
+          {(selectedAuction ? [selectedAuction] : []).map(a => (
             <React.Suspense key={a.key} fallback={null}>
               <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay}
                 onOpenBidReports={popup && vehicleId ? () => popup.push(<BidsPopup vehicleId={vehicleId} listingUrl={a.lotUrl} />, 'Recorded vehicle bid amounts', 420) : undefined} />

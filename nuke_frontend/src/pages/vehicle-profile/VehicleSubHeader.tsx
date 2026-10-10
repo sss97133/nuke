@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
-import { BadgePortal } from '../../components/badges/BadgePortal';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
+import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { profileFacetValue, type ProfileFacet } from '../stacks/bidPopulationReader';
+import { VehiclePerformance } from '../stacks/VehicleCohort';
 
 function toTitleCase(s: string): string {
   return String(s || '')
@@ -54,16 +55,26 @@ const TOKEN = {
 
 const VehicleSubHeader: React.FC = () => {
   const { vehicle } = useVehicleProfile();
-  const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
+  const [activeFacet, setActiveFacet] = useState<ProfileFacet | null>(null);
+  const triggerBoundary = useRef<HTMLDivElement>(null);
+  React.useEffect(() => setActiveFacet(null), [vehicle?.id]);
   if (!vehicle) return null;
 
-  const year         = vehicle.year ?? vehicle.model_year ?? '';
-  const mileage      = vehicle.mileage ?? vehicle.odometer ?? vehicle.miles;
-  const bodyStyle    = (vehicle as any).body_style ?? (vehicle as any).bodyStyle ?? '';
+  const year         = vehicle.year ?? (vehicle as any).model_year ?? '';
+  const mileage      = vehicle.mileage ?? (vehicle as any).odometer ?? (vehicle as any).miles;
+  const bodyStyle    = (vehicle as any).canonical_body_style ?? (vehicle as any).body_style ?? (vehicle as any).bodyStyle ?? '';
   const transmission = (vehicle as any).transmission ?? '';
   const drivetrain   = (vehicle as any).drivetrain ?? (vehicle as any).drive_type ?? '';
   const engineSize   = (vehicle as any).engine_size ?? (vehicle as any).displacement ?? '';
-  const location     = resolveLocation(vehicle);
+  const location     = profileFacetValue(vehicle as any, 'location') ?? resolveLocation(vehicle);
+  const facets = ([
+    { dimension: 'body_style', value: String(bodyStyle), label: toTitleCase(String(bodyStyle)) },
+    { dimension: 'engine', value: String(engineSize), label: String(engineSize) },
+    { dimension: 'transmission', value: String(transmission), label: toTitleCase(String(transmission)) },
+    { dimension: 'drivetrain', value: String(drivetrain), label: String(drivetrain) },
+    { dimension: 'location', value: location ?? '', label: location ?? '' },
+  ] satisfies { dimension: ProfileFacet; value: string; label: string }[]).filter(facet => facet.value.trim());
+  const selectedFacet = facets.find(facet => facet.dimension === activeFacet);
 
   // --- Styles ---
   const containerStyle: React.CSSProperties = {
@@ -76,6 +87,7 @@ const VehicleSubHeader: React.FC = () => {
     gap:             10,
     overflow:        'visible',
     fontFamily:      TOKEN.fontBody,
+    position:        'relative',
   };
 
   const leftStyle: React.CSSProperties = {
@@ -106,10 +118,8 @@ const VehicleSubHeader: React.FC = () => {
   };
 
   return (
-    <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: mileage only. Year/Make/Model/Trim are already shown as the
-          page-title chips in VehicleHeader -- showing them here again was
-          one of five restatements of the same identity. */}
+    <div ref={triggerBoundary} className="vp-sub-header" style={containerStyle}>
+      {/* Configuration doors remain in place while the stack opens below the strip. */}
       <div className="vp-sub-header__left" style={leftStyle}>
         {mileage != null && mileage !== '' && (
           <OdometerBadge
@@ -124,54 +134,17 @@ const VehicleSubHeader: React.FC = () => {
 
       {/* Dimension badges — every badge is clickable per design spec */}
       <div className="vp-sub-header__badges" style={badgesWrapStyle}>
-        {bodyStyle && (
-          <BadgePortal dimension="body_style" value={bodyStyle} label={toTitleCase(String(bodyStyle))} variant="dimension" static />
-        )}
-        {engineSize && (
-          <BadgePortal dimension="year" value={engineSize} label={String(engineSize)} variant="dimension" static />
-        )}
-        {transmission && (
-          <BadgePortal dimension="transmission" value={transmission} label={toTitleCase(String(transmission))} variant="dimension" static />
-        )}
-        {drivetrain && (
-          <BadgePortal dimension="drivetrain" value={drivetrain} label={toTitleCase(String(drivetrain))} variant="dimension" static />
-        )}
-        {location && (
-          <BadgePortal dimension="source" value={location} label={location} variant="dimension" static />
-        )}
-        {/* THIN badge — sparse vehicle indicator */}
-        {priceSettled && (() => {
-          const v = vehicle as any;
-          const specFields = [
-            v?.mileage ?? v?.odometer ?? v?.miles,
-            v?.engine ?? v?.engine_size ?? v?.displacement,
-            v?.transmission,
-            v?.drivetrain ?? v?.drive_type,
-            v?.body_style ?? v?.bodyStyle,
-            v?.vin,
-            v?.exterior_color ?? v?.color,
-            v?.interior_color,
-            v?.fuel_type,
-            priceKindLabel(priceFacts) ? priceFacts?.price_amount : null, // a sold / bid / ask price, never a raw sale_price
-            v?.description,
-            v?.city ?? v?.seller_city ?? v?.location,
-          ];
-          const populated = specFields.filter((f) => f != null && String(f).trim() !== '').length;
-          return populated < 5 ? (
-            <span style={{
-              fontFamily: 'Arial, sans-serif',
-              fontSize: 7,
-              fontWeight: 800,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.3px',
-              color: 'var(--text-disabled)',
-              padding: '1px 4px',
-              border: '2px solid var(--border)',
-              marginLeft: 4,
-            }}>THIN</span>
-          ) : null;
-        })()}
+        {facets.map(facet => <button key={facet.dimension} type="button"
+          className="vp-facet-button" aria-label={`${facet.label} performance stack`}
+          aria-haspopup="dialog" aria-expanded={activeFacet === facet.dimension}
+          onClick={() => setActiveFacet(current => current === facet.dimension ? null : facet.dimension)}>
+          {facet.label}<span aria-hidden="true"> ▾</span>
+        </button>)}
       </div>
+      {selectedFacet && <HeaderPopover open onClose={() => setActiveFacet(null)}
+        title={selectedFacet.label} width={360} dismissBoundaryRef={triggerBoundary}>
+        <VehiclePerformance key={`${vehicle.id}:${selectedFacet.dimension}`} vehicleId={vehicle.id} facet={selectedFacet} />
+      </HeaderPopover>}
     </div>
   );
 };

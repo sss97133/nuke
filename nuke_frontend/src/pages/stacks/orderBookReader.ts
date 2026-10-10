@@ -33,6 +33,7 @@ export interface VehicleRow {
   year: number | null;
   make: string | null;
   model: string | null;
+  normalized_model?: string | null;
   listing_url: string | null;
   sale_status: string | null;
 }
@@ -133,6 +134,7 @@ async function readAll<T extends { id: string }>(
 }
 
 export function chooseLot(lots: LotRow[], listingUrl: string | null, lotId: string | null): LotRow | null {
+  if (lotId === 'latest') return lots[0] ?? null;
   if (lotId) {
     const asked = lots.find((l) => l.id === lotId);
     if (asked) return asked;
@@ -145,7 +147,7 @@ export async function readOrderBook(vehicleId: string, lotId: string | null, sig
   if (!UUID_RE.test(vehicleId)) return null;
   const abort = signal ?? new AbortController().signal;
   const parent = await supabase.from('vehicles')
-    .select('id,year,make,model,listing_url,sale_status')
+    .select('id,year,make,model,normalized_model,listing_url,sale_status')
     .eq('id', vehicleId).eq('is_public', true).is('deleted_at', null)
     .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item')
     .abortSignal(abort).maybeSingle();

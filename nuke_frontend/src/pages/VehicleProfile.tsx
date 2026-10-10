@@ -13,6 +13,7 @@ import '../styles/barcode-timeline.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
+import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
@@ -21,6 +22,7 @@ const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceCon
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
+const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').then(module => ({ default: module.VehiclePerformance })));
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
 const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
 
@@ -33,6 +35,7 @@ const VehicleProfileInner: React.FC = () => {
 
   // Aliases from context — single source of truth
   const { vehicleId, vehicle, session, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
+  const selectedEpisode = useOrderBook(vehicleId ?? '', new URLSearchParams(location.search).get('performanceLot') ?? 'latest');
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
@@ -215,9 +218,16 @@ const VehicleProfileInner: React.FC = () => {
           </React.Suspense>
         </div>
 
+        <h1 className="vp-identity">{getVehicleTitle(vehicle)}</h1>
+
         {/* Vehicle Sub-Header — sticky badge bar */}
         <React.Suspense fallback={null}>
           <VehicleSubHeader />
+        </React.Suspense>
+
+        <React.Suspense fallback={null}>
+          <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
+          <VehicleBriefing collapsed />
         </React.Suspense>
 
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
@@ -227,9 +237,14 @@ const VehicleProfileInner: React.FC = () => {
           />
         </React.Suspense>
 
-        {/* Barcode Timeline — sticky, 10px collapsed, expandable to heatmap */}
+        {/* Optional timeline — one episode, with calendar controls on request */}
         <React.Suspense fallback={null}>
-          <BarcodeTimeline />
+          <BarcodeTimeline selectedAuctionUrl={selectedEpisode.data?.lot?.source_url ?? null} onSelectAuction={(url: string) => {
+            const selected = selectedEpisode.data?.lots.find(lot => lot.source_url.replace(/\/+$/, '') === url.replace(/\/+$/, ''));
+            if (!selected) return;
+            const next = new URLSearchParams(location.search); next.set('performanceLot', selected.id);
+            navigate(`${location.pathname}?${next}`, { replace: true });
+          }} />
         </React.Suspense>
 
         {/* Hero Image Section */}
@@ -256,11 +271,6 @@ const VehicleProfileInner: React.FC = () => {
             />
           </React.Suspense>
         )}
-
-        {/* Vehicle Briefing — L0 headline + L1 stat pills, immediately after hero */}
-        <React.Suspense fallback={null}>
-          <VehicleBriefing />
-        </React.Suspense>
 
         {/* Main Content */}
         <div style={{ marginTop: '8px' }}>

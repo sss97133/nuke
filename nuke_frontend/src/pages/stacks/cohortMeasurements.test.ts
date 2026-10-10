@@ -58,3 +58,15 @@ it('does not infer a normalized model from similar source text or manufacture a 
   const a=cohortReadings(dataset,read,'model','typical');
   expect(a.reading).toBeNull();expect(a.model).toBeNull();expect(a.effectiveScope).toBe('make');expect(a.admissionFailure).toBe('reported bid count mismatch');
 });
+it('uses the explicitly recorded normalized model for an admitted episode', () => {
+  const {dataset,read}=fixture(); dataset.lots=dataset.lots.filter(l => l.vehicleId !== read.vehicle.id);
+  read.vehicle.normalized_model='Corvette';
+  const result=cohortReadings(dataset,read,'model','typical');
+  expect(result.subject?.modelBasis).toBe('normalized-label'); expect(result.result.rankValues).toHaveLength(5);
+});
+it('restricts facet peers without filtering the subject or admitting another episode of that vehicle', () => {
+  const {dataset,read}=fixture();
+  const result=cohortReadings(dataset,read,'model','typical',undefined,new Set(['vehicle-0','vehicle-2','vehicle-5']));
+  expect(result.reading).toBe(75); expect(result.result.groups.flatMap(g => g.members.map(m => m.vehicleId))).toEqual(['vehicle-2','vehicle-5']);
+  expect(cohortReadings(dataset,read,'model','typical',undefined,new Set()).result.rankValues).toHaveLength(0);
+});

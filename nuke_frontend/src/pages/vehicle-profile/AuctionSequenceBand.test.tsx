@@ -2,10 +2,10 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ auction: null as any, activityUnavailable: false, hasUnpositionedActivity: false, rpc: vi.fn(), timelineEvents: [{ id: 'synthetic-profile-created', event_type: 'vehicle_added', event_date: '2025-01-01', title: 'Synthetic profile created' }], setGalleryFilter: vi.fn() }));
+const fixture = vi.hoisted(() => ({ auction: null as any, otherAuction: null as any, activityUnavailable: false, hasUnpositionedActivity: false, rpc: vi.fn(), timelineEvents: [{ id: 'synthetic-profile-created', event_type: 'vehicle_added', event_date: '2025-01-01', title: 'Synthetic profile created' }], setGalleryFilter: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: { id: 'synthetic-vehicle', year: 2025 }, vehicleId: 'synthetic-vehicle', timelineEvents: fixture.timelineEvents, setGalleryFilter: fixture.setGalleryFilter }) }));
-vi.mock('./useAuctionSequence', () => ({ useAuctionSequence: () => ({ auctions: fixture.auction ? [fixture.auction] : [], importStampedDays: [], loading: false, activityUnavailable: fixture.activityUnavailable, hasUnpositionedActivity: fixture.hasUnpositionedActivity }) }));
+vi.mock('./useAuctionSequence', () => ({ useAuctionSequence: () => ({ auctions: [fixture.auction,fixture.otherAuction].filter(Boolean), importStampedDays: [], loading: false, activityUnavailable: fixture.activityUnavailable, hasUnpositionedActivity: fixture.hasUnpositionedActivity }) }));
 vi.mock('./VehiclePhotoLightbox', () => ({ VEHICLE_DAY_OPEN_EVENT: 'synthetic-day-open' }));
 import AuctionSequenceBand from './AuctionSequenceBand';
 import BarcodeTimeline from './BarcodeTimeline';
@@ -26,7 +26,7 @@ function sequence(end: string | null, sale: string | null = null, status = 'sold
 }
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
-  fixture.activityUnavailable = false; fixture.hasUnpositionedActivity = false; fixture.auction = null;
+  fixture.activityUnavailable = false; fixture.hasUnpositionedActivity = false; fixture.auction = null; fixture.otherAuction = null;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.rpc.mockReset(); fixture.rpc.mockResolvedValue({ data: [], error: null });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
@@ -125,19 +125,15 @@ it('keeps the bidding week readable while retaining later commentary with its so
   const bid = container.querySelector('svg circle')!;
   expect(Number(bid.getAttribute('cx'))).toBeGreaterThan(700);
   expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
-  expect(container.textContent).toContain('2 of 3 timed interactions shown · 1 later interaction in All activity');
-  const all = [...container.querySelectorAll('button')].find(button => button.textContent === 'All activity')!;
-  all.focus();
-  expect(document.activeElement).toBe(all);
-  await act(async () => all.click());
-  expect(all.getAttribute('aria-pressed')).toBe('true');
-  expect(container.querySelector('svg a[href$="#comment-103"]')).not.toBeNull();
-  expect(container.textContent).toContain('3 of 3 timed interactions shown');
-  expect(Number(container.querySelector('svg circle')!.getAttribute('cx'))).toBeLessThan(20);
-  const bidding = [...container.querySelectorAll('button')].find(button => button.textContent === 'Bidding window')!;
-  await act(async () => bidding.click());
-  expect(bidding.getAttribute('aria-pressed')).toBe('true');
-  expect(container.querySelector('svg a[href$="#comment-103"]')).toBeNull();
+  const laterSource = container.querySelector('details a[href$="#comment-103"]')!;
+  expect(laterSource).not.toBeNull();
+  expect(container.querySelector('details')!.textContent).toContain('Later testimony');
+  expect(container.textContent).not.toContain('Bidding window');
+  expect(container.textContent).not.toContain('All activity');
+  container.querySelector('details')!.open = true;
+  laterSource.focus();
+  expect(document.activeElement).toBe(laterSource);
+  expect(Number(container.querySelector('svg circle')!.getAttribute('cx'))).toBeGreaterThan(700);
 });
 
 it('connects the visible source band to the existing vehicle bid drill', async () => {
@@ -151,4 +147,20 @@ it('connects the visible source band to the existing vehicle bid drill', async (
   expect(push).toHaveBeenCalledOnce();
   expect(push.mock.calls[0][0].props.vehicleId).toBe('synthetic-vehicle');
   expect(push.mock.calls[0][1]).toBe('Recorded vehicle bid amounts');
+});
+
+it('opens one selected auction, keeps the calendar optional, and does not reopen on scroll',async()=>{
+  fixture.auction=sequence('2025-01-10T20:30:00Z');
+  fixture.otherAuction={...sequence('2024-01-10T20:30:00Z'),key:'older',lotUrl:'https://bringatrailer.com/listing/synthetic-older/',lotNumber:'2'};
+  await act(async()=>root.render(<BarcodeTimeline selectedAuctionUrl={fixture.otherAuction.lotUrl}/>));
+  const toggle=container.querySelector<HTMLButtonElement>('button[aria-label="Vehicle timeline"]')!;
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  await act(async()=>toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(container.querySelectorAll('.auction-band')).toHaveLength(1);
+  expect(container.querySelector('.auction-band__lot')!.getAttribute('href')).toBe(fixture.otherAuction.lotUrl);
+  expect(container.querySelector<HTMLDetailsElement>('.timeline-view-options')!.open).toBe(false);
+  await act(async()=>toggle.click());
+  await act(async()=>window.dispatchEvent(new Event('scroll')));
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
 });

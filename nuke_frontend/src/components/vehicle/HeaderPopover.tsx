@@ -16,6 +16,7 @@ interface HeaderPopoverProps {
   width?: number;
   children: React.ReactNode;
   align?: 'left' | 'right' | 'center';
+  dismissBoundaryRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
@@ -25,6 +26,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
   width = 320,
   children,
   align = 'left',
+  dismissBoundaryRef,
 }) => {
   const isMobile = useIsMobile();
   const ref = useRef<HTMLDivElement>(null);
@@ -33,13 +35,13 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
   useEffect(() => {
     if (!open) return;
     const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (ref.current && !ref.current.contains(e.target as Node) && !dismissBoundaryRef?.current?.contains(e.target as Node)) {
         onClose();
       }
     };
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
-  }, [open, onClose]);
+  }, [open, onClose, dismissBoundaryRef]);
 
   // Escape key dismissal
   useEffect(() => {
@@ -69,6 +71,8 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
         />
         <div
           ref={ref}
+          role="dialog"
+          aria-label={title}
           style={{
             position: 'fixed',
             bottom: 0,
@@ -92,6 +96,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
             <span style={{ fontWeight: 700, fontSize: '13px' }}>{title}</span>
             <button
               type="button"
+              aria-label={`Close ${title}`}
               onClick={onClose}
               style={{
                 background: 'transparent',
@@ -123,13 +128,15 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
   return (
     <div
       ref={ref}
+      role="dialog"
+      aria-label={title}
       style={{
         position: 'absolute',
         top: '100%',
         marginTop: 4,
         zIndex: 1000,
         background: 'var(--bg)',
-        border: '2px solid var(--border)', width,
+        border: '2px solid var(--border)', width, maxWidth: 'calc(100vw - 24px)', maxHeight: '70vh', overflowY: 'auto',
         ...alignStyle,
       }}
       onClick={(e) => e.stopPropagation()}
@@ -146,6 +153,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
         <span style={{ fontWeight: 700, fontSize: '12px' }}>{title}</span>
         <button
           type="button"
+          aria-label={`Close ${title}`}
           onClick={onClose}
           style={{
             background: 'transparent',
