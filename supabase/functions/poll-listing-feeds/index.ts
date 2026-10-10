@@ -34,6 +34,7 @@ import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { captureLedgerFields } from "./captureLedger.ts";
+import { pollTargets } from "./targets.ts";
 import {
   ledgerWriteFor,
   planIngests,
@@ -932,6 +933,10 @@ Deno.serve(async (req) => {
     let feedId: string | null = null;
     let batchSize = 10;
     let force = false;
+    let targetPreview = false;
+    let targetAfterId = 0;
+    let targetSource: string | undefined;
+    let requestedMode: unknown;
 
     try {
       const body = await req.json();
@@ -939,8 +944,15 @@ Deno.serve(async (req) => {
       feedId = body.feed_id || null;
       batchSize = body.batch_size ?? 10;
       force = body.force || false;
+      targetPreview = body.mode === "targets_preview";
+      requestedMode = body.mode;
+      targetAfterId = body.after_id ?? 0;
+      targetSource = body.target_source;
     } catch (_) {
       /* no body is fine */
+    }
+    if (requestedMode !== undefined && requestedMode !== "feeds" && requestedMode !== "targets_preview") {
+      throw new Error("unknown intake mode; no work started");
     }
 
     const { data: control, error: controlError } = await supabase.from("platform_config")
@@ -950,7 +962,7 @@ Deno.serve(async (req) => {
     if (!Number.isInteger(batchSize) || batchSize < 0 || batchSize > 100) throw new Error("batch_size must be an integer from 0 to 100");
     batchSize = Math.min(batchSize, throttle.max_feeds);
     const budget = createIntakeBudget(throttle, startTime);
-    if (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0) return new Response(
+    if (!targetPreview && (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0)) return new Response(
       JSON.stringify({ success: true, feeds_polled: 0, status: "throttled", throttle: budget.snapshot() }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -978,12 +990,40 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch feeds: ${feedError.message}`);
     }
 
+    const runTargets = async (preview = false) => {
+      try {
+        return await pollTargets(supabase, {
+          // A scoped feed invocation must not move the global archive cursor.
+          controls: !preview && (source || feedId) ? { ...throttle.targets, enabled: false } : throttle.targets,
+          throttle, budget, feeds: (feeds ?? []).slice(0, 2000),
+          preview, afterId: preview ? targetAfterId : undefined, targetSource: preview ? targetSource : undefined,
+          ingest: async (url, timeoutMs) => {
+            const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest`, {
+              method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+              signal: AbortSignal.timeout(timeoutMs),
+            });
+            if (!response.ok) return { status: "error", error: `ingest HTTP ${response.status}` };
+            return await response.json();
+          },
+        });
+      } catch {
+        // Independent lane failure must not discard already-landed feed work
+        // or expose provider/config bodies in its public completion receipt.
+        return { status: "unavailable", scanned: null, attempted: null, complete: null };
+      }
+    };
+    if (targetPreview) return new Response(JSON.stringify({ success: true, feeds_polled: 0,
+      targets: await runTargets(true), throttle: budget.snapshot() }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     if (!feeds || feeds.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
           message: "No feeds due for polling",
           feeds_polled: 0,
+          targets: await runTargets(),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -999,6 +1039,7 @@ Deno.serve(async (req) => {
           success: true,
           message: "No feeds due for polling (per-feed interval)",
           feeds_polled: 0,
+          targets: await runTargets(),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1225,6 +1266,7 @@ Deno.serve(async (req) => {
       await new Promise((r) => setTimeout(r, 500));
     }
 
+    const targetResult = await runTargets();
     const elapsed = Date.now() - startTime;
     console.log(
       `[poll-feeds] Done. ${dueFeeds.length} feeds polled, ${totalFound} items found, ${totalQueued} new queued, ${totalIngested} new ingested in ${elapsed}ms`
@@ -1237,6 +1279,7 @@ Deno.serve(async (req) => {
         feeds_selected: dueFeeds.length,
         feed_selection_complete: feeds.length <= 2000,
         throttle: budget.snapshot(),
+        targets: targetResult,
         total_items_found: totalFound,
         total_new_queued: totalQueued,
         total_new_ingested: totalIngested,

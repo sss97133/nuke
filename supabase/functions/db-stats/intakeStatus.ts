@@ -1,6 +1,8 @@
 // Read-only operator sections for the existing db-stats / SystemStatus owners.
 // Each statement has its own clock and timeout. No source bodies or job commands.
 import { intakeThrottle } from '../poll-listing-feeds/ledger.ts';
+// Include normalized retained-target controls in this deployed reader bundle;
+// cursor state, lease tokens and provider responses remain outside its contract.
 export const INTAKE_TABLES = ['source_targets', 'import_queue', 'listing_page_snapshots',
   'vehicle_events', 'auction_events', 'auction_comments', 'external_identities',
   'vehicle_observations', 'vehicles', 'vehicle_images', 'vehicle_field_consensus',
