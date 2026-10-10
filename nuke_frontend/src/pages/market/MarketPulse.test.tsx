@@ -123,6 +123,17 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain(`lot=${id}`);
     expect(container.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
   });
+  it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
+    await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
+    await click('Local fixture: 3 captured lots');
+    expect(window.location.search).not.toContain('mapChild');
+    expect(window.location.search).not.toContain('mapFocus');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    await render('mapBy=year&mapFocus=1901');
+    expect(container.textContent).toContain('No captured lots remain in this map group');
+    await click('Show all map groups');
+    expect(boardTitles()).toEqual(['other-make', 'first', 'unknown', 'later']);
+  });
   it('keeps unrecorded taxonomy visible and distinguishes a failed metadata read', async () => {
     fixture.taxonomy.data = [{ id: 'later', listing_url: fixture.pulse.data.auctions[0].listingUrl, canonical_vehicle_type: 'CAR', canonical_body_style: 'COUPE' }];
     await render(); await choose('Group inventory by', 'type');

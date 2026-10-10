@@ -636,6 +636,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       next.delete('model');
       ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     }
+    if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
     next.delete('lot');

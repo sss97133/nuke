@@ -75,7 +75,8 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
     <div className="inventory-map-description" aria-live="polite">{hovered ?? 'Select a group to focus, or a lot to inspect its listing activity.'}</div>
     {pending && <p role="status">Reading recorded classifications…</p>}
     {failed && <p role="status">Recorded classifications could not be loaded. <button onClick={onRetryTaxonomy}>Retry classifications</button></p>}
-    <div ref={ref} className="inventory-map-canvas" style={{ height: pending || failed ? 0 : height }} aria-label={`Captured inventory by ${MAP_GROUPS.find(g => g.id === lens.group)?.label}`} onMouseLeave={() => setHovered(null)}>
+    {!pending && !failed && width > 0 && rects.length === 0 && <p role="status">No captured lots remain in this map group. <button onClick={() => onLensChange({ focus: null, child: null })}>Show all map groups</button></p>}
+    <div ref={ref} className="inventory-map-canvas" style={{ height: pending || failed || (width > 0 && rects.length === 0) ? 0 : height }} aria-label={`Captured inventory by ${MAP_GROUPS.find(g => g.id === lens.group)?.label}`} onMouseLeave={() => setHovered(null)}>
       {!pending && !failed && rects.map(({ node, x, y, w, h, expanded, children }) => {
         const changes = pulses && node.lots.some(a => risenIds.has(a.id));
         const roomy = w >= 120 && h >= 64;
