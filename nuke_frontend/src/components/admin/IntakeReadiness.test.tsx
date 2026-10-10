@@ -112,3 +112,15 @@ it.each(['coverage', 'model', 'jobs'])('rejects malformed %s row shapes while ke
   await render(); expect(container.textContent).toContain(`Unavailable: ${section}`);
   expect(container.textContent).toContain(section === 'coverage' ? 'MODEL RELATIONSHIPS' : 'KNOWN SOURCE TARGETS');
 });
+
+it('shows configured zero separately from provider failure and polling evidence', async () => {
+  fixture.responses.jobs.data.controls = { status: 'measured', value: { enabled: true, max_feeds: 40, max_ingests: 20,
+    sources: { synthetic: { enabled: true, max_ingests: 0 } } } };
+  fixture.responses.jobs.data.feeds = { status: 'measured', measured_at: clock, complete: true,
+    rows: [{ source_slug: 'synthetic', feeds: 2, enabled_feeds: 1, errored_feeds: 0, last_polled_at: clock,
+      shortest_interval_minutes: 60, billing_blocked: false, rate_limited: false }] };
+  await render();
+  expect(container.textContent).toContain('Held at zero');
+  expect(container.textContent).toContain('Monetary cost is unmeasured');
+  expect(container.textContent).toContain('does not prove new data landed');
+});

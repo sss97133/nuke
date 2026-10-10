@@ -39,6 +39,10 @@ import {
   planIngests,
   readLandedBatch,
   shouldLedger,
+  intakeThrottle,
+  selectIntakeFeeds,
+  createIntakeBudget,
+  type IntakeBudget,
   type IngestOutcome,
   type LedgerKnown,
 } from "./ledger.ts";
@@ -248,6 +252,7 @@ interface FeedResult {
     ledger?: string; // firecrawl_html path: the import_queue status written for this URL
   }>;
   error: string | null;
+  deferred_reason?: string | null;
 }
 
 /**
@@ -345,7 +350,7 @@ const MAX_ARTICLE_HOPS_PER_POLL = 8;
  * curated posts age out of the RSS within a day, and a login-walled target
  * (FB) would otherwise burn a hop slot retrying forever. One shot per article.
  */
-async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult> {
+async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
     source: feed.source_slug,
@@ -417,6 +422,9 @@ async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult>
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   for (const articleUrl of fresh) {
+    const grant = budget.reserve(feed.source_slug);
+    if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
+    const attemptStarted = Date.now();
     let targetUrl: string | null = null;
     let outcome = "no_target";
     let detail: string | undefined;
@@ -432,7 +440,7 @@ async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult>
 
       if (targetUrl) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 85000); // > ingest's 75s internal enrich timeout
+        const timeout = setTimeout(() => controller.abort(), Math.min(grant.timeout_ms, Math.max(1, budget.remainingMs() - 10_000)));
         const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
           method: "POST",
           headers: {
@@ -463,6 +471,7 @@ async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult>
       status: outcome,
       ...(detail ? { error: String(detail).slice(0, 200) } : {}),
     });
+    budget.record(feed.source_slug, Date.now() - attemptStarted, { status: outcome, error: detail });
 
     // One shot per article, whatever happened (see doc comment above).
     const { error: ledgerWriteError } = await supabase.from("import_queue").upsert(
@@ -509,7 +518,8 @@ async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult>
  */
 async function pollFirecrawlHtmlFeed(
   supabase: any,
-  feed: any
+  feed: any,
+  budget: IntakeBudget,
 ): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
@@ -804,6 +814,9 @@ async function pollFirecrawlHtmlFeed(
   };
 
   for (const url of toIngest) {
+    const grant = budget.reserve(feed.source_slug);
+    if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
+    const attemptStarted = Date.now();
     try {
       const controller = new AbortController();
       // ingest's own enrichment call (tryAutoEnrich) uses a 75s internal
@@ -812,7 +825,7 @@ async function pollFirecrawlHtmlFeed(
       // reports it back as a client "error" — which is NOT ledgered (errors
       // retry next poll, by design) — and re-burns a MAX_NEW_INGESTS_PER_POLL
       // slot on the exact same slow URL every future poll. Must exceed 75s.
-      const timeout = setTimeout(() => controller.abort(), 85000);
+      const timeout = setTimeout(() => controller.abort(), grant.timeout_ms);
 
       const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
         method: "POST",
@@ -843,6 +856,7 @@ async function pollFirecrawlHtmlFeed(
           : {}),
       };
       result.ingest_outcomes!.push(outcomeEntry);
+      budget.record(feed.source_slug, Date.now() - attemptStarted, ingest);
 
       if (status === "created") result.new_ingested!++;
       else if (status === "matched" || status === "duplicate")
@@ -851,6 +865,7 @@ async function pollFirecrawlHtmlFeed(
 
       if (shouldLedger(ingest)) waiting.push({ url, ingest, entry: outcomeEntry });
     } catch (err: any) {
+      budget.record(feed.source_slug, Date.now() - attemptStarted, { error: err?.message || String(err) });
       result.ingest_outcomes!.push({
         url,
         status: "error",
@@ -869,9 +884,12 @@ async function pollFirecrawlHtmlFeed(
   const ingestErrors = result.ingest_outcomes!.filter(
     (o) => o.status === "error"
   ).length;
-  if (toIngest.length > 0 && ingestErrors === toIngest.length) {
+  const attempted = result.ingest_outcomes!.length;
+  const hold = budget.refusal(feed.source_slug);
+  if (["billing", "rate_limited", "blocked", "timeout"].includes(hold || "")) return await failFeed(`intake_backoff: ${hold}`);
+  if (attempted > 0 && ingestErrors === attempted) {
     return await failFeed(
-      `ingest_failed: ${ingestErrors}/${toIngest.length} ingest calls errored`
+      `ingest_failed: ${ingestErrors}/${attempted} ingest calls errored`
     );
   }
 
@@ -919,11 +937,22 @@ Deno.serve(async (req) => {
       const body = await req.json();
       source = body.source || null;
       feedId = body.feed_id || null;
-      batchSize = body.batch_size || 10;
+      batchSize = body.batch_size ?? 10;
       force = body.force || false;
     } catch (_) {
       /* no body is fine */
     }
+
+    const { data: control, error: controlError } = await supabase.from("platform_config")
+      .select("config_value").eq("config_key", "source_intake").maybeSingle();
+    if (controlError) throw new Error("Intake throttle unavailable; no source work started");
+    const throttle = intakeThrottle(control?.config_value ?? {});
+    if (!Number.isInteger(batchSize) || batchSize < 0 || batchSize > 100) throw new Error("batch_size must be an integer from 0 to 100");
+    batchSize = Math.min(batchSize, throttle.max_feeds);
+    const budget = createIntakeBudget(throttle, startTime);
+    if (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0) return new Response(
+      JSON.stringify({ success: true, feeds_polled: 0, status: "throttled", throttle: budget.snapshot() }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     // Get feeds that are due for polling
     let query = supabase
@@ -931,7 +960,7 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("enabled", true)
       .order("last_polled_at", { ascending: true, nullsFirst: true })
-      .limit(batchSize);
+      .limit(2001);
 
     if (feedId) {
       query = query.eq("id", feedId);
@@ -939,13 +968,9 @@ Deno.serve(async (req) => {
       query = query.eq("source_slug", source);
     }
 
-    if (!force) {
-      // Only poll feeds that haven't been polled recently
-      // (last_polled_at is null OR older than poll_interval_minutes)
-      query = query.or(
-        `last_polled_at.is.null,last_polled_at.lt.${new Date(Date.now() - 10 * 60 * 1000).toISOString()}`
-      );
-    }
+    // Read bounded enabled-feed metadata, including each source's latest
+    // visit. Filtering before grouping hides that visit and lets a source
+    // with hundreds of old metro feeds stay first forever.
 
     const { data: feeds, error: feedError } = await query;
 
@@ -964,23 +989,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Honor each feed's own poll_interval_minutes (the SQL filter above is
-    // only a coarse 10-minute gate; a 60-min feed must not poll every cron tick).
-    const dueFeeds = force
-      ? feeds
-      : feeds.filter((f: any) => {
-          if (!f.last_polled_at) return true;
-          const lastPolledMs = new Date(f.last_polled_at).getTime();
-          if (Number.isNaN(lastPolledMs)) {
-            // Unparseable timestamp would make `Date.now() - NaN >= intervalMs`
-            // false forever, silently excluding this feed from every future
-            // poll with nothing to signal it's stuck. Treat as due instead.
-            console.error(`[poll-feeds] ${f.display_name}: unparseable last_polled_at "${f.last_polled_at}" — treating as due`);
-            return true;
-          }
-          const intervalMs = (f.poll_interval_minutes || 60) * 60 * 1000;
-          return Date.now() - lastPolledMs >= intervalMs;
-        });
+    // Honor each feed's interval/backoff and rotate sources fairly.
+    const dueFeeds = selectIntakeFeeds(feeds.slice(0, 2000), batchSize, throttle, Date.now(), force);
+    budget.shareAcrossSources(new Set(dueFeeds.map((f: any) => f.source_slug)).size);
 
     if (dueFeeds.length === 0) {
       return new Response(
@@ -1025,6 +1036,11 @@ Deno.serve(async (req) => {
         console.log(`[poll-feeds] Time budget exceeded (${Date.now() - startTime}ms) — stopping early, ${dueFeeds.length - results.length} feed(s) deferred to next cron tick`);
         break;
       }
+      const refusal = budget.refusal(feed.source_slug);
+      if (refusal) {
+        results.push({ feed: feed.display_name, source: feed.source_slug, items_found: 0, error: null, deferred_reason: refusal });
+        continue;
+      }
 
       // CLAIM BEFORE WORK. Stamp last_polled_at up front so a mid-feed kill
       // cannot wedge the queue. Feeds are selected `ORDER BY last_polled_at ASC
@@ -1044,7 +1060,7 @@ Deno.serve(async (req) => {
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
       if (feed.search_criteria?.fetch_strategy === "rss_article_hop") {
-        const hopResult = await pollArticleHopFeed(supabase, feed);
+        const hopResult = await pollArticleHopFeed(supabase, feed, budget);
         results.push(hopResult);
         totalFound += hopResult.items_found;
         totalIngested += hopResult.new_ingested || 0;
@@ -1057,7 +1073,7 @@ Deno.serve(async (req) => {
           feed.search_criteria?.fetch_strategy
         )
       ) {
-        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed);
+        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget);
         results.push(fcResult);
         totalFound += fcResult.items_found;
         totalIngested += fcResult.new_ingested || 0;
@@ -1077,7 +1093,7 @@ Deno.serve(async (req) => {
 
         // Build import_queue rows
         const rows = items
-          .filter((item) => item.link) // Must have a URL
+          .filter((item) => item.link && budget.reserve(feed.source_slug))
           .map((item) => {
             const url = cleanListingUrl(item.link, feed.source_slug);
             const hints = parseVehicleFromTitle(item.title || "");
@@ -1217,7 +1233,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        feeds_polled: dueFeeds.length,
+        feeds_polled: results.filter(r => !r.deferred_reason || r.items_found > 0 || r.error).length,
+        feeds_selected: dueFeeds.length,
+        feed_selection_complete: feeds.length <= 2000,
+        throttle: budget.snapshot(),
         total_items_found: totalFound,
         total_new_queued: totalQueued,
         total_new_ingested: totalIngested,

@@ -16,6 +16,9 @@ import {
   planIngests,
   readbackFor,
   readLandedBatch,
+  intakeThrottle,
+  createIntakeBudget,
+  selectIntakeFeeds,
   type IngestOutcome,
   type LandedBatch,
   type LedgerKnown,
@@ -385,4 +388,73 @@ Deno.test("the rejection is recorded once: later polls skip the URL until it is 
   // the third rejection is final
   const third = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site", { status: "failed", attempts: 2, max_attempts: 3 })!;
   equal(planIngests([REJECTED_URL], new Set(), new Map([[REJECTED_URL, third.row as unknown as LedgerKnown]]), at(30 * 24 * 60), 20).toIngest, []);
+});
+
+Deno.test('intake switches and zero budgets refuse work; malformed limits fail closed', () => {
+  for (const raw of [{ enabled: false }, { max_ingests: 0 }, { sources: { mecum: { max_ingests: 0 } } }]) {
+    equal(createIntakeBudget(intakeThrottle(raw), 0, () => 0).reserve('mecum'), null);
+  }
+  for (const raw of [null, { max_ingests: -1 }, { max_feeds: 0.5 }, { max_ingests: '20' }, { enabled: 'yes' }, { sources: [] }]) {
+    let rejected = false;
+    try { intakeThrottle(raw); } catch { rejected = true; }
+    assert(rejected, 'invalid controls must not silently reopen intake');
+  }
+});
+
+Deno.test('a busy metro source shares the feed slots with due auction and dealer sources', () => {
+  const feeds = Array.from({ length: 80 }, (_, i) => ({ source_slug: 'craigslist', id: i, last_polled_at: null }));
+  feeds.push({ source_slug: 'mecum', id: 81, last_polled_at: null }, { source_slug: 'dealer', id: 82, last_polled_at: null });
+  const selected = selectIntakeFeeds(feeds, 4, intakeThrottle(), 0);
+  equal(selected.map(f => f.source_slug), ['craigslist', 'mecum', 'dealer', 'craigslist']);
+  equal(selectIntakeFeeds(feeds, 0, intakeThrottle(), 0), []);
+  equal(selectIntakeFeeds([{ source_slug: 'mecum', last_polled_at: NOW.toISOString(), poll_interval_minutes: 60 }], 4, intakeThrottle(), NOW.getTime()), []);
+});
+
+Deno.test('shared budget caps all feeds and source failures back off independently', () => {
+  let time = 0;
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 3, sources: { mecum: { max_ingests: 1 } } }), 0, () => time);
+  assert(!!budget.reserve('mecum'), 'first source admission');
+  equal(budget.reserve('mecum'), null);
+  equal(budget.refusal('mecum'), 'source_limit');
+  assert(!!budget.reserve('dealer'), 'other source stays usable');
+  budget.record('dealer', 200, { enrichment_error: 'OpenAI API error: You have no credits remaining' });
+  equal(budget.reserve('dealer'), null);
+  equal(budget.refusal('dealer'), 'billing');
+  assert(!!budget.reserve('bat'), 'a different source is not blocked by dealer billing');
+  equal(budget.reserve('other'), null);
+  equal(budget.snapshot().attempted, 3);
+  time = 111_000;
+  equal(budget.remainingMs(), 0);
+});
+
+Deno.test('measured slow calls defer the next call; fast calls use available worker time', () => {
+  let time = 0;
+  const budget = createIntakeBudget(intakeThrottle(), 0, () => time);
+  assert(!!budget.reserve('slow'), 'initial bounded attempt');
+  time = 60_000;
+  budget.record('slow', 60_000, { status: 'matched' });
+  equal(budget.reserve('slow'), null);
+  equal(budget.refusal('slow'), 'worker_deadline');
+  assert(!!budget.reserve('fast'), 'another source can use the remaining time');
+  budget.record('fast', 100, { status: 'matched' });
+  assert(!!budget.reserve('fast'), 'fast cached extraction adapts to observed latency');
+  time = 101_000;
+  equal(budget.reserve('fast'), null);
+});
+
+Deno.test('latest source visit outranks its old metro feeds; billing errors persist a six-hour backoff', () => {
+  const now = NOW.getTime();
+  const feeds = [{ source_slug: 'craigslist', last_polled_at: new Date(now - 86400000).toISOString() },
+    { source_slug: 'craigslist', last_polled_at: new Date(now - 60000).toISOString() },
+    { source_slug: 'mecum', last_polled_at: new Date(now - 7200000).toISOString() }];
+  equal(selectIntakeFeeds(feeds, 1, intakeThrottle(), now).map(f => f.source_slug), ['mecum']);
+  const blocked = [{ source_slug: 'dealer', last_polled_at: new Date(now - 7200000).toISOString(),
+    last_error: 'intake_backoff: billing', error_count: 1 }];
+  equal(selectIntakeFeeds(blocked, 1, intakeThrottle(), now), []);
+  equal(selectIntakeFeeds(blocked, 1, intakeThrottle(), now + 6 * 3600000).length, 1);
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 4 }), 0, () => 0);
+  budget.shareAcrossSources(4);
+  assert(!!budget.reserve('mecum'), 'source receives one slot');
+  equal(budget.reserve('mecum'), null);
+  assert(!!budget.reserve('other'), 'another source retains a slot');
 });

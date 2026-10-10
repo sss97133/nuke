@@ -10,10 +10,15 @@ type Edge = { constraint_name: string; child_table: string; parent_table: string
 type Job = { jobname: string; present: boolean; active: boolean; schedule: string | null };
 type Health = { jobname: string; declared_writer: string | null; last_status: string | null; last_run_at: string | null;
   assay_status: string | null; health_status: string | null };
+type Feed = { source_slug: string; feeds: number; enabled_feeds: number; errored_feeds: number;
+  last_polled_at: string | null; shortest_interval_minutes: number | null; billing_blocked: boolean | null; rate_limited: boolean | null };
 type Reading = { contract: string; section: Section; status?: string; measured_at?: string; complete?: boolean;
   rows?: Source[] | Table[]; links?: Edge[]; links_complete?: boolean;
   config?: { status: string; measured_at: string; rows: Job[] };
-  health?: { status: string; measured_at: string | null; rows: Health[] }; health_scope?: string[] };
+  health?: { status: string; measured_at: string | null; rows: Health[] }; health_scope?: string[];
+  feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
+  controls?: { status: string; value?: { enabled: boolean; max_feeds: number; max_ingests: number;
+    sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
 
 // Start with bounded metadata, then avoid overlapping the two aggregate readers.
 const sections: Section[] = ['model', 'coverage', 'jobs'];
@@ -26,13 +31,23 @@ const names = (rows: any[], key: string, limit: number) => Array.isArray(rows) &
   && rows.every(r => r && typeof r[key] === 'string' && r[key].length > 0)
   && new Set(rows.map(r => r[key])).size === rows.length;
 const strings = (value: unknown) => value === null || Array.isArray(value) && value.every(s => typeof s === 'string');
+const validControls = (controls: any) => controls === undefined || ['invalid', 'unavailable'].includes(controls?.status)
+  || controls?.status === 'measured' && typeof controls.value?.enabled === 'boolean'
+    && [controls.value.max_feeds, controls.value.max_ingests].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 100)
+    && controls.value.sources && typeof controls.value.sources === 'object' && !Array.isArray(controls.value.sources)
+    && Object.values(controls.value.sources).every((s: any) => s && typeof s.enabled === 'boolean'
+      && Number.isSafeInteger(s.max_ingests) && s.max_ingests >= 0 && s.max_ingests <= 100);
 function validReading(data: any, section: Section): data is Reading {
   if (data?.contract !== 'intake_status_v1' || data.section !== section) return false;
   if (section === 'jobs') return data.config?.status === 'measured'
-    && Number.isFinite(Date.parse(data.config.measured_at)) && names(data.config.rows, 'jobname', 12)
+    && Number.isFinite(Date.parse(data.config.measured_at)) && names(data.config.rows, 'jobname', 14)
     && data.health && ['measured', 'unavailable'].includes(data.health.status)
     && (data.health.status === 'unavailable' || Number.isFinite(Date.parse(data.health.measured_at))
-      && names(data.health.rows, 'jobname', 5));
+      && names(data.health.rows, 'jobname', 6))
+    && validControls(data.controls)
+    && (data.feeds === undefined || data.feeds.status === 'unavailable' || data.feeds.status === 'measured'
+      && Number.isFinite(Date.parse(data.feeds.measured_at)) && names(data.feeds.rows, 'source_slug', 60)
+      && typeof data.feeds.complete === 'boolean');
   if (data.status !== 'measured' || !Number.isFinite(Date.parse(data.measured_at))) return false;
   if (section === 'coverage') return names(data.rows, 'source_slug', 30) && typeof data.complete === 'boolean';
   return names(data.rows, 'table_name', 14) && data.rows.every((t: Table) => strings(t.registry_owners) && strings(t.receipt_writers))
@@ -113,8 +128,32 @@ export default function IntakeReadiness() {
     </div>}
 
     {jobs && <div style={box}>
+      {jobs.controls?.status === 'measured' && jobs.controls.value && <p>
+        Intake {jobs.controls.value.enabled && jobs.controls.value.max_ingests > 0 ? 'open within capacity limits' : 'paused'} ·
+        Ceiling {count(jobs.controls.value.max_feeds)} feeds / {count(jobs.controls.value.max_ingests)} admissions per invocation.
+        Source rotation and measured extraction latency reduce actual work to fit the worker deadline. Monetary cost is unmeasured.
+      </p>}
+      {jobs.controls?.status === 'invalid' && <p role="status">Invalid throttle configuration: source work is refused.</p>}
+      {jobs.feeds?.status === 'measured' && <details><summary>Scheduled source feeds · {time(jobs.feeds.measured_at)}</summary>
+        <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>{['Source', 'Enabled feeds', 'Throttle', 'Errored feeds', 'Latest poll', 'Minimum interval'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
+          <tbody>{jobs.feeds.rows.map(f => {
+            const control = jobs.controls?.value?.sources[f.source_slug];
+            const state = jobs.controls?.status === 'invalid' ? 'Invalid controls: work refused'
+              : jobs.controls?.status !== 'measured' ? 'Controls unavailable'
+              : jobs.controls.value?.enabled === false || jobs.controls.value?.max_ingests === 0
+              || control?.enabled === false || control?.max_ingests === 0 ? 'Held at zero'
+              : f.billing_blocked ? 'Billing blocked' : f.rate_limited ? 'Provider limited' : 'Shared capacity budget';
+            return <tr key={f.source_slug}><th scope="row" style={cell}>{f.source_slug}</th>
+              <td style={cell}>{count(f.enabled_feeds)} / {count(f.feeds)}</td><td style={cell}>{state}</td>
+              <td style={cell}>{count(f.errored_feeds)}</td><td style={cell}>{time(f.last_polled_at)}</td>
+              <td style={cell}>{count(f.shortest_interval_minutes)} min</td></tr>;
+          })}</tbody>
+        </table></div>
+        <p>Feed discovery and polling only; a poll timestamp does not prove new data landed. {jobs.feeds.complete ? '' : 'First 60 source keys only.'}</p>
+      </details>}
       <h3 style={{ fontSize: 11 }}>INTAKE AND FOLD JOBS · CONFIGURATION {time(jobs.config?.measured_at)}</h3>
-      <p>Output health: {time(jobs.health?.measured_at)}. Five named jobs assayed here; other output readings are unmeasured. Paused jobs remain paused.</p>
+      <p>Output health: {time(jobs.health?.measured_at)}. Six named jobs assayed here; other output readings are unmeasured. Paused jobs remain paused.</p>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{['Job / UTC schedule', 'Enabled', 'Last execution', 'Output assay', 'Reported health', 'Declared writer → tables'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
         <tbody>{jobs.config?.rows.map(j => {

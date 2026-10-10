@@ -373,3 +373,106 @@ export function ledgerWriteFor(input: {
   }
   return { status, landed, row };
 }
+
+/** Shared invocation throttle. Source/feed switches do not alter testimony. */
+export interface IntakeThrottle {
+  enabled: boolean;
+  max_feeds: number;
+  max_ingests: number;
+  sources: Record<string, { enabled?: boolean; max_ingests?: number }>;
+}
+
+export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid intake throttle");
+  const value = raw as Record<string, unknown>;
+  const limit = (v: unknown, fallback: number, max: number) => {
+    if (v === undefined) return fallback;
+    if (!Number.isInteger(v) || Number(v) < 0 || Number(v) > max) throw new Error("invalid intake limit");
+    return Number(v);
+  };
+  const sources = value.sources ?? {};
+  if (typeof sources !== "object" || sources === null || Array.isArray(sources)) throw new Error("invalid source throttles");
+  const normalized: IntakeThrottle["sources"] = Object.create(null);
+  for (const [slug, item] of Object.entries(sources)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("invalid source throttle");
+    const config = item as Record<string, unknown>;
+    if (config.enabled !== undefined && typeof config.enabled !== "boolean") throw new Error("invalid source switch");
+    normalized[slug] = { enabled: config.enabled !== false, max_ingests: limit(config.max_ingests, 20, 100) };
+  }
+  if (value.enabled !== undefined && typeof value.enabled !== "boolean") throw new Error("invalid intake switch");
+  return { enabled: value.enabled !== false, max_feeds: limit(value.max_feeds, 40, 100),
+    max_ingests: limit(value.max_ingests, 20, 100), sources: normalized };
+}
+
+export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null }>(
+  feeds: T[], limit: number, throttle: IntakeThrottle, now: number, force = false,
+): T[] {
+  const groups = new Map<string, T[]>();
+  const sourceLatest = new Map<string, number>();
+  for (const feed of feeds) sourceLatest.set(feed.source_slug, Math.max(sourceLatest.get(feed.source_slug) ?? 0,
+    Number.isFinite(Date.parse(feed.last_polled_at || "")) ? Date.parse(feed.last_polled_at!) : 0));
+  for (const feed of feeds) {
+    if (throttle.sources[feed.source_slug]?.enabled === false || throttle.sources[feed.source_slug]?.max_ingests === 0) continue;
+    const last = feed.last_polled_at ? Date.parse(feed.last_polled_at) : NaN;
+    const category = feed.last_error?.match(/^intake_backoff: (billing|rate_limited|blocked|timeout)$/)?.[1]
+      ?? failureCategoryFor(feed.last_error || "");
+    const backoffMinutes = !feed.last_error ? 0 : category === "billing" ? 360 : category === "blocked" ? 360
+      : category === "rate_limited" ? 15 : 0;
+    const interval = Math.max(feed.poll_interval_minutes ?? 60, backoffMinutes * Math.min(4, Math.max(1, feed.error_count ?? 1)));
+    if (!force && Number.isFinite(last) && now - last < interval * 60_000) continue;
+    const group = groups.get(feed.source_slug) ?? [];
+    group.push(feed); groups.set(feed.source_slug, group);
+  }
+  // Oldest due source first, then round-robin. Hundreds of metro feeds must
+  // not take every slot ahead of a single auction-house feed.
+  const selected: T[] = [];
+  const fairGroups = new Map([...groups].sort(([a], [b]) => (sourceLatest.get(a) ?? 0) - (sourceLatest.get(b) ?? 0)));
+  while (selected.length < limit && fairGroups.size) {
+    for (const [slug, group] of fairGroups) {
+      selected.push(group.shift()!);
+      if (!group.length) fairGroups.delete(slug);
+      if (selected.length === limit) break;
+    }
+  }
+  return selected;
+}
+
+export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, clock = Date.now) {
+  let attempted = 0;
+  let sourceShare = 20;
+  const sources = new Map<string, { attempted: number; estimate_ms: number; hold: string | null }>();
+  const state = (source: string) => {
+    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: 15_000, hold: null });
+    return sources.get(source)!;
+  };
+  const remainingMs = () => Math.max(0, startedAt + 110_000 - clock());
+  const refusal = (source: string) => {
+    const s = state(source), config = throttle.sources[source];
+    if (!throttle.enabled || config?.enabled === false) return "paused";
+    if (s.hold) return s.hold;
+    if (attempted >= throttle.max_ingests) return "invocation_limit";
+    if (s.attempted >= (config?.max_ingests ?? sourceShare)) return "source_limit";
+    if (remainingMs() < Math.min(85_000, s.estimate_ms * 1.5) + 10_000) return "worker_deadline";
+    return null;
+  };
+  return {
+    shareAcrossSources(count: number) { sourceShare = Math.max(1, Math.ceil(throttle.max_ingests / Math.max(1, count))); },
+    reserve(source: string): { timeout_ms: number } | null {
+      if (refusal(source)) return null;
+      attempted++; state(source).attempted++;
+      return { timeout_ms: Math.min(85_000, remainingMs() - 10_000) };
+    },
+    record(source: string, elapsedMs: number, outcome: IngestOutcome) {
+      const s = state(source);
+      s.estimate_ms = Math.max(1_000, elapsedMs);
+      const error = [outcome.error, outcome.reason, outcome.enrichment_error].filter(Boolean).join(" ");
+      const category = failureCategoryFor(error);
+      if (error && ["billing", "rate_limited", "blocked", "timeout"].includes(category)) s.hold = category;
+    },
+    refusal,
+    remainingMs,
+    snapshot: () => ({ attempted, max_ingests: throttle.max_ingests, remaining_ms: remainingMs(),
+      sources: Object.fromEntries(sources), limit_scope: "this_invocation", monetary_cost: "unmeasured" }),
+  };
+}
+export type IntakeBudget = ReturnType<typeof createIntakeBudget>;
