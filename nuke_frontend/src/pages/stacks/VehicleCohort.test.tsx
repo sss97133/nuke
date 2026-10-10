@@ -29,9 +29,9 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
 async function mount(facet?:any){await act(async()=>root.render(<VehiclePerformance vehicleId="subject" facet={facet}/>));}
 it('shows concise rank rows, explicitly names the population, and keeps counts/methods under disclosure',async()=>{
   await mount();
-  expect(host.querySelectorAll('.vp-performance__table tbody tr')).toHaveLength(3);
+  expect(host.querySelectorAll('.vp-performance__readings > div')).toHaveLength(3);
   expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('BaT sample · bid years 2016–2026');
-  expect(host.querySelectorAll('.vp-performance__table td:last-child strong')[2].textContent).toBe('P50');
+  expect(host.querySelectorAll('.vp-performance__readings strong')[2].textContent).toBe('P50');
   const evidence=host.querySelector<HTMLDetailsElement>('details')!;
   expect(evidence.open).toBe(false);
   expect(evidence.textContent).toContain('not an overall vehicle grade');
@@ -41,7 +41,7 @@ it('defaults a configuration door to the same model year and keeps label inciden
   await mount({dimension:'body_style',value:'COUPE',label:'Coupe'});
   expect(host.querySelector<HTMLSelectElement>('select')!.value).toBe('vehicleYear');
   expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('Current-label match · BaT');
-  expect(host.querySelectorAll('.vp-performance__table tbody tr')).toHaveLength(3);
+  expect(host.querySelectorAll('.vp-performance__readings > div')).toHaveLength(3);
   const evidence=host.querySelector('details')!;
   expect(evidence.textContent).toContain('100.0% (7/7)');
   expect(evidence.textContent).toContain('2000 Coupe');
@@ -56,7 +56,7 @@ it('defaults a configuration door to the same model year and keeps label inciden
 });
 it('withholds a sparse exact-label rank rather than borrowing the wider model percentile',async()=>{
   await mount({dimension:'engine',value:'Exact Engine',label:'Exact Engine'});
-  expect(host.querySelector('.vp-performance__table')).toBeNull();
+  expect(host.querySelector('.vp-performance__readings')).toBeNull();
   expect(host.querySelector('.vp-performance__unranked')!.textContent).toContain('1 auction');
   expect(host.querySelector('details')!.textContent).toContain('100.0% (1/1)');
 });
@@ -71,7 +71,7 @@ it('does not replace a failed facet read with zero share or a broad model rank',
   state.error=true;
   await mount({dimension:'engine',value:'Exact Engine',label:'Exact Engine'});
   expect(host.querySelector('[role="status"]')!.textContent).toContain('could not be read');
-  expect(host.querySelector('.vp-performance__table')).toBeNull();
+  expect(host.querySelector('.vp-performance__readings')).toBeNull();
 });
 
 it('does not leave a settled denied or absent vehicle in an endless loading shell',async()=>{
@@ -83,7 +83,12 @@ it('does not leave a settled denied or absent vehicle in an endless loading shel
 it('does not present a stored live outcome as proof the source is active now',async()=>{
   state.read.lot.outcome='live';
   await mount();
-  expect(host.querySelector('.vp-performance__table')).toBeNull();
+  expect(host.querySelector('.vp-performance__readings')).toBeNull();
   expect(host.querySelector('.vp-performance__context')!.textContent).toContain('Recorded live');
   expect(host.querySelector('.vp-performance__context')!.textContent).not.toContain('Open auction');
+});
+
+it('does not allocate a completed-auction form to a vehicle with only one live lot',async()=>{
+  state.read.lot.outcome='live'; state.read.lots=[state.read.lot];
+  await mount(); expect(host.textContent).toBe('');
 });

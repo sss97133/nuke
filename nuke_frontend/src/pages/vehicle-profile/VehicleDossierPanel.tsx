@@ -506,9 +506,7 @@ const VehicleDossierPanel: React.FC = () => {
   if (!vehicle) return null;
 
   const v = vehicle as any;
-  const coverageScore = typeof v.data_quality_score === 'number' &&
-    Number.isFinite(v.data_quality_score) && v.data_quality_score >= 0 && v.data_quality_score <= 100
-    ? v.data_quality_score : null;
+
   const ymm = [v.year, v.make, v.model].filter(Boolean).join(' ').toUpperCase().trim();
 
   return (
@@ -828,52 +826,6 @@ const VehicleDossierPanel: React.FC = () => {
         <p style={{ margin: '4px 0 0' }}>Claim record counts do not establish independent support or verification.</p>
       </div>
 
-      {/* Stored coverage heuristic; does not assess fact verification. */}
-      {coverageScore !== null && (
-        <div data-testid="data-coverage-score" title="Inputs: images, identity fields, observations, price and VIN length." style={{
-          background: 'var(--surface-elevated)',
-          border: '2px solid var(--border)',
-          padding: '8px 10px',
-          marginBottom: '8px',
-        }}>
-          <div style={{
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '9px',
-            fontWeight: 700,
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            marginBottom: '4px',
-          }}>
-            DATA COVERAGE
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: '12px',
-              fontWeight: 700,
-              color: 'var(--text-secondary)',
-            }}>
-              {Math.round(coverageScore)}/100
-            </span>
-            <div style={{
-              flex: 1,
-              height: '4px',
-              background: 'var(--border)',
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${coverageScore}%`,
-                background: 'var(--text-secondary)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }} />
-            </div>
-          </div>
-          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Stored coverage heuristic · verification unknown.<br />
-            Assessment time unknown.
-          </div>
-        </div>
-      )}
 
       {/* Condition Score (if available) */}
       <ConditionScoreSection vehicleId={vehicle.id} />

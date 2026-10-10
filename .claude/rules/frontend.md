@@ -16,7 +16,8 @@ Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css
 - A structured brand/make label uses available identity artwork programmatically. Vehicle makes use `components/common/MakeIdentity.tsx`; organization identity uses the existing `OrgLogo` renderer. This applies wherever brand identity is relevant, including discovery, filters, group headings and drill paths.
 - `MakeIdentity` resolves the brand against the sourced artwork catalogue: wordmark first, otherwise emblem with readable name, otherwise plain text. Catalogue additions must become available to every consumer without adding page-specific brand lists. Preserve accessible names and text on asset failure.
 - Treat lettering as identity artwork, not a replacement UI font. Arial/Courier remain the interface fonts. Compact labels and prose retain readable text; an adjacent emblem uses `MakeLogo`. Do not guess brands from arbitrary text or rewrite vehicle titles into logos.
-- Reuse local attributed artwork and its theme variants. Reserve image dimensions, preserve contrast on selected surfaces, and do not infer historical logo variants from vehicle/bid years. New surfaces consume the shared rule instead of inventing artwork or fetching logos independently.
+- Reuse local attributed artwork and its theme variants. Reserve image dimensions and preserve contrast on selected surfaces. New surfaces consume the shared rule instead of inventing artwork or fetching logos independently.
+- Vehicle headlines use year/make/model-specific identity artwork (owner correction, 2026-10-10). Use `VehicleIdentity` in the shared `MakeIdentity.tsx` owner and `vehicle-identities.json`: sourced period maker lettering, model nameplate and model emblem, each with its own verified model/year applicability. Vehicle year selects a documented range; it does not establish a badge's history. Unknown matches retain text. Do not substitute a modern make wordmark or approximate script font. Preserve the source chrome/enamel rather than recoloring it for themes. This supersedes the 2026-10-08 blanket prohibition on year-based selection.
 - The local artwork catalogue uses a light/dark pair for colored wordmarks, or one verified monochrome wordmark that can be inverted. Keep that convention when registering artwork; absent theme metadata is not permission to recolor arbitrary logos.
 
 ## Visual
@@ -92,3 +93,7 @@ Rules:
 ## Reference Files
 - Design reference: `~/Downloads/nuke-session-files/`
 - Design book: `docs/library/technical/design-book/`
+
+## Vehicle profile fact ownership — owner instruction, 2026-10-10
+
+State each datum once on the page. Give it one primary owner; other sections should link to that owner or add a distinct computation. Do not repeat identity, sale result, dates, counts or scores across a masthead, chart label and evidence card. Before adding a tool, assay its population, units, clock and supported interpretation. An unexplained stored score or an average of unmatched configurations does not earn profile space; remove the surface rather than surrounding it with caveats.

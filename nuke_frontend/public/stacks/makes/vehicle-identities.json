@@ -1,0 +1,76 @@
+[
+  {
+    "make": "Chevrolet",
+    "models": [],
+    "years": [
+      1963,
+      1963
+    ],
+    "role": "make",
+    "file": "chevrolet-corvette-brochure-1963.jpg",
+    "viewport": "1460 1105 86 34",
+    "width": 76,
+    "height": 30,
+    "sourceWidth": 1600,
+    "sourceHeight": 1184,
+    "source": "https://www.corvetteactioncenter.com/specs/c2/1963/1963-corvette-sales-brochure.html",
+    "sourceAsset": "https://www.corvetteactioncenter.com/specs/c2/1963/images/1963%20Chevrolet%20Corvette-08.jpg",
+    "evidence": "https://www.corvetteactioncenter.com/specs/c2/1963/1963-corvette-sales-brochure.html",
+    "notes": "The actual black bowtie and condensed Chevrolet lettering printed on page 8 of the 1963 sales brochure. Unmodified source scan; viewport isolates the maker mark. Applicability limited to the source year.",
+    "retrievedAt": "2026-10-10",
+    "attribution": "Chevrolet and Corvette trademarks belong to General Motors. Reference art used to identify vehicles; not evidence that this physical badge is installed on a specific car.",
+    "sourceSha256Base64": "cxVhXMEasxHScilxi3Vg/0u9aJm68BGdizeqIT0H4x0="
+  },
+  {
+    "make": "Chevrolet",
+    "models": [
+      "Corvette",
+      "Corvette Sting Ray",
+      "Corvette Stingray"
+    ],
+    "years": [
+      1963,
+      1965
+    ],
+    "role": "model",
+    "file": "corvette-script-1963-1965.png",
+    "viewport": "105 335 695 210",
+    "width": 340,
+    "height": 103,
+    "sourceWidth": 900,
+    "sourceHeight": 900,
+    "source": "https://www.corvetteguys.com/products/c2-1963-1965-chevrolet-corvette-emblem-stingray-rear-ca-1103",
+    "sourceAsset": "https://www.corvetteguys.com/cdn/shop/files/1103-1_13bb2bd7-ae20-473a-ba53-bd58316d2563.png?v=1787341175&width=900",
+    "evidence": "https://www.zip-corvette.com/63-65-rear-corvette-sting-ray-script.html",
+    "notes": "GM restoration rear script, part 3797414. Corvette Sting Ray lettering, 1963\u201365. Source photograph unmodified; viewport isolates the emblem.",
+    "retrievedAt": "2026-10-10",
+    "attribution": "Chevrolet and Corvette trademarks belong to General Motors. Reference art used to identify vehicles; not evidence that this physical badge is installed on a specific car.",
+    "sourceSha256Base64": "sOfpKx9DQfW+JMzOQHpWZ5TfwqRpYMaJvLY1sRsj034="
+  },
+  {
+    "make": "Chevrolet",
+    "models": [
+      "Corvette",
+      "Corvette Sting Ray",
+      "Corvette Stingray"
+    ],
+    "years": [
+      1963,
+      1964
+    ],
+    "role": "emblem",
+    "file": "corvette-nose-1963-1964.png",
+    "viewport": "117 200 670 505",
+    "width": 64,
+    "height": 48,
+    "sourceWidth": 900,
+    "sourceHeight": 900,
+    "source": "https://www.corvetteguys.com/products/c-196-196-chevrole-corvett-emble-nos-c-1589",
+    "sourceAsset": "https://www.corvetteguys.com/cdn/shop/files/1589-1_0d07b7cd-b06d-454d-9d38-01b9a43105d9.png?v=1787346377&width=900",
+    "evidence": "https://www.corvetteactioncenter.com/specs/c2/1963/1963-corvette-sales-brochure.html",
+    "notes": "1963\u201364 nose emblem with crossed flags and central tricolor V. Source photograph unmodified; viewport isolates the emblem.",
+    "retrievedAt": "2026-10-10",
+    "attribution": "Chevrolet and Corvette trademarks belong to General Motors. Reference art used to identify vehicles; not evidence that this physical badge is installed on a specific car.",
+    "sourceSha256Base64": "eAsCbtvyfXUtJ2EB7B4aECyi6QNAOce26dVxsFFPC3I="
+  }
+]
