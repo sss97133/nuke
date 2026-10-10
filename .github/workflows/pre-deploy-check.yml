@@ -56,7 +56,7 @@ jobs:
 
       - name: Intake status consumer contracts
         working-directory: ./nuke_frontend
-        run: npm run test -- src/components/admin/IntakeReadiness.test.tsx src/pages/SystemStatus.test.tsx
+        run: npm run test -- src/components/admin/IntakeReadiness.test.tsx src/pages/SystemStatus.test.tsx src/components/organization/OrganizationSourceTargets.test.tsx
 
       - name: Email intake evidence contracts
         run: python3 scripts/email-alerts/test_intake.py

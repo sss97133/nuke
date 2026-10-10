@@ -17,11 +17,47 @@ export interface IntakeConnection {
   queryObject<T = Record<string, unknown>>(query: string, args?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-export const COVERAGE_SQL = `SELECT statement_timestamp() AS measured_at,
+// Prefer the recorded FK. A missing FK may resolve only by BOTH the source's
+// exact observed name and canonical origin, and only to one public organization.
+// Collections sharing an auction house's domain are not the source organization.
+export const SOURCE_PROFILES_SQL = `source_profiles AS (
+  SELECT s.slug AS source_slug, s.display_name, s.base_url,
+    (SELECT CASE WHEN count(*) = 1 THEN min(o.id::text) END
+      FROM public.organizations o WHERE o.is_public = true AND (
+        (s.business_id IS NOT NULL AND o.id = s.business_id) OR
+        (s.business_id IS NULL AND lower(trim(o.business_name)) = lower(trim(s.display_name))
+          AND lower(regexp_replace(rtrim(o.website, '/'), '^https?://(www[.])?', ''))
+            = lower(regexp_replace(rtrim(s.base_url, '/'), '^https?://(www[.])?', '')))
+      )) AS organization_id
+  FROM public.observation_sources s
+)`;
+
+export const COVERAGE_SQL = `WITH ${SOURCE_PROFILES_SQL}
+SELECT statement_timestamp() AS measured_at,
   coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) AS rows
-FROM (SELECT source_slug, total_targets, in_queue, extracted, pending, failed,
-  skipped, duplicate, gap FROM public.source_target_coverage
+FROM (SELECT c.source_slug, total_targets, in_queue, extracted, pending, failed,
+  skipped, duplicate, gap, p.organization_id, p.display_name, p.base_url
+  FROM public.source_target_coverage c LEFT JOIN source_profiles p USING (source_slug)
   ORDER BY total_targets DESC, source_slug LIMIT 31) s`;
+
+// Public provenance inventory only: no queue state, commands, contacts or bodies.
+// One indexed count per matched source; sample reads stop after 25 URLs.
+export const ORG_TARGETS_SQL = `WITH ${SOURCE_PROFILES_SQL}
+SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) AS rows
+FROM (SELECT p.source_slug, p.display_name, p.base_url,
+    (SELECT count(*) FROM public.source_targets t WHERE t.source_slug = p.source_slug) AS total_targets,
+    coalesce((SELECT jsonb_agg(to_jsonb(t)) FROM (
+      SELECT listing_url, first_discovered_at, last_seen_at FROM public.source_targets
+      WHERE source_slug = p.source_slug LIMIT 25) t), '[]'::jsonb) AS targets
+  FROM source_profiles p WHERE p.organization_id = $1 ORDER BY p.source_slug LIMIT 31) s`;
+
+export async function readOrganizationTargets(conn: IntakeConnection, organizationId: string) {
+  const result = await boundedRead(conn, ORG_TARGETS_SQL, [organizationId]);
+  return { contract: 'organization_targets_v1', organization_id: organizationId, ...result,
+    rows: result.rows.slice(0, 30), complete: result.status === 'measured' && result.rows.length <= 30,
+    sample_limit: 25 };
+}
 
 export const MODEL_SQL = `WITH scope AS (SELECT unnest($1::text[]) AS table_name),
 tables AS (SELECT s.table_name, a.activity, a.est_rows, a.n_cols, a.n_cols_described,

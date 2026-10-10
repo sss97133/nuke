@@ -15,6 +15,8 @@ import { Link, type LinkProps } from 'react-router-dom';
 // Map of href pattern → dynamic import. Keys are matched in order (first wins).
 // Each value MUST be a static import() expression so Vite can code-split it.
 const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown> }[] = [
+  { test: (h) => /^\/org\/[^/?#]+/.test(h) && !h.startsWith('/org/create'),
+    load: () => import('../pages/OrganizationProfile') },
   { test: (h) => h.startsWith('/u/') || h === '/profile' || h.startsWith('/profile/'),
     load: () => import('../pages/UserProfile') },
   { test: (h) => h.startsWith('/vehicle/'),

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import PrefetchLink from '../PrefetchLink';
+import { OrgLogo } from '../common/OrgLogo';
 
 type Section = 'coverage' | 'model' | 'jobs';
-type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number };
+type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number;
+  organization_id?: string | null; display_name?: string | null; base_url?: string | null };
 type Table = { table_name: string; atlas_present: boolean; est_rows: number; n_cols: number; n_cols_described: number;
   registry_owners: string[] | null; receipt_writers: string[] | null; receipt_undeclared_stmts: number;
   receipt_sample_count: number; receipt_sample_complete: boolean; last_write: string | null; triggers: number };
@@ -122,7 +125,14 @@ export default function IntakeReadiness() {
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <caption style={{ textAlign: 'left' }}>Coverage within the known URL inventory, rather than the whole market</caption>
         <thead><tr>{['Source', 'Known targets', 'In queue', 'Complete', 'Not queued', 'Failed', 'Skipped'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
-        <tbody>{sources.map(s => <tr key={s.source_slug}><th scope="row" style={cell}>{s.source_slug}</th>
+        <tbody>{sources.map(s => <tr key={s.source_slug}><th scope="row" style={cell}>
+          {s.organization_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.organization_id)
+            ? <PrefetchLink to={`/org/${s.organization_id}#source-targets`} style={{ color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <OrgLogo website={s.base_url} businessName={s.display_name || s.source_slug} size={16} />
+                {s.display_name || s.source_slug}
+              </PrefetchLink>
+            : <>{s.display_name || s.source_slug}<div style={{ fontWeight: 400 }}>Public profile unavailable</div></>}
+        </th>
           {[s.total_targets, s.in_queue, s.extracted, s.gap, s.failed, s.skipped].map((n, i) => <td key={i} style={cell}>{sourceValid(s) ? count(n) : 'Unmeasured'}</td>)}</tr>)}</tbody>
       </table></div>
     </div>}

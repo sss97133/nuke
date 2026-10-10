@@ -2,6 +2,7 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null }));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
@@ -13,7 +14,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
 import IntakeReadiness from './IntakeReadiness';
 let root: Root, container: HTMLDivElement;
 const clock = '2026-10-10T12:00:00Z';
-async function render() { await act(async () => root.render(<IntakeReadiness />)); }
+async function render() { await act(async () => root.render(<MemoryRouter><IntakeReadiness /></MemoryRouter>)); }
 async function tick(ms: number) { await act(async () => vi.advanceTimersByTimeAsync(ms)); }
 
 beforeEach(() => {
@@ -42,6 +43,17 @@ it('keeps URL denominators, queue completion and model delivery distinct', async
   expect(container.textContent).toContain('does not prove a vehicle, sale or downstream answer');
   expect(fixture.requests).toHaveLength(3);
   expect(fixture.requests.every(r => r.options.method === 'GET' && r.options.signal instanceof AbortSignal)).toBe(true);
+});
+it('links resolved public sources to their canonical profile inventory and leaves unresolved sources explicit', async () => {
+  const source = fixture.responses.coverage.data.rows[0];
+  source.organization_id = '11111111-1111-1111-1111-111111111111'; source.display_name = 'Synthetic Source';
+  await render();
+  expect(container.querySelector('a')?.getAttribute('href')).toBe('/org/11111111-1111-1111-1111-111111111111#source-targets');
+  expect(container.querySelector('a')?.textContent).toContain('Synthetic Source');
+  source.organization_id = null;
+  await tick(300_000);
+  expect(container.querySelector('a')).toBeNull();
+  expect(container.textContent).toContain('Public profile unavailable');
 });
 it('preserves successful execution alongside failed output and paused unmeasured jobs', async () => {
   await render(); const rows = [...container.querySelectorAll('tr')];
