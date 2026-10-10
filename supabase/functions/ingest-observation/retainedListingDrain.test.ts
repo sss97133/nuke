@@ -69,6 +69,28 @@ Deno.test("120 claims retain exact selectors, verified custody and zero inferenc
   r.selectors.forEach((s, i) => assert(JSON.stringify(s) === JSON.stringify({
     mode: rows(120)[i].mode, source_observation_id: rows(120)[i].source_observation_id })));
 });
+Deno.test("admissions overlap by at most two and completion stays source-bound", async () => {
+  let active = 0, peak = 0;
+  const admitted = new Set<string>(), finished = new Set<string>();
+  const work = rows(12);
+  const db = { rpc(name: string, args: any) { return { abortSignal() {
+    if (name === "claim_retained_listing_properties") return Promise.resolve({ data: work, error: null });
+    assert(admitted.has(args.p_source) && !finished.has(args.p_source));
+    assert(args.p_status === "done" && args.p_result === args.p_source);
+    finished.add(args.p_source);
+    return Promise.resolve({ data: true, error: null });
+  } }; } };
+  const response = await drainRetainedListingProperties(request(), input, db, async req => {
+    const selector = await req.json();
+    active++;peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    active--;admitted.add(selector.source_observation_id);
+    return new Response(JSON.stringify({ success: true, observation_id: selector.source_observation_id, duplicate: false }));
+  });
+  const receipt = await response.json();
+  assert(peak === 2 && active === 0 && finished.size === 12 && receipt.writes === 12);
+  assert(receipt.completion_failures === 0 && receipt.model_calls === 0 && receipt.provider_calls === 0);
+});
 Deno.test("120-cap drain still defers unstarted records at the existing35s boundary", async () => {
   const original = Date.now;let calls = 0;
   Date.now = () => calls++ < 100 ? 0 : 36000;

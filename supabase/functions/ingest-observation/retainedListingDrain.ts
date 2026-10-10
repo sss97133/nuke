@@ -2,6 +2,7 @@ import { RETAINED_PROPERTY_MODES } from "./retainedInterior.ts";
 
 export const RETAINED_LISTING_DRAIN_MODE = "retained_listing_property_drain_v1";
 export const RETAINED_LISTING_DRAIN_LIMIT = 120;
+const ADMISSION_CONCURRENCY = 2;
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const PROPERTY_KEYS: Record<string, string> = {
   "514cacd3-82b4-4330-b3df-e292612ee718": "interior_color",
@@ -61,7 +62,7 @@ export async function drainRetainedListingProperties(
   const lookups = new RetainedBatchLookups();
   const summary = { claimed: rows.length, stored: 0, writes: 0, duplicates: 0, refused: 0,
     retries: 0, deferred: 0, completion_failures: 0, model_calls: 0, provider_calls: 0 };
-  for (const row of rows) {
+  const process = async (row: any) => {
     let status = "deferred", result: string | null = null, duplicate = false;
     if (!req.signal.aborted && Date.now() - started < 35000) {
       status = "retry";
@@ -76,7 +77,7 @@ export async function drainRetainedListingProperties(
         } else if (response.status === 400 && body.error === "Retained source ineligible") status = "refused";
       } catch { status = "retry"; }
     }
-    if (Date.now() - started >= 55000) { summary.completion_failures++;continue; }
+    if (Date.now() - started >= 55000) { summary.completion_failures++;return; }
     try {
       let finished = await call("finish_retained_listing_property", { p_source: row.source_observation_id,
         p_property: row.property_id, p_worker: worker, p_status: status, p_result: result });
@@ -89,14 +90,20 @@ export async function drainRetainedListingProperties(
             p_property: row.property_id, p_worker: worker, p_status: "retry", p_result: null });
           if (!finished.error && finished.data === true) summary.retries++;
         }
-        continue;
+        return;
       }
       if (status === "done") { summary.stored++;if (duplicate) summary.duplicates++;else summary.writes++; }
       else if (status === "refused") summary.refused++;
       else if (status === "deferred") summary.deferred++;
       else summary.retries++;
     } catch { summary.completion_failures++; }
-  }
+  };
+  // Overlap at most two source admissions within the existing per-drain
+  // attempt and time budgets. Every result still requires its own custody CAS.
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(ADMISSION_CONCURRENCY, rows.length) }, async () => {
+    while (next < rows.length) await process(rows[next++]);
+  }));
   return json({ success: summary.completion_failures === 0, mode: RETAINED_LISTING_DRAIN_MODE,
     ...summary, duration_ms: Date.now() - started });
 }
