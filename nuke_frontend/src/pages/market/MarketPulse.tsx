@@ -4,9 +4,10 @@ import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
-import { squarify } from '../../lib/squarify';
+import MarketInventoryMap from './MarketInventoryMap';
+import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeIdentity, MakeLogo } from '../../components/common/MakeIdentity';
 
@@ -466,132 +467,6 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-interface MakeNode {
-  make: string;
-  count: number;
-}
-
-const recordedModel = (a: LiveAuction) => a.model?.trim() || 'Model unrecorded';
-
-function MarketMap({ auctions, selected, onSelect, models = false }: {
-  auctions: LiveAuction[]; selected: string | null; onSelect: (group: string | null) => void; models?: boolean;
-}) {
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const height = width < 640 ? 240 : 380;
-  const makes = useMemo(() => {
-    const by = new Map<string, MakeNode>();
-    for (const a of auctions) {
-      const key = models ? recordedModel(a) : a.make;
-      const n = by.get(key) ?? { make: key, count: 0 };
-      n.count += 1;
-      by.set(key, n);
-    }
-    return [...by.values()];
-  }, [auctions, models]);
-  const rects = useMemo(
-    () => (width > 0 ? squarify(makes.filter((m) => m.count > 0).map((m) => ({ node: m, area: m.count })), 0, 0, width, height) : []),
-    [makes, width, height]
-  );
-  const [hovered, setHovered] = useState<string | null>(null);
-  const shown = makes.find((m) => m.make === (hovered ?? selected));
-
-  const [showAll, setShowAll] = useState(false);
-  const ranked = [...makes].sort((a, b) => b.count - a.count || a.make.localeCompare(b.make));
-  const leading = width < 640 ? 6 : 10;
-  const visible = showAll ? ranked : ranked.slice(0, leading);
-
-  if (models || width < 640) return <div ref={ref} aria-label={models ? 'Inventory by recorded model' : 'Inventory by stored make'}>
-    <div style={{ fontSize: 11, marginBottom: 8 }}>{models
-      ? 'Bars count captured vehicle records by recorded model label. Aliases, generations and comparison equivalence are unresolved.'
-      : `Bring a Trailer · ${auctions.length} captured open vehicle records by stored make label. Complete platform coverage and unresolved make identity are unknown.`}</div>
-    <div style={{ display: 'grid', gap: 2 }}>
-      {visible.map(group => <button key={group.make} aria-pressed={selected === group.make}
-        aria-label={models ? `${group.make}: ${group.count} captured lots. Filter this recorded model` : `${group.make}: ${group.count} captured live lots`}
-        onClick={() => onSelect(selected === group.make ? null : group.make)}
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) minmax(0, 2fr) 40px', gap: 8, alignItems: 'center', minHeight: 44,
-          padding: '4px 8px', border: '2px solid var(--border)', fontFamily: 'Arial, sans-serif', fontSize: 12, textAlign: 'left',
-          background: selected === group.make ? 'var(--text)' : 'var(--bg)', color: selected === group.make ? 'var(--bg)' : 'var(--text)' }}>
-        <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{models ? group.make : <MakeIdentity make={group.make} inverse={selected === group.make} />}</span>
-        <span aria-hidden="true" style={{ height: 12, width: `${group.count / Math.max(1, ranked[0]?.count ?? 1) * 100}%`,
-          background: selected === group.make ? 'var(--bg)' : 'var(--text-secondary)' }} />
-        <span style={{ ...mono, textAlign: 'right' }}>{group.count}</span>
-      </button>)}
-    </div>
-    {ranked.length > leading && <button onClick={() => setShowAll(!showAll)} style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, marginTop: 6,
-      background: 'var(--bg)', color: 'var(--text)', border: '2px solid var(--border)', padding: '6px 8px' }}>
-      {showAll ? 'Show leading groups' : `Show all ${ranked.length} ${models ? 'recorded model groups' : 'stored make groups'}`}
-    </button>}
-  </div>;
-
-  return (
-    <div ref={ref}>
-      <div style={{ fontSize: 11, marginBottom: 6, lineHeight: 1.4 }}>
-        Bring a Trailer · {auctions.length.toLocaleString('en-US')} captured open vehicle lots across all makes in this inventory window.
-        {' '}Area counts vehicle records; source-wide inventory completeness is unknown.
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4, minHeight: 12 }}>
-        <span style={{ ...label, color: shown ? 'var(--text)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {shown
-            ? `${shown.make} · ${shown.count} of ${auctions.length} captured live lots`
-            : 'Live lots by make · area = captured lot count · hover or tap a make'}
-        </span>
-        {selected && (
-          <button onClick={() => onSelect(null)} style={{ ...label, color: 'var(--text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-            {selected} ✕
-          </button>
-        )}
-      </div>
-    <div style={{ position: 'relative', height, background: 'var(--border)' }} onMouseLeave={() => setHovered(null)}>
-      {rects.map(({ node, x, y, w, h }) => {
-        const active = selected === node.make;
-        const dim = selected != null && !active;
-        const roomy = w > 64 && h > 34;
-        return (
-          <button
-            key={node.make}
-            onClick={() => onSelect(active ? null : node.make)}
-            onMouseEnter={() => setHovered(node.make)}
-            onFocus={() => setHovered(node.make)}
-            aria-pressed={active}
-            aria-label={`${node.make}: ${node.count} captured live lots`}
-            style={{
-              position: 'absolute',
-              left: x + 1,
-              top: y + 1,
-              width: Math.max(0, w - 2),
-              height: Math.max(0, h - 2),
-              padding: roomy ? '5px 6px' : 0,
-              border: 'none',
-              background: active ? 'var(--text)' : 'var(--surface)',
-              color: active ? 'var(--bg)' : 'var(--text)',
-              opacity: dim ? 0.45 : 1,
-              cursor: 'pointer',
-              textAlign: 'left',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            {roomy && (
-              <>
-                <span style={{ ...label, color: 'inherit', fontSize: w > 140 ? 10 : 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-                  {w >= 120 && h >= 64 ? <MakeIdentity make={node.make} inverse={active} /> : node.make}
-                </span>
-                <span style={{ ...mono, fontSize: w > 140 ? 13 : 10, whiteSpace: 'nowrap' }}>
-                  {node.count} <span style={{ opacity: 0.7 }}>live lots</span>
-                </span>
-              </>
-            )}
-          </button>
-        );
-      })}
-    </div>
-    </div>
-  );
-}
-
 function Thumb({ src, size }: { src: string | null; size: number }) {
   const h = Math.round(size * 0.67);
   if (!src) return <div style={{ width: size, height: h, background: 'var(--surface)', flexShrink: 0 }} />;
@@ -730,6 +605,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const make = makeParam === 'ALL' ? null : makeParam ?? null;
   const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
   const model = make ? params.get('model') : null;
+  const inventoryLens = mapLens(params, make);
   const lotParam = params.get('lot');
   const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
   const openActivity = (auction: LiveAuction) => {
@@ -756,7 +632,10 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else next.set(key, value);
     if (key === 'live' || (key === 'make' && value != null) || key === 'bidRange') next.set('board', '1');
     if (key === 'live' || key === 'make') next.delete('bidRange');
-    if (key === 'make' || key === 'view') next.delete('model');
+    if (key === 'make' || key === 'view') {
+      next.delete('model');
+      ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
+    }
     if (key === 'view') next.delete('bidRange');
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
     next.delete('lot');
@@ -765,10 +644,30 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'bidRange', 'day', 'series', 'salesScope'].forEach(k => next.delete(k));
+    ['model', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
+  };
+  const setInventoryLens = (change: Partial<InventoryMapLens>) => {
+    const next = new URLSearchParams(params);
+    const keys = { group: 'mapBy', inside: 'mapInside', focus: 'mapFocus', child: 'mapChild' } as const;
+    for (const key of Object.keys(change) as (keyof InventoryMapLens)[]) {
+      const value = change[key];
+      if (value == null) next.delete(keys[key]); else next.set(keys[key], value);
+    }
+    next.delete('lot'); setParams(next);
+  };
+  const selectMapGroup = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false) => {
+    if (dimension === 'lot') { openActivity(group.lots[0]); return; }
+    if (child) {
+      setInventoryLens({ child: inventoryLens.child === group.key ? null : group.key,
+        focus: mapValue(group.lots[0], inventoryLens.group, taxonomy) });
+      return;
+    }
+    if (dimension === 'make') { setParam('make', group.key); return; }
+    if (dimension === 'model' && make) { setParam('model', model === recordedModel(group.lots[0]) ? null : recordedModel(group.lots[0])); return; }
+    setInventoryLens({ focus: inventoryLens.focus === group.key ? null : group.key, child: null });
   };
   const setSalesLens = (change: Partial<MarketSalesLens>) => {
     const next = new URLSearchParams(params);
@@ -807,9 +706,17 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now, heat.get(a.id))
     && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, heat, selectedBid]);
 
+  const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
+    && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, inventoryLens.group]);
+  const needsTaxonomy = inventoryLens.group === 'type' || inventoryLens.group === 'body';
+  const taxonomyQuery = useInventoryTaxonomy(mapAuctions, view === 'inventory' && needsTaxonomy);
+  const taxonomy = useMemo(() => taxonomyByListing(taxonomyQuery.data), [taxonomyQuery.data]);
+  const mapFilterPending = needsTaxonomy && !taxonomyQuery.isSuccess && inventoryLens.focus != null;
+
   const board = useMemo(() => {
     const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid) === selectedBid)
-      && (model == null || recordedModel(a) === model));
+      && (model == null || recordedModel(a) === model)
+      && matchesMapLens(a, inventoryLens, taxonomy));
     const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
@@ -817,7 +724,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [scoped, selectedBid, sort, heat, model]);
+  }, [scoped, selectedBid, sort, heat, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy]);
 
   if (!data && isError && view === 'inventory' && !activityId) return <>
     <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
@@ -884,9 +791,9 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       <div style={{ marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
-          <div style={{ ...label, marginBottom: 4 }}>Inventory by {make ? 'recorded model' : 'stored make label'} · {WINDOWS.find(w => w.id === win)?.label}{selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}</div>
-          {mappedInventory.some(a => make == null || a.make === make) && <MarketMap auctions={make ? mappedInventory.filter(a => a.make === make) : mappedInventory}
-            models={make != null} selected={make ? model : null} onSelect={(group) => setParam(make ? 'model' : 'make', group)} />}
+          {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy}
+            taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
+            risenIds={risenIds} selectedModel={model} onLensChange={setInventoryLens} onSelect={selectMapGroup} />}
         </section>
       </div>
 
@@ -895,7 +802,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
-            {board.length.toLocaleString('en-US')} lots · source bid units unverified
+            {mapFilterPending ? 'Reading classifications…' : `${board.length.toLocaleString('en-US')} lots`} · source bid units unverified
             {make ? ` · ${make}` : ''}
             {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
@@ -921,14 +828,14 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
             ))}
           </div>
         </div>
-        {!isLoading && board.length === 0 && <div role="status" style={{ padding: 12 }}>No open lots match these filters. <button onClick={() => {
+        {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" style={{ padding: 12 }}>No open lots match these filters. <button onClick={() => {
           const next = new URLSearchParams(params);
-          ['make', 'live', 'bidRange'].forEach(k => next.delete(k));
+          ['make', 'live', 'bidRange', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
           next.delete('model');
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}>Clear market filters</button></div>}
-        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={openActivity} />}
+        {isLoading || mapFilterPending ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} onActivity={openActivity} />}
       </section>
       </div>
       </>}
