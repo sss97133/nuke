@@ -126,7 +126,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   lastUpdatedAt,
 }) => {
   const isBat = ['bat', 'bringatrailer', 'bring_a_trailer'].includes(platform);
-  const { data: temperature } = useLiveLotTemperature(isBat ? vehicleId : null);
+  const { data: temperature, isPending: comparisonPending } = useLiveLotTemperature(isBat ? vehicleId : null);
   const [activeMetric, setActiveMetric] = useState<string | null>(null);
   const metricBoundary = React.useRef<HTMLDivElement>(null);
   useEffect(() => setActiveMetric(null), [vehicleId, listingUrl]);
@@ -353,7 +353,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         {[
           { key: 'price', label: staleBid ? 'Last observed bid' : 'Current bid', value: formatCurrency(currentBid, currencyCode), count: temperature?.price, agrees: temperature?.price.bid === currentBid },
           { key: 'bids', label: 'Bids', value: bidCount, count: temperature?.bids, agrees: temperature?.bids.value === bidCount },
-          { key: 'bidders', label: 'Bidders', value: temperature?.bidders.value, count: temperature?.bidders, agrees: temperature?.bids.value === bidCount && temperature?.price.bid === currentBid },
+          { key: 'bidders', label: 'Bidders', value: temperature?.bids.value === bidCount && temperature?.price.bid === currentBid && temperature?.endsAt === Date.parse(endDate || '') ? temperature?.bidders.value : undefined, count: temperature?.bidders, agrees: temperature?.bids.value === bidCount && temperature?.price.bid === currentBid },
           { key: 'watchers', label: 'Watching', value: watcherCount, count: undefined, agrees: false },
           { key: 'comments', label: 'Discussion', value: commentCount, count: undefined, agrees: false },
         ].filter(metric => metric.value != null).map(metric => {
@@ -384,7 +384,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         </HeaderPopover>
       </div>
       <div className="external-auction-stack__clock">
-        {temperature ? <>Comparison {comparisonAgeHours! >= 1 ? `${Math.floor(comparisonAgeHours!)}h old` : `${Math.floor(comparisonAgeHours! * 60)}m old`} · {temperature.hoursLeft.toFixed(1)}h before close at that read</> : <>Listing state saved {Number.isFinite(observedAt) ? new Date(observedAt).toLocaleString() : 'at an unknown time'}</>}
+        {temperature ? <>Comparison {comparisonAgeHours! >= 1 ? `${Math.floor(comparisonAgeHours!)}h old` : `${Math.floor(comparisonAgeHours! * 60)}m old`} · {temperature.hoursLeft.toFixed(1)}h before close at that read</> : <>{isBat && vehicleId && (comparisonPending ? 'Reading comparison · ' : 'Comparison unavailable · ')}Listing state saved {Number.isFinite(observedAt) ? new Date(observedAt).toLocaleString() : 'at an unknown time'}</>}
       </div>
 
       {/* CSS for pulse animation */}

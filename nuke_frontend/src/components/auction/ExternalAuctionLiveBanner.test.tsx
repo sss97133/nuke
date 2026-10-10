@@ -56,4 +56,5 @@ it('places a matching snapshot in its age-matched stack and withholds a rank whe
   expect(container.querySelector('[role="dialog"]')!.textContent).toContain('no age-matched percentile');
   await act(async () => root.render(<ExternalAuctionLiveBanner {...props} currentBid={120000} bidCount={11} endDate="2026-10-04T18:01:00Z" />));
   expect(container.textContent).not.toMatch(/P30|P50/);
+  expect(container.querySelector('[aria-label="Inspect bidders stack"]')).toBeNull();
 });
