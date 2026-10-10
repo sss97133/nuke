@@ -11,6 +11,7 @@ vi.mock('./hooks/useVehiclePriceFacts', () => ({
 vi.mock('../../lib/supabase', () => ({ supabase: {
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: fixture.condition }) }) }) }),
 } }));
+vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import VehicleBriefing from './VehicleBriefing';
 
 let root: Root, host: HTMLDivElement;
