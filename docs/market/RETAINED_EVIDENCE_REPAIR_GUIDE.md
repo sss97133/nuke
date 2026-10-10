@@ -15,48 +15,18 @@ live atlas and writer/reader behavior before engineering; do not repeat the whol
 
 ## What was delivered
 
-**2026-10-10 rollout and scale correction.** PR923 merged and CI deployed its
-canonical powertrain writer and readers. The approved validation batch admitted
-87 claims on30 existing vehicles, and all87 were checked against their source
-rows; anonymous provenance reads passed for all four property types. That is
-validation evidence, not dataset-scale completion. Thirty vehicles represent
-about0.003% of the live catalog estimate of1.01million vehicles.
+**2026-10-10 retained-data delivery, measured at 22:26 UTC.**
+[PR923](https://github.com/sss97133/nuke/pull/923) delivered four ratified powertrain selectors and their canonical source proof. Its 87-claim/30-vehicle batch was validation, not population completion. [PR928](https://github.com/sss97133/nuke/pull/928) extended the existing color queue and finite listing replay to all six properties. [PR935](https://github.com/sss97133/nuke/pull/935) added deterministic powertrain assertions from qualified retained description text. These changes are implemented, tested, merged, automatically deployed and runtime-verified through anonymous provenance and canonical readers.
 
-The measured scale bottleneck is the existing retained-listing queue: its
-constraint, enqueue function, completion proof and edge drain recognize only
-the two color properties. Its finite replay completed714675 source-key visits
-before this expansion. A separate indexed newest2000-listing dry run found350
-qualified BaT html_match envelopes and994 supported powertrain projections;
-1408 rows used html_description_capture and do not meet this property contract.
-These are bounded eligibility measurements, not new production admissions or
-whole-corpus coverage estimates.
+Since the original six-property replay began at 17:21:28 UTC, the live queue had admitted **25,074 new powertrain claims across 1,865 vehicle IDs** at 22:26 UTC. It admitted 2,027 claims in the preceding 30 minutes, with no failed queue items. The latest 50 claims passed current-source custody checks. The assay also checked 200 completed items; these bounded samples do not prove every historical claim's current eligibility. Counts describe source testimony, not distinct new canonical slots, independently verified configurations, fully modeled vehicles or whole-corpus coverage. The existing 120-attempt/minute ceiling is capacity, not measured yield.
 
-The next repair extends that same queue/drain to the four already ratified
-powertrain properties and restarts the finite baseline below a new recording
-highwater. Completed color work and the exact prior scan receipt survive.
-Future eligible inserts enqueue independently of their recording-clock order.
-The existing120-attempt/minute ceiling and load/backpressure budgets stay in
-place; attempted capacity is not measured yield. The assay adds per-property
-work counts and separates recent completed work from newly stored claims.
-Full replay rollout, sustained production yield and raw-description extraction
-remain separate checkpoints; this description does not establish those stages.
+The native-description epoch had visited 78,000 listing keys and seeded 17,636 work items; its baseline remained incomplete. Nested receipts preserve the prior six-property epoch's 38,500 visits and the older color replay's 714,675 visits. These visits can include multiple observations of one vehicle and are not additive vehicle coverage. All completed work and source testimony survive epoch changes; new eligible arrivals enqueue independently of recording-clock order.
 
-**2026-10-10 powertrain increment — implemented and locally tested; rollout pending.**
-An indexed 30-parent listing sample retained `engine_size` in 30, `transmission` in 29 and
-`drivetrain` in three JSON envelopes. The existing `ingest-observation` selector now supports
-four already ratified core keys: `engine_configuration`, `engine_displacement_l`,
-`transmission_type` and `drivetrain_layout`. The typed parent, original text, separate clocks,
-normalization version and unknown factory/current roles remain attached. Database admission
-and both existing readers enforce the normalized value against the current parent. The
-provenance reader exposes the source text beside the normalized value. No new property
-catalog, fact log or paid extraction is introduced.
+[PR938](https://github.com/sss97133/nuke/pull/938) adds the existing ratified odometer-reading property. It preserves displayed counts, original units, precision and approximation; true accumulated mileage and the reading event date remain unknown. It passed all PR CI checks, merged at 22:55:48 UTC and automatically deployed successfully. The initial runtime probe found no completed odometer claims. At23:00 UTC the assay returned SQLSTATE42883: native enqueue/completion compared text to production observation_kind[] arrays. The local text-array fixture masked this compatibility bug. Replay recovery, natural odometer admission and anonymous reader verification remain pending. [PR939](https://github.com/sss97133/nuke/pull/939) reuses qualified inputs within one bounded service drain. It passed all PR CI checks, merged at 22:58:28 UTC and automatically deployed successfully. Local tests show fewer repeated reads while retaining every admission/completion proof; production speed gains are unverified.
 
-The private preview yields 87 properties (28 configuration, 30 displacement, 26 transmission,
-three drivetrain), with 33 absent or unresolved values. This is sample eligibility, not
-production admission or fleet coverage. Checkpoints are: discovered fields → deterministic
-JSON projection → canonical writer/DB guards → reader proof → owner-approved rollout and
-bounded admission. Existing color replay/cron remains unchanged; automatic powertrain
-backfill and retained raw documents that have not yet become JSON remain open work.
+The next prepared extension covers six dimensions: existing ratified `year`, `make` and `model` extractor labels, plus explicit native description exterior/interior finish labels and front/rear power routes. An indexed 100-parent HTML JSON sample contained those fields in 99, 100 and 99 rows. Local parser, actual-handler, archive/build and PostgreSQL proofs pass, including 606 baseline claims plus six arrivals. Identity labels remain unverified; presentation claims preserve exact quotes and unknown factory/current roles. Original JSON and clocks survive; the extension never resolves a physical identity or mutates the vehicle record. The extension also repairs both enum-array comparisons and verifies the full replay with production column types, including reproduction of the prior error. It has not been published, merged or deployed.
+
+The owner's objective remains ongoing: raw retained evidence → qualified source input → deterministic attributed JSON → existing canonical intake and DB guards → bound keys/relationships → reader proof → finite baseline exhaustion plus arrivals. Each family is a checkpoint, not permission to stop. Preserve existing holds on historical sale/source corrections, paused jobs and new paid capacity. Private runtime/data receipts are in `/Users/skylar/nuke-logs`; refresh live ownership and progress before continuing.
 
 | Repair | Delivery and demonstrated behavior | Remaining boundary |
 |---|---|---|

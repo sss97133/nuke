@@ -1,4 +1,5 @@
 import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
+import { RETAINED_IDENTITY_KEYS, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -68,6 +69,11 @@ export function validateObservationProperty(
   }
   const fields = data as Record<string, unknown>;
   const value = fields[input.property_key];
+  if (RETAINED_IDENTITY_KEYS.includes(input.property_key) && (input.kind !== "specification" ||
+      retainedListingIdentityValue(input.property_key, value) === null ||
+      fields.identity_role !== "extractor_vehicle_label" || fields.identity_resolution_status !== "unverified")) {
+    return invalid("Retained identity properties require exact extractor labels with unverified identity resolution");
+  }
   if (value === undefined || value === null) {
     return invalid("Unknown property values must be omitted, not defaulted");
   }
