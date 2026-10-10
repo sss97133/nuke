@@ -74,8 +74,37 @@ it.each([false, 'inconsistent'])('withholds aggregate coverage for a capped or i
 });
 it('does not poll each minute or overlap manual refreshes while a read is pending', async () => {
   fixture.held = new Promise(() => {}); await render(); await tick(60_000);
-  expect(fixture.requests).toHaveLength(3);
+  expect(fixture.requests).toHaveLength(1);
   expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true);
+});
+it('finishes the metadata read before issuing aggregate reads and gives each a separate deadline', async () => {
+  let release!: (value: any) => void;
+  fixture.held = new Promise(resolve => { release = resolve; });
+  await render();
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model']);
+  fixture.held = null;
+  await act(async () => release(fixture.responses.model));
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=coverage', 'db-stats?intake=jobs']);
+  expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(3);
+  expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
+});
+it('does not turn unavailable job declarations into undeclared writers or absent owner matches', async () => {
+  fixture.responses.jobs.data.health = { status: 'unavailable', measured_at: null, rows: [] };
+  await render();
+  const row = [...container.querySelectorAll('tr')].find(r => r.textContent?.includes('synthetic-pull'))!;
+  expect(row.textContent).toContain('Owner mapping unmeasured');
+  expect(row.textContent).not.toContain('Undeclared');
+  expect(row.textContent).not.toContain('No exact owner match');
+});
+it('stops queued aggregate requests when the component unmounts', async () => {
+  let release!: (value: any) => void;
+  fixture.held = new Promise(resolve => { release = resolve; });
+  await render();
+  await act(async () => root.unmount());
+  fixture.held = null;
+  await act(async () => release(fixture.responses.model));
+  expect(fixture.requests).toHaveLength(1);
+  expect(fixture.requests[0].options.signal.aborted).toBe(true);
 });
 it.each(['coverage', 'model', 'jobs'])('rejects malformed %s row shapes while keeping other sections usable', async section => {
   if (section === 'jobs') fixture.responses.jobs.data.health.rows = {};
