@@ -60,8 +60,8 @@ describe('canonical value -> attributed observation', () => {
     expect(html).toContain('Source record time: 2026-10-01T12:01:00Z');
     expect(html).toContain('Source event time: Unknown');
     expect(html).toContain('not an independent confirmation');
-    expect(html).toContain('Vehicle identity remains unverified');
-    expect(html).toContain('Factory and current configuration remain unknown');
+    expect(html).toContain('This report leaves vehicle identity unverified');
+    expect(html).toContain('Factory and current configuration are unknown in this report');
   });
   it('escapes retained text and refuses malformed source-record routes without inventing clocks', () => {
     Object.assign(fixture.provenance.data.observations[0], {

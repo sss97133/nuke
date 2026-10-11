@@ -213,9 +213,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
               <div>Source observation time: {obs.source_observed_at || 'Unknown'} · Source record time: {obs.source_recorded_at || 'Unknown'}</div>
               {obs.source_event_time_status === 'unknown' && <div>Source event time: Unknown</div>}
               {obs.independent_source === false && <p>This report derives from the retained source record; it is not an independent confirmation.</p>}
-              {obs.identity_resolution_status === 'unverified' && <p>Vehicle identity remains unverified.</p>}
+              {obs.identity_resolution_status === 'unverified' && <p>This report leaves vehicle identity unverified.</p>}
               {obs.factory_configuration_status === 'unknown' && obs.current_configuration_status === 'unknown'
-                && <p>Factory and current configuration remain unknown.</p>}
+                && <p>Factory and current configuration are unknown in this report.</p>}
             </>}
           </details>}
           <div style={{ color: 'var(--text-secondary)' }}>Observation time: {obs.observed_at ? new Date(obs.observed_at).toLocaleString() : 'Unknown'} · Ingest time: {obs.ingested_at ? new Date(obs.ingested_at).toLocaleString() : 'Unavailable'}</div>
