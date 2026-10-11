@@ -10,7 +10,7 @@ import React from 'react';
 import PrefetchLink from '../../components/PrefetchLink';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
@@ -67,6 +67,10 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const awaiting = rows.filter(image => !hasImageAnalysis(image)).length;
   const imageReadFailed = !!inventory.error || !!provenance.error || (!provenance.isLoading && provenance.data === null);
   const imageObservations = provenance.data?.image_observations || [];
+  const isEngineProperty = !!ENGINE_PROPERTY_IDS[field];
+  const resolvedValue = isEngineProperty
+    ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
+    : provenance.data?.value;
   const hasRecordedImageReference = imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
 
   const sources = evidence?.sources || (provenance.data?.evidence || [])
@@ -91,20 +95,23 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         }}>
           {label}
         </div>
-        <div style={{
+        {!isEngineProperty && <div style={{
           fontFamily: field === 'vin' ? "'Courier New', monospace" : 'Arial, sans-serif',
           fontSize: field === 'vin' ? '12px' : '11px',
           fontWeight: 700,
           letterSpacing: field === 'vin' ? '1.5px' : 'normal',
         }}>
           {value}
-        </div>
+        </div>}
       </div>
 
       {provenance.data && <div style={{ marginBottom: 8 }}>
-        <span className="ev-label">CANONICAL VALUE</span>{' '}
-        <strong>{provenance.data.value || 'Unknown'}</strong>
-        {!provenance.data.value && <p>The canonical value is unknown. Source reports below remain attributed claims.</p>}
+        <span className="ev-label">{isEngineProperty ? 'RESOLVED SOURCE CLAIM' : 'CANONICAL VALUE'}</span>{' '}
+        <strong>{resolvedValue ? formatProvenanceValue(field, resolvedValue) : 'Unknown'}</strong>
+        {isEngineProperty && provenance.data.canonical?.status === 'unavailable'
+          ? <p role="status">The resolved value could not be read. Source reports below remain attributed claims.</p>
+          : !resolvedValue && <p>The canonical value is unknown. Source reports below remain attributed claims.</p>}
+        {isEngineProperty && resolvedValue && <p>Resolved from retained reports; this does not establish factory or current physical configuration.</p>}
         {evidence?.hasConflict && evidence.conflictType === 'genuine'
           ? <p role="status">Source claims differ. No resolution is established by this display.</p>
           : sortedSources.length > 1 && <p role="status">Multiple source claims are shown. This display does not establish whether differences have been resolved.</p>}
@@ -196,11 +203,12 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           {imageObservations.length > 1 && imageObservations.every(obs => obs.source_family && obs.source_family === imageObservations[0].source_family) && <p className="ev-footnote">These photographs come from the same source family. Multiple views are not independent source confirmations.</p>}
         </div>
       )}
-      {(provenance.data?.observations || []).filter(obs => obs.source_url && !imageObservations.some(imageObs => imageObs.observation_id === obs.id)).map(obs => (
+      {(provenance.data?.observations || []).filter(obs => !imageObservations.some(imageObs => imageObs.observation_id === obs.id)).map(obs => (
         <div key={obs.id} style={{ padding: '6px 0', overflowWrap: 'anywhere' }}>
           <div className="ev-label">SOURCE REPORT · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.id}`} onClick={closeTop}>Inspect observation {obs.id}</PrefetchLink></div>
+          {isEngineProperty && provenance.data?.canonical?.observation_id === obs.id && <div className="ev-label">RESOLVED REPORT</div>}
           {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
-          <span> · {obs.value || 'Value not recorded'}</span>
+          <span> · {obs.value ? formatProvenanceValue(field, obs.value) : 'Value not recorded'}</span>
           {(obs.content || obs.source_observation_id) && <details>
             <summary>Read retained evidence</summary>
             {obs.content && <div className="ev-proof-limitation" style={{ whiteSpace: 'pre-wrap' }}>
