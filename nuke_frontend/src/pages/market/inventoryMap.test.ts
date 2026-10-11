@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { increasedBids, type LiveAuction } from './useMarketPulse';
-import { inventoryGroups, mapLens, mapValue, matchesMapLens, taxonomyByListing, MAP_GROUPS } from './inventoryMap';
+import { inventoryGroups, mapLens, mapValue, matchesMapLens, taxonomyByListing, readableInventoryLayout, MAP_GROUPS } from './inventoryMap';
 
 const lot = (id: string, make = 'FORD', year: number | null = 1995): LiveAuction => ({ id, make, year, model: 'Shared model',
   currentBid: 100, endsAt: 0, updatedAt: 0, listedAt: 0, listingUrl: `https://bringatrailer.com/listing/${id}/`,
@@ -30,6 +30,21 @@ describe('inventory map grain and grouping', () => {
   it('has stable group and lot order when bid, end time, and response order change', () => {
     const ids = (items: LiveAuction[]) => inventoryGroups(items, 'make', new Map()).map(g => [g.key, g.lots.map(a => a.id)]);
     expect(ids([...lots].reverse().map(a => ({ ...a, currentBid: 999, endsAt: 999 })))).toEqual(ids(lots));
+  });
+  it('keeps counts and area honest when smaller groups cannot fit readable labels', () => {
+    const population = Array.from({ length: 80 }, (_, i) => Array.from({ length: i < 5 ? 100 - i * 10 : 2 }, (_, j) => lot(`${i}-${j}`, `BRAND ${i}`))).flat();
+    const groups = inventoryGroups(population, 'make', new Map());
+    for (const [width, height] of [[1416, 520], [366, 480]]) {
+      const rects = readableInventoryLayout(groups, width, height);
+      expect(rects.flatMap(r => r.node.lots.map(a => a.id)).sort()).toEqual(population.map(a => a.id).sort());
+      expect(rects[0].node.name).toBe('BRAND 0');
+      expect(rects.some(r => r.node.remainder?.length)).toBe(true);
+      for (const r of rects) {
+        expect(r.w).toBeGreaterThanOrEqual(88);
+        expect(r.h).toBeGreaterThanOrEqual(60);
+        expect(r.w * r.h / (width * height)).toBeCloseTo(r.node.lots.length / population.length);
+      }
+    }
   });
 });
 

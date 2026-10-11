@@ -1,32 +1,65 @@
 .inventory-map { min-width: 0; font-family: Arial, sans-serif; }
-.inventory-map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
-.inventory-map-controls label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.inventory-map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 12px 0; }
+.inventory-map-controls label { display: flex; align-items: center; gap: 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.inventory-map-controls select { width: auto; min-width: 140px; }
 .inventory-map-controls select, .inventory-map-controls button, .inventory-map button {
   font-family: Arial, sans-serif; border-radius: 0; box-shadow: none; color: var(--text); background: var(--surface); cursor: pointer;
 }
-.inventory-map-controls select, .inventory-map-controls button { border: 2px solid var(--border); padding: 6px; font-size: 12px; max-width: 100%; }
+.inventory-map-controls select, .inventory-map-controls button { border: 2px solid var(--border); padding: 6px 8px; font-size: 12px; max-width: 100%; }
+.inventory-map-key { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 20px; font-size: 11px; padding: 0 0 8px; color: var(--text-secondary); }
 .inventory-map-pulse-control input { accent-color: var(--text); }
 .inventory-map-note { font-size: 11px; line-height: 1.4; margin: 6px 0; color: var(--text-secondary); }
-.inventory-map-description { font-size: 11px; min-height: 30px; padding: 4px 0; overflow-wrap: anywhere; }
+.inventory-map-description { font-size: 12px; min-height: 32px; padding: 8px 0 4px; overflow-wrap: anywhere; }
 .inventory-map-canvas { position: relative; width: 100%; background: var(--border); }
 .inventory-map-region { position: absolute; overflow: hidden; }
-.inventory-map-group, .inventory-map-child { border: none; padding: 5px 6px; text-align: left; display: flex; justify-content: space-between; gap: 4px; min-width: 0; overflow: hidden; }
+.inventory-map-group, .inventory-map-child { border: none; padding: 8px; text-align: left; display: flex; justify-content: space-between; gap: 4px; min-width: 0; overflow: hidden; transition: background-color 180ms cubic-bezier(.16,1,.3,1); }
 .inventory-map-group { width: 100%; }
 .inventory-map-whole { height: 100%; flex-direction: column; }
-.inventory-map-heading { height: 30px; align-items: center; }
-.inventory-map-name { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
-.inventory-map-count { font: 12px 'Courier New', monospace; flex-shrink: 0; }
-.inventory-map-children { position: absolute; top: 31px; left: 0; right: 0; bottom: 0; }
+.inventory-map-heading { height: 44px; align-items: center; }
+.inventory-map-name { font-size: 9px; line-height: 1.25; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
+.inventory-map-region:not(.inventory-map-roomy) .inventory-map-name, .inventory-map-child .inventory-map-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.inventory-map-name .make-identity { vertical-align: middle; }
+.inventory-map-count { font: 16px/1.2 'Courier New', monospace; flex-shrink: 0; white-space: nowrap; }
+.inventory-map-count > span { font: 11px Arial, sans-serif; color: var(--text-secondary); }
+.inventory-map-roomy > .inventory-map-whole { padding: 16px; }
+.inventory-map-roomy > .inventory-map-whole .inventory-map-count { font-size: 28px; margin-top: auto; }
+.inventory-map-roomy > .inventory-map-whole .sx-make-wordmark { width: 156px; height: 32px; }
+.inventory-map-roomy > .inventory-map-whole .make-identity strong { font-size: 12px; }
+.inventory-map-action { font: 10px Arial, sans-serif; color: var(--text-secondary); display: flex; justify-content: space-between; align-self: stretch; margin-top: 4px; }
+.inventory-map-children { position: absolute; top: 46px; left: 0; right: 0; bottom: 0; }
 .inventory-map-child { position: absolute; flex-direction: column; }
-.inventory-map button:hover { background: var(--bg); }
+.inventory-map-pixel { padding: 0; }
+.inventory-map-heading .inventory-map-count { font-size: 12px; }
+.inventory-map-heading .sx-make-wordmark { width: 88px; height: 22px; }
+.inventory-map button:hover { background: var(--bg); outline: 2px solid var(--text-secondary); outline-offset: -2px; }
+.inventory-map button[data-map-more] { background: var(--bg); }
+.inventory-map button[data-map-more] .inventory-map-name { color: var(--text-secondary); }
+.inventory-map-more-preview { display: flex; flex-direction: column; gap: 10px; align-self: stretch; margin: 16px 0 auto; font-size: 11px; }
+.inventory-map-more-preview > span { display: flex; justify-content: space-between; gap: 12px; }
+.inventory-map-more-preview > span > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.inventory-map-more-preview > span > span:last-child { font-family: 'Courier New', monospace; }
 .inventory-map button[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: -2px; }
 .inventory-map button:focus-visible, .inventory-map select:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .inventory-map-pulse::after { content: ''; position: absolute; inset: 0; background: var(--text); pointer-events: none; animation: inventory-bid-pulse 1800ms ease-out both; }
 .inventory-map-whole, .inventory-map-heading { position: relative; }
 @keyframes inventory-bid-pulse { 0%, 12% { opacity: .24; } 100% { opacity: 0; } }
-.inventory-map-list { font-size: 11px; margin-top: 8px; }
-.inventory-map-list > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 2px; margin-top: 6px; }
-.inventory-map-list button { border: 2px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 8px; text-align: left; }
-.inventory-map-list button span:first-child { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 639px) { .inventory-map-controls select, .inventory-map-controls button, .inventory-map-pulse-control { min-height: 44px; } }
-@media (prefers-reduced-motion: reduce) { .inventory-map-pulse::after { animation: none; opacity: .14; } }
+.inventory-map-list, .inventory-map-settings { font-size: 11px; margin-top: 8px; }
+.inventory-map-list summary, .inventory-map-settings summary { cursor: pointer; padding: 4px 0; }
+.inventory-map-pulse-control { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; padding: 4px 0; }
+.inventory-map-pulse-control > span { color: var(--text-secondary); }
+.inventory-map-list > div, .inventory-map-list-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px; margin-top: 6px; }
+.inventory-map-list-grid { max-height: 420px; overflow-y: auto; }
+.inventory-map-list button, .inventory-map-list-grid button { border: 2px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 12px; text-align: left; }
+.inventory-map-list-grid button { position: relative; }
+.inventory-map-list button span:first-child, .inventory-map-list-grid button span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.inventory-map-remainder { background: var(--bg); border: 2px solid var(--border); padding: 12px; }
+.inventory-map-list-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; }
+.inventory-map-back { border: 2px solid var(--border); min-height: 44px; padding: 6px 12px; }
+@media (max-width: 639px) {
+  .inventory-map-controls { gap: 8px; }
+  .inventory-map-controls label { flex: 1 1 150px; flex-direction: column; align-items: stretch; gap: 4px; }
+  .inventory-map-controls select, .inventory-map-controls button, .inventory-map-pulse-control { min-height: 44px; }
+  .inventory-map-roomy > .inventory-map-whole { padding: 12px; }
+  .inventory-map-list > div, .inventory-map-list-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .inventory-map-pulse::after { animation: none; opacity: .14; } .inventory-map-group, .inventory-map-child { transition: none; } }

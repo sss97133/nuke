@@ -667,11 +667,12 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       next.delete('model');
       ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     }
+    if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
     next.delete('lot');
-    setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort' });
+    setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort', preventScrollReset: true });
   };
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
@@ -688,7 +689,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       const value = change[key];
       if (value == null) next.delete(keys[key]); else next.set(keys[key], value);
     }
-    next.delete('lot'); setParams(next);
+    next.delete('lot'); setParams(next, { preventScrollReset: true });
   };
   const selectMapGroup = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false) => {
     if (dimension === 'lot') { mapInspection.current = group.lots[0].id; openActivity(group.lots[0], 'auction'); return; }
@@ -792,13 +793,12 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       <div style={{ fontSize: 12, margin: '8px 0', lineHeight: 1.4 }}>
         <strong>Open inventory · {make ?? 'All makes'}</strong>{' · '}
         {isLoading ? 'Reading captured lots…' : `${cohort.length.toLocaleString('en-US')} of ${live.length.toLocaleString('en-US')} captured BaT vehicle lots`}
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Public vehicle records marked live with future listing ends. Complete BaT coverage is unknown.</div>
       </div>
-      <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
+      {make && <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
         <button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('make', null)}>All captured makes</button>
         {make && <><span aria-hidden="true">→</span><button style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}><MakeLogo make={make} />{make}</button></>}
         {model && <><span aria-hidden="true">→</span><span>Recorded model: {model}</span></>}
-      </div>
+      </div>}
 
       {/* Figures. Each one is a filter on the board below. */}
       <div role="group" aria-label="Open inventory filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
