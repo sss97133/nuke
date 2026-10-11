@@ -76,11 +76,15 @@ Deno.test({
       }).output();
     }
     const decoder = new TextDecoder();
-    const preflight = await command(["--command", "SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr()::text,'recovery',pg_is_in_recovery())::text"]);
+    const preflight = await command(["--command", "SELECT jsonb_build_object('database',current_database(),'address',host(inet_server_addr()),'recovery',pg_is_in_recovery())::text"]);
     assert(preflight.success, `Local fixture identity unavailable: ${decoder.decode(preflight.stderr)}`);
     const identity = JSON.parse(decoder.decode(preflight.stdout));
     equal(identity.database, database, "Connected database must equal the explicit disposable name");
-    assert(identity.address === null || ["127.0.0.1", "::1"].includes(identity.address), "Server must be local");
+    // This one CI job connects to its service container via a localhost port mapping.
+    const ciContainer = Deno.env.get("GITHUB_ACTIONS") === "true" && Deno.env.get("GITHUB_JOB") === "engine-family-intake" &&
+      host === "localhost" && database === "dm_refinement_engine_family_ci" &&
+      /^(?:10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.)/.test(identity.address ?? "");
+    assert(identity.address === null || ["127.0.0.1", "::1"].includes(identity.address) || ciContainer, "Server must be local");
     assert(identity.recovery === false, "Fixture must not be a replica");
     trustedFixture = true;
 
