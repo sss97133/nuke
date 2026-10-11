@@ -5,6 +5,7 @@ import { RETAINED_ODOMETER_VERSION, retainedOdometerWitness } from "./retainedOd
 import { RETAINED_IDENTITY_KEYS, RETAINED_IDENTITY_LABEL_VERSION, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 import { RETAINED_PRESENTATION_VERSION, descriptionPresentationWitness } from "./retainedDescriptionPresentation.ts";
 import { deriveRetainedCraigslistOdometer } from "./retainedCraigslistOdometer.ts";
+import { deriveRetainedCraigslistYear } from "./retainedCraigslistYear.ts";
 
 export const RETAINED_INTERIOR_MODE = "retained_listing_interior_color_v1";
 export const RETAINED_EXTERIOR_MODE = "retained_listing_exterior_color_v1";
@@ -28,6 +29,7 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   const powertrain = propertyKey in RETAINED_POWERTRAIN_FIELDS;
   const odometer = propertyKey === "mileage_miles";
   if(odometer && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistOdometer(source,vehicle,registeredSource);
+  if(propertyKey==="year" && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistYear(source,vehicle,registeredSource);
   const identity = RETAINED_IDENTITY_KEYS.includes(propertyKey);
   const presentation = ["interior_color","exterior_color","drivetrain_layout"].includes(propertyKey);
   const description = source?.extraction_method === "html_description_capture";

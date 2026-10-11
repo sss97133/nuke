@@ -1,22 +1,12 @@
-import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
+import { retainedCraigslistCaptureQualified } from "./retainedCraigslistCapture.ts";
 export const CRAIGSLIST_ODOMETER_PROFILE = "craigslist_auto_miles_v1";
-const UUID=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function craigslistOdometerValue(raw:unknown):number|null {
  if(typeof raw!=="string"||raw.length>20||!/^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)$/.test(raw))return null;
  const n=Number(raw.replaceAll(",",""));return Number.isSafeInteger(n)&&n>=0&&n<10000000?n:null;
 }
 export function deriveRetainedCraigslistOdometer(p:Record<string,any>,v:Record<string,any>|null,s:Record<string,any>|null){
  const r=p?.extraction_metadata?.raw,a=r?.attributes,raw=a?.raw?.auto_miles,value=craigslistOdometerValue(raw);
- let url:URL;try{url=new URL(p?.source_url);}catch{return null;}
- const nativePost=url.pathname.match(/\/([0-9]+)\.html$/)?.[1];
- if(!UUID.test(p?.id??"")||!UUID.test(p?.vehicle_id??"")||p.kind!=="listing"||p.extraction_method!=="html_parse"||p.is_superseded!==false||
-  p.property_id!=null||p.subject_type!=="vehicle"||p.subject_id!=null||!v||v.id!==p.vehicle_id||v.is_public!==true||v.deleted_at!=null||v.listing_kind==="non_vehicle_item"||
-  !s||s.id!==p.source_id||s.slug!=="craigslist"||!s.supported_observations?.includes("listing")||
-  url.protocol!=="https:"||! /^[a-z0-9-]+\.craigslist\.org$/.test(url.hostname)||url.search||url.hash||url.username||url.password||
-  !(/^\/(?:[a-z]+\/)?ct[od]\/d\/[^/?#]+\/[0-9]+\.html$/.test(url.pathname)||url.hostname==="www.craigslist.org"&&/^\/view\/d\/[^/?#]+\/[A-Za-z0-9_-]+$/.test(url.pathname))||
-  typeof r?.post_id!=="string"||! /^[0-9]{1,20}$/.test(r.post_id)||p.source_identifier!==r.post_id||(nativePost!==undefined&&nativePost!==r.post_id)||
-  observationClockMicroseconds(p.ingested_at)===null||(p.observed_at!==null&&observationClockMicroseconds(p.observed_at)===null)||
-  !Number.isFinite(p.confidence_score)||p.confidence_score<.4||p.confidence_score>1||value===null||a.odometer_raw!==raw||a.odometer!==value||
+ if(!retainedCraigslistCaptureQualified(p,v,s)||value===null||a.odometer_raw!==raw||a.odometer!==value||
   typeof a.odometer_broken!=="boolean"||typeof a.odometer_rolled_over!=="boolean"||
   a.odometer_broken!==Object.hasOwn(a.raw,"odometer_broken")||a.odometer_rolled_over!==Object.hasOwn(a.raw,"odometer_rolled_over"))return null;
  const mode="retained_listing_mileage_miles_v1";

@@ -69,9 +69,11 @@ export function validateObservationProperty(
   }
   const fields = data as Record<string, unknown>;
   const value = fields[input.property_key];
-  if (RETAINED_IDENTITY_KEYS.includes(input.property_key) && (input.kind !== "specification" ||
+  const craigslistYear=retainedPropertyVerified&&input.kind==="listing"&&input.property_key==="year"&&fields.source_profile==="craigslist_year_attribute_v1";
+  if (RETAINED_IDENTITY_KEYS.includes(input.property_key) && ((!craigslistYear&&input.kind !== "specification") ||
       retainedListingIdentityValue(input.property_key, value) === null ||
-      fields.identity_role !== "extractor_vehicle_label" || fields.identity_resolution_status !== "unverified")) {
+      fields.identity_role !== "extractor_vehicle_label" || fields.identity_resolution_status !== "unverified" ||
+      (craigslistYear&&(fields.year_label_basis!=="platform_year_attribute_or_title_row"||fields.normalization_version!=="retained_listing_year_attribute_v1")))) {
     return invalid("Retained identity properties require exact extractor labels with unverified identity resolution");
   }
   if (input.property_key === "vin" && (fields.vin_identifier_namespace !== "standard_17_character_vin_label" ||

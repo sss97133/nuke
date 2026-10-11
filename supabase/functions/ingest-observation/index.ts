@@ -784,7 +784,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     }
     // A freshly derived Craigslist label retains its source profile's cap;
     // source-URL/content/vehicle-match bonuses cannot turn it into stronger evidence.
-    if (retainedSourceId && input.structured_data?.source_profile === "craigslist_auto_miles_v1" && confidenceScore > 0.4) {
+    if (retainedSourceId && ["craigslist_auto_miles_v1","craigslist_year_attribute_v1"].includes(String(input.structured_data?.source_profile)) && confidenceScore > 0.4) {
       confidenceFactors.retained_listing_source_cap = 0.4 - confidenceScore;
       confidenceScore = 0.4;
     }
