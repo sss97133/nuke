@@ -45,18 +45,17 @@ const text = (value: unknown): string | null => {
 };
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-/** Display policy v1. Evidence conflicts, then powertrain, body and appearance.
+/** Configuration fallback. This is not the distinctiveness ranking (see the Market reader contract).
  * This selects attributed vehicle reports; it does not infer rarity, installation,
  * sale-time configuration, mileage units or features from a marketing headline.
  */
 export function selectRowFacts(specs: VehicleSpec[], identity: string): RowFact[] {
-  const priority = ['engine_type', 'engine_size', 'transmission', 'drivetrain', 'body_style', 'color', 'interior_color'];
+  const priority = ['engine_size', 'engine_type', 'transmission', 'drivetrain', 'body_style', 'color', 'interior_color'];
   const labels: Record<string, string> = { engine_type: 'Engine', engine_size: 'Listed engine', transmission: 'Transmission',
     drivetrain: 'Drive', body_style: 'Body', color: 'Color', interior_color: 'Interior' };
   const candidates = specs.filter(s => priority.includes(s.field))
     .filter(s => s.rooted || (s.source_observation_id && (s.reported_value != null || s.reported_conflict)))
-    .sort((a, b) => Number(!!b.reported_conflict) - Number(!!a.reported_conflict)
-      || priority.indexOf(a.field) - priority.indexOf(b.field) || a.field.localeCompare(b.field));
+    .sort((a, b) => priority.indexOf(a.field) - priority.indexOf(b.field) || a.field.localeCompare(b.field));
   const seen = new Set<string>();
   const result: RowFact[] = [];
   for (const s of candidates) {
@@ -68,8 +67,8 @@ export function selectRowFacts(specs: VehicleSpec[], identity: string): RowFact[
     if (!conflict && result.some(f => normalized(f.value) === normalized(value))) continue;
     seen.add(group);
     result.push({ field: s.field, label: labels[s.field], value, conflict, observationId: s.source_observation_id ?? null,
-      reason: conflict ? 'A disagreement takes priority over descriptive specifications.'
-        : 'Selected from attributed vehicle reports: powertrain, then body and appearance; repeated identity is omitted.' });
+      reason: conflict ? 'The reader reports differing values. This may be wording or a substantive disagreement; its importance has not been classified.'
+        : 'Configuration context from attributed reports. Distinctiveness within comparable vehicles has not been measured.' });
     if (result.length === 3) break;
   }
   return result;

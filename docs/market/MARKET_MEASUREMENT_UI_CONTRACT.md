@@ -14,23 +14,73 @@ inspection immediately beneath that row, preserving scroll position, filters and
 An inspected lot stays reachable when its deadline passes; elapsed time alone cannot establish
 the result. A different listing URL on the same vehicle must not replace the inspected episode.
 
-The initial display policy selects at most three attributed vehicle reports: disagreements first,
-then powertrain, body and appearance, suppressing repeated identity and duplicate engine fields.
-Unrooted scalar values and unknown mileage units do not become distinguishing claims. This is a
-versioned presentation priority, not empirical rarity, price impact or verified installation.
-Existing specification readers own evidence eligibility; the browser only selects and formats
-their output. Listing-supplied state/ZIP must retain their location basis; venue, registration and
-private sighting coordinates cannot substitute. Broader differentiation still needs qualified
-condition, history, configuration and conditional-frequency readers.
+**October 10 correction — Stack readings in the row.** The initial implementation's
+field ordering and raw auction counts did not satisfy the distinction/performance question.
+Configuration context is a fallback, not a claim that the selected fields make an example special.
+In particular, `reported_conflict` can reflect differently worded transmission descriptions;
+it must not automatically outrank meaningful configuration as if it were a material defect.
+The fallback keeps attributed listed-engine, transmission, drive, body and appearance reports,
+suppresses repeated identity, and flags differing reports without assigning their severity.
+Listing-supplied state/ZIP retains its location basis. Venue, registration and private sighting
+coordinates cannot substitute. Unknown mileage units cannot become a low-mileage claim.
 
-Keep auction measures in consistent positions. The initial row can expose the exact episode's
-recorded bid, positive source-reported bid/watcher counts and a supported latest bid-event time.
-Default zero counts are unknown. The short drill shows actual retained bid records and their
-numeric changes, with currency/capture limits. It does not manufacture recent bidder counts,
-interval rates, peer-relative pace or forecasts from a truncated interaction window. Those
-remain dependencies of the qualified measurement owner described below. Vehicle facts and
-Sources have their own concise inspections; full records and bid sequences require a deliberate
-deeper drill. Same question, same episode, same evidence context through each step.
+The auction row projects **Stack A's existing per-bid order-book fold**. Its high, identity depth
+and latest raise share one exact listing episode and retained bid collection. The compact reader
+reuses the public-parent gate, complete keyset collection and fold, requesting bids only; it does
+not load prose, identity profiles or live-frame history for each row. Only visible rows read,
+with a shared query cache and minute refresh. Another listing URL or ambiguous episode ownership
+refuses the read. No truncated discussion window supplies participant or sequence measurements.
+
+The default depth threshold is explicit: identified bidders whose highest retained bid is at
+least 90% of the retained high, including the leader. This is a descriptive slice of revealed
+bidding, not a learned hot/cold boundary or a forecast. Counts with missing identities or unequal
+held/reported bid counts are lower bounds. The gap to the second bidder requires count agreement
+and complete identity keys. A latest-raise percentage also requires a strictly increasing held
+sequence. Old-window, future, post-close, wrong-URL, duplicate and undated bid records are withheld.
+Default zero source counts remain unknown. Count agreement never establishes source freshness;
+the last bid clock, lot-write clock and browser-read clock have different meanings.
+
+The compact inspection leads with the measurement and its interpretation, then contributors and
+per-bid replay. Source counts, discussion and raw sequences are supporting disclosures. Stack A is
+a deliberate deeper drill; BaT remains under Sources. Same question, episode and evidence context
+through each step. The retained high is labeled and is the denominator of depth; a different
+recorded current-price scalar cannot silently become that denominator.
+
+### Distinguishing signals: proposed selection contract
+
+This is the next reader contract for review, **not an implemented rarity or feature-value model**.
+It reuses the existing stack owners. No new ontology tables, scoring spend or production writes
+are authorized by this proposal.
+
+A candidate is a claim or measurement about a specific relation: vehicle identity; component
+installation in a configuration at a time; condition/history; or one auction episode. It carries
+its value and unit, source observation/event IDs, valid-time and knowledge-time basis, evidence
+status, comparison population when applicable, exclusions, and an explanation of why it is
+being surfaced. A source's headline is testimony. A catalog engine is a component type; a seller's
+engine phrase is an attributed claim; an established installation is a separate relationship.
+These cannot share an unqualified `feature` string.
+
+| Question | Existing stack owners | Admission and deterministic selection |
+| --- | --- | --- |
+| What configuration distinguishes this example? | S12 dimensions, S19 attributed claims, S31 modification recipes | Require an attributed configuration relation and retain its time scope. Compare supported values within a purpose-qualified sibling cohort; expose known/eligible counts. No rarity from missing values, broad model labels or promotional words. |
+| Does that difference matter to value? | S14 option/color premiums, S57 feature attribution | Require a measured effect, qualified sibling match, support and uncertainty. Configuration frequency alone does not establish a premium. |
+| What could change the decision? | S05 disclosure gaps, S39 inconsistencies, S59 value of information | Promote a classified, material unresolved question with the conflicting evidence and next discriminating evidence. Raw text inequality is insufficient. |
+| What is the auction doing? | SA expressed demand, S21 pacing, S03 participant history, S22 comparable sales, S24 attention | Keep competition, pace, price position and attention separate. Live comparison requires the same observed phase and known capture coverage. Completed-lot percentile ranks cannot rank a live prefix. |
+
+Proposed priority is lexicographic and inspectable: (1) admitted decision-critical unresolved
+questions; (2) supported configuration effects with a qualified comparison; (3) measured
+configuration departures with their denominators; (4) attributed configuration context. Within a
+tier use evidence qualification, supported magnitude, then a stable field/relation key. Suppress
+repeated identity and duplicate relations; keep at most three. Do not mix incomparable units into
+an unexplained weighted score. Every selected item must return its tier and selection reason;
+inspection must make excluded and unresolved candidates inspectable too.
+
+The testable hypothesis is that this ordering answers what changes the vehicle decision more
+reliably than a fixed engine/transmission/color list. Acceptance cases must include a modified
+truck, a recreation, a stock sports car with an unusual configuration, a common configuration,
+and conflicting/insufficient evidence. The current specification reader supplies attributed
+context but lacks qualified frequency/effect outputs and classified material disagreements.
+That reader boundary is outstanding; shipping the Stack A projection does not close it.
 
 **Owner steering, October 4:** inventory counts, bid-price bins and raw model-label groups do not answer how a market or a vehicle is performing. PR558 passed technical checks and was rejected by the owner for its analytical design. Its controls and count charts are not the target design. This direction supersedes the earlier single-cohort-dropdown prescription. Implementation, deployment, runtime correctness and analytical usefulness are separate acceptance stages.
 

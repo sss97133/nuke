@@ -60,7 +60,7 @@
   .auction-evidence-links span { margin-left: 0; }
   .auction-evidence-discussion { max-height: none; overflow: visible; padding-right: 0; }
 }
-.market-lot-row { display: grid; grid-template-columns: 76px 72px minmax(0,1fr) 205px; gap: 12px; align-items: center; min-height: 88px; padding: 10px 12px; box-sizing: border-box; border-bottom: 2px solid var(--border); font: 12px/1.4 Arial,sans-serif; color: var(--text); background: var(--bg); }
+.market-lot-row { display: grid; grid-template-columns: 76px 72px minmax(0,1fr) 225px; gap: 12px; align-items: center; min-height: 98px; padding: 10px 12px; box-sizing: border-box; border-bottom: 2px solid var(--border); font: 12px/1.4 Arial,sans-serif; color: var(--text); background: var(--bg); }
 .market-lot-row[data-expanded=true] { background: var(--surface); }
 .market-lot-row button { font: inherit; text-align: left; color: inherit; border: 0; border-radius: 0; background: transparent; padding: 0; cursor: pointer; }
 .market-lot-row button:hover { text-decoration: underline; }
@@ -78,6 +78,17 @@
 .market-lot-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; font-size: 11px; }
 .market-lot-counts:empty { display: none; }
 .market-lot-last-bid { font-size: 10px; color: var(--text-secondary); }
+.market-lot-depth { font: 11px Arial,sans-serif; }
+.market-competition h3 { font-size: 12px; margin: 0 0 8px; }
+.market-competition-answer { font-size: 14px; margin: 0 0 12px; }
+.market-competition-measures { display: flex; gap: 16px 32px; flex-wrap: wrap; }
+.market-competition-measures > div { display: flex; flex-direction: column; }
+.market-competition-measures span, .market-competition-measures small { font-size: 10px; color: var(--text-secondary); }
+.market-competition-measures strong { font: 700 18px 'Courier New',monospace; margin: 2px 0; }
+.market-competition-replay { display: flex; flex-direction: column; max-width: 500px; margin: 12px 0; }
+.market-competition table { width: 100%; max-width: 600px; border-collapse: collapse; font-size: 11px; }
+.market-competition th, .market-competition td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.market-competition th:first-child, .market-competition td:first-child { overflow-wrap: anywhere; }
 .market-lot-inspection { padding: 12px 16px 16px 100px; background: var(--surface); color: var(--text); border-bottom: 2px solid var(--text); font: 12px/1.5 Arial,sans-serif; overflow-wrap: anywhere; }
 .market-inspection-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .market-inspection-header nav { display: flex; gap: 16px; }

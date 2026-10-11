@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { listingDescriptionsFromSpecs } from '../../components/vehicle/listingDescriptions';
 import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '../../hooks/useAuctionComments';
 import { useLotMovement } from './useLotMovement';
 import { selectRowFacts, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
+import { bidBookReading, depthAt, useBidBook } from '../stacks/orderBookReader';
 import './AuctionEvidence.css';
 
 function stamp(value: string | null | undefined) {
@@ -34,6 +35,72 @@ function closeStamp(value: string) {
     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
     timeZone: 'America/Los_Angeles', timeZoneName: 'short',
   }) : 'Time unknown';
+}
+
+/** The row and its inspection share Stack A's exact-episode query and fold. */
+export function AuctionCompetition({ vehicleId, sourceUrl, row = false, enabled = true, fallback }: {
+  vehicleId: string; sourceUrl?: string | null; row?: boolean; enabled?: boolean; fallback?: ReactNode;
+}) {
+  const query = useBidBook(vehicleId, sourceUrl, enabled);
+  const reading = useMemo(() => query.data ? bidBookReading(query.data) : null, [query.data]);
+  const [replay, setReplay] = useState<number | null>(null);
+  const pct = (n: number) => `${n.toFixed(1)}%`;
+  if (!reading || !query.data || !reading.states.length) {
+    const message = query.isFetching ? 'Reading bidding…' : query.isError ? 'Bidding read unavailable'
+      : 'Bid depth not established';
+    return row ? <>{fallback}<span className="market-lot-last-bid">{message}</span></>
+      : <p role="status">{message}{query.isError && <>. <button type="button" onClick={() => void query.refetch()}>Retry</button></>}</p>;
+  }
+  const r = reading;
+  const last = r.states[r.states.length - 1];
+  const coverage = `${r.held}/${r.reported ?? '?'} reported bids held`;
+  if (row) return <>
+    <span><span className="market-lot-label">Retained high</span><strong>{amount(r.high!)}</strong></span>
+    <span className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
+      {r.near! > 0 ? <><strong>{r.exact ? '' : '≥'}{r.near}</strong> within 10% of high</> : 'Near-high identities unresolved'}
+    </span>
+    <span className="market-lot-last-bid">{r.exact ? '' : '≥'}{r.bidders} bidders · {coverage}</span>
+    {r.lastRaise != null && <span className="market-lot-last-bid">Last raise +{pct(r.lastRaise)}</span>}
+    <time className="market-lot-last-bid" dateTime={new Date(last.bid.at).toISOString()}
+      title={stamp(new Date(last.bid.at).toISOString())}>Bid {Math.max(0, Math.floor((Date.now() - last.bid.at) / 3_600_000)) >= 1
+        ? `${Math.floor((Date.now() - last.bid.at) / 3_600_000)}h ago` : `${Math.max(0, Math.floor((Date.now() - last.bid.at) / 60_000))}m ago`}</time>
+  </>;
+  const state = replay == null ? last : r.states[Math.min(replay, r.states.length - 1)];
+  const book = state.book.filter(e => e.identityId);
+  const depth = depthAt(book, state.price * .9);
+  return <div className="market-competition">
+    <h3>How much bidding sits near the high?</h3>
+    <p className="market-competition-answer">{r.near! > 0
+      ? <><strong>{r.exact ? '' : 'At least '}{r.near} of {r.bidders} identified bidders</strong> have bid within 10% of the retained high.</>
+      : 'The bidders near the retained high are not identified; competition depth is unresolved.'}</p>
+    <p className="market-inspection-caption">Retained high {amount(r.high!)} · source bid units, currency unverified · includes the leading bidder.</p>
+    <div className="market-competition-measures">
+      {r.gap != null && <div><span>Leader’s margin</span><strong>{pct(r.gap)}</strong><small>below the high to the next bidder</small></div>}
+      {r.lastRaise != null && <div><span>Last raise</span><strong>+{pct(r.lastRaise)}</strong><small>over the preceding bid</small></div>}
+      <div><span>Bid coverage</span><strong>{r.held} / {r.reported ?? '?'}</strong><small>held / source-reported bids</small></div>
+    </div>
+    <p className="market-inspection-caption">Latest retained bid {stamp(new Date(last.bid.at).toISOString())}.
+      {' '}{r.exact ? 'All held bids are attributed; the count matches the reported total.' : 'Partial evidence: bidder counts are lower bounds.'}
+      {r.rejected > 0 && <> {r.rejected} conflicting, duplicate or undated bid rows withheld.</>}
+      {' '}Lot record updated {stamp(query.data.lot.updated_at)}.</p>
+    <p>{r.near === 1 ? 'Only one identified bidder has demonstrated an amount at this level in the retained bids.'
+      : `${r.near} identified bidders have demonstrated amounts near the high in the retained bids.`}
+      {' '}This measures expressed competition. It does not establish how much more anyone will pay.</p>
+    <details className="market-inspection-more">
+      <summary>Inspect contributors & how depth changed</summary>
+      <label className="market-competition-replay">Retained bid {state.index + 1} of {r.states.length}
+        <input type="range" min="0" max={r.states.length - 1} value={state.index}
+          aria-label="Replay retained bidding" onChange={e => setReplay(Number(e.target.value))} />
+      </label>
+      <p>{stamp(new Date(state.bid.at).toISOString())} · high {amount(state.price)} · {depth} identified {depth === 1 ? 'bidder' : 'bidders'} within 10%.</p>
+      <table><thead><tr><th>Bidder</th><th>Highest demonstrated bid</th><th>Below high</th></tr></thead>
+        <tbody>{book.slice(0, 5).map(e => <tr key={e.key}><td>{e.handle}</td><td>{amount(e.max)}</td><td>{pct(100 * (state.price - e.max) / state.price)}</td></tr>)}</tbody>
+      </table>
+      <p className="market-inspection-caption">Top five identified bidders at the selected event. Amounts retain source units; currency unverified.
+        Depth counts each canonical identity once; matching handle text does not merge bidders.</p>
+      <Link to={`/stacks/order-book/${vehicleId}?lot=${query.data.lot.id}`}>Explore this lot in Stack A →</Link>
+    </details>
+  </div>;
 }
 
 // Draw only the reader's posted bids at their actual time offsets. No peer ranking, interpolation,
@@ -140,7 +207,8 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, i
       {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
       {evidence && view === 'auction' && <>
-        <div className="market-inspection-reading">
+        <AuctionCompetition vehicleId={vehicleId} sourceUrl={sourceUrl ?? evidence.sourceUrl} />
+        <details className="market-inspection-more"><summary>Recorded price, counts & recent events</summary><div className="market-inspection-reading">
           {recent.length ? <p><strong>Latest recorded bid {amount(Number(recent[0].bid_amount))}</strong>
             {change != null && <> · {change >= 0 ? '+' : ''}{amount(change)} from the previous retained bid</>}
             <span className="market-inspection-caption">Posted <time dateTime={recent[0].posted_at!}>{stamp(recent[0].posted_at)}</time> · currency unverified</span></p>
@@ -154,7 +222,7 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, i
         {recent.length > 1 && <div className="market-inspection-bids" aria-label="Recent retained bids">
           {recent.slice().reverse().map(r => <div key={r.id}><strong>{amount(Number(r.bid_amount))}</strong>
             <time dateTime={r.posted_at!}>{new Date(r.posted_at!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</time></div>)}
-        </div>}
+        </div>}</details>
         <p className="market-inspection-caption">{receipt?.source_read_at && receipt.source_read_basis !== 'unknown'
           ? <>Source {receipt.source_read_basis === 'cached_snapshot' ? 'snapshot' : 'read'}: <time dateTime={receipt.source_read_at}>{stamp(receipt.source_read_at)}</time>.</>
           : 'Source read time unavailable.'} {evidence.truncated ? 'Earlier records are outside this read.' : 'Capture completeness is unknown.'}</p>
@@ -178,8 +246,9 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, i
             {f.observationId && <Link to={`/vehicle/${vehicleId}/observation/${f.observationId}`}>Evidence →</Link>}</dd>
         </div>)}</dl> : <p>No attributed distinguishing specifications are available in this read.</p>}
         {facts.length > 0 && <details className="market-inspection-more"><summary>Why these facts?</summary>
-          <p>Disagreements come first, then powertrain, body and appearance. Facts already in the identity are omitted.
-            These are attributed vehicle reports; rarity and current installed configuration have not been established.</p>
+          <p>These are configuration reports, selected as context: listed engine, transmission, drive, body and appearance.
+            Differing wording is flagged without treating it as a critical disagreement. Repeated identity is omitted.
+            Rarity, price impact and current installed configuration have not been established.</p>
         </details>}
         <Link to={`/vehicle/${vehicleId}`}>Explore the vehicle record →</Link>
       </>}

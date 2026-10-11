@@ -53,7 +53,7 @@ describe('source-gated market row metadata', () => {
   });
 });
 describe('deterministic vehicle fact selection', () => {
-  it('prioritizes conflicts, then supported powertrain and suppresses repeated identity and engine synonyms', () => {
+  it('keeps differing reports flagged without promoting unclassified wording differences above configuration', () => {
     const facts = selectRowFacts([
       { field: 'color', value: 'Red', rooted: true },
       { field: 'body_style', value: 'Coupe', rooted: true },
@@ -62,9 +62,9 @@ describe('deterministic vehicle fact selection', () => {
       { field: 'transmission', value: 'Automatic', reported_conflict: true, source_observation_id: 'evidence' },
     ], '2004 BMW M3 Coupe');
     expect(facts.map(f => [f.field, f.value])).toEqual([
-      ['transmission', 'Automatic'], ['engine_type', '5.0L V8'], ['color', 'Red'],
+      ['engine_size', '5.0L V8'], ['transmission', 'Automatic'], ['color', 'Red'],
     ]);
-    expect(facts[0].conflict).toBe(true);
+    expect(facts[1].conflict).toBe(true);
   });
   it('withholds unsupported specs and unitless mileage, but retains attributed reports', () => {
     expect(selectRowFacts([{ field: 'transmission', value: '6-speed manual' },

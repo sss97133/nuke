@@ -6,7 +6,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
-import AuctionEvidence from './AuctionEvidence';
+import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
@@ -67,11 +67,6 @@ function out(hours: number): string {
 // In the viewer's own time zone.
 function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-}
-
-function elapsed(at: string): string {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(at)) / 60_000));
-  return minutes < 1 ? 'within 1m' : minutes < 60 ? `${minutes}m ago` : minutes < 1440 ? `${Math.floor(minutes / 60)}h ago` : `${Math.floor(minutes / 1440)}d ago`;
 }
 
 function title(a: LiveAuction): string {
@@ -475,8 +470,8 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
 }
 
 // The virtualizer measures expanded rows; these are estimates for closed rows.
-const ROW_H = 88;
-const ROW_H_NARROW = 134;
+const ROW_H = 110;
+const ROW_H_NARROW = 154;
 
 function BoardRow({ a, risen, stale, detail, visible, expanded, onInspect }: {
   a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; visible: boolean; expanded: boolean;
@@ -515,12 +510,8 @@ function BoardRow({ a, risen, stale, detail, visible, expanded, onInspect }: {
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
-        <span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>
-        <span className="market-lot-counts">
-          {detail?.bidCount != null && <span>{detail.bidCount.toLocaleString('en-US')} bids</span>}
-          {detail?.watchers != null && <span>{detail.watchers.toLocaleString('en-US')} watching</span>}
-        </span>
-        {detail?.lastBidAt && <span className="market-lot-last-bid">Last bid <time dateTime={detail.lastBidAt} title={new Date(detail.lastBidAt).toLocaleString()}>{elapsed(detail.lastBidAt)}</time></span>}
+        <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={visible && !!detail}
+          fallback={<span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
       </button>
     </div>
   );
