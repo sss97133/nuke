@@ -15,6 +15,7 @@ const PROPERTY_KEYS: Record<string, string> = {
   "ece619f7-c49a-44f7-999f-a41acf5d4dc3": "year",
   "8d274b73-a8a6-43bf-9036-5864d0152725": "make",
   "a79b528f-7d9d-46ca-96f9-96d899e81d10": "model",
+  "9fc93dd3-3639-439a-8eed-3e9a0f846334": "vin",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },

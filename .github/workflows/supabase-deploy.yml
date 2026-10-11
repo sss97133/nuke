@@ -243,7 +243,8 @@ jobs:
              ! grep -Fxq 'supabase/migrations/20261010164331_expand_retained_listing_property_replay.sql' /tmp/migrations.txt &&
              ! grep -Fxq 'supabase/migrations/20261010175046_retained_description_powertrain_projection.sql' /tmp/migrations.txt &&
              ! grep -Fxq 'supabase/migrations/20261010182050_retained_odometer_description_projection.sql' /tmp/migrations.txt &&
-             ! grep -Fxq 'supabase/migrations/20261010223542_retained_listing_model_fields_projection.sql' /tmp/migrations.txt; then
+             ! grep -Fxq 'supabase/migrations/20261010223542_retained_listing_model_fields_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261011002640_retained_listing_vin_label_projection.sql' /tmp/migrations.txt; then
             exit 0
           fi
           if ! grep -Fxq 'ingest-observation' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then
