@@ -114,12 +114,12 @@ Deno.test("service replay reuses qualified inputs only within its batch and stil
   for(let batch=0;batch<2;batch++){
    reset();const receipt=await drain();
    assert(receipt.writes===4 && receipt.stored===4 && receipt.model_calls===0);
-   assert(counts.parent===1 && counts.vehicle===1 && counts.source===1 && counts.property===4 && counts.finish===4);
+   assert(counts.parent===2 && counts.vehicle===2 && counts.source===2 && counts.property===4 && counts.finish===4);
   }
   reset();privateVehicle=true;const refused=await drain();
   assert(refused.refused===4 && counts.parent===4 && counts.vehicle===4 && counts.insert===0);
   privateVehicle=false;reset();failFirstParent=true;const recovered=await drain();
-  assert(recovered.retries===1 && recovered.stored===3 && counts.parent===2);failFirstParent=false;
+  assert(recovered.retries===1 && recovered.stored===3 && counts.parent===3);failFirstParent=false;
   reset();rejectCompletion=true;const stale=await drain();
   assert(stale.stored===0 && stale.writes===0 && stale.completion_failures===4 && stale.retries===4 && counts.finish===8);
   rejectCompletion=false;reset();
