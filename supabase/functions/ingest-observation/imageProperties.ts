@@ -74,6 +74,10 @@ export function validateObservationProperty(
       fields.identity_role !== "extractor_vehicle_label" || fields.identity_resolution_status !== "unverified")) {
     return invalid("Retained identity properties require exact extractor labels with unverified identity resolution");
   }
+  if (input.property_key === "vin" && (fields.vin_identifier_namespace !== "standard_17_character_vin_label" ||
+      fields.vin_format_status !== "17_character_format" || fields.vin_checksum_status !== "not_evaluated")) {
+    return invalid("Retained VIN labels require explicit namespace and unevaluated checksum");
+  }
   if (value === undefined || value === null) {
     return invalid("Unknown property values must be omitted, not defaulted");
   }

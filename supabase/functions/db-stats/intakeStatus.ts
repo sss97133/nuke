@@ -118,7 +118,13 @@ FROM (SELECT s.jobname, c.jobid IS NOT NULL AS present, c.active, c.schedule
   LEFT JOIN cron.job c USING (jobname)) j`;
 export const HEALTH_SQL = `SELECT statement_timestamp() AS measured_at,
   coalesce(jsonb_agg(to_jsonb(j) ORDER BY j.jobname), '[]'::jsonb) AS rows
-FROM (SELECT jobname, declared_writer, last_status, last_run_at, assay_status, health_status
+FROM (SELECT jobname, declared_writer, last_status, last_run_at, assay_status, health_status,
+  (SELECT coalesce(jsonb_object_agg(key, value), '{}'::jsonb)
+    FROM jsonb_each(coalesce(assay, '{}'::jsonb) ||
+      CASE WHEN jsonb_typeof(assay->'counts') = 'object' THEN assay->'counts' ELSE '{}'::jsonb END)
+    WHERE key IN ('pending','claimed','failed','stale_qualified','sample_stale','due',
+      'custody_sampled','completed_work','canonical_observations','vehicles_mismatching',
+      'overdue_queue_sampled','failed_queue_sampled') AND jsonb_typeof(value) = 'number') AS assay_counts
   FROM public.v_job_health WHERE jobname = ANY($1::text[])) j`;
 
 // Preserve executions and declarations when an output assay exceeds its budget.
@@ -177,7 +183,7 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
       const reading = await boundedRead(conn, HEALTH_SQL, [[jobname]], '3s');
       const row = reading.rows.find(row => row.jobname === jobname);
       if (row) rows.set(jobname, { ...row, ...rows.get(jobname),
-        assay_status: row.assay_status, health_status: row.health_status });
+        assay_status: row.assay_status, health_status: row.health_status, assay_counts: row.assay_counts });
       const measured = reading.status === 'measured' && !!row && row.assay_status !== 'unavailable';
       readings.push({ jobname, status: measured ? 'measured' : 'unavailable', measured_at: reading.measured_at,
         reason: measured ? null : reading.status === 'unavailable' ? 'query_unavailable'

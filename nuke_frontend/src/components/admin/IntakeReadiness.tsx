@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../../lib/supabase';
 import PrefetchLink from '../PrefetchLink';
 import { OrgLogo } from '../common/OrgLogo';
 import { ORDER_BOOK_STACK } from '../../pages/stacks/stackDefinitions';
+import { useOrderBook, shapeOrderBook } from '../../pages/stacks/orderBookReader';
+import { VehicleIdentity } from '../common/MakeIdentity';
+import './IntakeReadiness.css';
 
 type Section = 'coverage' | 'model' | 'jobs' | 'consumers';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number;
@@ -13,7 +16,7 @@ type Table = { table_name: string; atlas_present: boolean; est_rows: number; n_c
 type Edge = { constraint_name: string; child_table: string; parent_table: string; validated: boolean };
 type Job = { jobname: string; present: boolean; active: boolean; schedule: string | null };
 type Health = { jobname: string; declared_writer: string | null; last_status: string | null; last_run_at: string | null;
-  assay_status: string | null; health_status: string | null };
+  assay_status: string | null; health_status: string | null; assay_counts?: Record<string, number> };
 type Feed = { source_slug: string; feeds: number; enabled_feeds: number; errored_feeds: number;
   last_polled_at: string | null; shortest_interval_minutes: number | null; billing_blocked: boolean | null; rate_limited: boolean | null };
 type Need = { layer: string; kind: string; object: string; verdict: 'present' | 'partial' | 'missing'; reason: string | null; related_table: string | null };
@@ -29,7 +32,7 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
 
 // Start with bounded metadata, then avoid overlapping the two aggregate readers.
-const sections: Section[] = ['model', 'coverage', 'jobs', 'consumers'];
+const sections: Section[] = ['model', 'consumers', 'coverage', 'jobs'];
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString() : 'Unmeasured';
 const time = (s: string | null | undefined) => s && Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleString() : 'Unmeasured';
 const sourceValid = (s: Source) => typeof s.source_slug === 'string' && s.source_slug.length > 0
@@ -90,10 +93,76 @@ const box = { border: '2px solid var(--border)', padding: 12, marginBottom: 16 }
 const cell = { padding: '6px 8px', textAlign: 'left' as const, borderBottom: '1px solid var(--border)', verticalAlign: 'top' as const };
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 };
 const label = { fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontWeight: 700 };
-const metric = { fontFamily: 'Courier New', fontSize: 24, fontWeight: 700, margin: '8px 0' };
 const lifecycleOrder = ['live', 'showable', 'building', 'measured', 'proposed', 'retired'];
 
-export default function IntakeReadiness() {
+// Purpose is from the canonical job owners; health and counts come from the live assay.
+const jobPurpose: Record<string, string> = {
+  'project-retained-listing-properties': 'Turns retained listing claims into attributed vehicle observations. Failed work or stale source custody prevents a clean output check.',
+  'qualify-bat-archived-sales': 'Qualifies retained BaT captures as sale observations. Failed work, stale qualified evidence or stalled replay can fail this check.',
+  'drain-sale-residual-fold': 'Maintains the sale residual fold from admitted sale evidence.',
+};
+const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+export function RetainedBidReplay() {
+  const demo = ORDER_BOOK_STACK.demonstration;
+  const result = useOrderBook(demo.vehicleId, demo.auctionEventId);
+  const [picked, setPicked] = useState<string | null>(null);
+  const read = result.data;
+  const view = read ? shapeOrderBook(read) : null;
+  const selected = view?.states.find(s => s.bid.id === picked) ?? (view ? view.states[view.states.length - 1] : undefined);
+  const route = `${ORDER_BOOK_STACK.route}/${demo.vehicleId}?lot=${demo.auctionEventId}`;
+  if (result.isPending) return <p role="status">Reading the retained lot and its keyed bids…</p>;
+  if (!read || !view || !selected) return <div role="status"><p>{result.isError
+    ? 'The retained lot could not be read completely.' : 'No replayable bids returned for this retained lot.'}</p>
+    <button type="button" onClick={() => void result.refetch()}>Retry retained lot</button></div>;
+  const prices = view.states.map(s => s.price);
+  const low = Math.min(...prices), high = Math.max(...prices);
+  const x = (i: number) => 12 + i / Math.max(1, prices.length - 1) * 576;
+  const y = (price: number) => 100 - (price - low) / Math.max(1, high - low) * 80;
+  const keyed = view.bids.filter(b => b.keyed).length;
+  const sourceUrl = /^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/.test(read.lot!.source_url) ? read.lot!.source_url : null;
+  return <div className="status-replay">
+    <div className="status-replay-head">
+      <VehicleIdentity year={read.vehicle.year} make={read.vehicle.make ?? ''} model={read.vehicle.model ?? ''} />
+      <PrefetchLink to={route}>Open full evidence & missing layers →</PrefetchLink>
+    </div>
+    {result.isError && <p role="status">Refresh unavailable. Showing the retained reading from {time(read.readAt)}.</p>}
+    <div className="status-trace" aria-label="Retained evidence path">
+      <span><b>Source</b>BaT · one lot</span><span><b>Evidence</b>{count(view.partition.inWindow.length)} rows in the lot window</span>
+      <span><b>Keys</b>{count(keyed)} / {count(view.bids.length)} bids linked to identities</span><span><b>Calculation</b>Book folded at each posted bid</span>
+    </div>
+    <div className="status-replay-grid">
+      <div>
+        <div className="status-kicker">HIGH BID BY BID SEQUENCE · USD</div>
+        <svg viewBox="0 0 600 116" width="600" height="116" className="status-bid-chart" role="img" aria-label={`Retained bid prices from ${usd(low)} to ${usd(high)}; selected bid ${selected.index + 1}`}>
+          <path d={`M 12 100 H 588`} fill="none" stroke="var(--border)" />
+          <polyline points={prices.map((p, i) => `${x(i)},${y(p)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2" />
+          <line x1={x(selected.index)} x2={x(selected.index)} y1="12" y2="104" stroke="currentColor" strokeDasharray="3 3" />
+          <circle cx={x(selected.index)} cy={y(selected.price)} r="4" fill="currentColor" />
+        </svg>
+        <div className="status-chart-scale"><span>First retained: {usd(prices[0])}</span><span>Latest retained: {usd(prices[prices.length - 1])}</span></div>
+        <div className="status-replay-controls">
+          <button type="button" disabled={selected.index === 0} onClick={() => setPicked(view.states[0].bid.id)}>First bid</button>
+          <label>Replay bid {selected.index + 1} / {view.states.length}
+            <input type="range" aria-label="Replay bid" min="0" max={view.states.length - 1} value={selected.index}
+              onChange={e => setPicked(view.states[Number(e.target.value)].bid.id)} />
+          </label>
+          <button type="button" disabled={selected.index === view.states.length - 1} onClick={() => setPicked(null)}>Latest retained</button>
+        </div>
+      </div>
+      <div className="status-replay-answer" aria-live="polite">
+        <div className="status-kicker">BOOK AT SELECTED BID</div>
+        <strong className="status-price">{usd(selected.price)}</strong>
+        <p>{count(selected.identities)} keyed identities · {count(selected.unresolved)} unresolved entries</p>
+        <p>Posted {time(new Date(selected.bid.at).toISOString())}<br />Landed {time(selected.bid.landedAt == null ? null : new Date(selected.bid.landedAt).toISOString())}</p>
+        {sourceUrl && <a href={`${sourceUrl.replace(/\/+$/, '')}/${selected.bid.batCommentId ? `#comment-${selected.bid.batCommentId}` : ''}`} target="_blank" rel="noopener noreferrer">Open source bid ↗</a>}
+      </div>
+    </div>
+    <p className="status-basis">Event-time replay of retained bids. Each state uses bids posted through that point; landing clocks are shown separately. This is revealed bidding, not a forecast or proof of what was known then. Read {time(read.readAt)}.</p>
+  </div>;
+}
+
+export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) {
   const [readings, setReadings] = useState<Partial<Record<Section, Reading>>>({});
   const [failed, setFailed] = useState<Section[]>([]);
   const [refresh, setRefresh] = useState(0);
@@ -106,6 +175,8 @@ export default function IntakeReadiness() {
   const [consumerSearch, setConsumerSearch] = useState('');
   const [consumerTableOnly, setConsumerTableOnly] = useState(false);
   const [consumerLimit, setConsumerLimit] = useState(8);
+  const [consumerTables, setConsumerTables] = useState<string[]>([]);
+  const [consumersOpen, setConsumersOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -141,6 +212,7 @@ export default function IntakeReadiness() {
     ? sources.reduce((sum, s) => ({ targets: sum.targets + s.total_targets, completed: sum.completed + s.extracted }), { targets: 0, completed: 0 }) : null;
   const model = readings.model;
   const tables = (model?.rows ?? []) as Table[];
+  const observationRows = tables.find(t => t.table_name === 'vehicle_observations' && t.atlas_present)?.est_rows;
   const table = tables.find(t => t.table_name === selectedTable);
   const edges = (model?.links ?? []).filter(e => e.child_table === selectedTable || e.parent_table === selectedTable);
   const jobs = readings.jobs;
@@ -165,55 +237,81 @@ export default function IntakeReadiness() {
   const needsTotals = consumers?.complete && questions.length > 0
     ? questions.reduce((sum, q) => ({ total: sum.total + q.n_needs, present: sum.present + q.n_present,
       partial: sum.partial + q.n_partial, missing: sum.missing + q.n_missing }), { total: 0, present: 0, partial: 0, missing: 0 }) : null;
-  const matchingQuestions = questions.filter(q => (!consumerTableOnly || q.needs.some(n => n.related_table === selectedTable))
+  const matchingQuestions = questions.filter(q => (!consumerTableOnly || q.needs.some(n => consumerTables.length
+    ? consumerTables.includes(n.related_table ?? '') : n.related_table === selectedTable))
     && `${q.stack_id} ${q.name} ${q.question} ${q.needs.map(n => n.object).join(' ')}`.toLowerCase().includes(consumerSearch.toLowerCase().trim()))
     .sort((a, b) => lifecycleOrder.indexOf(a.status) - lifecycleOrder.indexOf(b.status)
       || b.n_present - a.n_present || a.stack_id.localeCompare(b.stack_id));
 
   return <section aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-      <h2 id="intake-readiness-title" style={{ fontSize: 14, margin: 0 }}>OPERATIONS</h2>
+      <h2 id="intake-readiness-title" style={{ fontSize: 14, margin: 0 }}>THE DATA MACHINE</h2>
       <button type="button" disabled={loading} onClick={() => setRefresh(n => n + 1)} style={{ fontSize: 11 }}>
         {loading ? 'Reading…' : 'Refresh intake readings'}
       </button>
     </div>
-    <p style={{ color: 'var(--text-secondary)' }}>Source coverage, scheduled work and model relationships. Readings refresh every five minutes.</p>
+    <p className="status-basis">Follow what is captured, what is retained, what is processed and what can be answered. Readings refresh every five minutes.</p>
     {failed.length > 0 && <p role="status">Unavailable: {failed.join(', ')}. Retained readings below keep their original dates.</p>}
 
-    <div style={grid}>
-      <a href="#status-sources" onClick={() => setSourcesOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
-        <div style={label}>Known targets complete</div>
-        <div style={metric}>{totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}%` : 'Unmeasured'}</div>
-        <div>{totals ? `${count(totals.completed)} / ${count(totals.targets)} target URLs` : 'Waiting for source coverage'}</div>
-        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Queue completion · inspect sources ↓</div>
+    <nav className="status-flow" aria-label="Explore the data flow">
+      <a href="#status-sources" onClick={() => setSourcesOpen(true)}>
+        <span className="status-kicker">01 · SOURCES</span><strong>{coverage ? count(sources.length) : '…'}</strong>
+        <span>{coverage?.complete === false ? 'sources in returned inventory slice' : 'sources in target inventory'}</span><small>{totals ? `${count(totals.completed)} / ${count(totals.targets)} URL queue matches complete` : 'Coverage reading pending or unavailable'}{coverage && <><br />Read {time(coverage.measured_at)}</>}</small><em>Inspect capture gaps →</em>
       </a>
-      <a href="#status-jobs" onClick={() => setJobsOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
-        <div style={label}>Scheduled jobs</div><div style={metric}>{jobs ? count(activeJobs.length) : 'Unmeasured'}</div>
-        <div>{jobs ? `${count(pausedJobs.length)} paused · ${count(config.length)} in scope` : 'Waiting for job configuration'}</div>
-        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Enabled configuration · inspect jobs ↓</div>
+      <a href="#status-model" onClick={() => { setSelectedTable('vehicle_observations'); setModelOpen(true); }}>
+        <span className="status-kicker">02 · RETAINED EVIDENCE</span><strong>{typeof observationRows === 'number' && Number.isFinite(observationRows) && observationRows >= 0 ? `≈${count(Math.round(observationRows))}` : 'Unmeasured'}</strong>
+        <span>estimated vehicle observations</span><small>{model ? `${count(tables.length)} tables in this view · owners & keys` : 'Model reading pending or unavailable'}{model && <><br />Read {time(model.measured_at)}</>}</small><em>Trace evidence relationships →</em>
       </a>
-      <a href="#status-jobs" onClick={() => setJobsOpen(true)} style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
-        <div style={label}>Jobs reporting failure</div><div style={metric}>{health.length > 0 ? count(failedJobs.length) : 'Unmeasured'}</div>
-        <div>{executionReadings} execution readings / {activeJobs.length} enabled jobs</div>
-        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Output {jobs?.health?.output_measured === false || jobs?.health?.status !== 'measured' ? 'unmeasured' : 'assays below'} · not fleet health</div>
+      <a href="#status-jobs" onClick={() => setJobsOpen(true)} data-attention={failedJobs.length > 0}>
+        <span className="status-kicker">03 · PROCESSING</span><strong>{jobs ? count(activeJobs.length) : '…'}</strong>
+        <span>enabled in this view · {jobs ? count(pausedJobs.length) : '…'} paused</span><small>{jobs ? `${health.length ? `${count(failedJobs.length)} reporting failure` : 'Failure readings unmeasured'} · ${executionReadings} execution readings / ${activeJobs.length} enabled jobs` : 'Reading execution and output checks'}{jobs && <><br />Configuration {time(jobs.config?.measured_at)}</>}</small><em>Inspect execution & output →</em>
       </a>
-      <a href="#status-consumers" style={{ ...box, color: 'inherit', textDecoration: 'none' }}>
-        <div style={label}>Consumer dependencies</div><div style={metric}>{needsTotals ? `${count(needsTotals.present)} / ${count(needsTotals.total)}` : 'Unmeasured'}</div>
-        <div>{consumers ? `${count(questions.length)} registered questions` : 'Waiting for dependency readings'}</div>
-        <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>Structure present · inspect missing needs ↓</div>
+      <a href="#status-consumers" onClick={() => setConsumersOpen(true)}>
+        <span className="status-kicker">04 · QUESTIONS</span><strong>{consumers ? count(questions.length) : '…'}</strong>
+        <span>{consumers?.complete === false ? 'questions in returned registry slice' : 'registered questions'}</span><small>{needsTotals ? `${count(needsTotals.present)} / ${count(needsTotals.total)} dependencies present · ${count(needsTotals.missing)} missing` : 'Dependency reading pending or unavailable'}{consumers && <><br />Read {time(consumers.measured_at)}</>}</small><em>Find a question & its gaps →</em>
       </a>
+    </nav>
+    <p className="status-basis">Independent readings of the same machine. URL completion, stored structure, job checks and delivered answers have different scopes.</p>
+
+    <div className="status-operating-panels">
+    {(failedJobs.length > 0 || feedProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
+      <div className="status-attention">
+        <h3 style={label}>NEEDS ATTENTION</h3>
+        {failedJobs.map(j => {
+          const h = health.find(h => h.jobname === j.jobname);
+          const owned = h?.declared_writer ? tables.filter(t => t.registry_owners?.includes(h.declared_writer!)).map(t => t.table_name) : [];
+          const related = questions.filter(q => q.needs.some(n => owned.includes(n.related_table ?? '')));
+          const counts = Object.entries(h?.assay_counts ?? {}).filter(([key, n]) => /^[a-z_]+$/.test(key) && Number.isSafeInteger(n) && n >= 0);
+          return <details key={j.jobname} className="status-incident">
+            <summary><span className="status-kicker">{h?.assay_status === 'failed' ? 'OUTPUT CHECK FAILED' : h?.last_status === 'failed' ? 'EXECUTION FAILED' : 'HEALTH CHECK FAILED'}</span>
+              <strong>{j.jobname}</strong>{typeof h?.assay_counts?.failed === 'number' && Number.isSafeInteger(h.assay_counts.failed) && h.assay_counts.failed > 0 && <span>{count(h.assay_counts.failed)} failed work items</span>}</summary>
+            <div><p>{jobPurpose[j.jobname] ?? (owned.length ? `Declared writer for ${owned.join(', ')}.` : 'The canonical check reports a failure; its owner-to-consumer path is unmeasured in this scope.')}</p>
+              {counts.length > 0 && <dl className="status-assay-counts">{counts.map(([key, n]) => <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{count(n)}</dd></div>)}</dl>}
+              <p className="status-basis">Execution: {h?.last_status ?? 'unmeasured'} · {time(h?.last_run_at)}. {owned.length ? `${related.length} registered questions declare these tables; this does not identify affected records.` : 'No exact writer-to-table declaration returned; affected records and questions are unmeasured.'}</p>
+            </div>
+            <div className="status-incident-actions"><a href="#status-jobs" onClick={() => { setJobFilter('failures'); setJobsOpen(true); }}>Inspect failed checks →</a>
+              {related.length > 0 && <a href="#status-consumers" onClick={() => { setConsumerTables(owned); setConsumerTableOnly(true); setConsumerSearch(''); setConsumerLimit(8); setConsumersOpen(true); }}>Inspect declared consumers →</a>}
+            </div>
+          </details>;
+        })}
+        {feedProblems.length > 0 && <details className="status-reading-gap"><summary>{feedProblems.length} sources report feed errors</summary><p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. Capture freshness needs inspection. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p></details>}
+        {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
+        {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <details className="status-reading-gap"><summary>Missing health readings · {unavailableChecks.length || 'scope unmeasured'}</summary><p>{unavailableChecks.length > 0
+          ? `Health readings unavailable for ${unavailableChecks.map(r => r.jobname).join(', ')}. Other checks retain their own results.`
+          : 'Output assays unavailable.'} {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p></details>}
+      </div>}
+
+    <section id="status-delivery" className="status-delivery" aria-labelledby="status-delivery-title">
+      <div className="status-section-head"><div><div className="status-kicker">INSPECT A RESULT · RETAINED EVIDENCE</div>
+        <h3 id="status-delivery-title">How did bidding build on this lot?</h3>
+        <p>Move through posted bids. Watch the high bid and the identity count change from the same retained log.</p></div>
+      </div>
+      <RetainedBidReplay />
+      <p className="status-basis">SA · One retained demonstration. The full reader exposes coverage, source clocks and the missing baseline, residual and prediction layers.</p>
+    </section>
     </div>
 
-    {(failedJobs.length > 0 || feedProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
-      <div style={{ ...box, borderLeft: '4px solid var(--warning, var(--text))' }}>
-        <h3 style={label}>NEEDS ATTENTION</h3>
-        {failedJobs.map(j => <p key={j.jobname}><a href="#status-jobs" onClick={() => setJobsOpen(true)}>{j.jobname}</a> · {health.find(h => h.jobname === j.jobname)?.last_status === 'failed' ? 'Execution failed' : 'Output or health check failed'}</p>)}
-        {feedProblems.length > 0 && <p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p>}
-        {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
-        {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <p>{unavailableChecks.length > 0
-          ? `Health readings unavailable for ${unavailableChecks.map(r => r.jobname).join(', ')}. Other checks retain their own results.`
-          : 'Output assays unavailable.'} {health.length > 0 ? 'Execution readings remain available; successful exits do not prove output.' : 'Job configuration remains available; execution and output are unmeasured.'}</p>}
-      </div>}
+    {arrivals}
 
     {coverage && <details id="status-sources" open={sourcesOpen} onToggle={e => setSourcesOpen(e.currentTarget.open)} style={box}>
       <summary style={label}>SOURCE COVERAGE · {sources.length} sources · {totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}% queue complete` : 'Unmeasured'}</summary>
@@ -297,19 +395,21 @@ export default function IntakeReadiness() {
       </details>
     </div>}
 
-    {consumers && <section id="status-consumers" style={box} aria-labelledby="status-consumers-title">
+    {consumers && <details id="status-consumers" open={consumersOpen} onToggle={e => setConsumersOpen(e.currentTarget.open)} style={box}>
+      <summary style={label}>QUESTIONS & MISSING DEPENDENCIES · {questions.length} registered questions</summary>
       <h3 id="status-consumers-title" style={label}>QUESTIONS & MISSING DEPENDENCIES</h3>
       <p>{needsTotals ? `${count(needsTotals.present)} present · ${count(needsTotals.partial)} partial · ${count(needsTotals.missing)} missing / ${count(needsTotals.total)} dependency declarations`
         : 'First 100 questions only; aggregate totals withheld.'}</p>
       <p style={{ color: 'var(--text-secondary)' }}>Reading {time(consumers.measured_at)}. Registry structure, not verified answers. A present table or function does not prove correct processing, replay or delivery.</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12 }}>
         <label>Find a question or dependency <input type="search" value={consumerSearch} onChange={e => { setConsumerSearch(e.target.value); setConsumerLimit(8); }} style={{ fontSize: 11 }} /></label>
-        <label><input type="checkbox" checked={consumerTableOnly} onChange={e => { setConsumerTableOnly(e.target.checked); setConsumerLimit(8); }} /> Uses {selectedTable}</label>
+        <label><input type="checkbox" checked={consumerTableOnly} onChange={e => { setConsumerTableOnly(e.target.checked); setConsumerLimit(8); }} /> Uses {consumerTables.length ? consumerTables.join(', ') : selectedTable}</label>
+        {consumerTableOnly && <button type="button" onClick={() => { setConsumerTableOnly(false); setConsumerTables([]); }}>Clear table filter</button>}
       </div>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{['Question / declared dependencies', 'Registry status', 'Present', 'Partial', 'Missing'].map(name => <th scope="col" key={name} style={cell}>{name}</th>)}</tr></thead>
         <tbody>{matchingQuestions.slice(0, consumerLimit).map(q => <tr key={q.stack_id}>
-          <td style={cell}><details><summary>{q.stack_id} · {q.name}</summary><p>{q.question}</p>
+          <td style={cell}><div className="status-question">{q.question}</div><details><summary>{q.stack_id} · {q.name}</summary>
             <p>Definition v{q.version} · {q.needs_complete ? 'All declared needs shown' : 'First 64 needs only'}</p>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{['Layer', 'Dependency', 'Structure', 'Reason'].map(name => <th scope="col" key={name} style={cell}>{name}</th>)}</tr></thead>
               <tbody>{q.needs.map((n, i) => <tr key={`${n.layer}:${n.object}:${i}`}><td style={cell}>{n.layer}</td>
@@ -329,7 +429,7 @@ export default function IntakeReadiness() {
       <p style={{ color: 'var(--text-secondary)' }}>Showing {Math.min(consumerLimit, matchingQuestions.length)} of {matchingQuestions.length} matching questions, ordered by declared lifecycle status, then present dependencies. Shared dependencies count once per declaration.</p>
       {matchingQuestions.length > consumerLimit && <button type="button" onClick={() => setConsumerLimit(n => n + 8)} style={{ fontSize: 11 }}>Show more questions</button>}
       {matchingQuestions.length === 0 && <p>No question matches this filter in the returned registry scope.</p>}
-    </section>}
+    </details>}
 
     {model && <details id="status-model" open={modelOpen} onToggle={e => setModelOpen(e.currentTarget.open)} style={box}>
       <summary style={label}>MODEL RELATIONSHIPS · {tables.length} tables · {model.links?.length} declared links</summary>
@@ -355,7 +455,7 @@ export default function IntakeReadiness() {
         </details>
       </>}
       <p>Fourteen named tables. Foreign keys establish declared structure. Trigger counts, description coverage and receipts do not prove semantic correctness, replay or consumer delivery.</p>
-      <p><a href="#status-consumers" onClick={() => { setConsumerTableOnly(true); setConsumerSearch(''); setConsumerLimit(8); }}>Show registered questions using {selectedTable} →</a></p>
+      <p><a href="#status-consumers" onClick={() => { setConsumerTableOnly(true); setConsumerTables([]); setConsumersOpen(true); setConsumerSearch(''); setConsumerLimit(8); }}>Show registered questions using {selectedTable} →</a></p>
       <p><PrefetchLink to="/stacks">Inspect downstream stacks →</PrefetchLink></p>
     </details>}
   </section>;

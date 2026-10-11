@@ -64,6 +64,8 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
       ...(identity ? { source_value: rawValue, normalization_version: RETAINED_IDENTITY_LABEL_VERSION,
         identity_role: "extractor_vehicle_label", identity_resolution_status: "unverified",
         source_event_time_status: "unknown" } : {}),
+      ...(propertyKey === "vin" ? { vin_identifier_namespace: "standard_17_character_vin_label",
+        vin_format_status: "17_character_format", vin_checksum_status: "not_evaluated" } : {}),
       ...(powertrain ? { source_value: rawValue, normalization_version: "retained_powertrain_v1" } : {}),
       ...(reading ? { source_value: rawValue, normalization_version: "retained_odometer_miles_v1",
         source_reading_value: reading.source_reading_value, source_reading_unit: reading.source_reading_unit,
