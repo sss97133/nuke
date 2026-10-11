@@ -11,7 +11,7 @@ const frames = fixture.events.map(f => ({ ...f, monitored_auction_id: target.id,
 // wake just before its threshold, making short fixtures skip a heartbeat/ping.
 async function withCollectorClock(run:()=>Promise<void>) {
   const realNow=Date.now,realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
-  let now=realNow(),nextId=0,pump:number|undefined;
+  let now=realNow(),nextId=0,pump:ReturnType<typeof globalThis.setTimeout>|undefined;
   const timers=new Map<number,{at:number;run:()=>void}>();
   const schedule=()=>{
     if(pump!==undefined||!timers.size)return;
@@ -28,8 +28,8 @@ async function withCollectorClock(run:()=>Promise<void>) {
     const id=++nextId;
     timers.set(id,{at:now+Math.max(0,delay),run:()=>{(handler as (...args:unknown[])=>void)(...args);}});
     schedule();return id;
-  }) as typeof globalThis.setTimeout;
-  globalThis.clearTimeout=(id)=>{if(id!==undefined)timers.delete(id);};
+  }) as unknown as typeof globalThis.setTimeout;
+  globalThis.clearTimeout=(id)=>{if(typeof id==="number")timers.delete(id);};
   try { await run(); }
   finally {
     if(pump!==undefined)realClearTimeout(pump);
