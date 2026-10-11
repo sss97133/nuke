@@ -79,6 +79,30 @@ failure retention and growth are measured per organization. Schema breadth and
 a populated listing cache do not close those requirements. The person/organization
 dual ledger in §1.5 retains its separate representation proposal.
 
+### Release and recurring refresh proposal, 2026-10-11
+
+PR #957 is deployed and its public profile reader is runtime-verified. The sanctioned
+worker refreshed 208 public organization activity caches. PR #961 repaired the
+selector's production timeout; its deployed `all:true` path subsequently refreshed
+50 caches with zero errors. These are retained-listing folds, not proof of fresh
+organization source acquisition.
+
+The next prepared migration targets only existing job 263,
+`compute-org-seller-stats-daily`: preserve its exact worker command, credentials,
+`all:true` body and 120-second HTTP timeout; replace the daily cadence with one
+bounded invocation every ten minutes. The worker selects at most 50 oldest caches,
+skips qualified caches less than one hour old and isolates failed folds. At the
+measured 208-key cohort, five successful batches cover a sweep; a two-hour freshness
+target is an initial operating target, not a proven guarantee or a fleet-size promise.
+
+Activation requires the owner's separate approval because this job is paused.
+The migration rejects a changed command, job, access contract or cadence, and
+reapplication cannot undo a later pause on the ten-minute cadence. All other
+paused jobs remain untouched. After approval and CI deployment, verify actual
+cache-clock movement over scheduled runs and HTTP response outcomes; pg_cron's
+successful request enqueue alone does not prove a successful fold. Source binding,
+new organization acquisition and people/relationship admission remain open.
+
 The entity already exists and precipitates from the extraction crons:
 
 | Layer | What exists | State |
