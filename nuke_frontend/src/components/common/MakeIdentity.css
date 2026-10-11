@@ -28,6 +28,15 @@
 .vehicle-identity__art--make { width:76px; }
 .vehicle-identity__art--model { width:clamp(200px,29vw,340px); }
 .vehicle-identity__art--emblem { width:64px; }
+.vehicle-identity__variant { font-size:clamp(18px,2.5vw,28px); font-weight:400; }
+.vehicle-identity__art--variant { width:clamp(200px,29vw,340px); }
+/* A variant nameplate leads; its base model stays in the supporting identity line. */
+.vehicle-identity[data-variant-artwork="true"] { display:grid; grid-template-columns:64px minmax(0,340px); column-gap:20px; row-gap:10px; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__maker { grid-column:2; grid-row:1; flex-direction:row; flex-wrap:wrap; justify-content:space-between; gap:12px; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--make { width:124px; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--emblem { grid-column:1; grid-row:1 / 3; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__name { grid-column:2; grid-row:2; }
+.vehicle-identity[data-variant-artwork="true"] .vehicle-identity__model { font:inherit; }
 /* A neutral nameplate surface retains the source chrome/enamel in both themes.
    Multiply removes the white photographic surround without recoloring the badge. */
 .vehicle-identity[data-period-artwork="true"] { background:#f1f1ee; color:#202020; padding:12px 16px; }
@@ -39,4 +48,8 @@
   .vehicle-identity__art--emblem { width:46px; }
   .vehicle-identity__name { flex-basis:100%; }
   .vehicle-identity__art--model { width:min(280px,100%); }
+  .vehicle-identity[data-variant-artwork="true"] { grid-template-columns:46px minmax(0,280px); }
+  .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__art--make { width:100px; }
+  .vehicle-identity[data-variant-artwork="true"] .vehicle-identity__year { font-size:11px; }
+  .vehicle-identity__art--variant { width:min(280px,100%); }
 }

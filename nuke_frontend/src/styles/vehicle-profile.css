@@ -1294,7 +1294,6 @@
 .vp-masthead__identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0; font-family: Arial, sans-serif; }
 .vp-masthead__year { font: 12px 'Courier New', monospace; color: var(--text-secondary); }
 .vp-masthead__model { font-size: clamp(28px, 4vw, 44px); line-height: 1; letter-spacing: -.04em; }
-.vp-masthead__variant { font-size: clamp(18px, 2.5vw, 28px); font-style: italic; font-weight: 400; }
 .vp-masthead__result { position: relative; margin-left: auto; flex-shrink: 0; text-align: right; }
 .vp-masthead__result > span { display: block; color: var(--text-secondary); font: 9px Arial, sans-serif; }
 .vp-masthead__result strong { font: 700 20px 'Courier New', monospace; }
