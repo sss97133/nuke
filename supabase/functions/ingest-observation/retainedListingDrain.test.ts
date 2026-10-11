@@ -51,6 +51,11 @@ Deno.test("listing drain refuses arbitrary input before claim", async () => {
     const r = await run({ ...input, ...patch }, []);assert(r.response.status === 400 && r.calls.length === 0);
   }
 });
+Deno.test("drain dispatches only the exact registered VIN label key",async()=>{
+ const work={source_observation_id:source,property_id:"9fc93dd3-3639-439a-8eed-3e9a0f846334",mode:"retained_listing_vin_v1"};
+ const r=await run(input,[work]);assert(r.body.stored===1 && r.body.writes===1 && r.selectors[0].mode===work.mode);
+ const forged=await run(input,[{...work,mode:"retained_vin_reference_v1"}]);assert(forged.response.status===503 && forged.selectors.length===0);
+});
 Deno.test("sixty claims use exact existing selectors and require verified completion", async () => {
   const r = await run(input, rows(60));assert(r.body.writes === 60 && r.body.stored === 60 && r.body.retries === 0);
   assert(r.calls.length === 61 && r.selectors.length === 60);
