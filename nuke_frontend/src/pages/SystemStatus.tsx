@@ -248,10 +248,10 @@ export default function SystemStatus() {
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '8px' }}>
         <h1 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          ADMIN SYSTEM STATUS
+          SYSTEM STATUS
         </h1>
         <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-          Flow, scheduled work and evidence coverage. Estimated totals refresh each minute{stats ? ` • Last: ${stats.lastUpdate}` : ''}
+          Capture → evidence → processing → questions. Estimated totals refresh each minute{stats ? ` • Last: ${stats.lastUpdate}` : ''}
         </p>
       </div>
 
@@ -260,6 +260,7 @@ export default function SystemStatus() {
       {stats && statsError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>System totals unavailable. Showing the last received estimates.</p>}
       {pulseError && <p role="status" style={{ fontSize: '11px', marginBottom: 12 }}>Pipeline measurements unavailable.{pulse ? ' Showing the last received reading.' : ''}</p>}
       {pulsePending && <p role="status" style={{ fontSize: 11 }}>Reading {showHistory ? '14-day history' : 'recent pipeline arrivals'}…</p>}
+      <IntakeReadiness arrivals={<>
       {/* Pipeline Pulse — measured arrivals, with explicit partial coverage */}
       {pulse?.organs && (
         <div style={{ border: '2px solid var(--text)', padding: '12px', marginBottom: '16px', background: 'var(--bg)' }}>
@@ -317,7 +318,7 @@ export default function SystemStatus() {
                               <td key={d} style={{
                                 padding: '2px 4px', textAlign: 'right', border: '1px solid var(--border)',
                                 color: 'var(--text)',
-                                background: n === 0 && d !== dayKeys.at(-1) ? 'var(--surface)' : 'transparent',
+                                background: n === 0 && d !== dayKeys[dayKeys.length - 1] ? 'var(--surface)' : 'transparent',
                                 fontWeight: 400,
                               }}>
                                 {cappedPulse ? pulseCount(point) : measuredCount(n)}
@@ -344,7 +345,7 @@ export default function SystemStatus() {
         </div>
       )}
 
-      <IntakeReadiness />
+      </>} />
       {stats && <details style={{ border: '2px solid var(--border)', padding: 12, marginBottom: 16 }}>
         <summary style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em' }}>INVENTORY ESTIMATES & RECENT RECORDS</summary>
         <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Planner estimates of stored rows. These totals do not measure processing health or verified consumer delivery.</p>
