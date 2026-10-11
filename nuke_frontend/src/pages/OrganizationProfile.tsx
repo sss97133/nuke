@@ -2351,7 +2351,7 @@ export default function OrganizationProfile() {
               <div style={{ marginBottom: '16px' }}>
                 {/* Relationship context; listing activity is measured separately. */}
                 <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  Related vehicle records (bounded view): ownership, consignment, builds and sales. Recorded vehicle prices and dates do not establish this organization’s sales or revenue.
+                  Related vehicle records (bounded view): ownership, consignment, builds and sales. Currency is unmeasured in this vehicle-record view. Recorded amounts and dates do not establish this organization’s sales or revenue.
                 </p>
                 {/* Associated vehicle records, without organization revenue inference. */}
                 <div style={{
@@ -2400,7 +2400,7 @@ export default function OrganizationProfile() {
                               {[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', fontWeight: 600, color: 'var(--text)' }}>
-                              {v.sale_price ? `$${Math.round(Number(v.sale_price)).toLocaleString()}` : '—'}
+                              {v.sale_price ? Math.round(Number(v.sale_price)).toLocaleString() : '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>
                               {v.sale_date ? new Date(v.sale_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
