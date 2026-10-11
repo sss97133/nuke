@@ -35,6 +35,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     return builder;
   },
 } }));
+vi.mock('./stacks/orderBookReader', async importOriginal => ({ ...await importOriginal<typeof import('./stacks/orderBookReader')>(), useOrderBook: () => ({ isPending: true }) }));
 import SystemStatus from './SystemStatus';
 
 let root: Root, container: HTMLDivElement;
@@ -133,7 +134,7 @@ it('reports a transport failure instead of leaving an endless loading message', 
   expect(container.textContent).toContain('System totals unavailable. Retrying each minute.');
   fixture.transportFailure = false;
   await tick(60_000);
-  expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
+  expect(container.textContent).toContain('SYSTEM STATUS');
 });
 it('shows intake coverage through a failed totals read and does not re-fetch it when totals recover', async () => {
   fixture.transportFailure = true;
@@ -143,7 +144,7 @@ it('shows intake coverage through a failed totals read and does not re-fetch it 
   expect(container.textContent).toContain('System totals unavailable');
   expect(container.textContent).toContain('0 completed queue matches / 10 known target URLs');
   fixture.transportFailure = false; await tick(60_000);
-  expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
+  expect(container.textContent).toContain('SYSTEM STATUS');
   expect(fixture.intakeRequests).toHaveLength(4);
 });
 
@@ -185,7 +186,7 @@ it('keeps pipeline flow available when totals fail and hides empty recent widget
   fixture.transportFailure = true;
   await render();
   expect(row('VEHICLES')?.textContent).toContain('4');
-  expect(container.querySelector('h1')?.textContent).toBe('ADMIN SYSTEM STATUS');
+  expect(container.querySelector('h1')?.textContent).toBe('SYSTEM STATUS');
   expect(container.textContent).not.toContain('RECENT TIER 1 ANALYSIS');
   expect(container.textContent).not.toContain('RECENT CATALOG PARTS');
 });

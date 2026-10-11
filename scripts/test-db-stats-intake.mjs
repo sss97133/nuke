@@ -303,3 +303,15 @@ test('reported success without a readable vehicle never completes the queue item
   assert.notEqual(result.results[0].status, 'complete');
   assert(result.results[0].error.includes('read-back failed'));
 });
+
+test('health exposes only allowlisted numeric assay aggregates alongside the canonical verdict', async () => {
+  const db = connection({ [EXECUTION_SQL]: [{ measured_at: clock, rows: [{ jobname: HEALTH_JOBS[0], last_status: 'succeeded' }] }],
+    [HEALTH_SQL]: args => [{ measured_at: clock, rows: [{ jobname: args[0][0], assay_status: 'failed', health_status: 'failed',
+      assay_counts: { failed: 4, due: 12 } }] }] });
+  const result = await readIntakeSection(db, 'jobs');
+  assert.deepEqual(result.health.rows.find(r => r.jobname === HEALTH_JOBS[0]).assay_counts, { failed: 4, due: 12 });
+  assert.equal(result.health.rows.find(r => r.jobname === HEALTH_JOBS[0]).last_status, 'succeeded');
+  assert.match(HEALTH_SQL, /key IN \('pending','claimed','failed','stale_qualified'/);
+  assert.match(HEALTH_SQL, /jsonb_typeof\(value\) = 'number'/);
+  assert(!HEALTH_SQL.includes('source_scan')); assert(!HEALTH_SQL.includes('snapshot_cursor'));
+});
