@@ -160,3 +160,5 @@ def run_identity_checks(sql, read, rejects, claim, passed):
     for role in ('anon','authenticated'):
         assert sql(f"SELECT has_function_privilege('{role}','claim_retained_listing_properties(text,integer)','EXECUTE')") == 'f'
     passed('forged physical identity/year/source/event assertions refused, stale parent withdrawn from completion and readers')
+    from test_retained_canonical_recovery import run_canonical_recovery_checks
+    run_canonical_recovery_checks(sql, read, rejects, passed)
