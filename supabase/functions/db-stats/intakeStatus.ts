@@ -57,11 +57,42 @@ FROM (SELECT p.source_slug, p.display_name, p.base_url,
       WHERE source_slug = p.source_slug LIMIT 25) t), '[]'::jsonb) AS targets
   FROM source_profiles p WHERE p.organization_id = $1 ORDER BY p.source_slug LIMIT 31) s`;
 
+// A fixed-size cache read; never fold a company's event history on page load.
+// Gate by the canonical public parent and admit only the qualified contract.
+export const ORG_ACTIVITY_SQL = `SELECT statement_timestamp() AS measured_at,
+  coalesce(jsonb_agg(jsonb_build_object(
+    'contract', s.evidence_summary->>'contract', 'calculated_at', s.calculated_at,
+    'total_listings', s.total_listings, 'total_sold', s.total_sold,
+    'total_unsold', s.total_unsold, 'active_listings', s.active_listings,
+    'sell_through_rate', s.sell_through_rate,
+    'input_rows', s.evidence_summary->'input_rows',
+    'unresolved_identity_rows', s.evidence_summary->'unresolved_identity_rows',
+    'unknown_outcomes', s.evidence_summary->'unknown_outcomes',
+    'unpriced_sold', s.evidence_summary->'unpriced_sold',
+    'identity_conflicts', s.evidence_summary->'identity_conflicts',
+    'outcome_conflicts', s.evidence_summary->'outcome_conflicts',
+    'amount_conflicts', s.evidence_summary->'amount_conflicts',
+    'unknown_currency_sold', s.evidence_summary->'unknown_currency_sold',
+    'latest_input_created_at', s.evidence_summary->'latest_input_created_at',
+    'latest_input_extracted_at', s.evidence_summary->'latest_input_extracted_at',
+    'currencies', coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'currency', c->>'currency', 'listings', c->'listings', 'total', c->'total'))
+      FROM jsonb_array_elements(s.evidence_summary->'currencies') WITH ORDINALITY a(c,n)
+      WHERE n <= 30), '[]'::jsonb),
+    'currencies_complete', jsonb_array_length(s.evidence_summary->'currencies') <= 30
+  )), '[]'::jsonb) AS rows
+FROM public.organizations o JOIN public.organization_seller_stats s ON s.organization_id = o.id
+WHERE o.id = $1 AND o.is_public = true
+  AND s.evidence_summary->>'contract' = 'listing_activity_v1'
+  AND s.evidence_summary->>'scope' = 'retained_public_organization_attributed_listings'
+  AND s.evidence_summary->>'population_complete' = 'true'`;
+
 export async function readOrganizationTargets(conn: IntakeConnection, organizationId: string) {
   const result = await boundedRead(conn, ORG_TARGETS_SQL, [organizationId]);
+  const listingActivity = await boundedRead(conn, ORG_ACTIVITY_SQL, [organizationId], '3s');
   return { contract: 'organization_targets_v1', organization_id: organizationId, ...result,
     rows: result.rows.slice(0, 30), complete: result.status === 'measured' && result.rows.length <= 30,
-    sample_limit: 25 };
+    sample_limit: 25, listing_activity: listingActivity };
 }
 // The existing registry measures declared structure, not end-to-end delivery.
 // Project only dependency names/verdicts and reasons, never raw evidence payloads.

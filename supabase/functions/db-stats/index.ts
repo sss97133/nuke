@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     try {
       if (organizationId !== null) {
         const data = await readOrganizationTargets(conn1, organizationId);
-        return new Response(JSON.stringify(data), { status: data.status === 'measured' ? 200 : 503,
+        return new Response(JSON.stringify(data), { status: data.status === 'measured' || data.listing_activity.status === 'measured' ? 200 : 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
       }
       if (section !== null) {

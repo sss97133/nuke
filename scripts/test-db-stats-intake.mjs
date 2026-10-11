@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
   INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
-  ORG_TARGETS_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  ORG_TARGETS_SQL, ORG_ACTIVITY_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -121,7 +121,7 @@ test('relationship slice is explicit and uses fixed parameterized table scope', 
   assert(MODEL_SQL.includes('LIMIT 33')); assert(!MODEL_SQL.includes('writers_30d'));
 });
 
-function handler({ verdict, admin = false } = {}) {
+function handler({ verdict, admin = false, organizationReading } = {}) {
   let serve, pools = 0, queries = 0, reads = 0;
   const exports = {};
   const source = readFileSync(new URL('../supabase/functions/db-stats/index.ts', import.meta.url), 'utf8');
@@ -135,7 +135,7 @@ function handler({ verdict, admin = false } = {}) {
       if (name.endsWith('/writeGuard.ts')) return { authenticateWriter: async () => verdict ?? { ok: false } };
       if (name.endsWith('/intakeStatus.ts')) return {
         readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; },
-        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] }; },
+        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [], ...organizationReading }; },
       };
       if (name.includes('postgres@')) return { Pool: class {
         constructor() { pools++; }
@@ -189,6 +189,16 @@ test('signed-in non-admin gets no privileged metadata; membership is parameteriz
   assert.equal(h.counts().reads, 0);
   assert.equal(h.queryCalls[0].sql.includes('user_id = $1::uuid AND is_active'), true);
   assert.deepEqual(Array.from(h.queryCalls[0].args), ['synthetic-user']);
+});
+test('organization activity reads only its public parent cache; a cache failure preserves target inventory', async () => {
+  const db = connection({ [ORG_TARGETS_SQL]: [{ measured_at: clock, rows: [{ total_targets: 2 }] }],
+    [ORG_ACTIVITY_SQL]: new Error('PRIVATE_CACHE_ERROR') });
+  const result = await readOrganizationTargets(db, 'synthetic-id');
+  assert.equal(result.rows[0].total_targets, 2);
+  assert.equal(result.listing_activity.status, 'unavailable');
+  assert.deepEqual(db.calls.find(c => c.sql === ORG_ACTIVITY_SQL).args, ['synthetic-id']);
+  assert(!JSON.stringify(result).includes('PRIVATE_CACHE_ERROR'));
+  assert(!ORG_ACTIVITY_SQL.includes('public.vehicle_events'));
 });
 test('active admins and service callers receive only the requested read-only section without caching', async () => {
   for (const caller of [{ kind: 'user', userId: 'synthetic-admin' }, { kind: 'service_role' }]) {
@@ -314,4 +324,13 @@ test('health exposes only allowlisted numeric assay aggregates alongside the can
   assert.match(HEALTH_SQL, /key IN \('pending','claimed','failed','stale_qualified'/);
   assert.match(HEALTH_SQL, /jsonb_typeof\(value\) = 'number'/);
   assert(!HEALTH_SQL.includes('source_scan')); assert(!HEALTH_SQL.includes('snapshot_cursor'));
+});
+
+test('public activity survives unavailable target inventory; two unavailable readings return 503', async () => {
+  const partial = handler({ organizationReading: { status: 'unavailable', rows: [], listing_activity: { status: 'measured', rows: [{ total_listings: 2994 }] } } });
+  const response = await partial.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).listing_activity.rows[0].total_listings, 2994);
+  const unavailable = handler({ organizationReading: { status: 'unavailable', listing_activity: { status: 'unavailable', rows: [] } } });
+  assert.equal((await unavailable.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111')).status, 503);
 });

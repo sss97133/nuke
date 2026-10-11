@@ -26,6 +26,59 @@ An **organization is a business entity**; a **user is a person**. The thing that
 
 ## 2. This is dormant, not missing — develop, don't mint
 
+### Operating evidence and first repair, 2026-10-10
+
+Live reading at 2026-10-11 03:10 UTC: **5,734 organizations**, 4,540 public and
+1,194 private; one organization created in seven days. The actual constraint
+graph has 105 incoming foreign keys from 92 tables. This establishes structural
+capacity, not operating depth. Only 303 organizations have vehicle relationships
+(not every organization should); the seller cache has eight rows, last calculated
+April 14. The seller rollup, seller-intelligence, classic seller queue and location
+jobs are paused. Active vehicle feed polling does not prove organization monitoring.
+A separate indexed reading at 03:38 UTC found 208 organizations with native
+organization-attributed listing evidence; nine had rows created or extracted in
+the prior 24 hours. These are data-record clocks, not proof of new business events. This is real activity, but the eight old seller caches do not
+reflect it.
+There are 576 legacy dealer sources with no organization keys and 76 external
+organization profiles with no recorded sync. These are separate intake repair
+cohorts, not permission to enable stale writers or mint guessed organizations.
+
+The first implementation extends **compute-org-seller-stats** and
+**organization_seller_stats**, rather than adding a competing organization engine.
+`compute_organization_listing_activity(uuid)` folds the complete indexed retained
+public-vehicle listing population, keyed by platform and exact source URL, falling back to a
+native listing ID only when URL is missing. Missing identities remain unresolved
+rows; conflicting parents, native IDs, outcomes, prices and currencies remain
+coverage exclusions. Ended/cancelled does not mean an unsold result. A native
+reserve-not-met claim can establish an unsold result. Explicit currencies stay
+separate, with unknown units retained; associated vehicle prices do not establish
+organization sales or corporate revenue. The source records are unchanged.
+
+The fold excludes private/deleted vehicle parents and hidden/rejected organization
+associations. The existing public profile reader admits only this explicitly scoped
+qualified cache contract for a public canonical organization. Page loads read the cache, never fold the event
+history. The profile retains the calculation and input extraction/creation clocks,
+unknown outcomes, identity conflicts and amount coverage. This is **current retained
+evidence**, not a historical point-in-time reconstruction or complete world-market
+inventory. The oldest-cache candidate selector admits at most 50 indexed
+organization keys per existing worker invocation. Failed folds preserve the prior
+cache. No paused job is enabled by this migration.
+
+Acceptance is executable in `supabase/sql/test_organization_listing_activity.sql`
+and `scripts/test-organization-listing-activity.mjs`: populations beyond both old
+client caps, repeated aliases, separate listings for one vehicle, conflicts,
+unknown units, mixed currencies, known zero counters, atomic failure, concurrent
+cohort isolation, private-parent gating and actual public consumer SQL. Local
+tests are implementation evidence; merge, deployment and live admission still
+require their own receipts.
+
+Operating depth remains open until source binding and recurring admission feed
+organization activity; attributed people/roles, organization relationships,
+locations and work/service records reach their readers; and coverage, freshness,
+failure retention and growth are measured per organization. Schema breadth and
+a populated listing cache do not close those requirements. The person/organization
+dual ledger in §1.5 retains its separate representation proposal.
+
 The entity already exists and precipitates from the extraction crons:
 
 | Layer | What exists | State |

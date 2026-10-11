@@ -48,9 +48,6 @@ export interface SellerVehicleRecord {
 
 export interface SellerTrackRecord {
   vehicles_sold: SellerVehicleRecord[];
-  gmv_by_year: Record<string, number>;
-  volume_by_quarter: Array<{ quarter: string; count: number }>;
-  state_distribution: Record<string, number>;
 }
 
 export interface OrganizationProfileData {
@@ -554,67 +551,12 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
       }
     }
 
-    // State name normalization (full name → 2-letter abbreviation)
-    const STATE_ABBR: Record<string, string> = {
-      alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
-      connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',
-      illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',
-      maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
-      mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV',
-      'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
-      'north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',
-      pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',
-      tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA',
-      'west virginia':'WV',wisconsin:'WI',wyoming:'WY',
-    };
-    function normalizeState(s: string | null): string | null {
-      if (!s) return null;
-      const t = s.trim();
-      if (t.length === 2) return t.toUpperCase();
-      return STATE_ABBR[t.toLowerCase()] || t;
-    }
-
-    // Compute GMV by year, volume by quarter, state distribution from deduped vehicles
-    const gmvByYear: Record<string, number> = {};
-    const volumeMap: Record<string, number> = {};
-    const stateDistribution: Record<string, number> = {};
-
-    for (const row of bestByVehicle.values()) {
-      const v = row.vehicle;
-
-      // GMV by year
-      if (v.sale_price && v.sale_date) {
-        const yr = new Date(v.sale_date).getFullYear().toString();
-        gmvByYear[yr] = (gmvByYear[yr] || 0) + Number(v.sale_price);
-      }
-
-      // Volume by quarter
-      if (v.sale_date) {
-        const d = new Date(v.sale_date);
-        const q = `${d.getFullYear()} Q${Math.ceil((d.getMonth() + 1) / 3)}`;
-        volumeMap[q] = (volumeMap[q] || 0) + 1;
-      }
-
-      // State distribution (normalized)
-      const st = normalizeState(v.state);
-      if (st) {
-        stateDistribution[st] = (stateDistribution[st] || 0) + 1;
-      }
-    }
-
-    const volumeByQuarter = Object.entries(volumeMap)
-      .map(([quarter, count]) => ({ quarter, count }))
-      .sort((a, b) => a.quarter.localeCompare(b.quarter));
-
     sellerTrackRecord = {
       vehicles_sold: trackRecordVehicles.sort((a, b) => {
         const da = a.sale_date ? new Date(a.sale_date).getTime() : 0;
         const db = b.sale_date ? new Date(b.sale_date).getTime() : 0;
         return db - da;
       }),
-      gmv_by_year: gmvByYear,
-      volume_by_quarter: volumeByQuarter,
-      state_distribution: stateDistribution,
     };
   }
 
