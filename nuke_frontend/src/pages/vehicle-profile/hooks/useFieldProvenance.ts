@@ -49,6 +49,16 @@ export interface FieldProvenance {
     // Optional until the extended reader deployment has been verified.
     ingested_at?: string | null; extraction_method?: string | null; confidence?: number | null;
     kind?: string | null;
+    /** Existing reader returns at most 400 characters of observation content, not the complete source. */
+    content?: string | null;
+    source_observation_id?: string | null;
+    source_observed_at?: string | null;
+    source_recorded_at?: string | null;
+    source_event_time_status?: string | null;
+    independent_source?: boolean | null;
+    identity_resolution_status?: string | null;
+    factory_configuration_status?: string | null;
+    current_configuration_status?: string | null;
   }[];
 }
 

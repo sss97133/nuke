@@ -43,6 +43,41 @@ describe('canonical value -> attributed observation', () => {
     expect(html).toContain('Source claims differ'); expect(html).toContain('No resolution is established');
     expect(html).toContain('structured_import'); expect(html).not.toContain('Ingest time: Unavailable');
   });
+  it('lets readers open a retained excerpt and its original record with distinct source clocks and unknowns', () => {
+    Object.assign(fixture.provenance.data.observations[0], {
+      content: 'Retained source claim: This 1995 example was reported by its seller.',
+      source_observation_id: '00000000-0000-4000-8000-000000000001',
+      source_observed_at: '2026-10-01T12:00:00Z', source_recorded_at: '2026-10-01T12:01:00Z',
+      independent_source: false, source_event_time_status: 'unknown', identity_resolution_status: 'unverified',
+      factory_configuration_status: 'unknown', current_configuration_status: 'unknown',
+    });
+    const html = render();
+    expect(html).toContain('<details><summary>Read retained evidence</summary>');
+    expect(html).toContain('Retained source claim: This 1995 example');
+    expect(html).toContain('OBSERVATION EXCERPT · UP TO 400 CHARACTERS');
+    expect(html).toContain('/vehicle/local-vehicle/observation/00000000-0000-4000-8000-000000000001');
+    expect(html).toContain('Source observation time: 2026-10-01T12:00:00Z');
+    expect(html).toContain('Source record time: 2026-10-01T12:01:00Z');
+    expect(html).toContain('Source event time: Unknown');
+    expect(html).toContain('not an independent confirmation');
+    expect(html).toContain('This report leaves vehicle identity unverified');
+    expect(html).toContain('Factory and current configuration are unknown in this report');
+  });
+  it('escapes retained text and refuses malformed source-record routes without inventing clocks', () => {
+    Object.assign(fixture.provenance.data.observations[0], {
+      content: '<script>untrusted source text</script>', source_observation_id: '../../another-vehicle',
+      independent_source: true,
+    });
+    const html = render();
+    expect(html).toContain('&lt;script&gt;untrusted source text&lt;/script&gt;');
+    expect(html).not.toContain('<script>'); expect(html).not.toContain('another-vehicle');
+    expect(html).toContain('Source observation time: Unknown');
+    expect(html).toContain('Source record time: Unknown');
+    expect(html).not.toContain('independent confirmation');
+  });
+  it('does not add an empty evidence detail to older reader responses', () => {
+    expect(render()).not.toContain('Read retained evidence');
+  });
   it('qualifies multiple claims when opened before the parent evidence group arrives', () => {
     fixture.provenance.data.value = '4x4';
     fixture.provenance.data.evidence = [

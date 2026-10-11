@@ -201,6 +201,23 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           <div className="ev-label">SOURCE REPORT · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.id}`} onClick={closeTop}>Inspect observation {obs.id}</PrefetchLink></div>
           {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
           <span> · {obs.value || 'Value not recorded'}</span>
+          {(obs.content || obs.source_observation_id) && <details>
+            <summary>Read retained evidence</summary>
+            {obs.content && <div className="ev-proof-limitation" style={{ whiteSpace: 'pre-wrap' }}>
+              <span className="ev-label">OBSERVATION EXCERPT · UP TO 400 CHARACTERS</span>
+              <p>{obs.content}</p>
+            </div>}
+            {obs.source_observation_id && <>
+              {/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(obs.source_observation_id)
+                && <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.source_observation_id}`} onClick={closeTop}>Inspect retained source record</PrefetchLink>}
+              <div>Source observation time: {obs.source_observed_at || 'Unknown'} · Source record time: {obs.source_recorded_at || 'Unknown'}</div>
+              {obs.source_event_time_status === 'unknown' && <div>Source event time: Unknown</div>}
+              {obs.independent_source === false && <p>This report derives from the retained source record; it is not an independent confirmation.</p>}
+              {obs.identity_resolution_status === 'unverified' && <p>This report leaves vehicle identity unverified.</p>}
+              {obs.factory_configuration_status === 'unknown' && obs.current_configuration_status === 'unknown'
+                && <p>Factory and current configuration are unknown in this report.</p>}
+            </>}
+          </details>}
           <div style={{ color: 'var(--text-secondary)' }}>Observation time: {obs.observed_at ? new Date(obs.observed_at).toLocaleString() : 'Unknown'} · Ingest time: {obs.ingested_at ? new Date(obs.ingested_at).toLocaleString() : 'Unavailable'}</div>
           <div style={{ color: 'var(--text-secondary)' }}>Method: {obs.extraction_method || 'Unavailable'} · Stored confidence: {obs.confidence == null ? 'Unavailable' : obs.confidence}</div>
         </div>
