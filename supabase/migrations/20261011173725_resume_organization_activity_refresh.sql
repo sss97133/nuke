@@ -1,6 +1,9 @@
 -- Activation proposal for the existing organization listing cache owner only.
 -- No native intake, source records, other job, HTTP body or credential changes.
 BEGIN;
+-- cron.job is readable but not directly updateable by Supabase's deploy role.
+-- A concurrent owner edit must abort activation rather than invalidate its checks.
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '3s';
 DO $resume$
@@ -21,7 +24,7 @@ BEGIN
     RAISE EXCEPTION 'organization_listing_fold_access_changed';
   END IF;
   SELECT jobid, schedule, active, command INTO j FROM cron.job
-    WHERE jobid = 263 AND jobname = 'compute-org-seller-stats-daily' FOR UPDATE;
+    WHERE jobid = 263 AND jobname = 'compute-org-seller-stats-daily';
   IF NOT FOUND THEN RAISE EXCEPTION 'organization_refresh_job_changed'; END IF;
   IF encode(sha256(convert_to(j.command, 'UTF8')), 'base64') IS DISTINCT FROM
     'eidSpC4R4IQE1jlKoDOW1agaJoNZ4fHTXWot4k12bvQ=' THEN
