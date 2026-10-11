@@ -12,7 +12,10 @@ vi.mock('./useMarketPulse', async importOriginal => ({
 vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
 }));
-vi.mock('./AuctionEvidence', () => ({ default: ({ vehicleId, onClose }: any) => <section id={`lot-inspection-${vehicleId}`} aria-label="Listing activity evidence">{vehicleId}<button onClick={onClose}>Close listing evidence</button></section> }));
+vi.mock('./AuctionEvidence', () => ({
+  default: ({ vehicleId, onClose }: any) => <section id={`lot-inspection-${vehicleId}`} aria-label="Listing activity evidence">{vehicleId}<button onClick={onClose}>Close listing evidence</button></section>,
+  AuctionCompetition: ({ fallback }: any) => <>{fallback}<span>Stack A bidding depth</span></>,
+}));
 vi.mock('./useMarketRowDetails', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketRowDetails')>(),
   useMarketRowDetails: () => ({ data: fixture.details }), useMarketRowSpecs: () => ({ data: fixture.specs }),
@@ -313,7 +316,7 @@ describe('inline market row inspection', () => {
     expect(container.textContent).not.toContain('Arbitrary promotional headline');
     expect(container.textContent).toContain('6-speed manual');
     expect(container.textContent).toContain('CA · 90210');
-    expect(container.textContent).toContain('24 bids');
+    expect(container.querySelector(`[data-vehicle-id="${id}"] .market-lot-metrics`)?.textContent).toContain('Stack A bidding depth');
     expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
     await click('Inspect auction for 2004 BMW M3');
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;

@@ -2,11 +2,12 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any }));
+const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any, book: null as any }));
 vi.mock('../../hooks/useAuctionComments', () => ({ EPISODE_READ_LIMIT: 100, useAuctionEpisode: () => fixture.query }));
+vi.mock('../stacks/orderBookReader', async importOriginal => ({ ...await importOriginal<any>(), useBidBook: () => ({ data: fixture.book }) }));
 vi.mock('./useLotMovement', () => ({ useLotMovement: () => fixture.activity }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...p }: any) => <a href={to} {...p} /> }));
-import AuctionEvidence from './AuctionEvidence';
+import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 let root: Root, container: HTMLDivElement;
 const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
 const source = 'https://bringatrailer.com/listing/1937-packard-115c-convertible-8/';
@@ -26,6 +27,7 @@ beforeEach(() => {
       row('b1', 'bid', '2026-10-04T10:00:00Z', { bid_amount: 1000 }),
       row('unknown-date', 'bid', null, { bid_amount: 500 }),
     ] } };
+  fixture.book = null;
   fixture.activity = { coverage: { lots: [] } };
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
@@ -143,4 +145,33 @@ it('preserves the row owner focus when compact inspection effects replay', async
     await act(async () => root.render(null));
     tile.remove(); vehicle.remove();
   }
+});
+
+
+it('projects Stack A into the row and uses the same high for price and depth', async () => {
+  fixture.book = {
+    vehicle: { id }, lot: { id: 'lot', source_url: source, auction_end_date: '2026-10-04T12:00:00Z', total_bids: 3, updated_at: '2026-10-04T11:30:00Z' },
+    readAt: '2026-10-04T11:30:00Z', bids: [
+      row('one', 'bid', '2026-10-04T10:00:00Z', { bid_amount: 500, external_identity_id: id, bat_comment_id: 1 }),
+      row('two', 'bid', '2026-10-04T10:30:00Z', { bid_amount: 900, external_identity_id: '00000000-0000-4000-8000-000000000002', bat_comment_id: 2 }),
+      row('three', 'bid', '2026-10-04T11:00:00Z', { bid_amount: 1000, external_identity_id: id, bat_comment_id: 3 }),
+    ],
+  };
+  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
+  expect(container.textContent).toContain('Retained high1,000');
+  expect(container.textContent).toContain('2 within 10%');
+  expect(container.textContent).toContain('2 bidders · 3/3 reported bids held');
+  expect(container.textContent).not.toContain('800');
+  expect(container.querySelector('a')).toBeNull();
+  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} />));
+  expect(container.querySelector('.market-competition-answer')?.textContent).toContain('2 of 2');
+  expect(container.querySelector('input[type=range]')?.getAttribute('max')).toBe('2');
+  expect(container.querySelector('details')?.open).toBe(false);
+  expect(container.querySelector('a')?.getAttribute('href')).toContain('/stacks/order-book/');
+  fixture.book.lot.total_bids = 6;
+  fixture.book = { ...fixture.book };
+  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} />));
+  expect(container.textContent).toContain('At least 2');
+  expect(container.textContent).not.toContain('Leader’s margin');
+  expect(container.textContent).not.toContain('Last raise');
 });
