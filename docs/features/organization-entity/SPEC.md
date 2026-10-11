@@ -36,8 +36,8 @@ capacity, not operating depth. Only 303 organizations have vehicle relationships
 April 14. The seller rollup, seller-intelligence, classic seller queue and location
 jobs are paused. Active vehicle feed polling does not prove organization monitoring.
 A separate indexed reading at 03:38 UTC found 208 organizations with native
-organization-attributed listing evidence; nine had rows admitted or captured in
-the prior 24 hours. This is real activity, but the eight old seller caches do not
+organization-attributed listing evidence; nine had rows created or extracted in
+the prior 24 hours. These are data-record clocks, not proof of new business events. This is real activity, but the eight old seller caches do not
 reflect it.
 There are 576 legacy dealer sources with no organization keys and 76 external
 organization profiles with no recorded sync. These are separate intake repair
@@ -56,7 +56,7 @@ organization sales or corporate revenue. The source records are unchanged.
 
 The existing public profile reader admits only the qualified cache contract for
 a public canonical organization. Page loads read the cache, never fold the event
-history. The profile retains the calculation, input capture and admission clocks,
+history. The profile retains the calculation and input extraction/creation clocks,
 unknown outcomes, identity conflicts and amount coverage. This is **current retained
 evidence**, not a historical point-in-time reconstruction or complete world-market
 inventory. The oldest-cache candidate selector admits at most 50 indexed
