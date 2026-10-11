@@ -73,6 +73,71 @@ Deno.test("intake failure keeps every frame in order; bounded overflow is an err
   assert.equal(queue.pending, 0);
 });
 
+Deno.test("one rejected lot retains its ordered frames without blocking another lot", async () => {
+  const badId = target.id;
+  const goodId = "00000000-0000-0000-0000-000000000003";
+  let rejected = true;
+  const admitted: BatLiveFrame[] = [];
+  const failedFrames = Array.from({ length: 60 }, (_, i) => ({ ...frames[0], data: { sequence: i } }));
+  const goodFrames = [frames[1], frames[4]].map(f => ({ ...f, monitored_auction_id: goodId }));
+  const queue = new BatLiveBuffer(async batch => {
+    assert.equal(new Set(batch.map(f => f.monitored_auction_id)).size, 1);
+    assert.ok(batch.length <= 50);
+    if (rejected && batch[0].monitored_auction_id === badId) throw new Error("canonical vehicle auction event missing");
+    admitted.push(...batch);
+  });
+  failedFrames.forEach(f => queue.push(f));
+  goodFrames.forEach(f => queue.push(f));
+  await assert.rejects(() => queue.flush(), /canonical vehicle auction event missing/);
+  assert.deepEqual(admitted, goodFrames);
+  assert.equal(queue.pending, failedFrames.length);
+  assert.equal(queue.statusFor(badId).pending, failedFrames.length);
+  assert.match(queue.statusFor(badId).error!, /canonical vehicle auction event missing/);
+  assert.deepEqual(queue.statusFor(goodId), { pending: 0, oldestReceivedAt: null, error: null });
+  rejected = false;
+  await queue.flush();
+  assert.deepEqual(admitted, [...goodFrames, ...failedFrames]);
+  assert.equal(queue.pending, 0);
+  assert.equal(queue.statusFor(badId).error, null);
+});
+
+Deno.test("a collector reports admission lag and failure only on the rejected lot", async () => {
+  const good = { ...target, id: "00000000-0000-0000-0000-000000000003", post_id: target.post_id + 1 };
+  const heartbeats: any[] = [];
+  const admitted: BatLiveFrame[] = [];
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+  } };
+  await assert.rejects(() => collectBatLive([{ ...target }, good], {
+    socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+    admit: async (batch, h) => {
+      heartbeats.push(...h);
+      if (batch.some(f => f.monitored_auction_id === target.id)) throw new Error("live_intake_http_500");
+      admitted.push(...batch);
+    },
+    missed: async t => ({ comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } }),
+  }, 2100), /live_intake_http_500/);
+  assert.equal(admitted.filter(f => f.monitored_auction_id === good.id).length, 1);
+  assert.ok(heartbeats.some(h => h.monitored_auction_id === target.id && h.pending > 0 && h.error?.includes("live_intake_http_500")));
+  assert.ok(heartbeats.some(h => h.monitored_auction_id === good.id && h.connected && h.pending === 0 && h.error === null));
+});
+
+Deno.test("arrivals during admission survive acknowledgement even when the same frame object is reused", async () => {
+  let appended = false;
+  const sizes: number[] = [];
+  const queue = new BatLiveBuffer(async batch => {
+    sizes.push(batch.length);
+    if (!appended) { appended = true; queue.push(frames[0]); }
+  });
+  for (let i = 0; i < 50; i++) queue.push(frames[0]);
+  await queue.flush();
+  assert.deepEqual(sizes, [50, 1]);
+  assert.equal(queue.pending, 0);
+});
+
 Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", async () => {
   let release!: () => void;
   const slowAdmission = new Promise<void>(resolve => { release = resolve; });
