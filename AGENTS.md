@@ -83,6 +83,13 @@ recognize relationships from retained evidence, find the existing owner, impleme
 repair and prove its consumer. Configuration is one application; a diagnostic report alone does
 not close the work. The bounded discovery assays are operator tools, not autonomous write authority.
 
+Recursive work must return to its original failed question after each repair. Test the actual intake,
+PostgreSQL admission and consumer together; a registered property or a successful duplicate lookup is
+insufficient. Recheck withdrawal, supersession and source visibility through every affected reader.
+Carry the next observed gap into code and the methodology together, preserving deployment holds.
+Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
+into permanent identity types or mandatory arrival choices without a separate model decision.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.

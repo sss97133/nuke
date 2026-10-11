@@ -508,6 +508,16 @@ These functions are called by users, agents, or other functions but do not run o
 
 ## Key Architectural Principles
 
+Engine-family intake implementation and verification (2026-10-11, prepared for review):
+
+- `supabase/migrations/20261011230939_retained_engine_family_intake.sql` — existing witness, admission,
+  shared reader predicate and provenance response changes; leaves proposal review and replay untouched.
+- `supabase/functions/ingest-observation/retainedInterior.ts` and `retainedDescriptionPowertrain.ts` —
+  explicit native-source selector and literal publisher label derivation.
+- `supabase/functions/ingest-observation/engineFamilyPostgres.test.ts` and
+  `scripts/test-engine-family-intake.sh` — actual handler, local curator review, PostgreSQL guard and
+  anonymous readers, with before/after and withdrawal cases.
+
 | Principle | Location | Summary |
 |-----------|----------|---------|
 | Archive Fetch | CLAUDE.md | Every URL fetched gets stored. Fetch once, extract forever. |

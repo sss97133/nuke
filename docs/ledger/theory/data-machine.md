@@ -29,6 +29,18 @@ sales, comments and media. The owner should not need to supply each model's dist
 5. Record delivery stages separately, then use the next observed gap to choose the next repair.
    Byte accounting, descriptor presence and a passing sample are not semantic or fleet completion.
 
+**Recursive refinement, owner clarification 2026-10-11.** Discussion must change the executable model
+and the instructions that guide its next iteration. Re-run the original question after a repair, through
+the sanctioned writer and the actual consumer. If registration succeeds but intake refuses the claim,
+the next gap is admission; if admission succeeds but the reader drops its qualification, repair the
+reader. A retry must validate the persisted result rather than equating an existing ID with success.
+Keep a disagreement or withdrawal case beside each positive case. This is a method for choosing and
+verifying authorized work, not standing permission for production DDL or autonomous vocabulary approval.
+
+Artist, buyer and researcher are contextual descriptions supported by actions and relationships. They
+are not necessarily permanent person types or onboarding categories. The engine-family intake case
+below tests the repair method on an existing proposal; it does not implement that cross-domain role model.
+
 **Fleet-relative reporting, owner correction 2026-10-11.** The owner requires the full lot as the
 reference for data-model work. A small successful cohort does not establish a material fleet gain.
 Lead each progress report with the whole-population coverage and the unaddressed scope; put sample
