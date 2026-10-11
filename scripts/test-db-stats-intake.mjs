@@ -121,7 +121,7 @@ test('relationship slice is explicit and uses fixed parameterized table scope', 
   assert(MODEL_SQL.includes('LIMIT 33')); assert(!MODEL_SQL.includes('writers_30d'));
 });
 
-function handler({ verdict, admin = false } = {}) {
+function handler({ verdict, admin = false, organizationReading } = {}) {
   let serve, pools = 0, queries = 0, reads = 0;
   const exports = {};
   const source = readFileSync(new URL('../supabase/functions/db-stats/index.ts', import.meta.url), 'utf8');
@@ -135,7 +135,7 @@ function handler({ verdict, admin = false } = {}) {
       if (name.endsWith('/writeGuard.ts')) return { authenticateWriter: async () => verdict ?? { ok: false } };
       if (name.endsWith('/intakeStatus.ts')) return {
         readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; },
-        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [] }; },
+        readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [], ...organizationReading }; },
       };
       if (name.includes('postgres@')) return { Pool: class {
         constructor() { pools++; }
@@ -324,4 +324,13 @@ test('health exposes only allowlisted numeric assay aggregates alongside the can
   assert.match(HEALTH_SQL, /key IN \('pending','claimed','failed','stale_qualified'/);
   assert.match(HEALTH_SQL, /jsonb_typeof\(value\) = 'number'/);
   assert(!HEALTH_SQL.includes('source_scan')); assert(!HEALTH_SQL.includes('snapshot_cursor'));
+});
+
+test('public activity survives unavailable target inventory; two unavailable readings return 503', async () => {
+  const partial = handler({ organizationReading: { status: 'unavailable', rows: [], listing_activity: { status: 'measured', rows: [{ total_listings: 2994 }] } } });
+  const response = await partial.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111');
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).listing_activity.rows[0].total_listings, 2994);
+  const unavailable = handler({ organizationReading: { status: 'unavailable', listing_activity: { status: 'unavailable', rows: [] } } });
+  assert.equal((await unavailable.publicRequest('organization_targets=11111111-1111-1111-1111-111111111111')).status, 503);
 });

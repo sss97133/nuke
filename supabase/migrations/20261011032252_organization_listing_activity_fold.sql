@@ -22,7 +22,9 @@ BEGIN
   END IF;
   PERFORM set_config('app.writer', 'compute-org-seller-stats', true);
   WITH raw AS MATERIALIZED (
-    SELECT *, nullif(btrim(source_platform), '') AS platform,
+    SELECT vehicle_id, source_listing_id, final_price, bid_count, comment_count,
+      view_count, started_at, created_at, extracted_at,
+      nullif(btrim(source_platform), '') AS platform,
       CASE WHEN nullif(btrim(source_url), '') IS NOT NULL THEN 'url:' || btrim(source_url)
         WHEN nullif(btrim(source_listing_id), '') IS NOT NULL THEN 'id:' || btrim(source_listing_id) END AS episode_key,
       CASE WHEN upper(btrim(metadata->>'currency')) ~ '^[A-Z]{3}$'

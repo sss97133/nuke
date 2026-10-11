@@ -32,8 +32,9 @@ it('shows public targets with their discovery clocks and no verification claim',
 it('hides the inventory shell for private, missing or unrelated organization sources', async () => {
   fixture.response.data.rows = []; await render(); expect(container.textContent).toBe('');
 });
-it('shows qualified listing activity even without sitemap targets, preserving unknowns and separate currencies', async () => {
+it.each([false, true])('preserves qualified activity with target inventory unavailable=%s', async unavailable => {
   fixture.response.data.rows = [];
+  if (unavailable) Object.assign(fixture.response.data, { status: 'unavailable', measured_at: null, complete: false });
   fixture.response.data.listing_activity = { status: 'measured', rows: [{
     contract: 'listing_activity_v1', calculated_at: clock, total_listings: 11, input_rows: 17,
     total_sold: 5, total_unsold: 1, active_listings: 1, unknown_outcomes: 4,
@@ -50,6 +51,7 @@ it('shows qualified listing activity even without sitemap targets, preserving un
   expect(container.textContent).toContain('1 records lack listing identity');
   expect(container.textContent).toContain('Sale amounts do not establish company revenue');
   expect(container.textContent).not.toContain('known target URLs');
+  if (unavailable) expect(container.textContent).toContain('Source target inventory unavailable.');
 });
 it.each([{}, { status: 'measured' }, { status: 'measured', rows: [{ contract: 'legacy' }] }])(
   'keeps unavailable or unqualified activity from becoming testimony', async activity => {
