@@ -19,6 +19,7 @@ Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css
 - Reuse local attributed artwork and its theme variants. Reserve image dimensions and preserve contrast on selected surfaces. New surfaces consume the shared rule instead of inventing artwork or fetching logos independently.
 - Vehicle headlines use year/make/model-specific identity artwork (owner correction, 2026-10-10). Use `VehicleIdentity` in the shared `MakeIdentity.tsx` owner and `vehicle-identities.json`: sourced period maker lettering, model nameplate and model emblem, each with its own verified model/year applicability. Vehicle year selects a documented range; it does not establish a badge's history. Unknown matches retain text. Do not substitute a modern make wordmark or approximate script font. Preserve the source chrome/enamel rather than recoloring it for themes. This supersedes the 2026-10-08 blanket prohibition on year-based selection.
 - Pass recorded series/trim tokens into `VehicleIdentity` for variant nameplates. Match the complete designation and documented year range; a Turbo script must not stand in for Turbo S or Carrera. Keep the base model and complete accessible identity readable when a variant nameplate leads the headline.
+- Keep vehicle identity artwork compact and inline with the recorded price. Year, make, model and price persist while scrolling (owner correction, 2026-10-10). Specs and vehicle tabs scroll with the page. Hide the tab strip for a single vehicle; multiple tabs retain readable vehicle names, including the active tab.
 - The local artwork catalogue uses a light/dark pair for colored wordmarks, or one verified monochrome wordmark that can be inverted. Keep that convention when registering artwork; absent theme metadata is not permission to recolor arbitrary logos.
 
 ## Visual
@@ -57,14 +58,12 @@ The sticky stack is defined in `vehicle-profile.css` as named CSS custom propert
 
 ```
 --vp-h-site         42px   global header (NUKE + search)
---vp-h-tab-bar      28px   vehicle tab bar
---vp-h-sub          36px   sub-header (badge bar)
---vp-h-barcode      10px   barcode timeline strip
+--vp-h-masthead     measured identity + price height (50px fallback)
+--vp-h-barcode      24px   barcode timeline strip
 
---vp-stick-tab-bar  = h-site                              (tab bar below header)
---vp-stick-sub      = h-site + h-tab-bar                  (sub-header below tab bar)
---vp-stick-barcode  = h-site + h-tab-bar + h-sub          (barcode below sub-header)
---vp-sticky-top     = h-site + h-tab-bar + h-sub + h-barcode  (columns below barcode)
+--vp-stick-masthead = h-site
+--vp-stick-barcode  = h-site + h-masthead
+--vp-sticky-top     = h-site + h-masthead + h-barcode
 ```
 
 Rules:
@@ -72,7 +71,7 @@ Rules:
 - To add a new sticky layer: add its height var, create its anchor var, update ALL anchors below it
 - NEVER hardcode `top: 40px` or `top: calc(...)` inline — use the named token
 - If you change ANY height in the stack, verify every anchor below it still adds up
-- The tab bar CSS (`VehicleTabBar.css`) references `--vp-stick-tab-bar` with a fallback
+- `VehicleMasthead` measures its rendered height with `ResizeObserver`, including mobile wrapping and loaded artwork. Specs and tabs do not contribute sticky offsets.
 
 ## Horizontal Alignment
 - All layout containers: `padding: 0 12px`
