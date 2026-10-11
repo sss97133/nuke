@@ -26,6 +26,16 @@ const amount = (v: any) => typeof v === "number" && Number.isFinite(v) && v >= 0
 const integer = (v: any) => Number.isSafeInteger(v) && v >= 0 ? v : null;
 const unix = (v: any) => positive(v) && v >= 1577836800 && v < 4102444800 ? new Date(v * 1000).toISOString() : null;
 
+// Native metadata frames expose a member link without a username field. Keep
+// the displayed source alias only when its one canonical member route agrees.
+// This is the current high bidder label, not a buyer or resolved person identity.
+function metadataHighBidder(data: Record<string, any>): string | null {
+  if (typeof data.high_bidder_username === "string") return data.high_bidder_username;
+  if (typeof data.high_bidder_link !== "string" || data.high_bidder_link.length > 1024) return null;
+  const match = /^(?:by|<span class="data-listing-high-bidder-link-text-by">by<\/span>)[ \t\r\n]+<a href="https:\/\/bringatrailer\.com\/member\/([A-Za-z0-9._-]{1,80})\/?" target="_blank">([A-Za-z0-9._-]{1,80})<\/a>$/.exec(data.high_bidder_link);
+  return match && match[1].toLowerCase() === match[2].toLowerCase() ? match[2] : null;
+}
+
 export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTarget) {
   if (!uuid.test(target.id) || !uuid.test(target.vehicle_id) || !Number.isSafeInteger(target.post_id) || target.post_id <= 0
     || frame.monitored_auction_id !== target.id || !frame.data || typeof frame.data !== "object" || Array.isArray(frame.data)
@@ -66,7 +76,7 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
     clock_basis: nativeTime ? "native_comment_timestamp" : "collector_receipt_time_publication_unknown",
     end_at: endAt, current_bid: metadata ? amount(d.current_numeric) : positive(commentRows[0]?.bid_amount),
     bid_count: metadata ? integer(d.count) : null,
-    high_bidder: metadata && typeof d.high_bidder_username === "string" ? d.high_bidder_username : null,
+    high_bidder: metadata ? metadataHighBidder(d) : null,
     views: stats ? integer(d.views_numeric) : null, watchers: stats ? integer(d.watchers_numeric) : null,
     comment_count: frame.event === "comments-updated" ? integer(d.numeric) : null,
     native_comment_id: qualifiedComment ? comment.id : null, comment_row: commentRows[0] ?? null, projection_error: projectionError,

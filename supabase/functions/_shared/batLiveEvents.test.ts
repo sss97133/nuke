@@ -89,6 +89,46 @@ Deno.test("current metadata supports withdrawn bids and never substitutes catch-
   assert.equal(empty.bid_count, 0);
 });
 
+Deno.test("native member link supplies the current bidder alias while preserving the original frame", async () => {
+  const data: Record<string, any> = { ...frames[3].data };
+  delete data.high_bidder_username;
+  const original = JSON.stringify(data);
+  for (const link of [data.high_bidder_link, 'by <a href="https://bringatrailer.com/member/example_bidder/" target="_blank">Example_Bidder</a>']) {
+    const frame = { ...frames[3], data: { ...data, high_bidder_link: link } };
+    const projection = await prepareBatLiveFrame(frame, target);
+    assert.equal(projection.high_bidder, link === data.high_bidder_link ? "JuergenJanzen" : "Example_Bidder");
+    assert.deepEqual(JSON.parse(projection.raw_frame_json).data, frame.data);
+    assert.equal(projection.clock_basis, "collector_receipt_time_publication_unknown");
+    assert.equal(projection.observed_at, frame.received_at);
+    assert.equal(projection.buyer, null);
+    assert.equal(projection.outcome, null);
+    assert.equal(projection.comment_row, null);
+    assert.equal(projection.projection_error, null);
+    assert.equal((await prepareBatLiveFrame(frame, target)).content_hash, projection.content_hash);
+  }
+  assert.equal(JSON.stringify(data), original);
+});
+
+Deno.test("member-link fallback refuses ambiguous, mismatched and nonnative aliases", async () => {
+  const link = 'by <a href="https://bringatrailer.com/member/example_bidder/" target="_blank">Example_Bidder</a>';
+  const data: Record<string, any> = { ...frames[3].data };
+  delete data.high_bidder_username;
+  for (const bad of [null, {}, "", link.replace("https:", "http:"), link.replace("bringatrailer.com/", "bringatrailer.com.evil/"),
+    link.replace("example_bidder/", "different/"), link.replace("example_bidder/", "example_bidder/?x=1"),
+    link.replace("example_bidder/", "example_bidder/#x"), link.replace("example_bidder/", "%65xample_bidder/"),
+    link.replace("https://", "https://user@"), link + link, link + " trailing", link.replace("Example_Bidder</a>", "<b>Example_Bidder</b></a>"),
+    link.replace("Example_Bidder</a>", "Example&amp;Bidder</a>"), link.replace("by ", "winner "), "x".repeat(1025)]) {
+    const frame = { ...frames[3], data: { ...data, high_bidder_link: bad } };
+    const projection = await prepareBatLiveFrame(frame, target);
+    assert.equal(projection.high_bidder, null);
+    assert.equal(projection.current_bid, 33000);
+    assert.equal(projection.bid_count, 16);
+    assert.deepEqual(JSON.parse(projection.raw_frame_json).data, frame.data);
+  }
+  assert.equal((await prepareBatLiveFrame({ ...frames[3], data: { ...data, high_bidder_link: link, high_bidder_username: "Native_Typed_Alias" } }, target)).high_bidder, "Native_Typed_Alias");
+  assert.equal((await prepareBatLiveFrame({ ...frames[2], data: { ...frames[2].data, high_bidder_link: link } }, target)).high_bidder, null);
+});
+
 Deno.test("intake failure keeps every frame in order; bounded overflow is an error", async () => {
   let failed = true;
   const admitted: BatLiveFrame[] = [];
