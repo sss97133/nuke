@@ -85,9 +85,12 @@ export function validateObservationProperty(
       (input.kind !== "specification" || typeof value !== "string" || !value.trim())) {
     return invalid("Retained interior color requires exact nonempty specification text");
   }
-  if (input.property_key === "mileage_miles" && (input.kind !== "condition" ||
+  const craigslistReading=retainedPropertyVerified&&input.kind==="listing"&&fields.source_profile==="craigslist_auto_miles_v1";
+  if (input.property_key === "mileage_miles" && ((!craigslistReading&&input.kind !== "condition") ||
       typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || value >= 10000000 ||
-      fields.reading_role !== "odometer_display" || fields.true_mileage_status !== "unknown")) {
+      fields.reading_role !== (craigslistReading?"listing_odometer_label":"odometer_display") || fields.true_mileage_status !== "unknown" ||
+      (craigslistReading&&(fields.reading_unit_basis!=="platform_auto_miles_attribute"||fields.source_reading_unit!=="miles"||
+       typeof fields.odometer_broken!=="boolean"||typeof fields.odometer_rolled_over!=="boolean")))) {
     return invalid("Retained mileage requires an attributed integer odometer display; true mileage remains unknown");
   }
   if (Object.prototype.hasOwnProperty.call(IMAGE_PROPERTY_VALUES, input.property_key)) {

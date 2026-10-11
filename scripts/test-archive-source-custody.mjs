@@ -49,6 +49,7 @@ const sources = new Map([
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
+  ['retainedCraigslistOdometer',compile('../supabase/functions/ingest-observation/retainedCraigslistOdometer.ts')],
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
@@ -235,6 +236,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
+        if(specifier==='./retainedCraigslistOdometer.ts')return load('retainedCraigslistOdometer');
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');

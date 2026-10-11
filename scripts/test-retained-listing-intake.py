@@ -10,7 +10,7 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=9 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label'}
+assert len(sys.argv)<=10 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label','--craigslist-odometer'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
 two_front = '--two-front' in sys.argv[2:]
 bulk120 = '--bulk120' in sys.argv[2:]
@@ -23,6 +23,8 @@ identity = '--identity' in sys.argv[2:]
 assert not identity or odometer
 vin_label = '--vin-label' in sys.argv[2:]
 assert not vin_label or identity
+craigslist_odometer='--craigslist-odometer' in sys.argv[2:]
+assert not craigslist_odometer or vin_label
 assert not powertrain or (two_front and bulk120)
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
@@ -326,6 +328,9 @@ if powertrain:
     if vin_label:
         from test_retained_vin_label import run_vin_label_checks
         run_vin_label_checks(sql,read,rejects,claim,passed)
+    if craigslist_odometer:
+        from test_retained_craigslist_odometer import run_craigslist_odometer_checks
+        run_craigslist_odometer_checks(sql,read,rejects,claim,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
