@@ -12,14 +12,19 @@ async function run(input: Record<string, unknown>, claimed: unknown, scenario = 
   const calls: { name: string; args: any }[] = [], selectors: any[] = [];
   const db = { rpc(name: string, args: any) {
     calls.push({ name, args });
-    return { abortSignal() { return Promise.resolve(name === "claim_retained_listing_properties"
+    return { abortSignal() {
+      if (name === "finish_retained_listing_property" && scenario === "completion_throw") throw Error("private RPC detail");
+      return Promise.resolve(name === "claim_retained_listing_properties"
       ? { data: claimed, error: scenario === "claim_error" ? {} : null }
-      : { data: !(scenario === "bad_custody" && args.p_status === "done"), error: null }); } };
+      : { data: !(["bad_custody","retry_refused"].includes(scenario) && args.p_status === "done") && scenario !== "retry_refused",
+        error: scenario === "completion_error" && args.p_status === "done" ? { message: "private RPC error" } : null }); } };
   } };
   const response = await drainRetainedListingProperties(request(signal), input, db, async req => {
     assert(req.headers.get("authorization") === "Bearer test-key");
     selectors.push(await req.json());
     if (scenario === "throw") throw new Error("private provider detail");
+    if (scenario === "malformed") return new Response("private malformed response");
+    if (scenario === "missing_receipt") return new Response(JSON.stringify({ success: true }));
     const status = scenario === "refused" ? 400 : scenario === "error" ? 503 : 200;
     return new Response(JSON.stringify(status === 200 ? { success: true,
       observation_id: source, duplicate: scenario === "duplicate" } :
@@ -122,6 +127,27 @@ Deno.test("false persisted-result CAS cannot count writes or done", async () => 
   const r = await run(input, rows(1), "bad_custody");assert(r.body.stored === 0 && r.body.writes === 0 && r.body.completion_failures === 1);
   assert(r.body.retries === 1 && r.calls[2].args.p_status === "retry" && r.calls[2].args.p_result === null);
 });
+Deno.test("failure feedback distinguishes admission from persisted custody without exposing source details or changing retry states", async () => {
+  for (const [scenario,stage] of [["error","admission_http"],["throw","admission_exception"],
+    ["malformed","admission_exception"],["missing_receipt","admission_receipt"],
+    ["bad_custody","completion_custody"],["completion_error","completion_rpc"],
+    ["completion_throw","completion_exception"],["retry_refused","completion_custody"]]) {
+    const r=await run(input,rows(1),scenario);
+    assert(r.body.stored===0 && r.body.writes===0 && r.body.failure_stages[stage]===1);
+    assert(!JSON.stringify(r.body).includes("private") && r.body.model_calls===0 && r.body.provider_calls===0);
+    if (stage.startsWith("admission")) assert(r.calls[1].args.p_status==="retry" && r.body.retries===1);
+    else if (scenario!=="completion_throw") {
+      assert(r.calls[1].args.p_status==="done" && r.calls[2].args.p_status==="retry" && r.calls[2].args.p_result===null);
+      assert(r.body.retries===(scenario==="retry_refused"?0:1));
+    }
+    assert(r.body.failure_stages.completion_retry===(scenario==="retry_refused"?1:0));
+    assert(JSON.stringify(r.body.admission_http_statuses)===(scenario==="error"?'\u007b"503":1\u007d':'\u007b\u007d'));
+  }
+  for(const scenario of ["new","duplicate","refused"]){
+    const r=await run(input,rows(1),scenario);
+    assert(Object.values(r.body.failure_stages).every(n=>n===0));
+  }
+});
 Deno.test("aborted and elapsed-budget records defer before admission", async () => {
   const c = new AbortController();c.abort();
   const r = await run(input, rows(2), "new", c.signal);assert(r.body.deferred === 2 && r.selectors.length === 0);
@@ -129,6 +155,21 @@ Deno.test("aborted and elapsed-budget records defer before admission", async () 
   Date.now = () => calls++ < 2 ? 0 : 36000;
   try { const b = await run(input, rows(2));assert(b.body.deferred === 2 && b.selectors.length === 0); }
   finally { Date.now = original; }
+});
+Deno.test("elapsed completion budget is reported without an RPC or an unproved completion", async()=>{
+  const original=Date.now;let elapsed=0;
+  Date.now=()=>elapsed;
+  const calls:string[]=[];
+  const db={rpc(name:string){calls.push(name);return {abortSignal(){return Promise.resolve({data:rows(1),error:null});}};}};
+  try{
+    const response=await drainRetainedListingProperties(request(),input,db,async()=>{
+      elapsed=56000;
+      return new Response(JSON.stringify({success:true,observation_id:source,duplicate:false}));
+    });
+    const body=await response.json();
+    assert(body.success===false && body.stored===0 && body.writes===0 && body.completion_failures===1);
+    assert(body.failure_stages.completion_budget===1 && calls.length===1 && calls[0]==="claim_retained_listing_properties");
+  }finally{Date.now=original;}
 });
 Deno.test("claim failure is unavailable rather than healthy empty", async () => {
   const r = await run(input, [], "claim_error");assert(r.response.status === 503 && r.selectors.length === 0);

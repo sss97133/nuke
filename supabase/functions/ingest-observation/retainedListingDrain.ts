@@ -65,7 +65,13 @@ export async function drainRetainedListingProperties(
   })) return json({ success: false, error: "invalid_claimed_listing_work", writes: 0, model_calls: 0 }, 503);
   const lookups = new RetainedBatchLookups();
   const summary = { claimed: rows.length, stored: 0, writes: 0, duplicates: 0, refused: 0,
-    retries: 0, deferred: 0, completion_failures: 0, model_calls: 0, provider_calls: 0 };
+    retries: 0, deferred: 0, completion_failures: 0, model_calls: 0, provider_calls: 0,
+    // Counts describe failed operations, not unique items or a historical root
+    // cause. A failed done CAS and its failed retry can both be represented.
+    failure_stages: { admission_http: 0, admission_receipt: 0, admission_exception: 0,
+      completion_rpc: 0, completion_custody: 0, completion_exception: 0,
+      completion_budget: 0, completion_retry: 0 },
+    admission_http_statuses: {} as Record<string, number> };
   const process = async (row: any) => {
     let status = "deferred", result: string | null = null, duplicate = false;
     if (!req.signal.aborted && Date.now() - started < 35000) {
@@ -79,20 +85,30 @@ export async function drainRetainedListingProperties(
           typeof body.duplicate === "boolean") {
           status = "done";result = body.observation_id;duplicate = body.duplicate;
         } else if (response.status === 400 && body.error === "Retained source ineligible") status = "refused";
-      } catch { status = "retry"; }
+        else if (!response.ok) {
+          summary.failure_stages.admission_http++;
+          const code = String(response.status);
+          summary.admission_http_statuses[code] = (summary.admission_http_statuses[code] ?? 0) + 1;
+        } else summary.failure_stages.admission_receipt++;
+      } catch { status = "retry";summary.failure_stages.admission_exception++; }
     }
-    if (Date.now() - started >= 55000) { summary.completion_failures++;return; }
+    if (Date.now() - started >= 55000) {
+      summary.completion_failures++;summary.failure_stages.completion_budget++;return;
+    }
     try {
       let finished = await call("finish_retained_listing_property", { p_source: row.source_observation_id,
         p_property: row.property_id, p_worker: worker, p_status: status, p_result: result });
       if (finished.error || finished.data !== true) {
         summary.completion_failures++;
+        if (finished.error) summary.failure_stages.completion_rpc++;
+        else summary.failure_stages.completion_custody++;
         // A successful HTTP acknowledgement is not persisted custody proof.
         // If its lease remains ours, retry instead of falsely marking done.
         if (status === "done" && Date.now() - started < 50000) {
           finished = await call("finish_retained_listing_property", { p_source: row.source_observation_id,
             p_property: row.property_id, p_worker: worker, p_status: "retry", p_result: null });
           if (!finished.error && finished.data === true) summary.retries++;
+          else summary.failure_stages.completion_retry++;
         }
         return;
       }
@@ -100,7 +116,7 @@ export async function drainRetainedListingProperties(
       else if (status === "refused") summary.refused++;
       else if (status === "deferred") summary.deferred++;
       else summary.retries++;
-    } catch { summary.completion_failures++; }
+    } catch { summary.completion_failures++;summary.failure_stages.completion_exception++; }
   };
   // Overlap at most two source admissions within the existing per-drain
   // attempt and time budgets. Every result still requires its own custody CAS.

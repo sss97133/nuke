@@ -52,6 +52,7 @@ const sources = new Map([
   ['retainedCraigslistOdometer',compile('../supabase/functions/ingest-observation/retainedCraigslistOdometer.ts')],
   ['retainedCraigslistCapture',compile('../supabase/functions/ingest-observation/retainedCraigslistCapture.ts')],
   ['retainedCraigslistYear',compile('../supabase/functions/ingest-observation/retainedCraigslistYear.ts')],
+  ['retainedDescriptionYear',compile('../supabase/functions/ingest-observation/retainedDescriptionYear.ts')],
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
@@ -241,6 +242,7 @@ function fixture(options = {}) {
         if(specifier==='./retainedCraigslistOdometer.ts')return load('retainedCraigslistOdometer');
         if(specifier==='./retainedCraigslistCapture.ts')return load('retainedCraigslistCapture');
         if(specifier==='./retainedCraigslistYear.ts')return load('retainedCraigslistYear');
+        if(specifier==='./retainedDescriptionYear.ts')return load('retainedDescriptionYear');
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
