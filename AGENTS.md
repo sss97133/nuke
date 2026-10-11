@@ -47,6 +47,12 @@ constraint, permission, test or gate that implements it, or record the missing m
 Documentation changes should preserve owner intent while correcting stale navigation and status
 claims. See `docs/ledger/README.md` for the distinction between active guidance and audit outputs.
 
+Data-model progress reports must put the full population and its measurement date beside the
+numerator, then show the eligible population, net usable coverage gained and remaining backlog.
+Label estimates and unknown denominators explicitly. A fixed cohort is validation scope; completed
+source-property work and distinct vehicles touched are processing measures, not modeled-fleet
+coverage. Follow the fleet-relative reporting contract in `docs/ledger/theory/data-machine.md`.
+
 ## Answering vehicle and opportunity questions
 
 Read the existing database and reader contracts first. Reuse stored source captures and extraction
