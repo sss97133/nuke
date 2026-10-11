@@ -2314,6 +2314,7 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
+            {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
             {/* Key Metrics Bar — only show when seller track record hasn't loaded yet (it supersedes this) */}
             {!sellerTrackRecord && (((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{
@@ -2350,7 +2351,7 @@ export default function OrganizationProfile() {
               <div style={{ marginBottom: '16px' }}>
                 {/* Relationship context; listing activity is measured separately. */}
                 <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  Related vehicle records: ownership, consignment, builds and sales. Recorded vehicle prices and dates do not establish this organization’s sales or revenue.
+                  Related vehicle records (bounded view): ownership, consignment, builds and sales. Recorded vehicle prices and dates do not establish this organization’s sales or revenue.
                 </p>
                 {/* Associated vehicle records, without organization revenue inference. */}
                 <div style={{
@@ -2496,7 +2497,6 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
 
             {/* Activity Heatmap — only render when there's data to show */}
             {auctionHeatmapEvents.length > 0 && (
