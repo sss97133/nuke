@@ -29,6 +29,36 @@ sales, comments and media. The owner should not need to supply each model's dist
 5. Record delivery stages separately, then use the next observed gap to choose the next repair.
    Byte accounting, descriptor presence and a passing sample are not semantic or fleet completion.
 
+**Fleet-relative reporting, owner correction 2026-10-11.** The owner requires the full lot as the
+reference for data-model work. A small successful cohort does not establish a material fleet gain.
+Lead each progress report with the whole-population coverage and the unaddressed scope; put sample
+verification and implementation detail after them. When fleet coverage has not been measured, say so.
+
+- Name the population, entity/row grain, filters, count method and measurement date. Distinguish all
+  stored vehicle records from public, undeleted vehicle records and unresolved physical duplicates.
+  Label an owner-supplied reference, cached count or catalogue estimate; do not present it as a live
+  exact census or silently substitute a different population.
+- Show full-population and eligible-population denominators together. Name admitted source families,
+  supported properties/relationships and exclusions. An eligibility restriction does not remove the
+  rest of the owner's data from the goal. Unknown eligible totals or fleet coverage remain unknown.
+- Separate retained raw coverage, typed property/relationship coverage and actual consumer usability.
+  Define each acceptance condition. Eleven supported fields are a narrow model slice, not a complete
+  vehicle model; describing every table or JSON envelope does not model every stored record.
+- Report net newly usable vehicle/property or relationship pairs, losses, changed resolutions and
+  remaining backlog against the same defined population and baseline. Completed source-property work
+  can revisit existing pairs; distinct vehicles touched do not establish complete modeled vehicles.
+- A fixed cohort proves behavior on those IDs. State its size relative to the full population and its
+  selection method; do not extrapolate its gain to the fleet or lead with its within-sample percentage.
+  A reusable reader repair can affect other eligible records, but that reach must be measured separately.
+- Give observed throughput, incoming eligible work and backlog trend when judging pace. An active job
+  is not evidence of rapid coverage growth. Estimate completion time only for a known matching backlog,
+  with the measurement window and assumptions; otherwise state that fleet completion time is unknown.
+
+This is a reporting and acceptance requirement, not an implemented fleet assay. Reuse existing
+count/fold/assay owners and dated receipts; do not manufacture a denominator, start a full-table scan
+for each update or mint another dashboard. If a necessary measure is missing, name its existing owner
+and the missing measurement before claiming fleet impact.
+
 The read-only `scripts/discovery/intake-reader-reconciliation.sql` locates gaps between retained
 source, observation, fold and current reader. `configuration-catalog-relations.sql` drills existing
 property/model/OEM relationships and proposes owned repairs. Both require explicit bounded inputs;

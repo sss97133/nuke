@@ -984,6 +984,15 @@ and its words are already in §1. Each stage has a clock, a tier that runs it, a
 The repair loop in the card is one pass of key → describe → shape → fold → replay → assay on one gap. "Standing" means
 the pass runs between shifts, taking its gap from a queue the database computes.
 
+**Coverage-reporting correction, owner 2026-10-11.** Reports emphasized a selected 500-vehicle
+validation cohort without the full-lot reference. Against the owner's stated 690,000-vehicle reference,
+500 is about **0.072%**; that reference is not a newly verified live census. The cohort's field gains
+prove a bounded change, not whole-fleet semantic coverage or general-audience readiness. Completed
+source-property work and distinct vehicles touched are separate processing measures. Apply the
+fleet-relative reporting contract in `data-machine.md` to subsequent repair-loop reports. Fleet-wide
+net usable coverage, eligible backlog and completion time remain unestablished by these cohort receipts;
+this correction does not close C28 or authorize a new worker, source admission or capacity change.
+
 ### What is inefficient today (measured 2026-10-06)
 
 - **The definition was spread** over six documents, five views, one prompt file and a shift folder outside the repo;
