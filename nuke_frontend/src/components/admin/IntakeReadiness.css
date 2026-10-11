@@ -1,3 +1,4 @@
+.status-view { container: status-view / inline-size; }
 .status-kicker { font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .status-basis { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
 .status-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 2px solid var(--text); margin-top: 16px; }
@@ -41,7 +42,7 @@
 .status-replay-answer { border-top: 1px solid var(--border); padding-top: 12px; }
 .status-price { display: block; font: 700 30px 'Courier New', monospace; margin-top: 8px; }
 .status-question { font-size: 13px; line-height: 1.4; margin: 4px 0 8px; max-width: 75ch; }
-@media (max-width: 760px) {
+@container status-view (max-width: 760px) {
   .status-operating-panels { grid-template-columns: minmax(0, 1fr); }
   .status-attention { grid-column: 1; grid-row: 2; }
   .status-flow, .status-trace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -52,7 +53,7 @@
   .status-replay-answer { border-left: 0; border-top: 2px solid var(--border); padding: 12px 0 0; }
   .status-replay-controls { flex-wrap: wrap; }
 }
-@media (max-width: 420px) {
+@container status-view (max-width: 420px) {
   .status-flow, .status-trace { grid-template-columns: minmax(0, 1fr); }
   .status-flow > a + a { border-left: 0; border-top: 2px solid var(--text); }
   .status-flow > a + a::before { content: none; }

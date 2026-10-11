@@ -243,7 +243,7 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
     .sort((a, b) => lifecycleOrder.indexOf(a.status) - lifecycleOrder.indexOf(b.status)
       || b.n_present - a.n_present || a.stack_id.localeCompare(b.stack_id));
 
-  return <section aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
+  return <section className="status-view" aria-labelledby="intake-readiness-title" style={{ ...box, fontSize: 11 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
       <h2 id="intake-readiness-title" style={{ fontSize: 14, margin: 0 }}>THE DATA MACHINE</h2>
       <button type="button" disabled={loading} onClick={() => setRefresh(n => n + 1)} style={{ fontSize: 11 }}>
