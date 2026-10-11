@@ -22,6 +22,19 @@ beforeEach(() => {
   ] } };
 });
 describe('canonical value -> attributed observation', () => {
+  it('shows the qualified engine winner with its unit and identifies its report', () => {
+    fixture.provenance.data.canonical = { status: 'resolved', value: '2.5', observation_id: 'local-observation' };
+    fixture.provenance.data.observations[0].value = '2.5';
+    const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_displacement_l" label="DISPLACEMENT" value="2.5 L" />);
+    expect(html).toContain('RESOLVED SOURCE CLAIM'); expect(html).toContain('<strong>2.5 L</strong>');
+    expect(html).toContain('RESOLVED REPORT'); expect(html).toContain('does not establish factory or current physical configuration');
+  });
+  it('keeps reports available when the engine winner cannot be read', () => {
+    fixture.provenance.data.canonical = { status: 'unavailable' };
+    const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_configuration" label="ENGINE CONFIGURATION" value="Unknown" />);
+    expect(html).toContain('resolved value could not be read'); expect(html).toContain('SOURCE-VIN');
+    expect(html).not.toContain('RESOLVED REPORT'); expect(html).not.toContain('canonical value is unknown');
+  });
   it('keeps canonical unknown separate from a real report and links the observation and source', () => {
     const html = render();
     expect(html).toContain('The canonical value is unknown'); expect(html).toContain('SOURCE-VIN');
@@ -35,6 +48,8 @@ describe('canonical value -> attributed observation', () => {
     fixture.provenance.data.observations.push({ ...fixture.provenance.data.observations[0], id: 'local-repeat' });
     const html = render(); expect(html).toContain('Link unavailable'); expect(html).not.toContain('javascript:');
     expect(html).toContain('local-repeat'); expect(html).not.toContain('independent confirmations');
+    fixture.provenance.data.observations[0].source_url = null;
+    expect(render()).toContain('Inspect observation local-observation');
   });
   it('preserves optional deployed clocks and method without deriving a resolution', () => {
     Object.assign(fixture.provenance.data.observations[0], { ingested_at: '2026-10-03T13:00:00Z', extraction_method: 'structured_import' });

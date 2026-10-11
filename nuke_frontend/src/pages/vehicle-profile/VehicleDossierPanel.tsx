@@ -15,6 +15,7 @@ import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
 import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
+import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
@@ -31,7 +32,7 @@ const FIELD_ORDER = [
 
 const FIELD_GROUPS: { label: string; fields: readonly string[] }[] = [
   { label: 'IDENTITY', fields: ['vin', 'year', 'make', 'model', 'trim'] },
-  { label: 'POWERPLANT', fields: ['engine_type', 'engine_size', 'fuel_type', 'fuel_system_type'] },
+  { label: 'POWERPLANT', fields: ['engine_configuration', 'engine_displacement_l', 'engine_type', 'engine_size', 'fuel_type', 'fuel_system_type'] },
   { label: 'DRIVETRAIN', fields: ['transmission', 'drivetrain'] },
   { label: 'APPEARANCE', fields: ['color', 'interior_color', 'body_style'] },
   { label: 'METRICS', fields: ['mileage', 'sale_price'] },
@@ -40,6 +41,7 @@ const FIELD_GROUPS: { label: string; fields: readonly string[] }[] = [
 const FIELD_LABELS: Record<string, string> = {
   vin: 'VIN', year: 'YEAR', make: 'MAKE', model: 'MODEL',
   engine_type: 'ENGINE TYPE', engine_size: 'ENGINE SIZE',
+  engine_configuration: 'ENGINE CONFIGURATION', engine_displacement_l: 'DISPLACEMENT',
   transmission: 'TRANSMISSION', drivetrain: 'DRIVETRAIN',
   fuel_type: 'FUEL TYPE', fuel_system_type: 'FUEL SYSTEM',
   color: 'COLOR', interior_color: 'INTERIOR COLOR',
@@ -291,7 +293,8 @@ const FieldRow: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   onValueClick?: () => void;
-}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick }) => {
+  retainedClaimTooltip?: string;
+}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick, retainedClaimTooltip }) => {
   const [hovered, setHovered] = useState(false);
 
   const claimTooltip = useMemo(() => buildClaimTooltip(group), [group]);
@@ -313,7 +316,7 @@ const FieldRow: React.FC<{
         borderBottom: '1px solid var(--border)',
       }}
       data-field={field}
-      title={claimTooltip}
+      title={retainedClaimTooltip || claimTooltip}
     >
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
@@ -435,6 +438,16 @@ const VehicleDossierPanel: React.FC = () => {
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
+  const configuration = useFieldProvenance(vehicle?.id || '', 'engine_configuration');
+  const displacement = useFieldProvenance(vehicle?.id || '', 'engine_displacement_l');
+  const engineReads: Record<string, typeof configuration> = { engine_configuration: configuration, engine_displacement_l: displacement };
+  const engineValue = (field: string) => {
+    const read = engineReads[field];
+    if (!read || read.isLoading || read.error || !read.data || read.data.canonical?.status === 'unavailable') return '';
+    if (read.data.canonical?.status === 'resolved') return formatProvenanceValue(field, read.data.canonical.value!);
+    return read.data.observations.length > 0 ? 'Unknown' : '';
+  };
+  const engineReadFailed = [configuration, displacement].some(read => !!read.error || provenanceCoverageUnavailable(read.data) || read.data?.canonical?.status === 'unavailable');
   // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
   const { priceFacts, priceSettled, priceFailed } = useVehiclePriceFacts(vehicle?.id);
   const priceKind = priceSettled && !priceFailed ? priceKindLabel(priceFacts) : null;
@@ -624,6 +637,7 @@ const VehicleDossierPanel: React.FC = () => {
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            if (engineReads[field]) return !!engineValue(field);
             if (field === 'vin') return true; // Unknown canonical identity still has a useful source drill.
             if (field === 'sale_price') return !!priceKind;
             let pv = v[field];
@@ -646,6 +660,10 @@ const VehicleDossierPanel: React.FC = () => {
               return { field, value: fmtVal(field, pv) };
             });
             hiddenFields = deduplicatePowerplant(fieldEntries, evidence);
+            // Distinct resolved fields own the summary; preserve combined source text in the existing expansion.
+            if (configuration.data?.canonical?.status === 'resolved' && displacement.data?.canonical?.status === 'resolved') {
+              for (const field of ['engine_type', 'engine_size']) if (visibleFields.includes(field)) hiddenFields.add(field);
+            }
           }
           const shownFields = visibleFields.filter(f => !hiddenFields.has(f));
           const collapsedCount = hiddenFields.size;
@@ -674,6 +692,7 @@ const VehicleDossierPanel: React.FC = () => {
                   pv = group.primary.field_value;
                 }
                 let displayValue = fmtVal(field, pv);
+                if (engineReads[field]) displayValue = engineValue(field);
                 if (field === 'vin' && !displayValue) displayValue = 'Unknown';
                 let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 if (field === 'sale_price') {
@@ -701,7 +720,7 @@ const VehicleDossierPanel: React.FC = () => {
                         label={fieldLabel}
                         value={displayValue}
                         vehicleId={vehicle.id}
-                        evidence={group}
+                        evidence={engineReads[field] ? undefined : group}
                         vinDecode={vinDecode}
                       />
                     </React.Suspense>,
@@ -721,12 +740,13 @@ const VehicleDossierPanel: React.FC = () => {
                     isOpen={openDrawers.has(field)}
                     onToggle={() => toggleDrawer(field)}
                     onValueClick={handleValueClick}
+                    retainedClaimTooltip={engineReads[field] ? 'Retained source claims. Vehicle identity, factory/current configuration and independent support are not established by these reports.' : undefined}
                   />
                 );
               })}
               {/* P12: Collapsed fields indicator for POWERPLANT */}
               {fg.label === 'POWERPLANT' && collapsedCount > 0 && (
-                <div
+                <button type="button"
                   onClick={() => setPowerplantExpanded(true)}
                   style={{
                     fontFamily: 'Arial, sans-serif',
@@ -735,15 +755,17 @@ const VehicleDossierPanel: React.FC = () => {
                     padding: '2px 10px 3px',
                     cursor: 'pointer',
                     letterSpacing: '0.3px',
+                    display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 0,
                     borderBottom: '1px solid var(--border)',
                   }}
                 >
-                  {collapsedCount} related field{collapsedCount > 1 ? 's' : ''} collapsed
-                </div>
+                  {collapsedCount} original or overlapping field{collapsedCount > 1 ? 's' : ''} · expand
+                </button>
               )}
             </React.Fragment>
           );
         })}
+        {engineReadFailed && <p role="status">Engine source claims could not be read completely. Their absence has not been established.</p>}
 
         {/* Extended Specifications */}
         {(() => {

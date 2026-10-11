@@ -32,7 +32,10 @@ export interface ImageObservation {
 }
 export interface FieldProvenance {
   field: string;
+  vehicle_id?: string;
   value: string | null;
+  /** Existing canonical owner, qualified against the access-gated report collection. */
+  canonical?: { status: 'resolved' | 'unknown' | 'unavailable'; value?: string; observation_id?: string };
   inline_source: string | null;
   source_image_url: string | null;
   evidence: ProvenanceCitation[];
@@ -88,6 +91,30 @@ export function evidenceRelationLabel(relation: string | null): string {
   return relation === 'direct_code' ? 'CODED SPECIFICATION' : relation === 'direct_visual' ? 'VISIBLE APPEARANCE / CONTROL' : relation === 'component_inference' ? 'COMPONENT INFERENCE' : 'RECORDED CITATION';
 }
 
+// Ratified core properties; engine_size remains the original combined source field.
+export const ENGINE_PROPERTY_IDS: Record<string, string> = {
+  engine_configuration: 'c0f743ae-dc94-4dfd-98ef-514b76f74a9b',
+  engine_displacement_l: '66b2f1f6-b714-4ac0-85b6-60ba89529c1a',
+};
+
+export function bindEngineCanonical(vehicleId: string, field: string, provenance: FieldProvenance, rows: any[]): NonNullable<FieldProvenance['canonical']> {
+  const row = rows.length === 1 ? rows[0] : null;
+  const report = provenance.observations.find(o => o.id === row?.observation_id);
+  const value = row?.structured_data?.[field];
+  const validValue = field === 'engine_displacement_l'
+    ? typeof value === 'number' && Number.isFinite(value) && value > 0
+    : field === 'engine_configuration' && typeof value === 'string' && value.trim().length > 0;
+  if (!ENGINE_PROPERTY_IDS[field] || provenance.field !== field || provenance.vehicle_id !== vehicleId
+    || provenanceCoverageUnavailable(provenance) || !report || !validValue
+    || row.vehicle_id !== vehicleId || row.property_id !== ENGINE_PROPERTY_IDS[field]
+    || row.discriminator_value !== '__single__' || report.value !== String(value)) return { status: 'unknown' };
+  return { status: 'resolved', value: String(value), observation_id: row.observation_id };
+}
+
+export function formatProvenanceValue(field: string, value: string): string {
+  return field === 'engine_displacement_l' ? `${value} L` : value;
+}
+
 export function useFieldProvenance(vehicleId: string, field: string) {
   return useQuery({
     queryKey: ['field-provenance', vehicleId, field],
@@ -101,7 +128,17 @@ export function useFieldProvenance(vehicleId: string, field: string) {
       try {
         const { data, error } = await supabase.rpc('get_field_provenance', { p_vehicle_id: vehicleId, p_field: field }).abortSignal(controller.signal);
         if (error) throw error;
-        return data as FieldProvenance | null;
+        const provenance = data as FieldProvenance | null;
+        if (!provenance || !ENGINE_PROPERTY_IDS[field] || provenanceCoverageUnavailable(provenance)) return provenance;
+        if (!provenance.observations.length) return { ...provenance, canonical: { status: 'unknown' as const } };
+        // The view chooses the winner. Never rank reports or fall back to a claim in the client.
+        const canonical = await supabase.from('vehicle_canonical')
+          .select('vehicle_id,property_id,observation_id,structured_data,discriminator_value')
+          .eq('vehicle_id', vehicleId).eq('property_id', ENGINE_PROPERTY_IDS[field])
+          .eq('discriminator_value', '__single__').limit(2).abortSignal(controller.signal);
+        return { ...provenance, canonical: canonical.error
+          ? { status: 'unavailable' as const }
+          : bindEngineCanonical(vehicleId, field, provenance, canonical.data || []) };
       } finally {
         clearTimeout(timeout);
         signal.removeEventListener('abort', abort);
