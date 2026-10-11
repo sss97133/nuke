@@ -7,6 +7,36 @@ const target: BatLiveTarget = { id: "00000000-0000-0000-0000-000000000001", vehi
   post_id: fixture.post_id, source_url: fixture.source_url, last_comment_id: 0 };
 const frames = fixture.events.map(f => ({ ...f, monitored_auction_id: target.id, transport: "public_pusher" as const }));
 
+// Control the collector's clock and waits together. Real one-second timers can
+// wake just before its threshold, making short fixtures skip a heartbeat/ping.
+async function withCollectorClock(run:()=>Promise<void>) {
+  const realNow=Date.now,realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
+  let now=realNow(),nextId=0,pump:number|undefined;
+  const timers=new Map<number,{at:number;run:()=>void}>();
+  const schedule=()=>{
+    if(pump!==undefined||!timers.size)return;
+    pump=realSetTimeout(()=>{
+      pump=undefined;
+      const next=[...timers].sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];
+      if(next){timers.delete(next[0]);now=Math.max(now,next[1].at);next[1].run();}
+      schedule();
+    },0);
+  };
+  Date.now=()=>now;
+  globalThis.setTimeout=((handler:Parameters<typeof setTimeout>[0],delay=0,...args:unknown[])=>{
+    assert.equal(typeof handler,"function");
+    const id=++nextId;
+    timers.set(id,{at:now+Math.max(0,delay),run:()=>{(handler as (...args:unknown[])=>void)(...args);}});
+    schedule();return id;
+  }) as typeof globalThis.setTimeout;
+  globalThis.clearTimeout=(id)=>{if(id!==undefined)timers.delete(id);};
+  try { await run(); }
+  finally {
+    if(pump!==undefined)realClearTimeout(pump);
+    Date.now=realNow;globalThis.setTimeout=realSetTimeout;globalThis.clearTimeout=realClearTimeout;
+  }
+}
+
 Deno.test("captured native bid and final record retain source clocks, identities and result", async () => {
   const bid = await prepareBatLiveFrame(frames[0], target);
   assert.equal(bid.current_bid, 30750);
@@ -101,7 +131,7 @@ Deno.test("one rejected lot retains its ordered frames without blocking another 
   assert.equal(queue.statusFor(badId).error, null);
 });
 
-Deno.test("a collector reports admission lag and failure only on the rejected lot", async () => {
+Deno.test("a collector reports admission lag and failure only on the rejected lot", () => withCollectorClock(async () => {
   const good = { ...target, id: "00000000-0000-0000-0000-000000000003", post_id: target.post_id + 1 };
   const heartbeats: any[] = [];
   const admitted: BatLiveFrame[] = [];
@@ -123,7 +153,7 @@ Deno.test("a collector reports admission lag and failure only on the rejected lo
   assert.equal(admitted.filter(f => f.monitored_auction_id === good.id).length, 1);
   assert.ok(heartbeats.some(h => h.monitored_auction_id === target.id && h.pending > 0 && h.error?.includes("live_intake_http_500")));
   assert.ok(heartbeats.some(h => h.monitored_auction_id === good.id && h.connected && h.pending === 0 && h.error === null));
-});
+}));
 
 Deno.test("arrivals during admission survive acknowledgement even when the same frame object is reused", async () => {
   let appended = false;
@@ -138,7 +168,7 @@ Deno.test("arrivals during admission survive acknowledgement even when the same 
   assert.equal(queue.pending, 0);
 });
 
-Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", async () => {
+Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", () => withCollectorClock(async () => {
   let release!: () => void;
   const slowAdmission = new Promise<void>(resolve => { release = resolve; });
   let blocked = false, connections = 0, pings = 0;
@@ -164,9 +194,9 @@ Deno.test("slow historical admission cannot stop socket pings or connected cover
     assert.ok(heartbeatsDuringAdmission.filter(h => h.connected).length >= 3);
     assert.ok(heartbeatsDuringAdmission.every(h => h.error === null && h.pending > 0));
   } finally { clearTimeout(finishAdmission); release(); }
-});
+}));
 
-Deno.test("a stalled coverage acknowledgement cannot block source capture or spawn overlapping heartbeat requests", async () => {
+Deno.test("a stalled coverage acknowledgement cannot block source capture or spawn overlapping heartbeat requests", () => withCollectorClock(async () => {
   let release!: () => void;
   const stalledHeartbeat = new Promise<void>(resolve => { release = resolve; });
   let pings = 0, connections = 0, heartbeatCallsWhileStalled = 0, stalled = true;
@@ -187,9 +217,9 @@ Deno.test("a stalled coverage acknowledgement cannot block source capture or spa
     assert.equal(connections, 1);
     assert.ok(pings >= 4);
   } finally { clearTimeout(unblock); release(); }
-});
+}));
 
-Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", async () => {
+Deno.test("public collector covers all 20 simultaneous closings and recovers on subscription", () => withCollectorClock(async () => {
   const targets = Array.from({ length: 20 }, (_, i) => ({ ...target,
     id: `00000000-0000-0000-0000-${String(i + 1).padStart(12,"0")}`, post_id: fixture.post_id + i }));
   const subscriptions: string[] = []; const recovered = new Set<number>(); const heartbeats: any[] = [];
@@ -204,4 +234,4 @@ Deno.test("public collector covers all 20 simultaneous closings and recovers on 
   assert.equal(subscriptions.length, 60);
   assert.equal(recovered.size, 20);
   assert.equal(new Set(heartbeats.map(h => h.monitored_auction_id)).size, 20);
-});
+}));
