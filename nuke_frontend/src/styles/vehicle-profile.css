@@ -51,14 +51,12 @@
      To add a new sticky layer: add its height, insert a new anchor,
      and bump all anchors below it. Never use raw px for sticky top. */
   --vp-h-site: var(--header-height, 42px);       /* global header (NUKE + search) */
-  --vp-h-tab-bar: 28px;                           /* vehicle tab bar */
-  --vp-h-sub: 36px;                               /* sub-header (badge bar) */
+  --vp-h-masthead: 50px;                          /* measured identity + price */
   --vp-h-barcode: 24px;                            /* barcode timeline strip */
 
-  --vp-stick-tab-bar: var(--vp-h-site);                                              /* tab bar sticks below header */
-  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));                      /* sub-header sticks below tab bar */
-  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub)); /* barcode sticks below sub-header */
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode)); /* columns stick below barcode */
+  --vp-stick-masthead: var(--vp-h-site);
+  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-masthead));
+  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-masthead) + var(--vp-h-barcode));
 }
 
 /* Dark mode overrides for vehicle profile tokens */
@@ -78,16 +76,6 @@
   /* Heatmap contrast — dark mode */
   --heat-0: #3a3a3a;
   --heat-2: #4ade80;
-
-  /* Layout Heights — same sticky stack as light mode */
-  --vp-h-site: var(--header-height, 42px);
-  --vp-h-tab-bar: 28px;
-  --vp-h-sub: 36px;
-  --vp-h-barcode: 24px;
-  --vp-stick-tab-bar: var(--vp-h-site);
-  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));
-  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub));
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode));
 
   /* Layout */
   --h-hero: 550px;
@@ -137,11 +125,9 @@
 /* ============ LAYER 2: VEHICLE SUB-HEADER ============ */
 
 .vehicle-profile-sub-header {
-  position: sticky;
-  top: var(--vp-stick-sub);
   background: var(--vp-surface);
   border-bottom: 1px solid var(--vp-ghost);
-  min-height: var(--vp-h-sub);
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,12 +143,9 @@
   display: none !important;
 }
 
-/* VehicleSubHeader: show as sticky badge bar */
+/* Specs belong to the page content; identity and price own the sticky header. */
 .vehicle-profile-page .vp-sub-header {
   display: flex !important;
-  position: sticky !important;
-  top: var(--vp-stick-sub) !important;
-  z-index: 900 !important;
 }
 
 .vehicle-sub__left {
@@ -1287,7 +1270,7 @@
 }
 
 /* One identity masthead; one primary owner for each fact. */
-.vp-masthead { display: flex; align-items: center; gap: 20px; padding: 16px 12px; border-bottom: 2px solid var(--border); background: var(--surface); }
+.vp-masthead { position: sticky; top: var(--vp-stick-masthead); z-index: 900; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 2px solid var(--border); background: var(--surface); }
 .vp-masthead__brand { flex-shrink: 0; }
 .vp-masthead .sx-make-wordmark { width: 112px; height: 24px; object-fit: contain; }
 .vp-masthead .sx-make-logo { width: 28px; height: 28px; }
@@ -1332,6 +1315,7 @@
 .vp-performance__context { color: var(--text-secondary); }
 .vp-performance__unranked { margin: 8px 0; font-weight: 700; }
 .vp-performance__unranked span { font-weight: 400; color: var(--text-secondary); }
+.vp-performance__widen { padding: 4px 0; border: 0; border-bottom: 1px solid var(--text-secondary); background: transparent; color: var(--text); font: inherit; font-size: 10px; cursor: pointer; }
 .vp-performance__evidence-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
 .vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .barcode-bar { border: 0; background: var(--vp-surface); text-align: left; }

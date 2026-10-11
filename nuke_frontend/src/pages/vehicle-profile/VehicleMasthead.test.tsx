@@ -15,7 +15,7 @@ beforeEach(() => {
   fixture.price = { price_kind:'sold', price_amount:378000, source_url:'https://example.com/sale', platform:'bat', price_as_of:'2026-08-20' };
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function mount() { await act(async () => root.render(<VehicleMasthead priceLotId="recorded-lot" />)); }
 
 it('uses recorded model/series tokens and the shared brand catalogue with a complete accessible identity', async () => {
@@ -49,4 +49,25 @@ it('opens the source clock and linked auction without restating the price or inf
 it('does not promote a model estimate to the recorded price', async () => {
   fixture.price.price_kind = 'estimate';
   await mount(); expect(host.querySelector('[aria-label="Inspect recorded price sources"]')).toBeNull();
+});
+
+it('keeps downstream sticky content clear when the identity wraps or artwork loads', async () => {
+  host.className = 'vehicle-profile-page';
+  let height = 51;
+  let resize: () => void = () => {};
+  const disconnect = vi.fn();
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height);
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { resize = callback; }
+    observe() {}
+    disconnect = disconnect;
+  });
+  await mount();
+  expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('51px');
+  height = 86;
+  resize();
+  expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('86px');
+  await act(async () => root.render(null));
+  expect(disconnect).toHaveBeenCalled();
+  expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
 });

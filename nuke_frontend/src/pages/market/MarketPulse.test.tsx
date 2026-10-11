@@ -133,6 +133,23 @@ describe('market answer -> supporting lots', () => {
     expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
+  it('keeps smaller brands reachable and drills from an explicit brand view into models', async () => {
+    fixture.pulse.data.auctions = [...fixture.pulse.data.auctions,
+      ...Array.from({ length: 80 }, (_, i) => lot(`small-${i}`, `SMALL ${i}`, null, 1))];
+    await render('mapBy=make');
+    const more = container.querySelector<HTMLButtonElement>('[data-map-more]')!;
+    expect(more.textContent).toContain('more brands');
+    await act(async () => more.click());
+    const list = container.querySelector('.inventory-map-list-grid')!;
+    expect(list.textContent).toContain('SMALL 79');
+    await act(async () => list.querySelector<HTMLButtonElement>('button[aria-label^="SMALL 79:"]')!.click());
+    expect(window.location.search).toContain('make=SMALL+79');
+    expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('model');
+    expect(boardTitles()).toEqual(['small-79']);
+    await click('All captured makes');
+    expect(boardTitles()).toHaveLength(84);
+    expect(container.querySelector('.inventory-map-remainder')).toBeNull();
+  });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
     await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
     await click('Local fixture: 3 captured lots');
@@ -266,7 +283,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).not.toMatch(/Running hot|Running cold|vs last week|Current bid per auction|Median current bid/);
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
     await click('All captured makes');
-    expect(container.textContent).toContain('area = captured lot count');
+    expect(container.textContent).toContain('Box size = number of open lots');
   });
 });
 

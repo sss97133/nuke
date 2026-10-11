@@ -1,4 +1,6 @@
 import { listingKey, type InventoryTaxonomy, type LiveAuction } from './useMarketPulse';
+import { squarify } from '../../lib/squarify';
+import { vehicleIdentity } from './useMarketRowDetails';
 
 export const MAP_GROUPS = [
   { id: 'make', label: 'Brand' }, { id: 'model', label: 'Model' },
@@ -14,7 +16,7 @@ export interface InventoryMapLens {
   child: string | null;
 }
 export const recordedModel = (a: LiveAuction) => a.model?.trim() || 'Model unrecorded';
-export const lotTitle = (a: LiveAuction) => a.title || [a.year, a.make, a.model].filter(Boolean).join(' ');
+export const lotTitle = vehicleIdentity;
 
 export function mapLens(params: URLSearchParams, make: string | null): InventoryMapLens {
   const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'model' : 'make');
@@ -43,6 +45,36 @@ export function mapValue(a: LiveAuction, dimension: MapDimension | 'lot', taxono
 }
 
 export interface InventoryMapGroup { key: string; name: string; lots: LiveAuction[] }
+export interface ReadableMapGroup extends InventoryMapGroup { remainder?: InventoryMapGroup[] }
+
+/** Keep the area of every lot, but combine boxes too small to identify into a named list entry. */
+export function readableInventoryLayout(groups: InventoryMapGroup[], width: number, height: number) {
+  if (width <= 0 || height <= 0 || !groups.length) return [];
+  const sorted = [...groups].sort((a, b) => b.lots.length - a.lots.length || a.key.localeCompare(b.key));
+  const total = sorted.reduce((n, g) => n + g.lots.length, 0);
+  // Keep the largest legible prefix. Reserve the combined entry at the edge so it
+  // cannot displace the largest named brand or trigger repeated layout collapse.
+  const max = Math.min(sorted.length, Math.floor(width * height / (88 * 60)));
+  for (let shown = max; shown >= 0; shown--) {
+    const remainder = sorted.slice(shown);
+    const remainderLots = remainder.flatMap(g => g.lots);
+    const share = remainderLots.length / total;
+    const landscape = width >= height;
+    const mainWidth = landscape ? width * (1 - share) : width;
+    const mainHeight = landscape ? height : height * (1 - share);
+    const rects = squarify<ReadableMapGroup>(sorted.slice(0, shown).map(node => ({ node, area: node.lots.length })), 0, 0, mainWidth, mainHeight);
+    if (rects.some(r => r.w < 88 || r.h < 60)) continue;
+    if (remainder.length) {
+      const restWidth = landscape ? width - mainWidth : width;
+      const restHeight = landscape ? height : height - mainHeight;
+      if (shown > 0 && (restWidth < 88 || restHeight < 60)) continue;
+      rects.push({ node: { key: '__map_remainder__', name: `${remainder.length} more groups`, lots: remainderLots, remainder },
+        x: landscape ? mainWidth : 0, y: landscape ? 0 : mainHeight, w: restWidth, h: restHeight });
+    }
+    return rects;
+  }
+  return [];
+}
 export function inventoryGroups(auctions: LiveAuction[], dimension: MapDimension | 'lot', taxonomy: Map<string, InventoryTaxonomy>): InventoryMapGroup[] {
   const groups = new Map<string, InventoryMapGroup>();
   const singleMake = new Set(auctions.map(a => a.make)).size === 1;

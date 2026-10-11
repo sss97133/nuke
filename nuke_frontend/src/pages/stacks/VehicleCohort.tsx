@@ -58,6 +58,13 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
   const knownFacets = facet ? readableFacets.filter(row => profileFacetValue(row, facet.dimension)) : [];
   const matchingN = knownFacets.filter(row => referenceIds?.has(row.id)).length;
   const eligible = selected?.result.eligibleLots ?? 0;
+  // Offer a wider reference only when the same attribute has measured peers there.
+  // A sparse engine label must never borrow the unfiltered model's percentile.
+  const widerReferenceAvailable = facet && !measured.length && effectiveScope === 'vehicleYear' && selected?.model
+    && performanceMeasures.some(({ measure }) => {
+      const wider = cohortReadings(study.data, read, 'model', measure, period, referenceIds);
+      return wider.reading !== null && wider.result.rankValues.length >= MIN_DISTRIBUTION;
+    });
   const back = new URLSearchParams({ stack: 'SA', by: 'auction', measure: 'typical',
     make: read.vehicle.make ?? '', from: String(selected?.expression.from ?? 2016),
     to: String(selected?.expression.to ?? new Date(study.data.readAt).getUTCFullYear()), excludeVehicle: vehicleId });
@@ -81,6 +88,7 @@ export function VehiclePerformance({ vehicleId, facet }: { vehicleId: string; fa
       const standing = rank >= 75 ? measure === 'participants' ? 'Many bidders' : measure === 'typical' ? 'Large steps' : 'Fast' : rank < 25 ? measure === 'participants' ? 'Few bidders' : measure === 'typical' ? 'Small steps' : 'Slow' : 'Typical';
       return <div key={measure}><dt>{label}</dt><dd><strong>P{Math.round(rank)}</strong><span>{standing}</span><div className="vp-performance__scale" aria-hidden="true"><span style={{ left: `${Math.min(98, Math.max(2, rank))}%` }} /></div></dd></div>;
     })}</dl> : <p className="vp-performance__unranked">{selected?.admissionFailure ? 'Episode unranked' : 'Reference too small'} <span>· {eligible} auction{eligible === 1 ? '' : 's'}</span></p>}
+    {widerReferenceAvailable && <button type="button" className="vp-performance__widen" onClick={() => setScope('model')}>Compare all {modelLabel} model years →</button>}
     <div className="vp-performance__footer">
       {measured.length > 0 && <span>{new Set(measured.map(item => item.analysis.result.rankValues.length)).size === 1
         ? `${measured[0].analysis.result.rankValues.length} measured peer auctions`

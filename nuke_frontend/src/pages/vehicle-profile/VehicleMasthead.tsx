@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
@@ -13,14 +13,28 @@ export default function VehicleMasthead({ priceLotId }: { priceLotId?: string })
   const { priceFacts } = useVehiclePriceFacts(vehicle?.id);
   const [showPriceSources, setShowPriceSources] = useState(false);
   const priceBoundary = useRef<HTMLDivElement>(null);
+  const mastheadRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const masthead = mastheadRef.current;
+    const page = masthead?.closest<HTMLElement>('.vehicle-profile-page');
+    if (!masthead || !page) return;
+    const update = () => page.style.setProperty('--vp-h-masthead', `${masthead.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(masthead);
+    return () => {
+      observer.disconnect();
+      page.style.removeProperty('--vp-h-masthead');
+    };
+  }, [vehicle?.id]);
   if (!vehicle) return null;
   const priceOwnedByLiveStack = !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const tokens = getVehicleIdentityTokens(vehicle, { transmissionStrategy: 'never' });
   const model = tokens.primary.find(token => token.kind === 'model')?.value;
   if (!model || (vehicle as any).listing_kind === 'non_vehicle_item') {
-    return <h1 className="vp-masthead__fallback">{getVehicleTitle(vehicle)}</h1>;
+    return <header ref={mastheadRef} className="vp-masthead"><h1 className="vp-masthead__fallback">{getVehicleTitle(vehicle)}</h1></header>;
   }
-  return <><header className="vp-masthead">
+  return <header ref={mastheadRef} className="vp-masthead">
     <h1 className="vp-masthead__identity" aria-label={getVehicleTitle(vehicle)}>
       <VehicleIdentity year={vehicle.year} make={vehicle.make ?? ''} model={model} variants={tokens.differentiators} />
     </h1>
@@ -38,5 +52,5 @@ export default function VehicleMasthead({ priceLotId }: { priceLotId?: string })
       </div>
     </HeaderPopover>}
     </div>}
-  </header></>;
+  </header>;
 }

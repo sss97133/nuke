@@ -213,8 +213,8 @@ const VehicleProfileInner: React.FC = () => {
             This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
           </div>
         )}
-        {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
-        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
+        {/* Legacy header remains mounted for its data/context. */}
+        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header">
           <React.Suspense fallback={null}>
             <VehicleHeader
               primaryPriceElsewhere={!!priceKindLabel(priceFacts) && (vehicle as any).listing_kind !== 'non_vehicle_item' && getVehicleIdentityTokens(vehicle).primary.some(token => token.kind === 'model')}
@@ -227,7 +227,7 @@ const VehicleProfileInner: React.FC = () => {
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
 
-        {/* Vehicle Sub-Header — sticky badge bar */}
+        {/* Specs scroll with the page below the persistent identity and price. */}
         <React.Suspense fallback={null}>
           <VehicleSubHeader />
         </React.Suspense>
@@ -255,7 +255,7 @@ const VehicleProfileInner: React.FC = () => {
         </React.Suspense>
 
         {/* Hero Image Section */}
-        <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
+        <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'var(--vp-sticky-top)' }}>
           <React.Suspense fallback={null}>
             <VehicleHeroImage
               overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}

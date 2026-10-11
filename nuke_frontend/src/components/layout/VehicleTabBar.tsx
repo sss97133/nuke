@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppLayoutContext } from './AppLayoutContext';
-import { useIsMobile } from '../../hooks/useIsMobile';
 import './VehicleTabBar.css';
 
 export const VehicleTabBar: React.FC = () => {
   const { vehicleTabs, activeVehicleId, closeVehicleTab, setActiveVehicleTab } = useAppLayoutContext();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
 
   const handleClose = useCallback((vehicleId: string) => {
     const wasActive = vehicleId === activeVehicleId;
@@ -30,7 +28,7 @@ export const VehicleTabBar: React.FC = () => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Cmd+W / Ctrl+W — close active tab
-      if ((e.metaKey || e.ctrlKey) && e.key === 'w' && activeVehicleId && vehicleTabs.length > 0) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w' && activeVehicleId && vehicleTabs.length > 1) {
         e.preventDefault();
         handleClose(activeVehicleId);
         return;
@@ -57,11 +55,8 @@ export const VehicleTabBar: React.FC = () => {
     return () => document.removeEventListener('keydown', handler);
   }, [activeVehicleId, vehicleTabs, handleClose, setActiveVehicleTab, navigate]);
 
-  // On mobile, hide when only one tab
-  if (isMobile && vehicleTabs.length <= 1) return null;
-  // Always show the home tab; hide vehicle tabs if empty
-  const showBar = vehicleTabs.length > 0;
-  if (!showBar) return null;
+  // A single vehicle already has its identity in the masthead.
+  if (vehicleTabs.length <= 1) return null;
 
   return (
     <div className="vehicle-tab-bar">
@@ -98,8 +93,9 @@ export const VehicleTabBar: React.FC = () => {
                 navigate(`/vehicle/${t.vehicleId}`);
               }}
               title={t.title}
+              aria-current={isActive ? 'page' : undefined}
             >
-              {isActive ? '●' : t.title}
+              {t.title}
             </button>
             <button
               type="button"

@@ -4,7 +4,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null }));
+const fixture = vi.hoisted(() => ({ responses: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null,
+  book: null as any, bookCalls: 0 }));
+vi.mock('../../pages/stacks/orderBookReader', async importOriginal => ({
+  ...await importOriginal<typeof import('../../pages/stacks/orderBookReader')>(),
+  useOrderBook: () => { fixture.bookCalls++; return fixture.book; },
+}));
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
   invoke: vi.fn((name: string, options: any) => {
     fixture.requests.push({ name, options });
@@ -19,7 +24,7 @@ async function tick(ms: number) { await act(async () => vi.advanceTimersByTimeAs
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date(clock)); (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.requests = []; fixture.held = null;
+  fixture.requests = []; fixture.held = null; fixture.bookCalls = 0; fixture.book = { isPending: true };
   fixture.responses = {
     consumers: { data: { contract: 'intake_status_v1', section: 'consumers', status: 'measured', measured_at: clock, complete: true,
       rows: [{ stack_id: 'SA', version: 1, name: 'Synthetic question', question: 'Which retained observations support the answer?', status: 'building',
@@ -101,7 +106,7 @@ it('finishes the metadata read before issuing aggregate reads and gives each a s
   expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model']);
   fixture.held = null;
   await act(async () => release(fixture.responses.model));
-  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=coverage', 'db-stats?intake=jobs', 'db-stats?intake=consumers']);
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=consumers', 'db-stats?intake=coverage', 'db-stats?intake=jobs']);
   expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(4);
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
 });
@@ -112,6 +117,8 @@ it('does not turn unavailable job declarations into undeclared writers or absent
   expect(row.textContent).toContain('Owner mapping unmeasured');
   expect(row.textContent).not.toContain('Undeclared');
   expect(row.textContent).not.toContain('No exact owner match');
+  expect(container.querySelector('.status-flow')?.textContent).toContain('Failure readings unmeasured');
+  expect(container.querySelector('.status-flow')?.textContent).not.toContain('0 reporting failure');
 });
 it('stops queued aggregate requests when the component unmounts', async () => {
   let release!: (value: any) => void;
@@ -241,4 +248,67 @@ it('withholds consumer aggregates on overflow and rejects malformed declared cou
   await tick(300_000);
   expect(container.textContent).toContain('Unavailable: consumers');
   expect(container.textContent).not.toContain('20 / 2');
+});
+
+it('traces a failed output check to declared consumers without claiming affected records', async () => {
+  fixture.responses.jobs.data.health.rows[0].assay_counts = { failed: 4, pending: 12 };
+  fixture.responses.consumers.data.rows.push({ ...structuredClone(fixture.responses.consumers.data.rows[0]),
+    stack_id: 'S03', name: 'Unrelated question', needs: [{ layer: 'log', kind: 'table', object: 'auction_events',
+      related_table: 'auction_events', verdict: 'present', reason: null },
+      { layer: 'fold', kind: 'abstract', object: 'other fold', related_table: null, verdict: 'missing', reason: null }] });
+  await render();
+  const incident = container.querySelector('.status-incident')!;
+  expect(incident.textContent).toContain('OUTPUT CHECK FAILED');
+  expect(incident.textContent).toContain('Execution: succeeded');
+  expect(incident.textContent).toContain('this does not identify affected records');
+  expect(incident.querySelector('dd')?.textContent).toBe('4');
+  await act(async () => (incident.querySelector('a[href="#status-consumers"]') as HTMLAnchorElement).click());
+  expect((container.querySelector('#status-consumers') as HTMLDetailsElement).open).toBe(true);
+  expect(container.querySelector('#status-consumers')?.textContent).toContain('Synthetic question');
+  expect(container.querySelector('#status-consumers')?.textContent).not.toContain('Unrelated question');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear table filter')!.click());
+  expect(container.querySelector('#status-consumers')?.textContent).toContain('Unrelated question');
+});
+
+it('leaves undeclared failure consequences unmeasured rather than guessing consumers', async () => {
+  fixture.responses.jobs.data.health.rows[0].declared_writer = null;
+  await render();
+  const incident = container.querySelector('.status-incident')!;
+  expect(incident.textContent).toContain('affected records and questions are unmeasured');
+  expect(incident.textContent).not.toContain('Inspect declared consumers');
+});
+
+it('shows the canonical retained replay on load and preserves its bid states with their clocks', async () => {
+  const first = '2026-10-09T12:00:00Z', last = '2026-10-10T11:00:00Z';
+  fixture.book = { isPending: false, isError: false, refetch: vi.fn(), data: {
+    vehicle: { id: 'synthetic-vehicle', year: 2000, make: 'Synthetic', model: 'Model' },
+    lot: { source_url: 'https://bringatrailer.com/listing/synthetic/', auction_end_date: '2026-10-12T12:00:00Z', total_bids: 2, updated_at: clock },
+    lots: [], unkeyedOnUrl: 0, frames: [], readAt: clock,
+    identities: { one: { id: 'one', handle: 'first' }, two: { id: 'two', handle: 'second' } },
+    comments: [{ id: 'bid-one', posted_at: first, created_at: last, comment_type: 'bid', bid_amount: 12000, external_identity_id: 'one', bat_comment_id: 1 },
+      { id: 'bid-two', posted_at: last, created_at: clock, comment_type: 'bid', bid_amount: 20000, external_identity_id: 'two', bat_comment_id: 2 }],
+  } };
+  await render(); expect(fixture.bookCalls).toBeGreaterThan(0);
+  let answer = container.querySelector('.status-replay-answer')!;
+  expect(answer.textContent).toContain('$20,000'); expect(answer.textContent).toContain('2 keyed identities');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'First bid')!.click());
+  answer = container.querySelector('.status-replay-answer')!;
+  expect(answer.textContent).toContain('$12,000'); expect(answer.textContent).toContain('1 keyed identities');
+  expect(answer.textContent).toContain(timeForTest(first)); expect(answer.textContent).toContain(timeForTest(last));
+  expect(answer.querySelector('a')?.getAttribute('href')).toBe('https://bringatrailer.com/listing/synthetic/#comment-1');
+  expect(container.textContent).toContain('not a forecast or proof of what was known then');
+  expect(container.querySelector('.status-replay-head a')?.getAttribute('href')).toContain('lot=88a000fd-fc51-4d02-a93a-84b159deea7e');
+  fixture.book.isError = true; await render();
+  expect(container.textContent).toContain('Refresh unavailable. Showing the retained reading');
+  expect(container.querySelector('.status-replay-answer')?.textContent).toContain('$12,000');
+});
+const timeForTest = (s: string) => new Date(s).toLocaleString();
+
+it('offers a retry after an incomplete retained read without rendering invented results', async () => {
+  fixture.book = { isPending: false, isError: true, data: null, refetch: vi.fn() };
+  await render();
+  expect(container.querySelector('.status-price')).toBeNull();
+  expect(container.textContent).toContain('could not be read completely');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry retained lot')!.click());
+  expect(fixture.book.refetch).toHaveBeenCalledOnce();
 });

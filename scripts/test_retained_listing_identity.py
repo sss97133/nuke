@@ -162,3 +162,5 @@ def run_identity_checks(sql, read, rejects, claim, passed):
     passed('forged physical identity/year/source/event assertions refused, stale parent withdrawn from completion and readers')
     from test_retained_canonical_recovery import run_canonical_recovery_checks
     run_canonical_recovery_checks(sql, read, rejects, passed)
+    from test_retained_presentation_agreement import run_presentation_agreement_checks
+    run_presentation_agreement_checks(sql, read, rejects, claim, passed)
