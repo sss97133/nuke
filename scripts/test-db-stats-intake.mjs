@@ -67,7 +67,7 @@ test('one timed-out assay cannot erase another canonical check or its independen
   assert.equal(result.health.readings.find(r => r.jobname === 'bat-live-pull').reason, 'query_unavailable');
   assert.equal(result.health.output_measured, false);
   assert(db.calls.filter(c => c.sql === HEALTH_SQL).every(c => c.args[0].length === 1));
-  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '1500ms'").length, HEALTH_JOBS.length);
+  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '3s'").length, HEALTH_JOBS.length);
   assert(!JSON.stringify(result).includes('PRIVATE'));
 });
 
@@ -90,6 +90,8 @@ test('the section budget stops starting assays while retaining execution evidenc
   assert.equal(db.calls.filter(c => c.sql === HEALTH_SQL).length, 1);
   assert.equal(result.health.rows.length, HEALTH_JOBS.length);
   assert.equal(result.health.readings.filter(r => r.reason === 'reading_budget_exhausted').length, HEALTH_JOBS.length - 1);
+  assert.equal(result.health.rows.find(r => r.jobname === 'drain-sale-residual-fold').assay_status, 'passed');
+  assert.equal(result.health.rows.find(r => r.jobname === 'bat-live-pull').assay_status, null);
   assert.equal(result.health.output_measured, false);
 });
 test('coverage preserves known-target queue counts and refuses totals after source overflow', async () => {

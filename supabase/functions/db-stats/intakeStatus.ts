@@ -11,10 +11,12 @@ export const INTAKE_JOBS = ['poll-listing-feeds', 'source-monitor-poll', 'bat-li
   'batch-vin-decode-backfill', 'drain-vehicle-derived-queues', 'derivation-queue-drain',
   'drain-vehicle-taxonomy', 'project-retained-listing-properties', 'qualify-retained-vin-references',
   'qualify-bat-archived-sales', 'drain-sale-residual-fold'];
-export const HEALTH_JOBS = ['poll-listing-feeds', 'bat-live-pull', 'batch-vin-decode-backfill',
-  'drain-vehicle-derived-queues', 'derivation-queue-drain', 'rmsothebys-discovery',
-  'project-retained-listing-properties', 'qualify-retained-vin-references',
-  'qualify-bat-archived-sales', 'drain-sale-residual-fold'];
+// Read the inexpensive canonical output check first, then execution-only checks.
+// Slow output assays may exhaust the section budget without erasing these results.
+export const HEALTH_JOBS = ['drain-sale-residual-fold', 'poll-listing-feeds', 'batch-vin-decode-backfill',
+  'derivation-queue-drain', 'rmsothebys-discovery', 'project-retained-listing-properties',
+  'qualify-bat-archived-sales', 'bat-live-pull', 'drain-vehicle-derived-queues',
+  'qualify-retained-vin-references'];
 export type IntakeSection = 'coverage' | 'model' | 'jobs' | 'consumers';
 export interface IntakeConnection {
   queryObject<T = Record<string, unknown>>(query: string, args?: unknown[]): Promise<{ rows: T[] }>;
@@ -141,11 +143,11 @@ export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
   (SELECT config_value FROM public.platform_config WHERE config_key = 'source_intake') AS controls`;
 
 // Pooler-safe transaction-local limits; rollback on both success and failure.
-export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = [], timeout: '5s' | '1500ms' = '5s') {
+export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = [], timeout: '5s' | '3s' = '5s') {
   await conn.queryObject('BEGIN READ ONLY');
   try {
-    await conn.queryObject(timeout === '1500ms'
-      ? "SET LOCAL statement_timeout = '1500ms'" : "SET LOCAL statement_timeout = '5s'");
+    await conn.queryObject(timeout === '3s'
+      ? "SET LOCAL statement_timeout = '3s'" : "SET LOCAL statement_timeout = '5s'");
     await conn.queryObject("SET LOCAL lock_timeout = '1s'");
     const result = await conn.queryObject<{ measured_at: string; rows: Record<string, unknown>[]; links?: Record<string, unknown>[]; controls?: unknown }>(sql, args);
     const row = result.rows[0];
@@ -168,11 +170,11 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
     const rows = new Map(executions.rows.map(row => [row.jobname, row]));
     const readings: { jobname: string; status: 'measured' | 'unavailable'; measured_at: string | null; reason: string | null }[] = [];
     for (const jobname of HEALTH_JOBS) {
-      if (Date.now() + 1500 >= deadline) {
+      if (Date.now() + 3000 >= deadline) {
         readings.push({ jobname, status: 'unavailable', measured_at: null, reason: 'reading_budget_exhausted' });
         continue;
       }
-      const reading = await boundedRead(conn, HEALTH_SQL, [[jobname]], '1500ms');
+      const reading = await boundedRead(conn, HEALTH_SQL, [[jobname]], '3s');
       const row = reading.rows.find(row => row.jobname === jobname);
       if (row) rows.set(jobname, { ...row, ...rows.get(jobname),
         assay_status: row.assay_status, health_status: row.health_status });
