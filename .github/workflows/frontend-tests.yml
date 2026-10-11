@@ -541,6 +541,10 @@ jobs:
           node-version: '24'
       - name: Verify complete organization listing folds and public profile reader
         run: PGDATABASE=dm_refinement_org_activity_ci node scripts/test-organization-listing-activity.mjs
+      - name: Create disposable organization refresh cadence database
+        run: createdb dm_refinement_org_refresh_ci
+      - name: Verify organization refresh activation preserves owner pauses and commands
+        run: PGDATABASE=dm_refinement_org_refresh_ci node scripts/test-organization-refresh-cadence.mjs
       - name: Verify earlier resales, episode identity and candidate boundaries
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_event_candidates_ci -f scripts/discovery/sale-event-candidates-test.sql
       - name: Create disposable org-creator database
