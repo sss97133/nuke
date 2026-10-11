@@ -7,7 +7,7 @@ ALTER TABLE public.organization_seller_stats ADD COLUMN IF NOT EXISTS evidence_s
 COMMENT ON TABLE public.organization_seller_stats IS
   'Current organization-attributed listing cache, one organization per row, owner compute-org-seller-stats. Qualified listing_activity_v1 receipts retain input clocks, identity/outcome exclusions and separate observed currencies. Legacy rows without this receipt are not qualified profile evidence. This cache does not establish company revenue or historical replay.';
 COMMENT ON COLUMN public.organization_seller_stats.evidence_summary IS
-  'Current organization-attributed listing activity, listing_activity_v1. Owner: compute-org-seller-stats. Grain: platform and exact source URL, or native listing ID when URL absent. Retains identity, outcome and currency exclusions. Clock: calculated_at; input clocks retained in summary. Does not establish complete market coverage, legal seller role or corporate revenue.';
+  'Current organization-attributed listing activity, listing_activity_v1. Owner: compute-org-seller-stats. Grain: platform and exact source URL, or native listing ID when URL absent. Public vehicle parents only; excludes hidden/rejected organization links. Retains identity, outcome and currency exclusions. Clock: calculated_at; input clocks retained in summary. Does not establish complete market coverage, legal seller role or corporate revenue.';
 
 CREATE OR REPLACE FUNCTION public.compute_organization_listing_activity(p_org_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
@@ -33,7 +33,12 @@ BEGIN
         WHEN event_status = 'ended' AND metadata->>'reserve_status' = 'reserve_not_met' THEN 'unsold'
         WHEN event_status IN ('active', 'pending') THEN 'active'
         ELSE 'unknown' END AS outcome
-    FROM public.vehicle_events WHERE source_organization_id = p_org_id
+    FROM public.vehicle_events e WHERE source_organization_id = p_org_id
+      AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = e.vehicle_id
+        AND v.is_public = true AND v.deleted_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM public.organization_vehicles ov
+        WHERE ov.organization_id = p_org_id AND ov.vehicle_id = e.vehicle_id
+          AND (ov.hidden_from_public = true OR ov.user_rejected = true))
   ), episodes AS MATERIALIZED (
     SELECT platform, episode_key, count(*) AS input_rows,
       count(DISTINCT vehicle_id) > 1 OR count(DISTINCT nullif(btrim(source_listing_id), '')) > 1 AS identity_conflict,
@@ -78,7 +83,7 @@ BEGIN
     FROM qualified
   ) SELECT jsonb_build_object(
     'contract', 'listing_activity_v1', 'organization_id', p_org_id,
-    'calculated_at', statement_timestamp(), 'scope', 'retained_organization_attributed_listings',
+    'calculated_at', statement_timestamp(), 'scope', 'retained_public_organization_attributed_listings',
     'population_complete', true, 'input_rows', (SELECT count(*) FROM raw),
     'unresolved_identity_rows', (SELECT count(*) FROM raw WHERE platform IS NULL OR episode_key IS NULL),
     'latest_input_created_at', (SELECT max(created_at) FROM raw),
@@ -125,7 +130,7 @@ BEGIN
   RETURN summary;
 END $$;
 COMMENT ON FUNCTION public.compute_organization_listing_activity(uuid) IS
-  'Service-only bounded full-cohort fold for compute-org-seller-stats; existing source_organization_id index, one transaction, no testimony mutation. Exact source identity, conservative conflicts, explicit currency groups; current knowledge only. Missing units never default to USD. Counters are maximum retained native values per episode. Ten-second budget fails atomically.';
+  'Service-only bounded full-cohort fold for compute-org-seller-stats; existing source_organization_id index, one transaction, no testimony mutation; public/nondeleted vehicle parents and visible nonrejected links only. Exact source identity, conservative conflicts, explicit currency groups; current knowledge only. Missing units never default to USD. Counters are maximum retained native values per episode. Ten-second budget fails atomically.';
 REVOKE ALL ON FUNCTION public.compute_organization_listing_activity(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.compute_organization_listing_activity(uuid) TO service_role;
 
@@ -134,7 +139,12 @@ RETURNS TABLE (organization_id uuid) LANGUAGE sql STABLE SECURITY INVOKER SET se
 SET statement_timeout = '5s' AS $$
   SELECT o.id FROM public.organizations o
   LEFT JOIN public.organization_seller_stats s ON s.organization_id = o.id
-  WHERE EXISTS (SELECT 1 FROM public.vehicle_events e WHERE e.source_organization_id = o.id)
+  WHERE EXISTS (SELECT 1 FROM public.vehicle_events e WHERE e.source_organization_id = o.id
+    AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = e.vehicle_id
+      AND v.is_public = true AND v.deleted_at IS NULL)
+    AND NOT EXISTS (SELECT 1 FROM public.organization_vehicles ov
+      WHERE ov.organization_id = o.id AND ov.vehicle_id = e.vehicle_id
+        AND (ov.hidden_from_public = true OR ov.user_rejected = true)))
   ORDER BY s.calculated_at ASC NULLS FIRST, o.id
   LIMIT greatest(1, least(coalesce(p_limit, 50), 50));
 $$;

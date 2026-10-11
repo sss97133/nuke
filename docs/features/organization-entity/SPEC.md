@@ -46,7 +46,7 @@ cohorts, not permission to enable stale writers or mint guessed organizations.
 The first implementation extends **compute-org-seller-stats** and
 **organization_seller_stats**, rather than adding a competing organization engine.
 `compute_organization_listing_activity(uuid)` folds the complete indexed retained
-listing population, keyed by platform and exact source URL, falling back to a
+public-vehicle listing population, keyed by platform and exact source URL, falling back to a
 native listing ID only when URL is missing. Missing identities remain unresolved
 rows; conflicting parents, native IDs, outcomes, prices and currencies remain
 coverage exclusions. Ended/cancelled does not mean an unsold result. A native
@@ -54,8 +54,9 @@ reserve-not-met claim can establish an unsold result. Explicit currencies stay
 separate, with unknown units retained; associated vehicle prices do not establish
 organization sales or corporate revenue. The source records are unchanged.
 
-The existing public profile reader admits only the qualified cache contract for
-a public canonical organization. Page loads read the cache, never fold the event
+The fold excludes private/deleted vehicle parents and hidden/rejected organization
+associations. The existing public profile reader admits only this explicitly scoped
+qualified cache contract for a public canonical organization. Page loads read the cache, never fold the event
 history. The profile retains the calculation and input extraction/creation clocks,
 unknown outcomes, identity conflicts and amount coverage. This is **current retained
 evidence**, not a historical point-in-time reconstruction or complete world-market

@@ -19,12 +19,15 @@ CREATE TABLE public.vehicle_events(id uuid PRIMARY KEY, vehicle_id uuid,
   bid_count int, comment_count int, view_count int, started_at timestamptz,
   created_at timestamptz DEFAULT now(), extracted_at timestamptz DEFAULT now(), metadata jsonb DEFAULT '{}');
 CREATE INDEX idx_vehicle_events_source_org ON public.vehicle_events(source_organization_id);
+CREATE TABLE public.vehicles(id uuid PRIMARY KEY,is_public boolean,deleted_at timestamptz);
+CREATE TABLE public.organization_vehicles(organization_id uuid,vehicle_id uuid,hidden_from_public boolean,user_rejected boolean);
+CREATE INDEX org_vehicle_visibility ON public.organization_vehicles(organization_id,vehicle_id);
 CREATE TABLE public.pipeline_registry(table_name text, column_name text, owned_by text, description text,
   do_not_write_directly boolean, write_via text, UNIQUE(table_name,column_name));
 ALTER TABLE public.organization_seller_stats ENABLE ROW LEVEL SECURITY;
 CREATE POLICY service_cache ON public.organization_seller_stats FOR ALL TO service_role USING(true) WITH CHECK(true);
 GRANT USAGE ON SCHEMA public TO service_role, anon, authenticated;
-GRANT SELECT ON public.organizations, public.vehicle_events TO service_role;
+GRANT SELECT ON public.organizations, public.vehicle_events, public.vehicles, public.organization_vehicles TO service_role;
 GRANT SELECT, INSERT, UPDATE ON public.organization_seller_stats TO service_role;
 \ir ../migrations/20261011032252_organization_listing_activity_fold.sql
 -- Reapply the actual migration to verify idempotent DDL and permissions.
@@ -33,6 +36,9 @@ CREATE FUNCTION public.fixture_uid(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS
   SELECT ('00000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid
 $$;
 INSERT INTO public.organizations VALUES (fixture_uid(1),true),(fixture_uid(2),true),(fixture_uid(3),false),(fixture_uid(4),true);
+INSERT INTO public.vehicles VALUES (fixture_uid(99999),true,NULL),(fixture_uid(90),true,NULL),(fixture_uid(91),true,NULL),
+ (fixture_uid(92),false,NULL),(fixture_uid(93),true,now()),(fixture_uid(94),true,NULL),(fixture_uid(95),true,NULL);
+INSERT INTO public.organization_vehicles VALUES (fixture_uid(2),fixture_uid(94),true,false),(fixture_uid(2),fixture_uid(95),false,true);
 -- Every episode uses the same vehicle: organization volume must not collapse
 -- to a vehicle count or silently stop at the old 1,000/5,000 client limits.
 INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status,final_price,metadata,started_at)
@@ -60,8 +66,13 @@ FROM (VALUES
  (16,90,'https://fixture.example/j','j','sold',80,'{"currency":"USD"}',NULL),
  (17,90,'https://fixture.example/j','j','sold',80,'{"currency":"GBP"}',NULL)
 )f(n,v,url,native,status,price,meta,bids);
-INSERT INTO public.vehicle_events(id,source_organization_id,source_platform,source_url,event_status,final_price,metadata)
-VALUES (fixture_uid(8000),fixture_uid(3),'fixture','https://fixture.example/private','sold',100,'{"currency":"USD"}');
+INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status,final_price,metadata)
+VALUES (fixture_uid(8000),fixture_uid(90),fixture_uid(3),'fixture','https://fixture.example/private-org','sold',100,'{"currency":"USD"}');
+-- A public organization cannot publish private/deleted vehicle contributions or
+-- an association the owner hid/rejected, including through aggregate amounts.
+INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status,final_price,metadata)
+SELECT fixture_uid(8000+n),fixture_uid(91+n),fixture_uid(2),'fixture',
+ 'https://fixture.example/excluded/'||n,'sold',100000*n,'{"currency":"USD"}' FROM generate_series(1,4)n;
 CREATE TABLE public.fixture_fingerprint AS SELECT md5(string_agg(to_jsonb(e)::text,'' ORDER BY id)) hash FROM public.vehicle_events e;
 SET ROLE service_role;
 SELECT public.compute_organization_listing_activity(public.fixture_uid(1));
@@ -85,6 +96,7 @@ DO $$ DECLARE a jsonb; b jsonb; BEGIN
  ASSERT (b->>'avg_bid_count')::numeric=2,'Known zero retained, missing counters not imputed';
  ASSERT jsonb_array_length(b->'currencies')=2,'Currencies never combined';
  ASSERT (SELECT sum((c->>'total')::numeric) FROM jsonb_array_elements(b->'currencies')c)=30,'Only eligible native amounts';
+ ASSERT (b->>'input_rows')::int=17,'Private/deleted vehicles and hidden/rejected associations contribute neither counts nor amounts';
  ASSERT NOT EXISTS(SELECT 1 FROM public.organization_seller_stats WHERE total_gross_sales IS NOT NULL),'Legacy unitless revenue scalars retired';
  ASSERT NOT has_function_privilege('anon','public.compute_organization_listing_activity(uuid)','EXECUTE') AND
    NOT has_function_privilege('authenticated','public.compute_organization_listing_activity(uuid)','EXECUTE'),'Fold stays service-only';

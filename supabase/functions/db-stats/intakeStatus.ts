@@ -84,6 +84,7 @@ export const ORG_ACTIVITY_SQL = `SELECT statement_timestamp() AS measured_at,
 FROM public.organizations o JOIN public.organization_seller_stats s ON s.organization_id = o.id
 WHERE o.id = $1 AND o.is_public = true
   AND s.evidence_summary->>'contract' = 'listing_activity_v1'
+  AND s.evidence_summary->>'scope' = 'retained_public_organization_attributed_listings'
   AND s.evidence_summary->>'population_complete' = 'true'`;
 
 export async function readOrganizationTargets(conn: IntakeConnection, organizationId: string) {
