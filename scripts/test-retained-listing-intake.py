@@ -344,6 +344,8 @@ if powertrain:
     if native_year:
         from test_retained_native_year import run_native_year_checks
         run_native_year_checks(sql,read,rejects,claim,passed)
+        from test_retained_year_candidate_guard import run_year_candidate_guard_checks
+        run_year_candidate_guard_checks(sql,read,rejects,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
