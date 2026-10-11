@@ -534,6 +534,13 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_price_facts_ci -f supabase/sql/test_vehicle_price_facts_materialized_basis.sql
       - name: Create disposable sale-event candidate database
         run: createdb dm_refinement_sale_event_candidates_ci
+      - name: Create disposable organization listing activity database
+        run: createdb dm_refinement_org_activity_ci
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify complete organization listing folds and public profile reader
+        run: PGDATABASE=dm_refinement_org_activity_ci node scripts/test-organization-listing-activity.mjs
       - name: Verify earlier resales, episode identity and candidate boundaries
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_sale_event_candidates_ci -f scripts/discovery/sale-event-candidates-test.sql
       - name: Create disposable org-creator database

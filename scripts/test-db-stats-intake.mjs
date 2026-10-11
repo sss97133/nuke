@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
   INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
-  ORG_TARGETS_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  ORG_TARGETS_SQL, ORG_ACTIVITY_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -189,6 +189,16 @@ test('signed-in non-admin gets no privileged metadata; membership is parameteriz
   assert.equal(h.counts().reads, 0);
   assert.equal(h.queryCalls[0].sql.includes('user_id = $1::uuid AND is_active'), true);
   assert.deepEqual(Array.from(h.queryCalls[0].args), ['synthetic-user']);
+});
+test('organization activity reads only its public parent cache; a cache failure preserves target inventory', async () => {
+  const db = connection({ [ORG_TARGETS_SQL]: [{ measured_at: clock, rows: [{ total_targets: 2 }] }],
+    [ORG_ACTIVITY_SQL]: new Error('PRIVATE_CACHE_ERROR') });
+  const result = await readOrganizationTargets(db, 'synthetic-id');
+  assert.equal(result.rows[0].total_targets, 2);
+  assert.equal(result.listing_activity.status, 'unavailable');
+  assert.deepEqual(db.calls.find(c => c.sql === ORG_ACTIVITY_SQL).args, ['synthetic-id']);
+  assert(!JSON.stringify(result).includes('PRIVATE_CACHE_ERROR'));
+  assert(!ORG_ACTIVITY_SQL.includes('public.vehicle_events'));
 });
 test('active admins and service callers receive only the requested read-only section without caching', async () => {
   for (const caller of [{ kind: 'user', userId: 'synthetic-admin' }, { kind: 'service_role' }]) {
