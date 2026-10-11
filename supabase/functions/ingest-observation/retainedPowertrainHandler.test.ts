@@ -132,6 +132,44 @@ Deno.test("service replay reuses qualified inputs only within its batch and stil
   if(saved[i]===undefined)Deno.env.delete(key);else Deno.env.set(key,saved[i]!);
  }}
 });
+
+Deno.test("real Craigslist selector admits original auto_miles listing label and keeps both disclosures",async()=>{
+ const original=globalThis.fetch;Deno.env.set("SUPABASE_URL","https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY","test-key");
+ const sourceId="d7dad87c-0dc3-4b98-a31a-edf511618f8c";let writes=0;let stored:any=null;
+ const respond=(d:unknown,status=200)=>new Response(JSON.stringify(d),{status,headers:{"Content-Type":"application/json"}});
+ globalThis.fetch=async(resource,init)=>{
+  const u=new URL(typeof resource==="string"?resource:resource instanceof URL?resource.href:resource.url);
+  assert(u.origin==="https://db.test"&&u.pathname.startsWith("/rest/v1/"));
+  const options=init as {method?:string;body?:unknown}|undefined;
+  const body=typeof options?.body==="string"?JSON.parse(options.body):null;
+  if(u.pathname.endsWith("vehicles"))return respond([{id:VID,is_public:true,deleted_at:null,listing_kind:"vehicle"}]);
+  if(u.pathname.endsWith("observation_sources"))return respond([{id:sourceId,slug:"craigslist",base_trust_score:.4,supported_observations:["listing"]}]);
+  if(u.pathname.endsWith("observation_properties"))return respond([{id:"abdd7a7a-02c1-4b09-afc6-1a288207dd2d",namespace:"core",deprecated_at:null,applies_to_kinds:["listing","condition"]}]);
+  if(u.pathname.endsWith("vehicle_observations")){
+   if(options?.method==="POST"){
+    writes++;assert(body.kind==="listing"&&body.confidence_score===.4&&body.structured_data.mileage_miles===60000);
+    assert(body.source_observation_id===PARENT&&body.structured_data.source_value==="60,000"&&body.structured_data.odometer_broken===true&&body.structured_data.odometer_rolled_over===true);
+    assert(body.structured_data.true_mileage_status==="unknown"&&body.structured_data.source_event_time_status==="unknown"&&body.agent_cost_cents===0&&body.agent_model===null);
+    stored={...body,id:"77777777-7777-4777-8777-000000000001"};return respond(stored,201);
+   }
+   if(u.searchParams.has("id")){
+    assert(u.searchParams.get("select")!.includes("extraction_metadata")&&u.searchParams.get("select")!.includes("source_identifier"));
+    return respond([{id:PARENT,vehicle_id:VID,kind:"listing",is_superseded:false,property_id:null,subject_type:"vehicle",subject_id:null,
+     source_id:sourceId,source_identifier:"7000000001",source_url:"https://www.craigslist.org/view/d/example-car/abcDEF_123",
+     observed_at:null,ingested_at:"2026-10-10T00:00:00.123456Z",extraction_method:"html_parse",confidence_score:.4,
+     structured_data:{mileage:123456},extraction_metadata:{raw:{post_id:"7000000001",attributes:{raw:{auto_miles:"60,000",odometer_broken:"odometer broken",odometer_rolled_over:"odometer rolled over"},odometer_raw:"60,000",odometer:60000,odometer_broken:true,odometer_rolled_over:true}}}}]);
+   }
+   return respond(stored&&u.searchParams.get("content_hash")===`eq.${stored.content_hash}`?[stored]:[]);
+  }
+  throw Error(`unexpected route ${u.pathname}`);
+ };
+ try{
+  const req=(extra={})=>new Request("https://db.test/functions/v1/ingest-observation",{method:"POST",headers:{Authorization:"Bearer test-key","Content-Type":"application/json"},body:JSON.stringify({mode:"retained_listing_mileage_miles_v1",source_observation_id:PARENT,...extra})});
+  const first=await handler(req());assert(first.status===200&&(await first.json()).success);
+  const duplicate=await handler(req());assert(duplicate.status===200&&(await duplicate.json()).duplicate);
+  assert((await handler(req({structured_data:{mileage_miles:123456}}))).status===400);assert(writes===1);
+ }finally{globalThis.fetch=original;for(const [i,k]of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()){if(saved[i]===undefined)Deno.env.delete(k);else Deno.env.set(k,saved[i]!);}}
+});
 for(const [i,key] of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()){
  if(saved[i]===undefined)Deno.env.delete(key);else Deno.env.set(key,saved[i]!);
 }

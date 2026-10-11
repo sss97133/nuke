@@ -85,7 +85,7 @@ interface ObservationInput {
   extraction_metadata?: Record<string, unknown>;
   /** LLM provenance — which model produced this observation */
   agent_tier?: string;
-  agent_model?: string;
+  agent_model?: string | null;
   agent_cost_cents?: number;
   agent_duration_ms?: number;
   extraction_method?: string;
@@ -355,7 +355,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const parent = batchLookups?.get(`parent:${sourceId}`) ?? await supabase.from("vehicle_observations")
-        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data,content_text")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
         .eq("id", sourceId).maybeSingle();
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
@@ -781,6 +781,12 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     if (input.agent_inferred === true && confidenceScore > 0.6) {
       confidenceFactors.agent_inferred_cap = 0.6 - confidenceScore;
       confidenceScore = 0.6;
+    }
+    // A freshly derived Craigslist label retains its source profile's cap;
+    // source-URL/content/vehicle-match bonuses cannot turn it into stronger evidence.
+    if (retainedSourceId && input.structured_data?.source_profile === "craigslist_auto_miles_v1" && confidenceScore > 0.4) {
+      confidenceFactors.retained_listing_source_cap = 0.4 - confidenceScore;
+      confidenceScore = 0.4;
     }
 
     // Determine confidence level from score
