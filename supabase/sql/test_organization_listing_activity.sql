@@ -32,13 +32,20 @@ GRANT SELECT, INSERT, UPDATE ON public.organization_seller_stats TO service_role
 \ir ../migrations/20261011032252_organization_listing_activity_fold.sql
 -- Reapply the actual migration to verify idempotent DDL and permissions.
 \ir ../migrations/20261011032252_organization_listing_activity_fold.sql
+\ir ../migrations/20261011054710_organization_activity_candidate_probe.sql
+\ir ../migrations/20261011054710_organization_activity_candidate_probe.sql
 CREATE FUNCTION public.fixture_uid(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$
   SELECT ('00000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid
 $$;
 INSERT INTO public.organizations VALUES (fixture_uid(1),true),(fixture_uid(2),true),(fixture_uid(3),false),(fixture_uid(4),true);
+INSERT INTO public.organizations SELECT fixture_uid(n),true FROM generate_series(5,8)n;
 INSERT INTO public.vehicles VALUES (fixture_uid(99999),true,NULL),(fixture_uid(90),true,NULL),(fixture_uid(91),true,NULL),
  (fixture_uid(92),false,NULL),(fixture_uid(93),true,now()),(fixture_uid(94),true,NULL),(fixture_uid(95),true,NULL);
 INSERT INTO public.organization_vehicles VALUES (fixture_uid(2),fixture_uid(94),true,false),(fixture_uid(2),fixture_uid(95),false,true);
+INSERT INTO public.organization_vehicles VALUES (fixture_uid(7),fixture_uid(94),true,false),(fixture_uid(8),fixture_uid(95),false,true);
+INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status)
+SELECT fixture_uid(90000+n),fixture_uid(87+n),fixture_uid(n),'fixture','https://fixture.example/excluded/'||n,'sold'
+FROM generate_series(5,8)n;
 -- Every episode uses the same vehicle: organization volume must not collapse
 -- to a vehicle count or silently stop at the old 1,000/5,000 client limits.
 INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status,final_price,metadata,started_at)
@@ -103,6 +110,10 @@ DO $$ DECLARE a jsonb; b jsonb; BEGIN
  ASSERT has_function_privilege('service_role','public.compute_organization_listing_activity(uuid)','EXECUTE'),'Existing worker may execute';
  ASSERT (SELECT md5(string_agg(to_jsonb(e)::text,'' ORDER BY id)) FROM public.vehicle_events e)=(SELECT hash FROM public.fixture_fingerprint),'Testimony untouched';
  ASSERT (SELECT count(*) FROM public.organization_listing_activity_candidates(999))=3,'No-evidence organization excluded from batches';
+ ASSERT NOT EXISTS (SELECT 1 FROM public.organization_listing_activity_candidates(999) WHERE organization_id IN
+   (fixture_uid(5),fixture_uid(6),fixture_uid(7),fixture_uid(8))),'Private/deleted/hidden/rejected-only cohorts excluded from selector';
+ ASSERT NOT has_function_privilege('anon','public.organization_listing_activity_candidates(int)','EXECUTE') AND
+   NOT has_function_privilege('authenticated','public.organization_listing_activity_candidates(int)','EXECUTE'),'Selector remains service-only';
  ASSERT (SELECT count(*) FROM public.organization_listing_activity_candidates(1))=1,'Bounded candidate batch';
  ASSERT (SELECT total_listings FROM public.organization_seller_stats WHERE organization_id=fixture_uid(4))=0,'Empty evidence is measured zero';
  ASSERT NOT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock'),'No lock cascade';
@@ -117,4 +128,13 @@ DO $$ DECLARE before jsonb; BEGIN
  ASSERT before=(SELECT to_jsonb(s) FROM public.organization_seller_stats s WHERE organization_id=fixture_uid(1)),'Failed fold retains prior cache';
 END $$;
 DROP TRIGGER fixture_reject ON public.organization_seller_stats;
+-- More eligible keys than the batch cap; never computed caches sort first.
+INSERT INTO public.organizations SELECT fixture_uid(n),true FROM generate_series(200,254)n;
+INSERT INTO public.vehicle_events(id,vehicle_id,source_organization_id,source_platform,source_url,event_status)
+SELECT fixture_uid(91000+n),fixture_uid(90),fixture_uid(n),'fixture','https://fixture.example/new-org/'||n,'active'
+FROM generate_series(200,254)n;
+DO $$ BEGIN
+ ASSERT (SELECT count(*) FROM public.organization_listing_activity_candidates(999))=50,'Hard cap applies beyond fifty eligible keys';
+ ASSERT (SELECT organization_id FROM public.organization_listing_activity_candidates(1))=fixture_uid(200),'Oldest-first selection is deterministic';
+END $$;
 SELECT 'organization listing activity SQL contracts passed' AS result;
