@@ -77,13 +77,20 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
   };
 }
 
-/** One acknowledgement loop, retaining the complete unacknowledged prefix on failure. */
+/** One acknowledgement loop, ordered within each lot. A rejected lot retains
+ * its complete unacknowledged prefix while independent lots can still drain. */
 export class BatLiveBuffer {
   private frames: BatLiveFrame[] = [];
   private draining = false;
+  private failures = new Map<string, string>();
   constructor(private admit: (frames: BatLiveFrame[]) => Promise<void>, private capacity = 5000) {}
   get pending() { return this.frames.length; }
   get oldestReceivedAt() { return this.frames[0]?.received_at ?? null; }
+  statusFor(id: string) {
+    const frames = this.frames.filter(f => f.monitored_auction_id === id);
+    return { pending: frames.length, oldestReceivedAt: frames[0]?.received_at ?? null,
+      error: this.failures.get(id) ?? null };
+  }
   push(frame: BatLiveFrame) {
     if (this.frames.length >= this.capacity) throw new Error("bat_live_unacknowledged_capacity_exceeded");
     this.frames.push(frame);
@@ -92,11 +99,27 @@ export class BatLiveBuffer {
     if (this.draining) return;
     this.draining = true;
     try {
-      while (this.frames.length) {
-        const batch = this.frames.slice(0, 50);
-        await this.admit(batch);
-        this.frames.splice(0, batch.length);
+      const rejected = new Set<string>();
+      let firstFailure: unknown;
+      while (true) {
+        const next = this.frames.find(f => !rejected.has(f.monitored_auction_id));
+        if (!next) break;
+        const id = next.monitored_auction_id;
+        const batch = this.frames.filter(f => f.monitored_auction_id === id).slice(0, 50);
+        try {
+          await this.admit(batch);
+          // Only remove the acknowledged prefix of this lot. Arrivals appended
+          // while admission waits, including repeated frame objects, stay queued.
+          let remaining = batch.length;
+          this.frames = this.frames.filter(f => f.monitored_auction_id !== id || remaining-- <= 0);
+          this.failures.delete(id);
+        } catch (error) {
+          rejected.add(id);
+          this.failures.set(id, `admission:${String(error)}`.slice(0, 500));
+          firstFailure ??= error;
+        }
       }
+      if (rejected.size) throw firstFailure;
     } finally { this.draining = false; }
   }
 }

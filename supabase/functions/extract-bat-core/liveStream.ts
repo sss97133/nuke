@@ -142,8 +142,8 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       // connection and coverage clock running while that independent task waits
       // for acknowledgements, preserving the existing receipt/recovery order.
       if (!admissionTask) admissionTask = buffer.flush()
-        .then(() => { if (lastError?.startsWith("admission:")) lastError = null; })
-        .catch(error => { lastError = `admission:${String(error)}`.slice(0, 500); })
+        // Admission failures are retained and reported by lot in the buffer.
+        .catch(() => {})
         .finally(() => { admissionTask = null; });
       if (Date.now() - lastRecoveryAt > 45000) {
         for (const target of targets) if (acknowledged.has(`post;single;${target.post_id}`)) scheduleRecovery(target);
@@ -151,9 +151,13 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       }
       if (!heartbeatTask && Date.now() - lastHeartbeatAt >= 1000) {
         const at = new Date().toISOString();
-        heartbeatTask = io.admit([], targets.map(t => ({ monitored_auction_id: t.id, session_id: sessionId, at,
-          connected: ["single", "stats", "list"].every(type => acknowledged.has(`post;${type};${t.post_id}`)),
-          pending: buffer.pending, oldest_received_at: buffer.oldestReceivedAt, error: recoveryErrors.get(t.id) || lastError })))
+        heartbeatTask = io.admit([], targets.map(t => {
+          const status = buffer.statusFor(t.id);
+          return { monitored_auction_id: t.id, session_id: sessionId, at,
+            connected: ["single", "stats", "list"].every(type => acknowledged.has(`post;${type};${t.post_id}`)),
+            pending: status.pending, oldest_received_at: status.oldestReceivedAt,
+            error: recoveryErrors.get(t.id) || status.error || lastError };
+        }))
           .then(() => { if (lastError?.startsWith("coverage:")) lastError = null; })
           .catch(error => { lastError = `coverage:${String(error)}`.slice(0, 500); })
           .finally(() => { heartbeatTask = null; });
@@ -167,10 +171,17 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     await Promise.allSettled([...tasks]);
     if (heartbeatTask) await heartbeatTask;
     if (admissionTask) await admissionTask;
-    await buffer.flush();
-    // Leave the other overlapping worker's session intact.
-    await io.admit([], targets.map(t => ({ monitored_auction_id: t.id, session_id: sessionId, at: new Date().toISOString(),
-      connected: false, pending: buffer.pending, oldest_received_at: buffer.oldestReceivedAt, error: recoveryErrors.get(t.id) || lastError })));
+    try { await buffer.flush(); }
+    finally {
+      // Leave the other overlapping worker's session intact, even when this
+      // worker ends with a rejected lot still waiting for admission.
+      await io.admit([], targets.map(t => {
+        const status = buffer.statusFor(t.id);
+        return { monitored_auction_id: t.id, session_id: sessionId, at: new Date().toISOString(),
+          connected: false, pending: status.pending, oldest_received_at: status.oldestReceivedAt,
+          error: recoveryErrors.get(t.id) || status.error || lastError };
+      }));
+    }
   }
 }
 
