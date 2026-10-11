@@ -1332,6 +1332,7 @@
 .vp-performance__context { color: var(--text-secondary); }
 .vp-performance__unranked { margin: 8px 0; font-weight: 700; }
 .vp-performance__unranked span { font-weight: 400; color: var(--text-secondary); }
+.vp-performance__widen { padding: 4px 0; border: 0; border-bottom: 1px solid var(--text-secondary); background: transparent; color: var(--text); font: inherit; font-size: 10px; cursor: pointer; }
 .vp-performance__evidence-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 8px 0; }
 .vp-performance__evidence-table td, .vp-performance__evidence-table th { text-align: left; padding: 3px; border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .barcode-bar { border: 0; background: var(--vp-surface); text-align: left; }

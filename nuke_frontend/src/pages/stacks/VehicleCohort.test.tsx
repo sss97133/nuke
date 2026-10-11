@@ -59,6 +59,21 @@ it('withholds a sparse exact-label rank rather than borrowing the wider model pe
   expect(host.querySelector('.vp-performance__readings')).toBeNull();
   expect(host.querySelector('.vp-performance__unranked')!.textContent).toContain('1 auction');
   expect(host.querySelector('details')!.textContent).toContain('100.0% (1/1)');
+  expect(host.querySelector('.vp-performance__widen')).toBeNull();
+});
+it('offers a direct wider comparison only when the same attribute is measured there',async()=>{
+  for (const lot of state.dataset.lots) if (lot.vehicleId !== 'subject' && lot.vehicleId !== 'peer-1') lot.vehicleYear=2001;
+  await mount({dimension:'body_style',value:'COUPE',label:'Coupe'});
+  expect(host.querySelector('.vp-performance__readings')).toBeNull();
+  expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('Against 2000 Coupe');
+  const wider=host.querySelector<HTMLButtonElement>('.vp-performance__widen')!;
+  expect(wider.textContent).toBe('Compare all Coupe model years →');
+  expect(host.querySelector<HTMLDetailsElement>('details')!.open).toBe(false);
+  await act(async()=>wider.click());
+  expect(host.querySelector('.vp-performance__scope')!.textContent).toContain('Against Coupe · all model years');
+  expect(host.querySelectorAll('.vp-performance__readings > div')).toHaveLength(3);
+  expect(host.querySelector('.vp-performance__footer')!.textContent).toContain('8 measured peer auctions');
+  expect(host.querySelector('.vp-performance__widen')).toBeNull();
 });
 it('a scope control changes the denominator and identifies all model years explicitly',async()=>{
   await mount({dimension:'body_style',value:'COUPE',label:'Coupe'});
