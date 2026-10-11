@@ -133,6 +133,42 @@ Deno.test("service replay reuses qualified inputs only within its batch and stil
  }}
 });
 
+Deno.test("real native year selector preserves the introduction label separately from a chassis year and deduplicates through the existing SDK",async()=>{
+ const original=globalThis.fetch;Deno.env.set("SUPABASE_URL","https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY","test-key");
+ let writes=0,stored:any=null;
+ const opening="This 2014 Airstream Interstate 24 Lounge Extended was built on a 2013 Mercedes-Benz Sprinter 3500 chassis.";
+ const respond=(d:unknown,status=200)=>new Response(JSON.stringify(d),{status,headers:{"Content-Type":"application/json"}});
+ globalThis.fetch=async(resource,init)=>{
+  const u=new URL(typeof resource==="string"?resource:resource instanceof URL?resource.href:resource.url),options=init as {method?:string;body?:unknown}|undefined;
+  const body=typeof options?.body==="string"?JSON.parse(options.body):null;
+  if(u.pathname.endsWith("vehicles"))return respond([{id:VID,is_public:true,deleted_at:null,listing_kind:"vehicle"}]);
+  if(u.pathname.endsWith("observation_sources"))return respond([{id:SID,slug:"bat",base_trust_score:.85,supported_observations:["listing","specification"]}]);
+  if(u.pathname.endsWith("observation_properties"))return respond([{id:"ece619f7-c49a-44f7-999f-a41acf5d4dc3",namespace:"core",deprecated_at:null,applies_to_kinds:["listing","specification"]}]);
+  if(u.pathname.endsWith("vehicle_observations")){
+   if(options?.method==="POST"){
+    writes++;assert(body.kind==="specification"&&body.confidence_score<=.6&&body.structured_data.year===2014);
+    assert(body.source_observation_id===PARENT&&body.structured_data.source_value===opening&&body.structured_data.source_year_token==="2014");
+    assert(body.structured_data.year_label_basis==="native_listing_subject_introduction"&&body.structured_data.identity_resolution_status==="unverified");
+    assert(body.structured_data.source_event_time_status==="unknown"&&body.agent_cost_cents===0&&body.agent_model===null);
+    stored={...body,id:"77777777-7777-4777-8777-000000000001"};return respond(stored,201);
+   }
+   if(u.searchParams.has("id"))return respond([{id:PARENT,vehicle_id:VID,kind:"listing",is_superseded:false,property_id:null,subject_type:"vehicle",subject_id:null,
+    source_id:SID,source_url:"https://bringatrailer.com/listing/native-year-fixture/",observed_at:"2026-10-10T00:00:00.123456Z",ingested_at:"2026-10-10T00:00:01.123456Z",
+    extraction_method:"html_description_capture",confidence_score:.8,content_text:opening+" It was acquired in 2026. Factory configuration and physical identity remain unverified.",
+    structured_data:{year:1990,extractor:"extract-bat-core",source_text_field:"extract-bat-core.extractDescription",description_capture:true,extractor_input_truncated:false,
+     source_capture_basis:"direct_fetch",source_capture_sha256:"a".repeat(64),observation_time_basis:"source_capture",source_event_time_status:"unknown",source_captured_at:"2026-10-10T00:00:00.123456Z"}}]);
+   return respond(stored&&u.searchParams.get("content_hash")===`eq.${stored.content_hash}`?[stored]:[]);
+  }
+  throw Error(`unexpected route ${u.pathname}`);
+ };
+ try{
+  const req=(extra={})=>new Request("https://db.test/functions/v1/ingest-observation",{method:"POST",headers:{Authorization:"Bearer test-key","Content-Type":"application/json"},body:JSON.stringify({mode:"retained_listing_year_v1",source_observation_id:PARENT,...extra})});
+  const first=await handler(req());assert(first.status===200&&(await first.json()).success);
+  const duplicate=await handler(req());assert(duplicate.status===200&&(await duplicate.json()).duplicate);
+  assert((await handler(req({structured_data:{year:1990}}))).status===400&&writes===1);
+ }finally{globalThis.fetch=original;for(const [i,key]of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()){if(saved[i]===undefined)Deno.env.delete(key);else Deno.env.set(key,saved[i]!);}}
+});
+
 for(const key of ["mileage_miles","year"])Deno.test(`real Craigslist selector admits original ${key} listing label with source qualifiers`,async()=>{
  const original=globalThis.fetch;Deno.env.set("SUPABASE_URL","https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY","test-key");
  const sourceId="d7dad87c-0dc3-4b98-a31a-edf511618f8c";let writes=0;let stored:any=null;
