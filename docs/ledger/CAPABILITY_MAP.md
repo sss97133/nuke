@@ -9,6 +9,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 
 | Capability | USE THIS (canonical) | AVOID (duplicates / traps) |
 |---|---|---|
+| Schema proposal approval, expansion and retry | `schema_proposals` → `schema_proposal_reviews` → `fn_schema_proposal_apply`; `get_schema_proposal_progress(uuid)` implemented/tested, deployment pending (2026-10-11) | A second proposal queue; treating approval or registry insertion as completed intake/consumer repair. The progress reader always leaves consumer verification open. See encyclopedia chapter 8 §0. |
 | **INGESTION / EXTRACTION** | | |
 | Ingest ANY listing URL / unknown source | `ingest` edge fn (`nuke.ingest()`) | smart-extraction-router (ghost — map wrongly calls it the entry point), scrape-vehicle (undeployed; AddVehicle.tsx call is broken), process-url-drop, micro-scrape-bandaid, store-auction-listing (zombies) |
 | Route/drain import_queue | `process-import-queue` | continuous-queue-processor, extract-premium-auction, unified-scraper-orchestrator (zombie), re-extract-pending-vehicles, process-cl-queue |

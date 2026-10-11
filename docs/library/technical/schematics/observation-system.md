@@ -4,6 +4,16 @@
 
 This document describes the observation architecture: the unified intake system designed to accept data from any source, attach trust scores, deduplicate, resolve vehicles, and store structured observations with full provenance. This is the target architecture the system is migrating toward.
 
+**Schema repair boundary, 2026-10-11.** Existing flow:
+`evidenced gap → schema_proposals → curator review → typed registry expansion`.
+The staged `get_schema_proposal_progress(uuid)` reader checks that flow's registration
+state; it always leaves consumer verification open. The remaining path is
+`retained input → sanctioned intake → original question + counterexample assay`.
+Property admission remains explicitly supported by the intake implementation. Neither
+registry insertion nor a `pending_claims` table establishes that this replay operates.
+The retry/progress migration is tested locally, with deployment pending; see
+[chapter 8](../../reference/encyclopedia/08-schema-proposal-workflow.md#implementation-check-2026-10-11).
+
 ---
 
 ## Table of Contents

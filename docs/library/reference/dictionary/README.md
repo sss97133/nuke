@@ -280,6 +280,10 @@ can supersede it without editing the original or guessing from model/year.
 
 ## R
 
+**Role, evidenced** — A person's participation in a particular activity or relationship, supported by attributed evidence and its relevant time. Artist, buyer and researcher may describe such participation; they are not mutually exclusive account types. Browsing can help route an immediate interaction without establishing profession, ownership or authority. Missing evidence stays unknown. See `docs/ledger/theory/data-machine.md`, **Discussion as construction**.
+
+**Registration versus repair** — Registering vocabulary makes a definition available in its registry. Repairing a blocked question additionally requires the sanctioned writer to admit the retained evidence and the consumer to answer the original question under an executable acceptance check. Proposal approval, registry presence and consumer success are separate evidence stages.
+
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 
 **Resolution** — See Entity Resolution.

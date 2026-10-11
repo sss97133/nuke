@@ -1767,3 +1767,41 @@ versus planned action, event date/mileage and ownership-window relationships, wi
 and sanctioned admission. Qualify outcome histories before learning cost/reliability weights; missing records
 do not establish neglect or successful work. Measure resale reassurance against later price/liquidity
 separately from personal-use repair expense, downtime and useful service over an explicit buyer horizon.
+
+### 13.11 Discussion must develop the model and its working method (owner, 2026-10-11)
+
+**Owner clarification, in substance.** The provenance discussion should shape Postgres, documentation
+and the `.md` method for agentic work in parallel. Artist, buyer and researcher are contextual roles
+expressed through behavior, relationships and time, not a fixed set of onboarding personas. Evidence
+of browsing does not establish professional identity, ownership or authority.
+
+**Construction requirement.** Apply the existing §12 repair process and the theory card's
+**Discussion as construction** section to each selected gap. Name the original evidence and missing
+relationship, inspect its current schema/writer/reader owner, use `schema_proposals` where vocabulary
+is missing, and deliver the authorized implementation with a falsifiable assay and a consumer.
+Preserve corrections in the theory and agent instructions; a proposal or documentation change alone
+does not establish a delivered database capability. Automatic work remains limited to approved
+deterministic operations through existing owners and CI, without widening production/schema/write
+permissions or overruling processing and standing-worker holds.
+
+**Acceptance boundary.** A contextual role must retain its subject, relationship or activity,
+supporting evidence and time; a visit cannot confer authorship, ownership or access. A selected
+repair must preserve an unresolved case and reach the same intended consumer before it can close.
+Record implementation, test, merge, deployment and runtime receipts separately. Owner direction and
+methodology alone establish no schema delivery, queue drainage or running autonomous repair system.
+
+**Bounded implementation prepared, 2026-10-11.** Migration
+`20261011223810_schema_proposal_retry_and_progress.sql` extends the existing `schema_proposals` owner.
+An `add_property` retry through `fn_schema_proposal_apply` is a no-op only for the same proposal's
+exact surviving property; a changed, foreign, missing or retired registration refuses. The new
+service-role-only, invoker-rights `get_schema_proposal_progress(uuid)` distinguishes review from
+registration and always reports consumer verification as unverified. Existing approval mechanisms
+are unchanged; this repair adds no automatic ingestion, admission or replay.
+
+Implemented locally. The existing proposal contract, including `test_schema_proposal_retry_and_progress.sql`,
+passed 69 assertions on disposable PostgreSQL 17, including migration reapplication.
+The enforced local CI gate also passed. Merge,
+deployment and live verification are not yet established. The progress reader is an operator consumer
+of proposal state, not proof that the original question can be answered: full retained-evidence →
+sanctioned writer → original-question consumer replay remains unresolved. Synthetic contextual-role
+test vocabulary does not ratify a production role or infer authority from browsing.

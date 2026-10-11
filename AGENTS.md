@@ -77,6 +77,19 @@ recognize relationships from retained evidence, find the existing owner, impleme
 repair and prove its consumer. Configuration is one application; a diagnostic report alone does
 not close the work. The bounded discovery assays are operator tools, not autonomous write authority.
 
+**Discussion and construction, owner clarification 2026-10-11.** Within requested model development,
+substantive reasoning should shape the appropriate artifacts: the model, maintained documentation
+and the agent's working method. Inspect the existing owner first; a discussion does not require a
+schema mutation when the existing representation fits. Turn a discovered implementation gap into
+an owned repair: retained evidence, existing schema/writer or `schema_proposals` path, bounded
+implementation, executable assay and downstream consumer. Carry authorized construction alongside
+the discussion; record a concrete blocker when it cannot proceed.
+Preserve the owner's corrections in the theory card and case ledger, with delivery stages separated.
+Artist, buyer and researcher are contextual roles supported by behavior, relationships and time,
+not fixed onboarding personas; browsing alone establishes no profession, ownership or authority.
+See the theory card's **Discussion as construction** section for the feedback and automation bounds.
+This method grants no additional production, schema, data-write, permission or standing-runner authority.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
