@@ -331,6 +331,9 @@ if powertrain:
     if craigslist_odometer:
         from test_retained_craigslist_odometer import run_craigslist_odometer_checks
         run_craigslist_odometer_checks(sql,read,rejects,claim,passed)
+    if vin_label:
+        from test_retained_exhausted_recovery import run_exhausted_recovery_checks
+        run_exhausted_recovery_checks(sql,read,rejects,claim,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
