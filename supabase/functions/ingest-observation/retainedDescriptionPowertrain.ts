@@ -48,3 +48,28 @@ export function retainedDescriptionCaptureQualified(source: Record<string, any>)
 export function retainedDescriptionWitness(source: Record<string, any>, key: string) {
   return retainedDescriptionCaptureQualified(source) ? descriptionPowertrainWitness(key, source.content_text) : null;
 }
+
+/** Read-only candidate for the schema curator. Publisher family labels are not
+ * the registered casting/serial-derived engine_code. No intake mode is added. */
+export function proposedDescriptionEngineFamilyLabelWitness(text: unknown): { source_value: string; value: string } | null {
+  if (typeof text !== "string" || bytes(text) < 100 || bytes(text) > 32000 ||
+      !descriptionPowertrainWitness("engine_configuration", text) ||
+      !descriptionPowertrainWitness("engine_displacement_l", text)) return null;
+  let witness: { source_value: string; value: string } | null = null;
+  for (const raw of text.split(/(?<=[.!?])[ \t\r\n]+|[\r\n]+/)) {
+    const sentence = raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
+    if (!SUBJECT.test(sentence) || !POWER.test(sentence)) continue;
+    if (bytes(sentence) > 500 || QUALIFIED.test(sentence)) return null;
+    const labels = [...sentence.matchAll(/\b\d+(?:\.\d+)?-lit(?:er|re)[ \t]+([A-Z0-9]+(?:-[A-Z0-9]+)?)[ \t]+(?:[Vv](?:2|3|4|5|6|8|10|12|16)|(?:inline|flat)-(?:two|three|four|five|six|eight|ten|twelve|sixteen))\b/g)]
+      .map(match => match[1]);
+    if (!labels.length) continue;
+    if (labels.some(label => label.length > 20 || !/[A-Z]/.test(label) || !/[0-9]/.test(label) || /^\d+[Vv]$/.test(label)) ||
+        new Set(labels).size !== 1 || (witness && witness.value !== labels[0])) return null;
+    witness ??= { source_value: sentence, value: labels[0] };
+  }
+  return witness;
+}
+
+export function proposedRetainedEngineFamilyLabelWitness(source: Record<string, any>) {
+  return retainedDescriptionCaptureQualified(source) ? proposedDescriptionEngineFamilyLabelWitness(source.content_text) : null;
+}
