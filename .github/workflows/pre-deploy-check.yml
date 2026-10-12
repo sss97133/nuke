@@ -52,7 +52,7 @@ jobs:
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
 
       - name: Intake status reader contracts
-        run: node --test scripts/test-db-stats-intake.mjs
+        run: node --test scripts/test-db-stats-intake.mjs scripts/test-source-intake-progress.mjs
 
       - name: Intake status consumer contracts
         working-directory: ./nuke_frontend

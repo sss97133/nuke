@@ -34,6 +34,7 @@ import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { captureLedgerFields } from "./captureLedger.ts";
+import { createIntakeRunReceipt } from "../_shared/extractionMetrics.ts";
 import {
   ledgerWriteFor,
   planIngests,
@@ -250,6 +251,8 @@ interface FeedResult {
     reason?: string;
     enrichment_error?: string; // firecrawl_html path: ingest's report that the page extractor failed
     ledger?: string; // firecrawl_html path: the import_queue status written for this URL
+    ledger_write_status?: 'acknowledged' | 'unavailable';
+    ingest_attempted?: boolean;
   }>;
   error: string | null;
   deferred_reason?: string | null;
@@ -426,6 +429,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
     if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
     const attemptStarted = Date.now();
     let targetUrl: string | null = null;
+    let ingestAttempted = false;
     let outcome = "no_target";
     let detail: string | undefined;
     try {
@@ -441,6 +445,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
       if (targetUrl) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), Math.min(grant.timeout_ms, Math.max(1, budget.remainingMs() - 10_000)));
+        ingestAttempted = true;
         const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
           method: "POST",
           headers: {
@@ -468,6 +473,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
 
     result.ingest_outcomes!.push({
       url: targetUrl || articleUrl,
+      ingest_attempted: ingestAttempted,
       status: outcome,
       ...(detail ? { error: String(detail).slice(0, 200) } : {}),
     });
@@ -798,15 +804,19 @@ async function pollFirecrawlHtmlFeed(
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
       }
       if (write.status === "failed") result.landed_no_data!++;
-      w.entry.ledger = write.status;
-      const { error: ledgerWriteError } = await supabase
+      const { error: ledgerWriteError, data: ledgerReceipt } = await supabase
         .from("import_queue")
-        .upsert(write.row, { onConflict: "listing_url" });
-      if (ledgerWriteError) {
+        .upsert(write.row, { onConflict: "listing_url" }).select('id,status,listing_url');
+      if (ledgerWriteError || !Array.isArray(ledgerReceipt) || ledgerReceipt.length !== 1
+        || !ledgerReceipt[0].id || ledgerReceipt[0].status !== write.status || ledgerReceipt[0].listing_url !== w.url) {
+        w.entry.ledger_write_status = 'unavailable';
         // Non-fatal, but say so — a silent ledger gap re-burns cap slots.
         console.error(
-          `[poll-feeds] ledger write failed for ${w.url}: ${ledgerWriteError.message}`
+          `[poll-feeds] ledger write unacknowledged for ${w.url}`
         );
+      } else {
+        w.entry.ledger = write.status;
+        w.entry.ledger_write_status = 'acknowledged';
       }
     }
     waiting.length = 0;
@@ -848,6 +858,7 @@ async function pollFirecrawlHtmlFeed(
       const outcomeEntry: NonNullable<FeedResult["ingest_outcomes"]>[number] = {
         url,
         status,
+        ingest_attempted: true,
         vehicle_id: ingest.vehicle_id ?? null,
         ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
         ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
@@ -869,6 +880,7 @@ async function pollFirecrawlHtmlFeed(
       result.ingest_outcomes!.push({
         url,
         status: "error",
+        ingest_attempted: true,
         error: (err?.message || String(err)).slice(0, 200),
       });
     }
@@ -920,6 +932,7 @@ Deno.serve(async (req) => {
   }
 
   const startTime = Date.now();
+  let runReceipt: Awaited<ReturnType<typeof createIntakeRunReceipt>> | undefined;
 
   try {
     const supabase = createClient(
@@ -950,9 +963,14 @@ Deno.serve(async (req) => {
     if (!Number.isInteger(batchSize) || batchSize < 0 || batchSize > 100) throw new Error("batch_size must be an integer from 0 to 100");
     batchSize = Math.min(batchSize, throttle.max_feeds);
     const budget = createIntakeBudget(throttle, startTime);
-    if (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0) return new Response(
-      JSON.stringify({ success: true, feeds_polled: 0, status: "throttled", throttle: budget.snapshot() }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    runReceipt = await createIntakeRunReceipt(supabase, startTime);
+    if (!throttle.enabled || batchSize === 0 || throttle.max_ingests === 0) {
+      await runReceipt.select([], true, throttle);
+      await runReceipt.finish('throttled', 'controls_zero');
+      return new Response(JSON.stringify({ success: true, feeds_polled: 0, status: "throttled",
+        receipt_id: runReceipt.id, throttle: budget.snapshot() }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Get feeds that are due for polling
     let query = supabase
@@ -979,11 +997,14 @@ Deno.serve(async (req) => {
     }
 
     if (!feeds || feeds.length === 0) {
+      await runReceipt.select([], true, throttle);
+      await runReceipt.finish('completed', 'no_due_targets');
       return new Response(
         JSON.stringify({
           success: true,
           message: "No feeds due for polling",
           feeds_polled: 0,
+          receipt_id: runReceipt.id,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -991,14 +1012,17 @@ Deno.serve(async (req) => {
 
     // Honor each feed's interval/backoff and rotate sources fairly.
     const dueFeeds = selectIntakeFeeds(feeds.slice(0, 2000), batchSize, throttle, Date.now(), force);
+    await runReceipt.select(dueFeeds, feeds.length <= 2000, throttle);
     budget.shareAcrossSources(new Set(dueFeeds.map((f: any) => f.source_slug)).size);
 
     if (dueFeeds.length === 0) {
+      await runReceipt.finish('completed', 'no_due_targets');
       return new Response(
         JSON.stringify({
           success: true,
           message: "No feeds due for polling (per-feed interval)",
           feeds_polled: 0,
+          receipt_id: runReceipt.id,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1038,9 +1062,14 @@ Deno.serve(async (req) => {
       }
       const refusal = budget.refusal(feed.source_slug);
       if (refusal) {
-        results.push({ feed: feed.display_name, source: feed.source_slug, items_found: 0, error: null, deferred_reason: refusal });
+        const deferred = { feed: feed.display_name, source: feed.source_slug, items_found: 0, error: null, deferred_reason: refusal };
+        results.push(deferred);
+        await runReceipt.record(feed.id, deferred);
         continue;
       }
+      await runReceipt.begin(feed.id);
+      const resultIndex = results.length;
+      try {
 
       // CLAIM BEFORE WORK. Stamp last_polled_at up front so a mid-feed kill
       // cannot wedge the queue. Feeds are selected `ORDER BY last_polled_at ASC
@@ -1223,6 +1252,10 @@ Deno.serve(async (req) => {
 
       // Small delay between feeds to be polite
       await new Promise((r) => setTimeout(r, 500));
+      } finally {
+        const result = results[resultIndex];
+        if (result) await runReceipt.record(feed.id, result);
+      }
     }
 
     const elapsed = Date.now() - startTime;
@@ -1230,9 +1263,11 @@ Deno.serve(async (req) => {
       `[poll-feeds] Done. ${dueFeeds.length} feeds polled, ${totalFound} items found, ${totalQueued} new queued, ${totalIngested} new ingested in ${elapsed}ms`
     );
 
+    await runReceipt.finish('completed');
     return new Response(
       JSON.stringify({
         success: true,
+        receipt_id: runReceipt.id,
         feeds_polled: results.filter(r => !r.deferred_reason || r.items_found > 0 || r.error).length,
         feeds_selected: dueFeeds.length,
         feed_selection_complete: feeds.length <= 2000,
@@ -1246,6 +1281,10 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
+    if (runReceipt) {
+      try { await runReceipt.finish('failed', 'worker_failed'); }
+      catch { console.error('[poll-feeds] intake progress unavailable; source work stopped'); }
+    }
     console.error("[poll-feeds] Error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
