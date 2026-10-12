@@ -8,7 +8,7 @@ import vm from 'node:vm';
 import { test } from 'node:test';
 import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
-const require = createRequire(import.meta.url);
+const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
 const compile = text => ts.transpileModule(text, { compilerOptions: {
