@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-def run_native_year_checks(sql,read,rejects,claim,passed):
+def run_native_year_checks(sql,read,rejects,claim,passed,native_identity=False):
     literal=lambda s:"'"+s.replace("'","''")+"'"
     prop='ece619f7-c49a-44f7-999f-a41acf5d4dc3'
     source='4cdc735c-f117-42f2-889f-ba33805639a5'
@@ -18,7 +18,7 @@ def run_native_year_checks(sql,read,rejects,claim,passed):
     def body(i):
         return ("This 2014 Airstream Interstate 24 Lounge Extended was built on a 2013 Mercedes-Benz Sprinter 3500 chassis." if i==1 else
                 "This 2001 BMW X5 4.4i remained with its original owner until 2024." if i==2 else
-                f"This {1900+i} Example Vehicle is described by its publisher.")+rest
+                f"This {1900+i} {'Ford F-150 Ranger' if native_identity else 'Example Vehicle'} is described by its publisher.")+rest
     def parents(first,last,clock):
         for i in range(first,last+1):
             sql(f"""INSERT INTO vehicle_observations SELECT (jsonb_populate_record(NULL::vehicle_observations,to_jsonb(p)||jsonb_build_object(

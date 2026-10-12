@@ -1085,6 +1085,34 @@ Twenty-nine focused UI contracts and the existing ENFORCE/build gate pass. This 
 contention mitigation; the follow-up merge, deployment and signed-in successful reading remain
 separate delivery stages until recorded in the private receipt.
 
+**Deterministic bulk model construction, 2026-10-12 UTC (implementation/testing).**
+The owner explicitly rejected per-node LLM processing. The existing specification reader gains a
+bounded200-ID metadata model overload (optional typed custody reads capped20) that includes every eligible requested record, including those with
+no canonical claim.13 recorded primitive attributes retain their `vehicles` origin, maintenance
+clocks, unassayed attribution and unknown units/configuration. A set-based record binding function maps
+existing literal labels and powertrain values to11 ratified property keys, retaining source column/value,
+numeric unit conversion and column disagreement without canonical promotion; unitless mileage stays unbound.11 current canonical selectors retain
+property/observation keys and qualifiers. Unrequested typed claims are labeled separately from zero qualified claims. This expands a consistent data-exploration contract;
+it creates no testimony and does not establish full vehicle models or full-fleet runtime verification.
+
+The existing retained-listing owner batches up to500 source PKs in SQL and repairs already visited
+native year parents for exact make/model opening-label tokens. A finite prior-work source-key walk
+runs inside the original seeder; the raw cursor,120attempts/minute,2admissions, guards, source custody
+and held sources remain. Model remainders may contain trim/body words and are not catalog identities.
+No provider or per-record model calls occur. The existing deployment pauses and reactivates this same
+job only with its matching canonical edge owner deployed.
+
+The complete32,164-key enrolled-year-work probe found18,941 qualified native captures on2,172
+stored eligible vehicles;18,671 recognized captures cover2,143 vehicles. Relative to the dated
+full-model baseline, only40 make and40 model slots were absent. A complete current reread of those40 vehicles found68
+of the80 slots already present, leaving12 potential additions in this declared set. These are potential missing fields,
+not realized gains, complete cars or a fleet breakthrough. The full reference remains the
+2026-10-11 windowed census:687,987 public rows;631,862 public, undeleted, non-nonvehicle rows;
+31,311 with any type-valid canonical claim and720 with all eleven core slots. The bulk reader's
+record availability must not be substituted for these evidence-coverage measures. Private source
+pages, type/qualification tests and delivery stages are retained under `~/nuke-logs/retained-bulk-*`.
+Merge, deployment, realized net gains and anonymous runtime remain separate until recorded.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
