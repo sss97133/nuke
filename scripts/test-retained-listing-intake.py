@@ -10,7 +10,7 @@ import sys
 
 host = os.environ.get('PGHOST', '/private/tmp')
 port = os.environ.get('PGPORT', '5432' if host == 'localhost' else '55438')
-assert len(sys.argv)<=12 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label','--craigslist-odometer','--craigslist-year','--native-year'}
+assert len(sys.argv)<=13 and set(sys.argv[2:]) <= {'--two-front','--bulk120','--powertrain','--description','--odometer','--identity','--vin-label','--craigslist-odometer','--craigslist-year','--native-year','--native-identity'}
 database = sys.argv[1] if len(sys.argv)>=2 else 'dm_refinement_listing_intake_ci'
 two_front = '--two-front' in sys.argv[2:]
 bulk120 = '--bulk120' in sys.argv[2:]
@@ -29,6 +29,8 @@ craigslist_year='--craigslist-year' in sys.argv[2:]
 assert not craigslist_year or craigslist_odometer
 native_year='--native-year' in sys.argv[2:]
 assert not native_year or craigslist_year
+native_identity='--native-identity' in sys.argv[2:]
+assert not native_identity or native_year
 assert not powertrain or (two_front and bulk120)
 assert host in ('localhost', '/private/tmp') and database.startswith('dm_refinement_listing_')
 psql = os.environ.get('NUKE_TEST_PSQL', 'psql')
@@ -52,6 +54,8 @@ setup = re.search(r' sql\(`(DO \$\$ BEGIN IF NOT EXISTS[\s\S]+?)`\);', fixture).
 assert '${' not in setup
 setup = setup.replace('44444444-4444-4444-8444-444444444444', '514cacd3-82b4-4330-b3df-e292612ee718')
 sql(setup)
+if native_identity:
+    sql("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS year integer,ADD COLUMN IF NOT EXISTS make text,ADD COLUMN IF NOT EXISTS model text,ADD COLUMN IF NOT EXISTS vin text,ADD COLUMN IF NOT EXISTS trim text,ADD COLUMN IF NOT EXISTS mileage integer,ADD COLUMN IF NOT EXISTS color text,ADD COLUMN IF NOT EXISTS interior_color text,ADD COLUMN IF NOT EXISTS transmission text,ADD COLUMN IF NOT EXISTS drivetrain text,ADD COLUMN IF NOT EXISTS engine_type text,ADD COLUMN IF NOT EXISTS engine_size text,ADD COLUMN IF NOT EXISTS body_style text,ADD COLUMN IF NOT EXISTS created_at timestamptz,ADD COLUMN IF NOT EXISTS updated_at timestamptz")
 reader = Path('supabase/migrations/20261005013641_bounded_field_provenance_inputs.sql').read_text()
 sql(reader[reader.index('CREATE OR REPLACE FUNCTION public.get_field_provenance'):reader.index('$function$;') + 12])
 view = Path('scripts/discovery/fixtures/vehicle_canonical_20260517.sql').read_text()
@@ -343,9 +347,12 @@ if powertrain:
         run_craigslist_year_checks(sql,read,rejects,claim,passed)
     if native_year:
         from test_retained_native_year import run_native_year_checks
-        run_native_year_checks(sql,read,rejects,claim,passed)
+        run_native_year_checks(sql,read,rejects,claim,passed,native_identity=native_identity)
         from test_retained_year_candidate_guard import run_year_candidate_guard_checks
         run_year_candidate_guard_checks(sql,read,rejects,passed)
+    if native_identity:
+        from test_retained_native_identity import run_native_identity_checks
+        run_native_identity_checks(sql,read,rejects,claim,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'

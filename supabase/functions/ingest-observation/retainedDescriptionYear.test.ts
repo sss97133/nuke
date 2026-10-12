@@ -55,7 +55,7 @@ Deno.test("native year selector preserves the quote and separate label token wit
  assert(d.structured_data.source_event_time_status==="unknown"&&d.structured_data.factory_configuration_status==="unknown"&&d.agent_cost_cents===0);
  assert(d.structured_data.source_field==="content_text"&&d.structured_data.source_capture_sha256===p.structured_data.source_capture_sha256&&JSON.stringify(p)===before);
  assert(validateObservationProperty(d,{id:v.id,namespace:"core",deprecated_at:null,applies_to_kinds:["specification","listing"]},true).ok);
- assert(!deriveRetainedInterior(p,v,s,"retained_listing_make_v1")&&!deriveRetainedInterior(p,v,s,"retained_listing_model_v1"));
+ assert(deriveRetainedInterior(p,v,s,"retained_listing_make_v1")?.structured_data.make==="Airstream"&&deriveRetainedInterior(p,v,s,"retained_listing_model_v1")?.structured_data.model==="Interstate 24 Lounge Extended");
  assert(!deriveRetainedInterior({...p,content_text:cases[10][0]+rest},v,s,"retained_listing_year_v1"));
  assert(!deriveRetainedInterior(p,{...v,is_public:false},s,"retained_listing_year_v1"));
 });
