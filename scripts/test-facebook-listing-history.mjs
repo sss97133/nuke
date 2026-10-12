@@ -83,7 +83,7 @@ test('actual PostgreSQL history preserves source grain, admission boundaries, re
     const seed=(n,observed,ack,price,detail=false,ids=['1001']) => {
       const run=JSON.parse(sql(`SELECT to_json(md5('run-${n}')::uuid)`));
       const capture={ capture_id: run,observed_at: observed,access_state: 'available',complete: false,
-        actual_url: detail ? 'https://www.facebook.com/marketplace/item/1001/' : 'https://www.facebook.com/marketplace/category/vehicles/?sortBy=creation_time_descend',
+        actual_url: detail ? 'https://www.facebook.com/marketplace/item/1001/' : 'https://www.facebook.com/marketplace/category/vehicles/?sortBy=creation_time_descend&next=/marketplace/item/1002/',
         target_url: 'https://www.facebook.com/marketplace/las-vegas/vehicles/',actual_region: 'Nevada',retrieval_surface: detail ? 'detail' : 'search',
         source_listed_at: null,source_listed_label: detail ? '2 hours ago' : null };
       const batch=ids.map(id=>({ facebook_id: id,title: `Retained listing ${id}`,price: id==='1001' ? price : 200,content_text: 'PRIVATE_RAW_BODY' }));
@@ -101,15 +101,17 @@ test('actual PostgreSQL history preserves source grain, admission boundaries, re
     const semantic=r=>{ r=structuredClone(r);delete r.measured_at;return r; };
     seed(1,'2025-01-03T06:00:00Z','2025-01-03T06:01:00Z',100,false,['1001','1002']);
     seed(2,'2025-01-03T07:00:00Z','2025-01-03T07:01:00Z',100);
-    seed(3,'2025-01-03T08:00:00Z','2025-01-03T08:01:00Z',100,true);
+    seed(3,'2025-01-03T08:00:00Z','2025-01-03T08:01:00Z',100,true,['1001','1002']);
     const original=read('2025-01-03T10:00:00Z','2025-01-03T09:00:00Z');
     const a=original.rows.find(r=>r.facebook_id==='1001');const b=original.rows.find(r=>r.facebook_id==='1002');
     assert.equal(a.observation_count,3);assert.equal(a.same_query_revisits,1);assert.equal(a.detail_observations,1);
     assert.equal(a.observed_span_minutes,120);assert.equal(a.current_vehicle_id,null);
+    assert.equal(b.observation_count,1);assert.equal(b.detail_observations,0);
+    assert.equal(b.observations[0].source_reported_age_label,null);
     assert.equal(a.observations[2].source_reported_age_label,'2 hours ago');assert.equal(a.observations[2].source_reported_listed_at,null);
     assert(a.observations.every(o=>o.asking_currency===null));assert.equal(a.title,'Retained listing 1001');
     assert(!JSON.stringify(original).includes('PRIVATE_'));assert(!JSON.stringify(original).includes('MUTABLE_TITLE'));
-    seed(3,'2025-01-03T08:00:00Z','2025-01-03T08:01:00Z',100,true);
+    seed(3,'2025-01-03T08:00:00Z','2025-01-03T08:01:00Z',100,true,['1001','1002']);
     assert.deepEqual(semantic(read('2025-01-03T10:00:00Z','2025-01-03T09:00:00Z')),semantic(original));
     const later=seed(4,'2025-01-03T09:00:00Z','2025-01-03T11:00:00Z',80);
     // Same source event arrives later. Neither source time nor current listing

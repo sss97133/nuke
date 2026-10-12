@@ -57,12 +57,12 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
     left(j.capture->>'actual_region',200) AS actual_region,
     j.capture->>'actual_url' AS actual_url,j.capture->>'target_url' AS target_url,
     j.capture->'complete'='true'::jsonb AS source_scope_complete,
-    (j.capture->>'actual_url') ~ '/marketplace/item/[0-9]+/?([?].*)?$' AS detail_observation,
-    CASE WHEN j.capture->>'source_listed_at' ~ '(Z|[+-][0-9]{2}:[0-9]{2})$'
+    coalesce(page.detail_id=l.facebook_id,false) AS detail_observation,
+    CASE WHEN page.detail_id=l.facebook_id AND j.capture->>'source_listed_at' ~ '(Z|[+-][0-9]{2}:[0-9]{2})$'
       AND pg_input_is_valid(j.capture->>'source_listed_at','timestamptz')
       THEN CASE WHEN isfinite((j.capture->>'source_listed_at')::timestamptz)
         THEN (j.capture->>'source_listed_at')::timestamptz END END AS source_reported_listed_at,
-    left(j.capture->>'source_listed_label',100) AS source_reported_age_label,
+    CASE WHEN page.detail_id=l.facebook_id THEN left(j.capture->>'source_listed_label',100) END AS source_reported_age_label,
     CASE WHEN pg_input_is_valid(card.value->>'price','numeric')
       THEN CASE WHEN (card.value->>'price')::numeric::text NOT IN ('NaN','Infinity','-Infinity')
         AND (card.value->>'price')::numeric >= 0 AND (card.value->>'price')::numeric=s.price_at_sighting
@@ -76,10 +76,16 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
     SELECT (jsonb_agg(b.value))->0 AS value,count(*) AS matching_cards
     FROM jsonb_array_elements(j.metadata->'batch') b(value) WHERE b.value->>'facebook_id'=l.facebook_id
   ) card
+  CROSS JOIN LATERAL (
+    SELECT substring(j.capture->>'actual_url' FROM '^https://(?:www[.])?facebook[.]com/marketplace/item/([0-9]+)/?(?:[?].*)?$') AS detail_id
+  ) page
   WHERE card.matching_cards=1 AND l.facebook_id ~ '^[0-9]+$'
     AND r.value->>'facebook_id'=l.facebook_id
     AND r.value->'listing_landed'='true'::jsonb AND r.value->'sighting_landed'='true'::jsonb
     AND s.listing_id=l.id AND s.sweep_job_id=j.id AND s.seen_at=j.source_at
+    -- A detail page's age/availability testimony belongs to its exact item,
+    -- not additional recommendation cards retained in the same capture.
+    AND (j.capture->>'actual_url' !~ '^https://(www[.])?facebook[.]com/marketplace/item/' OR page.detail_id=l.facebook_id)
     AND ($4::text IS NULL OR l.facebook_id=$4)
   ORDER BY s.id,r.ordinal
 ), ordered AS (
