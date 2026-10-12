@@ -543,6 +543,10 @@ jobs:
           node-version: '24'
       - name: Verify complete organization listing folds and public profile reader
         run: PGDATABASE=dm_refinement_org_activity_ci node scripts/test-organization-listing-activity.mjs
+      - name: Create disposable classifieds listing-history database
+        run: createdb dm_refinement_listing_history
+      - name: Verify retained listing clocks, asking histories, retries and private reader
+        run: PGDATABASE=dm_refinement_listing_history node --test scripts/test-facebook-listing-history.mjs
       - name: Create disposable organization refresh cadence database
         run: createdb dm_refinement_org_refresh_ci
       - name: Verify organization refresh activation preserves owner pauses and commands

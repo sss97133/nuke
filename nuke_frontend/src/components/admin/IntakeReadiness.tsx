@@ -6,6 +6,7 @@ import { ORDER_BOOK_STACK } from '../../pages/stacks/stackDefinitions';
 import { useOrderBook, shapeOrderBook } from '../../pages/stacks/orderBookReader';
 import { VehicleIdentity } from '../common/MakeIdentity';
 import './IntakeReadiness.css';
+import FacebookListingHistory from './FacebookListingHistory';
 
 type Section = 'coverage' | 'model' | 'jobs' | 'consumers';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number;
@@ -272,6 +273,7 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
     </div>
     <p className="status-basis">Follow what is captured, what is retained, what is processed and what can be answered. Readings refresh every five minutes.</p>
     {failed.length > 0 && <p role="status">Unavailable: {failed.join(', ')}. Retained readings below keep their original dates.</p>}
+    <FacebookListingHistory busy={loading} />
 
     <nav className="status-flow" aria-label="Explore the data flow">
       <a href="#status-sources" onClick={() => setSourcesOpen(true)}>
