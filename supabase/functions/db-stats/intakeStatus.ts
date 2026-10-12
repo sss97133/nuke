@@ -179,6 +179,77 @@ export const FEEDS_SQL = `SELECT statement_timestamp() AS measured_at,
   ) f), '[]'::jsonb) AS rows,
   (SELECT config_value FROM public.platform_config WHERE config_key = 'source_intake') AS controls`;
 
+// Two existing receipt stores, not newest-row or cron-success proxies. Bounded
+// 24-hour run scope; no raw cards, target URLs, contacts or provider error text.
+// Counts describe acknowledged row operations, not new vehicles/fleet coverage.
+export const ACTIVITY_SQL = `WITH feed_runs AS MATERIALIZED (
+  SELECT id, source, started_at, completed_at, status, metadata FROM public.extraction_runs
+  WHERE source = 'poll-listing-feeds' AND metadata->>'contract' = 'source_intake_run_v1'
+    AND started_at >= statement_timestamp() - interval '24 hours'
+  ORDER BY started_at DESC, id LIMIT 51
+), fb_runs AS MATERIALIZED (
+  SELECT id, started_at, completed_at, status, metadata FROM public.fb_sweep_jobs
+  WHERE metadata->>'writer' = 'extract-facebook-marketplace' AND metadata->>'capture_version' = '1'
+    AND started_at >= statement_timestamp() - interval '24 hours'
+  ORDER BY started_at DESC, id LIMIT 51
+), runs AS (
+  SELECT id AS run_id, 'poll-listing-feeds'::text AS worker, started_at, completed_at, status,
+    NULL::text AS observed_at, NULL::text AS retrieval_surface, NULL::text AS actual_region,
+    metadata->'target_scope_complete' AS scope_complete,
+    CASE WHEN metadata->>'reason' IN('controls_zero','no_due_targets','worker_failed','worker_deadline') THEN metadata->>'reason' END AS reason,
+    'selected_feed_targets; dispatch_intent_is_not_fetch_success'::text AS basis,
+    coalesce((SELECT jsonb_agg(jsonb_build_object('source', s->'source',
+      'selected_targets', s->'selected_targets', 'attempted_targets', s->'attempted_targets',
+      'unattempted_targets',s->'unattempted_targets','unfinished_started_targets',s->'unfinished_started_targets',
+      'completed_targets', s->'completed_targets', 'deferred_targets', s->'deferred_targets', 'failed_targets', s->'failed_targets',
+      'counts', jsonb_build_object('discovered_items', s->'counts'->'discovered_items',
+        'queue_rows_acknowledged', s->'counts'->'queue_rows_acknowledged',
+        'ingestion_requests', s->'counts'->'ingestion_requests',
+        'landed_ledger_acknowledged', s->'counts'->'landed_ledger_acknowledged',
+        'ledger_write_failures', s->'counts'->'ledger_write_failures',
+        'known_or_matched', s->'counts'->'known_or_matched', 'backing_off', s->'counts'->'backing_off'),
+      'reasons', coalesce((SELECT jsonb_agg(reason) FROM jsonb_array_elements_text(
+        CASE WHEN jsonb_typeof(s->'reasons')='array' THEN s->'reasons' ELSE '[]'::jsonb END) reason
+        WHERE reason IN('paused','invocation_limit','source_limit','worker_deadline','billing','rate_limited','blocked','timeout','worker_failed')),'[]'),
+      'consumer_usable', NULL)) FROM jsonb_array_elements(
+        CASE WHEN jsonb_typeof(metadata->'source_totals')='array' THEN metadata->'source_totals' ELSE '[]'::jsonb END)
+        WITH ORDINALITY a(s,n) WHERE n<=100), '[]') AS sources
+  FROM (SELECT * FROM feed_runs ORDER BY started_at DESC,id LIMIT 50) f
+  UNION ALL
+  SELECT id, 'extract-facebook-marketplace', started_at, completed_at, status,
+    metadata->'capture'->>'observed_at', left(metadata->'capture'->>'retrieval_surface',64),
+    left(metadata->'capture'->>'actual_region',100), metadata->'capture'->'complete',
+    NULL::text,
+    'declared_browser_capture; first_seen_is_not_listed_time',
+    jsonb_build_array(jsonb_build_object('source','facebook_marketplace',
+      'counts', CASE WHEN jsonb_typeof(metadata->'results')='array' THEN (
+        SELECT jsonb_build_object(
+          'captured_cards', CASE WHEN jsonb_typeof(metadata->'batch')='array' THEN jsonb_array_length(metadata->'batch') END,
+          'result_rows',count(*),
+          'listing_rows_acknowledged',count(*) FILTER(WHERE item->'listing_landed'='true'::jsonb),
+          'listing_rows_verified',count(*) FILTER(WHERE listing.id IS NOT NULL AND item->'listing_landed'='true'::jsonb),
+          'sightings_acknowledged',count(*) FILTER(WHERE item->'sighting_landed'='true'::jsonb),
+          'sightings_verified',count(*) FILTER(WHERE sighting.id IS NOT NULL AND sighting.listing_id=listing.id AND sighting.sweep_job_id=f.id),
+          'linked_observation_receipts',count(*) FILTER(WHERE item->'observation_landing'->>'status' IN('written','duplicate')),
+          'linked_observations_verified',count(*) FILTER(WHERE observation.id IS NOT NULL AND observation.vehicle_id=listing.vehicle_id
+            AND observation_source.slug='facebook_marketplace' AND observation.kind::text='listing'
+            AND observation.extraction_method='fb_direct_input'
+            AND observation.source_identifier=listing.facebook_id||':'||f.id::text
+            AND observation.source_url=listing.url),
+          'unlinked_results',count(*) FILTER(WHERE item->'observation_landing'->>'status'='unlinked'),
+          'observation_errors',count(*) FILTER(WHERE item->'observation_landing'->>'status'='error'))
+        FROM jsonb_array_elements(metadata->'results') item
+        LEFT JOIN public.marketplace_listings listing ON listing.id=CASE WHEN pg_catalog.pg_input_is_valid(item->>'listing_id','uuid') THEN (item->>'listing_id')::uuid END
+        LEFT JOIN public.fb_listing_sightings sighting ON sighting.id=CASE WHEN pg_catalog.pg_input_is_valid(item->>'sighting_id','uuid') THEN (item->>'sighting_id')::uuid END
+        LEFT JOIN public.vehicle_observations observation ON observation.id=CASE WHEN pg_catalog.pg_input_is_valid(item->'observation_landing'->>'observation_id','uuid') THEN (item->'observation_landing'->>'observation_id')::uuid END
+        LEFT JOIN public.observation_sources observation_source ON observation_source.id=observation.source_id
+      ) ELSE NULL END, 'consumer_usable',NULL, 'reasons','[]'::jsonb))
+  FROM (SELECT * FROM fb_runs ORDER BY started_at DESC,id LIMIT 50) f
+)
+SELECT statement_timestamp() AS measured_at, coalesce(jsonb_agg(to_jsonb(r) ORDER BY started_at DESC,run_id),'[]') AS rows,
+  (SELECT count(*)<=50 FROM feed_runs) AND (SELECT count(*)<=50 FROM fb_runs) AS complete
+FROM runs r`;
+
 // Pooler-safe transaction-local limits; rollback on both success and failure.
 export async function boundedRead(conn: IntakeConnection, sql: string, args: unknown[] = [], timeout: '5s' | '3s' = '5s') {
   await conn.queryObject('BEGIN READ ONLY');
@@ -201,6 +272,7 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);
     const executions = await boundedRead(conn, EXECUTION_SQL, [HEALTH_JOBS]);
     const feeds = await boundedRead(conn, FEEDS_SQL);
+    const activity = await boundedRead(conn, ACTIVITY_SQL, [], '3s');
     // Read canonical checks independently. A slow assay loses its own result,
     // while the execution reading and other checks survive. Leave headroom for
     // transport inside the frontend's 25-second request limit.
@@ -231,6 +303,8 @@ export async function readIntakeSection(conn: IntakeConnection, section: IntakeS
     const { controls: _rawControls, ...feedReading } = feeds.status === 'measured' ? feeds : { ...feeds, controls: undefined };
     return { contract: 'intake_status_v1', section, config,
       health, controls,
+      activity: { ...activity, window_hours: 24, limit_per_worker: 50,
+        complete: activity.status === 'measured' && 'complete' in activity && activity.complete === true },
       feeds: { ...feedReading, rows: feeds.rows.slice(0, 60), complete: feeds.status === 'measured' && feeds.rows.length <= 60 },
       scope: INTAKE_JOBS, health_scope: HEALTH_JOBS };
   }

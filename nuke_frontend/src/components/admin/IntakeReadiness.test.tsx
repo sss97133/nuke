@@ -304,6 +304,36 @@ it('shows the canonical retained replay on load and preserves its bid states wit
 });
 const timeForTest = (s: string) => new Date(s).toLocaleString();
 
+it('separates browser capture, acknowledged listing/sighting writes and linked observations with both clocks', async () => {
+  const observed = '2026-10-10T11:58:00Z';
+  fixture.responses.jobs.data.activity = { status: 'measured', measured_at: clock, window_hours: 24,
+    limit_per_worker: 50, complete: true, rows: [{ run_id: 'capture-run', worker: 'extract-facebook-marketplace',
+      started_at: clock, completed_at: clock, observed_at: observed, status: 'completed', scope_complete: false,
+      actual_region: 'Synthetic region', retrieval_surface: 'native_browser', basis: 'declared_browser_capture',
+      sources: [{ source: 'facebook_marketplace', counts: { captured_cards: 20, listing_rows_acknowledged: 18,
+        sightings_verified: 17, linked_observation_receipts: 2, observation_errors: 1 }, reasons: [], consumer_usable: null }] }] };
+  await render();
+  const receipts = [...container.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent?.includes('Source intake receipts'))!;
+  expect(receipts.textContent).toContain('facebook_marketplace'); expect(receipts.textContent).toContain('Synthetic region');
+  expect(receipts.textContent).toContain(timeForTest(observed)); expect(receipts.textContent).toContain(timeForTest(clock));
+  expect(receipts.textContent).toContain('Partial target surface');
+  expect([...receipts.querySelectorAll('tbody td')].map(td => td.textContent)).toEqual(expect.arrayContaining(['20','18','17','2','1']));
+  expect(receipts.textContent).toContain('Canonical property coverage and consumer usability remain unmeasured');
+});
+it('a malformed or unavailable activity reading does not hide independent job failure evidence', async () => {
+  fixture.responses.jobs.data.activity = { status: 'measured', measured_at: clock, window_hours: 24,
+    limit_per_worker: 50, complete: true, rows: [{ worker: 'unknown-worker', sources: [] }] };
+  await render();
+  expect(container.textContent).toContain('Source intake receipts unavailable');
+  expect(container.textContent).toContain('synthetic-pull'); expect(container.textContent).toContain('reporting failure');
+});
+it('an empty measured receipt window reports unmeasured attempts rather than no source data', async () => {
+  fixture.responses.jobs.data.activity = { status: 'measured', measured_at: clock, window_hours: 24,
+    limit_per_worker: 50, complete: true, rows: [] };
+  await render(); expect(container.textContent).toContain('No matching receipts in this measured window');
+  expect(container.textContent).toContain('Source attempts and landing remain unmeasured');
+});
+
 it('offers a retry after an incomplete retained read without rendering invented results', async () => {
   fixture.book = { isPending: false, isError: true, data: null, refetch: vi.fn() };
   await render();
