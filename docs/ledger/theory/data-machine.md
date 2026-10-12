@@ -29,6 +29,26 @@ sales, comments and media. The owner should not need to supply each model's dist
 5. Record delivery stages separately, then use the next observed gap to choose the next repair.
    Byte accounting, descriptor presence and a passing sample are not semantic or fleet completion.
 
+**Correction as model development, owner clarification 2026-10-11.** An evolving knowledge graph
+with LLM-assisted ETL is a fair baseline description, not evidence of a new capability. The stronger
+claim is a repeated loop: identify a representation limit, extend its existing owner, connect retained
+evidence and improve a downstream evaluation without introducing incoherence. A larger schema does
+not establish that the machine compounds understanding rather than mistakes.
+
+Keep four evidence stages distinguishable: captured observation, attributed claim, agent interpretation
+with its method/version, and computed conclusion with its inputs/rules. Name the existing mechanism
+that carries each distinction, or the missing mechanism; this requirement alone creates no schema.
+When an interpretation is superseded, trace its affected relationships, measures and consumers and
+verify their revised results. Preserve the original testimony and the inputs/method needed to replay
+the earlier evaluation. A changed current answer and a reproducible earlier answer are separate proofs.
+
+Every claimed correction loop needs a plausible wrong interpretation, later discriminating evidence,
+the same source-to-consumer assay and an unaffected counterexample. Contradiction may correctly withhold
+an answer; withholding is not resolution. Repeated improvement needs separately selected held-out
+evaluations, with correction cost, regressions and population coverage. Parser accuracy, schema growth,
+a proposal approval and one passing fixture cannot substitute for that evidence. The bounded comparison
+contract and its delivery limits are recorded in the case ledger, §12.
+
 **Fleet-relative reporting, owner correction 2026-10-11.** The owner requires the full lot as the
 reference for data-model work. A small successful cohort does not establish a material fleet gain.
 Lead each progress report with the whole-population coverage and the unaddressed scope; put sample
