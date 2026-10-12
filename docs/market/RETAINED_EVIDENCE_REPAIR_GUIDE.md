@@ -200,3 +200,50 @@ the exact checked head, changed owner, same-case before/after result and what re
 Count affected data at the repair's declared grain after admission, distinguishing unchanged,
 superseded, unresolved and consumer-visible records. Do not label a reader's returned URL groups
 as model changes or assume that one repaired witness proves fleet completion.
+
+## Prepared historical supersession reader repair, 2026-10-12
+
+The existing `valuation_by_ymm` reader selects archived sale interpretations using
+the current `is_superseded` flag in two places. A local disposable fixture using
+the deployed definition and the actual `supersede_observation_relay` reproduces a
+fixed `known_at` result changing from eleven sales / 40.9091 percentile to ten /
+45 after supersession. The successor has the same supported value: this isolates
+temporal membership rather than claiming improved interpretation accuracy.
+
+The prepared migration changes only those two predicates. In `known_at` mode an
+original interpretation remains eligible before its finite recorded
+`superseded_at`; at and after that instant it is withheld. All source/admission
+clocks and other qualification gates still apply. Unknown/nonfinite supersession
+clocks are withheld. Retrospective/current selection stays unchanged. The patch
+checks the exact inspected owner definition, refuses drift, and permits an
+identical retry without changing its owner, grants, settings or security mode.
+
+The existing source-sale regression exercises actual tracked writer/reader
+migrations with synthetic producer admission. It compares the complete earlier,
+current and unaffected results except calculation execution timestamps, and
+checks admission boundaries, before/at/after retirement, deterministic replay,
+retained testimony, retry attribution and privacy. This is one eleven-sale
+fixture, not fleet coverage, commit-availability or a full historical-model proof.
+
+**Delivery hold:** review preparation and draft publication are authorized;
+merge and production function application require separate owner approval.
+Feature pushes and PR events cannot run `supabase-deploy.yml`: it applies on
+`push` to `main` or explicit manual dispatch. A draft is reviewable code, not
+deployed behavior. Existing schema/intake holds remain in force.
+
+After explicit approval and successful applicable CI/review, use the existing
+exact-head merge and deployment path. Before deployment, retain a private copy
+of the function definition/hash and permissions, and pin one already-retained
+qualified supersession pair with independently finite event, capture, admission
+and retirement clocks. Record fixed reader parameters and full historical/current
+receipts; do not create synthetic production testimony. If no admissible real
+pair exists, leave the runtime claim unverified.
+
+After the normal CI deployment, verify the deployed definition equals the
+reviewed two-predicate replacement and that permissions/security settings match.
+Read the pinned pair at the same pre-retirement cutoff and at/after retirement,
+checking source IDs, successor admission, exclusions, totals and percentile.
+Repeat with identical parameters and an unaffected subject/cohort; compare the
+current result to its baseline. Retain private receipts and separate implemented,
+tested, merged, deployed and runtime-verified stages. This reader repair adds no
+semantic claims or modeled-fleet coverage; broader held-out accuracy remains open.

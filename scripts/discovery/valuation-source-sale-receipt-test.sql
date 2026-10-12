@@ -891,3 +891,180 @@ DO $$ DECLARE r jsonb:=pg_temp.current_read(); c jsonb:=r#>'{source_context}'; B
     AND c->>'record_limit_per_source'='20' AND jsonb_array_length(c->'records')=20
     AND c#>>'{sources,0,recorded_url_groups}'='25' AND c#>>'{sources,0,evidence_records_returned}'='20');
 END $$;
+
+-- Correction replay: synthetic producer admission and minimal relay dependencies,
+-- actual tracked sanctioned writer and consumer. This does not establish real
+-- producer/auth/RLS or commit-availability semantics. Same-valued successor
+-- isolates interpretation membership from accuracy and pricing-policy changes.
+ALTER TABLE public.vehicles ADD COLUMN owner_id uuid, ADD COLUMN user_id uuid, ADD COLUMN uploaded_by uuid;
+ALTER TABLE public.vehicle_observations ADD COLUMN superseded_by uuid,
+  ADD COLUMN superseded_at timestamptz, ADD COLUMN lineage_chain uuid[];
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$ SELECT current_setting('fixture.role',true) $$;
+CREATE TABLE public.vehicle_ownerships(vehicle_id uuid,owner_profile_id uuid,is_current boolean);
+CREATE TABLE public.ownership_verifications(vehicle_id uuid,user_id uuid,status text);
+CREATE TABLE public.vehicle_contributors(vehicle_id uuid,user_id uuid);
+CREATE TABLE public.reattribution_audit(id bigserial PRIMARY KEY,observation_type text,
+  old_observation_id uuid,old_vehicle_id uuid,new_observation_id uuid,new_vehicle_id uuid,
+  reason text,actor_user_id uuid);
+\ir ../../supabase/migrations/20260927180000_supersede_observation_owner_relay.sql
+
+SELECT pg_temp.base();
+SELECT pg_temp.seed(11);
+SELECT pg_temp.admit(11);
+UPDATE public.vehicles SET owner_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  WHERE id=md5('vehicle-11')::uuid;
+CREATE TEMP TABLE correction_receipts(stage text PRIMARY KEY,result jsonb);
+CREATE TEMP TABLE preserved_original AS SELECT id,to_jsonb(o) AS original
+  FROM public.vehicle_observations o WHERE source_snapshot_id=md5('snapshot-11')::uuid;
+INSERT INTO correction_receipts VALUES
+  ('earlier_before',pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')),
+  ('current_before',pg_temp.read()),
+  ('unaffected_before',pg_temp.read(jsonb_build_object('subject',md5('vehicle-11')::uuid)));
+SELECT pg_temp.ok('original interpreted sale is usable at earlier cutoff',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_receipts WHERE stage='earlier_before')='11');
+
+-- A later interpretation version of the same supported tuple. Reuse retained
+-- custody/hash/byte evidence; do not invent new raw bytes or independent support.
+INSERT INTO public.listing_page_snapshots
+SELECT (jsonb_populate_record(NULL::public.listing_page_snapshots,
+  to_jsonb(s)||jsonb_build_object('id',md5('successor-capture-11')::uuid,
+    'created_at','2026-01-02T12:00:00Z'))).*
+FROM public.listing_page_snapshots s WHERE id=md5('snapshot-11')::uuid;
+SELECT pg_temp.admit(11,
+  jsonb_build_object('byte_length',(SELECT original#>'{structured_data,source_sale_receipt,byte_length}' FROM preserved_original)),
+  '{"ingested_at":"2026-01-02T12:00:00Z"}',md5('successor-capture-11')::uuid);
+UPDATE public.vehicles SET origin_metadata=jsonb_set(origin_metadata,'{bat_snapshot_parsed,snapshot_id}',
+  to_jsonb(md5('successor-capture-11')::uuid::text)) WHERE id=md5('vehicle-11')::uuid;
+CREATE TEMP TABLE successor AS SELECT id FROM public.vehicle_observations
+  WHERE source_snapshot_id=md5('successor-capture-11')::uuid;
+GRANT SELECT ON preserved_original,successor TO service_role;
+SELECT pg_temp.ok('locator rotation alone preserves earlier evaluation',
+  pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')#>>'{stats,sold_count}'='11');
+SELECT set_config('fixture.role','service_role',false);
+SET ROLE service_role;
+-- The real installed sanctioned writer, not a direct supersession UPDATE.
+SELECT public.supersede_observation_relay(
+  (SELECT id FROM preserved_original),(SELECT id FROM successor),
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','disposable correction-development assay');
+RESET ROLE;
+INSERT INTO correction_receipts VALUES
+  ('current_after',pg_temp.read()),
+  ('earlier_after',pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')),
+  ('unaffected_after',pg_temp.read(jsonb_build_object('subject',md5('vehicle-11')::uuid)));
+SELECT pg_temp.ok('current real valuation export reaches successor interpretation',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_receipts WHERE stage='current_after')='11'
+  AND EXISTS(SELECT FROM jsonb_array_elements((SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='current_after')) e
+    WHERE e->>'derivedObservationId'=(SELECT id::text FROM successor)));
+SELECT pg_temp.ok('original testimony and its immutable tuple remain',
+  (SELECT to_jsonb(o)-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain']
+    =p.original-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain']
+   FROM public.vehicle_observations o JOIN preserved_original p ON p.id=o.id));
+SELECT pg_temp.ok('unaffected comparison denominator and percentile remain',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_receipts WHERE stage='unaffected_before')
+    =(SELECT result#>>'{stats,sold_count}' FROM correction_receipts WHERE stage='unaffected_after')
+  AND (SELECT result#>'{receipt,percentile}' FROM correction_receipts WHERE stage='unaffected_before')
+    =(SELECT result#>'{receipt,percentile}' FROM correction_receipts WHERE stage='unaffected_after'));
+SET ROLE service_role;
+SELECT public.supersede_observation_relay(
+  (SELECT id FROM preserved_original),(SELECT id FROM successor),
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','disposable correction-development assay');
+RESET ROLE;
+SELECT pg_temp.ok('sanctioned supersession retry creates one audit receipt',(SELECT count(*) FROM public.reattribution_audit)=1);
+
+SELECT pg_temp.ok('deployed current-flag predicate changes the earlier known-at result',
+  (SELECT result#>>'{stats,sold_count}' FROM correction_receipts WHERE stage='earlier_after')='10'
+  AND (SELECT (result#>>'{receipt,percentile}')::numeric FROM correction_receipts WHERE stage='earlier_after')=45);
+CREATE TEMP TABLE correction_owner_permissions AS SELECT proacl,proconfig,prosecdef,proowner FROM pg_proc
+WHERE oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure;
+\ir ../../supabase/migrations/20261012040000_valuation_known_at_supersession.sql
+CREATE TEMP TABLE correction_clock AS SELECT now() AS event_before;
+-- Execution timestamps describe this computation, not evidence membership.
+-- Compare every remaining field, including exclusions and coverage.
+CREATE FUNCTION pg_temp.semantic_result(r jsonb) RETURNS jsonb LANGUAGE sql AS $$
+  SELECT r #- '{source_context,observed_at}' #- '{receipt,computed_at}'
+$$;
+INSERT INTO correction_receipts VALUES
+  ('earlier_repaired',pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')),
+  ('current_repaired',pg_temp.read()),
+  ('unaffected_repaired',pg_temp.read(jsonb_build_object('subject',md5('vehicle-11')::uuid))),
+  ('later_known_at_repaired',pg_temp.read(jsonb_build_object('mode','known_at','known',(SELECT event_before FROM correction_clock),'before',(SELECT event_before FROM correction_clock))));
+SELECT pg_temp.ok('entire earlier semantic receipt is preserved',
+  (SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='earlier_before')
+    =(SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='earlier_repaired'));
+SELECT pg_temp.ok('entire current semantic receipt is unchanged',
+  (SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='current_after')
+    =(SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='current_repaired'));
+SELECT pg_temp.ok('entire unaffected semantic receipt is unchanged',
+  (SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='unaffected_before')
+    =(SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='unaffected_repaired'));
+INSERT INTO correction_receipts
+SELECT stage,pg_temp.read(jsonb_build_object('mode','known_at','known',cutoff,'before',(SELECT event_before FROM correction_clock)))
+FROM (SELECT o.superseded_at FROM public.vehicle_observations o JOIN preserved_original p ON p.id=o.id) s
+CROSS JOIN LATERAL (VALUES
+  ('before_successor_admission','2026-01-02T11:59:59.999999Z'::timestamptz),
+  ('before_supersession',s.superseded_at-interval '1 microsecond'),
+  ('at_supersession',s.superseded_at),
+  ('after_supersession',s.superseded_at+interval '1 microsecond')) b(stage,cutoff);
+SELECT pg_temp.ok('successor is excluded before its admission and before supersession',
+  NOT EXISTS(SELECT FROM correction_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage IN ('before_successor_admission','before_supersession')
+      AND e->>'derivedObservationId'=(SELECT id::text FROM successor))
+  AND (SELECT count(*) FROM correction_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage IN ('before_successor_admission','before_supersession')
+      AND e->>'derivedObservationId'=(SELECT id::text FROM preserved_original))=2);
+SELECT pg_temp.ok('successor replaces original exactly at and after recorded supersession',
+  NOT EXISTS(SELECT FROM correction_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage IN ('at_supersession','after_supersession')
+      AND e->>'derivedObservationId'=(SELECT id::text FROM preserved_original))
+  AND (SELECT count(*) FROM correction_receipts r CROSS JOIN LATERAL jsonb_array_elements(r.result#>'{receipt,eligible}') e
+    WHERE r.stage IN ('at_supersession','after_supersession')
+      AND e->>'derivedObservationId'=(SELECT id::text FROM successor))=2);
+SELECT pg_temp.ok('boundary replay is deterministic',
+  (SELECT pg_temp.semantic_result(result) FROM correction_receipts WHERE stage='at_supersession')
+    =pg_temp.semantic_result(pg_temp.read(jsonb_build_object('mode','known_at',
+      'known',(SELECT superseded_at FROM public.vehicle_observations o JOIN preserved_original p ON p.id=o.id),'before',(SELECT event_before FROM correction_clock)))));
+SELECT pg_temp.ok('repaired restores earlier prices and exact admitted source lineage',
+  (SELECT result->'stats' FROM correction_receipts WHERE stage='earlier_before')
+    =(SELECT result->'stats' FROM correction_receipts WHERE stage='earlier_repaired')
+  AND (SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='earlier_before')
+    =(SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='earlier_repaired')
+  AND (SELECT result#>'{receipt,percentile}' FROM correction_receipts WHERE stage='earlier_before')
+    =(SELECT result#>'{receipt,percentile}' FROM correction_receipts WHERE stage='earlier_repaired'));
+SELECT pg_temp.ok('repaired preserves retrospective current calculation and successor lineage',
+  (SELECT result->'stats' FROM correction_receipts WHERE stage='current_after')
+    =(SELECT result->'stats' FROM correction_receipts WHERE stage='current_repaired')
+  AND (SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='current_after')
+    =(SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='current_repaired'));
+SELECT pg_temp.ok('known_at after recorded supersession uses successor, not predecessor',
+  EXISTS(SELECT FROM jsonb_array_elements((SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='later_known_at_repaired')) e
+    WHERE e->>'derivedObservationId'=(SELECT id::text FROM successor))
+  AND NOT EXISTS(SELECT FROM jsonb_array_elements((SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='later_known_at_repaired')) e
+    WHERE e->>'derivedObservationId'=(SELECT id::text FROM preserved_original)));
+SELECT pg_temp.ok('repaired leaves unaffected cohort identical',
+  (SELECT result->'stats' FROM correction_receipts WHERE stage='unaffected_before')
+    =(SELECT result->'stats' FROM correction_receipts WHERE stage='unaffected_repaired')
+  AND (SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='unaffected_before')
+    =(SELECT result#>'{receipt,eligible}' FROM correction_receipts WHERE stage='unaffected_repaired'));
+SELECT pg_temp.seed(12);
+SELECT pg_temp.admit(12,'{}','{"superseded":true}');
+SELECT pg_temp.ok('unknown supersession clock does not manufacture historical admissibility',
+  pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')#>>'{stats,sold_count}'='11');
+UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-11')::uuid;
+SELECT pg_temp.ok('historical predicate retains current parent privacy gate',
+  pg_temp.read('{"mode":"known_at","known":"2026-01-02T06:00:00Z","before":"2026-01-03T00:00:00Z"}')#>>'{stats,sold_count}'='10');
+
+SELECT pg_temp.ok('repair preserves owner, grants, security mode and settings',
+  EXISTS(SELECT 1 FROM pg_proc p CROSS JOIN correction_owner_permissions b
+    WHERE p.oid='public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure
+      AND p.proacl IS NOT DISTINCT FROM b.proacl AND p.proconfig IS NOT DISTINCT FROM b.proconfig
+      AND p.prosecdef=b.prosecdef AND p.proowner=b.proowner));
+CREATE TEMP TABLE repaired_definition AS SELECT pg_get_functiondef(
+  'public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure) AS definition;
+\ir ../../supabase/migrations/20261012040000_valuation_known_at_supersession.sql
+
+SELECT pg_temp.ok('identical migration retry preserves exact function definition',
+  pg_get_functiondef('public.valuation_by_ymm(integer,text,text,timestamptz,timestamptz,timestamptz,text,numeric,uuid,text)'::regprocedure)
+    =(SELECT definition FROM repaired_definition));
+SELECT pg_temp.ok('correction assay leaves no waiting lock cascade',
+  NOT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock'));
