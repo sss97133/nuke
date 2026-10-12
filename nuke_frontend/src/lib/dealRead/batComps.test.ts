@@ -177,6 +177,78 @@ function populationOptions(over: Partial<SalePopulationOptions> = {}): SalePopul
 }
 
 describe('sale-event population and explicit relevance selection v2', () => {
+  it.each(['model', 'amount', 'outcome'] as const)(
+    'propagates a later %s contradiction while preserving earlier replay and an unaffected cohort',
+    dimension => {
+      // Synthetic supplied receipts; no production admission or automatic resolution.
+      const rows = Array.from({ length: 20 }, (_, i) => saleCapture(i + 1, {
+        relevance: [relevanceClaim(`synthetic-cohort-${i + 1}`, {
+          value: i < 10 ? 'synthetic-model' : 'synthetic-other-model',
+        })],
+      }));
+      const original = structuredClone(rows);
+      const historical = populationOptions({ knowledgeMode: 'known_at', evidenceAsOf: '2026-01-01T00:00:00Z' });
+      const current = populationOptions();
+      const other = populationOptions({ subject: { ...current.subject,
+        relevance: [relevanceClaim('synthetic-subject', { value: 'synthetic-other-model' })] } });
+      const evaluate = (population: ReturnType<typeof selectSourceSalePopulation>, amount = 5000) =>
+        comparePriceToSourceSales(population.matched.map(event => ({
+          vehicleId: event.vehicleId, sourceUrl: event.sourceUrls[0], amount: event.amount,
+          outcome: 'sold', eventAt: event.eventAt, knownAt: event.knownAt, currency: event.currency,
+          priceBasis: event.priceBasis, unitSource: event.sourceUrls[0], conditionEvidence: 'unknown',
+        })), saleOptions({ subject: { ...saleOptions().subject, amount }, minimumSales: 9,
+          evidenceAsOf: population.evidenceAsOf, knowledgeMode: population.knowledgeMode,
+          cohort: { ...saleOptions().cohort, complete: population.reasons.length === 0 } }));
+      const before = selectSourceSalePopulation(rows, historical);
+      const priorEvaluation = evaluate(before), frozenEvaluation = structuredClone(priorEvaluation);
+      const unaffected = evaluate(selectSourceSalePopulation(rows, other), 15000);
+      const later: SourceSaleCapture = { ...structuredClone(rows[0]),
+        capture: { table: 'vehicle_observations', id: `synthetic-later-${dimension}` },
+        knownAt: '2026-01-02T00:00:00Z',
+        qualification: { ...rows[0].qualification,
+          evidenceRefs: [{ table: 'listing_page_snapshots', id: `synthetic-later-source-${dimension}` }] },
+      };
+      if (dimension === 'model') later.relevance = [relevanceClaim('synthetic-cohort-1', {
+        value: 'synthetic-other-model', knownAt: later.knownAt,
+        evidenceRefs: later.qualification.evidenceRefs,
+      })];
+      if (dimension === 'amount') later.amount = 8000;
+      if (dimension === 'outcome') {
+        later.outcome = 'not_sold'; later.amount = null; later.currency = null;
+        later.priceBasis = null; later.unitSource = null;
+      }
+      const amended = [...rows, later];
+      const after = selectSourceSalePopulation(amended, current);
+      const revisedEvaluation = evaluate(after);
+      expect(priorEvaluation.percentile).toBe(45);
+      expect(after.counts).toMatchObject({ inputCaptures: 21, candidateEpisodes: 20, matchedEpisodes: 9 });
+      expect(revisedEvaluation.counts.eligibleSales).toBe(9);
+      expect(revisedEvaluation.percentile).toBeCloseTo(100 * 3.5 / 9);
+      expect(revisedEvaluation.distribution?.p50).toBe(6000);
+      expect(after.candidates.find(c => c.sourceKey === before.matched[0].sourceKey)?.captures)
+        .toEqual(expect.arrayContaining([rows[0], later]));
+      if (dimension === 'model') {
+        expect(after.qualified).toHaveLength(20);
+        expect(after.comparisons.find(c => c.event.sourceEpisodeKey === 'synthetic-cohort-1')?.reasons)
+          .toContain('model:conflict');
+      } else {
+        expect(after.qualified).toHaveLength(19);
+        expect(after.conflicts[0].dimensions).toContain(dimension);
+      }
+      const replay = selectSourceSalePopulation(amended, historical);
+      expect(evaluate(replay)).toEqual(frozenEvaluation);
+      expect(replay.candidates.flatMap(c => c.excluded)).toContainEqual({
+        capture: later.capture, reason: 'learned_later',
+      });
+      expect(evaluate(selectSourceSalePopulation(amended, other), 15000)).toEqual(unaffected);
+      expect(evaluate(selectSourceSalePopulation([...amended].reverse(), current))).toEqual(revisedEvaluation);
+      expect(evaluate(selectSourceSalePopulation(amended, current))).toEqual(revisedEvaluation);
+      expect(rows).toEqual(original);
+      expect(priorEvaluation).toEqual(frozenEvaluation);
+      expect(revisedEvaluation.conditionAdjustedAssessment).toBe('unmeasured');
+    },
+  );
+
   it('uses all 150 supplied events and reports unknown condition without an eighteen or hundred row trim', () => {
     const result = selectSourceSalePopulation(Array.from({ length: 150 }, (_, i) => saleCapture(i + 1)), populationOptions());
     expect(result.counts).toEqual({ inputCaptures: 150, candidateEpisodes: 150, qualifiedEpisodes: 150, conflictedEpisodes: 0, matchedEpisodes: 150 });

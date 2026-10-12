@@ -993,6 +993,42 @@ fleet-relative reporting contract in `data-machine.md` to subsequent repair-loop
 net usable coverage, eligible backlog and completion time remain unestablished by these cohort receipts;
 this correction does not close C28 or authorize a new worker, source admission or capacity change.
 
+### Correction reaches a comparison: bounded contract, 2026-10-12 UTC
+
+The owner's objection is whether an evolving representation compounds understanding or mistakes.
+Correction belongs in the development loop: retain captured observations, attributed claims,
+versioned interpretations and computed conclusions; then prove the consequences of a changed
+interpretation rather than treating schema growth as the result.
+
+`nuke_frontend/src/lib/dealRead/batComps.test.ts` now connects the existing
+`selectSourceSalePopulation` and `comparePriceToSourceSales` contracts across three synthetic
+later contradictions: episode model identity, sold amount and sale outcome. The fixed input contains
+20 sale episodes in two disjoint ten-episode model cohorts; appending a later capture produces
+21 captures of the same 20 episodes. The affected matched denominator changes from ten to nine;
+the synthetic candidate's percentile changes from 45 to approximately 38.89 and the median from
+5,500 to 6,000 in the declared synthetic units. These are fixture results, not market measurements.
+
+- Both captures remain inspectable with their source and qualification references. A model conflict
+  withholds narrow matching but retains the independently supported sale in the broad population.
+  Amount/outcome conflicts withhold the disputed sale from the qualified price population.
+- The earlier knowledge cutoff excludes the later capture and reproduces the entire earlier price
+  calculation. The previous input and result are unchanged; the unrelated cohort's calculation is
+  identical. Reordered input and repeated evaluation produce the same revised calculation.
+- This proves conflict propagation and deterministic evaluation, not admitted supersession,
+  automatic conflict resolution, persistent evaluation dependencies or independently measured accuracy.
+  The population selector remains a local contract, not a newly wired production valuation reader.
+  Its replay proves this selector/calculator path, not historical canonical-reader reconstruction.
+
+The focused file passes 74 tests, including the three new cases. This entry records implemented and
+locally tested stages only; PR CI, merge and delivery require their own receipts. No production schema,
+testimony, source, worker, evaluation policy or capacity changes are part of this increment. Net newly
+usable fleet claims from this test work: zero. Fleet-wide semantic coverage remains unestablished by it.
+
+The next acceptance case must use an existing sanctioned supersession owner, revise a supported
+interpretation, prove its actual downstream consumer and reproduce the earlier evaluation receipt.
+Then test a separately selected held-out case and report correction cost and regressions. The bounded
+conflict assay does not close C28 or establish repeated autonomous representation development.
+
 ### What is inefficient today (measured 2026-10-06)
 
 - **The definition was spread** over six documents, five views, one prompt file and a shift folder outside the repo;
