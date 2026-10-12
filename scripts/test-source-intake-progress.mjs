@@ -110,7 +110,9 @@ test('real handler retains source progress, distinct request/write stages and no
   assert.equal(source.attempted_targets, 1); assert.equal(source.counts.ingestion_requests, 1);
   assert.equal(source.counts.landed_ledger_acknowledged, 0); assert.equal(source.counts.ledger_write_failures, 1);
   assert.equal(source.consumer_usable, null); assert.equal(source.source_population, null);
-  assert(!JSON.stringify(run).includes('PRIVATE_')); assert(!JSON.stringify(run).includes('bringatrailer.com'));
+  assert(!JSON.stringify(run).includes('PRIVATE_'));
+  assert.deepEqual(Object.keys(run.metadata.targets[0]).sort(),
+    ['target_id', 'source', 'state', 'attempted_at', 'completed_at', 'reason', 'counts'].sort());
 });
 test('a progress-store failure stops source dispatch and preserves only the last acknowledged stage', async () => {
   const f = fixture({ progressFailure: 2 }), result = await f.request();
