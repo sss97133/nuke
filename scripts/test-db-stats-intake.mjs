@@ -133,6 +133,7 @@ function handler({ verdict, admin = false, organizationReading } = {}) {
     require(name) {
       if (name.endsWith('/cors.ts')) return { corsHeaders: { 'Access-Control-Allow-Origin': '*' } };
       if (name.endsWith('/writeGuard.ts')) return { authenticateWriter: async () => verdict ?? { ok: false } };
+      if (name.endsWith('/listingHistory.ts')) return {};
       if (name.endsWith('/intakeStatus.ts')) return {
         readIntakeSection: async (_db, section) => { reads++; return { contract: 'intake_status_v1', section }; },
         readOrganizationTargets: async (_db, id) => { reads++; return { contract: 'organization_targets_v1', organization_id: id, status: 'measured', rows: [], ...organizationReading }; },

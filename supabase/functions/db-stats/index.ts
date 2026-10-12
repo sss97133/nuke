@@ -14,6 +14,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticateWriter } from '../_shared/writeGuard.ts';
 import { readIntakeSection, readOrganizationTargets, type IntakeSection } from './intakeStatus.ts';
+import { listingHistoryScope, readListingHistory } from './listingHistory.ts';
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,10 +31,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'invalid_organization' }), { status: 400, headers });
   }
   let intakeCaller: string | 'service' | null = null;
+  let historyScope: ReturnType<typeof listingHistoryScope> | null = null;
   if (section !== null) {
     const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
     if (req.method !== 'GET') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers });
-    if (!['coverage', 'model', 'jobs', 'consumers'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
+    if (!['coverage', 'model', 'jobs', 'consumers', 'listing_history'].includes(section)) return new Response(JSON.stringify({ error: 'invalid_section' }), { status: 400, headers });
     // Reuse cryptographically verified callers. Privileged metadata also needs
     // an active admin_users membership, matching the existing admin UI guard.
     const auth = await authenticateWriter(req);
@@ -41,6 +43,10 @@ Deno.serve(async (req) => {
     if (auth.caller.kind === 'service_role') intakeCaller = 'service';
     else if (auth.caller.kind === 'user') intakeCaller = auth.caller.userId;
     else return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers });
+    if (section === 'listing_history') {
+      try { historyScope = listingHistoryScope(params); }
+      catch { return new Response(JSON.stringify({ error: 'invalid_history_scope' }), { status: 400, headers }); }
+    }
   }
 
   try {
@@ -72,7 +78,9 @@ Deno.serve(async (req) => {
             'SELECT EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = $1::uuid AND is_active) AS allowed', [intakeCaller]);
           if (membership.rows[0]?.allowed !== true) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers });
         }
-        return new Response(JSON.stringify(await readIntakeSection(conn1, section as IntakeSection)), { headers });
+        return new Response(JSON.stringify(historyScope
+          ? await readListingHistory(conn1, historyScope)
+          : await readIntakeSection(conn1, section as IntakeSection)), { headers });
       }
       // Single query: pg_class estimates + small counts + MVs (all fast now)
       const [lightweightResult, eventsResult, vehiclesResult, snapshotsResult] = await Promise.all([
