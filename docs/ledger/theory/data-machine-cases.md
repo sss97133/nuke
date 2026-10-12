@@ -1121,6 +1121,28 @@ Twenty-nine focused UI contracts and the existing ENFORCE/build gate pass. This 
 contention mitigation; the follow-up merge, deployment and signed-in successful reading remain
 separate delivery stages until recorded in the private receipt.
 
+**Source-intake acknowledgement and observation visibility, 2026-10-12 UTC
+(implementation/testing; delivery stages recorded separately).** The existing feed poller assigned
+`ledger=complete` before its queue write returned. An actual-handler/installed-SDK denied-write
+fixture reproduced that result; completion now requires one returned queue receipt with the exact
+URL and expected status. Failed, missing or unrelated acknowledgements remain unavailable.
+The existing extraction metrics helper records bounded feed-run progress in `extraction_runs`;
+source work stops if progress cannot be acknowledged. Completed target processing, dispatch intent,
+actual ingestion requests, unattempted targets and ledger acknowledgements remain different measures.
+Interrupted runs retain their last acknowledged progress. Existing invocation ceilings, source
+rotation, sanctioned intake, crons and native BaT admission controls are unchanged.
+
+The existing `db-stats?intake=jobs` / `/admin/status` consumer reads at most50 matching runs per
+worker over24hours, with overflow and unavailable readings explicit. It also consumes the existing
+Facebook capture writer's `fb_sweep_jobs.metadata.results` and verifies exact listing/sighting and
+linked-observation pointers; original cards, contacts, target URLs and error bodies are excluded.
+Browser observation time and intake clocks remain separate. The read-only live SQL assay at
+07:01:43Z found41 retained presentations in three declared captures and41 matching sightings;
+all were unlinked. That is source-listing custody in the declared capture scope, not new vehicle
+models, continuous availability, a source-wide denominator or public consumer usability. The full
+eligible stored-record reference remains the completed632,014-record census; no repeat census or
+whole-fleet canonical gain is claimed. Source-intake holds and unresolved vehicle links remain.
+
 **Deterministic bulk model construction, 2026-10-12 UTC (implementation/testing).**
 The owner explicitly rejected per-node LLM processing. The existing specification reader gains a
 bounded200-ID metadata model overload (optional typed custody reads capped20) that includes every eligible requested record, including those with

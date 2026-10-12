@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
   INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
-  ORG_TARGETS_SQL, ORG_ACTIVITY_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
+  ORG_TARGETS_SQL, ORG_ACTIVITY_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL, ACTIVITY_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
 function connection(results = {}) {
@@ -25,6 +25,21 @@ test('each read is read-only, bounded and rolls back before returning', async ()
   assert.deepEqual(db.calls.map(c => c.sql), ['BEGIN READ ONLY', "SET LOCAL statement_timeout = '5s'",
     "SET LOCAL lock_timeout = '1s'", COVERAGE_SQL, 'ROLLBACK']);
 });
+test('source activity retains its own window and clock without promoting writer receipts to fleet coverage', async () => {
+  const rows = [{ run_id: 'synthetic-run', worker: 'extract-facebook-marketplace', started_at: clock,
+    observed_at: '2026-10-10T11:58:00Z', sources: [{ source: 'facebook_marketplace', consumer_usable: null }] }];
+  const result = await readIntakeSection(connection({ [ACTIVITY_SQL]: [{ measured_at: clock, rows, complete: false }] }), 'jobs');
+  assert.deepEqual(result.activity.rows, rows); assert.equal(result.activity.window_hours, 24);
+  assert.equal(result.activity.complete, false); assert.equal(result.activity.limit_per_worker, 50);
+  assert(ACTIVITY_SQL.includes('LIMIT 51')); assert(!ACTIVITY_SQL.includes('error_details'));
+  assert(!ACTIVITY_SQL.includes("'batch',")); assert(!ACTIVITY_SQL.includes('seller_name'));
+});
+test('unavailable source receipts preserve independent job and configuration readings', async () => {
+  const result = await readIntakeSection(connection({ [ACTIVITY_SQL]: new Error('PRIVATE_CAPTURE_PAYLOAD'),
+    [CONFIG_SQL]: [{ measured_at: clock, rows: [{ jobname: 'synthetic-job', active: true }] }] }), 'jobs');
+  assert.equal(result.activity.status, 'unavailable'); assert.equal(result.activity.complete, false);
+  assert.equal(result.config.status, 'measured'); assert(!JSON.stringify(result).includes('PRIVATE_'));
+});
 test('timeout/refusal loses only that reading and never exposes private SQL error bodies', async () => {
   const db = connection({ [CONFIG_SQL]: [{ measured_at: clock, rows: [{ jobname: 'synthetic-job', active: false }] }],
     [HEALTH_SQL]: new Error('PRIVATE_SQL_COMMAND_AND_CREDENTIAL') });
@@ -33,7 +48,7 @@ test('timeout/refusal loses only that reading and never exposes private SQL erro
   assert.equal(result.config.rows[0].active, false);
   assert.equal(result.health.measured_at, null); assert.deepEqual(result.health.rows, []);
   assert(!JSON.stringify(result).includes('PRIVATE_'));
-  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, HEALTH_JOBS.length + 3);
+  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, HEALTH_JOBS.length + 4);
   assert.deepEqual(result.scope, INTAKE_JOBS); assert.deepEqual(result.health_scope, HEALTH_JOBS);
 });
 test('an output timeout preserves execution evidence without claiming output health', async () => {
@@ -67,7 +82,7 @@ test('one timed-out assay cannot erase another canonical check or its independen
   assert.equal(result.health.readings.find(r => r.jobname === 'bat-live-pull').reason, 'query_unavailable');
   assert.equal(result.health.output_measured, false);
   assert(db.calls.filter(c => c.sql === HEALTH_SQL).every(c => c.args[0].length === 1));
-  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '3s'").length, HEALTH_JOBS.length);
+  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '3s'").length, HEALTH_JOBS.length + 1);
   assert(!JSON.stringify(result).includes('PRIVATE'));
 });
 

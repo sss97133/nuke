@@ -20,6 +20,11 @@ type Health = { jobname: string; declared_writer: string | null; last_status: st
   assay_status: string | null; health_status: string | null; assay_counts?: Record<string, number> };
 type Feed = { source_slug: string; feeds: number; enabled_feeds: number; errored_feeds: number;
   last_polled_at: string | null; shortest_interval_minutes: number | null; billing_blocked: boolean | null; rate_limited: boolean | null };
+type SourceRun = { run_id: string; worker: string; started_at: string; completed_at: string | null;
+  status: string; observed_at: string | null; retrieval_surface: string | null; actual_region: string | null;
+  scope_complete: boolean | null; basis: string; reason: string | null; sources: { source: string; selected_targets?: number;
+    attempted_targets?: number; unattempted_targets?: number; deferred_targets?: number; counts: Record<string, number | null> | null;
+    reasons: string[]; consumer_usable: null }[] };
 type Need = { layer: string; kind: string; object: string; verdict: 'present' | 'partial' | 'missing'; reason: string | null; related_table: string | null };
 type Consumer = { stack_id: string; version: number; name: string; question: string; status: string; coverage: number | null;
   n_needs: number; n_present: number; n_partial: number; n_missing: number; needs_complete: boolean; needs: Need[] };
@@ -29,6 +34,8 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
   health?: { status: string; measured_at: string | null; rows: Health[]; output_measured?: boolean;
     readings?: { jobname: string; status: string; measured_at: string | null; reason: string | null }[] }; health_scope?: string[];
   feeds?: { status: string; measured_at: string | null; rows: Feed[]; complete: boolean };
+  activity?: { status: string; measured_at: string | null; rows: SourceRun[]; complete: boolean;
+    window_hours: number; limit_per_worker: number };
   controls?: { status: string; value?: { enabled: boolean; max_feeds: number; max_ingests: number;
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
 
@@ -36,6 +43,16 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
 const sections: Section[] = ['model', 'consumers', 'coverage', 'jobs'];
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString() : 'Unmeasured';
 const time = (s: string | null | undefined) => s && Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleString() : 'Unmeasured';
+const validActivity = (reading: Reading['activity']) => reading?.status === 'measured'
+  && Number.isFinite(Date.parse(reading.measured_at ?? '')) && reading.window_hours === 24
+  && reading.limit_per_worker === 50 && typeof reading.complete === 'boolean' && Array.isArray(reading.rows)
+  && reading.rows.length <= 100 && reading.rows.every(r => r && typeof r.run_id === 'string'
+    && ['poll-listing-feeds', 'extract-facebook-marketplace'].includes(r.worker)
+    && Number.isFinite(Date.parse(r.started_at)) && typeof r.status === 'string'
+    && Array.isArray(r.sources) && r.sources.length <= 100 && r.sources.every(s => s
+      && typeof s.source === 'string' && Array.isArray(s.reasons) && s.reasons.every(v => typeof v === 'string')
+      && s.consumer_usable === null && (s.counts === null || typeof s.counts === 'object' && !Array.isArray(s.counts)
+        && Object.values(s.counts).every(n => n === null || Number.isSafeInteger(n) && n >= 0))));
 const sourceValid = (s: Source) => typeof s.source_slug === 'string' && s.source_slug.length > 0
   && [s.total_targets, s.in_queue, s.extracted, s.gap, s.failed, s.skipped].every(n => Number.isSafeInteger(n) && n >= 0)
   && s.in_queue <= s.total_targets && s.extracted <= s.in_queue && s.gap === s.total_targets - s.in_queue;
@@ -230,6 +247,9 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
   const visibleJobs = config.filter(j => jobFilter === 'all' || (jobFilter === 'active' ? j.active === true
     : jobFilter === 'paused' ? j.active === false : failedJobs.includes(j)));
   const feedProblems = jobs?.feeds?.status === 'measured' ? jobs.feeds.rows.filter(f => f.errored_feeds > 0) : [];
+  const landingProblems = validActivity(jobs?.activity) ? jobs!.activity!.rows.flatMap(r => r.sources
+    .filter(s => (s.counts?.ledger_write_failures ?? s.counts?.observation_errors ?? 0) > 0)
+    .map(s => ({ run: r, source: s }))) : [];
   const receiptProblems = tables.filter(t => t.receipt_undeclared_stmts > 0);
   const parents = [...new Set(edges.filter(e => e.child_table === selectedTable).map(e => e.parent_table))];
   const children = [...new Set(edges.filter(e => e.parent_table === selectedTable).map(e => e.child_table))];
@@ -276,7 +296,7 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
     <p className="status-basis">Independent readings of the same machine. URL completion, stored structure, job checks and delivered answers have different scopes.</p>
 
     <div className="status-operating-panels">
-    {(failedJobs.length > 0 || feedProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
+    {(failedJobs.length > 0 || feedProblems.length > 0 || landingProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
       <div className="status-attention">
         <h3 style={label}>NEEDS ATTENTION</h3>
         {failedJobs.map(j => {
@@ -297,6 +317,9 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
           </details>;
         })}
         {feedProblems.length > 0 && <details className="status-reading-gap"><summary>{feedProblems.length} sources report feed errors</summary><p>{feedProblems.map(f => f.source_slug).join(', ')} · enabled feeds report errors. Capture freshness needs inspection. <PrefetchLink to="/admin/sources">Inspect sources →</PrefetchLink></p></details>}
+        {landingProblems.length > 0 && <details className="status-reading-gap"><summary>{landingProblems.length} source-run receipts report landing failures</summary>
+          <p>{landingProblems.map(p => `${p.source.source} · ${time(p.run.started_at)}`).join('; ')}.
+            A completed run does not establish acknowledged landing. <a href="#status-jobs" onClick={() => setJobsOpen(true)}>Inspect source receipts →</a></p></details>}
         {receiptProblems.length > 0 && <p>{receiptProblems.map(t => t.table_name).join(', ')} · undeclared writers in the latest receipt sample. <a href="#status-model" onClick={() => setModelOpen(true)}>Inspect model →</a></p>}
         {(jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') && <details className="status-reading-gap"><summary>Missing health readings · {unavailableChecks.length || 'scope unmeasured'}</summary><p>{unavailableChecks.length > 0
           ? `Health readings unavailable for ${unavailableChecks.map(r => r.jobname).join(', ')}. Other checks retain their own results.`
@@ -347,6 +370,35 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
         Source rotation and measured extraction latency reduce actual work to fit the worker deadline. Monetary cost is unmeasured.
       </p>}
       {jobs.controls?.status === 'invalid' && <p role="status">Invalid throttle configuration: source work is refused.</p>}
+      {validActivity(jobs.activity) ? <details>
+        <summary>Source intake receipts · last 24 hours · {time(jobs.activity?.measured_at)}</summary>
+        {jobs.activity?.rows.length === 0 ? <p>No matching receipts in this measured window. Source attempts and landing remain unmeasured.</p>
+          : <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>{['Source / worker', 'Source observed / run started', 'Run state', 'Target work started / selected / unattempted / deferred',
+              'Captured cards or discovered items', 'Acknowledged ledger or listing rows', 'Verified sightings', 'Linked observation receipts', 'Write failures / deferrals'].map(h => <th scope="col" key={h} style={cell}>{h}</th>)}</tr></thead>
+            <tbody>{jobs.activity?.rows.flatMap(r => (r.sources.length ? r.sources : [{ source: 'No selected target',
+              selected_targets: 0, attempted_targets: 0, unattempted_targets: 0, deferred_targets: 0, counts: null,
+              reasons: r.reason ? [r.reason] : [], consumer_usable: null }]).map(s => ({ r, s }))).slice(0, 100).map(({ r, s }) =>
+              <tr key={`${r.run_id}:${s.source}`}><th scope="row" style={cell}>{s.source}<br /><small>{r.worker}</small></th>
+                <td style={cell}>{time(r.observed_at)}<br />{time(r.started_at)}
+                  {r.actual_region && <><br />{r.actual_region}</>}
+                  <br /><small>{r.scope_complete === false ? 'Partial target surface' : r.scope_complete === true ? 'Declared target scope' : 'Target scope unmeasured'}</small></td>
+                <td style={cell}>{r.status}<br />{time(r.completed_at)}</td>
+                <td style={cell}>{count(s.attempted_targets)} / {count(s.selected_targets)} / {count(s.unattempted_targets)} / {count(s.deferred_targets)}</td>
+                <td style={cell}>{count(s.counts?.captured_cards ?? s.counts?.discovered_items)}</td>
+                <td style={cell}>{count(s.counts?.listing_rows_acknowledged ?? s.counts?.landed_ledger_acknowledged)}
+                  {s.counts?.queue_rows_acknowledged !== undefined && <><br />{count(s.counts.queue_rows_acknowledged)} queued</>}</td>
+                <td style={cell}>{count(s.counts?.sightings_verified)}</td>
+                <td style={cell}>{count(s.counts?.linked_observation_receipts)}</td>
+                <td style={cell}>{count(s.counts?.ledger_write_failures ?? s.counts?.observation_errors)}<br />{s.reasons.join(', ')}</td>
+              </tr>)}</tbody>
+          </table></div>}
+        <p>Receipts measure selected targets and acknowledged processing, not new vehicles or source-wide coverage.
+          Work started records dispatch intent; fetch success is separate. First observed is not listed time.
+          Canonical property coverage and consumer usability remain unmeasured here.
+          {' '}Browser captures are separate from scheduled-feed ceilings.
+          {' '}{jobs.activity?.complete ? '' : 'Run history exceeds this reading.'} At most 100 source-run rows shown.</p>
+      </details> : <p role="status">Source intake receipts unavailable. Attempts and landing remain unmeasured; job execution readings are separate.</p>}
       {jobs.feeds?.status === 'measured' && <details><summary>Scheduled source feeds · {time(jobs.feeds.measured_at)}</summary>
         <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['Source', 'Enabled feeds', 'Throttle', 'Errored feeds', 'Latest poll', 'Minimum interval'].map(label => <th scope="col" key={label} style={cell}>{label}</th>)}</tr></thead>
