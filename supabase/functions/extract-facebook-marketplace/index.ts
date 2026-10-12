@@ -1,9 +1,8 @@
 /**
  * Facebook Marketplace Listing Extractor
  *
- * Two modes:
- *   1. "direct" — accepts pre-extracted data from agents (no Firecrawl)
- *   2. URL mode — scrapes via Firecrawl, parses, inserts (legacy)
+ * "direct" accepts extracted data; "browser_capture" retains bounded browser passes
+ * with original source clocks and acknowledged sightings. URL mode is legacy Firecrawl.
  *
  * POST /functions/v1/extract-facebook-marketplace
  *
@@ -17,6 +16,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
+import { handleDirect as landDirect, type DirectInput } from "./direct.ts";
+import { handleBrowserCapture } from "./capture.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const supabase = createClient(
@@ -128,234 +129,7 @@ async function linkToVehicle(params: {
 
 // ── Direct Mode ──────────────────────────────────────────────────────────────
 
-interface DirectInput {
-  mode: "direct";
-  facebook_id?: string;
-  url?: string;
-  title?: string;
-  price?: number;
-  current_price?: number;
-  description?: string;
-  location?: string;
-  parsed_year?: number;
-  parsed_make?: string;
-  parsed_model?: string;
-  mileage?: number;
-  exterior_color?: string;
-  interior_color?: string;
-  transmission?: string;
-  fuel_type?: string;
-  image_url?: string;
-  all_images?: string[];
-  seller_name?: string;
-  contact_info?: Record<string, unknown>;
-  status?: string;
-  agent_context?: {
-    agent_id?: string;
-    on_behalf_of?: string | null;
-    session_type?: string;
-  };
-}
-
-async function handleDirect(body: DirectInput) {
-  // Resolve facebook_id: from body or URL
-  let facebookId = body.facebook_id;
-  if (!facebookId && body.url) {
-    facebookId = extractFacebookItemId(body.url) ?? undefined;
-  }
-  if (!facebookId) {
-    return jsonResponse({ error: "facebook_id or valid url required" }, 400);
-  }
-
-  const url = body.url || `https://www.facebook.com/marketplace/item/${facebookId}/`;
-
-  // Check existing
-  const { data: existing } = await supabase
-    .from("marketplace_listings")
-    .select("id, vehicle_id, submission_count")
-    .eq("facebook_id", facebookId)
-    .maybeSingle();
-
-  if (existing) {
-    // Update: bump submission_count, refresh last_seen_at, merge non-null fields
-    const updates: Record<string, unknown> = {
-      last_seen_at: new Date().toISOString(),
-      submission_count: (existing.submission_count || 1) + 1,
-    };
-
-    // Merge any new non-null fields from body
-    const mergeFields: Array<[string, unknown]> = [
-      ["title", body.title],
-      ["price", body.price != null ? Math.round(body.price) : undefined],
-      ["current_price", body.current_price ?? body.price],
-      ["description", body.description],
-      ["location", body.location],
-      ["parsed_year", body.parsed_year],
-      ["extracted_year", body.parsed_year],
-      ["parsed_make", body.parsed_make],
-      ["parsed_model", body.parsed_model],
-      ["mileage", body.mileage],
-      ["exterior_color", body.exterior_color],
-      ["interior_color", body.interior_color],
-      ["transmission", body.transmission],
-      ["fuel_type", body.fuel_type],
-      ["image_url", body.image_url],
-      ["all_images", body.all_images],
-      ["seller_name", body.seller_name],
-      ["contact_info", body.contact_info],
-      ["status", body.status],
-    ];
-
-    for (const [col, val] of mergeFields) {
-      if (val != null && val !== undefined) {
-        updates[col] = val;
-      }
-    }
-
-    // Append agent provenance to raw_scrape_data
-    if (body.agent_context) {
-      updates.raw_scrape_data = {
-        agent_context: body.agent_context,
-        submitted_at: new Date().toISOString(),
-        mode: "direct",
-      };
-    }
-
-    // Attempt vehicle linking if not already linked
-    let vehicleId = existing.vehicle_id;
-    if (!vehicleId) {
-      const link = await linkToVehicle({
-        vin: null,
-        parsed_year: body.parsed_year,
-        parsed_make: body.parsed_make,
-        parsed_model: body.parsed_model,
-        location: body.location,
-        description: body.description,
-      });
-      if (link.vehicle_id) {
-        updates.vehicle_id = link.vehicle_id;
-        vehicleId = link.vehicle_id;
-      }
-      if (link.suggested_vehicle_id) {
-        updates.suggested_vehicle_id = link.suggested_vehicle_id;
-      }
-    }
-
-    await supabase
-      .from("marketplace_listings")
-      .update(updates)
-      .eq("id", existing.id);
-
-    // Fire-and-forget observation write if linked to a vehicle
-    if (vehicleId) {
-      const obsFields: Record<string, any> = {};
-      if (body.parsed_year) obsFields.year = body.parsed_year;
-      if (body.parsed_make) obsFields.make = body.parsed_make;
-      if (body.parsed_model) obsFields.model = body.parsed_model;
-      if (body.price) obsFields.asking_price = body.price;
-      if (body.mileage) obsFields.mileage = body.mileage;
-      if (body.exterior_color) obsFields.color = body.exterior_color;
-      if (body.transmission) obsFields.transmission = body.transmission;
-      writeObservation(supabase, {
-        vehicleId,
-        source: { platform: "facebook_marketplace", url, trustScore: 0.4 },
-        fields: obsFields,
-        observationKind: "listing",
-        extractionMethod: "fb_direct_input",
-      }).catch((e: any) => console.warn(`[fb] observationWriter error for ${vehicleId}: ${e?.message}`));
-    }
-
-    return jsonResponse({
-      success: true,
-      listing_id: existing.id,
-      vehicle_id: vehicleId,
-      is_new: false,
-      submission_count: (existing.submission_count || 1) + 1,
-    });
-  }
-
-  // New listing — attempt vehicle linking before insert
-  const link = await linkToVehicle({
-    vin: null,
-    parsed_year: body.parsed_year,
-    parsed_make: body.parsed_make,
-    parsed_model: body.parsed_model,
-    location: body.location,
-    description: body.description,
-  });
-
-  const row: Record<string, unknown> = {
-    facebook_id: facebookId,
-    platform: "facebook_marketplace",
-    url: normalizeUrl(facebookId),
-    title: body.title || null,
-    price: body.price != null ? Math.round(body.price) : null,
-    current_price: body.current_price ?? body.price ?? null,
-    description: body.description || null,
-    location: body.location || null,
-    parsed_year: body.parsed_year || null,
-    extracted_year: body.parsed_year || null,
-    parsed_make: body.parsed_make || null,
-    parsed_model: body.parsed_model || null,
-    mileage: body.mileage || null,
-    exterior_color: body.exterior_color || null,
-    interior_color: body.interior_color || null,
-    transmission: body.transmission || null,
-    fuel_type: body.fuel_type || null,
-    image_url: body.image_url || null,
-    all_images: body.all_images || null,
-    seller_name: body.seller_name || null,
-    contact_info: body.contact_info || null,
-    status: body.status || "active",
-    last_seen_at: new Date().toISOString(),
-    raw_scrape_data: {
-      agent_context: body.agent_context || null,
-      submitted_at: new Date().toISOString(),
-      mode: "direct",
-    },
-  };
-
-  // Apply vehicle linking results
-  if (link.vehicle_id) row.vehicle_id = link.vehicle_id;
-  if (link.suggested_vehicle_id) row.suggested_vehicle_id = link.suggested_vehicle_id;
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("marketplace_listings")
-    .insert(row)
-    .select("id, vehicle_id")
-    .maybeSingle();
-
-  if (insertError) throw insertError;
-
-  // Fire-and-forget observation write if linked to a vehicle
-  const linkedVehicleId = inserted!.vehicle_id || link.vehicle_id;
-  if (linkedVehicleId) {
-    const obsFields: Record<string, any> = {};
-    if (body.parsed_year) obsFields.year = body.parsed_year;
-    if (body.parsed_make) obsFields.make = body.parsed_make;
-    if (body.parsed_model) obsFields.model = body.parsed_model;
-    if (body.price) obsFields.asking_price = body.price;
-    if (body.mileage) obsFields.mileage = body.mileage;
-    if (body.exterior_color) obsFields.color = body.exterior_color;
-    if (body.transmission) obsFields.transmission = body.transmission;
-    writeObservation(supabase, {
-      vehicleId: linkedVehicleId,
-      source: { platform: "facebook_marketplace", url: normalizeUrl(facebookId), trustScore: 0.4 },
-      fields: obsFields,
-      observationKind: "listing",
-      extractionMethod: "fb_direct_input",
-    }).catch((e: any) => console.warn(`[fb] observationWriter error for ${linkedVehicleId}: ${e?.message}`));
-  }
-
-  return jsonResponse({
-    success: true,
-    listing_id: inserted!.id,
-    vehicle_id: inserted!.vehicle_id,
-    is_new: true,
-    submission_count: 1,
-    linked_via: link.vehicle_id ? "vin" : link.suggested_vehicle_id ? "ymm_match" : null,
-  });
-}
+const handleDirect = (body: DirectInput) => landDirect(body, { supabase, linkToVehicle, writeObservation });
 
 // ── URL (Legacy) Mode ────────────────────────────────────────────────────────
 
@@ -671,6 +445,8 @@ interface BatchInput {
     parsed_make?: string;
     parsed_model?: string;
     year?: number;
+    location?: string;
+    image_url?: string;
     _source?: string;
   }>;
   source?: string;
@@ -714,7 +490,9 @@ async function handleBatch(body: BatchInput) {
       const resp = await handleDirect(directInput);
       const respBody = await resp.json();
 
-      if (respBody.is_new) {
+      if (!resp.ok || !respBody.success) {
+        results.errors++;
+      } else if (respBody.is_new) {
         results.created++;
       } else {
         results.updated++;
@@ -726,7 +504,7 @@ async function handleBatch(body: BatchInput) {
   }
 
   return jsonResponse({
-    success: true,
+    success: results.errors === 0,
     source,
     ...results,
     message: `Synced ${results.created} new, ${results.updated} existing, ${results.skipped} skipped, ${results.errors} errors`,
@@ -746,6 +524,10 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
 
+    if (body.mode === "browser_capture") {
+      return jsonResponse(await handleBrowserCapture(supabase, body, (item) => landDirect(item, { supabase, linkToVehicle, writeObservation, capturePrepared: true })));
+    }
+
     if (body.mode === "batch") {
       return await handleBatch(body as BatchInput);
     }
@@ -757,6 +539,6 @@ Deno.serve(async (req) => {
     return await handleUrlMode(body);
   } catch (error) {
     console.error("FB Marketplace extraction error:", error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });

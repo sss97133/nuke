@@ -27,7 +27,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |
 | Extract Craigslist listing | `extract-craigslist` | |
 | Extract eBay Motors listing | `extract-ebay-motors` | |
-| Extract Facebook Marketplace listing | `extract-facebook-marketplace` or `fb-marketplace-orchestrator` | Use orchestrator for bulk. Supports `mode: "direct"` for agent-extracted data (skips Firecrawl). |
+| Extract Facebook Marketplace listing | `extract-facebook-marketplace` | `direct` accepts agent-extracted fields; `browser_capture` retains a bounded permitted browser pass in existing sweep/sighting ledgers with checked landing receipts. Stage/retry using `scripts/fb-import-urls.ts --capture <file>`; `--land` submits to this writer. Source access is separate from landing; no cookies/private endpoints or paid fetch fallback. |
 | Import Facebook Saved vehicles | MCP `import_facebook_saved` tool or `scripts/fb-saved-extractor.js` | Two-step: extract (returns browser JS) → submit (POSTs to ingest). Runs client-side in user's browser on facebook.com/saved. |
 | Extract Bonhams auction | `extract-bonhams` | |
 | Extract RM Sotheby's | `extract-rmsothebys` | |
