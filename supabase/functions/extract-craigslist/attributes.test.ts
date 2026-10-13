@@ -8,6 +8,7 @@ import {
   parseAttributes,
   parseCapture,
   parseOdometer,
+  parsePlace,
   parsePostInfo,
   pickCapture,
 } from "../_shared/craigslistAttributes.ts";
@@ -290,4 +291,30 @@ Deno.test("pickCapture keeps a clock only if it is an ISO UTC time a timestamptz
   equal(clocks("2026-01-02T11:04:05.000Z", "2026-01-03T12:05:06Z"), ["2026-01-02T11:04:05.000Z", "2026-01-03T12:05:06Z"]);
   equal(clocks("yesterday", "2026-13-45T99:99:99Z"), [null, null]);
   equal(clocks("2026-01-02T03:04:05-0800", 12345), [null, null], "an offset form or a number is not carried");
+});
+
+// ---- the post's place ----------------------------------------------------------------------------------------------
+
+Deno.test("place: JSON-LD city, region, postal code and point; placeholders are not a place", () => {
+  const html = page("classic-vin-manual-truck.html");
+  equal(parsePlace(html), { locality: "Sampletown", region: null, postal_code: null, country: "US", latitude: null, longitude: null });
+  const real = html.replace('"latitude":"0.000000","longitude":"0.000000"', '"latitude":"36.114600","longitude":"-115.172800"')
+    .replace('"addressRegion":"ZZ"', '"addressRegion":"NV"').replace('"postalCode":"00000"', '"postalCode":"89109"')
+    .replace('"streetAddress":""', '"streetAddress":"1 Sample Way"');
+  const p = parsePlace(real)!;
+  equal(p, { locality: "Sampletown", region: "NV", postal_code: "89109", country: "US", latitude: 36.1146, longitude: -115.1728 });
+  assert(!JSON.stringify(parseCapture(real)).includes("Sample Way"), "the street line is never read");
+});
+
+Deno.test("place: the map element's point when JSON-LD has none; nothing when the page has neither", () => {
+  const map = '<div id="map" class="viewposting" data-latitude="40.7608" data-longitude="-111.8910" data-accuracy="22"></div>';
+  equal(parsePlace(map), { locality: null, region: null, postal_code: null, country: null, latitude: 40.7608, longitude: -111.891 });
+  equal(parsePlace("<html><body>no place</body></html>"), null);
+});
+
+Deno.test("pickCapture keeps a place field by field and drops what is malformed", () => {
+  const good = parseCapture(page("classic-vin-manual-truck.html"));
+  const c = pickCapture({ ...good, place: { locality: "<b>x</b>", region: "NV", postal_code: "8910", country: "USA", latitude: "91", longitude: -115.2 } });
+  equal(c!.place, { locality: null, region: "NV", postal_code: null, country: null, latitude: null, longitude: null });
+  equal(pickCapture({ ...good, place: { region: "ZZ", latitude: 0, longitude: 0 } })!.place, undefined);
 });

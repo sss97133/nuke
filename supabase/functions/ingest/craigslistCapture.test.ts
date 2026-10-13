@@ -3,7 +3,7 @@
 // observation writer, where the VIN goes and where it must not, and what the poller's ledger row ends up holding.
 // The writer is exercised two ways: a stub that records the call it receives, and the real _shared/observationWriter
 // over a client that records every table write.
-import { captureObservationFields, COLUMNS_WRITTEN_AT_CREATION, cylindersFrom, fuelTypeFrom, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { captureObservationFields, COLUMNS_WRITTEN_AT_CREATION, cylindersFrom, fuelTypeFrom, landCraigslistCapture, ledgerFields, placeObservationRow } from "./craigslistCapture.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { parseCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
@@ -61,6 +61,7 @@ interface World {
   holderLookupFails?: boolean;
   row?: Record<string, unknown>; // the vehicle row as it stands
   duplicateObservation?: boolean;
+  placeSeen?: boolean; // vehicle_location_observations already holds this post's place
 }
 function world(w: World = {}) {
   const row = {
@@ -82,6 +83,9 @@ function world(w: World = {}) {
         return { data: row };
       case "field_evidence":
         return { data: [{ id: "evidence-1" }] };
+      case "vehicle_location_observations":
+        if (c.ops.some((o) => o[0] === "insert")) return {};
+        return { data: w.placeSeen ? [{ id: "place-0" }] : [] };
       default:
         return {};
     }
@@ -434,4 +438,44 @@ Deno.test("a rejected post's ledger fields keep the page's block too, without a 
   equal(fields.attributes.vin, "CKY145Z123456");
   equal("capture_landing" in fields, false);
   equal(fields.post_id, "7000000001");
+});
+
+// ---- the post's place ----------------------------------------------------------------------------------------------
+
+// The fixtures are sanitized (0,0, region ZZ, postal 00000); this is the same page with a real-shaped place and a street.
+const placed = () => parseCapture(page("classic-vin-manual-truck.html")
+  .replace('"latitude":"0.000000","longitude":"0.000000"', '"latitude":"47.655000","longitude":"-92.632100"')
+  .replace('"addressRegion":"ZZ"', '"addressRegion":"MN"').replace('"postalCode":"00000"', '"postalCode":"55710"')
+  .replace('"streetAddress":""', '"streetAddress":"100 Sample Rd"'), URL1);
+
+Deno.test("place: one location row with city, region, postal code and point, and never the street", async () => {
+  const capture = { ...placed(), source_capture: { snapshot_id: "33333333-3333-4333-8333-333333333333", observed_at: "2026-10-13T22:31:23.104Z" } };
+  const row = placeObservationRow(VEHICLE, URL1, capture, "observation-1")!;
+  equal([row.city, row.region_code, row.postal_code, row.country_code, row.latitude, row.longitude, row.precision, row.observed_at],
+    ["Sampletown", "MN", "55710", "US", 47.655, -92.6321, "city", "2026-10-13T22:31:23.104Z"]);
+  equal(row.location_text_clean, "Sampletown, MN 55710");
+  assert(!JSON.stringify(row).includes("Sample Rd"), "the street line is not kept");
+  assert(!JSON.stringify(ledgerFields(capture)).includes("Sample Rd"), "nor on the observation");
+  const w = world();
+  const landing = await landCraigslistCapture({ supabase: w.client, writeObservation },
+    { vehicleId: VEHICLE, listingUrl: URL1, capture, written: WRITTEN, isNewVehicle: true });
+  equal(landing.place, "written");
+  equal(writes(w.calls, "vehicle_location_observations", "insert").length, 1);
+});
+
+Deno.test("place: a re-read of the same post with the same place adds nothing", async () => {
+  const w = world({ placeSeen: true });
+  const landing = await landCraigslistCapture({ supabase: w.client, writeObservation },
+    { vehicleId: VEHICLE, listingUrl: URL1, capture: placed(), written: WRITTEN, isNewVehicle: true });
+  equal(landing.place, "duplicate");
+  equal(writes(w.calls, "vehicle_location_observations", "insert").length, 0);
+});
+
+Deno.test("place: a sanitized page (0,0, ZZ, 00000) has only a town, so no location row is written", async () => {
+  equal(placeObservationRow(VEHICLE, URL1, classic(), "observation-1"), null);
+  const w = world();
+  const landing = await landCraigslistCapture({ supabase: w.client, writeObservation },
+    { vehicleId: VEHICLE, listingUrl: URL1, capture: classic(), written: WRITTEN, isNewVehicle: true });
+  equal(landing.place, undefined);
+  equal(w.calls.filter((c) => c.table === "vehicle_location_observations").length, 0);
 });
