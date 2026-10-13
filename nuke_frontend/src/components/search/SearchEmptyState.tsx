@@ -217,6 +217,7 @@ function VehicleGrid({ title, vehicles }: {
             showPriceChange={false}
             showPriceOverlay={true}
             showDetailOverlay={true}
+            showGrade={false}
             infoDense={true}
             thumbnailFit="contain"
           />
