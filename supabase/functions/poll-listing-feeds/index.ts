@@ -19,10 +19,9 @@
  *   - search_criteria.fetch_strategy = "firecrawl_html": Craigslist killed RSS,
  *     so the search page is fetched as curated HTML, listing detail URLs are
  *     extracted from the HTML/markdown, and unknown ones are POSTed to the
- *     `ingest` edge function (capped per poll). Firecrawl is tried first, but
- *     Firecrawl refuses craigslist.org outright (HTTP 403 "we do not support
- *     this site"), so on failure we fall back to a direct archiveFetch -- the
- *     static search page carries a full page of /view/d/ share links (verified
+ *     `ingest` edge function (capped per poll). Craigslist uses one identified
+ *     public request through archiveFetch, without a paid renderer or
+ *     immediate access-denial retries. The static search page carries a full page of /view/d/ share links (verified
  *     2026-07-01). Failures are ALWAYS written to the feed row
  *     (last_error / error_count) -- a silent 0 is a lie.
  */
@@ -30,6 +29,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
@@ -518,7 +518,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
 }
 
 /**
- * Poll one firecrawl_html feed: Firecrawl-fetch the search page, extract
+ * Poll one firecrawl_html feed: acquire the search page, extract
  * listing URLs, ingest unknown ones (capped), and write honest bookkeeping
  * to the feed row. Never throws; every failure lands in last_error.
  */
@@ -563,11 +563,8 @@ async function pollFirecrawlHtmlFeed(
   //    through `ingest`. Bypasses import_queue entirely: nothing drains that
   //    queue (cron 420 off) and refilling it is the 2026-07-01 editorial-slop
   //    landmine.
-  //  - firecrawl_html (default): Firecrawl first (renders JS when it works),
-  //    but Firecrawl refuses craigslist.org at the API level (403 "we do not
-  //    support this site"), so fall back to a direct fetch through
-  //    archiveFetch -- the static page carries a full page of /view/d/ share
-  //    links (verified 2026-07-01), and the snapshot is archived as a bonus.
+  //  - firecrawl_html (default): Craigslist uses the archived public direct
+  //    request only. Other sources retain their configured renderer/fallback.
   let urls: string[] = [];
   let blockNote = "";
 
@@ -603,72 +600,78 @@ async function pollFirecrawlHtmlFeed(
     let markdown: string | null = null;
     const fetchErrors: string[] = [];
 
-    // Server-rendered sources (KSL, Hagerty, ClassicCars) carry their listing
-    // links in plain HTML — fetching them through Firecrawl works but spends
-    // credits for nothing. prefer_direct_fetch=true tries the free direct
-    // fetch first; Firecrawl below remains the fallback either way.
-    if (feed.search_criteria?.prefer_direct_fetch === true) {
-      try {
-        const direct = await archiveFetch(feed.feed_url, {
-          platform: feed.source_slug || "unknown",
-          skipCache: true,
-          useFirecrawl: false,
-          includeMarkdown: false,
-          callerName: "poll-listing-feeds",
-        });
-        html = direct.html;
-        if (!html && direct.error)
-          fetchErrors.push(`direct-first: ${direct.error}`);
-      } catch (err: any) {
-        fetchErrors.push(`direct-first: ${err?.message || String(err)}`);
-      }
-    }
-
-    if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
-      try {
-        const scrape = await firecrawlScrape({
-          url: feed.feed_url,
-          formats: ["html", "markdown"],
-          onlyMainContent: false,
-          // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
-          // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
-          // are per-feed config, not code.
-          waitFor: feed.search_criteria?.firecrawl_wait_for ?? 3000,
-          timeout: 30000,
-          ...(feed.search_criteria?.firecrawl_proxy
-            ? { proxy: feed.search_criteria.firecrawl_proxy }
-            : {}),
-        });
-        html = scrape.data.html;
-        markdown = scrape.data.markdown;
-        if (scrape.blocked) {
-          blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
-        }
-        if (!html && !markdown) {
-          fetchErrors.push(
-            `firecrawl: ${scrape.error || `HTTP ${scrape.httpStatus}, empty payload`}`
-          );
-        }
-      } catch (err: any) {
-        fetchErrors.push(`firecrawl: ${err?.message || String(err)}`);
-      }
+    if (feed.source_slug === "craigslist") {
+      const direct = await fetchCraigslistFeed(feed.feed_url, archiveFetch);
+      if (!direct.html) return await failFeed(`fetch_failed: ${direct.error}`);
+      html = direct.html;
     } else {
-      fetchErrors.push("firecrawl: FIRECRAWL_API_KEY missing");
-    }
+      // Server-rendered sources (KSL, Hagerty, ClassicCars) carry their listing
+      // links in plain HTML — fetching them through Firecrawl works but spends
+      // credits for nothing. prefer_direct_fetch=true tries the free direct
+      // fetch first; Firecrawl below remains the fallback either way.
+      if (feed.search_criteria?.prefer_direct_fetch === true) {
+        try {
+          const direct = await archiveFetch(feed.feed_url, {
+            platform: feed.source_slug || "unknown",
+            skipCache: true,
+            useFirecrawl: false,
+            includeMarkdown: false,
+            callerName: "poll-listing-feeds",
+          });
+          html = direct.html;
+          if (!html && direct.error)
+            fetchErrors.push(`direct-first: ${direct.error}`);
+        } catch (err: any) {
+          fetchErrors.push(`direct-first: ${err?.message || String(err)}`);
+        }
+      }
 
-    if (!html && !markdown) {
-      try {
-        const direct = await archiveFetch(feed.feed_url, {
-          platform: feed.source_slug || "craigslist",
-          skipCache: true, // hourly poll needs a fresh page, not yesterday's
-          useFirecrawl: false,
-          includeMarkdown: false,
-          callerName: "poll-listing-feeds",
-        });
-        html = direct.html;
-        if (!html && direct.error) fetchErrors.push(`direct: ${direct.error}`);
-      } catch (err: any) {
-        fetchErrors.push(`direct: ${err?.message || String(err)}`);
+      if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+        try {
+          const scrape = await firecrawlScrape({
+            url: feed.feed_url,
+            formats: ["html", "markdown"],
+            onlyMainContent: false,
+            // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
+            // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
+            // are per-feed config, not code.
+            waitFor: feed.search_criteria?.firecrawl_wait_for ?? 3000,
+            timeout: 30000,
+            ...(feed.search_criteria?.firecrawl_proxy
+              ? { proxy: feed.search_criteria.firecrawl_proxy }
+              : {}),
+          });
+          html = scrape.data.html;
+          markdown = scrape.data.markdown;
+          if (scrape.blocked) {
+            blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
+          }
+          if (!html && !markdown) {
+            fetchErrors.push(
+              `firecrawl: ${scrape.error || `HTTP ${scrape.httpStatus}, empty payload`}`
+            );
+          }
+        } catch (err: any) {
+          fetchErrors.push(`firecrawl: ${err?.message || String(err)}`);
+        }
+      } else {
+        fetchErrors.push("firecrawl: FIRECRAWL_API_KEY missing");
+      }
+
+      if (!html && !markdown) {
+        try {
+          const direct = await archiveFetch(feed.feed_url, {
+            platform: feed.source_slug || "craigslist",
+            skipCache: true, // hourly poll needs a fresh page, not yesterday's
+            useFirecrawl: false,
+            includeMarkdown: false,
+            callerName: "poll-listing-feeds",
+          });
+          html = direct.html;
+          if (!html && direct.error) fetchErrors.push(`direct: ${direct.error}`);
+        } catch (err: any) {
+          fetchErrors.push(`direct: ${err?.message || String(err)}`);
+        }
       }
     }
 

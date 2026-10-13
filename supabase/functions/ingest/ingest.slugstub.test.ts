@@ -22,6 +22,7 @@ interface Seen {
 
 let seen: Seen[] = [];
 let persistedVehicle: Record<string, unknown> | null = null;
+let publicPage: ((req: Request) => Response) | null = null;
 let extractor: (name: string, body: Record<string, unknown>) => Response = () => json({ error: "no extractor stubbed" }, 500);
 
 function json(body: unknown, status = 200): Response {
@@ -36,6 +37,10 @@ function json(body: unknown, status = 200): Response {
   const body = isRead ? null : await req.clone().text();
   seen.push({ method: req.method, url: req.url, path: url.pathname, body });
 
+  if (url.hostname === "craigslist.org" || url.hostname.endsWith(".craigslist.org")) {
+    if (!publicPage) throw new Error("unexpected public source request");
+    return publicPage(req);
+  }
   if (url.pathname.startsWith("/functions/v1/")) {
     const name = url.pathname.slice("/functions/v1/".length);
     return extractor(name, body ? JSON.parse(body) : {});
@@ -269,5 +274,68 @@ Deno.test({
         equal(body.action, name === 'extract-rmsothebys' ? 'extract' : undefined);
       } finally { persistedVehicle = null; }
     }
+  },
+});
+
+
+for (const statusCode of [403, 429]) {
+  Deno.test({
+    name: `Craigslist share HTTP ${statusCode} stops after one identified fetch and never calls an extractor or creates a vehicle`,
+    sanitizeOps: false, sanitizeResources: false,
+    fn: async () => {
+      publicPage = (req) => {
+        equal(req.headers.get("user-agent"), "NukeListingCollector/1.0 (+https://nuke.ag)");
+        return new Response("denied", { status: statusCode });
+      };
+      try {
+        const { result } = await ingest({ url: "https://www.craigslist.org/view/d/car/token" });
+        equal(result.status, "rejected");
+        equal(result.reason, `enrichment_failed: HTTP ${statusCode}`);
+        equal(result.enrichment_error, `HTTP ${statusCode}`);
+        equal(seen.filter(r => {
+          const host = new URL(r.url).hostname;
+          return host === "craigslist.org" || host.endsWith(".craigslist.org");
+        }).length, 1);
+        equal(extractorCalls(), []);
+        equal(vehicleInserts(), []);
+        // The failed original request is archived as a failure, not a capture ACK.
+        const raw = writes().filter(r => r.path === "/rest/v1/listing_page_snapshots");
+        equal(raw.length, 1);
+        equal(JSON.parse(raw[0].body!).success, false);
+      } finally { publicPage = null; }
+    },
+  });
+  Deno.test({
+    name: `Craigslist detail HTTP ${statusCode} uses only the deterministic extractor and returns a ledgerable failure`,
+    sanitizeOps: false, sanitizeResources: false,
+    fn: async () => {
+      extractor = (name, body) => {
+        equal(body.save_to_db, false);
+        equal(name, "extract-craigslist");
+        return json({ success: false, error: `Failed to fetch: HTTP ${statusCode}` }, 500);
+      };
+      const { result } = await ingest({ url: "https://lasvegas.craigslist.org/cto/d/1969-chevrolet-camaro/1234567890.html" });
+      equal(result.status, "rejected");
+      assert(result.reason.startsWith("enrichment_failed:"), "failure goes to the existing ledger/backoff");
+      assert(result.enrichment_error.includes(`HTTP ${statusCode}`), "access/rate disposition retained");
+      equal(extractorCalls(), ["extract-craigslist"]);
+      equal(writes(), []);
+    },
+  });
+}
+
+Deno.test({
+  name: "Craigslist successful detail extraction lands through the existing deterministic path",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    extractor = (name, body) => {
+      equal(body.save_to_db, false);
+      equal(name, "extract-craigslist");
+      return json({ success: true, extracted: SUCCESS_BODY.data });
+    };
+    const { result } = await ingest({ url: "https://lasvegas.craigslist.org/cto/d/1993-chevrolet-corvette/1234567890.html" });
+    equal(result.status, "created");
+    equal(extractorCalls(), ["extract-craigslist"]);
+    equal(vehicleInserts().length, 1);
   },
 });

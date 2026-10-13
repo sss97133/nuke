@@ -8,6 +8,7 @@ import vm from 'node:vm';
 import { test } from 'node:test';
 import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
+import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
@@ -21,7 +22,7 @@ vm.runInNewContext(compile(readFileSync(new URL('../supabase/functions/_shared/e
 export function fixture(options = {}) {
   const feed = { id: '00000000-0000-4000-8000-000000000001', source_slug: 'bat', display_name: 'Synthetic feed',
     feed_url: 'https://source.invalid/feed', enabled: true, poll_interval_minutes: 60,
-    search_criteria: { fetch_strategy: 'rss_direct_ingest' } };
+    search_criteria: { fetch_strategy: 'rss_direct_ingest' }, ...options.feed };
   const vehicleId = '00000000-0000-4000-8000-000000000002';
   const ledgerId = '00000000-0000-4000-8000-000000000003';
   const calls = [], stored = new Map(); let serve, patchCount = 0;
@@ -68,11 +69,12 @@ export function fixture(options = {}) {
       if (name.includes('supabase-js')) return { createClient: () => db };
       if (name.endsWith('/ledger.ts')) return ledger;
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
+      if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
-      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: () => { throw new Error('unexpected acquisition'); } };
+      if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }) };
       if (name.endsWith('/firecrawl.ts')) return { firecrawlScrape: () => { throw new Error('unexpected paid provider'); } };
       throw new Error(`Unexpected feed import ${name}`);
     },
@@ -153,3 +155,31 @@ test('partial progress keeps completed targets and names unattempted selected ta
   assert.equal(deferred.unattempted_targets, 1); assert.equal(deferred.unfinished_started_targets, 0);
   assert.equal(deferred.reasons[0], 'worker_deadline'); assert.equal(final.metadata.target_scope_complete, false);
 });
+
+for (const status of [403, 429]) {
+  test(`real CL feed handler retains HTTP ${status} failure, no ingest/capture ACK and existing backoff`, async () => {
+    const archived = [];
+    const f = fixture({ feed: { source_slug: 'craigslist',
+      search_criteria: { fetch_strategy: 'firecrawl_html' } },
+      archive: async (url, policy) => { archived.push({ url, policy });
+        return { html: null, error: `HTTP ${status}`, statusCode: status }; },
+    });
+    const result = await f.request();
+    assert.equal(result.status, 200); // completed dispatch, failed source target
+    assert.equal(archived.length, 1);
+    assert.equal(archived[0].policy.useFirecrawl, false);
+    assert.deepEqual(archived[0].policy.directFetchOptions, { publicOnly: true });
+    assert.equal(result.body.total_items_found, 0);
+    assert.equal(f.calls.filter(c => c.path === '/functions/v1/ingest').length, 0);
+    assert.equal(f.calls.filter(c => c.path === '/rest/v1/import_queue' && c.method === 'POST').length, 0);
+    const failure = f.calls.find(c => c.path === '/rest/v1/listing_feeds' && c.body?.last_error);
+    assert.equal(failure.body.last_error, `fetch_failed: direct: HTTP ${status}`);
+    assert.equal(failure.body.error_count, 1);
+    const target = f.stored.get(result.body.receipt_id).metadata.targets[0];
+    assert.equal(target.state, 'failed');
+    assert.equal(target.counts.discovered_items, 0);
+    assert.equal(target.counts.landed_ledger_acknowledged, 0);
+    assert.deepEqual(ledger.selectIntakeFeeds([{ ...f.feed, ...failure.body }], 1,
+      ledger.intakeThrottle(), Date.parse(failure.body.last_polled_at) + 15 * 60_000), []);
+  });
+}

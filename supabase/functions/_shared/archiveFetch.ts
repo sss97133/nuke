@@ -15,7 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { fetchBatPage, type FetchOptions as BatFetchOptions, type FetchResult as BatFetchResult, logFetchCost, isLoginPage } from "./batFetcher.ts";
-import { fetchPage } from "./hybridFetcher.ts";
+import { fetchPage, type FetchOptions as DirectFetchOptions } from "./hybridFetcher.ts";
 import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 import { parseQualifiedBaTSale } from "./batParser.ts";
 
@@ -51,6 +51,8 @@ export interface ArchiveFetchOptions {
   metadata?: Record<string, unknown>;
   /** BaT-specific fetch options */
   batOptions?: BatFetchOptions;
+  /** Explicit caller policy for the generic direct fetch. */
+  directFetchOptions?: DirectFetchOptions;
   /** Calling function name (for cost logging) */
   callerName?: string;
 }
@@ -318,7 +320,7 @@ export async function archiveFetch(
     }).catch(() => {});
   } else {
     // Generic direct fetch with retries
-    const directResult = await fetchPage(url);
+    const directResult = await fetchPage(url, options?.directFetchOptions);
     result.html = directResult.html;
     result.source = directResult.source as "direct" | "proxy";
     result.statusCode = directResult.statusCode ?? null;

@@ -253,20 +253,23 @@ const CRAIGSLIST_SHARE_RE = /(?:www\.)?craigslist\.org\/view\/d\//;
  * A www.craigslist.org/view/d/... share link hides the real listing.
  * Fetch the page (archived to listing_page_snapshots) and pull the canonical
  * regional URL (e.g. lasvegas.craigslist.org/cto/d/.../7944399929.html) out
- * of the body/JSON. Returns null if it can't be resolved (expired/blocked).
+ * of the body/JSON. Retains the failure when it cannot be resolved (expired/blocked).
  */
-async function resolveCraigslistShareUrl(shareUrl: string): Promise<string | null> {
+async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: string | null; error: string | null }> {
   try {
-    const { html } = await archiveFetch(shareUrl, {
+    const result = await archiveFetch(shareUrl, {
       platform: "craigslist",
       callerName: "ingest",
+      useFirecrawl: false,
+      directFetchOptions: { publicOnly: true },
       maxAgeSec: 86400,
     });
-    if (!html) return null;
-    return extractCraigslistCanonicalUrls(html)[0]?.url ?? null;
+    const url = result.html ? extractCraigslistCanonicalUrls(result.html)[0]?.url ?? null : null;
+    return { url, error: url ? null : result.error || "Craigslist share page has no canonical listing URL" };
   } catch (e) {
-    console.error(`Craigslist share resolution failed for ${shareUrl}:`, e instanceof Error ? e.message : String(e));
-    return null;
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`Craigslist share resolution failed for ${shareUrl}:`, error);
+    return { url: null, error };
   }
 }
 
@@ -1071,6 +1074,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 
   // Map platform to extractor edge function
   const extractors: Record<string, string> = {
+    craigslist: "extract-craigslist", // deterministic; no generic AI retry after an access denial
     cars_and_bids: "extract-cars-and-bids-core",
     hagerty: "extract-hagerty-listing",
     pcarmarket: "import-pcarmarket-listing",
@@ -1096,7 +1100,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         "Authorization": `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url, save_to_db: true, ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
+      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
       signal: AbortSignal.timeout(75_000),
     });
 
@@ -1270,39 +1274,26 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let parsed: ParsedVehicle = { year: null, make: null, model: null };
     let listingUrl: string | null = input.url || null;
 
-    // True when identity resolution can't rely on Tier 2 URL-matching at
-    // all — currently: an unresolved Craigslist share URL. Passed into
-    // matchOrCreateVehicle so Tier 3 uses its lower confidence floor and
-    // still queues a reviewable merge_proposal instead of a fully silent
-    // duplicate vehicle.
-    let identityUncertain = false;
+    // Unresolved Craigslist share URLs now stop before identity resolution.
+    const identityUncertain = false;
 
     if (input.url) {
       const source = detectSource(input.url);
       platform = source.platform;
       externalId = source.externalId;
 
-      // Craigslist share links hide the real listing — resolve to the
-      // canonical regional URL and use it everywhere (dedup, listing_url,
-      // enrichment). If resolution fails, keep the share URL; the platform
-      // is still recognized as craigslist. Retry once — Craigslist fetches
-      // are frequently transient-blocked (verified 2026-07-01/02), and a
-      // second attempt materially reduces how often we fall back to the
-      // uncertain-identity path below.
-      // Skipped in preview: resolution calls archiveFetch (external fetch +
-      // listing_page_snapshots insert) — preview must stay zero-fetch/zero-write.
-      // A CL share URL in preview simply yields no slug → caller falls back to
-      // manual entry.
+      // Resolve a Craigslist share link once. Failure returns to the intake
+      // ledger/backoff before detail enrichment; it must not retry the same
+      // denied page through another extractor. Preview stays zero-fetch/write.
       if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(input.url) && !isPreview) {
-        let canonical = await resolveCraigslistShareUrl(input.url);
-        if (!canonical) canonical = await resolveCraigslistShareUrl(input.url);
-        if (canonical) {
-          listingUrl = canonical;
-          const canonicalSource = detectSource(canonical);
-          if (canonicalSource.externalId) externalId = canonicalSource.externalId;
-        } else {
-          identityUncertain = true;
+        const resolution = await resolveCraigslistShareUrl(input.url);
+        if (!resolution.url) {
+          return { status: "rejected", reason: `enrichment_failed: ${resolution.error}`,
+            enrichment_error: resolution.error || undefined, source: platform, external_id: externalId };
         }
+        listingUrl = resolution.url;
+        const canonicalSource = detectSource(resolution.url);
+        if (canonicalSource.externalId) externalId = canonicalSource.externalId;
       }
     }
 
@@ -1443,6 +1434,14 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         enrichmentError = enrichResult.error;
         console.error(`Enrichment failed for ${listingUrl} (${platform}): ${enrichmentError}`);
       }
+    }
+
+    // Automated Craigslist intake must ledger a failed public detail request,
+    // not mint a vehicle from its URL slug or fall through to generic inference.
+    if (platform === "craigslist" && enrichmentError &&
+      (identityIsSlugGuess || (!input.year && !input.make && !input.model))) {
+      return { status: "rejected", reason: `enrichment_failed: ${enrichmentError}`,
+        enrichment_error: enrichmentError, source: platform, external_id: externalId };
     }
 
     // ── MINIMUM-VIABILITY GATE ──────────────────────────────────────
