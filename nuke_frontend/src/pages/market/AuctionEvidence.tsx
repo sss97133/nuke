@@ -55,16 +55,19 @@ export function AuctionCompetition({ vehicleId, sourceUrl, row = false, enabled 
   const r = reading;
   const last = r.states[r.states.length - 1];
   const coverage = `${r.held}/${r.reported ?? '?'} reported bids held`;
+  // The row's reading in four lines: the price, the competition, the pace, then the coverage that bounds them.
+  const ago = Math.max(0, Math.floor((Date.now() - last.bid.at) / 3_600_000)) >= 1
+    ? `${Math.floor((Date.now() - last.bid.at) / 3_600_000)}h ago` : `${Math.max(0, Math.floor((Date.now() - last.bid.at) / 60_000))}m ago`;
   if (row) return <>
     <span><Text role="label">Retained high</Text><Text role="measure" dense>{amount(r.high!)}</Text></span>
-    <Text role="caption" className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
-      {r.near! > 0 ? <><strong>{r.exact ? '' : '≥'}{r.near}</strong> within 10% of high</> : 'Near-high identities unresolved'}
+    <Text role="body" className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
+      <strong>{r.exact ? '' : '≥'}{r.bidders}</strong> bidders · {r.near! > 0 ? <><strong>{r.exact ? '' : '≥'}{r.near}</strong> within 10% of the high</> : 'near-high identities unresolved'}
     </Text>
-    <Text role="caption" className="market-lot-last-bid">{r.exact ? '' : '≥'}{r.bidders} bidders · {coverage}</Text>
-    {r.lastRaise != null && <Text role="caption" className="market-lot-last-bid">Last raise +{pct(r.lastRaise)}</Text>}
-    <time className="k-caption market-lot-last-bid" dateTime={new Date(last.bid.at).toISOString()}
-      title={stamp(new Date(last.bid.at).toISOString())}>Bid {Math.max(0, Math.floor((Date.now() - last.bid.at) / 3_600_000)) >= 1
-        ? `${Math.floor((Date.now() - last.bid.at) / 3_600_000)}h ago` : `${Math.max(0, Math.floor((Date.now() - last.bid.at) / 60_000))}m ago`}</time>
+    <Text role="caption" className="market-lot-last-bid">
+      <time dateTime={new Date(last.bid.at).toISOString()} title={stamp(new Date(last.bid.at).toISOString())}>Bid {ago}</time>
+      {r.lastRaise != null && <> · last raise +{pct(r.lastRaise)}</>}
+    </Text>
+    <Text role="caption" className="market-lot-last-bid market-lot-coverage">{coverage}</Text>
   </>;
   const state = replay == null ? last : r.states[Math.min(replay, r.states.length - 1)];
   const book = state.book.filter(e => e.identityId);

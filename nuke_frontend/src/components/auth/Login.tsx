@@ -248,7 +248,7 @@ const Login = () => {
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
-              <p className="text text-muted">Vehicle Provenance Engine</p>
+              <p className="text text-muted">An observational ledger for physical assets</p>
             </div>
 
             {/* Sign in / Sign up toggle */}

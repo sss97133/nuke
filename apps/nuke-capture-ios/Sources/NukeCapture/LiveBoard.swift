@@ -124,10 +124,14 @@ struct LiveBoard: Decodable {
     var syncedAtDate: Date? { ProfileClock.date(synced_at) }
     static let staleAfter: TimeInterval = 45 * 60
 
-    /// Lots still open at `now`, the web's count (`endsAt > now`); a lot that closed since the
-    /// last poll is not an open lot.
+    /// Lots still open at `now`, the web's count (`endsAt > now`): a lot that closed since the
+    /// last poll is not an open lot, and neither is one with no recorded end time (the web's
+    /// `Date.parse(null) > now` is false).
     func open(at now: Date) -> [LiveAuction] {
-        auctions.filter { ($0.endsAtDate ?? .distantFuture) > now }
+        auctions.filter { lot in
+            guard let end = lot.endsAtDate else { return false }
+            return end > now
+        }
     }
 
     /// The population line (fleet-relative reporting): how many open lots, the record clock

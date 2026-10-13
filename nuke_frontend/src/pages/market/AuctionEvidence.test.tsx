@@ -160,7 +160,7 @@ it('projects Stack A into the row and uses the same high for price and depth', a
   await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
   expect(container.textContent).toContain('Retained high$1,000');
   expect(container.textContent).toContain('2 within 10%');
-  expect(container.textContent).toContain('2 bidders · 3/3 reported bids held');
+  expect(container.textContent).toContain('2 bidders · 2 within 10% of the high'); expect(container.textContent).toContain('3/3 reported bids held');
   expect(container.textContent).not.toContain('800');
   expect(container.querySelector('a')).toBeNull();
   await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} />));

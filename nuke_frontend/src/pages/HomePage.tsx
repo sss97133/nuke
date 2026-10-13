@@ -1015,7 +1015,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <Text role="caption">
-              {fmtNum(totalCount)} {levelType === 'vehicles' ? 'vehicles' : 'vehicles with a recorded price'}{levelType === 'vehicles' ? '' : ' · median = the recorded sale or asking price'}{embedded ? ' · as of the last refresh of the ledger\u2019s views' : ''}
+              {fmtNum(totalCount)} {levelType === 'vehicles' ? 'vehicles' : 'vehicles with a recorded price'}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1198,7 +1198,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded price · click to go down'}
+          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded sale or asking price · click to go down'}{embedded ? ' · as of the last refresh of the ledger\u2019s views' : ''}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
