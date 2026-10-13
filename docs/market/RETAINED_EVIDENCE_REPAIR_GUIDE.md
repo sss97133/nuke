@@ -247,3 +247,107 @@ Repeat with identical parameters and an unaffected subject/cohort; compare the
 current result to its baseline. Retain private receipts and separate implemented,
 tested, merged, deployed and runtime-verified stages. This reader repair adds no
 semantic claims or modeled-fleet coverage; broader held-out accuracy remains open.
+
+## Prepared public search pagination repair, 2026-10-13
+
+**Prepared and locally tested; deployment and runtime remain unverified.**
+This repair establishes no new public-ready records or fleet coverage.
+The existing `search_vehicles_fts(text,integer,boolean,integer)` reader
+is the owner; no new production reader, table, count, grant or index is added.
+
+The cached live definition applies the same offset and full limit independently
+to exact-make and broader make/model branches. Its year-prefix branch can also
+return the same vehicle again through the broader match. In a synthetic fixture:
+
+| Request | Cached reader | Prepared repair |
+| --- | --- | --- |
+| 9 exact + 7 fallback candidates, limit 5 / offset 5 | 6 rows, skipping the first 5 fallback rows | Correct 5-row slice |
+| Same population, limit 5 / offset 10 | Empty despite remaining fallback candidates | Correct 5-row slice |
+| Year-prefix and broader-match overlap, limit 20 | 16 rows containing 6 duplicate IDs | 10 distinct candidates, highest matching branch priority |
+
+[The migration](../../supabase/migrations/20261013090000_search_vehicles_fts_single_offset.sql)
+carries one remaining offset and limit through bounded, ordered branch scans.
+Year matches retain relevance 0.98, exact make 0.95, and broader matches 0.9.
+Within each branch the existing order remains image presence, coalesced image
+count, coalesced BaT/general views, sale price descending with nulls last, year
+descending, then UUID. A full primary page returns before the broader query.
+Higher-priority year matches are excluded from the later branch. No total count
+is inferred from a returned page.
+
+The patch refuses definition drift from the cached SHA256
+`f77ef0a7a8512a87cf4bb11bcf4bb042958794566c8fcc6177f93277fd5bb7b3`, accepts an identical
+retry, and verifies the resulting definition. CREATE OR REPLACE retains the
+existing owner, ACL, security mode, settings and signature. Every branch also
+requires `deleted_at IS NULL` and excludes `listing_kind = 'non_vehicle_item'`,
+aligning search with the existing public vehicle-reader population. A null
+listing kind remains eligible. The cached reader exposed those otherwise public
+deleted/non-vehicle fixtures. Required identity fields and `is_auto_vehicle`
+remain, unless the caller explicitly selects non-auto mode; the production
+taxonomy classifier and its policy are unchanged.
+
+Run `bash scripts/test-search-reader-pagination.sh` with installed PostgreSQL
+(`PG_BINDIR` may select its binary directory). It creates and removes its own
+Unix-socket cluster, uses synthetic data, and cannot consume a production URL.
+The [SQL fixture](../../supabase/sql/test_search_vehicles_fts_pagination.sql)
+executes the exact cached definition and actual migration twice. PostgreSQL 17.9
+passed all offsets for page sizes 1, 2, 5 and 20 against hand-declared ID/relevance
+oracles; ordinary eligible first pages remain identical. Tests also cover private,
+deleted, non-vehicle and incomplete records, false/unknown auto decisions, anonymous execution, explicit
+non-auto mode, empty/NULL queries, zero/NULL limits, invalid offsets, unchanged
+catalog attributes and deployment refusal after definition drift. The same actual
+SQL fixture and drift check run in the existing CI database-contract job. The classifier
+is a declared fixture stand-in, not a test of the live classifier's taxonomy.
+
+A separate 12,001-candidate fixture (6,000 exact + 6,001 fallback) reconciles every
+ID with a 94-candidate first page, 100-candidate later pages and one-row lookahead,
+including an offset-10,000 oracle check. Installed `auto_explain` confirms that
+both baseline and patched full first pages execute only the exact branch: the
+same make-index scan over 6,000 rows and 95-row top-N sort. At offset 5,999 the
+patch consumes 6,000 exact candidates then 100 fallback candidates; the latter
+uses the fixture's sequential scan and top-N sort. No optional rank index is
+installed by the fixture; its simple make index models the existing access path.
+
+One local warm run with nested-plan logging took 2.118 ms before / 1.885 ms after
+for the full first page, and 11.373 ms for the boundary page. These are synthetic
+single-run diagnostics, not a production speedup, p95 or service objective.
+Production's previously observed estimate of roughly 42,171 public Porsche rows
+scanned and 19,594 eligible rows sorted is still an unresolved latency concern.
+Deep offsets still sort/visit preceding candidates and now decrement the offset
+in PL/pgSQL. Separate HTTP requests do not share a snapshot: concurrent eligibility
+or rank changes can still move records across pages.
+
+### Separate optional index proposal — not part of the migration
+
+The measured exact-make scan/sort suggests the following candidate for a separate
+authorized index review. It is not applied locally or to production and has no
+measured performance or storage claim:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_vehicles_public_make_search_rank
+ON public.vehicles (
+  make,
+  (primary_image_url IS NOT NULL) DESC,
+  (COALESCE(image_count, 0)) DESC,
+  (COALESCE(bat_view_count, view_count, 0)) DESC,
+  sale_price DESC NULLS LAST,
+  year DESC,
+  id
+)
+WHERE is_public = true
+  AND year IS NOT NULL AND make IS NOT NULL AND model IS NOT NULL;
+```
+
+It could serve the exact-make equality and current order without sorting the
+whole qualifying make. Auto classification remains a residual predicate; no
+immutability claim is made for that helper. This index would not resolve broad
+ILIKE or year-prefix scans. Image/view-count changes would update a wide index,
+so storage, write cost, existing index overlap and realistic before/after plans
+need separate review. The concurrent build also requires a suitable existing
+deployment path outside a transaction; the reader migration does not attempt it.
+
+Before any authorized delivery, refresh the live definition and permission
+receipt, review this guarded migration and run its fixture through applicable
+CI. After the existing migration deployment path, verify the exact definition,
+unchanged permissions, anonymous ordinary/private controls, boundary IDs and
+cold/warm latency using declared public requests. Keep production acceptance
+unverified until those checks pass; no fixture establishes population readiness.

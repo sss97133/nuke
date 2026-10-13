@@ -55,6 +55,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Verify exact-file migration recovery scope
         run: python3 scripts/test-dispatch-migration.py
+      - name: Verify ranked vehicle search pagination and public eligibility
+        run: |
+          createdb dm_refinement_search_pagination
+          psql -X -v ON_ERROR_STOP=1 -d dm_refinement_search_pagination -f supabase/sql/test_search_vehicles_fts_pagination.sql
+          psql -X -v ON_ERROR_STOP=1 -d dm_refinement_search_pagination -c 'ALTER FUNCTION public.search_vehicles_fts(text,integer,boolean,integer) COST 101'
+          if psql -X -v ON_ERROR_STOP=1 -d dm_refinement_search_pagination -f supabase/migrations/20261013090000_search_vehicles_fts_single_offset.sql > "$RUNNER_TEMP/search-reader-drift.log" 2>&1; then
+            echo 'Drifted search reader was unexpectedly replaced' >&2
+            exit 1
+          fi
+          grep -q 'Search reader owner drifted' "$RUNNER_TEMP/search-reader-drift.log"
       - name: Create disposable metric-fold assay database
         run: createdb dm_fold_assay_ci
       - name: Verify actual fold-health migration and operational failure contracts
