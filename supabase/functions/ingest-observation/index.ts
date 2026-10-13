@@ -354,15 +354,16 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       const sourceId = retainedInteriorSelector(input as unknown as Record<string, unknown>);
       if (!sourceId) return new Response(JSON.stringify({ error: "Expected only a retained source selector" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const parent = batchLookups?.get(`parent:${sourceId}`) ?? await supabase.from("vehicle_observations")
+      const read = (key: string, load: () => PromiseLike<any>) => batchLookups ? batchLookups.read(key, load) : load();
+      const parent = await read(`parent:${sourceId}`, () => supabase.from("vehicle_observations")
         .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,source_identifier,observed_at,ingested_at,extraction_method,confidence_score,structured_data,extraction_metadata,content_text")
-        .eq("id", sourceId).maybeSingle();
+        .eq("id", sourceId).maybeSingle());
       if (parent.error) throw new Error("Retained source unavailable");
       const row = parent.data;
       if (!row) return new Response(JSON.stringify({ error: "Retained source unavailable" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const vehicle = batchLookups?.get(`vehicle:${row.vehicle_id}`) ?? await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle();
-      const source = batchLookups?.get(`source-id:${row.source_id}`) ?? await supabase.from("observation_sources").select("id,slug,base_trust_score,supported_observations").eq("id", row.source_id).maybeSingle();
+      const vehicle = await read(`vehicle:${row.vehicle_id}`, () => supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind").eq("id", row.vehicle_id).maybeSingle());
+      const source = await read(`source-id:${row.source_id}`, () => supabase.from("observation_sources").select("id,slug,base_trust_score,supported_observations").eq("id", row.source_id).maybeSingle());
       if (vehicle.error || source.error) throw new Error("Retained source qualification unavailable");
       const derived = deriveRetainedInterior(row, vehicle.data, source.data, input.mode);
       if (!derived) return new Response(JSON.stringify({ error: "Retained source ineligible" }),

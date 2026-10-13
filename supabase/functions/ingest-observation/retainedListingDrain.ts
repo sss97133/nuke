@@ -25,8 +25,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
  * Admission and completion still prove current custody in Postgres. */
 export class RetainedBatchLookups {
   private rows = new Map<string, any>();
+  private inFlight = new Map<string, Promise<any>>();
   private bytes = 0;
+  private counts = { reads_started: 0, cache_hits: 0, in_flight_shares: 0 };
   get(key: string): any { return this.rows.get(key); }
+  /** Share only reads within this drain. Qualification still decides what may
+   * be retained; failed/missing/unqualified results never become cache entries.
+   * The original SDK request keeps its cancellation and five-second deadline. */
+  async read(key: string, load: () => PromiseLike<any>): Promise<any> {
+    const cached = this.get(key);
+    if (cached !== undefined) { this.counts.cache_hits++;return cached; }
+    const pending = this.inFlight.get(key);
+    if (pending) { this.counts.in_flight_shares++;return pending; }
+    this.counts.reads_started++;
+    const task = Promise.resolve().then(load);
+    this.inFlight.set(key, task);
+    try { return await task; }
+    finally { this.inFlight.delete(key); }
+  }
+  stats() { return { ...this.counts }; }
   remember(key: string, result: any): void {
     if (result?.error || !result?.data || this.rows.has(key) || this.rows.size >= 256) return;
     const size = new TextEncoder().encode(JSON.stringify(result.data)).length;
@@ -125,5 +142,5 @@ export async function drainRetainedListingProperties(
     while (next < rows.length) await process(rows[next++]);
   }));
   return json({ success: summary.completion_failures === 0, mode: RETAINED_LISTING_DRAIN_MODE,
-    ...summary, duration_ms: Date.now() - started });
+    ...summary, input_lookups: lookups.stats(), duration_ms: Date.now() - started });
 }

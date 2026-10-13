@@ -184,3 +184,44 @@ Deno.test("batch inputs omit failures and stop retaining rows at the byte/entry 
  assert(lookups.get("row:255").data.id===255 && lookups.get("row:256")===undefined);
  assert(new RetainedBatchLookups().get("row:0")===undefined);
 });
+
+Deno.test("overlapping input reads share work but only qualified results are retained", async () => {
+ const lookups = new RetainedBatchLookups();let reads = 0;
+ let release!: (value: any) => void;
+ const result = { data: { id: source }, error: null };
+ const load = () => { reads++;return new Promise(resolve => { release = resolve; }); };
+ const first = lookups.read("parent", load), second = lookups.read("parent", load);
+ const unrelated = await lookups.read("different-parent", async () => ({ data: { id: interior }, error: null }));
+ assert(reads === 1 && unrelated.data.id === interior);
+ release(result);
+ assert((await first) === result && (await second) === result);
+ assert(lookups.get("parent") === undefined); // Reading alone is not qualification.
+ lookups.remember("parent", result);
+ assert(await lookups.read("parent", load) === result && reads === 1);
+ assert(JSON.stringify(lookups.stats()) === JSON.stringify({ reads_started: 2, cache_hits: 1, in_flight_shares: 1 }));
+ assert(new RetainedBatchLookups().get("parent") === undefined);
+});
+
+Deno.test("missing, failed, cancelled and thrown shared reads can be retried", async () => {
+ for (const result of [{ data: null, error: null }, { data: null, error: { message: "private failure" } }]) {
+  const lookups = new RetainedBatchLookups();let reads = 0;
+  const load = async () => { reads++;return result; };
+  await Promise.all([lookups.read("parent", load), lookups.read("parent", load)]);
+  lookups.remember("parent", result);
+  await lookups.read("parent", load);
+  assert(reads === 2 && lookups.get("parent") === undefined);
+ }
+ for (const synchronous of [true, false]) {
+  const lookups = new RetainedBatchLookups();
+  const controller = new AbortController();
+  const load = () => {
+   if (synchronous) throw new Error("private failure");
+   return new Promise((_resolve, reject) => controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true }));
+  };
+  const pending = Promise.allSettled([lookups.read("parent", load), lookups.read("parent", load)]);
+  await Promise.resolve();controller.abort();
+  assert((await pending).every(result => result.status === "rejected"));
+  assert((await lookups.read("parent", async () => ({ data: { id: source }, error: null }))).data.id === source);
+  assert(lookups.stats().reads_started === 2 && lookups.stats().in_flight_shares === 1);
+ }
+});
