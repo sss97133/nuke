@@ -227,10 +227,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
-          {/* Worth Engine — 3-method labor substrate triangulation */}
-          <React.Suspense fallback={null}>
-            <WorthEngineCard vehicleId={vehicle.id} />
-          </React.Suspense>
+          {/* Worth Engine — 3-method labor substrate triangulation. Labor-cost proxies are the owner's
+              money (owner rule 2026-09-28: work costs owner-only), so anonymous readers do not get the card. */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <WorthEngineCard vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
 
           {/* Photo Authentication — EXIF chain of custody rollup */}
           <React.Suspense fallback={null}>
