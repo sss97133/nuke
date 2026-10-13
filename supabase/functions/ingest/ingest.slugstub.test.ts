@@ -7,6 +7,7 @@
 //
 // The stub is installed before `index.ts` is imported, because supabase-js binds the global fetch when the module
 // creates its client.
+import { extractFromHtml } from "../extract-craigslist/extract.ts";
 
 const SUPABASE_URL = "https://stub.supabase.test";
 const SERVICE_KEY = "test-service-role-key";
@@ -126,6 +127,106 @@ const SUCCESS_BODY = {
     description: "Two owners, recent service.", image_urls: ["https://images.example.test/listing/1/1.jpg"], vin: null,
   },
 };
+
+const SHARE_URL = "https://www.craigslist.org/view/d/fixture-1993-chevrolet-corvette/FixtureShareToken";
+const SHARE_HTML = `<html><head><link href="${SHARE_URL}" rel="canonical">
+<script type="application/ld+json" id="ld_posting_data">{"name":"1993 Chevrolet Corvette","offers":{"price":2345},"image":["https://images.example.test/fixture.jpg"]}</script></head><body>
+<div class="attrgroup"><div class="attr important"><span class="valu year">1993</span><span class="valu makemodel">chevrolet corvette</span></div>
+<div class="attr auto_transmission"><span class="labl">transmission:</span><span class="valu">manual</span></div></div>
+<section id="postingbody">Fixture listing description with retained source testimony.</section>
+<p class="postinginfo">post id: 1000000001</p><p class="postinginfo">posted: <time datetime="2024-01-02T03:04:05-0800">fixture date</time></p><!-- ${'fixture padding '.repeat(100)} --></body></html>`;
+
+Deno.test({
+  name: "Craigslist full canonical share keeps observed URL and native post id through existing intake",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    publicPage = () => new Response(SHARE_HTML);
+    extractor = (name, body) => {
+      equal(name, "extract-craigslist"); equal(body.url, SHARE_URL); equal(body.save_to_db, false);
+      return json({ success: true, extracted: extractFromHtml(SHARE_HTML, SHARE_URL) });
+    };
+    try {
+      const { result } = await ingest({ url: SHARE_URL });
+      equal(result.status, "created"); equal(result.external_id, "1000000001");
+      equal(result.listing_capture.post_id, "1000000001");
+      // The existing vehicle URL normalizer strips www; the observed share path stays intact.
+      equal(JSON.parse(vehicleInserts()[0].body!).listing_url, SHARE_URL.replace("www.", ""));
+      equal(extractorCalls(), ["extract-craigslist"]);
+      assert(!seen.some(r => new URL(r.url).hostname.endsWith("craigslist.org") && r.url !== SHARE_URL), "no manufactured regional source request");
+    } finally { publicPage = null; }
+  },
+});
+
+for (const [kind, html] of [
+  ["missing native id", SHARE_HTML.replace('<p class="postinginfo">post id: 1000000001</p>', '')],
+  ["foreign canonical", SHARE_HTML.replace(`href="${SHARE_URL}"`, 'href="https://outside.example/fixture"')],
+  ["expired shell with recommendation", `<link rel="canonical" href="${SHARE_URL}"><h1>Posting expired</h1><a href="https://sample.craigslist.org/cto/d/fixture/1000000002.html">Recommendation</a>${' '.repeat(1200)}`],
+] as const) {
+  Deno.test({
+    name: `Craigslist share ${kind} rejects before enrichment or vehicle creation`,
+    sanitizeOps: false, sanitizeResources: false,
+    fn: async () => {
+      publicPage = () => new Response(html);
+      try {
+        const { result } = await ingest({ url: SHARE_URL });
+        equal(result.status, "rejected"); equal(result.external_id, null);
+        assert(result.enrichment_error.includes(kind === "foreign canonical" ? "no canonical listing URL" : "lacks full listing evidence"), "resolver inspected the retained HTML");
+        equal(extractorCalls(), []); equal(vehicleInserts(), []);
+      } finally { publicPage = null; }
+    },
+  });
+}
+
+Deno.test({
+  name: "Craigslist share disagreement between source and extracted post ids rejects before vehicle creation",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    publicPage = () => new Response(SHARE_HTML);
+    extractor = () => json({ success: true, extracted: { ...extractFromHtml(SHARE_HTML, SHARE_URL), post_id: "1000000009" } });
+    try {
+      const { result } = await ingest({ url: SHARE_URL });
+      equal(result.status, "rejected"); equal(result.external_id, "1000000001");
+      assert(result.enrichment_error.includes("identity mismatch"), "disagreement stays explicit");
+      equal(vehicleInserts(), []);
+    } finally { publicPage = null; }
+  },
+});
+
+Deno.test({
+  name: "Craigslist legacy regional redirect still resolves its observed numeric post id",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const canonical = "https://sample.craigslist.org/cto/d/fixture-1993-chevrolet-corvette/1000000002.html";
+    publicPage = () => new Response(`<link rel="canonical" href="${canonical}">${' '.repeat(1200)}`);
+    extractor = (name, body) => { equal(name, "extract-craigslist"); equal(body.url, canonical); return json({ success: true, extracted: SUCCESS_BODY.data }); };
+    try {
+      const { result } = await ingest({ url: SHARE_URL });
+      equal(result.status, "created"); equal(result.external_id, "1000000002");
+      equal(JSON.parse(vehicleInserts()[0].body!).listing_url, canonical);
+    } finally { publicPage = null; }
+  },
+});
+
+Deno.test({
+  name: "Craigslist-looking foreign targets reject without a source request",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const { result } = await ingest({ url: `https://outside.example/?next=${SHARE_URL}` });
+    equal(result.status, "rejected"); equal(result.enrichment_error, "Invalid Craigslist share URL");
+    equal(extractorCalls(), []); equal(writes(), []);
+    assert(!seen.some(r => !new URL(r.url).hostname.endsWith("supabase.test")), "no foreign or source fetch");
+  },
+});
+
+Deno.test({
+  name: "Craigslist preview never treats the opaque share token as a native post id or fetches",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const { result } = await ingest({ url: SHARE_URL, preview: true });
+    equal(result.status, "preview"); equal(result.external_id, null); equal(extractorCalls(), []); equal(writes(), []);
+    assert(!seen.some(r => new URL(r.url).hostname.endsWith("craigslist.org")), "preview stays source-read free");
+  },
+});
 
 // ── a slug-stub venue whose extractor failed is rejected, and nothing is written ──
 

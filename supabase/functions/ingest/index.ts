@@ -28,6 +28,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
 import { slugStubRejection } from "./slugStub.ts";
+import { extractFromHtml } from "../extract-craigslist/extract.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -74,11 +75,10 @@ const SOURCE_PATTERNS: Array<{
   },
   {
     // Craigslist share links: https://www.craigslist.org/view/d/{slug}/{token}
-    // The token is an opaque share id, not the listing id — resolve to the
-    // canonical regional URL via resolveCraigslistShareUrl() before use.
+    // The token is opaque. Only the fetched page can establish a native post id.
     platform: "craigslist",
     pattern: /(?:www\.)?craigslist\.org\/view\/d\/[\w-]+\/(\w+)/,
-    extractId: (m) => m[1],
+    extractId: () => null,
   },
   {
     platform: "ebay_motors",
@@ -250,13 +250,17 @@ function detectSource(url: string): SourceMatch {
 const CRAIGSLIST_SHARE_RE = /(?:www\.)?craigslist\.org\/view\/d\//;
 
 /**
- * A www.craigslist.org/view/d/... share link hides the real listing.
- * Fetch the page (archived to listing_page_snapshots) and pull the canonical
- * regional URL (e.g. lasvegas.craigslist.org/cto/d/.../7944399929.html) out
- * of the body/JSON. Retains the failure when it cannot be resolved (expired/blocked).
+ * A share URL can itself be the canonical full detail page. Validate that
+ * declaration and read its native post id with the existing detail parser.
+ * Legacy redirect pages still resolve their observed regional listing URL.
+ * Never manufacture a regional URL or treat the share token as a post id.
  */
-async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: string | null; error: string | null }> {
+async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: string | null; postId: string | null; error: string | null }> {
   try {
+    const requested = new URL(shareUrl);
+    if (requested.protocol !== "https:" || !["www.craigslist.org", "craigslist.org"].includes(requested.hostname) || requested.username || requested.password || requested.port || !/^\/view\/d\/[^/]+\/[\w-]+\/?$/.test(requested.pathname)) {
+      return { url: null, postId: null, error: "Invalid Craigslist share URL" };
+    }
     const result = await archiveFetch(shareUrl, {
       platform: "craigslist",
       callerName: "ingest",
@@ -264,12 +268,21 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
       directFetchOptions: { publicOnly: true },
       maxAgeSec: 86400,
     });
-    const url = result.html ? extractCraigslistCanonicalUrls(result.html)[0]?.url ?? null : null;
-    return { url, error: url ? null : result.error || "Craigslist share page has no canonical listing URL" };
+    const html = result.html ?? "";
+    const canonicalTag = html.match(/<link\b[^>]*\brel\s*=\s*["'][^"']*\bcanonical\b[^"']*["'][^>]*>/i)?.[0];
+    const canonical = canonicalTag?.match(/\bhref\s*=\s*(["'])([^"']+)\1/i)?.[2];
+    if (canonical === requested.href) {
+      const detail = extractFromHtml(html, shareUrl);
+      if (detail.post_id && detail.title && detail.description) return { url: shareUrl, postId: detail.post_id, error: null };
+      // A self-canonical shell/expired page cannot borrow a recommendation's identity.
+      return { url: null, postId: null, error: "Craigslist canonical share page lacks full listing evidence" };
+    }
+    const target = extractCraigslistCanonicalUrls(canonical ?? html)[0];
+    return { url: target?.url ?? null, postId: target?.id ?? null, error: target ? null : result.error || "Craigslist share page has no canonical listing URL" };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     console.error(`Craigslist share resolution failed for ${shareUrl}:`, error);
-    return { url: null, error };
+    return { url: null, postId: null, error };
   }
 }
 
@@ -1292,8 +1305,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
             enrichment_error: resolution.error || undefined, source: platform, external_id: externalId };
         }
         listingUrl = resolution.url;
-        const canonicalSource = detectSource(resolution.url);
-        if (canonicalSource.externalId) externalId = canonicalSource.externalId;
+        externalId = resolution.postId;
       }
     }
 
@@ -1388,6 +1400,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(listingUrl) && enriched.capture?.post_id !== externalId) {
+          return { status: "rejected", reason: "enrichment_failed: Craigslist share detail post identity mismatch",
+            enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
+        }
         extractorVehicleId = enriched.vehicle_id;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
