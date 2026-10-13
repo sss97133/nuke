@@ -162,7 +162,7 @@ struct ProfileTab: View {
         NavigationStack {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil)
+                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil, onSignIn: onSignIn)
                 } else if searchError && results.isEmpty {
                     // The search request failed — never read as "no such handle".
                     ContentUnavailableView {
@@ -260,6 +260,15 @@ struct ProfileView: View {
     @State private var unresolvedGarageSources: [GarageUnresolvedSource] = []
     @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var garageError = false        // a FAILED load must never read as "no vehicles"
+    /// The user readers (get_user_garage, get_user_understanding, get_user_producer_signals,
+    /// the calendar) are EXECUTE authenticated only: a stranger, or a session whose token
+    /// lapsed, gets 42501 from each. That is one permission state, said once, never three
+    /// "connection dropped" cards (2026-10-13, the Profile tab as anon).
+    @State private var signInNeeded = false
+    var onSignIn: (() -> Void)? = nil
+    private static func isPermissionDenied(_ error: Error) -> Bool {
+        (error as? PostgrestError)?.code == "42501"
+    }
     // Offline fallback (LocalStore garage_vehicle mirror, write-through cache of
     // get_user_garage). When the live call fails, we render the last-cached rows
     // instead of the error card — but the UI must say so, never pretend it's live.
@@ -316,6 +325,27 @@ struct ProfileView: View {
                     BarcodeTimeline(days: days) { day in receiptDay = day }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
+                }
+            }
+
+            // The user readers refused this viewer: one card with the door, in place of the
+            // garage, calendar and latest-work sections it would have filled.
+            if signInNeeded {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Sign in to see the garage, calendar and latest work", systemImage: "person.crop.circle.badge.questionmark")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.primary)
+                        Text("These readers answer only a signed-in viewer; the public record of each vehicle is open from Explore.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let onSignIn {
+                            Button("Sign in") { onSignIn() }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
             }
 
@@ -481,6 +511,7 @@ struct ProfileView: View {
                 .value
             latest = u.latest
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; return }
             latestError = true
             NSLog("NukeCapture profile latest work failed: %@", String(describing: error))
         }
@@ -494,6 +525,7 @@ struct ProfileView: View {
                 .execute()
                 .value
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; return }
             NSLog("NukeCapture producer signals failed: %@", String(describing: error))
         }
     }
@@ -806,6 +838,7 @@ struct ProfileView: View {
             }
             if isOwn { await loadPhotoEvidence() }
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; garageError = false; return }
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
             unresolvedGarageSources = isOwn && SupabaseService.currentUserId == userId.lowercased()
                 ? ((try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []) : []
@@ -1042,6 +1075,7 @@ struct ProfileView: View {
             }
             loadError = nil
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; return }
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
