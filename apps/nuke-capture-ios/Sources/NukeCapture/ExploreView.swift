@@ -88,10 +88,11 @@ struct ExploreView: View {
         // Screenshot loop: NUKE_DEBUG_EXPLORE_MODE=pulse roots straight on the treemap
         // (matches the NUKE_DEBUG_* deep-link pattern; DEBUG only, never ships).
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "pulse" { return .treemap }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "live" { return .live }
         #endif
         return .map
     }()
-    enum LandingMode: Hashable { case metros, treemap, map }
+    enum LandingMode: Hashable { case metros, treemap, map, live }
 
     // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -238,6 +239,8 @@ struct ExploreView: View {
                 case .metros:  metroList
                 case .map:     MarketMapView(query: $query)
                 case .treemap: MarketTreemapView()
+                // The open board from market_pulse_live, the reader the web Market tab stands on.
+                case .live:    LiveBoardView().padding(.top, 52)
                 }
             }
             // Two lenses on one market: the Map (geography) and the Pulse (a treemap
@@ -246,6 +249,7 @@ struct ExploreView: View {
             Picker("View", selection: $landingMode) {
                 Text("Map").tag(LandingMode.map)
                 Text("Pulse").tag(LandingMode.treemap)
+                Text("Live").tag(LandingMode.live)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 10)

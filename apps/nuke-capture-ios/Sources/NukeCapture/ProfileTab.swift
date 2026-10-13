@@ -554,7 +554,14 @@ struct ProfileView: View {
                     if let hy = p.hours_year, hy > 0 { stat("\(hy)h", "this year") }
                     if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
                     if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
-                    if let an = p.images_analyzed, an > 0 { stat(an.formatted(), "analyzed") }
+                    // A count with its population: analyzed frames out of the record's frames.
+                    if let an = p.images_analyzed, an > 0 {
+                        if let total = p.images_total, total > 0 {
+                            stat("\(an.formatted()) of \(total.formatted())", "analyzed")
+                        } else {
+                            stat(an.formatted(), "analyzed · total unknown")
+                        }
+                    }
                 }
             }
 
