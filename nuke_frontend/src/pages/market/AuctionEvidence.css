@@ -177,6 +177,12 @@
 .market-range__tick { fill: var(--text-secondary); }
 .market-range__now { fill: var(--text); }
 .market-range__verdict { color: var(--text); }
+.market-heat { position: relative; display: inline-flex; flex-direction: column; margin-top: 3px; }
+.market-heat__tag { all: unset; cursor: pointer; display: inline-block; padding: 1px 4px; }
+.market-heat__tag--hot { background: var(--success); }
+.market-heat__tag--cold { background: var(--error); }
+.market-heat__tag .k-label { color: var(--bg); }
+.market-heat__tag:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .market-countdown { color: var(--text-secondary); }
 .market-countdown--soon { color: var(--text); }
 .market-thumb { width: 72px; height: 48px; object-fit: cover; flex-shrink: 0; background: var(--surface); }

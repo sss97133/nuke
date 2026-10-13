@@ -342,15 +342,25 @@ describe('market answer -> supporting lots', () => {
     await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
     expect(container.textContent).toContain('1 of 1 lots have a recorded bid number');
   });
-  it('withholds monetary heat and histories without comparable source units', async () => {
+  it('tags a priced lot hot or cold against its comps and explains the reading with its track record', async () => {
     fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
     fixture.pulse.data.auctions[0].band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' };
-    fixture.pulse.data.weekAgo = { bids: 12345, byMake: {}, n: 10, day: '2026-09-26', source: 'live' };
-    await render('make=PORSCHE&live=hot&sort=hottest');
-    expect(container.textContent).not.toMatch(/Running hot|Running cold|vs last week|Current bid per auction|Median current bid/);
-    expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
-    await click('All captured makes');
-    expect(container.textContent).toContain('Box size = number of open lots');
+    await render('make=PORSCHE');
+    expect(button('Running hot').textContent).toContain('1');
+    expect([...container.querySelectorAll('button')].some(b => b.textContent?.startsWith('Running cold'))).toBe(false);
+    const tag = container.querySelector('[data-vehicle-id="later"] .market-heat__tag')!;
+    expect(tag.textContent).toBe('Running hot · 3×+');
+    expect(tag.getAttribute('aria-label')).toBe('Why 2000 PORSCHE Local fixture is running hot');
+    await act(async () => (tag as HTMLButtonElement).click());
+    expect(document.body.textContent).toContain('Of sold cars running this hot 2 days out, 86% finished above the middle of their comparable sales.');
+    expect(document.body.textContent).toContain('100 on its BaT model page');
+    expect(document.body.textContent).toContain('$100–$1,000');
+    await click('Running hot');
+    expect(boardTitles()).toEqual(['later']);
+    await click('Hottest');
+    expect(window.location.search).toContain('sort=hottest');
+    await click('Running hot');
+    expect(container.querySelector('[data-vehicle-id="first"] .market-heat')).toBeNull();
   });
 });
 

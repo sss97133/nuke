@@ -2,12 +2,13 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { CoverageView, Masthead, Text } from '../../kit';
+import { CoverageView, Masthead, Row, Rows, Text } from '../../kit';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type HourReading, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BidCurve, type HourReading, type LiveAuction } from './useMarketPulse';
+import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -21,8 +22,8 @@ import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-type Window = 'all' | '1h' | '24h' | 'new' | 'nr';
-type Sort = 'ending' | 'bid' | 'newest';
+type Window = 'all' | '1h' | '24h' | 'new' | 'nr' | 'hot' | 'cold';
+type Sort = 'ending' | 'bid' | 'newest' | 'hottest' | 'coldest';
 
 const WINDOWS: { id: Window; label: string }[] = [
   { id: 'all', label: 'Live lots' },
@@ -30,6 +31,8 @@ const WINDOWS: { id: Window; label: string }[] = [
   { id: '24h', label: 'Ending < 24 h' },
   { id: 'new', label: 'First seen < 24 h' },
   { id: 'nr', label: 'No reserve' },
+  { id: 'hot', label: 'Running hot' },
+  { id: 'cold', label: 'Running cold' },
 ];
 
 // Current auctions appear in close order unless the viewer chooses another sort.
@@ -37,6 +40,8 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'bid', label: 'Highest bid' },
   { id: 'ending', label: 'Ending first' },
   { id: 'newest', label: 'First seen' },
+  { id: 'hottest', label: 'Hottest' },
+  { id: 'coldest', label: 'Coldest' },
 ];
 
 // Bids are US dollars: Bring a Trailer runs every auction in USD and reports the bid as a dollar amount.
@@ -218,6 +223,112 @@ function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Seri
   );
 }
 
+// ---- Hot / cold: the bid against where comparable sales usually sit at this point in the auction --------------
+// heat = current bid / (band middle x the share of the final price comparable cars are usually bid to with
+// this much time left). The band is the lot's expected-price range from comparable BaT sales on its model
+// page, weighted toward its own version (scripts/market/live-bands.mjs, model version 31); the curve is
+// measured on 36,700 sales (migration 20260927230000). Past 120 h the curve rests on thin, early data, so no verdict.
+export interface Heat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
+const HEAT_MAX_H = 120;
+const HOT = 1.25;
+const COLD = 0.8;
+
+function curveAt(curve: BidCurve, tier: string, hours: number): number | null {
+  const pts = curve[tier];
+  if (!pts || pts.length === 0) return null;
+  const h = Math.max(pts[pts.length - 1][0], Math.min(pts[0][0], hours));
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [h1, v1] = pts[i];
+    const [h2, v2] = pts[i + 1];
+    if (h <= h1 && h >= h2) return v1 + ((v2 - v1) * (h1 - h)) / (h1 - h2);
+  }
+  return pts[pts.length - 1][1];
+}
+
+export function heatOf(a: LiveAuction, curve: BidCurve | null, now: number): Heat | null {
+  if (!curve || !a.band || !a.currentBid || a.currentBid <= 0) return null;
+  const hoursLeft = (a.endsAt - now) / HOUR;
+  if (hoursLeft <= 0 || hoursLeft > HEAT_MAX_H) return null;
+  const share = curveAt(curve, a.band.tier, hoursLeft);
+  if (!share) return null;
+  const typicalNow = a.band.p50 * share;
+  const ratio = a.currentBid / typicalNow;
+  return { ratio, state: ratio >= HOT ? 'hot' : ratio <= COLD ? 'cold' : 'in line', typicalNow, share, hoursLeft };
+}
+
+// Backtest, 10,065 cars sold 2026-06-27..09-26, each priced only from sales before it: of the cars tagged hot at
+// this much time left, the share that finished above the middle of their comparable sales; of those tagged cold,
+// the share that finished below it. (In line: 46-49% above, i.e. no signal.)
+const BACKTEST: [number, string, number, number][] = [
+  [120, '5 days', 0.784, 0.781], [96, '4 days', 0.808, 0.797], [72, '3 days', 0.833, 0.809],
+  [48, '2 days', 0.855, 0.829], [24, 'a day', 0.884, 0.85], [12, '12 hours', 0.915, 0.876],
+];
+
+// Three significant figures: "about $166,000", not "$166,323".
+function about(n: number): number {
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(Math.max(n, 1))) - 2);
+  return Math.round(n / step) * step;
+}
+
+// Past 3x the multiple mostly says the comps don't describe the car (backtest: 77% of those sold above 90% of their
+// comps), so it is shown as 3x+ rather than as a precise number.
+function multiple(ratio: number): string {
+  return ratio >= 3 ? '3×+' : ratio < 0.1 ? '<0.1×' : `${ratio.toFixed(1)}×`;
+}
+
+function heatParts(a: LiveAuction, heat: Heat) {
+  const band = a.band as NonNullable<LiveAuction['band']>;
+  // Quote the checkpoint at or before this point in the auction (17 h left reads the 24 h record, not the 12 h one).
+  const [, when, hotAbove, coldBelow] = [...BACKTEST].reverse().find((row) => row[0] >= heat.hoursLeft) ?? BACKTEST[BACKTEST.length - 1];
+  return {
+    bid: bidNumber(a.currentBid),
+    left: left(heat.hoursLeft * HOUR),
+    comps: band.comps,
+    middle: bidNumber(band.p50),
+    range: `${bidNumber(band.p10)}–${bidNumber(band.p90)}`,
+    share: Math.round(heat.share * 100),
+    typical: bidNumber(about(heat.typicalNow)),
+    multiple: multiple(heat.ratio),
+    beyond: (a.currentBid ?? 0) > band.p90
+      ? 'The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
+      : null,
+    outcome: heat.state === 'hot'
+      ? `Of sold cars running this hot ${when} out, ${Math.round(hotAbove * 100)}% finished above the middle of their comparable sales.`
+      : heat.state === 'cold'
+        ? `Of sold cars running this cold ${when} out, ${Math.round(coldBelow * 100)}% finished below the middle of their comparable sales.`
+        : null,
+  };
+}
+
+// The tag on a row, and the reasoning behind it one tap away: the bid, the comps, their middle, the typical bid
+// at this point in the auction, the multiple, and how lots tagged this way finished before.
+function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat }) {
+  const [open, setOpen] = useState(false);
+  const boundary = useRef<HTMLSpanElement>(null);
+  if (heat.state === 'in line') return null;
+  const x = heatParts(a, heat);
+  const hot = heat.state === 'hot';
+  return (
+    <span ref={boundary} className="market-heat">
+      <button type="button" className={`market-heat__tag market-heat__tag--${heat.state}`} aria-haspopup="dialog" aria-expanded={open}
+        aria-label={`Why ${title(a)} is running ${heat.state}`} onClick={() => setOpen((v) => !v)}>
+        <Text role="label">{hot ? 'Running hot' : 'Running cold'} · {x.multiple}</Text>
+      </button>
+      <HeaderPopover open={open} title={`${hot ? 'Running hot' : 'Running cold'} · ${title(a)}`} width={360} align="left" dismissBoundaryRef={boundary} onClose={() => setOpen(false)}>
+        <Rows title="The reading">
+          <Row label="Current bid">{x.bid} · {x.left} left</Row>
+          <Row label="Comparable sales">{x.comps} on its BaT model page, weighted toward the same version, year, mileage and gearbox</Row>
+          <Row label="Their middle">{x.middle} (80% range {x.range})</Row>
+          <Row label="Typical bid now">about {x.typical}: with this much time left, cars at this price are usually bid to about {x.share}% of their final</Row>
+          <Row label="This bid" role="measure">{x.multiple} typical</Row>
+        </Rows>
+        {x.beyond && <Text role="body" as="p">{x.beyond}</Text>}
+        {x.outcome && <Text role="body" as="p"><Text role="label">Track record</Text> {x.outcome}</Text>}
+      </HeaderPopover>
+    </span>
+  );
+}
+
 function Thumb({ src }: { src: string | null }) {
   if (!src) return <div className="market-thumb" />;
   return <img className="market-thumb" src={src} alt="" width={72} height={48} loading="lazy" decoding="async" />;
@@ -255,8 +366,8 @@ function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] 
   return [ref, seen];
 }
 
-function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
-  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean;
+function BoardRow({ a, risen, stale, detail, expanded, heat, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; heat: Heat | null;
   onInspect: (a: LiveAuction, view: LotInspection) => void;
 }) {
   const [rowRef, seen] = useSeen<HTMLDivElement>();
@@ -270,6 +381,7 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
       <div className="market-lot-close">
         <Text role="label">Closes in</Text>
         <Countdown endsAt={a.endsAt} />
+        {heat && <HeatTag a={a} heat={heat} />}
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
@@ -305,8 +417,8 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
 // document never grows past one page. A shared link to a lot opens the page that holds it.
 export const PAGE = 24;
 
-function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
-  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null;
+function Board({ rows, risenIds, stale, activityId, heats, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null; heats: Map<string, Heat | null>;
   inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
 }) {
@@ -325,7 +437,7 @@ function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onIns
         const expanded = a.id === activityId;
         return (
           <div key={a.id}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} onInspect={onInspect} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} heat={heats.get(a.id) ?? null} onInspect={onInspect} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -335,8 +447,10 @@ function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onIns
   );
 }
 
-function inWindow(a: LiveAuction, w: Window, now: number): boolean {
+function inWindow(a: LiveAuction, w: Window, now: number, heat?: Heat | null): boolean {
   switch (w) {
+    case 'hot': return heat?.state === 'hot';
+    case 'cold': return heat?.state === 'cold';
     case '1h': return a.endsAt - now < HOUR;
     case '24h': return a.endsAt - now < DAY;
     case 'new': return now - a.listedAt < DAY;
@@ -485,20 +599,21 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
     return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
   }, [live]);
-  // The board has no bound currency contract: no monetary heat, no hot/cold verdicts, until units can be matched.
+  const heats = useMemo(() => new Map<string, Heat | null>(live.map((a) => [a.id, heatOf(a, data?.curve ?? null, now)])), [live, data?.curve, now]);
+
   const figures = useMemo(() => {
-    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0 };
-    for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now)) f[w.id] += 1;
+    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
+    for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now, heats.get(a.id))) f[w.id] += 1;
     return f;
-  }, [cohort, now]);
+  }, [cohort, now, heats]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
-  const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now)), [cohort, win, now]);
+  const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now, heats.get(a.id))), [cohort, win, now, heats]);
   const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
   // The make map is the wider inventory context. Window/range changes reshape its actual population;
   // the selected make is highlighted within it rather than erasing all other brands.
-  const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now)
-    && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, selectedBid]);
+  const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now, heats.get(a.id))
+    && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, heats, selectedBid]);
 
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
     && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, inventoryLens.group]);
@@ -513,11 +628,14 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       && matchesMapLens(a, inventoryLens, taxonomy));
     // Keep an inspected lot reachable while the board rolls past its deadline.
     if (pinnedAuction?.id === activityId && !rows.some(a => a.id === activityId)) rows.push(pinnedAuction);
+    const ratio = (a: LiveAuction) => heats.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
+    else if (sort === 'hottest') rows.sort((a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1));
+    else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [scoped, selectedBid, sort, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
+  }, [scoped, selectedBid, sort, heats, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
 
   // One page of the board. A link to a lot opens its page; a filter change returns to the first page.
   const pages = Math.max(1, Math.ceil(board.length / PAGE));
@@ -598,7 +716,10 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       <div role="group" aria-label="Open inventory filters" className="market-windows">
         {WINDOWS.filter((w) => w.id !== 'all' && (isLoading || win === w.id || figures[w.id] > 0)).map((w) => (
           <button key={w.id} type="button" className="market-window" aria-pressed={win === w.id}
-            title={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min' : undefined}
+            title={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min'
+              : w.id === 'hot' ? `Bid at least ${HOT}x where comparable sales usually sit at this point in the auction (within 5 days of the close)`
+              : w.id === 'cold' ? `Bid at most ${COLD}x where comparable sales usually sit at this point in the auction (within 5 days of the close)`
+              : undefined}
             onClick={() => setParam('live', win === w.id ? null : w.id)}>
             <Text role="label">{w.label}</Text>
             <Text role="measure">{isLoading ? '…' : figures[w.id].toLocaleString('en-US')}</Text>
@@ -646,7 +767,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}><Text role="label">Clear market filters</Text></button></div>}
-        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind}
+        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} heats={heats}
           activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
           <nav className="market-board-pager" aria-label="Board pages">
