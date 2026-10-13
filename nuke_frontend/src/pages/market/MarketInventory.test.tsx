@@ -5,7 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn() }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string) => { fixture.source(source); return fixture.query; } }));
-vi.mock('./MarketPulse', () => ({ default: () => <section>Existing BaT bid board</section> }));
+vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import MarketInventory from './MarketInventory';

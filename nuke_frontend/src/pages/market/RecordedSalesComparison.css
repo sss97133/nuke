@@ -43,3 +43,14 @@
 }
 
 .sales-count-bar { width: 50%; }
+
+/* Market scope strip: the view pair, the other collection and the cohort select, coverage at the end. */
+.market-scope.k-strip { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
+.market-scope__views { display: inline-flex; flex-wrap: wrap; gap: 2px; }
+.market-scope__cohort { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.market-control { font: inherit; color: var(--text); background: var(--bg); border: 2px solid var(--border); border-radius: 0; padding: 5px 8px; max-width: 100%; cursor: pointer; }
+.market-control:hover:not(:disabled) { border-color: var(--text); }
+.market-control:disabled { cursor: default; color: var(--text-disabled); }
+.market-control[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.market-control[aria-pressed="true"] .k-label { color: inherit; }
+select.market-control { padding-right: 24px; }
