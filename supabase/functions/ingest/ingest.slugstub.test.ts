@@ -292,7 +292,10 @@ for (const statusCode of [403, 429]) {
         equal(result.status, "rejected");
         equal(result.reason, `enrichment_failed: HTTP ${statusCode}`);
         equal(result.enrichment_error, `HTTP ${statusCode}`);
-        equal(seen.filter(r => new URL(r.url).hostname.endsWith("craigslist.org")).length, 1);
+        equal(seen.filter(r => {
+          const host = new URL(r.url).hostname;
+          return host === "craigslist.org" || host.endsWith(".craigslist.org");
+        }).length, 1);
         equal(extractorCalls(), []);
         equal(vehicleInserts(), []);
         // The failed original request is archived as a failure, not a capture ACK.
