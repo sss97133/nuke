@@ -26,7 +26,10 @@ describe('public captured listing boundary', () => {
     expect(vehicles.eq).toHaveBeenCalledWith('is_public', true);
     expect(vehicles.is).toHaveBeenCalledWith('deleted_at', null);
     expect(vehicles.or).toHaveBeenCalledWith('listing_kind.is.null,listing_kind.neq.non_vehicle_item');
-    expect(events.select.mock.calls[0][0]).not.toMatch(/metadata|contact|seller/);
+    const fields = events.select.mock.calls[0][0].split(',');
+    expect(fields).toContain('source_observed_at:metadata->>source_observed_at');
+    expect(fields).not.toContain('metadata');
+    expect(fields.join(',')).not.toMatch(/contact|seller|snapshot|observation_id/);
   });
   it('advances bounded source-scoped cursor even when an entire scanned page is withheld', async () => {
     const events = query(Array.from({ length: 51 }, (_, i) => row(`${String(i).padStart(8, '0')}-0000-0000-0000-000000000000`, vehicleId)));
@@ -41,6 +44,14 @@ describe('public captured listing boundary', () => {
   it('does not turn failed parent eligibility checks into unresolved rows or successful emptiness', async () => {
     fixture.from.mockImplementation((table: string) => table === 'vehicle_events' ? query([row('linked', vehicleId)]) : query([], new Error('reader unavailable')));
     await expect(readCapturedListings()).rejects.toThrow('reader unavailable');
+  });
+  it('retains the explicit source clock separately from later processing clocks, and never substitutes for missing or invalid testimony', async () => {
+    const values = ['2026-10-12T01:02:03.456Z', null, undefined, '', 'not-a-clock', '2026-02-30T01:02:03Z', '2026-10-12T24:00:00Z', 0, { private: 'value' }];
+    fixture.from.mockReturnValue(query(values.map((value, i) => ({ ...row(`clock-${i}`), source_observed_at: value }))));
+    const page = await readCapturedListings('craigslist');
+    expect(page.items.map(r => r.source_observed_at)).toEqual([values[0], ...values.slice(1).map(() => null)]);
+    expect(page.items[0].created_at).toBe('2026-10-13T02:31:04.821+00:00');
+    expect(page.items[0].updated_at).toBe('2026-10-13T02:32:00Z');
   });
   it('rejects credential URLs, hostile domains and non-listing Facebook URLs', () => {
     for (const url of ['javascript:alert(1)', 'https://craigslist.org.attacker.example/123.html', 'https://user:secret@craigslist.org/123.html']) expect(sourceLink('craigslist', url)).toBeNull();

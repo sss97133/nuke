@@ -14,8 +14,18 @@ export type CapturedListing = {
   id: string; vehicle_id: string | null; source_platform: string; source_listing_id: string | null;
   source_url: string | null; current_price: number | null; event_status: string | null;
   created_at: string | null; updated_at: string | null;
+  source_observed_at: string | null;
   vehicle: { id: string; year: number | null; make: string | null; model: string | null; primary_image_url?: string | null } | null;
 };
+function sourceClock(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!parts || !Number.isFinite(Date.parse(value))) return null;
+  const [, year, month, day, hour, minute, second] = parts.map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate()
+    || hour > 23 || minute > 59 || second > 59) return null;
+  return value;
+}
 const SOURCE_HOSTS: Record<string, string> = {
   craigslist: 'craigslist.org', facebook_marketplace: 'facebook.com', ksl: 'ksl.com',
   bat: 'bringatrailer.com', bring_a_trailer: 'bringatrailer.com', cars_and_bids: 'carsandbids.com', mecum: 'mecum.com',
@@ -50,7 +60,7 @@ export async function readCapturedListings(source = 'classifieds', cursor?: Curs
   const started = performance.now();
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
   let query = supabase.from('vehicle_events')
-    .select('id,vehicle_id,source_platform,source_listing_id,source_url,current_price,event_status,created_at,updated_at')
+    .select('id,vehicle_id,source_platform,source_listing_id,source_url,current_price,event_status,created_at,updated_at,source_observed_at:metadata->>source_observed_at')
     .in('source_platform', source === 'classifieds' ? CLASSIFIED_SOURCES : source ? PLATFORM_ALIASES[source] ?? [source] : LISTING_SOURCES.flatMap(value => PLATFORM_ALIASES[value] ?? [value]))
     .order('created_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).limit(PAGE_SIZE + 1).abortSignal(requestSignal);
   if (cursor) {
@@ -75,7 +85,7 @@ export async function readCapturedListings(source = 'classifieds', cursor?: Curs
   return {
     timings: { eventsMs: Math.round(eventsRead - started), parentsMs: Math.round(performance.now() - eventsRead) },
     items: rows.filter(row => row.vehicle_id ? parents.has(row.vehicle_id) : !!sourceLink(row.source_platform, row.source_url))
-      .map(row => ({ ...row, vehicle: row.vehicle_id ? parents.get(row.vehicle_id)! : null })),
+      .map(row => ({ ...row, source_observed_at: sourceClock(row.source_observed_at), vehicle: row.vehicle_id ? parents.get(row.vehicle_id)! : null })),
     next: data && data.length > PAGE_SIZE && last ? { at: last.created_at, id: last.id } : undefined,
   };
 }
