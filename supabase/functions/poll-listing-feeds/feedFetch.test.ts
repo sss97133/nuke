@@ -34,7 +34,7 @@ for (const status of [401, 403, 429, 451]) {
     let calls = 0;
     await withFetch(async (_input, init) => {
       calls++;
-      equal(new Headers(init?.headers).get("user-agent"), "NukeListingCollector/1.0 (+https://nuke.ag)");
+      equal(new Headers((init as { headers?: HeadersInit } | undefined)?.headers).get("user-agent"), "NukeListingCollector/1.0 (+https://nuke.ag)");
       return new Response("denied", { status });
     }, async () => {
       const result = await fetchCraigslistFeed(url, async (requested, options) => {
@@ -86,7 +86,7 @@ Deno.test("one public regional Craigslist redirect keeps the identified headers"
   const calls: string[] = [];
   await withFetch(async (input, init) => {
     calls.push(String(input));
-    equal(new Headers(init?.headers).get("user-agent"), "NukeListingCollector/1.0 (+https://nuke.ag)");
+    equal(new Headers((init as { headers?: HeadersInit } | undefined)?.headers).get("user-agent"), "NukeListingCollector/1.0 (+https://nuke.ag)");
     return calls.length === 1 ? new Response(null, { status: 302, headers: { location: "https://lasvegas.craigslist.org/cto/d/car/123.html" } })
       : new Response(html);
   }, async () => {
@@ -97,7 +97,7 @@ Deno.test("one public regional Craigslist redirect keeps the identified headers"
 
 Deno.test("other callers retain their default browser headers", async () => {
   await withFetch(async (_input, init) => {
-    equal(new Headers(init?.headers).get("user-agent")?.startsWith("Mozilla/"), true);
+    equal(new Headers((init as { headers?: HeadersInit } | undefined)?.headers).get("user-agent")?.startsWith("Mozilla/"), true);
     return new Response(html);
   }, async () => { equal((await fetchPage("https://example.com")).html, html); });
 });
