@@ -15,6 +15,7 @@
 // profiles.username).
 
 import SwiftUI
+import Supabase
 
 // ─── Row models (exact column shapes, verified against prod) ─────────────────
 
@@ -134,6 +135,10 @@ struct DayReceipt: Decodable {
     let photos: [Photo]
     let work_sessions: [WorkSession]
     let receipts: [Receipt]
+    /// The database's verdict on who is reading (auth.uid() against the record's user).
+    let is_owner_view: Bool?
+    /// Set by the source gate once money keys are nulled for non-owners (web #1037 pattern).
+    let money_masked: Bool?
 }
 
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
@@ -1092,15 +1097,20 @@ struct DayReceiptView: View {
                                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         }
                     }
+                    // Money is the owner's (owner rule; web #1037/#1039 mask it at the source for the
+                    // vehicle day readers). This user-scoped reader still ships amounts, and the
+                    // Explore mode shows a real profile to anonymous viewers, so the phone renders a
+                    // cost only on the owner's own view and says so, never a bare $0 or a silent gap.
+                    let moneyVisible = receipt.is_owner_view == true
                     if !receipt.work_sessions.isEmpty {
-                        Section("Work") {
+                        Section {
                             ForEach(receipt.work_sessions) { ws in
                                 LabeledContent(ws.title ?? "work session") {
                                     HStack(spacing: 8) {
                                         if let minutes = ws.duration_minutes {
                                             Text(formatMinutes(minutes)).monospacedDigit()
                                         }
-                                        if let cost = ws.total_job_cost, cost > 0 {
+                                        if moneyVisible, let cost = ws.total_job_cost, cost > 0 {
                                             Text(cost, format: .currency(code: "USD"))
                                                 .monospacedDigit()
                                                 .foregroundStyle(.secondary)
@@ -1108,19 +1118,37 @@ struct DayReceiptView: View {
                                     }
                                 }
                             }
+                        } header: {
+                            Text("Work")
+                        } footer: {
+                            if !moneyVisible { Text("Costs are shown to the record's owner.") }
                         }
                     }
                     if !receipt.receipts.isEmpty {
-                        Section("Receipts") {
+                        Section {
                             ForEach(receipt.receipts) { r in
                                 LabeledContent(r.vendor ?? "—") {
-                                    if let total = r.total {
+                                    if moneyVisible, let total = r.total {
                                         Text(total, format: .currency(code: "USD"))
                                             .monospacedDigit()
+                                    } else if !moneyVisible {
+                                        Text("amount owner-only")
+                                            .font(.caption2).foregroundStyle(.tertiary)
                                     }
                                 }
                             }
+                        } header: {
+                            Text("Receipts")
+                        } footer: {
+                            if !moneyVisible { Text("Amounts are shown to the record's owner.") }
                         }
+                    }
+                } else if let loadError, loadError.hasPrefix("Sign in") {
+                    // Not a network failure: the reader is for signed-in accounts.
+                    ContentUnavailableView {
+                        Label(loadError, systemImage: "person.crop.circle.badge.questionmark")
+                    } description: {
+                        Text("Day receipts are read by signed-in accounts.")
                     }
                 } else if loadError != nil {
                     // Failed ≠ empty — offer a way back, never a dead red string.
@@ -1171,7 +1199,13 @@ struct DayReceiptView: View {
                 receipt = try dec.decode([DayReceipt].self, from: raw).first
             }
         } catch {
-            loadError = "Load failed"
+            // The reader is EXECUTE authenticated only (42501 for anon): say that, never
+            // "check your connection" for a permission the viewer does not have.
+            if let pg = error as? PostgrestError, pg.code == "42501" {
+                loadError = "Sign in to open a day receipt"
+            } else {
+                loadError = "Load failed"
+            }
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
         }
         loaded = true    // flip regardless of result — stops the infinite spinner
