@@ -97,6 +97,63 @@ Deno.test("a complete row clears any earlier error and retry time; a skipped row
   assert(!("error_message" in skipped!.row) && !("attempts" in skipped!.row), "a structural skip writes no error or attempts");
 });
 
+const clOutcome = (event: NonNullable<NonNullable<IngestOutcome["listing_capture"]>["capture_landing"]>["listing_event"]): IngestOutcome => ({
+  status: "created", source: "craigslist", vehicle_id: "v1",
+  listing_capture: { post_id: "7000000001", capture_landing: {
+    observation: "written", observation_id: "observation-1", listing_event: event,
+  } },
+});
+const WITH_DATA = { description: "Retained source description." };
+
+Deno.test("a Craigslist parent with data but failed, conflicted or missing event ACK stays retryable", () => {
+  for (const event of [{ action: "error", error: "projection unavailable" },
+    { action: "skipped", reason: "listing changed during projection; retry" }, { action: "inserted", id: null }, undefined]) {
+    const result = write(clOutcome(event), WITH_DATA)!;
+    equal(result.status, "failed");
+    equal(result.row.failure_category, "readback_error");
+    equal(result.row.attempts, 1);
+    equal(result.row.next_attempt_at, iso(HOUR));
+    equal(ledgerDecision({ status: result.status, attempts: 1, next_attempt_at: iso(-HOUR) }, NOW), "retry");
+  }
+});
+
+Deno.test("Craigslist requires a canonical observation ACK as well as a native post and event ACK", () => {
+  for (const change of ["capture", "observation", "post"] as const) {
+    const ingest = clOutcome({ action: "inserted", id: "event-1" });
+    if (change === "capture") delete ingest.listing_capture;
+    if (change === "observation") delete ingest.listing_capture!.capture_landing!.observation_id;
+    if (change === "post") ingest.listing_capture!.post_id = "opaque-share-token";
+    equal(write(ingest, WITH_DATA)!.status, "failed");
+  }
+});
+
+Deno.test("a Craigslist canonical event ACK or an existing newer keyed episode completes and clears prior failures", () => {
+  for (const event of [{ action: "inserted", id: "event-1" }, { action: "updated", id: "event-1" },
+    { action: "updated_clock_locked", id: "event-1" }, { action: "skipped", reason: "older source observation" }]) {
+    const ingest = clOutcome(event);
+    ingest.status = "matched";
+    ingest.listing_capture!.capture_landing!.observation = "duplicate";
+    const result = write(ingest, WITH_DATA, { status: "failed", attempts: 1, max_attempts: 3 })!;
+    equal([result.status, result.row.error_message, result.row.failure_category, result.row.next_attempt_at], ["complete", null, null, null]);
+  }
+});
+
+Deno.test("repeated Craigslist projection failure uses existing bounded backoff and max attempts", () => {
+  const ingest = clOutcome({ action: "error", error: "projection unavailable" });
+  const second = write(ingest, WITH_DATA, { status: "failed", attempts: 1, max_attempts: 3 })!;
+  const third = write(ingest, WITH_DATA, { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal([second.row.attempts, second.row.next_attempt_at], [2, iso(2 * HOUR)]);
+  equal([third.row.attempts, third.row.next_attempt_at], [3, null]);
+  equal(ledgerDecision({ status: "failed", attempts: 3, max_attempts: 3, next_attempt_at: null }, NOW), "settled");
+});
+
+Deno.test("another platform keeps its existing completeness contract even with similarly named capture data", () => {
+  const ingest = clOutcome({ action: "error", error: "unrelated projection" });
+  ingest.source = "mecum";
+  equal(write(ingest, WITH_DATA)!.status, "complete");
+  equal(write({ status: "created", vehicle_id: "v1" }, WITH_DATA)!.status, "complete");
+});
+
 Deno.test("the poller ledgers nothing for an ingest error or a non-structural rejection", () => {
   equal(write({ status: "error", error: "ingest HTTP 502" }, null), null);
   equal(write({ status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, null), null);
