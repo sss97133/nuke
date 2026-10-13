@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ vehicle: {} as any, price: null as any }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle }) }));
+const fixture = vi.hoisted(() => ({ vehicle: {} as any, price: null as any, pulse: null as any }));
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse }) }));
 vi.mock('./hooks/useVehiclePriceFacts', async (original) => ({ ...await original<any>(), useVehiclePriceFacts: () => ({ priceFacts: fixture.price }) }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
@@ -13,6 +13,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.vehicle = { id:'subject', year:1997, make:'Porsche', normalized_model:'911', model:'911 Turbo', series:'Turbo', transmission:'6-Speed Manual' };
   fixture.price = { price_kind:'sold', price_amount:378000, source_url:'https://example.com/sale', platform:'bat', price_as_of:'2026-08-20' };
+  fixture.pulse = null;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -48,6 +49,18 @@ it('opens the source clock and linked auction without restating the price or inf
 });
 it('does not promote a model estimate to the recorded price', async () => {
   fixture.price.price_kind = 'estimate';
+  await mount(); expect(host.querySelector('[aria-label="Inspect recorded price sources"]')).toBeNull();
+});
+it('keeps the typed classified ask visible despite a cached unqualified pulse, without inventing bid meaning or currency', async () => {
+  fixture.price = { price_kind: 'ask', price_amount: 12500, platform: 'craigslist', source_url: 'https://fixture.craigslist.org/cto/d/fixture/700000000000.html', price_as_of: '2025-03-22' };
+  fixture.pulse = { platform: 'craigslist', listing_url: fixture.price.source_url, listing_status: 'active', current_bid: 12500 };
+  await mount(); expect(host.textContent).toContain('Asking');
+  expect(host.querySelector('[aria-label="Inspect recorded price sources"]')?.textContent).toBe('12,500');
+  expect(host.textContent).toContain('Currency unrecorded'); expect(host.textContent).not.toContain('$12,500');
+  expect(host.textContent).not.toContain('Current bid');
+});
+it('keeps genuine live BaT bid ownership in the existing auction stack', async () => {
+  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/fixture', listing_status: 'active', current_bid: 12500 };
   await mount(); expect(host.querySelector('[aria-label="Inspect recorded price sources"]')).toBeNull();
 });
 

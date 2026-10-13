@@ -631,7 +631,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const { data: events } = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })

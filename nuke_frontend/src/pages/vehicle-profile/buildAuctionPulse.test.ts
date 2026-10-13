@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { auctionReaderRevision, buildAuctionPulseFromExternalListings, isAuctionPresentation } from './buildAuctionPulse';
 
 const listing = {
   id: 'event-1', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/synthetic-soft-close',
@@ -7,6 +7,29 @@ const listing = {
   bid_count: 10, final_price: null, sold_at: null, updated_at: '2026-10-04T16:45:00Z',
 };
 afterEach(() => vi.useRealTimers());
+
+describe('classified and auction price meaning', () => {
+  it.each(['craigslist', 'facebook_marketplace', 'ksl'])('does not turn %s active asking amounts into bids, even with a legacy auction type', platform => {
+    const row = { ...listing, source_platform: platform, event_type: 'auction', current_price: 12500, bid_count: 0 };
+    expect(buildAuctionPulseFromExternalListings([row], 'synthetic-vehicle')).toBeNull();
+    expect(row.current_price).toBe(12500);
+  });
+  it('refuses an explicit nonauction event on an auction venue and preserves the genuine BaT row in a mixed history', () => {
+    expect(buildAuctionPulseFromExternalListings([{ ...listing, event_type: 'listing' }], 'synthetic-vehicle')).toBeNull();
+    const pulse = buildAuctionPulseFromExternalListings([{ ...listing, source_platform: 'craigslist', current_price: 99999 }, listing], 'synthetic-vehicle');
+    expect(pulse).toMatchObject({ platform: 'bat', current_bid: listing.current_price });
+  });
+  it('requires an actual auction presentation path on mixed venues', () => {
+    expect(isAuctionPresentation({ platform: 'hagerty', listing_url: 'https://www.hagerty.com/marketplace/auction/fixture/fixture-id' })).toBe(true);
+    expect(isAuctionPresentation({ platform: 'hagerty', event_type: 'auction', listing_url: 'https://www.hagerty.com/marketplace/classified/fixture/fixture-id' })).toBe(false);
+    expect(isAuctionPresentation({ platform: 'hemmings', listing_url: 'https://www.hemmings.com/auction/fixture' })).toBe(true);
+    expect(isAuctionPresentation({ platform: 'hemmings', listing_url: 'https://www.hemmings.com/classifieds/fixture' })).toBe(false);
+    expect(isAuctionPresentation({ platform: 'ebay_motors', event_type: 'auction', listing_url: 'https://www.ebay.com/itm/700000000000' })).toBe(false);
+  });
+  it('refreshes the existing reader when source/type qualification changes', () => {
+    expect(auctionReaderRevision({ ...listing, event_type: 'listing' })).not.toBe(auctionReaderRevision({ ...listing, event_type: 'auction' }));
+  });
+});
 
 describe('canonical auction telemetry across a soft close', () => {
   it('refreshes evidence readers for native bids, comments, extensions and results, without heartbeat refetches', () => {
