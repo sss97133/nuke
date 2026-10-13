@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Masthead, Text } from '../../kit';
+import ClassifiedArrivals from './ClassifiedArrivals';
 import PrivateCaptureHistory from './PrivateCaptureHistory';
 import { LISTING_SOURCES, sourceLink, sourceName, useCapturedListings } from './useCapturedListings';
 // The market page's frame, strip and controls live in these two sheets; the auction board imports them through its
@@ -23,8 +24,15 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
   const [params, setParams] = useSearchParams();
   const requested = params.get('source') ?? 'classifieds';
   const source = requested === 'classifieds' || requested === '' || LISTING_SOURCES.includes(requested as typeof LISTING_SOURCES[number]) ? requested : 'classifieds';
-  const query = useCapturedListings(source);
+  const arrivals = source === 'classifieds';
+  const query = useCapturedListings(source, !arrivals);
   const rows = query.data?.pages.flatMap(page => page.items) ?? [];
+  const sourcePicker = <label className="market-scope__cohort"><Text role="label">Source</Text><select className="market-control k-body" value={source} onChange={event => {
+    const next = new URLSearchParams(params); next.set('collection', 'listings');
+    next.set('source', event.target.value); setParams(next);
+  }}><option value="classifieds">Classified arrivals</option><option value="">All supported sources</option>{LISTING_SOURCES.map(value => <option key={value} value={value}>{sourceName(value)}</option>)}</select></label>;
+  // Classifieds open on the arrivals board; one source at a time keeps the retained list.
+  if (arrivals) return <><ClassifiedArrivals collection={collection} sourcePicker={sourcePicker} /><PrivateCaptureHistory source={source} /></>;
   return <section aria-label="Captured listings" className="market-explorer">
     <Masthead result={<>
       <Text role="measure" as="div">{query.isPending ? '…' : rows.length.toLocaleString('en-US')}</Text>
@@ -34,10 +42,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
     </Masthead>
     <div className="k-section k-strip market-scope" role="group" aria-label="Listings scope">
       <div role="group" aria-label="Market view" className="market-scope__views">{collection}</div>
-      <label className="market-scope__cohort"><Text role="label">Source</Text><select className="market-control k-body" value={source} onChange={event => {
-        const next = new URLSearchParams(params); next.set('collection', 'listings');
-        next.set('source', event.target.value); setParams(next);
-      }}><option value="classifieds">Classified listings</option><option value="">All supported sources</option>{LISTING_SOURCES.map(value => <option key={value} value={value}>{sourceName(value)}</option>)}</select></label>
+      {sourcePicker}
       <Text role="caption" className="market-scope__note">Asking prices as listed on US classifieds, in dollars; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</Text>
     </div>
     {query.isPending && <p role="status" className="k-body">Reading retained listings…</p>}
