@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SUPABASE_URL } from '../../lib/env';
+import { Text } from '../../kit';
 
 const API_BASE = `${SUPABASE_URL}/functions/v1`;
 
