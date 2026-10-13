@@ -370,7 +370,7 @@ jobs:
         run: |
           createdb dm_refinement_listing_bulk_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_bulk_ci --two-front --bulk120
-      - name: Verify full retained listing powertrain replay and measured yield
+      - name: Verify full retained replay, exact assay equality and 500k aggregation plans
         run: |
           createdb dm_refinement_listing_powertrain_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain --description --odometer --identity --vin-label --craigslist-odometer --craigslist-year --native-year --native-identity
