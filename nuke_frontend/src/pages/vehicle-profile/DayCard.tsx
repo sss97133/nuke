@@ -293,6 +293,9 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
   const [expanded, setExpanded] = useState(!!isPopup);
   const [popupDetail, setPopupDetail] = useState<DailyReceipt | null>(detail);
   const [popupLoading, setPopupLoading] = useState(false);
+  // The day reader masks money for anyone but the owner (money_masked); a masked amount is shown as such, never as $0.
+  const moneyMasked = Boolean((popupDetail ?? detail)?.money_masked);
+  const masked = <span title="Cost is visible to the owner">$•••</span>;
   const loadedRef = React.useRef(false);
 
   // When in popup mode, auto-load day detail via RPC
@@ -593,7 +596,7 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
                         {ev.description}
                       </span>
                       <span style={{ textAlign: 'right', fontSize: '8px' }}>
-                        {ev.cost_cents ? fmtCents(ev.cost_cents) : ''}
+                        {moneyMasked ? masked : ev.cost_cents ? fmtCents(ev.cost_cents) : ''}
                       </span>
                     </div>
                   ))}
@@ -634,7 +637,7 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
                         )}
                       </span>
                       <span style={{ textAlign: 'right', fontWeight: 700 }}>
-                        {fmt(Number(r.total || r.total_amount || 0))}
+                        {moneyMasked ? masked : fmt(Number(r.total || r.total_amount || 0))}
                       </span>
                       {/* Receipt items */}
                       {Array.isArray(r.items) && r.items.length > 0 && r.items.map((item: any, idx: number) => (
@@ -650,7 +653,7 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
                             {item.description || item.name || item.part_number || '—'}
                           </span>
                           <span style={{ fontSize: '7px', color: 'var(--vp-pencil)', textAlign: 'right' }}>
-                            {item.total != null ? fmt(Number(item.total)) : item.unit_price != null ? fmt(Number(item.unit_price)) : ''}
+                            {moneyMasked ? masked : item.total != null ? fmt(Number(item.total)) : item.unit_price != null ? fmt(Number(item.unit_price)) : ''}
                           </span>
                         </React.Fragment>
                       ))}

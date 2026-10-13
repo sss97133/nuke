@@ -54,7 +54,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
-        MARKETING_VERSION: "1.0.1"
+        MARKETING_VERSION: "1.1.0"
         # CI OWNS THE BUILD NUMBER — do NOT bump this per release. ci_post_clone.sh
         # rewrites CURRENT_PROJECT_VERSION to an epoch timestamp ($(date +%s)) before
         # xcodegen, and ci_pre_xcodebuild.sh PlistBuddy-stamps CFBundleVersion to the
