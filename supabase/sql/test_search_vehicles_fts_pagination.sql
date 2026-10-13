@@ -146,10 +146,11 @@ INSERT INTO public.vehicles(id,year,make,model,primary_image_url,image_count,vie
 SELECT pg_temp.uid(100000+n),2000+n%20,CASE WHEN n<=6000 THEN 'Boundary' ELSE 'Other' END,
   'Boundary Needle',CASE WHEN n%3=0 THEN NULL ELSE 'image' END,n%5,n%7,n%11
 FROM generate_series(1,12001)n;
--- Model the existing make access path, not the optional proposed rank index.
+-- Model the existing make access path before applying the rank index below.
 CREATE INDEX fixture_make_idx ON public.vehicles(make);
 ANALYZE public.vehicles;
-DO $$ DECLARE expected uuid[]; actual uuid[]:='{}'; page_ids uuid[]; cursor integer:=0; cap integer:=94; started timestamptz;
+CREATE FUNCTION pg_temp.assert_large_stream() RETURNS void LANGUAGE plpgsql AS $$
+DECLARE expected uuid[]; actual uuid[]:='{}'; page_ids uuid[]; cursor integer:=0; cap integer:=94; started timestamptz;
 BEGIN
   SELECT array_agg(v.id ORDER BY (v.make='Boundary') DESC,(v.primary_image_url IS NOT NULL) DESC,
     COALESCE(v.image_count,0) DESC,COALESCE(v.bat_view_count,v.view_count,0) DESC,
@@ -169,6 +170,7 @@ BEGIN
   PERFORM pg_temp.ok('offset 10,000 retains the exact oracle slice',
     (SELECT array_agg(s.id ORDER BY ordinality) FROM public.search_vehicles_fts('boundary',101,true,10000) WITH ORDINALITY s)=expected[10001:10101]);
 END $$;
+SELECT pg_temp.assert_large_stream();
 
 -- These outer plans measure local execution, not the production scan estimate.
 -- Installed auto_explain records the nested plans in this disposable server's
@@ -180,8 +182,79 @@ SET auto_explain.log_analyze = on;
 SET auto_explain.log_timing = off;
 SET auto_explain.log_buffers = on;
 SET auto_explain.log_format = json;
+-- Capture nested plans in the psql receipt as well as the server log, so the
+-- same runner can assert them against CI's existing disposable PG service.
+SET client_min_messages = log;
 EXPLAIN (ANALYZE,BUFFERS,TIMING OFF) SELECT * FROM public.search_vehicles_fts_baseline('boundary',95,true,0);
 EXPLAIN (ANALYZE,BUFFERS,TIMING OFF) SELECT * FROM public.search_vehicles_fts('boundary',95,true,0);
 EXPLAIN (ANALYZE,BUFFERS,TIMING OFF) SELECT * FROM public.search_vehicles_fts('boundary',101,true,5999);
 SET auto_explain.log_min_duration = -1;
+
+CREATE TEMP TABLE before_index_owner AS SELECT to_jsonb(p) AS attributes
+  FROM pg_proc p WHERE oid = 'public.search_vehicles_fts(text,integer,boolean,integer)'::regprocedure;
+\ir ../migrations/20261013110000_vehicles_public_make_search_rank.sql
+CREATE TEMP TABLE first_index AS SELECT indexrelid, pg_relation_filenode(indexrelid) AS filenode
+  FROM pg_index WHERE indexrelid = 'public.idx_vehicles_public_make_search_rank'::regclass;
+\ir ../migrations/20261013110000_vehicles_public_make_search_rank.sql
+SET statement_timeout = '60s';
+SET lock_timeout = '1s';
+SELECT pg_temp.ok('identical index retry retains the ready/valid object and storage',
+  (SELECT i.indisvalid AND i.indisready AND i.indislive AND pg_relation_filenode(i.indexrelid)=b.filenode
+    FROM pg_index i JOIN first_index b ON i.indexrelid=b.indexrelid));
+SELECT pg_temp.ok('index changes no reader body, owner, grants, security, settings or signature',
+  (SELECT to_jsonb(p)=b.attributes FROM pg_proc p CROSS JOIN before_index_owner b
+    WHERE p.oid='public.search_vehicles_fts(text,integer,boolean,integer)'::regprocedure));
+SELECT pg_temp.assert_pages('porsche',
+  ARRAY(SELECT pg_temp.uid(n) FROM unnest(ARRAY[7,8,6,5,9,4,3,2,1,20,21,22,23,24,25,26])n),
+  array_fill(0.95::real,ARRAY[9]) || array_fill(0.9::real,ARRAY[7]));
+SELECT pg_temp.assert_pages('1967 Mustang',
+  ARRAY(SELECT pg_temp.uid(n) FROM unnest(ARRAY[30,31,32,33,34,35,39,36,37,38])n),
+  array_fill(0.98::real,ARRAY[7]) || array_fill(0.9::real,ARRAY[3]));
+SELECT pg_temp.assert_pages('Porsche & GT3',
+  ARRAY(SELECT pg_temp.uid(n) FROM unnest(ARRAY[7,8,6,5,9,4,3,2,1])n), array_fill(0.9::real,ARRAY[9]));
+SELECT pg_temp.assert_large_stream();
+SET ROLE anon;
+SELECT pg_temp.ok('indexed anonymous search retains all public and classifier negative controls',
+  (SELECT count(*)=16 AND bool_and(id NOT BETWEEN pg_temp.uid(90) AND pg_temp.uid(102))
+    FROM public.search_vehicles_fts('porsche',100,true,0)));
+RESET ROLE;
+
+SET auto_explain.log_min_duration = 0;
+EXPLAIN (ANALYZE,BUFFERS,TIMING OFF) SELECT * FROM public.search_vehicles_fts('boundary',95,true,0);
+EXPLAIN (ANALYZE,BUFFERS,TIMING OFF) SELECT * FROM public.search_vehicles_fts('boundary',101,true,5999);
+SET auto_explain.log_min_duration = -1;
+
+-- Ordinary writes in this synthetic table must maintain expression rank and
+-- partial membership. No testimony or production writes are performed.
+UPDATE public.vehicles SET primary_image_url='restored' WHERE id=pg_temp.uid(1);
+SELECT pg_temp.ok('image-presence update changes indexed rank',
+  (SELECT id=pg_temp.uid(1) FROM public.search_vehicles_fts('porsche',1,true,0)));
+UPDATE public.vehicles SET image_count=1000 WHERE id=pg_temp.uid(2);
+SELECT pg_temp.ok('image-count update changes indexed rank',
+  (SELECT id=pg_temp.uid(2) FROM public.search_vehicles_fts('porsche',1,true,0)));
+UPDATE public.vehicles SET image_count=1000,bat_view_count=1000 WHERE id=pg_temp.uid(3);
+SELECT pg_temp.ok('coalesced-view update changes indexed rank',
+  (SELECT id=pg_temp.uid(3) FROM public.search_vehicles_fts('porsche',1,true,0)));
+UPDATE public.vehicles SET image_count=1000,bat_view_count=1000,sale_price=100 WHERE id=pg_temp.uid(4);
+SELECT pg_temp.ok('sale-price update changes indexed rank',
+  (SELECT id=pg_temp.uid(4) FROM public.search_vehicles_fts('porsche',1,true,0)));
+UPDATE public.vehicles SET image_count=1000,bat_view_count=1000,sale_price=100,year=2022 WHERE id IN(pg_temp.uid(5),pg_temp.uid(6));
+SELECT pg_temp.ok('year update retains UUID tie-break',
+  (SELECT array_agg(id ORDER BY ordinality)=ARRAY[pg_temp.uid(5),pg_temp.uid(6)]
+    FROM public.search_vehicles_fts('porsche',2,true,0) WITH ORDINALITY));
+UPDATE public.vehicles SET is_public=false WHERE id=pg_temp.uid(5);
+UPDATE public.vehicles SET deleted_at='2026-10-13Z' WHERE id=pg_temp.uid(6);
+UPDATE public.vehicles SET listing_kind='non_vehicle_item' WHERE id=pg_temp.uid(4);
+UPDATE public.vehicles SET make='Changed' WHERE id=pg_temp.uid(3);
+UPDATE public.vehicles SET model=NULL WHERE id=pg_temp.uid(2);
+UPDATE public.vehicles SET year=NULL WHERE id=pg_temp.uid(1);
+SELECT pg_temp.ok('public, deleted, listing-kind and YMM changes maintain partial membership',
+  (SELECT array_agg(id ORDER BY ordinality)=ARRAY[pg_temp.uid(7),pg_temp.uid(8),pg_temp.uid(9)]
+    FROM public.search_vehicles_fts('porsche',3,true,0) WITH ORDINALITY));
+SELECT pg_temp.ok('make update is discoverable through the same all-make index',
+  (SELECT id=pg_temp.uid(3) FROM public.search_vehicles_fts('changed',1,true,0)));
+UPDATE public.vehicles SET is_public=true,listing_kind=NULL WHERE id=pg_temp.uid(5);
+SELECT pg_temp.ok('newly public eligible row re-enters index',
+  (SELECT id=pg_temp.uid(5) FROM public.search_vehicles_fts('porsche',1,true,0)));
+SELECT pg_size_pretty(pg_relation_size('public.idx_vehicles_public_make_search_rank')) AS synthetic_rank_index_size;
 SELECT pg_temp.ok('fixture leaves no waiting locks',NOT EXISTS(SELECT FROM pg_stat_activity WHERE wait_event_type='Lock'));

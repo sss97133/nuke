@@ -304,8 +304,9 @@ including an offset-10,000 oracle check. Installed `auto_explain` confirms that
 both baseline and patched full first pages execute only the exact branch: the
 same make-index scan over 6,000 rows and 95-row top-N sort. At offset 5,999 the
 patch consumes 6,000 exact candidates then 100 fallback candidates; the latter
-uses the fixture's sequential scan and top-N sort. No optional rank index is
-installed by the fixture; its simple make index models the existing access path.
+uses the fixture's sequential scan and top-N sort. This is the fixture's
+pre-index phase; its simple make index models the existing access path. The
+separate index phase and its unchanged-ID comparisons are described below.
 
 One local warm run with nested-plan logging took 2.118 ms before / 1.885 ms after
 for the full first page, and 11.373 ms for the boundary page. These are synthetic
@@ -316,11 +317,12 @@ Deep offsets still sort/visit preceding candidates and now decrement the offset
 in PL/pgSQL. Separate HTTP requests do not share a snapshot: concurrent eligibility
 or rank changes can still move records across pages.
 
-### Separate optional index proposal — not part of the migration
+### Separate exact-make index proposal, prepared 2026-10-13
 
-The measured exact-make scan/sort suggests the following candidate for a separate
-authorized index review. It is not applied locally or to production and has no
-measured performance or storage claim:
+**Implemented and tested only in a disposable local database; uncommitted,
+unpublished and undeployed.** The pagination migration does not build an index.
+The separate [index migration](../../supabase/migrations/20261013110000_vehicles_public_make_search_rank.sql)
+targets the observed exact-make scan/sort with this all-make access path:
 
 ```sql
 CREATE INDEX CONCURRENTLY idx_vehicles_public_make_search_rank
@@ -334,16 +336,75 @@ ON public.vehicles (
   id
 )
 WHERE is_public = true
+  AND deleted_at IS NULL
+  AND listing_kind IS DISTINCT FROM 'non_vehicle_item'
   AND year IS NOT NULL AND make IS NOT NULL AND model IS NOT NULL;
 ```
 
-It could serve the exact-make equality and current order without sorting the
-whole qualifying make. Auto classification remains a residual predicate; no
-immutability claim is made for that helper. This index would not resolve broad
-ILIKE or year-prefix scans. Image/view-count changes would update a wide index,
-so storage, write cost, existing index overlap and realistic before/after plans
-need separate review. The concurrent build also requires a suitable existing
-deployment path outside a transaction; the reader migration does not attempt it.
+Its predicate matches the repaired public/YMM reader, including undeleted and
+non-vehicle exclusions. Auto classification remains a residual predicate; no
+immutability claim is made for that helper. No source rows, reader, ranking,
+grants, service capacity, or server timeout policy are changed. The existing
+`supabase-deploy.yml` uses `psql -f` without a wrapping transaction, as required
+by `CREATE INDEX CONCURRENTLY`.
+
+The migration uses 120 s statement and 10 s lock limits. Preflight refuses
+existing lock waiters, idle transactions in the current database, active target
+readers/writers, and other active index builds. These are point-in-time checks,
+not a reservation that prevents later traffic. Existing same-name objects must
+have the exact expected definition and ready/valid/live flags; an identical
+retry retains the index. Conflicts and failed builds refuse for inspection.
+Postflight checks the same structure/flags and lock waiters. There is no automatic
+drop/rebuild or timeout increase. A failed concurrent build can leave an invalid
+index; inspect and explicitly resolve that artifact before retrying through the
+existing delivery path. The [PostgreSQL concurrent-build documentation](https://www.postgresql.org/docs/17/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY)
+describes the two scans, old-transaction waits and invalid-index failure state.
+
+The owner's dated catalog sample on 2026-10-13 estimated 1,007,218 stored vehicle
+rows, 2,531,074,048 heap bytes / 308,969 pages, and 11,314,577,408 total bytes.
+The existing make/source index measured 55,304,192 bytes with approximately
+676,918 entries. No inspected vehicle index referenced image presence, image
+count or BaT view count; no index build was active at that observation. These
+are retained metadata observations, not current deployment preflight or an
+eligible-population census. The separate cached 632,014 eligible-record export
+had maximum make length 50 and none longer than 256 characters; that does not
+guarantee current or future key width. No truncation or extra population
+exclusion is introduced to force keys into the btree limit.
+
+The existing SQL fixture now applies the actual index migration twice and
+repeats its complete 12,001-candidate reconciliation and hand-declared smaller
+ID/relevance oracles before/after the index. Public, deleted, non-vehicle,
+incomplete identity and unknown/non-auto controls remain intact. Ordinary
+synthetic updates to image presence, counts, coalesced views, price, year,
+make and eligibility maintain order and partial membership. The reader's full
+catalog representation is unchanged.
+
+On installed PostgreSQL 17.9, nested plans changed from a 6,000-row make-index
+scan plus sort to a 95-row ordered rank-index scan for the same 95-result first
+page, with no Sort or Incremental Sort node. At offset 5,999 the exact branch
+still consumes 6,000 ordered rows; the broader fallback still scans and sorts.
+One local warm run measured the repaired reader at 2.010 ms before / 0.188 ms
+after index for that first page and 11.853 / 5.407 ms at the boundary. The index
+occupied 760 kB in this small synthetic fixture. These measurements are neither
+production speedup nor p50/p95, a storage projection, or a fleet coverage gain.
+
+`bash scripts/test-search-reader-pagination.sh` also exercises live fixture
+sessions for active-reader, idle-transaction, lock-waiter and active-build
+refusal. A conflicting valid index is retained unchanged. A deliberately
+oversized synthetic make causes the real concurrent build to fail and leave an
+invalid index with the intended definition; an otherwise safe retry refuses
+that state. No catalog validity flags are forged. CI's existing database-contract
+job invokes the same runner with `--ci-service`, restricted to its localhost
+disposable database; both paths assert the actual nested plan and drift refusals.
+
+Image/view-count changes maintain additional index entries and can reduce HOT
+update opportunities. Production storage, write amplification, current key
+widths, concurrent-build duration within 120 s, cold/warm reader performance,
+and unchanged public results remain unverified. This index does not resolve
+broad ILIKE/year-prefix scans, low auto-classification acceptance, or the cost
+of large offsets. After any authorized checked delivery, retain exact index
+structure/validity, size, lock state, and same-request before/after results and
+plans; report the reader improvements separately from public readiness.
 
 Before any authorized delivery, refresh the live definition and permission
 receipt, review this guarded migration and run its fixture through applicable
