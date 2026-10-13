@@ -78,7 +78,10 @@ and say which, with the delivery stage (implemented → built → archived → u
    ignored by Xcode Cloud (measured 2026-10-13: six minutes, no run). After a squash merge the ref no
    longer descends from main, so carry main onto it with a merge commit whose tree is main's:
    `m=$(git commit-tree <main-sha>^{tree} -p <old-ref-sha> -p <main-sha> -m "ship(ios): carry main <main-sha> onto the Xcode Cloud ref")`
-   then `git push origin "$m:refs/heads/fable5/ignition-ios"` (quote the refspec: zsh reads `$m:r` as a modifier). Xcode Cloud stamps `CFBundleVersion` with its run counter,
+   then `git push origin "$m:refs/heads/fable5/ignition-ios"` (quote the refspec: zsh reads `$m:r` as a modifier).
+   A fast-forward pushed while the previous run is still starting can also go unregistered (measured
+   2026-10-13 17:19Z, eight minutes, no run): if no check-run appears within three minutes, push a
+   fresh same-tree commit (`git commit-tree <ref>^{tree} -p <ref> -m "ship(ios): retrigger"`) onto the ref. Xcode Cloud stamps `CFBundleVersion` with its run counter,
    overriding `project.yml` and both `ci_scripts`; when App Store Connect rejects a build as not higher
    than an earlier one, bump `MARKETING_VERSION` in `project.yml` (a new train has no prior builds). The
    build appears on the phone as a new version with its own Update button.
