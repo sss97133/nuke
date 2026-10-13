@@ -63,7 +63,14 @@ struct MarketMake: Decodable, Identifiable {
 }
 
 struct ExploreView: View {
-    @State private var query = ""
+    @State private var query: String = {
+        #if DEBUG
+        // Screenshot loop: NUKE_DEBUG_EXPLORE_QUERY="k5 blazer" lands on the search
+        // results deterministically (same NUKE_DEBUG_* convention; DEBUG only).
+        if let q = ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_QUERY"], !q.isEmpty { return q }
+        #endif
+        return ""
+    }()
     @State private var metros: [MarketMetro] = []
     @State private var results: [VehicleHeaderRow] = []
     @State private var loadingFeed = false
@@ -213,7 +220,7 @@ struct ExploreView: View {
             .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard isSearching else { results = []; searched = false; return }
+                guard isSearching else { results = []; searchMeta = nil; searched = false; return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
                 guard !Task.isCancelled else { return }
                 await search(term)
@@ -337,6 +344,14 @@ struct ExploreView: View {
                         .buttonStyle(.plain)
                     Divider()
                 }
+                // The denominator before the pictures: what this page is a window onto.
+                if let m = searchMeta {
+                    Text(m.sentence)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16).padding(.vertical, 6)
+                }
                 LazyVGrid(columns: columns, spacing: 2) {
                     ForEach(results) { v in
                         NavigationLink(value: v) { cell(v) }
@@ -458,39 +473,21 @@ struct ExploreView: View {
         }
     }
 
-    // ─── Search — tokenized: a 4-digit year token becomes an AND year.eq filter,
-    // the remaining words become an OR(make,model) text match. Order-independent.
+    // ─── Search — the web's door. universal-search owns public eligibility, the ranked
+    // full-text reader, the year and ILIKE fallbacks and VIN/URL detection; the phone
+    // asks it the same question the site does and shows the same records in the same
+    // order. The grid keeps only hits with a photo and says how many it dropped.
     private func search(_ term: String) async {
-        let clean = term.replacingOccurrences(of: "*", with: "")
-            .replacingOccurrences(of: ",", with: "")
-            .replacingOccurrences(of: "(", with: "")
-            .replacingOccurrences(of: ")", with: "")
-        let tokens = clean.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        var year: Int? = nil
-        var textTokens: [String] = []
-        for tok in tokens {
-            if year == nil, tok.count == 4, let n = Int(tok), n > 1885, n < 2100 {
-                year = n
-            } else {
-                textTokens.append(tok)
-            }
-        }
-        let text = textTokens.joined(separator: " ")
         searchError = false
         do {
-            var q = SupabaseService.client
-                .from("vehicles")
-                .select("id,year,make,model,trim,primary_image_url")
-                .eq("is_public", value: true)
-                .neq("status", value: "pending")
-            if let yr = year { q = q.eq("year", value: yr) }
-            if !text.isEmpty { q = q.or("make.ilike.*\(text)*,model.ilike.*\(text)*") }
-            let raw: [VehicleHeaderRow] = try await q
-                .order("year", ascending: false)
-                .limit(60)
-                .execute()
-                .value
-            results = raw.filter { ($0.primary_image_url?.isEmpty == false) }
+            let res = try await UniversalSearch.vehicles(query: term, limit: 60)
+            guard res.success else { throw URLError(.badServerResponse) }
+            let rows = res.results.compactMap(\.headerRow)
+            results = rows.filter { $0.primary_image_url?.isEmpty == false }
+            searchMeta = SearchCoverage(returned: rows.count, shown: results.count,
+                                        hasMore: res.meta?.has_more ?? false,
+                                        reader: res.meta?.vehicle_source,
+                                        milliseconds: res.search_time_ms)
             searched = true
         } catch {
             searchError = true
@@ -498,6 +495,28 @@ struct ExploreView: View {
             NSLog("NukeCapture explore search failed: %@", String(describing: error))
         }
     }
+
+    /// What the grid is a window onto: how many public records the door returned for this
+    /// page, how many carry a photo and are drawn, whether more pages exist, which reader
+    /// answered. The door does not count the whole match set for a text query, so the
+    /// total is stated as not counted rather than guessed (fleet-relative reporting).
+    struct SearchCoverage {
+        let returned: Int
+        let shown: Int
+        let hasMore: Bool
+        let reader: String?
+        let milliseconds: Int?
+
+        var sentence: String {
+            var parts: [String] = []
+            parts.append(shown == returned ? "\(shown) public records" : "\(shown) of \(returned) public records shown · \(returned - shown) without a photo")
+            parts.append(hasMore ? "more pages · total not counted" : "total not counted")
+            if let r = reader { parts.append("reader \(r)") }
+            if let ms = milliseconds { parts.append("\(ms) ms") }
+            return parts.joined(separator: " · ")
+        }
+    }
+    @State private var searchMeta: SearchCoverage?
 }
 
 // ─── Metro detail — the make breakdown behind a metro's pulse ───────────────────

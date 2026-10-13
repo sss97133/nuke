@@ -29,10 +29,6 @@ vi.mock('./RecordedSalesComparison', () => ({ default: ({ make, onMakeChange, on
   <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
 </section> }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
-vi.mock('@tanstack/react-virtual', () => ({ defaultRangeExtractor: () => [], useWindowVirtualizer: ({ count, estimateSize }: any) => ({
-  getTotalSize: () => count * estimateSize(), measureElement: () => {}, range: { startIndex: 0, endIndex: count - 1 },
-  getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ index, start: index * estimateSize() })),
-}) }));
 
 import MarketPulse from './MarketPulse';
 import { currentBidDistribution, type LiveAuction } from './useMarketPulse';
@@ -150,8 +146,35 @@ describe('market answer -> supporting lots', () => {
     expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('model');
     expect(boardTitles()).toEqual(['small-79']);
     await click('All captured makes');
-    expect(boardTitles()).toHaveLength(84);
+    expect(boardTitles()).toHaveLength(24);
+    expect(container.textContent).toContain('1–24 of 84 lots');
     expect(container.querySelector('.inventory-map-remainder')).toBeNull();
+    await click('Next 24 lots');
+    expect(window.location.search).toContain('board=2');
+    expect(boardTitles()).toHaveLength(24);
+    expect(boardTitles()[0]).toBe('small-23');
+    await render('mapBy=make&make=all&board=4');
+    expect(boardTitles()).toHaveLength(12);
+    expect(container.textContent).toContain('73–84 of 84 lots');
+    expect(container.querySelector('[aria-label="Next 24 lots"]')).toBeNull();
+    await click('Ending < 24 h');
+    expect(window.location.search).toContain('board=1');
+  });
+  it('opens a shared lot on the page that holds it and returns to the first page by link', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions = [...Array.from({ length: 30 }, (_, i) => lot(`early-${i}`, 'PORSCHE', null, 1)),
+      { ...lot(id, 'PORSCHE', 1000, 2), year: 1999, model: '911' }];
+    await render(`lot=${id}&inspect=auction`);
+    expect(boardTitles()).toHaveLength(7);
+    expect(container.textContent).toContain('25–31 of 31 lots');
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+    await click('Previous 24 lots');
+    expect(window.location.search).toContain('board=1');
+    expect(window.location.search).not.toContain('lot=');
+    expect(boardTitles()).toHaveLength(24);
+    expect(container.querySelector('[aria-label="Previous 24 lots"]')).toBeNull();
   });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
     await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
