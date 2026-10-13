@@ -55,6 +55,9 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
   const link = container.querySelector('a[href="/vehicle/eligible"]');
   expect(link?.getAttribute('aria-label')).toBe('1963 Chevrolet Corvette');
   expect(link?.querySelector('.sr-only')?.textContent).toBe('1963 Chevrolet Corvette');
+  const visibleIdentity = link!.cloneNode(true) as HTMLElement;
+  visibleIdentity.querySelectorAll('.sr-only').forEach(node => node.remove());
+  expect(visibleIdentity.textContent?.match(/1963/g)).toHaveLength(1);
   const image = container.querySelector('img'); expect(image?.getAttribute('alt')).toBe('Vehicle record image');
   expect(image?.getAttribute('width')).toBe('80'); expect(image?.getAttribute('height')).toBe('60');
 });
