@@ -181,6 +181,10 @@ jobs:
         run: createdb dm_refinement_projection_outcomes_key_ci
       - name: Verify projection_outcomes.vehicle_id keys vehicles NOT VALID (old orphans kept and still gradable, new or re-keyed orphans refused, vehicle delete refused, no row written, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_projection_outcomes_key_ci -f supabase/sql/test_projection_outcomes_vehicle_key.sql
+      - name: Create disposable source_targets key database
+        run: createdb dm_refinement_source_targets_key_ci
+      - name: Verify source_targets.source_slug keys observation_sources(slug) validated (writer's insert and refresh admitted, unregistered slug and re-key refused, source delete or rename refused while targets exist, no row written, re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_source_targets_key_ci -f supabase/sql/test_source_targets_source_key.sql
       - name: Create disposable place entity database
         run: createdb dm_refinement_place_entity_ci
       - name: Verify the place entity declaration (county table format checks, NOT VALID keys from location observations and ZIPs, orphans kept, new orphans refused, the substrate declared, registry rows and comments, re-apply a no-op)
