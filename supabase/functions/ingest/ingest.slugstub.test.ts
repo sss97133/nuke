@@ -25,6 +25,7 @@ let seen: Seen[] = [];
 let persistedVehicle: Record<string, unknown> | null = null;
 let publicPage: ((req: Request) => Response) | null = null;
 let clWorld: { observationId?: string; event?: Record<string, unknown>; failEventOnce?: boolean; failObservation?: boolean; afterEventRead?: () => void } | null = null;
+let cachedArchive: { id: string; fetched_at: string; html: string } | null = null;
 let extractor: (name: string, body: Record<string, unknown>) => Response = () => json({ error: "no extractor stubbed" }, 500);
 
 function json(body: unknown, status = 200): Response {
@@ -50,6 +51,9 @@ function json(body: unknown, status = 200): Response {
   if (url.pathname.startsWith("/auth/v1/")) return json({ code: 401, msg: "invalid JWT" }, 401);
   if (url.pathname.startsWith("/rest/v1/")) {
     const wantsObject = (req.headers.get("accept") ?? "").includes("vnd.pgrst.object");
+    if (cachedArchive && isRead && url.pathname === "/rest/v1/listing_page_snapshots") {
+      return json(url.searchParams.has("id") ? { id: cachedArchive.id, fetched_at: cachedArchive.fetched_at } : [cachedArchive]);
+    }
     if (clWorld) {
       if (url.pathname === "/rest/v1/observation_sources" && isRead) return json({ id: "source-craigslist", base_trust_score: 0.4, supported_observations: ["listing"] });
       if (url.pathname === "/rest/v1/vehicle_observations") {
@@ -539,5 +543,30 @@ Deno.test({
     equal(result.status, "created");
     equal(extractorCalls(), ["extract-craigslist"]);
     equal(vehicleInserts().length, 1);
+  },
+});
+
+Deno.test({
+  name: "the real fetching extractor carries the cached snapshot clock from a keyed receipt read without another source visit",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const ingestHandler = handler;
+    cachedArchive = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", fetched_at: "2026-01-04T01:02:03.456Z", html: SHARE_HTML };
+    seen = [];
+    try {
+      await import("../extract-craigslist/index.ts");
+      const response = await handler!(new Request("https://test.local/functions/v1/extract-craigslist", {
+        method: "POST", headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: SHARE_URL, save_to_db: false }),
+      }));
+      equal(response.status, 200);
+      const result = await response.json();
+      equal(result.extracted.source_capture, { snapshot_id: cachedArchive.id, observed_at: cachedArchive.fetched_at });
+      equal(seen.length, 2);
+      for (const request of seen) equal([new URL(request.url).hostname, request.path, request.method], ["stub.supabase.test", "/rest/v1/listing_page_snapshots", "GET"]);
+      const receipt = new URL(seen[1].url);
+      equal([receipt.searchParams.get("id"), receipt.searchParams.get("platform"), receipt.searchParams.get("success")],
+        [`eq.${cachedArchive.id}`, "eq.craigslist", "eq.true"]);
+    } finally { cachedArchive = null; handler = ingestHandler; }
   },
 });
