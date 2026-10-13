@@ -351,3 +351,50 @@ CI. After the existing migration deployment path, verify the exact definition,
 unchanged permissions, anonymous ordinary/private controls, boundary IDs and
 cold/warm latency using declared public requests. Keep production acceptance
 unverified until those checks pass; no fixture establishes population readiness.
+
+## Prepared exact retained-work assay aggregation, 2026-10-13
+
+The existing `assay_retained_listing_properties()` returned `unavailable / read_failed`
+with SQLSTATE `57014` while the scheduled worker was succeeding. Successful cron
+executions do not establish completed claims or current custody. Two separately
+bounded live measurements identified additive cost: the exact done count/distinct
+pass took 2,126.345 ms for 498,013 done work rows, including a 9,760 kB external sort;
+the existing 200-row custody check took 982.926 ms. Custody selection read only 101
+entries from each end of the completed index. These are dated component timings,
+not a sum measured from one complete assay invocation.
+
+`20261013144500_consolidate_retained_listing_assay.sql` is implemented and locally
+tested only. It aggregates the entire work relation once by property/status and
+derives the exact status, completed, failed, due, property and recent-completion
+counts from that small result. Global `COUNT(DISTINCT observation_id)` remains a
+separate exact pass. Custody selection/checking, the recent attribution join, JSON
+shape and null behavior, source scan receipts, status rules, permissions and the
+existing five-second function setting remain unchanged. No population cap, index,
+table, stored counter, writer or resource setting is added. The guarded migration
+accepts only the measured baseline or its exact already-applied replacement; the
+latter is a no-op. Other definition/config drift refuses before replacement.
+
+The existing retained-property PostgreSQL fixture now checks complete old/new JSON
+equality on real replay, empty/incomplete/missing state, all work statuses, duplicate
+result IDs across properties, exact recent cutoffs, private-parent withdrawal,
+complete small-population custody and cancellation. Its `v_job_health` consumer
+agrees, and the migration preserves OID, owner, ACL, configuration, data, indexes,
+custody and public reader definitions. The same `image-projection` CI job runs it.
+
+A disposable PostgreSQL 17.9 fixture also reconciles all 500,000 synthetic work rows
+(498,000 done, 490,000 distinct results). At default `work_mem=4MB` and
+`hash_mem_multiplier=2`, additive aggregation took 65.420 ms versus 137.598 ms across
+the old component queries. Whole synthetic assay timings were 317.736 → 256.932 ms;
+the reversed warm-order repeat was 323.038 → 253.421 ms. Temporary I/O stayed at
+1,220 blocks read / 1,222 written. A grouped/hash distinct alternative was rejected:
+148.607 ms and 4,842 temporary blocks written, versus 71.605 ms / 1,222 for the
+original distinct query. No memory increase was used to hide that regression.
+
+Those synthetic rows have missing custody parents, and their four-row observation
+clock fixture tests recent-join semantics without rewriting immutable testimony.
+The scale timings therefore do not model production custody cost, cold storage or
+concurrent ingestion. Lifetime aggregation remains linear in retained work; this
+repair does not guarantee the assay stays below its budget at every future size.
+Production speedup, renewed full-assay availability and fleet readiness remain
+unverified. After checked delivery, measure the existing full assay once under its
+existing budget and retain `unavailable` if it cannot complete.

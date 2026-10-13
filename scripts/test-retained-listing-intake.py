@@ -353,6 +353,8 @@ if powertrain:
     if native_identity:
         from test_retained_native_identity import run_native_identity_checks
         run_native_identity_checks(sql,read,rejects,claim,passed)
+        from test_retained_assay_aggregation import run_assay_aggregation_checks
+        run_assay_aggregation_checks(sql,read,rejects,passed)
     sys.exit(0)
 if two_front:
     assert sql("SELECT reverse_cursor_recorded_at='2026-01-01'::timestamptz AND cursor_recorded_at='2026-01-01'::timestamptz FROM retained_listing_property_replay")=='t'
