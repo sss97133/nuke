@@ -396,7 +396,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   // PERF: Never do per-card network calls on the feed.
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
-  const { displayPrice } = React.useMemo(() => {
+  const { displayPrice, priceKind } = React.useMemo(() => {
     const v: any = vehicle as any;
     
     // Extract all price fields with proper validation
@@ -453,7 +453,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     const formatted = formatCurrencyValue(priceValue);
 
-    return { displayPrice: formatted };
+    // The kind of money that number is, in the same order. A number without its kind is not a price.
+    const priceKind =
+      salePrice != null ? 'SOLD' :
+      liveBid != null ? 'BID' :
+      winningBid != null ? 'SOLD' :
+      highBid != null ? 'HIGH BID' :
+      currentBid != null ? 'BID' :
+      asking != null ? 'ASKING' :
+      currentValue != null ? 'EST' :
+      purchasePrice != null ? 'PAID' :
+      msrp != null ? 'MSRP' : null;
+
+    return { displayPrice: formatted, priceKind };
   }, [vehicle]);
 
   const identity = React.useMemo(() => getVehicleIdentityTokens(vehicle as any), [vehicle]);
@@ -1136,10 +1148,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // If auction ended > 1 day ago, show asset value instead of auction status
     if (shouldShowAssetValue) {
       if (marketValue) {
-        return formatCurrencyValue(marketValue);
+        return `${v.current_value ? 'EST' : v.asking_price ? 'ASKING' : 'PAID'} ${formatCurrencyValue(marketValue)}`;
       }
       if (ownerCost) {
-        return formatCurrencyValue(ownerCost);
+        return `PAID ${formatCurrencyValue(ownerCost)}`;
       }
     }
     
@@ -1147,17 +1159,17 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // For non-auction vehicles, use displayPrice which handles: sale_price > asking_price > etc.
     // But also check marketValue/ownerCost as fallback if displayPrice is "—"
     if (displayPrice && displayPrice !== '—') {
-      return displayPrice;
+      return priceKind ? `${priceKind} ${displayPrice}` : displayPrice;
     }
     // Fallback to market value if displayPrice is empty
     if (marketValue) {
-      return formatCurrencyValue(marketValue);
+      return `${v.current_value ? 'EST' : v.asking_price ? 'ASKING' : 'PAID'} ${formatCurrencyValue(marketValue)}`;
     }
     if (ownerCost) {
-      return formatCurrencyValue(ownerCost);
+      return `PAID ${formatCurrencyValue(ownerCost)}`;
     }
     return displayPrice; // Will be "—" if nothing found
-  }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
+  }, [isActiveAuction, displayPrice, priceKind, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
 
   const closeSpecPopover = React.useCallback(() => setSpecPopover(null), []);
 
@@ -1413,6 +1425,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const up = raw.toUpperCase();
     if (up.startsWith('SOLD ')) return { label: 'SOLD', value: raw.slice(5).trim() || null };
     if (up.startsWith('RESULT ')) return { label: 'RESULT', value: raw.slice(7).trim() || null };
+    // The kind of money, from the price memo: a bid, a high bid, an ask, an estimate, what was paid, the MSRP.
+    const kind = /^(HIGH BID|BID|ASKING|EST|PAID|MSRP) (.+)$/.exec(up);
+    if (kind) return { label: kind[1], value: raw.slice(kind[1].length + 1).trim() || null };
     if (up === 'ENDED') return { label: 'ENDED', value: null as string | null };
     return { label: null as string | null, value: raw || null };
   }, [badgeMainText]);
