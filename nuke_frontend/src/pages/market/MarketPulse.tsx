@@ -62,9 +62,9 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
   const now = useSecondClock();
   const remaining = endsAt - now;
   return (
-    <span className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
+    <Text role="measure" dense className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
       {remaining <= 0 ? 'Awaiting result' : left(remaining)}
-    </span>
+    </Text>
   );
 }
 
@@ -79,12 +79,12 @@ const STALE_MS = 45 * 60_000;
 
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
-    <span
+    <Text role="measure" dense
       title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       className={`market-bid${risen ? ' market-bid--risen' : stale ? ' market-bid--stale' : ''}`}
     >
       {bidNumber(auction.currentBid)}
-    </span>
+    </Text>
   );
 }
 
@@ -118,7 +118,7 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
   return (
     <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
       <div className="market-lot-close">
-        <span className="market-lot-label">Closes in</span>
+        <Text role="label">Closes in</Text>
         <Countdown endsAt={a.endsAt} />
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
@@ -127,25 +127,25 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
       </button>
       <div className="market-lot-identity">
         <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
-          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>{title(a)}</button>
+          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity" dense>{title(a)}</Text></button>
         <div className="market-lot-facts">
           {facts.map(f => <button type="button" key={f.field} onClick={() => onInspect(a, 'vehicle')}
             title={`${f.label}: ${f.value}${f.conflict ? ' · differing reports' : ''}`}
             aria-label={`Inspect ${f.label.toLowerCase()} for ${title(a)}: ${f.value}${f.conflict ? ', differing reports' : ''}`}>
-            {f.value}{f.conflict && <span aria-hidden="true"> †</span>}
+            <Text role="body">{f.value}{f.conflict && <span aria-hidden="true"> †</span>}</Text>
           </button>)}
-          {!facts.length && specs.isError && <span>Specifications unavailable</span>}
+          {!facts.length && specs.isError && <Text role="caption">Specifications unavailable</Text>}
         </div>
         <div className="market-lot-context">
-          {detail?.location && <span>{detail.location}</span>}
-          {a.noReserve && <span>No reserve</span>}
-          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}>Source: BaT</button>
+          {detail?.location && <Text role="caption">{detail.location}</Text>}
+          {a.noReserve && <Text role="caption">No reserve</Text>}
+          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}><Text role="caption">Source: BaT</Text></button>
         </div>
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
-          fallback={<span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
+          fallback={<span><Text role="label">Recorded bid</Text><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
       </button>
     </div>
   );

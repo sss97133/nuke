@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Text } from '../../kit';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { listingDescriptionsFromSpecs } from '../../components/vehicle/listingDescriptions';
 import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '../../hooks/useAuctionComments';
@@ -48,20 +49,20 @@ export function AuctionCompetition({ vehicleId, sourceUrl, row = false, enabled 
   if (!reading || !query.data || !reading.states.length) {
     const message = query.isFetching ? 'Reading bidding…' : query.isError ? 'Bidding read unavailable'
       : 'Bid depth not established';
-    return row ? <>{fallback}<span className="market-lot-last-bid">{message}</span></>
+    return row ? <>{fallback}<Text role="caption" className="market-lot-last-bid">{message}</Text></>
       : <p role="status">{message}{query.isError && <>. <button type="button" onClick={() => void query.refetch()}>Retry</button></>}</p>;
   }
   const r = reading;
   const last = r.states[r.states.length - 1];
   const coverage = `${r.held}/${r.reported ?? '?'} reported bids held`;
   if (row) return <>
-    <span><span className="market-lot-label">Retained high</span><strong>{amount(r.high!)}</strong></span>
-    <span className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
+    <span><Text role="label">Retained high</Text><Text role="measure" dense>{amount(r.high!)}</Text></span>
+    <Text role="caption" className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
       {r.near! > 0 ? <><strong>{r.exact ? '' : '≥'}{r.near}</strong> within 10% of high</> : 'Near-high identities unresolved'}
-    </span>
-    <span className="market-lot-last-bid">{r.exact ? '' : '≥'}{r.bidders} bidders · {coverage}</span>
-    {r.lastRaise != null && <span className="market-lot-last-bid">Last raise +{pct(r.lastRaise)}</span>}
-    <time className="market-lot-last-bid" dateTime={new Date(last.bid.at).toISOString()}
+    </Text>
+    <Text role="caption" className="market-lot-last-bid">{r.exact ? '' : '≥'}{r.bidders} bidders · {coverage}</Text>
+    {r.lastRaise != null && <Text role="caption" className="market-lot-last-bid">Last raise +{pct(r.lastRaise)}</Text>}
+    <time className="k-caption market-lot-last-bid" dateTime={new Date(last.bid.at).toISOString()}
       title={stamp(new Date(last.bid.at).toISOString())}>Bid {Math.max(0, Math.floor((Date.now() - last.bid.at) / 3_600_000)) >= 1
         ? `${Math.floor((Date.now() - last.bid.at) / 3_600_000)}h ago` : `${Math.max(0, Math.floor((Date.now() - last.bid.at) / 60_000))}m ago`}</time>
   </>;

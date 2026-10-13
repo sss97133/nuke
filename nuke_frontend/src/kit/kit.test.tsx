@@ -60,6 +60,12 @@ describe('Text and formatting', () => {
     expect(h1.className).toBe('k-entity');
     expect(h1.getAttribute('style')).toBeNull();
   });
+  it('adds a dense form to entity and measure only', () => {
+    render(<><Text role="entity" dense>Lot</Text><Text role="measure" dense>12</Text><Text role="body" dense>facts</Text></>);
+    expect(host.querySelector('.k-entity')?.className).toBe('k-entity k-entity--dense');
+    expect(host.querySelector('.k-measure')?.className).toBe('k-measure k-measure--dense');
+    expect(host.querySelector('.k-body')?.className).toBe('k-body');
+  });
   it('formats units and clocks', () => {
     expect(formatMeasure(24000, 'USD')).toBe('$24,000');
     expect(formatMeasure(12.345, '%')).toBe('12.3%');
