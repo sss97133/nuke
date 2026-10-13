@@ -40,6 +40,17 @@ evidence is generated rather than typed: the hand-written table of 2026-10-07 wa
 within an hour. The block below is written by the daily `readme-stats.mjs` run, and its queries fix the unit and print
 the denominators.
 
+Against the comparison a reviewer raises most, Scale AI: the same loop with the ownership reversed. Scale labels
+other people's data for other people's models, with about 240,000 contractors through Remotasks and Outlier (Turing
+Post, Contrary Research) and services revenue just under $1B in 2025 (Forbes 2026-05-14), and keeps none of the
+output; its ground truth is annotator consensus, which is why it needs a workforce and a QA department. Nuke keeps
+its own ledger of observations about assets and grades its own predictions against outcomes the market settles, a
+hammer, a title transfer, a receipt, which nobody labels. The week Meta bought 49% of Scale for $14.3B (June 2025,
+CNBC) its largest model customers left, because a service holds no asset that stays; Nuke's asset is the ledger and
+the error table. The one Scale idea kept here is the data-engine rule, collect more of what the model fails on: the
+lots with the largest graded error name the next photos and comments to process (`v_graded_lot_vision_backlog`,
+2026-10-13).
+
 ## What is measured
 
 Units are lots, not rows, and every rate names its denominator. The block below is generated from the live database
