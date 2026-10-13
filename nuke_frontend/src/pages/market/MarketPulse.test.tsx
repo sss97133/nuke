@@ -123,6 +123,17 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).not.toContain('mapChild');
     await click('1990–1999:'); expect(boardTitles()).toEqual(['later']);
   });
+  it('shows the models inside a brand box before the drill is taken, and keeps the chosen sub-box option', async () => {
+    fixture.pulse.data.auctions[0].model = 'Recorded model A';
+    await render();
+    expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('model');
+    const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
+    expect(porsche.querySelector('button[aria-label^="Recorded model A: 1 captured lots"]')).toBeTruthy();
+    expect(porsche.querySelector('button[aria-label^="Local fixture: 2 captured lots"]')).toBeTruthy();
+    await choose('Inventory sub-boxes', 'none');
+    expect(window.location.search).toContain('mapInside=none');
+    expect(container.querySelector('[data-map-group="PORSCHE"] .inventory-map-child')).toBeNull();
+  });
   it('opens an individual lot in the existing evidence route without a nested button', async () => {
     const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
     fixture.pulse.data.auctions[0].id = id;
@@ -142,7 +153,18 @@ describe('market answer -> supporting lots', () => {
     await render('mapBy=make');
     const more = container.querySelector<HTMLButtonElement>('[data-map-more]')!;
     expect(more.textContent).toContain('more brands');
-    await act(async () => more.click());
+    // The tail keeps its area: every small brand is a cell of its own inside the box, sized by its lots.
+    const tail = more.closest('.inventory-map-region')!;
+    const folded = Number(more.textContent!.match(/(\d+) more brands/)![1]);
+    expect(folded).toBeGreaterThan(60);
+    expect(tail.querySelectorAll('.inventory-map-child')).toHaveLength(folded);
+    expect(tail.querySelector('button[aria-label^="SMALL 79:"]')).toBeTruthy();
+    expect(container.querySelector('.inventory-map-more-preview')).toBeNull();
+    await act(async () => tail.querySelector<HTMLButtonElement>('button[aria-label^="SMALL 78:"]')!.click());
+    expect(window.location.search).toContain('make=SMALL+78');
+    expect(boardTitles()).toEqual(["small-78"]);
+    await click('All captured makes');
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-map-more]')!.click());
     const list = container.querySelector('.inventory-map-list-grid')!;
     expect(list.textContent).toContain('SMALL 79');
     await act(async () => list.querySelector<HTMLButtonElement>('button[aria-label^="SMALL 79:"]')!.click());

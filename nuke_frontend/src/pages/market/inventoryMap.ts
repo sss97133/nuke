@@ -20,7 +20,8 @@ export const lotTitle = vehicleIdentity;
 
 export function mapLens(params: URLSearchParams, make: string | null): InventoryMapLens {
   const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'model' : 'make');
-  const inside = (['none', 'make', 'model', 'year', 'lot'] as const).find(s => s === params.get('mapInside')) ?? 'none';
+  // A brand box shows its models unless the viewer chooses otherwise: the drill is visible before it is taken.
+  const inside = (['none', 'make', 'model', 'year', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'model' : 'none');
   return { group, inside, focus: params.get('mapFocus'), child: inside === 'none' ? null : params.get('mapChild') };
 }
 
