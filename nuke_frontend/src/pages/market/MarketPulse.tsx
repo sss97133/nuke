@@ -78,7 +78,7 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
   const now = useSecondClock();
   const remaining = endsAt - now;
   return (
-    <span style={{ ...mono, fontWeight: strong || remaining < HOUR ? 700 : 400, color: remaining < HOUR ? 'var(--text)' : 'var(--text-secondary)' }}>
+    <span className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
       {remaining <= 0 ? 'Awaiting result' : left(remaining)}
     </span>
   );
@@ -431,20 +431,9 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function Thumb({ src, size }: { src: string | null; size: number }) {
-  const h = Math.round(size * 0.67);
-  if (!src) return <div style={{ width: size, height: h, background: 'var(--surface)', flexShrink: 0 }} />;
-  return (
-    <img
-      src={src}
-      alt=""
-      width={size}
-      height={h}
-      loading="lazy"
-      decoding="async"
-      style={{ width: size, height: h, objectFit: 'cover', flexShrink: 0, background: 'var(--surface)' }}
-    />
-  );
+function Thumb({ src }: { src: string | null }) {
+  if (!src) return <div className="market-thumb" />;
+  return <img className="market-thumb" src={src} alt="" width={72} height={48} loading="lazy" decoding="async" />;
 }
 
 // This is a row-write-age warning only. vehicles.updated_at can change for any
@@ -455,14 +444,7 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   return (
     <span
       title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
-      style={{
-        ...mono,
-        fontWeight: 700,
-        padding: '1px 3px',
-        background: risen ? 'var(--success)' : 'transparent',
-        color: risen ? 'var(--bg)' : stale ? 'var(--text-disabled)' : 'var(--text)',
-        transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
+      className={`market-bid${risen ? ' market-bid--risen' : stale ? ' market-bid--stale' : ''}`}
     >
       {bidNumber(auction.currentBid)}
     </span>
@@ -504,7 +486,7 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
-        <Thumb src={a.imageUrl} size={72} />
+        <Thumb src={a.imageUrl} />
       </button>
       <div className="market-lot-identity">
         <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
@@ -777,16 +759,16 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   if (!data && isError && view === 'inventory' && !activityId) return <>
     {masthead}
     {scope}
-    <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
+    <div role="status" className="market-status">Live BaT bids could not be loaded. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry live board</Text></button></div>
     {onUnavailable}
   </>;
 
   return (
     <ExplainContext.Provider value={openExplain}>
-    <div className="market-explorer" style={{ fontFamily: 'Arial, sans-serif', color: 'var(--text)', background: 'var(--bg)', padding: '12px 12px 32px' }}>
+    <div className="market-explorer">
       {masthead}
 
-      {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
+      {view === 'inventory' && isError && data && <div role="status" className="market-status">Refresh failed. Showing the last fetched board. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry</Text></button></div>}
 
       {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
@@ -796,83 +778,66 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 
       {view === 'inventory' && <>
-      {make && <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
-        <button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('make', null)}>All captured makes</button>
-        {make && <><span aria-hidden="true">→</span><button style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}><MakeLogo make={make} />{make}</button></>}
-        {model && <><span aria-hidden="true">→</span><span>Recorded model: {model}</span></>}
-      </div>}
+      {make && <nav aria-label="Inventory drill path" className="market-drill">
+        <button type="button" className="market-control" onClick={() => setParam('make', null)}><Text role="label">All captured makes</Text></button>
+        <span aria-hidden="true">→</span>
+        <button type="button" className="market-control market-control--make" onClick={() => setParam('model', null)}><MakeLogo make={make} /><Text role="label">{make}</Text></button>
+        {model && <><span aria-hidden="true">→</span><Text role="body">Recorded model: {model}</Text></>}
+      </nav>}
 
-      {/* Figures. Each one is a filter on the board below. */}
-      <div role="group" aria-label="Open inventory filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
-        {WINDOWS.map((w) => (
-          <Figure
-            key={w.id}
-            caption={w.label}
-            hint={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min'
-              : w.id === 'hot' ? `Bid at least ${HOT}x where comparable sales usually are at this point in the auction (within 5 days of the close)`
-              : w.id === 'cold' ? `Bid at most ${COLD}x where comparable sales usually are at this point in the auction (within 5 days of the close)`
-              : undefined}
-            value={isLoading ? '…' : figures[w.id].toLocaleString('en-US')}
-            active={win === w.id && w.id !== 'all'}
-            onClick={() => setParam('live', w.id === 'all' || win === w.id ? null : w.id)}
-            compact={narrow}
-          />
+      {/* Windows. Each is a count that filters the board below. The whole cohort is counted in the masthead,
+          and a window with nothing in it is not offered. */}
+      <div role="group" aria-label="Open inventory filters" className="market-windows">
+        {WINDOWS.filter((w) => w.id !== 'all' && (isLoading || win === w.id || figures[w.id] > 0)).map((w) => (
+          <button key={w.id} type="button" className="market-window" aria-pressed={win === w.id}
+            title={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min' : undefined}
+            onClick={() => setParam('live', win === w.id ? null : w.id)}>
+            <Text role="label">{w.label}</Text>
+            <Text role="measure">{isLoading ? '…' : figures[w.id].toLocaleString('en-US')}</Text>
+          </button>
         ))}
       </div>
 
-      {!isLoading && <details open={selectedBid != null} style={{ fontSize: 11, marginBottom: 12 }}>
-        <summary>Filter live lots by recorded bid number · currency unverified</summary>
+      {!isLoading && <details open={selectedBid != null} className="market-distribution">
+        <summary><Text role="label">Filter live lots by recorded bid number · currency unverified</Text></summary>
         <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
       </details>}
 
 
-      <div style={{ marginBottom: 12 }}>
-        <section style={{ minWidth: 0 }}>
+      <section className="market-map">
           {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy}
             taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
             risenIds={risenIds} selectedModel={model} onLensChange={setInventoryLens} onSelect={selectMapGroup} />}
-        </section>
-      </div>
+      </section>
 
 
       <div ref={boardRef} tabIndex={-1} className="market-board" aria-label="Supporting live lots">
-      <section style={{ border: '2px solid var(--border)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
-          <span style={label}>
+      <section className="market-board__frame">
+        <div className="market-board__head">
+          <Text role="caption">
             {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`} · source bid units unverified
             {make ? ` · ${make}` : ''}
             {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
             {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
-            <span style={{ marginLeft: 12, fontWeight: 400 }}>† differing specification reports</span>
-          </span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {' · † differing specification reports'}
+          </Text>
+          <div className="market-sorts" role="group" aria-label="Sort">
             {SORTS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setParam('sort', s.id === 'ending' ? null : s.id)}
-                aria-pressed={sort === s.id}
-                style={{
-                  ...label,
-                  color: sort === s.id ? 'var(--bg)' : 'var(--text)',
-                  background: sort === s.id ? 'var(--text)' : 'transparent',
-                  border: '2px solid var(--text)',
-                  padding: '2px 6px',
-                  cursor: 'pointer',
-                }}
-              >
-                {s.label}
+              <button key={s.id} type="button" className="market-control" aria-pressed={sort === s.id}
+                onClick={() => setParam('sort', s.id === 'ending' ? null : s.id)}>
+                <Text role="label">{s.label}</Text>
               </button>
             ))}
           </div>
         </div>
-        {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" style={{ padding: 12 }}>No open lots match these filters. <button onClick={() => {
+        {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" className="market-board__empty">No open lots match these filters. <button type="button" className="market-control" onClick={() => {
           const next = new URLSearchParams(params);
           ['make', 'live', 'bidRange', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
           next.delete('model');
           next.set('make', 'all');
           setParams(next, { replace: true });
-        }}>Clear market filters</button></div>}
+        }}><Text role="label">Clear market filters</Text></button></div>}
         {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind}
           activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
@@ -887,9 +852,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       </>}
 
       {view === 'inventory' && data?.source && (
-        <div style={{ ...label, marginTop: 8 }}>
+        <Text role="caption" as="p" className="market-source">
           Source: {data.source}. Current bid is a recorded listing number; its unit and freshness need source evidence. Monetary totals, medians and hot/cold comparisons are withheld until currencies can be matched.
-        </div>
+        </Text>
       )}
       <ExplainSheet item={explaining} onClose={closeExplain} narrow={narrow} />
     </div>
@@ -902,66 +867,36 @@ function BidDistribution({ distribution, lots, scope, selected, onSelect, fetche
   selected: BidBucket | null; onSelect: (b: BidBucket) => void; fetchedAt: number;
 }) {
   return (
-    <section aria-label="Current bid distribution" style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', marginBottom: 6 }}>
-        <span style={{ ...label, color: 'var(--text)' }}>{scope}</span>
-        <span style={{ fontSize: 12 }}>
-          {distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid number
-        </span>
+    <section aria-label="Current bid distribution" className="market-distribution__body">
+      <div className="market-distribution__head">
+        <Text role="label">{scope}</Text>
+        <Text role="body">{distribution.recorded.toLocaleString('en-US')} of {lots.toLocaleString('en-US')} lots have a recorded bid number</Text>
       </div>
-      {lots === 0 && <div role="status" style={{ fontSize: 12 }}>No open lots in this scope.</div>}
-      <div style={{ display: 'grid', gap: 2 }}>
+      {lots === 0 && <div role="status" className="k-body">No open lots in this scope.</div>}
+      <div className="market-distribution__bars">
         {BID_BUCKETS.map(b => {
           const n = distribution.counts[b.id];
           const pct = lots > 0 ? n / lots * 100 : 0;
           return (
-            <button key={b.id} disabled={n === 0 && selected !== b.id} aria-pressed={selected === b.id}
+            <button key={b.id} type="button" className="market-bucket" disabled={n === 0 && selected !== b.id} aria-pressed={selected === b.id}
               aria-label={`${b.label}: ${n} of ${lots} lots. Show supporting lots`}
-              onClick={() => onSelect(b.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 24, padding: '2px 4px', border: '2px solid transparent', textAlign: 'left', fontFamily: 'Arial, sans-serif', fontSize: 11,
-                color: selected === b.id ? 'var(--bg)' : 'var(--text)', background: selected === b.id ? 'var(--text)' : 'var(--bg)', cursor: n > 0 || selected === b.id ? 'pointer' : 'default' }}>
-              <span style={{ width: 100, flexShrink: 0 }}>{b.label}</span>
-              <span aria-hidden="true" style={{ flex: 1, height: 8, background: 'var(--surface)' }}>
-                <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: selected === b.id ? 'var(--bg)' : 'var(--text-secondary)' }} />
-              </span>
-              <span style={{ ...mono, width: 76, textAlign: 'right', flexShrink: 0 }}>{n} · {pct.toFixed(1)}%</span>
+              onClick={() => onSelect(b.id)}>
+              <Text role="body" className="market-bucket__label">{b.label}</Text>
+              <svg aria-hidden="true" className="market-bucket__track" viewBox="0 0 100 1" preserveAspectRatio="none"><rect x="0" y="0" width={pct} height="1" /></svg>
+              <Text role="measure" className="market-bucket__count">{n} · {pct.toFixed(1)}%</Text>
             </button>
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
+      <Text role="caption" as="div" className="market-distribution__note">
         Recorded bid numbers · source currency unknown · ranges group raw numbers, not comparable monetary values. Choose a range to see its lots.
-      </div>
-      <details style={{ fontSize: 11, marginTop: 6 }}>
-        <summary style={{ cursor: 'pointer' }}>Scope, source and timing</summary>
-        <p style={{ margin: '6px 0' }}>One public, undeleted vehicle record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
-        <p style={{ margin: '6px 0' }}>These are recorded listing numbers, not sold prices or a valuation. Their source currencies are unknown, so monetary aggregates and comparison tags are withheld. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
-        <p style={{ margin: '6px 0' }}>Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. BaT's board is scheduled to be read every 15 minutes; that schedule does not prove freshness.</p>
+      </Text>
+      <details className="market-notes">
+        <summary><Text role="label">Scope, source and timing</Text></summary>
+        <p className="k-body">One public, undeleted vehicle record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
+        <p className="k-body">These are recorded listing numbers, not sold prices or a valuation. Their source currencies are unknown, so monetary aggregates and comparison tags are withheld. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
+        <p className="k-body">Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. BaT's board is scheduled to be read every 15 minutes; that schedule does not prove freshness.</p>
       </details>
     </section>
-  );
-}
-
-function Figure({ caption, value, active, onClick, hint, compact }: { caption: string; value: string; active: boolean; onClick: () => void; hint?: string; compact?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      title={hint}
-      style={{
-        textAlign: 'left',
-        padding: compact ? '6px 6px' : '8px 10px',
-        border: '2px solid var(--border)',
-        flex: '1 1 100px',
-        minHeight: 44,
-        background: active ? 'var(--text)' : 'var(--bg)',
-        color: active ? 'var(--bg)' : 'var(--text)',
-        cursor: 'pointer',
-        transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
-    >
-      <div style={{ ...label, color: 'inherit', opacity: 0.8 }}>{caption}</div>
-      <div style={{ ...mono, fontSize: 15, fontWeight: 700, marginTop: 2 }}>{value}</div>
-    </button>
   );
 }
