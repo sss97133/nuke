@@ -160,7 +160,7 @@ describe('ImageGallery canonical database rows', () => {
 
   it('keeps all399 admitted photos through filename/date heuristics and progressive navigation', async () => {
     await mount();
-    expect(fixture.fetch).toHaveBeenCalledWith('vehicle-fixture', expect.any(String), { includeMismatchFilter: true });
+    expect(fixture.fetch).toHaveBeenCalledWith('vehicle-fixture', expect.any(String), expect.objectContaining({ includeMismatchFilter: true }));
     const rendered = galleryPhotos();
     expect(rendered).toHaveLength(399);
     expect(new Set(rendered.map(img => img.getAttribute('src'))).size).toBe(399);
@@ -168,6 +168,29 @@ describe('ImageGallery canonical database rows', () => {
     // Last image opens with its real database ID, rather than a synthetic URL row.
     await act(async () => { rendered.at(-1)!.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
     expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(fixture.rows.at(-1)!.id);
+  });
+
+  it('says how many of the admitted photos loaded when the fetch left rows behind, and only then', async () => {
+    fixture.fetch.mockImplementation(async (_vehicleId: string, _select: string, options: any) => {
+      options?.onLoadCoverage?.({ loaded: 399, total: 1445 });
+      return fixture.rows;
+    });
+    await mount();
+    expect(container.textContent).toContain('399 of 1,445');
+    expect(container.querySelector('[title*="399 of 1,445 admitted images loaded"]')).not.toBeNull();
+
+    fixture.fetch.mockImplementation(async (_vehicleId: string, _select: string, options: any) => {
+      options?.onLoadCoverage?.({ loaded: 399, total: 399 });
+      return fixture.rows;
+    });
+    await act(async () => { root.unmount(); });
+    container.remove();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await mount();
+    expect(container.textContent).not.toContain(' of 399');
+    expect(container.textContent).toMatch(/399 (photos|images)/);
   });
 
   it('keeps legacy URL fallback filtering separate from canonical admission', async () => {
