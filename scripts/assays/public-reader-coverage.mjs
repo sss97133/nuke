@@ -35,10 +35,13 @@
  * Operator identity-witness acquisition (existing read-only Management API path):
  *   --identity-evidence /private/config.json --out /private/new-segment.jsonl
  * Config: {mode:public_identity_evidence_v1, configuration:<reconciliation config>,
- *   after?:<last UUID>, budget:{batchSize:1..200,maxRequests:1..10000,pauseMs:100..60000,until}}.
+ *   after?:<exclusive UUID>, through?:<inclusive UUID>,
+ *   budget:{batchSize:1..200,maxRequests:1..10000,pauseMs:100..60000,until}}.
  * Each private segment reports its dated full denominator, current read window,
  * exact source-path exhaustion and uninspected population. `after` selects a
- * segment, not proof that earlier segments completed. Terminal hashes certify
+ * segment, not proof that earlier segments completed. `through` bounds an exact
+ * retry range within the same manifest; it does not shrink the denominator.
+ * Terminal hashes certify
  * receipt bytes only. Source support is one gate; anonymous delivery, independent
  * quality, freshness and service remain unassessed. No database or model writes.
  */
@@ -1474,8 +1477,10 @@ function identityInput(input, now) {
     !Number.isInteger(b.maxRequests) || b.maxRequests < 1 || b.maxRequests > 10000 ||
     !Number.isInteger(b.pauseMs) || b.pauseMs < 100 || b.pauseMs > 60000 ||
     !streamClock(b.until) || Date.parse(b.until) <= now || Date.parse(b.until) > now + 14 * 3600000 ||
-    !UUID.test(input.after ?? ZERO)) throw new AssayError('invalid_identity_evidence_scope');
-  return { ...b, after: (input.after ?? ZERO).toLowerCase(), until: Date.parse(b.until) };
+    !UUID.test(input.after ?? ZERO) || input.through != null &&
+      (!UUID.test(input.through) || input.through.toLowerCase() <= (input.after ?? ZERO).toLowerCase()))
+    throw new AssayError('invalid_identity_evidence_scope');
+  return { ...b, after: (input.after ?? ZERO).toLowerCase(), through: input.through?.toLowerCase() ?? null, until: Date.parse(b.until) };
 }
 
 function identitySubjects(rows, ids) {
@@ -1539,19 +1544,21 @@ export async function acquireIdentityEvidence(input, { query, emit = async () =>
   const b = identityInput(input, now()), c = input.configuration, verified = {};
   // Validate the WHOLE dated manifest before issuing any live query. Incomplete
   // input tails must not initiate an expensive partial census.
-  let previous = '', afterFound = b.after === ZERO;
+  let previous = '', afterFound = b.after === ZERO, throughFound = b.through === null;
   for await (const s of reconciliationStream(c.manifest, c.population, 'subject', verified)) {
     if (!UUID.test(s.key ?? '') || s.key !== s.key.toLowerCase() || s.key <= previous ||
       s.grain !== c.population.grain || JSON.stringify(s.capabilities) !== '["find_open"]')
       throw new AssayError('identity_manifest_subject_invalid');
     previous = s.key;
     if (s.key === b.after) afterFound = true;
+    if (s.key === b.through) throughFound = true;
   }
   if (!afterFound) throw new AssayError('identity_resume_key_outside_manifest');
+  if (!throughFound) throw new AssayError('identity_end_key_outside_manifest');
   const startedAt = new Date(now()).toISOString(), totals = {}, reasons = {}, retryRanges = [], gateTotals = { passed: 0, not_assessed: 0 };
   let requests = 0, inspected = 0, collected = 0, lastKey = b.after, stopReason = 'manifest_exhausted', failures = 0, ownerHash;
   await emit({ type: 'manifest', schemaVersion: IDENTITY_VERSION, population: c.population,
-    sourceManifest: verified, startedAt, after: b.after, budget: b,
+    sourceManifest: verified, startedAt, after: b.after, through: b.through, budget: b,
     anonymous: false, evidenceOnly: true, databaseWrites: 0, modelCalls: 0 });
   async function request(args) {
     if (requests >= b.maxRequests || now() >= b.until) throw new AssayError('identity_request_budget');
@@ -1649,13 +1656,20 @@ export async function acquireIdentityEvidence(input, { query, emit = async () =>
     if (stopReason !== 'manifest_exhausted') break;
     if (requests >= b.maxRequests || now() >= b.until) { stopReason = 'identity_request_budget'; break; }
     ids.push(s.key);
-    if (ids.length === b.batchSize) { await batch(ids); ids = []; }
+    if (ids.length === b.batchSize || s.key === b.through) { await batch(ids); ids = []; }
+    if (s.key === b.through) {
+      // Preserve a failed last batch's stop reason. A bounded retry is traversal
+      // of this range, never proof that the rest of the population was read.
+      if (stopReason === 'manifest_exhausted' && s.key !== previous) stopReason = 'range_boundary_reached';
+      break;
+    }
   }
   if (ids.length && stopReason === 'manifest_exhausted') await batch(ids);
   const result = { type: 'summary', schemaVersion: IDENTITY_VERSION, population: c.population,
-    startedAt, completedAt: new Date(now()).toISOString(), after: b.after, resumeAfter: lastKey,
+    startedAt, completedAt: new Date(now()).toISOString(), after: b.after, through: b.through, resumeAfter: lastKey,
     inspected, collected, uninspectedInFullPopulation: c.population.denominator - inspected,
     segmentExhausted: stopReason === 'manifest_exhausted', fullPopulationAcquired: b.after === ZERO && collected === c.population.denominator,
+    rangeExhausted: b.through !== null && lastKey === b.through && ['manifest_exhausted', 'range_boundary_reached'].includes(stopReason),
     stopReason, requests, facets: totals, evidenceGateTotals: gateTotals, reasons, retryRanges, ownerSha256: ownerHash ?? null,
     ready: 0, blocked: 0, notAssessed: c.population.denominator,
     publicReadinessCertificate: false, anonymousDeliveryMeasured: false, databaseWrites: 0, modelCalls: 0 };
@@ -1690,7 +1704,7 @@ async function runIdentityAcquisition(args, print, deps) {
         if (row.type === 'identity_evidence' && rows % 1000 === 0) print(JSON.stringify({ status: 'identity_acquisition_running', inspected: rows - 1, eligiblePopulation: input.configuration.population.denominator }));
       } });
     print(JSON.stringify(result));
-    return result.segmentExhausted ? 0 : 2;
+    return result.segmentExhausted || result.rangeExhausted ? 0 : 2;
   } finally { await source?.close(); await output?.close(); }
 }
 
