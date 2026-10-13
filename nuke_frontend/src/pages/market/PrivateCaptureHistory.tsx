@@ -8,12 +8,21 @@ import { sourceLink } from './useCapturedListings';
 
 export async function readPrivateCaptureHistory(principal: string, signal: AbortSignal) {
   const { data } = await supabase.auth.getSession();
-  if (data.session?.user.id !== principal || signal.aborted) throw new Error('Private capture session unavailable');
+  const session = data.session;
+  if (session?.user.id !== principal || !session.access_token || signal.aborted) throw new Error('Private capture session unavailable');
   const { data: reading, error } = await supabase.functions.invoke('db-stats?intake=listing_history', {
-    method: 'GET', signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+    method: 'GET', headers: { Authorization: `Bearer ${session.access_token}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
   });
   if (error || signal.aborted || !validListingHistory(reading)) throw new Error('Private captures unavailable');
   return reading;
+}
+
+function captureSurface(value: string) {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.port && !url.search && !url.hash
+      && (url.hostname === 'facebook.com' || url.hostname.endsWith('.facebook.com')) && url.pathname.startsWith('/marketplace/') ? url.href : null;
+  } catch { return null; }
 }
 
 function PrivateHistory({ principal }: { principal: string }) {
@@ -38,7 +47,9 @@ function PrivateHistory({ principal }: { principal: string }) {
         <thead><tr><th scope="col">Listing</th><th scope="col">Last observed asking amount</th><th scope="col">Observed history</th></tr></thead>
         <tbody>{reading.rows.map(history => {
           const latest = history.observations.at(-1);
-          const href = sourceLink('facebook_marketplace', latest?.actual_url ?? null) ?? facebookListingUrl(history.facebook_id);
+          const observedLink = sourceLink('facebook_marketplace', latest?.actual_url ?? null);
+          const observedId = observedLink && new URL(observedLink).pathname.match(/^\/marketplace\/item\/(\d+)\/?$/)?.[1];
+          const href = observedId === history.facebook_id ? observedLink : facebookListingUrl(history.facebook_id);
           return <tr key={history.listing_id} style={{ borderTop: '2px solid var(--border)' }}>
             <td style={{ padding: '8px 0' }}>{history.title || 'Listing title unrecorded'}<div>{history.current_vehicle_id ? 'Vehicle link retained; identity not verified here' : 'Vehicle unresolved'}</div>
               {href ? <a href={href} target="_blank" rel="noopener noreferrer">Facebook listing</a> : <span>Source link unavailable</span>}</td>
@@ -48,6 +59,8 @@ function PrivateHistory({ principal }: { principal: string }) {
               <ol>{history.observations.map(observation => <li key={observation.sighting_id}>
                 {new Date(observation.observed_at).toLocaleString()} · {observation.detail_observation ? 'Detail observation' : 'Search sighting'} · {observation.asking_amount === null ? 'Ask unrecorded' : `${observation.asking_amount.toLocaleString()} ${observation.asking_currency || 'currency unrecorded'}`}
                 <div>{observation.source_scope_complete === true ? 'Declared complete capture' : 'Partial or undeclared capture scope'}</div>
+                <div>{captureSurface(observation.actual_url) ? <a href={captureSurface(observation.actual_url)!} target="_blank" rel="noopener noreferrer">Capture surface</a> : 'Capture surface unavailable here'}</div>
+                <div>Known by capture completion {new Date(observation.known_by).toLocaleString()}</div>
               </li>)}</ol>
             </details></td>
           </tr>;

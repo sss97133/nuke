@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ user: null as { id: string } | null, admin: false, sessionUser: 'owner', invoke: vi.fn() }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user }) }));
 vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: fixture.admin, loading: false }) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: fixture.sessionUser } } } }) }, functions: { invoke: fixture.invoke } } }));
+vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: fixture.sessionUser }, access_token: `synthetic-${fixture.sessionUser}-token` } } }) }, functions: { invoke: fixture.invoke } } }));
 import PrivateCaptureHistory, { readPrivateCaptureHistory } from './PrivateCaptureHistory';
 
 function reading(title = 'Synthetic private listing') {
@@ -67,4 +67,19 @@ it('aborts an old principal request and never caches a late private response aft
 it('refuses a session/principal mismatch before requesting private history', async () => {
   await expect(readPrivateCaptureHistory('wrong-user', new AbortController().signal)).rejects.toThrow('session unavailable');
   expect(fixture.invoke).not.toHaveBeenCalled();
+});
+it('binds the request to the same principal-checked session rather than a newly selected implicit session', async () => {
+  fixture.invoke.mockImplementationOnce((_name, options) => {
+    fixture.sessionUser = 'second-owner';
+    expect(options.headers.Authorization).toBe('Bearer synthetic-owner-token');
+    return Promise.resolve({ data: reading(), error: null });
+  });
+  await readPrivateCaptureHistory('owner', new AbortController().signal);
+  expect(fixture.invoke).toHaveBeenCalledOnce();
+});
+it('keeps a different captured detail-page URL as evidence while linking the actual retained native listing ID', async () => {
+  const result = reading(); result.rows[0].observations[0].actual_url = 'https://www.facebook.com/marketplace/item/700000000099/';
+  fixture.invoke.mockResolvedValueOnce({ data: result, error: null }); fixture.user = { id: 'owner' }; fixture.admin = true; await render();
+  expect(container.querySelector('a')?.getAttribute('href')).toBe('https://www.facebook.com/marketplace/item/700000000001/');
+  expect([...container.querySelectorAll('a')].find(a => a.textContent === 'Capture surface')?.getAttribute('href')).toBe('https://www.facebook.com/marketplace/item/700000000099/');
 });

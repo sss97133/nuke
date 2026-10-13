@@ -21,7 +21,7 @@ export default function CapturedListings() {
   const rows = query.data?.pages.flatMap(page => page.items) ?? [];
   return <section aria-label="Captured listings" style={{ padding: '0 12px' }}>
     <h2>Listings</h2>
-    <p>Captured listings; availability and source-wide coverage are unverified. Private capture histories are not included here.</p>
+    <p>Captured listings; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</p>
     <label>Source <select value={source} onChange={event => {
       const next = new URLSearchParams(params); next.set('collection', 'listings');
       next.set('source', event.target.value); setParams(next);
