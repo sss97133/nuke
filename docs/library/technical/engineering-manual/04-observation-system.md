@@ -8,6 +8,15 @@ The observation system is the unified data ingestion layer. Every piece of infor
 
 ## Key Tables and Functions
 
+For a missing-property repair, inspect the existing proposal owner before creating
+structure. The staged `get_schema_proposal_progress(uuid)` distinguishes registration
+from consumer verification; follow the current limits in
+[chapter 8](../../reference/encyclopedia/08-schema-proposal-workflow.md#implementation-check-2026-10-11).
+Validate retry and approval behavior in an empty disposable `dm_refinement_*` PostgreSQL
+17 database with `psql -X -v ON_ERROR_STOP=1 -d <database> -f supabase/sql/test_schema_proposal_add_source_contract.sql`.
+That contract includes the retry/progress cases and uses synthetic evidence. It does not
+authorize production approval, admission, or a replay worker.
+
 ### Tables
 
 | Table | Purpose |

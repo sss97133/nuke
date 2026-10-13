@@ -8,6 +8,12 @@ Updated: 2026-03-27
 
 ## By Concept
 
+### Schema expansion and repair
+- **Owner**: `schema_proposals` → `schema_proposal_reviews` → `fn_schema_proposal_apply`.
+- **Progress reader, implemented/tested; deployment pending**: `get_schema_proposal_progress(uuid)` in `supabase/migrations/20261011223810_schema_proposal_retry_and_progress.sql`; reports registration separately from the unverified consumer.
+- **Contract**: `supabase/sql/test_schema_proposal_retry_and_progress.sql`, included in the existing PostgreSQL 17 `test_schema_proposal_add_source_contract.sql` CI run.
+- **Method**: `docs/ledger/theory/data-machine.md`, **Discussion as construction**; operational limits in encyclopedia chapter 8, §0.
+
 ### Intake / Ingestion
 - **Function**: `supabase/functions/process-import-queue/index.ts` (legacy router)
 - **Function**: `supabase/functions/ingest-observation/index.ts` (unified -- target state)

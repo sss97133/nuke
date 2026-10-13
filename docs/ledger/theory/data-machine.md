@@ -209,6 +209,44 @@ property/model/OEM relationships and proposes owned repairs. Both require explic
 neither installs an autonomous worker, admits claims or qualifies valuation. See the database
 operations manual for execution and acceptance boundaries.
 
+**Discussion as construction, owner clarification 2026-10-11.**
+
+Within requested model development, conceptual discussion and authorized construction proceed
+together. Reasoning should improve the appropriate artifact: maintained methodology, documentation,
+or the schema, reader or writer where a concrete implementation gap is found and repair is authorized.
+Inspect the existing Postgres owner first; a discussion does not require a schema mutation when the
+existing representation fits. For an implementation gap, an explanation or backlog entry alone is
+not delivery. When construction is blocked, record the exact missing evidence or authorization and
+continue the independent work.
+
+Use the existing repair loop: **question and counterexample → retained evidence → owned gap →
+implementation and assay → consumer → next observed gap**. Write the expected behavior and a case
+that would disprove it before judging the result. Reuse the existing schema, sanctioned writer and
+`schema_proposals` curator path; a new noun in conversation is not permission to mint a table.
+Prove that the distinction reaches a useful consumer, including its unresolved or disagreement case.
+Revise the assumption when the evidence fails it; agreement between agents or increasingly consistent
+wording is not an external assay. Keep the theory, case ledger and applicable agent instructions
+current with owner corrections and distinguish proposed, implemented, tested, merged, deployed and
+runtime-verified work.
+
+**Roles are contextual relationships.** Artist, buyer and researcher can describe the same person
+in different activities, relationships and periods. They are not mutually exclusive onboarding
+personas or permanent identity attributes inferred from a visit. State the activity, object or
+organization relationship, time and supporting evidence when using a role. Browsing establishes a
+browsing event; it does not establish professional identity, ownership, authorship or permission to
+act. Declared intent, observed behavior, attributed role claims and verified authority remain distinct.
+Unknown relationships stay unknown. A reader may adapt to a current question without granting access
+or turning that question into an identity claim.
+
+**Automatic expansion remains bounded.** Only approved deterministic operations may run within their
+declared input scope, rule revision, existing owner, limits, stop conditions and receipts. Novel
+vocabulary or relationships lacking an approved binding return to the existing proposal/review path;
+they do not authorize generated DDL, claim admission or their own approval. Schema and function
+changes retain the existing migration, review, CI and live-verification path. New permissions,
+production data changes, paid execution and standing workers retain their specific authorization
+requirements and existing holds. These instructions define a working method, not evidence that a
+repair worker or any new schema capability operates.
+
 Promoted by the owner on 2026-09-30 as "the absolute most important thing": the database structure, its vocabulary,
 and how the owner and every agent talk about it. Read this before designing any table, feature, cohort or prediction.
 
