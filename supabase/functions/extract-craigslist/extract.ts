@@ -2,7 +2,7 @@
 // Craigslist is server-rendered: JSON-LD for title, price, place and photos; the attribute block for the rest.
 // index.ts fetches the page through archiveFetch (which archives it to listing_page_snapshots) and calls this.
 
-import { type CraigslistAttributes, parseCapture, stripTags } from '../_shared/craigslistAttributes.ts';
+import { type CraigslistAttributes, type CraigslistPlace, parseCapture, stripTags } from '../_shared/craigslistAttributes.ts';
 
 export interface CraigslistExtracted {
   url: string;
@@ -31,6 +31,8 @@ export interface CraigslistExtracted {
   vin: string | null;
   /** The whole attribute block, a stable object: see CraigslistAttributes. */
   attributes: CraigslistAttributes;
+  /** City, region, postal code and approximate point; never the street line. Absent when the page has none. */
+  place?: CraigslistPlace;
   source_capture?: { snapshot_id: string; observed_at: string };
 }
 
@@ -92,7 +94,7 @@ export function extractFromHtml(html: string, url: string): CraigslistExtracted 
   const { make, model } = parseYearMakeModel(makeModelStr);
 
   // The attribute block and the post's own id and clocks
-  const { post_id, posted_at, updated_at, attributes } = parseCapture(html, url);
+  const { post_id, posted_at, updated_at, attributes, place } = parseCapture(html, url);
 
   // Extract description from postingbody
   let description: string | null = null;
@@ -139,6 +141,7 @@ export function extractFromHtml(html: string, url: string): CraigslistExtracted 
     post_id,
     vin: attributes.vin,
     attributes,
+    ...(place ? { place } : {}),
   };
 }
 

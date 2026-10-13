@@ -12,7 +12,10 @@
  *     vin, drivetrain, fuel_type, listing_posted_at, listing_updated_at, plus confirmations of what ingest wrote at
  *     creation (mileage, transmission, color, body_style, title_status);
  *   - field_evidence rows for each of those, written by the same writer;
- *   - condition, cylinders and the odometer disclosures have no vehicles column; they stay testimony in the observation.
+ *   - condition, cylinders and the odometer disclosures have no vehicles column; they stay testimony in the observation;
+ *   - the post's place (city, region, postal code, approximate point; never the street line) as one listing row in
+ *     vehicle_location_observations, the table the map and the county key already read. A re-read of the same post
+ *     with the same place adds nothing.
  *
  * Two choices that are not obvious:
  *   1. The VIN is NOT given to ingest's identity machinery for Craigslist (gate, Tier-1 VIN match, the creation insert).
@@ -61,6 +64,7 @@ export interface CaptureLanding {
   errors: string[];
   observation_id?: string;
   listing_event?: VehicleEventWriteResult;
+  place?: "written" | "duplicate" | "error";
 }
 
 /** Craigslist says "gas"; the column's dominant spelling (93,571 + 61,487 rows, 2026-10-06) is "gasoline". "other" is not a fuel. */
@@ -121,8 +125,63 @@ export function ledgerFields(capture: CraigslistCapture, landing?: CaptureLandin
     attributes: capture.attributes,
     ...(capture.source_capture ? { source_capture: capture.source_capture } : {}),
     ...(capture.asking_price !== undefined ? { asking_price: capture.asking_price } : {}),
+    ...(capture.place ? { place: capture.place } : {}),
     ...(landing ? { capture_landing: landing } : {}),
   };
+}
+
+/**
+ * The vehicle_location_observations row for a post's place, or null when it has none. Craigslist moves its map pin,
+ * so a point is city precision, the same grain the table's other listing rows carry.
+ */
+export function placeObservationRow(
+  vehicleId: string,
+  listingUrl: string,
+  capture: CraigslistCapture,
+  observationId: string | null,
+): Record<string, unknown> | null {
+  const p = capture.place;
+  // A town name alone is already vehicles.location, and ambiguous without its state.
+  if (!p || (!p.region && !p.postal_code && p.latitude === null)) return null;
+  const text = [p.locality, [p.region, p.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
+  return {
+    vehicle_id: vehicleId,
+    source_type: "listing",
+    source_platform: "craigslist",
+    source_url: listingUrl,
+    observed_at: capture.source_capture?.observed_at ?? new Date().toISOString(),
+    location_text_raw: text,
+    location_text_clean: text,
+    country_code: p.country,
+    region_code: p.region,
+    city: p.locality,
+    postal_code: p.postal_code,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    precision: p.locality || p.latitude !== null ? "city" : "region",
+    confidence: p.latitude !== null || p.postal_code ? 0.8 : 0.6,
+    metadata: {
+      method: "json_ld_available_at_or_from",
+      ...(observationId ? { observation_id: observationId } : {}),
+      ...(capture.source_capture ? { snapshot_id: capture.source_capture.snapshot_id } : {}),
+    },
+  };
+}
+
+/** Write the place once per (vehicle, post, place). Never throws. */
+async function landPlace(supabase: any, row: Record<string, unknown>): Promise<"written" | "duplicate" | "error"> {
+  try {
+    let seen = supabase.from("vehicle_location_observations").select("id")
+      .eq("vehicle_id", row.vehicle_id).eq("source_platform", "craigslist").eq("source_url", row.source_url);
+    for (const k of ["postal_code", "latitude", "longitude"]) seen = row[k] === null ? seen.is(k, null) : seen.eq(k, row[k]);
+    const { data, error } = await seen.limit(1);
+    if (error) return "error";
+    if (data && data.length > 0) return "duplicate";
+    const { error: insertError } = await supabase.from("vehicle_location_observations").insert(row);
+    return insertError ? "error" : "written";
+  } catch {
+    return "error";
+  }
 }
 
 /** The columns ingest inserts at creation from the same page. On a vehicle it just created they are already there. */
@@ -247,6 +306,11 @@ export async function landCraigslistCapture(
         landing.listing_event = { action: "error", error: e instanceof Error ? e.message : String(e), code: null };
         landing.errors.push(`listing event: ${landing.listing_event.error}`);
       }
+    }
+    const placeRow = result.observationId ? placeObservationRow(vehicleId, listingUrl, capture, result.observationId) : null;
+    if (placeRow) {
+      landing.place = await withTimeout(landPlace(deps.supabase, placeRow), args.timeoutMs ?? 8000).catch(() => "error" as const);
+      if (landing.place === "error") landing.errors.push("place: not written");
     }
   } catch (e) {
     landing.observation = "error";

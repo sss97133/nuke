@@ -229,9 +229,12 @@ function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Seri
 // page, weighted toward its own version (scripts/market/live-bands.mjs, model version 31); the curve is
 // measured on 36,700 sales (migration 20260927230000). Past 120 h the curve rests on thin, early data, so no verdict.
 export interface Heat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
-const HEAT_MAX_H = 120;
-const HOT = 1.25;
-const COLD = 0.8;
+/** The verdict's three numbers, stated once. The phone's LiveBoard.swift carries the same three; the fixture test
+ *  (heat-fixture.contract.test.ts) binds both to one file. */
+export const HEAT_THRESHOLDS = { hot: 1.25, cold: 0.8, maxHours: 120 } as const;
+const HEAT_MAX_H = HEAT_THRESHOLDS.maxHours;
+const HOT = HEAT_THRESHOLDS.hot;
+const COLD = HEAT_THRESHOLDS.cold;
 
 function curveAt(curve: BidCurve, tier: string, hours: number): number | null {
   const pts = curve[tier];
