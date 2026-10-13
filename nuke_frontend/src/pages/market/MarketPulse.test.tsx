@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn() }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
-  useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: [] }), useInventoryTaxonomy: () => fixture.taxonomy,
+  useMarketPulse: () => fixture.pulse, useInventoryTaxonomy: () => fixture.taxonomy,
 }));
 vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
