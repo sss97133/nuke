@@ -22,7 +22,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
-import { normalizeListingUrl, extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
+import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
@@ -277,8 +277,15 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
       // A self-canonical shell/expired page cannot borrow a recommendation's identity.
       return { url: null, postId: null, error: "Craigslist canonical share page lacks full listing evidence" };
     }
-    const target = extractCraigslistCanonicalUrls(canonical ?? html)[0];
-    return { url: target?.url ?? null, postId: target?.id ?? null, error: target ? null : result.error || "Craigslist share page has no canonical listing URL" };
+    // A recommendation/body substring is not an authoritative redirect target.
+    if (canonical) {
+      const target = new URL(canonical);
+      const postId = target.pathname.match(/^\/[a-z]{2,4}\/d\/[^/]+\/(\d{6,})\.html$/i)?.[1];
+      if (target.protocol === "https:" && /^[a-z0-9-]+\.craigslist\.org$/i.test(target.hostname) && target.hostname !== "www.craigslist.org" && !target.username && !target.password && !target.port && target.href === canonical && postId) {
+        return { url: canonical, postId, error: null };
+      }
+    }
+    return { url: null, postId: null, error: result.error || "Craigslist share page has no canonical listing URL" };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     console.error(`Craigslist share resolution failed for ${shareUrl}:`, error);

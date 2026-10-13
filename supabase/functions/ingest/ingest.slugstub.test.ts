@@ -160,6 +160,8 @@ Deno.test({
 for (const [kind, html] of [
   ["missing native id", SHARE_HTML.replace('<p class="postinginfo">post id: 1000000001</p>', '')],
   ["foreign canonical", SHARE_HTML.replace(`href="${SHARE_URL}"`, 'href="https://outside.example/fixture"')],
+  ["foreign canonical with nested Craigslist URL", SHARE_HTML.replace(`href="${SHARE_URL}"`, 'href="https://outside.example/?next=https://sample.craigslist.org/cto/d/fixture/1000000002.html"')],
+  ["no canonical expired page with recommendation", `<h1>Posting expired</h1><a href="https://sample.craigslist.org/cto/d/fixture/1000000002.html">Recommendation</a>${' '.repeat(1200)}`],
   ["expired shell with recommendation", `<link rel="canonical" href="${SHARE_URL}"><h1>Posting expired</h1><a href="https://sample.craigslist.org/cto/d/fixture/1000000002.html">Recommendation</a>${' '.repeat(1200)}`],
 ] as const) {
   Deno.test({
@@ -170,7 +172,7 @@ for (const [kind, html] of [
       try {
         const { result } = await ingest({ url: SHARE_URL });
         equal(result.status, "rejected"); equal(result.external_id, null);
-        assert(result.enrichment_error.includes(kind === "foreign canonical" ? "no canonical listing URL" : "lacks full listing evidence"), "resolver inspected the retained HTML");
+        assert(result.enrichment_error.includes(kind.startsWith("foreign") || kind.startsWith("no canonical") ? "no canonical listing URL" : "lacks full listing evidence"), "resolver inspected the retained HTML");
         equal(extractorCalls(), []); equal(vehicleInserts(), []);
       } finally { publicPage = null; }
     },
