@@ -4,8 +4,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from } }));
 import { readCapturedListings, sourceLink } from './useCapturedListings';
 
 const vehicleId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-function row(id: string, vehicle_id: string | null = null, source_url = 'https://www.craigslist.org/view/d/bangor-miata/2TNyMpPJLHFnrK9iPF2Fyq') {
-  return { id, vehicle_id, source_url, source_platform: 'craigslist', source_listing_id: '7982350344', current_price: 0,
+function row(id: string, vehicle_id: string | null = null, source_url = 'https://www.craigslist.org/view/d/fixture-listing/SyntheticShareToken0000') {
+  return { id, vehicle_id, source_url, source_platform: 'craigslist', source_listing_id: '7000000000', current_price: 0,
     event_status: 'active', created_at: '2026-10-13T02:31:04.821+00:00', updated_at: '2026-10-13T02:32:00Z' };
 }
 function query(data: unknown[], error: Error | null = null) {
@@ -21,7 +21,7 @@ describe('public captured listing boundary', () => {
     fixture.from.mockImplementation((table: string) => table === 'vehicle_events' ? events : vehicles);
     const result = await readCapturedListings('craigslist');
     expect(result.items.map(r => r.id)).toEqual(['unresolved', 'public']);
-    expect(result.items[0]).toMatchObject({ vehicle_id: null, vehicle: null, source_listing_id: '7982350344', current_price: 0 });
+    expect(result.items[0]).toMatchObject({ vehicle_id: null, vehicle: null, source_listing_id: '7000000000', current_price: 0 });
     expect(result.items[1].vehicle?.id).toBe('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
     expect(vehicles.eq).toHaveBeenCalledWith('is_public', true);
     expect(vehicles.is).toHaveBeenCalledWith('deleted_at', null);
@@ -53,5 +53,26 @@ describe('public captured listing boundary', () => {
     expect(result.items[0].created_at).toBeNull();
     expect(events.order).toHaveBeenCalledWith('created_at', { ascending: false, nullsFirst: false });
     expect(events.is).toHaveBeenCalledWith('created_at', null); expect(events.lt).toHaveBeenCalledWith('id', vehicleId);
+  });
+  it('qualifies unresolved rows against actual supported listing paths and intake aliases', () => {
+    const listings = [
+      ['ksl', 'https://cars.ksl.com/listing/10662354'], ['bring_a_trailer', 'https://bringatrailer.com/listing/1990-mazda-miata/'],
+      ['cars_and_bids', 'https://carsandbids.com/auctions/9X1kJq3p/1990-mazda-miata'],
+      ['mecum', 'https://www.mecum.com/lots/1177355/2005-hummer-h2'],
+      ['barrett_jackson', 'https://www.barrett-jackson.com/2026-columbus/docket/vehicle/1951-plymouth-cranbrook-300183'],
+    ];
+    for (const [platform, url] of listings) expect(sourceLink(platform, url)).toBe(url);
+    expect(sourceLink('cars_and_bids', 'https://carsandbids.com/auctions/9X1kJq3p/')).toContain('/auctions/9X1kJq3p/');
+    for (const platform of ['ksl', 'bat', 'cars_and_bids', 'mecum', 'barrett_jackson']) {
+      const host = { ksl: 'cars.ksl.com', bat: 'bringatrailer.com', cars_and_bids: 'carsandbids.com', mecum: 'mecum.com', barrett_jackson: 'barrett-jackson.com' }[platform];
+      for (const path of ['/account', '/login', '/redirect?token=secret']) expect(sourceLink(platform, `https://${host}${path}`)).toBeNull();
+    }
+    expect(sourceLink('ksl', 'https://cars.ksl.com:8443/listing/10662354')).toBeNull();
+    expect(sourceLink('ksl', 'https://cars.ksl.com/listing/10662354?token=secret')).toBeNull();
+  });
+  it('reads current and retained intake aliases through one source filter', async () => {
+    const events = query([]); fixture.from.mockReturnValue(events);
+    await readCapturedListings('bat'); expect(events.in).toHaveBeenCalledWith('source_platform', ['bat', 'bring_a_trailer']);
+    await readCapturedListings('barrett_jackson'); expect(events.in).toHaveBeenCalledWith('source_platform', ['barrett_jackson', 'barrettjackson']);
   });
 });

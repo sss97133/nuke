@@ -1,8 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
-export const LISTING_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl', 'bat', 'cars_and_bids', 'mecum', 'barrettjackson'] as const;
+export const LISTING_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl', 'bat', 'cars_and_bids', 'mecum', 'barrett_jackson'] as const;
 export const CLASSIFIED_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl'];
+const PLATFORM_ALIASES: Record<string, string[]> = { bat: ['bat', 'bring_a_trailer'], barrett_jackson: ['barrett_jackson', 'barrettjackson'] };
+const SOURCE_NAMES: Record<string, string> = { craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', ksl: 'KSL',
+  bat: 'Bring a Trailer', bring_a_trailer: 'Bring a Trailer', cars_and_bids: 'Cars & Bids', mecum: 'Mecum',
+  barrett_jackson: 'Barrett-Jackson', barrettjackson: 'Barrett-Jackson' };
+export const sourceName = (platform: string) => SOURCE_NAMES[platform] ?? platform;
 const PAGE_SIZE = 50;
 type Cursor = { at: string | null; id: string };
 export type CapturedListing = {
@@ -13,16 +18,27 @@ export type CapturedListing = {
 };
 const SOURCE_HOSTS: Record<string, string> = {
   craigslist: 'craigslist.org', facebook_marketplace: 'facebook.com', ksl: 'ksl.com',
-  bat: 'bringatrailer.com', cars_and_bids: 'carsandbids.com', mecum: 'mecum.com', barrettjackson: 'barrett-jackson.com',
+  bat: 'bringatrailer.com', bring_a_trailer: 'bringatrailer.com', cars_and_bids: 'carsandbids.com', mecum: 'mecum.com',
+  barrettjackson: 'barrett-jackson.com', barrett_jackson: 'barrett-jackson.com',
+};
+// Listing paths from ingest/index.ts and the existing platform readers. A host
+// alone cannot qualify an unresolved row (account/login/redirect paths are not listings).
+const SOURCE_PATHS: Record<string, RegExp> = {
+  craigslist: /^(?:\/view\/d\/[\w-]+\/[a-zA-Z0-9]+|\/\w+\/d\/[\w-]+\/\d+\.html)\/?$/,
+  facebook_marketplace: /^\/marketplace\/item\/\d+\/?$/,
+  ksl: /^\/listing\/\d+\/?$/,
+  bat: /^\/listing\/[\w-]+\/?$/, bring_a_trailer: /^\/listing\/[\w-]+\/?$/,
+  cars_and_bids: /^\/auctions\/[\w-]+(?:\/[\w-]+)?\/?$/,
+  mecum: /^\/lots\/\d+\/[\w-]+\/?$/,
+  barrettjackson: /^\/[\w-]+\/docket\/vehicle\/[\w-]+\/?$/,
+  barrett_jackson: /^\/[\w-]+\/docket\/vehicle\/[\w-]+\/?$/,
 };
 export function sourceLink(platform: string, value: string | null): string | null {
   try {
     const url = new URL(value ?? ''), host = SOURCE_HOSTS[platform];
-    if (!host || !['https:', 'http:'].includes(url.protocol) || url.username || url.password ||
+    if (!host || !['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.port || url.search || url.hash ||
       !(url.hostname === host || url.hostname.endsWith('.' + host))) return null;
-    if (platform === 'facebook_marketplace' && !/^\/marketplace\/item\/\d+\/?$/.test(url.pathname)) return null;
-    if (platform === 'craigslist' && !(/^\/view\/d\/.+\/[a-zA-Z0-9]+$/.test(url.pathname) || /\/\d+\.html$/.test(url.pathname))) return null;
-    if (url.pathname === '/') return null;
+    if (!SOURCE_PATHS[platform]?.test(url.pathname)) return null;
     return url.href;
   } catch { return null; }
 }
@@ -35,10 +51,10 @@ export async function readCapturedListings(source = 'classifieds', cursor?: Curs
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
   let query = supabase.from('vehicle_events')
     .select('id,vehicle_id,source_platform,source_listing_id,source_url,current_price,event_status,created_at,updated_at')
-    .in('source_platform', source === 'classifieds' ? CLASSIFIED_SOURCES : source ? [source] : [...LISTING_SOURCES])
+    .in('source_platform', source === 'classifieds' ? CLASSIFIED_SOURCES : source ? PLATFORM_ALIASES[source] ?? [source] : LISTING_SOURCES.flatMap(value => PLATFORM_ALIASES[value] ?? [value]))
     .order('created_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).limit(PAGE_SIZE + 1).abortSignal(requestSignal);
   if (cursor) {
-    if (cursor.at !== null && !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.at) || !/^[a-f0-9-]{36}$/i.test(cursor.id)) throw new Error('Invalid cursor');
+    if ((cursor.at !== null && !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.at)) || !/^[a-f0-9-]{36}$/i.test(cursor.id)) throw new Error('Invalid cursor');
     query = cursor.at === null ? query.is('created_at', null).lt('id', cursor.id)
       : query.or(`created_at.lt.${cursor.at},created_at.is.null,and(created_at.eq.${cursor.at},id.lt.${cursor.id})`);
   }

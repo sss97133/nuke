@@ -13,13 +13,13 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   fixture.source.mockClear(); fixture.more.mockClear();
-  fixture.query = { data: { pages: [{ items: [{ id: 'listing', vehicle_id: null, vehicle: null, source_platform: 'craigslist', source_listing_id: '7982350344', source_url: 'https://www.craigslist.org/view/d/bangor-miata/2TNyMpPJLHFnrK9iPF2Fyq', current_price: 0, event_status: 'active', created_at: '2026-10-13T02:31:04Z', updated_at: '2026-10-13T02:32:00Z' }] }] }, hasNextPage: true, fetchNextPage: fixture.more };
+  fixture.query = { data: { pages: [{ items: [{ id: 'listing', vehicle_id: null, vehicle: null, source_platform: 'craigslist', source_listing_id: '7000000000', source_url: 'https://www.craigslist.org/view/d/fixture-listing/SyntheticShareToken0000', current_price: 0, event_status: 'active', created_at: '2026-10-13T02:31:04Z', updated_at: '2026-10-13T02:32:00Z' }] }] }, hasNextPage: true, fetchNextPage: fixture.more };
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function render(query = '') { window.history.replaceState({}, '', '/?' + query); await act(async () => root.render(<BrowserRouter><MarketInventory /></BrowserRouter>)); }
 it('makes unresolved source presentations discoverable at the normal market landing without claiming live availability or currency', async () => {
   await render();
-  expect(container.textContent).toContain('Vehicle unresolved'); expect(container.textContent).toContain('7982350344');
+  expect(container.textContent).toContain('Vehicle unresolved'); expect(container.textContent).toContain('7000000000');
   expect(container.textContent).toContain('0 · currency unrecorded'); expect(container.textContent).toContain('availability and source-wide coverage are unverified');
   expect(container.textContent).toContain('Source observation time unrecorded');
   expect(container.querySelector('a')?.getAttribute('href')).toContain('craigslist.org/view/d/');
@@ -38,6 +38,14 @@ it('keeps source filtering and Market navigation in the URL and retains existing
 it('opens the unchanged auction board for a legacy lot deep link', async () => {
   await render('tab=market&lot=retained-lot'); expect(container.textContent).toContain('Existing BaT bid board');
   expect(container.querySelector('section[aria-label="Captured listings"]')).toBeNull();
+});
+it.each(['make=FORD&board=1', 'live=1&sort=ending&bidRange=under10k', 'day=2026-10-01&salesScope=all&days=7&benchmark=all', 'inspect=sources&series=fixture'])('preserves existing auction lens links: %s', async query => {
+  await render(query); expect(container.textContent).toContain('Existing BaT bid board');
+});
+it('honors an explicit listings selection while retaining the old auction lens context', async () => {
+  await render('collection=listings&make=FORD&board=1');
+  expect(container.querySelector('section[aria-label="Captured listings"]')).not.toBeNull();
+  expect(new URLSearchParams(window.location.search).get('make')).toBe('FORD');
 });
 it('links eligible vehicles with their exact recorded identity and shared nameplate', async () => {
   const row = fixture.query.data.pages[0].items[0]; row.vehicle_id = 'eligible';
