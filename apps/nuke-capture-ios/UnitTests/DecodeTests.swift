@@ -75,6 +75,15 @@ final class DecodeTests: XCTestCase {
         XCTAssertNil(board.auctions[1].currentBid)           // a non-number is missing, not fatal
         XCTAssertFalse(board.auctions[1].noReserve)
         XCTAssertNil(board.auctions[2].vehicleUUID)          // a bad id opens nothing
+        // A non-scalar in a slot is consumed as one position; a non-finite number reads as missing, never traps.
+        let odd = try decode(LiveBoard.self, #"{"synced_at":null,"source":"t","auctions":[["69c01291-6232-4df8-ad9e-82eaac792462",{"year":1},["x"],"M3","nan","2026-10-13T18:00:00+00:00",null,null,null,false,null,"Title",1,2,3,"d","1e400"]]}"#)
+        XCTAssertEqual(odd.auctions.count, 1)
+        XCTAssertNil(odd.auctions[0].year)
+        XCTAssertEqual(odd.auctions[0].model, "M3")
+        XCTAssertNil(odd.auctions[0].currentBid)
+        XCTAssertEqual(odd.auctions[0].title, "Title")
+        XCTAssertEqual(odd.auctions[0].band?.p50, 2)
+        XCTAssertEqual(odd.auctions[0].band?.comps, 0)
         XCTAssertEqual(board.open(at: Date(timeIntervalSince1970: 1_792_000_000)).count, 0)
     }
 
@@ -112,6 +121,22 @@ final class DecodeTests: XCTestCase {
         let broken = try decode(LiveBoard.self, #"{"synced_at":null,"source":"t","curve":{"d":"not points"},"baseline":{"week_ago":{"bids":"x"}},"auctions":[]}"#)
         XCTAssertEqual(broken.curve?.tiers.isEmpty, true)          // a malformed curve reads as absent, never as a crash
         XCTAssertNil(broken.weekAgo)
+    }
+
+    func testLedgerMapRowsDecodeAtEveryLevelAndFormatAsTheWebDoes() throws {
+        // treemap_by_brand carries min and max; treemap_years does not. Both decode to the same node.
+        let brand = try decode([LedgerNode].self, #"[{"name":"CHEVROLET","count":151479,"value":5400000000,"median_price":36000,"min_price":100,"max_price":3500000,"sold_count":40000,"auction_count":9000,"avg_bids":12,"avg_watchers":400}]"#)
+        XCTAssertEqual(brand.first?.median_price, 36000)
+        let year = try decode([LedgerNode].self, #"[{"name":"1969","count":812,"value":40600000,"median_price":50000,"sold_count":300,"auction_count":100,"avg_bids":10,"avg_watchers":200}]"#)
+        XCTAssertNil(year.first?.min_price)
+        XCTAssertEqual(year.first?.count, 812)
+        // The leaf: a recorded sale price wins, else the sold price, as the web's useTreemapVehicles maps it.
+        let leaf = try decode([LedgerVehicle].self, #"[{"id":"e08bf694-970f-4cbe-8a74-8715158a0f2e","year":1977,"make":"Chevrolet","model":"Blazer","listing_title":null,"bat_listing_title":null,"sale_price":null,"sold_price":42000,"primary_image_url":null,"mileage":null}]"#)
+        XCTAssertEqual(leaf.first?.price, 42000)
+        XCTAssertEqual(leaf.first?.name, "1977 Chevrolet Blazer")
+        XCTAssertEqual(LedgerMap.money(36_000), "$36K")
+        XCTAssertEqual(LedgerMap.money(1_250_000), "$1.3M")
+        XCTAssertEqual(LedgerMap.money(0), "--")
     }
 
     func testCalendarDayDecodesTheMaskedShapeFor1048() throws {

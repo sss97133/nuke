@@ -41,26 +41,32 @@ struct LiveAuction: Decodable, Identifiable {
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
         // Each helper consumes exactly one position. A null is consumed by decodeNil; a value of
-        // the wrong type is consumed by AnyScalar. (The first version used decodeIfPresent under
+        // the wrong type is consumed by AnyValue. (The first version used decodeIfPresent under
         // `try?`, whose flattened nil could not tell "null" from "threw", so a null was consumed
         // twice and every field after it shifted one place: a lot with no image URL read its
         // listing URL as its title and its band one position off. Caught by the band test, 2026-10-13.)
+        // A value of the wrong shape, scalar or not, is consumed by a reader that reads nothing
+        // (AnyValue), so the next helper always sees the next position (review round two, 2026-10-13:
+        // an object in a slot had emptied the rest of the row).
+        func skip() { _ = try? c.decode(AnyValue.self) }
         func str() -> String? {
             if (try? c.decodeNil()) == true { return nil }
             if let s = try? c.decode(String.self) { return s }
-            _ = try? c.decode(AnyScalar.self); return nil
+            skip(); return nil
         }
+        /// A finite number, from a number or a numeric string; "nan", "inf" and 1e400 read as missing.
         func num() -> Double? {
             if (try? c.decodeNil()) == true { return nil }
-            if let d = try? c.decode(Double.self) { return d }
-            if let s = try? c.decode(String.self) { return Double(s) }
-            _ = try? c.decode(AnyScalar.self); return nil
+            if let d = try? c.decode(Double.self) { return d.isFinite ? d : nil }
+            if let s = try? c.decode(String.self) { return Double(s).flatMap { $0.isFinite ? $0 : nil } }
+            skip(); return nil
         }
-        func int() -> Int? { num().map { Int($0) } }
+        /// An integer only when in range, so a huge value never traps in Int(_:).
+        func int() -> Int? { num().flatMap { abs($0) < 1e15 ? Int($0) : nil } }
         func bool() -> Bool {
             if (try? c.decodeNil()) == true { return false }
             if let b = try? c.decode(Bool.self) { return b }
-            _ = try? c.decode(AnyScalar.self); return false
+            skip(); return false
         }
         id = try c.decode(String.self)
         year = int()
@@ -125,17 +131,8 @@ struct LiveAuction: Decodable, Identifiable {
     }
 }
 
-/// A scalar of any JSON type, consumed and discarded when a positional value is not what the row promised.
-struct AnyScalar: Decodable {
-    init(from decoder: Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil() { return }
-        if (try? c.decode(Double.self)) != nil { return }
-        if (try? c.decode(String.self)) != nil { return }
-        if (try? c.decode(Bool.self)) != nil { return }
-        throw DecodingError.dataCorruptedError(in: c, debugDescription: "not a scalar")
-    }
-}
+/// A value of any JSON shape, consumed and discarded when a position is not what the row promised.
+struct AnyValue: Decodable { init(from decoder: Decoder) throws {} }
 
 /// An array whose undecodable elements are skipped and counted instead of failing the whole array.
 struct LossyArray<Element: Decodable>: Decodable {
@@ -285,14 +282,14 @@ struct LiveBoardView: View {
         guard filterMake == nil, let board, let wk = board.weekAgo, let before = wk.bids, before > 0 else { return nil }
         let nowBids = openLots.reduce(0.0) { $0 + ($1.currentBid ?? 0) }
         let pct = (nowBids - before) / before * 100
-        let signed = (pct >= 0 ? "+" : "") + String(format: "%.1f", pct) + "%"
+        let signed = (pct >= 0 ? "+" : "") + LedgerMap.oneDecimal(pct) + "%"
         return "vs same time last week \(wk.source == "archive" ? "≈" : "")\(signed) from \(Self.bidNumber(before, compact: true))"
     }
 
     /// The web's bidNumber: BaT runs every auction in US dollars and reports the bid as one (#1061).
     static func bidNumber(_ n: Double?, compact: Bool = false) -> String {
         guard let n, n.isFinite else { return "—" }
-        if compact, abs(n) >= 1_000_000 { return "$" + String(format: "%.1f", n / 1_000_000) + "M" }
+        if compact, abs(n) >= 1_000_000 { return "$" + LedgerMap.oneDecimal(n / 1_000_000) + "M" }
         if compact, abs(n) >= 10_000 { return "$\(Int((n / 1_000).rounded()))K" }
         return "$" + Int(n.rounded()).formatted()
     }
@@ -303,7 +300,7 @@ struct LiveBoardView: View {
     }
     /// Past 3× the comps mostly do not describe the car, so it reads as 3×+ rather than a precise number.
     static func multiple(_ ratio: Double) -> String {
-        ratio >= 3 ? "3×+" : ratio < 0.1 ? "<0.1×" : String(format: "%.1f×", ratio)
+        ratio >= 3 ? "3×+" : ratio < 0.1 ? "<0.1×" : LedgerMap.oneDecimal(ratio) + "×"
     }
 
     @State private var reading: LiveAuction?
@@ -312,6 +309,13 @@ struct LiveBoardView: View {
         Group {
             if let board {
                 List {
+                    // The Market tab's first section on the web: the ledger as a map (every record
+                    // with a recorded price), the open board below it.
+                    Section {
+                        LedgerMapView()
+                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 4, trailing: 12))
+                            .listRowBackground(Color.clear)
+                    }
                     // The board drawn as the web draws it: brands as boxes, decades inside.
                     Section {
                         LiveInventoryMapView(lots: openLots) { make, decade in
@@ -492,7 +496,7 @@ struct HeatReadingSheet: View {
                     }
                 }
                 Section {
-                    Text("Hot is 1.25× the typical bid or more; cold is 0.8× or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, over 36,700 BaT sales; past 120 hours left there is no verdict. How lots tagged this way finished is shown on nuke.ag from a table typed into its page; it joins here when a read carries it.")
+                    Text("Hot is \(LiveBoardView.multiple(LiveAuction.hotAt)) the typical bid or more; cold is \(LiveBoardView.multiple(LiveAuction.coldAt)) or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, from sold BaT lots (the payload carries the curve, not its sample or window); past \(Int(LiveAuction.heatMaxHours)) hours left there is no verdict. How lots tagged this way finished is shown on nuke.ag from a table typed into its page; it joins here when a read carries it.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
