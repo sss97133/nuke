@@ -115,6 +115,8 @@ export interface DashboardSummary {
 }
 
 export interface VehiclesDashboardState {
+  /** False for a visitor who is not signed in: the garage then explains itself instead of offering an add. */
+  signedIn: boolean;
   unresolvedSources?: UnresolvedGarageSource[];
   sections: GarageSection[];
   vehicles: GarageVehicle[];
@@ -613,6 +615,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   const data = userId ? buildDashboardData(sections, vehicles) : null;
 
   return {
+    signedIn: !!userId,
     sections,
     unresolvedSources,
     vehicles,
