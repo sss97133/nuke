@@ -708,6 +708,13 @@ struct VehicleDetailView: View {
     // CLIPS from 300→0 (past that edge there's no hero pixel to show through), while
     // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
     // we only transform its rendered output.
+    // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
+    // profile paints first (loadVehicleData.ts, "Initialize leadImageUrl from primary_image_url")
+    // before selectBestHeroImage replaces it with a screened frame. It is reached only when no
+    // admitted frame exists. Measured 2026-10-13 on 300 public vehicles with a primary_image_url:
+    // 36 had no admitted frame at all, and 69 had a primary_image_url with no vehicle_images row
+    // behind it (a listing URL written straight onto the vehicle). Keep it beside the web's rule,
+    // and move both onto a lead in the document when the read grows its gallery section.
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
             imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
@@ -1993,13 +2000,16 @@ struct VehicleDetailView: View {
         return nil
     }
 
-    /// Fetch one image row by id (for an owner-designated bookend).
+    /// Fetch one image row by id (for an owner-designated bookend), through the same gate as
+    /// every other frame on the page: a designation names a row, it does not admit one. A
+    /// bookend the gate has not approved, or that is a document, duplicate or superseded frame,
+    /// is read as absent and the section stays hidden (review 2026-10-13, finding 16).
     private func image(id: UUID) async -> VehicleGalleryImage? {
         do {
-            let rows: [VehicleGalleryImage] = try await SupabaseService.client
+            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
                 .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("id", value: id.uuidString.lowercased())
+                .eq("id", value: id.uuidString.lowercased()))
                 .limit(1).execute().value
             return rows.first
         } catch {
