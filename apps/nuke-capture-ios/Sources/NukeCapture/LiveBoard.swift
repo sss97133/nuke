@@ -108,15 +108,52 @@ struct LiveBoard: Decodable {
 struct LiveBoardView: View {
     @State private var board: LiveBoard?
     @State private var loadError = false
+    // The map's selection narrows the list to one brand, then one decade: one population, one
+    // filter, never a second read. The web Market tab's mapFocus/mapChild do the same.
+    @State private var filterMake: String? = {
+        #if DEBUG
+        if let m = ProcessInfo.processInfo.environment["NUKE_DEBUG_LIVE_MAKE"], !m.isEmpty { return m }
+        #endif
+        return nil
+    }()
+    @State private var filterDecade: String? = nil
 
     private var lots: [LiveAuction] {
-        (board?.auctions ?? []).sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
+        (board?.auctions ?? [])
+            .filter { filterMake == nil || LiveInventory.make($0) == filterMake }
+            .filter { filterDecade == nil || LiveInventory.decade($0) == filterDecade }
+            .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
+    }
+
+    private var filterLine: String? {
+        guard let m = filterMake else { return nil }
+        return [m, filterDecade].compactMap { $0 }.joined(separator: " · ") + " · \(lots.count.formatted()) of \((board?.auctions.count ?? 0).formatted()) open lots"
     }
 
     var body: some View {
         Group {
             if let board {
                 List {
+                    // The board drawn as the web draws it: brands as boxes, decades inside.
+                    Section {
+                        LiveInventoryMapView(lots: board.auctions) { make, decade in
+                            filterMake = make; filterDecade = decade
+                        }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        .listRowBackground(Color.clear)
+                        if let f = filterLine {
+                            HStack(spacing: 8) {
+                                Text(f).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Button("All") { filterMake = nil; filterDecade = nil }.font(.caption2)
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    } header: {
+                        Text(board.coverageSentence)
+                            .font(.system(size: 9, design: .monospaced))
+                            .textCase(nil)
+                    }
                     Section {
                         ForEach(lots) { lot in
                             NavigationLink(value: VehicleHeaderRow(id: UUID(uuidString: lot.id) ?? UUID(), year: lot.year, make: lot.make,
@@ -126,7 +163,7 @@ struct LiveBoardView: View {
                             }
                         }
                     } header: {
-                        Text(board.coverageSentence)
+                        Text(filterMake == nil ? "Ending soonest" : "Ending soonest in the selection")
                             .font(.system(size: 9, design: .monospaced))
                             .textCase(nil)
                     } footer: {
