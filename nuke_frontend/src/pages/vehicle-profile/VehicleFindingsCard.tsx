@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
+import { useVehicleProfile } from './VehicleProfileContext';
 
 interface Props { vehicleId: string }
 
@@ -46,6 +47,9 @@ function inc(map: Record<string, number>, key: string | null | undefined) {
 
 const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
   const [findings, setFindings] = useState<Findings | null>(null);
+  // A plate read off a photo is personal data: masked for anyone but the owner (privacy is masking, not hiding).
+  const { isRowOwner, isVerifiedOwner, hasContributorAccess } = useVehicleProfile();
+  const canSeeIdentity = isRowOwner || isVerifiedOwner || hasContributorAccess;
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +185,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
       <div style={{ padding: '8px 12px', fontFamily: 'Arial, sans-serif', color: 'var(--text, #1a1a1a)' }}>
         <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>identity</div>
         {findings.vins.length > 0 && row('VIN', list(findings.vins))}
-        {findings.plates.length > 0 && row('plate', list(findings.plates))}
+        {findings.plates.length > 0 && row('plate', canSeeIdentity ? list(findings.plates) : <span title="Visible to the owner">••••</span>)}
         {findings.colors.length > 0 && row('color', list(findings.colors.slice(0, 8)))}
         {findings.interiorTrims.length > 0 && row('interior trim', list(findings.interiorTrims))}
 
