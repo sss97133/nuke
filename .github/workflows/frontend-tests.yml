@@ -169,6 +169,10 @@ jobs:
         run: createdb dm_graded_lot_vision_ci
       - name: Verify the graded-lot vision backlog view, one row per lot with the newest grade, photo filters, cost constants and grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_graded_lot_vision_ci -f supabase/sql/test_graded_lot_vision_backlog.sql
+      - name: Create disposable classified ask board database
+        run: createdb dm_ask_board_ci
+      - name: Verify the classified ask board's window, one row per vehicle, place, distance, band, tiers, errors and anon read
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_ask_board_ci -f supabase/sql/test_classified_ask_board.sql
       - name: Create disposable bounded pipeline pulse database
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings
