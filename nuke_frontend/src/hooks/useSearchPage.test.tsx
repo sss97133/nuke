@@ -152,3 +152,32 @@ it('retains unread-population metadata at the offset ceiling and asks for refine
   await act(async () => state.handleLoadMore());
   expect(fixture.requests).toHaveLength(2); expect(state.searchSummary).not.toContain('Try again');
 });
+
+it('continues and retries an empty eligible page using its raw cursor', async () => {
+  fixture.params = new URLSearchParams({ q: 'porsche' });
+  let failed = false;
+  fixture.respond = request => {
+    if (!request.offset) return page([], 0, 100);
+    if (!failed) { failed = true; return { error: new Error('timeout'), data: null }; }
+    return page([vehicle(100)], 100, null);
+  };
+  await act(async () => root.render(<Harness />));
+  expect(state.displayResults).toHaveLength(0); expect(state.searchMeta?.next_offset).toBe(100);
+  await act(async () => state.handleLoadMore());
+  expect(state.searchMeta?.next_offset).toBe(100); expect(state.loadMoreError).toContain('Try again');
+  await act(async () => state.handleLoadMore());
+  expect(fixture.requests.slice(1).map(request => request.offset)).toEqual([100,100]);
+  expect(state.displayResults.map(result => result.id)).toEqual(['vehicle_100']);
+  expect(state.loadMoreError).toBeNull(); expect(state.searchMeta?.has_more).toBe(false);
+});
+
+it('keeps pagination available when the price filter removes every loaded result', async () => {
+  fixture.respond = request => !request.offset
+    ? page([{ ...vehicle(0), metadata: { sale_price: 77000 } }], 0, 94)
+    : page([{ ...vehicle(94), metadata: { sale_price: 12000 } }], 94, null);
+  await act(async () => root.render(<Harness />));
+  expect(state.displayResults).toHaveLength(0); expect(state.searchMeta?.has_more).toBe(true);
+  await act(async () => state.handleLoadMore());
+  expect(fixture.requests[1].offset).toBe(94);
+  expect(state.displayResults.map(result => result.id)).toEqual(['vehicle_94']);
+});

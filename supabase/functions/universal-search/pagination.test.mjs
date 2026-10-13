@@ -14,27 +14,68 @@ const helperModule = { exports: {} };
 new Function('exports', compile('./pagination.ts'))(helperModule.exports);
 const { candidatePage, preservePrimaryPage } = helperModule.exports;
 const handlerCode = compile('./index.ts');
-const row = n => ({ id: `vehicle_${String(n).padStart(5, '0')}`, year: 2020, make: 'Porsche', model: 'GT3', relevance: 0.9 });
+const row = n => ({ id: `vehicle_${String(n).padStart(5, '0')}`, year: 2020, make: 'Porsche', model: 'GT3', relevance: 0.9,
+  is_public: true, deleted_at: null, listing_kind: null });
 const rows = count => Array.from({ length: count }, (_, i) => row(i));
 
-function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], tags = [], owned = [],
+// Evaluate the relevant PostgREST predicates against current parents. In
+// particular, SQL NULL does not satisfy != and top-level OR calls replace one
+// another here, so a gate cannot pass merely because its syntax was appended.
+const splitClauses = expression => {
+  let depth = 0, start = 0; const clauses = [];
+  for (let i = 0; i < expression.length; i++) {
+    if (expression[i] === '(') depth++;
+    else if (expression[i] === ')') depth--;
+    else if (expression[i] === ',' && depth === 0) { clauses.push(expression.slice(start, i)); start = i + 1; }
+  }
+  return [...clauses, expression.slice(start)];
+};
+const ilikeMatch = (value, pattern) => value != null && new RegExp(`^${String(pattern).split(/(%|_)/).map(part =>
+  part === '%' ? '.*' : part === '_' ? '.' : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('')}$`, 'i').test(String(value));
+const matchesExpression = (v, expression) => {
+  if (expression.startsWith('and(')) return splitClauses(expression.slice(4, -1)).every(clause => matchesExpression(v, clause));
+  if (expression.startsWith('or(')) return splitClauses(expression.slice(3, -1)).some(clause => matchesExpression(v, clause));
+  const [, field, operator, value] = expression.match(/^([a-z_]+)\.(is|neq|ilike)\.(.*)$/) || [];
+  if (operator === 'is' && value === 'null') return v[field] == null;
+  if (operator === 'neq') return v[field] != null && String(v[field]) !== value;
+  if (operator === 'ilike') return ilikeMatch(v[field], value);
+  throw new Error(`Unexpected fixture predicate: ${expression}`);
+};
+const applyPredicates = (values, q) => {
+  const orExpression = q.ops.filter(op => op[0] === 'or').at(-1)?.[1];
+  return values.filter(v => q.ops.every(([op, field, value, other]) => {
+    if (op === 'eq') return v[field] === value;
+    if (op === 'is') return value === null ? v[field] == null : v[field] === value;
+    if (op === 'not' && value === 'is' && other === null) return v[field] != null;
+    if (op === 'in') return value.includes(v[field]);
+    if (op === 'ilike') return ilikeMatch(v[field], value);
+    return true;
+  }) && (!orExpression || splitClauses(orExpression).some(clause => matchesExpression(v, clause))));
+};
+
+function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], vin = [], deep = [], fuzzy = [], parents = [], missingIds = [], tags = [], owned = [],
   rankedError = () => false, enrichmentError = () => false, directError = false, ilikeError = false,
-  verifiedUser = null, authThrows = false } = {}) {
-  const calls = [], allVehicles = new Map([...ranked, ...direct, ...ilike, ...year, ...owned].map(v => [v.id, v]));
+  verifiedUser = null, authThrows = false, eligibilityError = () => false } = {}) {
+  const calls = [], allVehicles = new Map([...ranked, ...direct, ...ilike, ...year, ...vin, ...owned,
+    ...deep.map(v => ({ ...v, id: v.vehicle_id })), ...fuzzy.map(v => ({ ...v, id: v.vehicle_id })), ...parents].map(v => [v.id, v]));
+  for (const id of missingIds) allVehicles.delete(id);
   const respond = q => {
     calls.push(q);
     if (q.table === 'user_vehicle_links') return { data: owned.map(v => ({ vehicle_id: v.id })) };
     if (q.table === 'image_tags') return { data: tags };
     if (q.table !== 'vehicles') return { data: [] };
     const ids = q.ops.find(op => op[0] === 'in')?.[2];
-    if (ids) return enrichmentError(q) ? { data: null, error: { message: 'enrichment failure' } }
-      : { data: ids.map(id => allVehicles.get(id)).filter(Boolean) };
-    const source = q.ops.some(op => op[0] === 'textSearch') ? direct : q.ops.some(op => op[0] === 'eq' && op[1] === 'year') ? year : ilike;
+    if (ids) return enrichmentError(q) || eligibilityError(q) ? { data: null, error: { message: 'enrichment/eligibility failure' } }
+      : { data: applyPredicates(ids.map(id => allVehicles.get(id)).filter(Boolean), q) };
+    const source = q.ops.some(op => op[0] === 'textSearch') ? direct
+      : q.ops.some(op => op[0] === 'ilike' && op[1] === 'vin') ? vin
+      : q.ops.some(op => op[0] === 'eq' && op[1] === 'year') ? year : ilike;
     const failure = source === direct ? directError : source === ilike ? ilikeError : false;
     if (failure) return { data: null, error: { message: 'reader failure' } };
     const range = q.ops.find(op => op[0] === 'range');
     const limit = q.ops.find(op => op[0] === 'limit');
-    return { data: range ? source.slice(range[1], range[2] + 1) : source.slice(0, limit?.[1] ?? source.length) };
+    const eligible = applyPredicates(source, q);
+    return { data: range ? eligible.slice(range[1], range[2] + 1) : eligible.slice(0, limit?.[1] ?? eligible.length) };
   };
   const client = {
     auth: { async getUser(token) {
@@ -45,7 +86,7 @@ function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], t
     } },
     from(table) {
       const q = { table, ops: [] }, builder = {};
-      for (const method of ['select', 'eq', 'not', 'ilike', 'contains', 'in', 'or', 'order', 'range', 'limit', 'textSearch'])
+      for (const method of ['select', 'eq', 'is', 'not', 'ilike', 'contains', 'in', 'or', 'order', 'range', 'limit', 'textSearch'])
         builder[method] = (...args) => { q.ops.push([method, ...args]); return builder; };
       builder.then = (resolve, reject) => Promise.resolve().then(() => respond(q)).then(resolve, reject);
       return builder;
@@ -54,6 +95,8 @@ function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], t
       calls.push({ rpc: name, args });
       if (name === 'search_vehicles_fts') return rankedError(args) ? { data: null, error: { message: 'ranked timeout' } }
         : { data: ranked.slice(args.offset_count || 0, (args.offset_count || 0) + args.limit_count) };
+      if (name === 'search_vehicles_deep') return { data: deep };
+      if (name === 'search_vehicles_fuzzy') return { data: fuzzy };
       return { data: [] };
     },
   };
@@ -201,4 +244,95 @@ test('verified Auth identity, never the untrusted payload sub, authorizes the ex
   assert.deepEqual(linkQuery.ops.find(op => op[0] === 'eq'), ['eq', 'user_id', 'verified_owner']);
   assert(r.results.some(v => v.id === row(999).id));
   assert.equal(r.meta.next_offset, 94);
+});
+
+test('VIN exact/partial, year and direct readers enforce all public gates while admitting NULL listing kinds', async () => {
+  const vin = '1HGCM82633A004352';
+  const candidates = rows(6).map(v => ({ ...v, vin }));
+  candidates[0].is_public = false;
+  candidates[1].deleted_at = '2026-10-13T00:00:00Z';
+  candidates[2].listing_kind = 'non_vehicle_item';
+  candidates[4].listing_kind = 'vehicle';
+  candidates[5].is_public = null;
+  for (const [options, request] of [
+    [{ vin: candidates }, { query: vin }],
+    [{ vin: candidates.map(v => ({ ...v, vin: `prefix${vin}` })) }, { query: vin }],
+    [{ year: candidates }, { query: '2020' }],
+    [{ direct: candidates, rankedError: () => true }, { query: 'porsche', types: ['vehicle'] }],
+  ]) {
+    const r = await edgeFixture(options).search(request);
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.results.map(v => v.id), [row(3).id, row(4).id]);
+  }
+});
+
+test('ILIKE composes eligibility, query, location and body groups without replacing the public gate', async () => {
+  const candidates = rows(8).map(v => ({ ...v, city: 'Reno', body_style: 'coupe' }));
+  candidates[0].is_public = false;
+  candidates[1].deleted_at = '2026-10-13T00:00:00Z';
+  candidates[2].listing_kind = 'non_vehicle_item';
+  candidates[4].listing_kind = 'vehicle';
+  candidates[5].city = 'Seattle';
+  candidates[6].body_style = 'sedan';
+  candidates[7].make = 'Volvo'; candidates[7].model = '240';
+  const f = edgeFixture({ ilike: candidates });
+  const r = await f.search({ query: 'porsche gt3', vehicle_source: 'ilike', location: 'Reno', body_style: 'coupe' });
+  assert.equal(r.status, 200); assert.deepEqual(r.results.map(v => v.id), [row(3).id, row(4).id]);
+  const lookup = f.calls.find(c => c.table === 'vehicles' && !c.ops.some(op => op[0] === 'in'));
+  assert.equal(lookup.ops.filter(op => op[0] === 'or').length, 1);
+});
+
+test('a fully ineligible stale ranked page retains raw candidate continuation without exposing payloads', async () => {
+  const ranked = rows(101), parents = ranked.slice(0, 100).map((v, i) => ({ ...v,
+    ...(i % 4 === 0 ? { is_public: false } : i % 4 === 1 ? { deleted_at: '2026-10-13T00:00:00Z' }
+      : i % 4 === 2 ? { listing_kind: 'non_vehicle_item' } : { is_public: null }),
+  }));
+  const f = edgeFixture({ ranked, parents });
+  const first = await f.search({ types: ['vehicle'] });
+  assert.equal(first.status, 200); assert.deepEqual(first.results, []);
+  assert.equal(first.meta.has_more, true); assert.equal(first.meta.next_offset, 100);
+  assert.equal(first.meta.consumed_candidates, 100); assert.equal(first.meta.vehicle_source, 'ranked');
+  const next = await f.search({ types: ['vehicle'], offset: 100, vehicle_source: 'ranked' });
+  assert.deepEqual(next.results.map(v => v.id), [row(100).id]); assert.equal(next.meta.has_more, false);
+});
+
+test('deep/fuzzy payloads require current eligible parents, including current non-auto classification', async () => {
+  for (const source of ['deep', 'fuzzy']) {
+    const candidates = rows(6).map(v => ({ ...v, vehicle_id: v.id, match_source: 'comment', snippet: `snippet_${v.id}` }));
+    const parents = rows(6);
+    parents[0].is_public = false; parents[1].deleted_at = '2026-10-13T00:00:00Z';
+    parents[2].listing_kind = 'non_vehicle_item'; parents[5].canonical_vehicle_type = 'BOAT';
+    const f = edgeFixture({ ranked: [], [source]: candidates, parents, missingIds: [row(3).id] });
+    const r = await f.search({ types: ['vehicle'] });
+    assert.equal(r.status, 200); assert.deepEqual(r.results.map(v => v.id), [row(4).id]);
+    for (const n of [0,1,2,3,5]) assert(!JSON.stringify(r).includes(`snippet_${row(n).id}`));
+  }
+});
+
+test('deep/fuzzy eligibility lookup failures fail the page with no advanced/exhausted cursor', async () => {
+  for (const source of ['deep', 'fuzzy']) {
+    const f = edgeFixture({ ranked: [], [source]: [{ ...row(1), vehicle_id: row(1).id }], eligibilityError: () => true });
+    const r = await f.search({ types: ['vehicle'] });
+    assert.equal(r.status, 500); assert.equal(r.success, false); assert.deepEqual(r.results, []); assert.equal(r.meta, undefined);
+  }
+});
+
+test('RPC over-return cannot expand deep/fuzzy current-parent validation beyond their bounded batches', async () => {
+  for (const [source, bound] of [['deep', 20], ['fuzzy', 10]]) {
+    const f = edgeFixture({ ranked: [], [source]: rows(bound + 5).map(v => ({ ...v, vehicle_id: v.id })) });
+    const r = await f.search({ types: ['vehicle'] });
+    assert.equal(r.status, 200); assert.equal(r.results.length, bound);
+    const lookup = f.calls.find(c => c.table === 'vehicles' && c.ops.some(op => op[0] === 'in'));
+    assert.equal(lookup.ops.find(op => op[0] === 'in')[2].length, bound);
+  }
+});
+
+test('verified private-owned result survives but cannot receive a stale public deep/fuzzy payload', async () => {
+  const owned = { ...row(999), is_public: false };
+  const stale = { ...row(999), vehicle_id: owned.id, match_source: 'comment', snippet: 'unvalidated_private_snippet' };
+  const f = edgeFixture({ ranked: [], owned: [owned], parents: [owned], deep: [stale], fuzzy: [stale], verifiedUser: 'verified_owner' });
+  const r = await f.search({}, true);
+  assert.equal(r.status, 200); assert.deepEqual(r.results.map(v => v.id), [owned.id]);
+  assert.equal(r.results[0].relevance_score, 1.5);
+  assert(!JSON.stringify(r).includes('unvalidated_private_snippet'));
 });

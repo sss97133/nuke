@@ -188,6 +188,8 @@ function escapePostgrestValue(s: string): string {
   return s.replace(/[",().\\]/g, '');
 }
 
+class PublicVehicleReadError extends Error {}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -282,12 +284,37 @@ Deno.serve(async (req) => {
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
     const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, body_style, image_count, observation_count, city, state, listing_location, updated_at';
 
+    // Keep eligibility and optional match groups in one logical expression.
+    // Repeated PostgREST .or() calls must not replace or weaken the public gate.
+    const publicVehicleFilter = (q: any, matchGroups: string[] = []) => {
+      const eligibility = 'listing_kind.is.null,listing_kind.neq.non_vehicle_item';
+      const expression = matchGroups.length
+        ? `and(or(${eligibility}),${matchGroups.map(group => `or(${group})`).join(',')})`
+        : eligibility;
+      return q.eq('is_public', true).is('deleted_at', null).or(expression);
+    };
+
     // Exclude non-automobile types from all search results
     const NON_AUTO_TYPES = new Set(['MOTORCYCLE', 'BOAT', 'TRAILER', 'ATV', 'BUS', 'RV', 'SNOWMOBILE', 'OTHER', 'EQUIPMENT']);
     const isNonAutomobile = (v: any): boolean => {
       const vtype = (v.canonical_vehicle_type || '').toUpperCase();
       const bstyle = (v.canonical_body_style || '').toUpperCase();
       return NON_AUTO_TYPES.has(vtype) || NON_AUTO_TYPES.has(bstyle);
+    };
+
+    // RPCs can contain stale indexed parents. Resolve only this bounded batch
+    // against the current public parent before using any of its payload.
+    const publicVehiclesByIds = async (ids: string[], select = VEHICLE_SELECT) => {
+      const uniqueIds = [...new Set(ids)];
+      if (!uniqueIds.length) return [];
+      if (uniqueIds.length > 200) throw new PublicVehicleReadError('Vehicle eligibility batch is too large');
+      try {
+        const { data, error } = await publicVehicleFilter(supabase.from('vehicles').select(select)).in('id', uniqueIds);
+        if (error || !Array.isArray(data)) throw new Error('Invalid eligibility response');
+        return data;
+      } catch {
+        throw new PublicVehicleReadError('Vehicle eligibility lookup failed; retry the same page');
+      }
     };
 
     // Build a rich metadata object from a vehicle row.
@@ -329,25 +356,25 @@ Deno.serve(async (req) => {
       const vin = trimmedQuery.toUpperCase();
 
       // Try exact match first (case-insensitive via ilike)
-      const { data: exactVehicles } = await supabase
+      const { data: exactVehicles, error: exactError } = await publicVehicleFilter(supabase
         .from('vehicles')
-        .select(VEHICLE_SELECT)
+        .select(VEHICLE_SELECT))
         .ilike('vin', vin)
-        .eq('is_public', true)
         .limit(10);
+      if (exactError) throw new PublicVehicleReadError('Vehicle VIN search failed');
 
       let vehicles = exactVehicles || [];
 
       // If no exact match, try partial match (last 6-8 digits, or substring)
       if (!vehicles.length && vin.length >= 5) {
-        const { data: partialVehicles } = await supabase
+        const { data: partialVehicles, error: partialError } = await publicVehicleFilter(supabase
           .from('vehicles')
-          .select(VEHICLE_SELECT)
+          .select(VEHICLE_SELECT))
           .ilike('vin', `%${escapeIlike(vin)}%`)
-          .eq('is_public', true)
           .not('year', 'is', null)
           .not('make', 'is', null)
           .limit(10);
+        if (partialError) throw new PublicVehicleReadError('Vehicle VIN search failed');
         vehicles = partialVehicles || [];
       }
 
@@ -398,18 +425,17 @@ Deno.serve(async (req) => {
     if (queryType === 'year') {
       const year = parseInt(trimmedQuery, 10);
 
-      const { data: yearCandidates, error: yearError } = await supabase
+      const { data: yearCandidates, error: yearError } = await publicVehicleFilter(supabase
         .from('vehicles')
-        .select(VEHICLE_SELECT)
+        .select(VEHICLE_SELECT))
         .eq('year', year)
-        .eq('is_public', true)
         .not('make', 'is', null)
         .not('model', 'is', null)
         .order('updated_at', { ascending: false })
         .order('id', { ascending: true })
         .range(offset, offset + sanitizedLimit);
       if (yearError) throw new Error('Vehicle year search failed; retry the same page');
-      const yearPage = candidatePage(yearCandidates || [], offset, sanitizedLimit);
+      const yearPage = candidatePage<any>(yearCandidates || [], offset, sanitizedLimit);
       const vehicles = yearPage.rows;
 
       if (vehicles?.length) {
@@ -452,23 +478,25 @@ Deno.serve(async (req) => {
     const searchPattern = `%${escapeIlike(trimmedQuery)}%`;
     const allowedTypes = types || ['vehicle', 'organization', 'user', 'tag', 'external_identity'];
 
-    // Apply optional vehicle filters (location, body_style) to any query builder
-    const applyVehicleFilters = (q: any): any => {
+    // Optional filters are ANDed with eligibility and query matching in one OR
+    // expression below, including combinations of location and body style.
+    const vehicleMatchGroups = (): string[] => {
+      const groups: string[] = [];
       if (locationFilter) {
         const loc = escapeIlike(escapePostgrestValue(locationFilter));
         if (locationFilter.length === 2) {
           // 2-letter state code
-          q = q.ilike('state', loc);
+          groups.push(`state.ilike.${loc}`);
         } else {
           // City name or longer location string
-          q = q.or(`city.ilike.%${loc}%,state.ilike.%${loc}%,listing_location.ilike.%${loc}%`);
+          groups.push(`city.ilike.%${loc}%,state.ilike.%${loc}%,listing_location.ilike.%${loc}%`);
         }
       }
       if (bodyStyleFilter) {
         const bs = escapeIlike(escapePostgrestValue(bodyStyleFilter));
-        q = q.or(`body_style.ilike.%${bs}%,canonical_body_style.ilike.%${bs}%`);
+        groups.push(`body_style.ilike.%${bs}%,canonical_body_style.ilike.%${bs}%`);
       }
-      return q;
+      return groups;
     };
 
     // Parallel searches
@@ -498,8 +526,8 @@ Deno.serve(async (req) => {
           return vehiclePage.rows;
         };
         const directSearch = async () => {
-          const { data, error } = await supabase.from('vehicles').select(VEHICLE_SELECT)
-            .eq('is_public', true).not('year', 'is', null).not('make', 'is', null).not('model', 'is', null)
+          const { data, error } = await publicVehicleFilter(supabase.from('vehicles').select(VEHICLE_SELECT))
+            .not('year', 'is', null).not('make', 'is', null).not('model', 'is', null)
             .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
             .order('id', { ascending: true }).range(offset, offset + vehicleLimit);
           if (error) throw new Error('Vehicle fallback search failed; retry the same page');
@@ -523,9 +551,7 @@ Deno.serve(async (req) => {
             // exact/trigram offsets still need a DB-side branch-boundary fix.
             const ranked = useCandidates(data || [], 'ranked').filter((r: any) => (r.relevance || 0) >= 0.85);
             if (ranked.length) {
-              const { data: enriched, error: enrichmentError } = await supabase.from('vehicles')
-                .select(VEHICLE_SELECT).in('id', ranked.map((r: any) => r.id));
-              if (enrichmentError) throw new Error('Vehicle enrichment failed; retry the same page');
+              const enriched = await publicVehiclesByIds(ranked.map((r: any) => r.id));
               const byId = new Map((enriched || []).map((v: any) => [v.id, v]));
               vehicles = ranked.map((r: any) => ({ ...byId.get(r.id), relevance: r.relevance })).filter((v: any) => v.id);
             }
@@ -545,22 +571,21 @@ Deno.serve(async (req) => {
         const skipIlike = requestedSource !== 'ilike' && (!firstPage || !!requestedSource || tokens.length < 2 || vehicles.length >= Math.ceil(vehicleLimit / 2));
         if (!skipIlike) {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-          let ilikeQuery = applyVehicleFilters(supabase
+          const matchGroups = vehicleMatchGroups();
+          let ilikeQuery = supabase
             .from('vehicles')
             .select(VEHICLE_SELECT)
-            .eq('is_public', true)
             // Filter stub vehicles (no year/make/model) from search results
             .not('year', 'is', null)
             .not('make', 'is', null)
-            .not('model', 'is', null));
+            .not('model', 'is', null);
 
           if (yearMatch) {
             // "1973 Porsche 911" → year=1973 AND (make|model ILIKE '%porsche 911%')
             const year = parseInt(yearMatch[1], 10);
             const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
-            ilikeQuery = ilikeQuery
-              .eq('year', year)
-              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
+            ilikeQuery = ilikeQuery.eq('year', year);
+            matchGroups.push(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
           } else if (tokens.length >= 2) {
             // Build filter: first token assumed to be make, rest is model — AND also try all
             // tokens against model independently (catches "Porsche 997 GT3" → model ILIKE '%997%')
@@ -572,7 +597,7 @@ Deno.serve(async (req) => {
               .map(t => `model.ilike.%${escapeIlike(escapePostgrestValue(t))}%`)
               .join(',');
 
-            ilikeQuery = ilikeQuery.or(
+            matchGroups.push(
               // Primary: make=token[0], model contains rest
               `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
               // Reverse: model=token[0], make contains rest
@@ -587,10 +612,10 @@ Deno.serve(async (req) => {
           } else {
             // Single token: search both make, model, and color
             const t = escapePostgrestValue(searchPattern);
-            ilikeQuery = ilikeQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
+            matchGroups.push(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
           }
 
-          const { data: ilikeResults, error: ilikeError } = await ilikeQuery
+          const { data: ilikeResults, error: ilikeError } = await publicVehicleFilter(ilikeQuery, matchGroups)
             .order('sale_price', { ascending: false, nullsFirst: false })
             .order('id', { ascending: true })
             .range(offset, offset + vehicleLimit);
@@ -864,8 +889,12 @@ Deno.serve(async (req) => {
             p_offset: 0,
           });
           if (deepErr || !deepResults?.length) return;
-
-          for (const d of deepResults) {
+          const deepCandidates = deepResults.slice(0, 20);
+          const eligibleParents = await publicVehiclesByIds(
+            deepCandidates.map((d: any) => d.vehicle_id), 'id, canonical_vehicle_type, canonical_body_style');
+          const eligibleIds = new Set(eligibleParents.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id));
+          for (const d of deepCandidates) {
+            if (!eligibleIds.has(d.vehicle_id)) continue;
             if (isNonAutomobile(d)) continue;
             // Only add if not already in results (the main vehicle search may have found it too)
             if (results.some(r => r.id === d.vehicle_id)) {
@@ -902,6 +931,7 @@ Deno.serve(async (req) => {
             });
           }
         } catch (e) {
+          if (e instanceof PublicVehicleReadError) { vehicleSearchFailed = true; throw e; }
           console.error('Deep search failed (non-fatal):', e);
         }
       })());
@@ -933,7 +963,12 @@ Deno.serve(async (req) => {
           p_limit: 10,
         });
         if (fuzzyResults?.length) {
-          for (const f of fuzzyResults) {
+          const fuzzyCandidates = fuzzyResults.slice(0, 10);
+          const eligibleParents = await publicVehiclesByIds(
+            fuzzyCandidates.map((f: any) => f.vehicle_id), 'id, canonical_vehicle_type, canonical_body_style');
+          const eligibleIds = new Set(eligibleParents.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id));
+          for (const f of fuzzyCandidates) {
+            if (!eligibleIds.has(f.vehicle_id)) continue;
             if (isNonAutomobile(f)) continue;
             if (results.some(r => r.id === f.vehicle_id)) continue;
             const price = f.sale_price;
@@ -956,6 +991,7 @@ Deno.serve(async (req) => {
           results.sort((a, b) => b.relevance_score - a.relevance_score || a.id.localeCompare(b.id));
         }
       } catch (e) {
+        if (e instanceof PublicVehicleReadError) throw e;
         console.error('Fuzzy search failed (non-fatal):', e);
       }
     }
