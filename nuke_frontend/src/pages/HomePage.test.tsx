@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: false }) }));
 vi.mock('../hooks/useVehiclesDashboard', () => ({ useVehiclesDashboard: () => ({}) }));
 vi.mock('../components/onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
-vi.mock('./market/MarketPulse', () => ({ default: () => <div role="region" aria-label="Market screen" /> }));
+vi.mock('./market/MarketInventory', () => ({ default: () => <div role="region" aria-label="Market screen" /> }));
 vi.mock('../feed/components/FeedPage', () => ({ default: () => <div role="region" aria-label="Feed screen" /> }));
 vi.mock('../components/garage/GarageTab', () => ({ default: () => <div role="region" aria-label="Garage screen" /> }));
 vi.mock('./intake/IntakePage', () => ({ default: () => null }));
