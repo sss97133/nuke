@@ -36,6 +36,9 @@ CREATE TABLE public.field_evidence (
 CREATE TABLE public.ownership_verifications (
   vehicle_id uuid, user_id uuid, status text, title_document_url text, drivers_license_url text);
 CREATE TABLE public.vehicle_contributors (vehicle_id uuid, user_id uuid, role text, status text);
+CREATE TABLE public.timeline_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, event_type text, event_date date,
+  created_at timestamptz DEFAULT now());
 CREATE TABLE public.test_price_facts (
   vehicle_id uuid PRIMARY KEY, price_kind text, price_amount numeric, price_as_of timestamptz,
   price_live boolean, platform text, source_url text);
@@ -64,6 +67,9 @@ CREATE POLICY "Anyone can view evidence" ON public.field_evidence FOR SELECT
   USING (auth.role() = 'authenticated'
     OR (coalesce(source_type, '') <> ALL (ARRAY['quickbooks', 'invoice', 'email_receipt', 'receipt', 'bank_statement', 'card_statement'])
         AND coalesce(field_name, '') <> ALL (ARRAY['seller_name', 'seller_profile_url', 'seller_phone', 'seller_email', 'buyer_name'])));
+ALTER TABLE public.timeline_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY public_vehicle_events ON public.timeline_events FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = timeline_events.vehicle_id AND v.is_public = true));
 ALTER TABLE public.ownership_verifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_claims ON public.ownership_verifications FOR SELECT USING (user_id = (SELECT auth.uid()));
 ALTER TABLE public.vehicle_contributors ENABLE ROW LEVEL SECURITY;
@@ -73,6 +79,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
+\ir ../migrations/20261013161500_vehicle_profile_read_timeline.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -102,6 +109,14 @@ INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, sourc
  ('10000000-0000-0000-0000-000000000001', 'mileage',      '100010',    'bat',                     90, '2026-09-05T00:00:00Z', 'accepted'),
  ('10000000-0000-0000-0000-000000000006', 'engine_size',  '4.7L V8',   'user-submission_listing', 60, '2026-09-01T00:00:00Z', 'accepted'),
  ('10000000-0000-0000-0000-000000000006', 'engine_size',  '4.7l v8',   'factory_service_manual',  95, '2026-09-06T00:00:00Z', 'accepted');
+INSERT INTO public.timeline_events (vehicle_id, event_type, event_date, created_at) VALUES
+ ('10000000-0000-0000-0000-000000000001', 'photo_session', '2026-02-01', '2026-02-01T10:00:00Z'),
+ ('10000000-0000-0000-0000-000000000001', 'photo_session', '2026-02-01', '2026-02-01T11:00:00Z'),
+ ('10000000-0000-0000-0000-000000000001', 'service',       '2026-02-01', '2026-02-01T12:00:00Z'),
+ ('10000000-0000-0000-0000-000000000001', 'service',       '2025-12-24', '2025-12-24T09:00:00Z'),
+ ('10000000-0000-0000-0000-000000000001', NULL,            '2025-12-24', '2026-03-01T09:00:00Z'),
+ ('10000000-0000-0000-0000-000000000001', 'note',          NULL,         '2026-03-02T09:00:00Z'),
+ ('10000000-0000-0000-0000-000000000004', 'service',       '2026-01-01', '2026-01-01T09:00:00Z');
 INSERT INTO public.test_price_facts VALUES
  ('10000000-0000-0000-0000-000000000001', 'sold', 24000, '2026-09-21T00:00:00Z', false, 'bring-a-trailer', 'https://bringatrailer.com/listing/x'),
  ('10000000-0000-0000-0000-000000000003', 'estimate', 112200, '2026-09-21T00:00:00Z', false, 'user-submission', NULL),
@@ -127,7 +142,7 @@ BEGIN
   PERFORM public.t_assert(d->>'viewer' = 'anon', 'anonymous viewer');
   PERFORM public.t_assert(d->>'vehicle_id' = '10000000-0000-0000-0000-000000000001', 'vehicle id');
   PERFORM public.t_assert((d->>'read_at')::timestamptz > now() - interval '1 minute', 'read_at is the read clock');
-  PERFORM public.t_assert(jsonb_array_length(d->'sections') = 2, 'masthead and strip');
+  PERFORM public.t_assert((SELECT string_agg(x->>'kind', ',' ORDER BY o) FROM jsonb_array_elements(d->'sections') WITH ORDINALITY AS t(x, o)) = 'masthead,strip,timeline', 'masthead, strip and timeline');
   m := d->'sections'->0;
   PERFORM public.t_assert(m->>'kind' = 'masthead' AND m->>'model' = 'Mustang' AND (m->>'year')::int = 1966, 'masthead identity');
   PERFORM public.t_assert(m->'identity_source'->>'normalized_model' = 'Mustang', 'identity_source for the client tokens');
@@ -162,8 +177,14 @@ END $$;
 DO $$
 DECLARE d jsonb;
 BEGIN
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert(d->'sections'->2->'coverage' = jsonb_build_object('n', 5, 'of', 6, 'grain', 'events dated', 'as_of', '2026-03-02T09:00:00+00:00'),
+    format('timeline coverage: five dated of six events, as of the latest row; got %s', d->'sections'->2->'coverage'));
+  PERFORM public.t_assert(d->'sections'->2->'days' = '[{"day":"2026-02-01","kinds":{"photo_session":2,"service":1}},{"day":"2025-12-24","kinds":{"event":1,"service":1}}]'::jsonb,
+    format('days newest first, kinds counted, an untyped event is an event; got %s', d->'sections'->2->'days'));
+
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
-  PERFORM public.t_assert(jsonb_array_length(d->'sections') = 1 AND d->'sections'->0->>'kind' = 'masthead', 'no strip when nothing is recorded');
+  PERFORM public.t_assert(jsonb_array_length(d->'sections') = 1 AND d->'sections'->0->>'kind' = 'masthead', 'no strip and no timeline when nothing is recorded');
   PERFORM public.t_assert(d->'sections'->0->'price' = 'null'::jsonb AND d->'sections'->0->'priceLabel' = 'null'::jsonb, 'no price without a typed price');
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000003');
