@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, writeFile, rm, symlink, open } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -838,4 +839,206 @@ test('old low-age freshness receipts expire by elapsed time since measurement', 
   const b=readySubject();b.gates.freshness.receipt.measuredAt=new Date(matrixNow-20_000).toISOString();
   assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow).assessments[0].state,'ready');
   assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow+1).assessments[0].state,'blocked');
+});
+
+const digest = value => createHash('sha256').update(value).digest('hex');
+const streamSubject = key => ({ type: 'subject', key, grain: 'public_vehicle_record', capabilities: ['find_open'] });
+const streamAssessment = key => {
+  const a = readySubject(); a.key = key;
+  for (const gate of Object.values(a.gates)) gate.receipt.key = key;
+  return { type: 'assessment', grain: 'public_vehicle_record', ...a };
+};
+
+async function writePopulationStream(dir, name, rows, population) {
+  const filePath = path.join(dir, name), file = await open(filePath, 'w');
+  const whole = createHash('sha256'), content = createHash('sha256');
+  let count = 0, buffer = '';
+  try {
+    for (const row of rows) {
+      const line = JSON.stringify(row) + '\n';
+      whole.update(line); content.update(line); count++; buffer += line;
+      if (buffer.length > 65536) { await file.writeFile(buffer); buffer = ''; }
+    }
+    const end = JSON.stringify({ type: 'end', populationKey: population.key, grain: population.grain,
+      measuredAt: population.measuredAt, window: population.window, rows: count, exhausted: true,
+      sha256: content.digest('hex') }) + '\n';
+    whole.update(end); await file.writeFile(buffer + end);
+  } finally { await file.close(); }
+  return { path: filePath, rows: count, sha256: whole.digest('hex'), exhausted: true };
+}
+
+async function populationFixture(t, subjects = [streamSubject('subject_1')], assessments = [], size = subjects.length) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'public-population-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const population = { key: 'offline_fixture', grain: 'public_vehicle_record', filter: 'offline eligible records',
+    measuredAt: '2026-10-13T02:00:00Z', window: { start: '2026-10-13T01:00:00Z', end: '2026-10-13T02:00:00Z' },
+    denominator: size, fullRetained: { count: size + 10, grain: 'vehicle_record' }, fullPublic: { count: size + 5, grain: 'public_vehicle_record' },
+    evidenceStage: 'cached_census', sourceReceipt: { id: 'offline_census_fixture', sha256: 'b'.repeat(64) } };
+  const config = { schemaVersion: 'public_inventory_acceptance_v1', mode: 'population_reconciliation_v1', population,
+    capabilities: [{ id: 'find_open', grain: population.grain, eligibilityRule: 'offline public records including missing evidence', eligibleCount: size }],
+    manifest: await writePopulationStream(dir, 'subjects.jsonl', subjects, population),
+    assessments: await writePopulationStream(dir, 'assessments.jsonl', assessments, population) };
+  return { dir, config };
+}
+
+test('population reconciliation retains omitted members and gate intersections beside independent denominators', async t => {
+  const blocked = streamAssessment('subject_2');
+  blocked.gates.evidence = { status: 'failed', reason: 'source_witness_missing' };
+  blocked.gates.public_delivery = { status: 'failed', reason: 'anonymous_reader_denied' };
+  const { config } = await populationFixture(t, ['subject_1', 'subject_2', 'subject_3'].map(streamSubject),
+    [streamAssessment('subject_1'), blocked]);
+  const output = [], r = await reconcilePopulation(config, { now: matrixNow, emit: x => output.push(x) });
+  const c = r.capabilities[0];
+  assert.deepEqual(c.totals, { ready: 1, blocked: 1, not_assessed: 1 });
+  assert.equal(c.eligibleCount, 3); assert.equal(c.missingAssessments, 1); assert.equal(c.assessmentReceipts, 2);
+  assert.equal(r.population.fullRetained.count, 13); assert.equal(r.population.fullPublic.count, 8);
+  assert.equal(r.inputs.manifest.rows, 3); assert.equal(r.inputs.assessments.rows, 2);
+  assert.equal(c.failedGateIntersections['evidence+public_delivery'], 1);
+  assert.equal(c.gates.evidence.reasons['evidence:source_witness_missing'], 1);
+  assert.deepEqual({ ...c.gates.public_delivery, reasons: undefined }, { passed: 1, failed: 1, not_assessed: 1, reasons: undefined });
+  const rows = output.filter(x => x.type === 'assessment');
+  assert.deepEqual(rows.map(x => x.key), ['subject_1', 'subject_2', 'subject_3']);
+  assert.equal(rows[2].assessmentProvided, false); assert.equal(rows[2].evaluation, undefined);
+  assert(r.reasonSets[rows[2].reasonSet].gates.every(x => x.status === 'not_assessed'));
+  assert(r.unmeasuredCapabilities.every(x => x.eligibleCount === null && x.state === 'not_assessed'));
+  assert.equal(r.populationReconciled, true); assert.equal(r.publicReadinessCertificate, false);
+  assert.equal(r.gateEvidenceIndependentlyVerified, false); assert.equal(r.networkRequests, 0);
+});
+
+test('empty sparse receipts cannot create pass evidence or remove any eligible subject', async t => {
+  const { config } = await populationFixture(t, [streamSubject('a'), streamSubject('b')]);
+  config.capabilities[0].gates = []; // A supplied declaration cannot weaken the fixed contract.
+  const r = await reconcilePopulation(config, { now: matrixNow });
+  assert.deepEqual(r.capabilities[0].totals, { ready: 0, blocked: 0, not_assessed: 2 });
+  assert.equal(r.capabilities[0].missingAssessments, 2);
+  assert.equal(Object.keys(r.reasonSets).length, 1);
+  assert.equal(Object.keys(r.capabilities[0].gates).length, PUBLIC_ACCEPTANCE[0].gates.length);
+  assert.equal(r.inputs.assessments.contentSha256, digest(''));
+});
+
+test('duplicate and reordered subject or assessment keys fail even with valid input hashes', async t => {
+  for (const keys of [['a', 'a'], ['b', 'a']]) {
+    const f = await populationFixture(t, keys.map(streamSubject));
+    await assert.rejects(reconcilePopulation(f.config, { now: matrixNow }), /duplicate_or_unsorted_subject_key/);
+    const g = await populationFixture(t, ['a', 'b'].map(streamSubject), keys.map(streamAssessment));
+    await assert.rejects(reconcilePopulation(g.config, { now: matrixNow }), /duplicate_or_unsorted_assessment_key/);
+  }
+  const { config } = await populationFixture(t, ['a', 'a-'].map(streamSubject), ['a', 'a-'].map(streamAssessment));
+  assert.equal((await reconcilePopulation(config, { now: matrixNow })).capabilities[0].totals.ready, 2);
+});
+
+test('unmatched, ineligible and wrong-grain keys never enter the reconciled population', async t => {
+  for (const key of ['a', 'z']) {
+    const { config } = await populationFixture(t, [streamSubject('m')], [streamAssessment(key)]);
+    await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /unmatched_assessment_key/);
+  }
+  for (const change of [a => { a.capability = 'one_inventory'; }, a => { a.grain = 'public_presentation_question'; }]) {
+    const a = streamAssessment('subject_1'); change(a);
+    const { config } = await populationFixture(t, undefined, [a]);
+    await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /ineligible_assessment_key|assessment_grain_mismatch/);
+  }
+  for (const row of [{ ...streamSubject('subject_1'), grain: 'vehicle_record' },
+    { ...streamSubject('subject_1'), capabilities: [] }, { ...streamSubject('subject_1'), capabilities: ['one_inventory'] }]) {
+    const { config } = await populationFixture(t, [row]);
+    await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /subject_key_or_grain|subject_capability_membership/);
+  }
+});
+
+test('population and capability counts, grain and measurement windows are enforced', async t => {
+  const { config } = await populationFixture(t);
+  for (const mutate of [c => { c.population.denominator++; }, c => { c.capabilities[0].eligibleCount = 0; },
+    c => { c.population.fullPublic.count = 0; }, c => { c.population.fullRetained.count = 0; },
+    c => { c.capabilities[0].id = 'one_inventory'; }, c => { c.capabilities[0].grain = 'public_record_question'; },
+    c => { c.population.measuredAt = '2027-01-01T00:00:00Z'; }, c => { c.population.window.start = '2026-10-14T00:00:00Z'; },
+    c => { c.population.measuredAt = '2026-10-13'; }, c => { c.population.window.end = '2026-10-13T02:10:00Z'; }]) {
+    const altered = structuredClone(config); mutate(altered);
+    await assert.rejects(reconcilePopulation(altered, { now: matrixNow }));
+  }
+});
+
+test('terminal receipts must match counts, hashes, population, grain, window and exhaustion', async t => {
+  for (const name of ['manifest', 'assessments']) {
+    for (const mutate of [r => { r.rows++; }, r => { r.sha256 = '0'.repeat(64); }, r => { r.exhausted = false; },
+      r => { r.populationKey = 'wrong'; }, r => { r.grain = 'public_presentation_question'; },
+      r => { r.measuredAt = '2026-10-13T01:59:00Z'; }, r => { r.window.start = '2026-10-12T00:00:00Z'; }]) {
+      const { config } = await populationFixture(t), d = config[name];
+      const lines = (await readFile(d.path, 'utf8')).trimEnd().split('\n');
+      const end = JSON.parse(lines.at(-1)); mutate(end); lines[lines.length - 1] = JSON.stringify(end);
+      const bytes = lines.join('\n') + '\n'; await writeFile(d.path, bytes); d.sha256 = digest(bytes);
+      const emitted = [];
+      await assert.rejects(reconcilePopulation(config, { now: matrixNow, emit: r => emitted.push(r) }), /stream_end_receipt_mismatch/);
+      assert.equal(emitted.some(r => r.type === 'summary'), false);
+    }
+  }
+});
+
+test('truncated tails, trailing data and descriptor mismatches fail without a completion summary', async t => {
+  for (const name of ['manifest', 'assessments']) {
+    for (const change of [bytes => bytes.slice(0, -1), bytes => bytes.slice(0, bytes.lastIndexOf('\n', bytes.length - 2) + 1),
+      bytes => bytes + '\n', bytes => bytes + JSON.stringify(streamSubject('z')) + '\n']) {
+      const { config } = await populationFixture(t), d = config[name], bytes = change(await readFile(d.path, 'utf8'));
+      await writeFile(d.path, bytes); d.sha256 = digest(bytes);
+      await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /truncated_or_end_missing|data_after_end/);
+    }
+    for (const change of [d => { d.sha256 = '0'.repeat(64); }, d => { d.exhausted = false; }, d => { d.rows++; }]) {
+      const { config } = await populationFixture(t); change(config[name]);
+      await assert.rejects(reconcilePopulation(config, { now: matrixNow }));
+    }
+  }
+});
+
+test('malformed JSON and oversized records fail explicitly without silently clipping a stream', async t => {
+  for (const firstLine of ['{broken}\n', '[]\n', '\n', JSON.stringify({ ...streamSubject('subject_1'), unexpected: 'x'.repeat(1_000_000) }) + '\n']) {
+    const { config } = await populationFixture(t), d = config.manifest;
+    await writeFile(d.path, firstLine); d.sha256 = digest(firstLine);
+    await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /invalid_stream_json|invalid_stream_row|stream_line_too_large/);
+  }
+});
+
+test('streaming mode reuses gate qualification and cannot certify private, wrong-key or unknown gates', async t => {
+  for (const mutate of [a => { a.gates.public_delivery.receipt.basis = 'service_runtime'; },
+    a => { a.gates.evidence.receipt.key = 'wrong'; }, a => { a.gates.semantic_quality.receipt.basis = 'anonymous_runtime'; },
+    a => { delete a.objectives; }, a => { delete a.gates.service.metrics; }]) {
+    const a = streamAssessment('subject_1'); mutate(a);
+    const { config } = await populationFixture(t, undefined, [a]);
+    const r = await reconcilePopulation(config, { now: matrixNow });
+    assert.deepEqual(r.capabilities[0].totals, { ready: 0, blocked: 0, not_assessed: 1 });
+    if (!a.objectives) for (const gate of ['freshness', 'service']) {
+      assert.equal(r.capabilities[0].gates[gate].passed, 0);
+      assert.equal(r.capabilities[0].gates[gate].not_assessed, 1);
+    }
+  }
+  const a = streamAssessment('subject_1'); a.gates.invented_gate = { status: 'passed' };
+  const { config } = await populationFixture(t, undefined, [a]);
+  await assert.rejects(reconcilePopulation(config, { now: matrixNow }), /unknown_acceptance_gate/);
+});
+
+test('large streaming manifests reconcile past the explicit compiler cap and retain their final missing member', async t => {
+  const size = 30_001;
+  function* subjects() { for (let i = 0; i < size; i++) yield streamSubject(id(i)); }
+  const { config } = await populationFixture(t, subjects(), [streamAssessment(id(size - 2))], size);
+  let emitted = 0, last;
+  const r = await reconcilePopulation(config, { now: matrixNow, emit: row => {
+    if (row.type === 'assessment') { emitted++; last = row; }
+  } });
+  assert.equal(emitted, size); assert.equal(last.key, id(size - 1)); assert.equal(last.state, 'not_assessed');
+  assert.equal(r.inputs.manifest.rows, size); assert.equal(r.capabilities[0].missingAssessments, size - 1);
+  assert.deepEqual(r.capabilities[0].totals, { ready: 1, blocked: 0, not_assessed: size - 1 });
+  assert.equal(Object.keys(r.reasonSets).length, 2);
+});
+
+test('population CLI is offline, exclusive/private, and hashes its complete output before its terminal summary', async t => {
+  const { config, dir } = await populationFixture(t, [streamSubject('a'), streamSubject('b')]);
+  const input = path.join(dir, 'config.json'), output = path.join(dir, 'receipt.jsonl');
+  for (const name of ['manifest', 'assessments']) config[name].path = path.basename(config[name].path);
+  await writeFile(input, JSON.stringify(config));
+  const printed = [], deps = { now: () => matrixNow, print: x => printed.push(x), env: {}, client: { parents() { throw new Error('network forbidden'); } } };
+  assert.equal(await main(['--reconcile-population', input, '--out', output], deps), 0);
+  const bytes = await readFile(output, 'utf8'), lines = bytes.trimEnd().split('\n'), report = JSON.parse(lines.at(-1));
+  assert.equal(lines.length, 4); assert.equal(report.status, 'reconciled');
+  assert.equal(report.precedingOutputRows, 3); assert.equal(report.precedingOutputSha256, digest(lines.slice(0, -1).join('\n') + '\n'));
+  assert.equal(report.inputSha256, digest(await readFile(input))); assert.match(report.assaySourceSha256, /^[a-f0-9]{64}$/);
+  assert.equal((await stat(output)).mode & 0o777, 0o600);
+  assert.equal(await main(['--reconcile-population', input, '--out', output], deps), 1);
+  assert.equal(await main(['--reconcile-population', input, '--out', output, '--live', 'true'], deps), 1);
 });
