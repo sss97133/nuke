@@ -73,11 +73,19 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     var photo_imported_at: String? = nil
     var photo_listing_url: String? = nil
 
-    /// The vision gate as the web applies it on every public image read
-    /// (useVehicleImages, VehicleThumbnail, ProImageViewer, DiscoveryFeed): a frame the gate
-    /// rejected as personal or misattributed never reaches a public surface; an ungated frame
-    /// (null) still may. Pass to PostgREST `.or(...)`. Keep it one string so every read agrees.
-    static let gateRule = "vision_gate_status.is.null,vision_gate_status.not.in.(\"rejected_personal\",\"rejected_misattributed\")"
+    /// The web gallery's population, applied to a vehicle_images query: the shared database
+    /// predicate `vehicle_image_gallery_eligible` (gate null or approved, pending only with proven
+    /// publication, no mismatch) plus the same document, duplicate, superseded and null-url
+    /// exclusions as nuke_frontend/src/lib/fetchVehicleImages.ts. One function so every public
+    /// read agrees with the web and with itself. The row policy is the privacy gate; this is
+    /// display eligibility.
+    static func eligible(_ q: PostgrestFilterBuilder) -> PostgrestFilterBuilder {
+        q.eq("vehicle_image_gallery_eligible", value: true)
+         .not("is_document", operator: .is, value: "true")
+         .not("is_duplicate", operator: .is, value: "true")
+         .not("is_superseded", operator: .is, value: "true")
+         .not("image_url", operator: .is, value: "null")
+    }
 
     // Legacy importers copied the import clock into taken_at. It is not a
     // camera date, even though the column's name suggests one.
@@ -286,6 +294,7 @@ struct VehicleDetailView: View {
     @State private var profile: ProfileRead?
     @State private var profileError = false
     @State private var images: [VehicleGalleryImage] = []
+    @State private var galleryTotal: Int? = nil    // exact count of the gallery predicate, from page 0
     @State private var loadingMore = false         // a gallery page is in flight
     @State private var reachedEnd = false          // last page returned < pageSize
     @State private var renderingShare = false      // share card is composing
@@ -761,15 +770,12 @@ struct VehicleDetailView: View {
     @State private var heroCandidates: [VehicleGalleryImage] = []
     private func loadHero() async {
         do {
-            heroCandidates = try await SupabaseService.client
+            heroCandidates = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
                 .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
-                .eq("image_category", value: "exterior_body")
-                .in("ai_processing_status", values: ["completed", "analyzed"])
-                .not("is_superseded", operator: .is, value: "true")
-                .or(VehicleGalleryImage.gateRule)
-                .order("taken_at", ascending: false)
+                .eq("image_category", value: "exterior_body"))
+                .order("taken_at", ascending: false, nullsFirst: false)
                 .limit(200)
                 .execute().value
         } catch {
@@ -882,17 +888,14 @@ struct VehicleDetailView: View {
         }
     }
 
-    /// Fields the strip now owns, so the spec table states each datum once.
+    /// Fields the read evaluates, so the spec table states each datum once. The read decides them
+    /// all once it loads, including a refused odometer ("a reading without a source is a guess, and
+    /// a guess is not shown"), so none of them may come back through the older spec reader.
     private var stripOwnedFields: Set<String> {
-        guard let strip = profile?.strip else { return [] }
-        var owned = Set(strip.facets.compactMap { ProfileHeaderBlock.field(for: $0.dimension) })
-        if strip.odometer != nil { owned.insert("mileage") }
-        return owned
+        profile == nil ? [] : ["body_style", "engine_size", "transmission", "drivetrain", "mileage"]
     }
 
-    private var stripOwnsLocation: Bool {
-        profile?.strip?.facets.contains { $0.dimension == "location" } == true
-    }
+    private var stripOwnsLocation: Bool { profile != nil }
 
     private var specsOutsideStrip: [VehicleSpec] {
         specs.filter { !stripOwnedFields.contains($0.field) }
@@ -1034,12 +1037,23 @@ struct VehicleDetailView: View {
     // when the asset was never modeled (honest blank, not a facade).
     // Worth as a BRACKET (low · mid · high) + basis, through the shared component —
     // never a bare scalar posing as a price. Renders nothing without a value.
+    /// The web's owner rule (VehicleBriefing.tsx marketDefends): an estimate is defended only
+    /// against a market event, a typed price (sold, bid or ask) or a live listing. A car that is
+    /// not listed, such as an owner's build, has neither, so it shows no estimate to anyone. The
+    /// typed price comes from the same read the header renders; the live listing from the pulse.
+    private var marketDefendsEstimate: Bool {
+        guard let read = profile else { return false }          // no document, nothing defended
+        let priced = read.masthead?.price != nil
+        let listed = pulse?.is_live == true
+        return priced || listed
+    }
+
     @ViewBuilder private var valuationSection: some View {
-        if let v = valuation, let val = v.value, val > 0 {
+        if marketDefendsEstimate, let v = valuation, let val = v.value, val > 0 {
             WorthBracketView(valuation: v, make: vehicle?.make, model: vehicle?.model,
                              year: vehicle?.year, excludeId: vehicleId)
                 .nukeCard()
-        } else if valuationError {
+        } else if marketDefendsEstimate, valuationError {
             sectionError("the estimate") { Task { await loadValuation() } }
         }
     }
@@ -1116,7 +1130,8 @@ struct VehicleDetailView: View {
                let d = await RemoteImageCache.shared.image(u) { strip.append(d) }
         }
         guard hero != nil || !strip.isEmpty else { return nil }   // nothing to show → URL only
-        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: valuation,
+        // The card carries a worth line only when the screen would (the market defends it).
+        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: marketDefendsEstimate ? valuation : nil,
                                strip: strip, days: days, vehicleId: vehicleId)
     }
 
@@ -1476,10 +1491,12 @@ struct VehicleDetailView: View {
         }
     }
 
+    /// "n of N" only while a load is partial, against the same predicate the rows came from
+    /// (web #1051); the whole count alone once every eligible frame is loaded.
     private var photosCountLine: String {
         let loaded = images.count.formatted()
-        if let total = vehicle?.image_count, total > images.count {
-            return "\(loaded) loaded of \(total.formatted()) on the record" + (reachedEnd ? "" : " · more pages")
+        if let total = galleryTotal, total > images.count {
+            return "\(loaded) of \(total.formatted()) eligible" + (reachedEnd ? "" : " · more pages")
         }
         return loaded + (reachedEnd ? "" : "+")
     }
@@ -1762,11 +1779,12 @@ struct VehicleDetailView: View {
     /// WHERE taken_at IS NOT NULL) → backward index scan, ~1ms, no RLS full-sort
     /// timeout.
     ///
-    /// NO server count: an exact count over the ~2.6K matching rows under RLS
-    /// materializes the whole set and trips statement_timeout (measured: 500 @19s),
-    /// and the planner's estimate for this partial-index query is garbage (~65). So
-    /// the header shows the honest loaded count (`images.count`) — which becomes the
-    /// true total once the tail is reached.
+    /// The population is the web's: the shared predicate `vehicle_image_gallery_eligible`
+    /// (nuke_frontend/src/lib/fetchVehicleImages.ts), with the same document, duplicate,
+    /// superseded and null-url exclusions. Page 0 carries the exact count of that same
+    /// predicate, so the header's "n of N" divides one population (web #1051). The phone's
+    /// one difference is stated beside the count: it groups by capture day, so it orders by
+    /// taken_at and shows undated frames last.
     private func loadGalleryPage(reset: Bool = false) async {
         if loadingMore { return }
         if !reset && reachedEnd { return }
@@ -1776,22 +1794,22 @@ struct VehicleDetailView: View {
         let from = reset ? 0 : images.count
         let to = from + Self.galleryPageSize - 1
         do {
-            var request = SupabaseService.client
+            let request = VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("vehicle_id", value: vehicleId)
-                .in("ai_processing_status", values: ["completed", "analyzed"])
-                .not("is_superseded", operator: .is, value: "true")   // keep null/false, drop superseded dupes
-                .or(VehicleGalleryImage.gateRule)                      // the vision gate, as the web applies it
-            if mapContext == nil {
-                request = request.not("taken_at", operator: .is, value: "null")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url",
+                        count: reset ? .exact : nil)
+                .eq("vehicle_id", value: vehicleId))
+            // created_at is only an indexed paging order for a source listing's gallery, never a label.
+            let response = try await request
+                .order(mapContext == nil ? "taken_at" : "created_at", ascending: false, nullsFirst: false)
+                .order("id", ascending: false).range(from: from, to: to).execute() as PostgrestResponse<[VehicleGalleryImage]>
+            let page = response.value
+            if reset {
+                images = page; reachedEnd = false
+                galleryTotal = response.count      // the exact count of the predicate loaded, from page 0
+            } else {
+                images.append(contentsOf: page)
             }
-            // A source listing's gallery includes photos whose camera dates are
-            // unknown. created_at is only an indexed paging order, never a label.
-            let page: [VehicleGalleryImage] = try await request
-                .order(mapContext == nil ? "taken_at" : "created_at", ascending: false)
-                .order("id", ascending: false).range(from: from, to: to).execute().value
-            if reset { images = page; reachedEnd = false } else { images.append(contentsOf: page) }
             if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
             // Only the FIRST page (empty strip) surfaces as an error; a tail-page
@@ -2155,14 +2173,12 @@ private struct DayDrillSheet: View {
         guard let d = f.date(from: day.day),
               let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else { return }
         do {
-            photos = try await SupabaseService.client
+            photos = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
                 .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .gte("taken_at", value: day.day)
-                .lt("taken_at", value: f.string(from: next))
-                .not("is_superseded", operator: .is, value: "true")
-                .or(VehicleGalleryImage.gateRule)
+                .lt("taken_at", value: f.string(from: next)))
                 .order("taken_at", ascending: true)
                 .limit(200)
                 .execute().value

@@ -10,6 +10,7 @@ import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
 import IntakePage from './intake/IntakePage';
+import { Text } from '../kit';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -1013,9 +1014,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         {/* Level indicator + feed shortcut */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
-            <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
-              {fmtNum(totalCount)} vehicles · {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} recorded sale value{embedded ? ' · counts as of the last refresh of the ledger\u2019s views' : ''}
-            </span>
+            <Text role="caption">
+              {fmtNum(totalCount)} {levelType === 'vehicles' ? 'vehicles' : 'vehicles with a recorded price'}{levelType === 'vehicles' ? '' : ' · median = the recorded sale or asking price'}{embedded ? ' · as of the last refresh of the ledger\u2019s views' : ''}
+            </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
             <Link
@@ -1196,9 +1197,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           gap: 12,
         }}
       >
-        <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: 'var(--text-disabled)' }}>
-          {levelType === 'vehicles' ? 'AREA = SALE PRICE / CLICK TO VIEW' : 'AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE'}
-        </span>
+        <Text role="caption">
+          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded price · click to go down'}
+        </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={onBrowse}
@@ -1215,7 +1216,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               cursor: 'pointer',
             }}
           >
-            {embedded ? 'OPEN LOTS BELOW' : 'BROWSE ALL'}
+            {embedded ? 'THE LIVE BOARD ↓' : 'BROWSE ALL'}
           </button>
           {!embedded && <a
             href="https://nuke.ag"

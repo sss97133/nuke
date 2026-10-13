@@ -58,7 +58,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
             <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{sourceName(row.source_platform)} · original listing</a> : <span>{sourceName(row.source_platform)} · {row.source_url ? 'source link unavailable here' : 'source link unrecorded'}</span>}</Text></td>
           <td>{row.current_price == null || !Number.isFinite(Number(row.current_price)) ? <Text role="caption">Unrecorded</Text>
             : <><Text role="measure" dense>${Number(row.current_price).toLocaleString()}</Text> <Text role="caption">· asking</Text></>}</td>
-          <td><details className="market-notes"><summary><Text role="label">{row.event_status ? `Recorded ${row.event_status}` : 'Listing evidence'}</Text></summary>
+          <td><details className="market-notes"><summary><Text role="label">{row.event_status && row.event_status !== 'unknown' ? `Recorded ${row.event_status}` : 'Status unrecorded · evidence'}</Text></summary>
             <Text role="caption" as="div">Source ID {row.source_listing_id || 'unrecorded'}</Text><Text role="caption" as="div">Retained {clock(row.created_at)}</Text><Text role="caption" as="div">Record updated {clock(row.updated_at)}</Text><Text role="caption" as="div">Source observation time {row.source_observed_at ? clock(row.source_observed_at) : 'unrecorded'}</Text>
           </details></td>
         </tr>;

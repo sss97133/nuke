@@ -65,7 +65,10 @@ struct CalendarDay: Decodable {
     let events: Int
     let work: Int            // confirmed work SESSIONS that day
     let work_minutes: Int    // confirmed labor minutes — the real value signal
-    let work_cost: Int       // job dollars on confirmed work
+    /// Job dollars on confirmed work. Null for everyone but the record's own user since
+    /// #1048 (money_masked true), so a non-owner's calendar must decode, not throw.
+    let work_cost: Int?
+    let money_masked: Bool?
 }
 
 /// Day rows after grouping (one per calendar day, newest first). Carries the
@@ -137,8 +140,6 @@ struct DayReceipt: Decodable {
     let receipts: [Receipt]
     /// The database's verdict on who is reading (auth.uid() against the record's user).
     let is_owner_view: Bool?
-    /// Set by the source gate once money keys are nulled for non-owners (web #1037 pattern).
-    let money_masked: Bool?
 }
 
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
@@ -1029,9 +1030,14 @@ struct ProfileView: View {
             // deployed yet (404), fall back to the capped (day,kind) RPC so the
             // timeline still renders a working organ (C4) — it auto-upgrades to
             // full history once the migration lands.
-            if let calendar = try? await loadCalendar(), !calendar.isEmpty {
-                days = calendar
-            } else {
+            // Fall back to the capped reader only when the full-history RPC is missing
+            // (PostgREST 404, code PGRST202); any other failure is a failure, never a
+            // silent downgrade to the 1,000-row reader (that is how a decoder change hid
+            // every non-owner's history).
+            do {
+                let calendar = try await loadCalendar()
+                days = calendar.isEmpty ? try await loadContributionDays() : calendar
+            } catch let e as PostgrestError where e.code == "PGRST202" {
                 days = try await loadContributionDays()
             }
             loadError = nil
@@ -1058,7 +1064,7 @@ struct ProfileView: View {
             .value
         return cal
             .map { DayRecord(day: $0.day, photos: $0.photos, events: $0.events,
-                             work: $0.work, workMinutes: $0.work_minutes, workCost: $0.work_cost) }
+                             work: $0.work, workMinutes: $0.work_minutes, workCost: $0.work_cost ?? 0) }
             .sorted { $0.day > $1.day }   // newest first (matches the day list)
     }
 
@@ -1104,10 +1110,10 @@ struct DayReceiptView: View {
                                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         }
                     }
-                    // Money is the owner's (owner rule; web #1037/#1039 mask it at the source for the
-                    // vehicle day readers). This user-scoped reader still ships amounts, and the
-                    // Explore mode shows a real profile to anonymous viewers, so the phone renders a
-                    // cost only on the owner's own view and says so, never a bare $0 or a silent gap.
+                    // Money is the owner's. get_user_day_receipt has nulled total_job_cost and skipped
+                    // receipts for anyone but the record's own user since its first migration
+                    // (20260610140000), and its CI contract asserts it; is_owner_view is the server's
+                    // verdict. The phone follows that verdict so a masked cost is never a bare $0.
                     let moneyVisible = receipt.is_owner_view == true
                     if !receipt.work_sessions.isEmpty {
                         Section {

@@ -730,10 +730,11 @@ struct MarketTreemapView: View {
                 Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            // The denominator under the number (fleet-relative reporting): what population
-            // this is, and that its view records no refresh clock, which the app will not
-            // invent. The count is the market pulse view's grouped public records.
-            Text("public records with a listing, by \(groupBy.label.lowercased()) · market pulse view · refresh clock not recorded")
+            // The denominator under the number (fleet-relative reporting): the population and
+            // its clock. mv_market_pulse and mv_market_position filter on is_public only, so
+            // deleted and non-vehicle records are inside the count; cron job 502 refreshes both
+            // nightly at 03:40Z and the RPCs do not return that clock, so the schedule is stated.
+            Text("public vehicle records, deleted included, by \(groupBy.label.lowercased()) · market views refreshed nightly 03:40Z")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .lineLimit(2)

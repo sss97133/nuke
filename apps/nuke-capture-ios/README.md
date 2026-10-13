@@ -51,13 +51,20 @@ new client-side query to the header.
 
 Standing rules the code carries:
 
-- **Images:** every public `vehicle_images` read passes `VehicleGalleryImage.gateRule` to `.or(...)`
-  (frames the vision gate rejected as personal or misattributed never show; null still may), drops
-  `is_superseded`, and renders through `NukeImage.thumb(url, width:)` (the render endpoint), never the raw
-  original outside the full-screen viewer.
-- **Money is never anonymous.** The investment ledger and value curve render only when the read's viewer
-  is not `anon` (owner, uploader or contributor; source gate #1037), failing closed without a document. A
-  license plate read off an image is never displayed.
+- **Images:** every public `vehicle_images` read goes through `VehicleGalleryImage.eligible(_:)`, the web
+  gallery's population (`vehicle_image_gallery_eligible` plus the document, duplicate, superseded and
+  null-url exclusions of `fetchVehicleImages.ts`), and page 0 carries the exact count of that same
+  predicate. This is display eligibility, not privacy: the row policy on `vehicle_images` is the gate,
+  and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
+  Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
+  the raw original outside the full-screen viewer.
+- **Money is never anonymous.** The readers mask it at the source (#1037, #1046, #1048, and the day
+  receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
+  not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
+  recorded; nothing masks plate-shaped text yet, so do not claim it.
+- **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
+  typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
+  screen and on the share card.
 - **Coverage on every counter.** A count without its population and clock is not shown; say "unknown"
   instead of guessing (fleet-relative reporting, `docs/ledger/theory/data-machine.md`).
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
