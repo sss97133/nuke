@@ -251,6 +251,10 @@ struct ProfileRead: Decodable {
         for s in sections { if case .strip(let st) = s { return st } }
         return nil
     }
+    var timeline: ProfileSection.Timeline? {
+        for s in sections { if case .timeline(let t) = s { return t } }
+        return nil
+    }
 }
 
 /// Clocks as the kit prints them: short month, day, year, in UTC. nil when the clock is missing or unparseable.

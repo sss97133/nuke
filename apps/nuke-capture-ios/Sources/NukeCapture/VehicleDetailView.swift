@@ -617,6 +617,7 @@ struct VehicleDetailView: View {
                         liveAuctionBanner
                         profileHeaderBlock
                         buildInstrument
+                        if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
                         heroActionRow
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
