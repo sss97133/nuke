@@ -44,3 +44,21 @@ export function Measures({ title, coverage, items, ariaLabel }: { title: string;
     <div className="k-measures">{items.map(item => <MeasureView key={item.label} m={item} />)}</div>
   </Section>;
 }
+
+/** A titled group of label/value rows. Renders nothing when it has no rows. */
+export function Rows({ title, count, children }: { title: string; count?: number | null; children: React.ReactNode }) {
+  const rows = React.Children.toArray(children).filter(Boolean);
+  if (rows.length === 0) return null;
+  return <div className="k-rows" role="group" aria-label={title}>
+    <div className="k-rows__head"><Text role="label">{title}</Text>{count != null && <Text role="caption">{count.toLocaleString('en-US')}</Text>}</div>
+    {rows}
+  </div>;
+}
+
+/** One label/value row. The value is body text by default; pass role="measure" for a number. */
+export function Row({ label, role = 'body', children }: { label: string; role?: 'body' | 'measure' | 'caption'; children: React.ReactNode }) {
+  return <div className="k-row">
+    <Text role="label">{label}</Text>
+    <Text role={role} className="k-row__value">{children}</Text>
+  </div>;
+}
