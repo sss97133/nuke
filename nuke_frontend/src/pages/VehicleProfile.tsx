@@ -9,11 +9,10 @@ const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroI
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
 import '../styles/barcode-timeline.css';
-const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import { useVehiclePriceFacts } from './vehicle-profile/hooks/useVehiclePriceFacts';
-import VehicleMasthead from './vehicle-profile/VehicleMasthead';
+import ProfileHeader from './vehicle-profile/ProfileHeader';
 import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
@@ -198,14 +197,10 @@ const VehicleProfileInner: React.FC = () => {
             This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
           </div>
         )}
-        <VehicleMasthead key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
+        {/* The header through the kit: identity and price stay in view; recorded facts scroll with the page. */}
+        <ProfileHeader key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
-
-        {/* Specs scroll with the page below the persistent identity and price. */}
-        <React.Suspense fallback={null}>
-          <VehicleSubHeader />
-        </React.Suspense>
 
         <React.Suspense fallback={null}>
           <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
