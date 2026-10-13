@@ -3,6 +3,7 @@
  * again.
  *
  * `complete` means the vehicle row holds data from the listing page: at least a price, an image or a description.
+ * Craigslist also requires its canonical listing observation and Market episode projection to have landed.
  * It never means "ingest returned created". For venues whose URL slug carries year, make and model, `ingest` creates
  * the vehicle from the slug when the page extractor fails and reports the failure in `enrichment_error` with status
  * "created". The poller used to ledger that as `complete`. Measured 2026-10-06, vehicles created in the last 14 days:
@@ -80,10 +81,19 @@ export interface VehicleLandedRow {
 /** The part of the `ingest` response the ledger reads. */
 export interface IngestOutcome {
   status?: string;
+  source?: string;
   vehicle_id?: string | null;
   enrichment_error?: string | null;
   reason?: string | null;
   error?: string | null;
+  listing_capture?: {
+    post_id?: string | null;
+    capture_landing?: {
+      observation?: string;
+      observation_id?: string;
+      listing_event?: { action?: string; id?: string | null; reason?: string; error?: string };
+    };
+  };
 }
 
 export interface Landed {
@@ -273,6 +283,21 @@ export function ledgerOutcomeForIngest(ingest: IngestOutcome, readback: Readback
   }
 
   const landed = landedFields(readback.row)!;
+  if (ingest.source === "craigslist") {
+    const capture = ingest.listing_capture;
+    const landing = capture?.capture_landing;
+    const event = landing?.listing_event;
+    const observationAck = !!landing?.observation_id && ["written", "duplicate"].includes(landing.observation ?? "");
+    const eventAck = (!!event?.id && ["inserted", "updated", "updated_clock_locked"].includes(event.action ?? "")) ||
+      // This exact keyed-writer result means a newer existing episode was read and deliberately left intact.
+      (event?.action === "skipped" && event.reason === "older source observation");
+    if (!capture?.post_id || !/^\d{6,}$/.test(capture.post_id) || !observationAck || !eventAck) {
+      const reason = !capture?.post_id ? "canonical capture missing" : !observationAck ? "canonical observation ACK missing"
+        : event?.error || event?.reason || "listing event ACK missing";
+      return { status: "failed", message: `Craigslist listing projection incomplete: ${reason}`,
+        failure_category: "readback_error", landed };
+    }
+  }
   if (landed.price || landed.images || landed.description) return { status: "complete", landed };
 
   const message = enrichmentError || NO_DATA_MESSAGE;
