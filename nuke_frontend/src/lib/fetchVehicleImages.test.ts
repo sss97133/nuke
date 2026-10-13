@@ -67,6 +67,24 @@ describe('gallery database admission', () => {
     expect(requests()[1].searchParams.get('offset')).toBe('500');
   });
 
+  it('reports how many admitted rows loaded against the exact count', async () => {
+    transport.fetch.mockResolvedValueOnce(response(Array.from({ length: 500 }, (_, index) => photo(index)), 1445));
+    const coverage: Array<{ loaded: number; total: number }> = [];
+
+    // A caller that only wants the first page is told the whole it left behind.
+    const rows = await fetchVehicleImages(vehicleId, 'id,image_url', { maxRows: 10, onLoadCoverage: c => coverage.push(c) });
+
+    expect(rows).toHaveLength(10);
+    expect(coverage).toEqual([{ loaded: 10, total: 1445 }]);
+    expect(transport.fetch).toHaveBeenCalledTimes(1);
+
+    transport.fetch.mockResolvedValueOnce(response(Array.from({ length: 500 }, (_, index) => photo(index)), 501));
+    transport.fetch.mockResolvedValueOnce(response([photo(500)], 501));
+    const all = await fetchVehicleImages(vehicleId, 'id,image_url', { onLoadCoverage: c => coverage.push(c) });
+    expect(all).toHaveLength(501);
+    expect(coverage.at(-1)).toEqual({ loaded: 501, total: 501 });
+  });
+
   it('does not retry without admission when the computed database field fails', async () => {
     transport.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ code: '42703', message: 'computed field unavailable' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },

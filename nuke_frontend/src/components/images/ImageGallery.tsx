@@ -132,9 +132,10 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     };
   });
 
-const fetchGalleryImages = async (vehicleId: string): Promise<any[]> =>
+type LoadCoverage = { loaded: number; total: number };
+const fetchGalleryImages = async (vehicleId: string, onLoadCoverage?: (coverage: LoadCoverage) => void): Promise<any[]> =>
   rehydrateGalleryRows(
-    await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true }),
+    await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true, onLoadCoverage }),
   );
 const UNKNOWN_DEVICE_FINGERPRINT = 'Unknown-Unknown-Unknown-Unknown';
 
@@ -360,6 +361,13 @@ const ImageGallery = ({
   onAddToSetRequested
 }: ImageGalleryProps) => {
   const [allImages, setAllImages] = useState<any[]>([]);
+  // How much of what the database admits actually loaded (fetchVehicleImages reports it). The count
+  // label says "n of N" only when a cap or the deadline left rows behind; what loaded is never the whole.
+  const [loadCoverage, setLoadCoverage] = useState<LoadCoverage | null>(null);
+  const partialLoad = !!loadCoverage && loadCoverage.total > loadCoverage.loaded;
+  const countLabel = (shown: number, noun: string) =>
+    partialLoad ? `${shown} of ${loadCoverage!.total.toLocaleString('en-US')} ${noun}` : `${shown} ${noun}`;
+  const countTitle = partialLoad ? `${loadCoverage!.loaded.toLocaleString('en-US')} of ${loadCoverage!.total.toLocaleString('en-US')} admitted images loaded before the time budget` : undefined;
   const [displayedImages, setDisplayedImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Dedup user_tools loads across auth-state churn (Supabase fires INITIAL_SESSION on subscribe).
@@ -1203,7 +1211,7 @@ const ImageGallery = ({
       }
 
       // Refresh DB-backed gallery view immediately
-      const refreshed = await fetchGalleryImages(vehicleId);
+      const refreshed = await fetchGalleryImages(vehicleId, setLoadCoverage);
 
       const images = dedupeFetchedImages(refreshed || []);
       setUsingFallback(false);
@@ -1846,7 +1854,7 @@ const ImageGallery = ({
 
         // Fetch images and duplicate count in parallel
         const [rawImages, dupCountResult] = await Promise.all([
-          fetchGalleryImages(vehicleId),
+          fetchGalleryImages(vehicleId, setLoadCoverage),
           // Count duplicates filtered out (for "dupes removed" display)
           supabase
             .from('vehicle_images')
@@ -1929,7 +1937,7 @@ const ImageGallery = ({
         setTimeout(async () => {
           try {
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
-            const refreshedImages = await fetchGalleryImages(vehicleId);
+            const refreshedImages = await fetchGalleryImages(vehicleId, setLoadCoverage);
 
             if (refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
@@ -2867,7 +2875,7 @@ const ImageGallery = ({
         };
 
         const parts: React.ReactNode[] = [];
-        parts.push(<span key="count">{totalCount} photos</span>);
+        parts.push(<span key="count" title={countTitle}>{countLabel(totalCount, 'photos')}</span>);
         if (duplicateCount > 0) {
           parts.push(
             <span key="dupes" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
@@ -2948,7 +2956,7 @@ const ImageGallery = ({
             flexShrink: 0,
             marginRight: 'auto'
           }}>
-            {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
+            <span title={countTitle}>{countLabel(allImages.length, allImages.length === 1 ? 'image' : 'images')}</span>
           </span>
 
           {/* View Mode — hidden when parent controls via galleryView (e.g. vehicle profile toolbar) */}
