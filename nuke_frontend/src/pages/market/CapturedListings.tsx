@@ -38,7 +38,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
         const next = new URLSearchParams(params); next.set('collection', 'listings');
         next.set('source', event.target.value); setParams(next);
       }}><option value="classifieds">Classified listings</option><option value="">All supported sources</option>{LISTING_SOURCES.map(value => <option key={value} value={value}>{sourceName(value)}</option>)}</select></label>
-      <Text role="caption" className="market-scope__note">Captured listings; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</Text>
+      <Text role="caption" className="market-scope__note">Asking prices as listed on US classifieds, in dollars; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</Text>
     </div>
     {query.isPending && <p role="status" className="k-body">Reading retained listings…</p>}
     {query.isError && <p role="status" className="k-body">Listings could not be refreshed. {rows.length ? 'Showing the last fetched records.' : ''} <button type="button" className="market-control" onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
@@ -57,7 +57,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
           </PrefetchLink> : <span>Vehicle unresolved</span>}</Text>
             <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{sourceName(row.source_platform)} · original listing</a> : <span>{sourceName(row.source_platform)} · {row.source_url ? 'source link unavailable here' : 'source link unrecorded'}</span>}</Text></td>
           <td>{row.current_price == null || !Number.isFinite(Number(row.current_price)) ? <Text role="caption">Unrecorded</Text>
-            : <><Text role="measure" dense>{Number(row.current_price).toLocaleString()}</Text> <Text role="caption">· currency unrecorded</Text></>}</td>
+            : <><Text role="measure" dense>${Number(row.current_price).toLocaleString()}</Text> <Text role="caption">· asking</Text></>}</td>
           <td><details className="market-notes"><summary><Text role="label">{row.event_status ? `Recorded ${row.event_status}` : 'Listing evidence'}</Text></summary>
             <Text role="caption" as="div">Source ID {row.source_listing_id || 'unrecorded'}</Text><Text role="caption" as="div">Retained {clock(row.created_at)}</Text><Text role="caption" as="div">Record updated {clock(row.updated_at)}</Text><Text role="caption" as="div">Source observation time {row.source_observed_at ? clock(row.source_observed_at) : 'unrecorded'}</Text>
           </details></td>

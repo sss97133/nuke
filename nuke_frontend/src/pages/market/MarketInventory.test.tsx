@@ -26,7 +26,7 @@ it('opens the existing explorer at Market and keeps unresolved source presentati
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
   expect(container.textContent).toContain('Vehicle unresolved'); expect(container.textContent).toContain('7000000000');
-  expect(container.textContent).toContain('0 · currency unrecorded'); expect(container.textContent).toContain('availability and source-wide coverage are unverified');
+  expect(container.textContent).toContain('$0 · asking'); expect(container.textContent).toContain('availability and source-wide coverage are unverified');
   expect(container.textContent).toContain('Source observation time unrecorded');
   expect(container.querySelector('a')?.getAttribute('href')).toContain('craigslist.org/view/d/');
   expect(container.querySelector('a[href^="/vehicle/"]')).toBeNull();
