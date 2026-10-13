@@ -284,9 +284,8 @@ describe('market answer -> supporting lots', () => {
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
-    expect(container.textContent).toContain('source currency unknown');
-    expect(container.textContent).not.toContain('USD');
-    expect(container.textContent).not.toContain('$');
+    expect(container.textContent).toContain('Current bids in US dollars as recorded');
+    expect(container.querySelector('.market-bid')?.textContent).toMatch(/^\$[\d,]+$/);
     expect(cohortCount()).toBe('3');
     expect(container.textContent).toContain('3 of 4 captured BaT vehicle lots');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
@@ -297,11 +296,11 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('board=1');
   });
   it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
-    await render('make=PORSCHE'); await click('25,000–49,999:');
+    await render('make=PORSCHE'); await click('$25,000–49,999:');
     expect(window.location.search).toContain('make=PORSCHE');
     expect(boardTitles()).toEqual(['later']);
-    expect(button('25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
-    await click('25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+    expect(button('$25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
+    await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
     await render('make=PORSCHE'); await click('Unrecorded:');

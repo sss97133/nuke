@@ -39,11 +39,12 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'newest', label: 'First seen' },
 ];
 
+// Bids are US dollars: Bring a Trailer runs every auction in USD and reports the bid as a dollar amount.
 function bidNumber(n: number | null | undefined, compact = false): string {
   if (n == null) return '—';
-  if (compact && Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (compact && Math.abs(n) >= 10_000) return `${Math.round(n / 1_000)}K`;
-  return `${Math.round(n).toLocaleString('en-US')}`;
+  if (compact && Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (compact && Math.abs(n) >= 10_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
 const left = timeLeft;
@@ -424,7 +425,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       </div>
 
       {!isLoading && <details open={selectedBid != null} className="market-distribution">
-        <summary><Text role="label">Filter live lots by recorded bid number · currency unverified</Text></summary>
+        <summary><Text role="label">Filter live lots by current bid</Text></summary>
         <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
       </details>}
 
@@ -440,7 +441,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       <section className="market-board__frame">
         <div className="market-board__head">
           <Text role="caption">
-            {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`} · source bid units unverified
+            {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`}
             {make ? ` · ${make}` : ''}
             {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
@@ -478,7 +479,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
       {view === 'inventory' && data?.source && (
         <Text role="caption" as="p" className="market-source">
-          Source: {data.source}. Current bid is a recorded listing number; its unit and freshness need source evidence. Monetary totals, medians and hot/cold comparisons are withheld until currencies can be matched.
+          Source: {data.source}. Bids are US dollars as Bring a Trailer records them; a bid's freshness is the record's last write, shown beside it.
         </Text>
       )}
     </div>
@@ -512,12 +513,12 @@ function BidDistribution({ distribution, lots, scope, selected, onSelect, fetche
         })}
       </div>
       <Text role="caption" as="div" className="market-distribution__note">
-        Recorded bid numbers · source currency unknown · ranges group raw numbers, not comparable monetary values. Choose a range to see its lots.
+        Current bids in US dollars as recorded. Choose a range to see its lots.
       </Text>
       <details className="market-notes">
         <summary><Text role="label">Scope, source and timing</Text></summary>
         <p className="k-body">One public, undeleted vehicle record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
-        <p className="k-body">These are recorded listing numbers, not sold prices or a valuation. Their source currencies are unknown, so monetary aggregates and comparison tags are withheld. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
+        <p className="k-body">These are current bids, not sold prices or a valuation. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
         <p className="k-body">Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. BaT's board is scheduled to be read every 15 minutes; that schedule does not prove freshness.</p>
       </details>
     </section>

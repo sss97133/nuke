@@ -111,8 +111,8 @@ it('keeps the first inspection concise and puts the outbound listing behind Sour
   try {
     await act(async () => root.render(<AuctionEvidence vehicleId={id} compact onClose={() => {}} />));
     expect(container.querySelector('section')?.id).toBe(`lot-inspection-${id}`);
-    expect(container.textContent).toContain('Latest recorded bid 2,000');
-    expect(container.textContent).toContain('+1,000 from the previous retained bid');
+    expect(container.textContent).toContain('Latest recorded bid $2,000');
+    expect(container.textContent).toContain('+$1,000 from the previous retained bid');
     expect(container.querySelector('a[href^="https://bringatrailer.com"]')).toBeNull();
     expect(container.querySelector('.auction-evidence-layout')).toBeNull();
     expect(container.querySelector('svg')?.closest('details')?.open).toBe(false);
@@ -158,7 +158,7 @@ it('projects Stack A into the row and uses the same high for price and depth', a
     ],
   };
   await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
-  expect(container.textContent).toContain('Retained high1,000');
+  expect(container.textContent).toContain('Retained high$1,000');
   expect(container.textContent).toContain('2 within 10%');
   expect(container.textContent).toContain('2 bidders · 3/3 reported bids held');
   expect(container.textContent).not.toContain('800');
