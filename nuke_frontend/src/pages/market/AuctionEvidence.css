@@ -123,3 +123,10 @@
   .market-lot-name, .market-lot-image, .market-lot-metrics, .market-inspection-header button { min-height: 44px; }
   .market-lot-facts button, .market-lot-context button, .market-inspection-more > summary { padding-block: 8px; }
 }
+
+/* The board's pager: one page of lots at a time, the page named in the URL. */
+.market-board { scroll-margin-top: 48px; }
+.market-board-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 12px; }
+.market-board-pager .k-caption { margin-right: auto; }
+.market-board-page { font: inherit; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 6px 10px; min-height: 32px; cursor: pointer; }
+.market-board-page:hover { border-color: var(--text); }
