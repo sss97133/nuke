@@ -163,6 +163,18 @@
 .market-sorts { display: flex; flex-wrap: wrap; gap: 2px; }
 .market-board__empty { padding: 12px; }
 .market-source { margin: 8px 0 0; }
+/* Edges: a number in its own history (range, a tick per earlier week, a block for now, a counted verdict). */
+.market-edges { border: 2px solid var(--border); margin: 0 0 12px; }
+.market-edges__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 6px 8px; border-bottom: 2px solid var(--border); }
+.market-edge { padding: 8px; border-top: 2px solid var(--border); }
+.market-edge:first-of-type { border-top: 0; }
+.market-edge__head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.market-range { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.market-range__bar { width: 160px; height: 12px; display: block; }
+.market-range__track { fill: var(--border); }
+.market-range__tick { fill: var(--text-secondary); }
+.market-range__now { fill: var(--text); }
+.market-range__verdict { color: var(--text); }
 .market-countdown { color: var(--text-secondary); }
 .market-countdown--soon { color: var(--text); }
 .market-thumb { width: 72px; height: 48px; object-fit: cover; flex-shrink: 0; background: var(--surface); }

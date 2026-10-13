@@ -7,7 +7,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, useMarketPulse, useInventoryTaxonomy, type BidBucket, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -66,6 +66,159 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
     <Text role="measure" dense className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
       {remaining <= 0 ? 'Awaiting result' : left(remaining)}
     </Text>
+  );
+}
+
+// ---- The building block (docs/schematics/homepage.md): one number placed in its own history ----------------
+// Each earlier week at this weekday and hour is a tick; now is the block; the sentence ranks now among them,
+// counted, never labelled. The page scans every series that has such a history and shows only those at an edge.
+
+function pctChange(now: number, before: number): number | null {
+  return before > 0 ? ((now - before) / before) * 100 : null;
+}
+
+function signed(pct: number): string {
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+}
+
+function rankOf(value: number, readings: { v: number }[]): { below: number; above: number; n: number; text: string | null } {
+  const n = readings.length;
+  const below = readings.filter((r) => value > r.v).length;
+  const above = readings.filter((r) => value < r.v).length;
+  const text = n === 0 ? null
+    : below === n ? `higher than all ${n}`
+    : above === n ? `lower than all ${n}`
+    : below >= above ? `higher than ${below} of ${n}` : `lower than ${above} of ${n}`;
+  return { below, above, n, text };
+}
+
+function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number }) {
+  const lo = Math.min(value, ...readings.map((r) => r.v));
+  const hi = Math.max(value, ...readings.map((r) => r.v));
+  const span = hi - lo;
+  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5) * 160;
+  const { n, text: rank } = rankOf(value, readings);
+  return (
+    <span className="market-range">
+      <Text role="label">Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</Text>
+      <Text role="measure" dense>{fmt(lo, true)}</Text>
+      <svg className="market-range__bar" viewBox="0 0 160 12" width="160" height="12" aria-hidden="true">
+        <rect className="market-range__track" x="0" y="5" width="160" height="2" />
+        {readings.map((r) => <rect key={r.day} className="market-range__tick" x={x(r.v) - 1} y="2" width="2" height="8"><title>{`${r.day}: ${fmt(r.v)}`}</title></rect>)}
+        <rect className="market-range__now" x={x(value) - 3} y="0" width="6" height="12"><title>{`Now: ${fmt(value)}`}</title></rect>
+      </svg>
+      <Text role="measure" dense>{fmt(hi, true)}</Text>
+      {rank && <Text role="label" className="market-range__verdict">{rank} {weekdayUtc}s at this hour</Text>}
+    </span>
+  );
+}
+
+interface Series {
+  key: string;
+  what: string; // what is measured
+  set: string; // the comparison set
+  value: number; // now
+  readings: { day: string; v: number }[]; // the same weekday and hour in earlier weeks
+  fmt: (n: number, compact?: boolean) => string;
+}
+
+interface Edge extends Series { depth: number; beyond: number }
+
+const EDGE_MIN_READINGS = 6;
+const EDGE_MAX = 6;
+const MAKE_MIN_AUCTIONS = 5;
+
+function count(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function edgeOf(s: Series): Edge | null {
+  const { below, above, n } = rankOf(s.value, s.readings);
+  if (n < EDGE_MIN_READINGS) return null;
+  const top = below >= n - 1;
+  const bottom = above >= n - 1;
+  if (!top && !bottom) return null;
+  const vs = s.readings.map((r) => r.v);
+  const lo = Math.min(...vs);
+  const hi = Math.max(...vs);
+  const span = hi - lo || Math.abs(hi) || 1;
+  // depth 0 = beyond every reading, 1 = beyond all but one; beyond = how far past the far end, in spans.
+  return { ...s, depth: n - Math.max(below, above), beyond: top ? (s.value - hi) / span : (lo - s.value) / span };
+}
+
+// Series: the whole board's current bids, auctions with a bid, and bid per auction; and, once 6 weeks of live
+// readings carry them, the same per make.
+export function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
+  const bidded = live.filter((a) => a.currentBid != null);
+  const bids = bidded.reduce((s, a) => s + (a.currentBid ?? 0), 0);
+  const withN = readings.filter((r) => r.n != null && (r.n as number) > 0);
+  const out: Series[] = [
+    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: bidNumber },
+    { key: 'n', what: 'Auctions with a bid', set: 'all live BaT auctions', value: bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.n as number })), fmt: count },
+  ];
+  if (bidded.length > 0) {
+    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => bidNumber(v) });
+  }
+  const byMake = readings.filter((r) => r.byMake != null);
+  if (byMake.length >= EDGE_MIN_READINGS) {
+    const now = new Map<string, [number, number]>();
+    for (const a of bidded) {
+      const m = now.get(a.make) ?? [0, 0];
+      now.set(a.make, [m[0] + (a.currentBid ?? 0), m[1] + 1]);
+    }
+    const makes = new Set([...now.keys(), ...byMake.flatMap((r) => Object.keys(r.byMake as object))]);
+    for (const make of makes) {
+      if (make === NO_MAKE) continue;
+      const past = byMake.map((r) => ({ day: r.day, bm: (r.byMake as Record<string, [number, number]>)[make] ?? [0, 0] }));
+      const cur = now.get(make) ?? [0, 0];
+      if (Math.max(cur[1], ...past.map((p) => p.bm[1])) < MAKE_MIN_AUCTIONS) continue;
+      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: bidNumber });
+      out.push({ key: `n:${make}`, what: `${make} · auctions with a bid`, set: `live BaT auctions of ${make}`, value: cur[1], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[1]) })), fmt: count });
+    }
+  }
+  return out;
+}
+
+function shortDay(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays, weekAgo, bids }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string>; weekAgo: BoardReading | null; bids: number }) {
+  const edges = useMemo(
+    () => series.map(edgeOf).filter((e): e is Edge => e != null).sort((a, b) => a.depth - b.depth || b.beyond - a.beyond).slice(0, EDGE_MAX),
+    [series]
+  );
+  if (series.length === 0) return null;
+  const scanned = `${series.length} series scanned, each against its own readings at ${hourUtc}:00 UTC on earlier ${weekdayUtc}s`;
+  const pct = weekAgo ? pctChange(bids, weekAgo.bids) : null;
+  return (
+    <section className="market-edges" aria-label="Edges of the board's own history">
+      <div className="market-edges__head">
+        <Text role="label">{edges.length ? `Top or bottom 2 of its own history now · ${edges.length} of ${scanned}` : `None in the top or bottom 2 of its own history now · ${scanned}`}</Text>
+        {weekAgo && pct != null && <Text role="caption" title={`${bidNumber(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+          current bids {bidNumber(bids, true)} · vs same time last week {weekAgo.source === 'archive' ? '≈' : ''}{signed(pct)} from {bidNumber(weekAgo.bids, true)}
+        </Text>}
+      </div>
+      {edges.map((e) => {
+        const weeks = Math.round((Date.now() - Date.parse(`${e.readings[0].day}T00:00:00Z`)) / (7 * DAY));
+        const rebuilt = e.readings.filter((r) => archiveDays.has(r.day)).length;
+        return (
+          <div key={e.key} className="market-edge">
+            <div className="market-edge__head">
+              <Text role="entity" dense>{e.what}</Text>
+              <Text role="measure" dense>{e.fmt(e.value)}</Text>
+              <Text role="label">now</Text>
+            </div>
+            <RangeBar value={e.value} readings={e.readings} fmt={e.fmt} weekdayUtc={weekdayUtc} weeks={weeks} />
+            <Text role="caption" as="div">
+              Window: {hourUtc}:00 UTC on {weekdayUtc}s, {shortDay(e.readings[0].day)} to {shortDay(e.readings[e.readings.length - 1].day)}, and now.
+              {' '}Count: {e.readings.length} readings.
+              {' '}Set: {e.set} (BAT-LIVE-BIDS index, read hourly from the live board{rebuilt ? `; ${rebuilt} of the readings rebuilt from BaT bid history, 96% of auctions` : ''}).
+            </Text>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -266,6 +419,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
+    if (key === 'view' && value === 'sales' && (!next.get('make') || next.get('make') === 'all') && largestMake) next.set('make', largestMake);
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
     next.delete('lot');
     setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort', preventScrollReset: true });
@@ -317,6 +471,17 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
+  const todayUtc = new Date(now).toISOString().slice(0, 10);
+  const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
+  const edgeInput = useMemo(() => data?.sameHour && sameHour.data ? edgeSeries(live, sameHour.data) : [], [data?.sameHour, sameHour.data, live]);
+  const archiveDays = useMemo(() => new Set((sameHour.data ?? []).filter((r) => r.source === 'archive').map((r) => r.day)), [sameHour.data]);
+  const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
+  // The largest open cohort opens the recorded-sales view when no make is chosen, so the view never opens empty.
+  const largestMake = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
+    return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
+  }, [live]);
   const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
   // The board has no bound currency contract: no monetary heat, no hot/cold verdicts, until units can be matched.
   const figures = useMemo(() => {
@@ -400,6 +565,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
 
       {scope}
+
+      {view === 'inventory' && data?.sameHour && edgeInput.length > 0 &&
+        <EdgeStrips series={edgeInput} hourUtc={data.sameHour.hourUtc} weekdayUtc={data.sameHour.weekdayUtc} archiveDays={archiveDays} weekAgo={data.weekAgo} bids={liveBids} />}
 
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 

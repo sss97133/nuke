@@ -19,7 +19,9 @@ export const recordedModel = (a: LiveAuction) => a.model?.trim() || 'Model unrec
 export const lotTitle = vehicleIdentity;
 
 export function mapLens(params: URLSearchParams, make: string | null): InventoryMapLens {
-  const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'model' : 'make');
+  // A chosen brand opens on its decades: BaT's recorded models are too fine-grained to read as a map
+  // (100 models for 143 Porsche lots, most of them one lot). Models stay one choice away in the control.
+  const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'era' : 'make');
   // A brand box shows its models unless the viewer chooses otherwise: the drill is visible before it is taken.
   const inside = (['none', 'make', 'model', 'year', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'model' : 'none');
   return { group, inside, focus: params.get('mapFocus'), child: inside === 'none' ? null : params.get('mapChild') };

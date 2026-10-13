@@ -4,10 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn() }));
+const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[] }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
-  useMarketPulse: () => fixture.pulse, useInventoryTaxonomy: () => fixture.taxonomy,
+  useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: fixture.sameHour }), useInventoryTaxonomy: () => fixture.taxonomy,
 }));
 vi.mock('./useLotMovement', async importOriginal => ({
   ...await importOriginal<typeof import('./useLotMovement')>(), useLotMovement: () => fixture.movement,
@@ -73,6 +73,7 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
   HTMLElement.prototype.scrollIntoView = vi.fn();
   fixture.movement = { data: [], coverage: undefined, dataUpdatedAt: Date.now() };
+  fixture.sameHour = [];
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   fixture.pulse = { data: { auctions: [lot('later', 'PORSCHE', 25_000, 30), lot('first', 'PORSCHE', 0, 2),
     lot('unknown', 'PORSCHE', null, 10), lot('other-make', 'FORD', 100_000, 1)], syncedAt: Date.now(), curve: null },
@@ -170,7 +171,7 @@ describe('market answer -> supporting lots', () => {
     expect(list.textContent).toContain('SMALL 79');
     await act(async () => list.querySelector<HTMLButtonElement>('button[aria-label^="SMALL 79:"]')!.click());
     expect(window.location.search).toContain('make=SMALL+79');
-    expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('model');
+    expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('era');
     expect(boardTitles()).toEqual(['small-79']);
     await click('All captured makes');
     expect(boardTitles()).toHaveLength(24);
@@ -204,7 +205,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Previous 24 lots"]')).toBeNull();
   });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
-    await render('make=PORSCHE&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
+    await render('make=PORSCHE&mapBy=model&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
     await click('Local fixture: 3 captured lots');
     expect(window.location.search).not.toContain('mapChild');
     expect(window.location.search).not.toContain('mapFocus');
@@ -240,7 +241,7 @@ describe('market answer -> supporting lots', () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';
     fixture.pulse.data.auctions[2].model = 'Recorded model B';
-    await render('make=PORSCHE');
+    await render('make=PORSCHE&mapBy=model');
     await click('Recorded model B: 2 captured lots');
     expect(window.location.search).toContain('model=Recorded+model+B');
     expect(boardTitles()).toEqual(['first', 'unknown']);
@@ -303,7 +304,7 @@ describe('market answer -> supporting lots', () => {
     await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
-    await render('make=PORSCHE'); await click('Unrecorded:');
+    await render('make=PORSCHE&mapBy=model'); await click('Unrecorded:');
     expect(boardTitles()).toEqual(['unknown']);
     await click('Ending < 24 h');
     expect(window.location.search).not.toContain('bidRange');
@@ -343,6 +344,31 @@ describe('market answer -> supporting lots', () => {
   });
 });
 
+
+describe('the board in its own history', () => {
+  it('places the current bids among the same hour on earlier weeks and says where they sit, counted', async () => {
+    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
+    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
+    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 3, byMake: null, source: i === 0 ? 'archive' : 'live' }));
+    await render('make=all');
+    const edges = container.querySelector('[aria-label="Edges of the board\'s own history"]')!;
+    expect(edges.textContent).toContain('Current bids');
+    expect(edges.textContent).toContain('$125,000');
+    expect(edges.textContent).toContain('higher than all 7 Saturdays at this hour');
+    expect(edges.textContent).toContain('vs same time last week +25.0% from $100K');
+    expect(edges.textContent).toContain('1 of the readings rebuilt from BaT bid history');
+    expect(edges.querySelector('.market-range')!.querySelectorAll('.market-range__tick')).toHaveLength(7);
+  });
+  it('renders nothing of the kind when the board has no hour', async () => {
+    await render();
+    expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
+  });
+  it('opens recorded sales on the largest open cohort instead of an empty form', async () => {
+    await render();
+    await click('Use recorded sales view');
+    expect(window.location.search).toContain('make=PORSCHE');
+  });
+});
 
 describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
