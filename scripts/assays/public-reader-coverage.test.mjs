@@ -997,6 +997,74 @@ test('identity segments cannot claim skipped subjects were measured or accept an
   input.after = id(3);
   await assert.rejects(acquireIdentityEvidence(input, { ...identityDeps, query: () => { throw Error('must not query'); } }), /resume_key_outside_manifest/);
 });
+
+test('identity range retry reads only the exact failed interval and retains the full denominator', async t => {
+  const { config } = await populationFixture(t, [1, 2, 3, 4, 5, 6].map(n => streamSubject(id(n))));
+  const input = { ...identityConfig(config), after: id(2), through: id(4) }, calls = [], rows = [];
+  const candidates = [3, 4].flatMap(n => identityFields.map((f, i) => identityClaim(n, f, n * 10 + i)));
+  const result = await acquireIdentityEvidence(input, { ...identityDeps, emit: r => rows.push(r), query: a => {
+    calls.push(a); assert.deepEqual(a.vehicleIds, [id(3), id(4)]);
+    return a.mode === 'inventory' ? identityInventory([identitySubject(3, 1), identitySubject(4, 1)], candidates)
+      : identityReply('custody', { results: candidates.map(identityChecked) });
+  } });
+  assert.equal(calls.length, 2); assert.equal(result.collected, 2); assert.equal(result.inspected, 2);
+  assert.equal(result.through, id(4)); assert.equal(result.resumeAfter, id(4));
+  assert.equal(result.stopReason, 'range_boundary_reached'); assert.equal(result.rangeExhausted, true);
+  assert.equal(result.segmentExhausted, false); assert.equal(result.fullPopulationAcquired, false);
+  assert.equal(result.uninspectedInFullPopulation, 4); assert.equal(result.notAssessed, 6); assert.equal(result.ready, 0);
+  assert.equal(rows[0].through, id(4)); assert.deepEqual(rows.filter(r => r.type === 'identity_evidence').map(r => r.key), [id(3), id(4)]);
+});
+
+test('identity range rejects invalid endpoints and still verifies the manifest beyond its bound before querying', async t => {
+  const { config } = await populationFixture(t, [1, 2, 3].map(n => streamSubject(id(n))));
+  let calls = 0; const deps = { ...identityDeps, query: () => { calls++; throw Error('must not query'); } };
+  for (const through of [id(1), id(2), id(4), 'invalid']) {
+    await assert.rejects(acquireIdentityEvidence({ ...identityConfig(config), after: id(2), through }, deps), /invalid_identity_evidence_scope|end_key_outside_manifest/);
+  }
+  await writeFile(config.manifest.path, '\n', { flag: 'a' });
+  await assert.rejects(acquireIdentityEvidence({ ...identityConfig(config), through: id(1) }, deps), /stream_data_after_end/);
+  assert.equal(calls, 0);
+});
+
+test('identity range cannot hide a custody budget stop or two failed reads at its endpoint', async t => {
+  const { config } = await populationFixture(t, [1, 2, 3, 4].map(n => streamSubject(id(n))));
+  const input = { ...identityConfig(config, { batchSize: 1, maxRequests: 1 }), after: id(1), through: id(3) };
+  const candidate = identityClaim(2, 'year', 20), s = identitySubject(2);
+  s.facets.year.typedCount = s.facets.year.plausibleCount = 1;
+  const budget = await acquireIdentityEvidence(input, { ...identityDeps, query: () => identityInventory([s], [candidate]) });
+  assert.equal(budget.stopReason, 'identity_request_budget'); assert.equal(budget.rangeExhausted, false);
+  assert.equal(budget.inspected, 1); assert.equal(budget.collected, 0); assert.equal(budget.uninspectedInFullPopulation, 3);
+  input.budget.maxRequests = 10;
+  let calls = 0;
+  const failures = await acquireIdentityEvidence(input, { ...identityDeps, query: () => { calls++; throw Error('read failed'); } });
+  assert.equal(calls, 2); assert.equal(failures.resumeAfter, id(3)); assert.equal(failures.rangeExhausted, false);
+  assert.equal(failures.stopReason, 'identity_read_failed'); assert.equal(failures.collected, 0);
+  assert.equal(failures.notAssessed, 4); assert.equal(failures.retryRanges.length, 2);
+});
+
+test('identity bound at the actual manifest tail keeps full and resumed population accounting distinct', async t => {
+  const { config } = await populationFixture(t, [1, 2].map(n => streamSubject(id(n))));
+  for (const after of [undefined, id(1)]) {
+    const result = await acquireIdentityEvidence({ ...identityConfig(config), after, through: id(2) }, {
+      ...identityDeps, query: a => identityInventory(a.vehicleIds.map(v => identitySubject(Number(v.slice(-12))))) });
+    assert.equal(result.stopReason, 'manifest_exhausted'); assert.equal(result.rangeExhausted, true);
+    assert.equal(result.segmentExhausted, true); assert.equal(result.fullPopulationAcquired, after === undefined);
+    assert.equal(result.uninspectedInFullPopulation, after === undefined ? 0 : 1);
+  }
+});
+
+test('identity bounded CLI reports successful range traversal without claiming a full scan', async t => {
+  const { config, dir } = await populationFixture(t, [1, 2, 3].map(n => streamSubject(id(n))));
+  const inputPath = path.join(dir, 'range-config.json'), out = path.join(dir, 'range.jsonl');
+  await writeFile(inputPath, JSON.stringify({ ...identityConfig(config), after: id(1), through: id(2) }));
+  assert.equal(await main(['--identity-evidence', inputPath, '--out', out], {
+    ...identityDeps, print: () => {}, query: a => { assert.deepEqual(a.vehicleIds, [id(2)]); return identityInventory([identitySubject(2)]); }
+  }), 0);
+  const lines = (await readFile(out, 'utf8')).trimEnd().split('\n'), last = JSON.parse(lines.at(-1));
+  assert.equal(last.precedingOutputSha256, digest(lines.slice(0, -1).join('\n') + '\n'));
+  assert.equal(last.rangeExhausted, true); assert.equal(last.segmentExhausted, false);
+  assert.equal(last.uninspectedInFullPopulation, 2); assert.equal(last.fullPopulationAcquired, false);
+});
 const streamAssessment = key => {
   const a = readySubject(); a.key = key;
   for (const gate of Object.values(a.gates)) gate.receipt.key = key;

@@ -19,6 +19,13 @@ interface FetchVehicleImagesOptions {
    * (hero + gallery) stuck on an infinite "Loading…" spinner. Default 12s.
    */
   timeoutMs?: number;
+  /**
+   * Told how many rows were loaded against how many the database admits (page 0 carries the exact
+   * count), once the fetch settles. A caller that shows a count can then say "n of N" when a cap or
+   * the deadline left rows behind, instead of presenting what loaded as the whole. Not part of the
+   * in-flight dedupe key, so a coalesced concurrent caller is not told.
+   */
+  onLoadCoverage?: (coverage: { loaded: number; total: number }) => void;
 }
 
 // In-flight dedupe keyed on query shape. The identical full-set vehicle_images
@@ -110,13 +117,17 @@ async function fetchVehicleImagesUncached<T = any>(
   if (first.timedOut) return [];
   const rows: T[] = [...(first.data || [])];
   const total = typeof first.count === 'number' ? first.count : rows.length;
+  const settle = (collected: T[]) => {
+    options.onLoadCoverage?.({ loaded: collected.length, total: Math.max(total, collected.length) });
+    return collected;
+  };
 
   // Caller only wants the first N (e.g. hero/lead resolution) — stop early.
   if (maxRows && rows.length >= maxRows) {
     rows.length = maxRows;
-    return rows;
+    return settle(rows);
   }
-  if (rows.length < PAGE_SIZE || total <= rows.length) return rows;
+  if (rows.length < PAGE_SIZE || total <= rows.length) return settle(rows);
 
   const cap = maxRows ? Math.min(total, maxRows) : total;
   const offsets: number[] = [];
@@ -138,5 +149,5 @@ async function fetchVehicleImagesUncached<T = any>(
   }
 
   if (maxRows && rows.length > maxRows) rows.length = maxRows;
-  return rows;
+  return settle(rows);
 }

@@ -509,6 +509,17 @@ Two consecutive read failures stop the run. A bounded memory ceiling can stop a
 dense batch; it cannot qualify a missing facet. Method-definition fingerprints
 and identity fingerprints prevent silently combining changed inputs across pages.
 
+After inspecting a failure, an operator can retry an exact saved interval with
+`after` (exclusive) and `through` (inclusive). Both boundaries must belong to the
+original fully validated manifest. The last batch ends at that key even when it
+is smaller than the configured batch size; no successful neighboring records need
+to be reread. `rangeExhausted` reports traversal of the selected interval, while
+`collectionExhausted` still records failed collection. It does not imply that the
+full manifest was visited: full-population counts, remaining keys, failure ranges
+and the original denominator remain in the receipt. Time/request limits, custody
+checks and the two-failure stop still apply. Preserve prior segment receipts and
+verify their union before claiming a completed population measurement.
+
 Private per-record receipts retain full candidate counts and up to three
 qualified claim/source references per facet. Output distinguishes qualified
 support, disagreement, invalid supported witnesses, unsupported methods, missing

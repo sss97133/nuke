@@ -125,16 +125,26 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).not.toContain('mapChild');
     await click('1990–1999:'); expect(boardTitles()).toEqual(['later']);
   });
-  it('shows the models inside a brand box before the drill is taken, and keeps the chosen sub-box option', async () => {
-    fixture.pulse.data.auctions[0].model = 'Recorded model A';
+  it('shows the decades inside a brand box before the drill is taken, and keeps the chosen sub-box option', async () => {
+    fixture.pulse.data.auctions[0].year = 1995;
     await render();
-    expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('model');
+    expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('era');
     const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
-    expect(porsche.querySelector('button[aria-label^="Recorded model A: 1 captured lots"]')).toBeTruthy();
-    expect(porsche.querySelector('button[aria-label^="Local fixture: 2 captured lots"]')).toBeTruthy();
+    expect(porsche.querySelector('button[aria-label^="1990–1999: 1 captured lots"]')).toBeTruthy();
+    expect(porsche.querySelector('button[aria-label^="2000–2009: 2 captured lots"]')).toBeTruthy();
     await choose('Inventory sub-boxes', 'none');
     expect(window.location.search).toContain('mapInside=none');
     expect(container.querySelector('[data-map-group="PORSCHE"] .inventory-map-child')).toBeNull();
+  });
+  it('keeps every model as a cell inside its brand instead of folding them into a list box', async () => {
+    fixture.pulse.data.auctions = [...fixture.pulse.data.auctions,
+      ...Array.from({ length: 60 }, (_, i) => ({ ...lot(`p-${i}`, 'PORSCHE', null, 1), model: `Model ${i}` })),
+      ...Array.from({ length: 12 }, (_, i) => lot(`f-${i}`, 'FORD', null, 1))];
+    await render('mapInside=model');
+    const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
+    expect(porsche.querySelectorAll('.inventory-map-child')).toHaveLength(61);
+    expect(porsche.textContent).not.toContain('more models');
+    expect(porsche.querySelector('button[aria-label^="Local fixture: 3 captured lots"]')).toBeTruthy();
   });
   it('opens an individual lot in the existing evidence route without a nested button', async () => {
     const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';

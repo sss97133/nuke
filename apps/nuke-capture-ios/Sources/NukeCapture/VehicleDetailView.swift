@@ -33,6 +33,9 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
     // fetch carries just the title parts, the hero, and the location.
     let city: String?
     let state: String?
+    /// The record's image count (denormalized on vehicles, kept by triggers): the population the
+    /// gallery's loaded rows are a window onto. Optional: the search door's rows do not carry it.
+    var image_count: Int? = nil
 
     /// "YEAR MAKE MODEL TRIM" — only the parts that exist, never a lone "—".
     var title: String {
@@ -69,6 +72,12 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     var source: String? = nil
     var photo_imported_at: String? = nil
     var photo_listing_url: String? = nil
+
+    /// The vision gate as the web applies it on every public image read
+    /// (useVehicleImages, VehicleThumbnail, ProImageViewer, DiscoveryFeed): a frame the gate
+    /// rejected as personal or misattributed never reaches a public surface; an ungated frame
+    /// (null) still may. Pass to PostgREST `.or(...)`. Keep it one string so every read agrees.
+    static let gateRule = "vision_gate_status.is.null,vision_gate_status.not.in.(\"rejected_personal\",\"rejected_misattributed\")"
 
     // Legacy importers copied the import clock into taken_at. It is not a
     // camera date, even though the column's name suggests one.
@@ -165,7 +174,7 @@ struct CohortDrill: Identifiable, Hashable {
     var id: String { "\(year)|\(make)|\(model)" }
 }
 
-private extension View {
+extension View {
     /// Stock inset-grouped card: the data section floats as a rounded
     /// `secondarySystemGroupedBackground` panel on the grouped page — the native
     /// Settings / Photos-info idiom, replacing flat monospace-on-white. The values
@@ -271,6 +280,11 @@ struct VehicleDetailView: View {
     @State private var vehicle: VehicleHeaderRow?
     @State private var specs: [VehicleSpec] = []   // get_vehicle_specs: fact vs facade
     @State private var valuation: VehicleValuation?  // get_vehicle_valuation: comp-based estimate + basis
+    // The header's document (vehicle_profile_read): the headline price and the strip of
+    // recorded facts as Claims with coverage, viewer-scoped by the database. The same read
+    // the web header renders; the phone mirrors it, it does not rebuild it from columns.
+    @State private var profile: ProfileRead?
+    @State private var profileError = false
     @State private var images: [VehicleGalleryImage] = []
     @State private var loadingMore = false         // a gallery page is in flight
     @State private var reachedEnd = false          // last page returned < pageSize
@@ -369,6 +383,7 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { if mapContext == nil { await loadHero() } }
         .task(id: vehicleId) { if mapContext != nil { await loadMapEvidence() } }
         .task(id: vehicleId) { await loadSpecs() }
+        .task(id: vehicleId) { if mapContext == nil { await loadProfileRead() } }
         .task(id: vehicleId) { if mapContext == nil { await loadValuation() } }
         .task(id: vehicleId) { if mapContext == nil { await loadVehicleDays() } }
         .task(id: vehicleId) { if mapContext == nil { await loadSaleHistory() } }
@@ -603,14 +618,22 @@ struct VehicleDetailView: View {
                         heroLayer
                         loadState
                         liveAuctionBanner
+                        profileHeaderBlock
                         buildInstrument
+                        if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
                         heroActionRow
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
-                        ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
-                        if vehicle != nil { InvestmentProofView(vehicleId: vehicleId).id("proof") }
-                        photoStrip
+                        // Money is never anonymous (owner rule; web #1001/#1007, source gate #1037:
+                        // owner, uploader or contributor read it). The viewer is the database's
+                        // verdict from vehicle_profile_read, never a client guess, and a missing
+                        // read fails closed: no document, no ledger.
+                        if let viewer = profile?.viewer, viewer != .anon {
+                            ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
+                            InvestmentProofView(vehicleId: vehicleId).id("proof")
+                        }
+                        photoStrip.id("photos")
                         assetWindow.id("asset")
                         specTable.id("specs")
                         webCTA
@@ -745,6 +768,7 @@ struct VehicleDetailView: View {
                 .eq("image_category", value: "exterior_body")
                 .in("ai_processing_status", values: ["completed", "analyzed"])
                 .not("is_superseded", operator: .is, value: "true")
+                .or(VehicleGalleryImage.gateRule)
                 .order("taken_at", ascending: false)
                 .limit(200)
                 .execute().value
@@ -845,6 +869,50 @@ struct VehicleDetailView: View {
         }
     }
 
+    // ─── The header document — vehicle_profile_read rendered through the kit's shapes
+    // (ProfileDocument.swift / ProfileStripView.swift). The one headline price as a Claim
+    // (off while a live auction's banner owns the number, as on the web) and the strip of
+    // recorded facts, each with its source and clock, closed by its coverage sentence.
+    @ViewBuilder private var profileHeaderBlock: some View {
+        if let read = profile {
+            ProfileHeaderBlock(vehicleId: vehicleId, read: read,
+                               priceOwnedByLiveStack: pulse?.is_live == true)
+        } else if profileError {
+            sectionError("the record header") { Task { await loadProfileRead() } }
+        }
+    }
+
+    /// Fields the strip now owns, so the spec table states each datum once.
+    private var stripOwnedFields: Set<String> {
+        guard let strip = profile?.strip else { return [] }
+        var owned = Set(strip.facets.compactMap { ProfileHeaderBlock.field(for: $0.dimension) })
+        if strip.odometer != nil { owned.insert("mileage") }
+        return owned
+    }
+
+    private var stripOwnsLocation: Bool {
+        profile?.strip?.facets.contains { $0.dimension == "location" } == true
+    }
+
+    private var specsOutsideStrip: [VehicleSpec] {
+        specs.filter { !stripOwnedFields.contains($0.field) }
+    }
+
+    /// The header's document, one request, viewer-scoped by the read itself.
+    private func loadProfileRead() async {
+        profileError = false
+        do {
+            let read: ProfileRead? = try await SupabaseService.client
+                .rpc("vehicle_profile_read", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            profile = read
+        } catch {
+            profileError = true
+            NSLog("NukeCapture profile read failed: %@", String(describing: error))
+        }
+    }
+
     // ─── Spec table — driven by get_vehicle_specs, which marks each value a FACT
     // (rooted: a real atom — a source photo, a field-keyed observation, or real
     // extraction evidence backs it) or a FACADE (a bare column carrying only a
@@ -853,7 +921,7 @@ struct VehicleDetailView: View {
     // dimmed and "unverified" and never pretend to be fact. The root-system
     // contract, on the surface. Long-press any value to copy it.
     @ViewBuilder private var specTable: some View {
-        if !specs.isEmpty || locationRow != nil {
+        if !specsOutsideStrip.isEmpty || (locationRow != nil && !stripOwnsLocation) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("SPECIFICATIONS")
                     .font(.system(.caption2, design: .monospaced))
@@ -861,8 +929,10 @@ struct VehicleDetailView: View {
                     .padding(.bottom, 4)
 
                 VStack(spacing: 0) {
-                    ForEach(specs) { specRow($0) }
-                    if let loc = locationRow { plainRow("Location", loc) }
+                    // Rows the strip already states (body, engine, transmission, drivetrain,
+                    // odometer, location) are its to show; the table carries the rest.
+                    ForEach(specsOutsideStrip) { specRow($0) }
+                    if let loc = locationRow, !stripOwnsLocation { plainRow("Location", loc) }
                 }
 
                 // WHAT THIS NEEDS — the unverified specs are the gaps; a signed-in
@@ -1370,7 +1440,10 @@ struct VehicleDetailView: View {
                     Text("PHOTOS")
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     Spacer()
-                    Text(images.count.formatted() + (reachedEnd ? "" : "+"))
+                    // Loaded against the record (web #1051: "n of N", never what loaded as the whole).
+                    // The record's count includes frames the gate or analysis has not admitted, so the
+                    // two numbers are named, not reconciled.
+                    Text(photosCountLine)
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16)
@@ -1401,6 +1474,14 @@ struct VehicleDetailView: View {
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
         }
+    }
+
+    private var photosCountLine: String {
+        let loaded = images.count.formatted()
+        if let total = vehicle?.image_count, total > images.count {
+            return "\(loaded) loaded of \(total.formatted()) on the record" + (reachedEnd ? "" : " · more pages")
+        }
+        return loaded + (reachedEnd ? "" : "+")
     }
 
     /// `images` (taken_at DESC) grouped into ordered day-clusters — the Photos 'Days' shape.
@@ -1579,7 +1660,7 @@ struct VehicleDetailView: View {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
-                .select("id,year,make,model,trim,city,state,primary_image_url")
+                .select("id,year,make,model,trim,city,state,primary_image_url,image_count")
                 .eq("id", value: vehicleId)
                 .limit(1)
                 .execute()
@@ -1701,6 +1782,7 @@ struct VehicleDetailView: View {
                 .eq("vehicle_id", value: vehicleId)
                 .in("ai_processing_status", values: ["completed", "analyzed"])
                 .not("is_superseded", operator: .is, value: "true")   // keep null/false, drop superseded dupes
+                .or(VehicleGalleryImage.gateRule)                      // the vision gate, as the web applies it
             if mapContext == nil {
                 request = request.not("taken_at", operator: .is, value: "null")
             }
@@ -2080,6 +2162,7 @@ private struct DayDrillSheet: View {
                 .gte("taken_at", value: day.day)
                 .lt("taken_at", value: f.string(from: next))
                 .not("is_superseded", operator: .is, value: "true")
+                .or(VehicleGalleryImage.gateRule)
                 .order("taken_at", ascending: true)
                 .limit(200)
                 .execute().value

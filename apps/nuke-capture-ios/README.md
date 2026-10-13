@@ -17,6 +17,86 @@ Same engine, same row shape, same privacy gates as the Mac app:
 | Trigger | `PHPhotoLibraryChangeObserver` (always-on app) | foreground sync + `PHPhotoLibraryChangeObserver` + `BGAppRefreshTask` heartbeat |
 | Auth | email/password, Keychain session, RLS | identical |
 
+## The room (read this first; `AGENTS.md` sends every agent here)
+
+The app is LIVE on TestFlight, not greenfield. Develop from what exists: name the file and improve it
+in place. It is the phone end of the data machine: the one surface that can **capture** (camera roll,
+EXIF, location, on-device Vision and OCR, the GPS shop gate), and it **mirrors** the web for everything
+else. The user profile starts at image intake, so it lives here (owner, 2026-10-05).
+
+Two rules outrank taste:
+
+1. **The web is the source of truth; the phone mirrors it.** Same RPCs, same numbers, same masks, same
+   rules. Never a parallel local data layer, never a client-side rebuild of a number the database can
+   state. The app was once caught showing 766 images against the real 22,315 (2026-06-12); that is the
+   failure this rule exists for.
+2. **Only a Claim or a Measure reaches the screen, and every number carries its Coverage.** The kit
+   (`nuke_frontend/src/kit/types.ts`) is the contract; `Sources/NukeCapture/ProfileDocument.swift` is its
+   Swift twin; `RootedValueView` (`RootedValue.swift`) is the one primitive that renders a value, with its
+   trust rung, its clock and its drill (or its honest refusal to drill). A bare value is a bug.
+
+**The header is on the read.** `vehicle_profile_read(uuid)` (migration `20261013143000`, SECURITY
+INVOKER, callable by anon and authenticated) returns the vehicle page's header as one ProfileDocument: a
+`masthead` (identity columns, the one headline price as a Claim with its kind, platform and clock), a
+`strip` (body, engine, transmission, drivetrain, location and odometer as Claims, closed by `coverage`:
+n of N facts attributed, as of a clock) and a `timeline` (events dated by day and kind, with coverage).
+`VehicleDetailView.loadProfileRead()` fetches it; `ProfileStripView.swift` renders it; the spec table drops
+the rows the strip owns, so each datum is stated once. The viewer (`anon`, `contributor`, `owner`) is what
+the database decided from `auth.uid()`. Claim source kind → trust rung: owner, document → `.proven`;
+listing, image, agent → `.attributed`; model → `.projected`; legacy → `.facade` (dim, "unverified", no
+drill: the web says the same in words in its popover, the phone says it by grammar). A live auction
+banner owns the headline price; the masthead price stays off while `vehicle_pulse.is_live`. When the read
+grows a section, add its case to `ProfileSection` and render it through the same primitives; never add a
+new client-side query to the header.
+
+Standing rules the code carries:
+
+- **Images:** every public `vehicle_images` read passes `VehicleGalleryImage.gateRule` to `.or(...)`
+  (frames the vision gate rejected as personal or misattributed never show; null still may), drops
+  `is_superseded`, and renders through `NukeImage.thumb(url, width:)` (the render endpoint), never the raw
+  original outside the full-screen viewer.
+- **Money is never anonymous.** The investment ledger and value curve render only when the read's viewer
+  is not `anon` (owner, uploader or contributor; source gate #1037), failing closed without a document. A
+  license plate read off an image is never displayed.
+- **Coverage on every counter.** A count without its population and clock is not shown; say "unknown"
+  instead of guessing (fleet-relative reporting, `docs/ledger/theory/data-machine.md`).
+- **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
+  DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
+  out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
+  profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs`. A session injected once
+  persists in the simulator Keychain; terminate and relaunch, or use an explicit screen hook.
+
+**Shipping to TestFlight.** The owner's phone is the test surface. Three paths; use the first that works
+and say which, with the delivery stage (implemented → built → archived → uploaded → on the phone).
+"Merged to main" ships nothing by itself.
+
+1. **Xcode Cloud (works, no local credentials).** The workflow "Default" builds the branch
+   `fable5/ignition-ios`, archives, and distributes to the TestFlight group "Nuke Internal". Ship a
+   commit with `git push origin <sha>:refs/heads/fable5/ignition-ios` and watch
+   `gh api repos/sss97133/nuke/commits/<sha>/check-runs` for the check-run `NukeCapture | Default |
+   Archive - iOS` (about six minutes). **Move the ref only by a fast-forward.** A forced update is
+   ignored by Xcode Cloud (measured 2026-10-13: six minutes, no run). After a squash merge the ref no
+   longer descends from main, so carry main onto it with a merge commit whose tree is main's:
+   `m=$(git commit-tree <main-sha>^{tree} -p <old-ref-sha> -p <main-sha> -m "ship(ios): carry main <main-sha> onto the Xcode Cloud ref")`
+   then `git push origin "$m:refs/heads/fable5/ignition-ios"` (quote the refspec: zsh reads `$m:r` as a modifier).
+   A fast-forward pushed while the previous run is still starting can also go unregistered (measured
+   2026-10-13 17:19Z, eight minutes, no run): if no check-run appears within three minutes, push a
+   fresh same-tree commit (`git commit-tree <ref>^{tree} -p <ref> -m "ship(ios): retrigger"`) onto the ref. Xcode Cloud stamps `CFBundleVersion` with its run counter,
+   overriding `project.yml` and both `ci_scripts`; when App Store Connect rejects a build as not higher
+   than an earlier one, bump `MARKETING_VERSION` in `project.yml` (a new train has no prior builds). The
+   build appears on the phone as a new version with its own Update button.
+2. **CLI ship from a Mac** (`scripts/ios/ship-testflight.sh`): `xcodebuild archive` + `-exportArchive`
+   with automatic signing. Needs Xcode signed into the team's Apple ID (the errors "Unable to log in with
+   account" and "No Account for Team" mean exactly that, not a broken pipeline) or the App Store Connect
+   key for the Nuke team (key id `77637BYL66`; issuer id in `~/.appstoreconnect/asc-nuke.env`, never in
+   the repo).
+3. **GitHub Actions** (`.github/workflows/ios-testflight.yml`): manual trigger, needs six secrets, two
+   were never set. Not a working path as of 2026-10-13.
+
+One agent owns this folder at a time; register in `.claude/LANES.md` (local) and `.claude/agents/active/`.
+Migrations and edge functions belong to their own rooms; this app only reads them. Shapes are decided in
+`nuke_frontend/src/kit`; change `types.ts` and this app's twin together, or not at all.
+
 ## Build
 
 There is no committed `.xcodeproj` — it's generated from `project.yml`.
