@@ -4,7 +4,7 @@ import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import { useVehicleProfile } from './VehicleProfileContext';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
 
-const SellerStackButton = React.lazy(() => import('./VehicleHeader').then(module => ({ default: module.SellerStackButton })));
+const SellerStackButton = React.lazy(() => import('./SellerStackButton'));
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
 const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner'));
 const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/MergeProposalsPanel'));
