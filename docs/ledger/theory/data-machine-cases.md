@@ -1019,8 +1019,29 @@ the digest of all preceding output rows. The existing explicit-manifest mode rem
 This remains an offline compiler of supplied gate evidence. Matching file hashes cannot establish
 source fidelity, independent review or anonymous runtime delivery. A windowed cached export is
 dated evidence, not an atomic or current production snapshot. Reconciliation alone neither adds
-usable records nor produces a launch certificate. Before/after supported-answer comparison and
-the actual population gate assays remain required.
+usable records nor produces a launch certificate. The actual population gate assays remain required.
+
+The same owner also accepts `--compare-populations /private/comparison.json --out /private/delta.jsonl`.
+Its `population_comparison_v1` configuration carries `before` and `after`, each with an explicit
+`evaluatedAt` UTC clock and a complete reconciliation `configuration` as defined above. Stream paths
+are relative to the comparison file. It reruns both reconciliations with bounded pull streams,
+including all original counts, hashes, tails and gate qualification; it does not trust summary totals.
+Population filters, grains and capability eligibility rules must match. Retained/public denominators
+and measurement windows remain beside each side's eligible population.
+
+The result separates shared-member state transitions from arrivals and departures and reconciles the
+ready-count delta to those components. `blocked → ready`, `not_assessed → ready`, `ready → blocked`
+and `ready → not_assessed` remain separate. Changed freshness/service objectives have a separate
+transition matrix; loosening an objective cannot masquerade as a pass under unchanged objectives.
+The primary gain/loss counters require unchanged objectives; the separate decision-count delta
+includes all objective changes and reconciles to arrivals/departures. Population measurement clocks
+and window boundaries cannot run backward. Each side is evaluated at its declared time, so expired evidence can regress. A newly assessed pass
+is a measurement change, and no state transition by itself establishes that a repair caused the gain.
+Only the terminal `reconciled` summary establishes a complete comparison. A broken input tail leaves
+an incomplete private output, never a success report. This mode performs no network, model calls or
+database writes and does not independently certify the supplied gate evidence.
+Configuration and stream inputs must be regular files; nonblocking admission rejects named pipes
+without waiting indefinitely for another process.
 
 ### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
 
