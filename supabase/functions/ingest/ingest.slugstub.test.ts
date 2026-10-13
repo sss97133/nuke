@@ -152,7 +152,7 @@ Deno.test({
       // The existing vehicle URL normalizer strips www; the observed share path stays intact.
       equal(JSON.parse(vehicleInserts()[0].body!).listing_url, SHARE_URL.replace("www.", ""));
       equal(extractorCalls(), ["extract-craigslist"]);
-      assert(!seen.some(r => new URL(r.url).hostname.endsWith("craigslist.org") && r.url !== SHARE_URL), "no manufactured regional source request");
+      assert(!seen.some(r => { const host = new URL(r.url).hostname; return (host === "craigslist.org" || host.endsWith(".craigslist.org")) && r.url !== SHARE_URL; }), "no manufactured regional source request");
     } finally { publicPage = null; }
   },
 });
@@ -214,7 +214,7 @@ Deno.test({
     const { result } = await ingest({ url: `https://outside.example/?next=${SHARE_URL}` });
     equal(result.status, "rejected"); equal(result.enrichment_error, "Invalid Craigslist share URL");
     equal(extractorCalls(), []); equal(writes(), []);
-    assert(!seen.some(r => !new URL(r.url).hostname.endsWith("supabase.test")), "no foreign or source fetch");
+    assert(!seen.some(r => new URL(r.url).hostname !== new URL(SUPABASE_URL).hostname), "no foreign or source fetch");
   },
 });
 
@@ -224,7 +224,7 @@ Deno.test({
   fn: async () => {
     const { result } = await ingest({ url: SHARE_URL, preview: true });
     equal(result.status, "preview"); equal(result.external_id, null); equal(extractorCalls(), []); equal(writes(), []);
-    assert(!seen.some(r => new URL(r.url).hostname.endsWith("craigslist.org")), "preview stays source-read free");
+    assert(!seen.some(r => { const host = new URL(r.url).hostname; return host === "craigslist.org" || host.endsWith(".craigslist.org"); }), "preview stays source-read free");
   },
 });
 
