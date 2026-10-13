@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MakeIdentity } from '../../components/common/MakeIdentity';
+import { Text } from '../../kit';
 import { squarify } from '../../lib/squarify';
 import { MAP_GROUPS, inventoryGroups, mapValue, readableInventoryLayout, type InventoryMapGroup, type InventoryMapLens, type MapDimension, type MapSubdivision } from './inventoryMap';
 import type { InventoryTaxonomy, LiveAuction } from './useMarketPulse';
@@ -80,19 +81,19 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
 
   return <section className="inventory-map" aria-label="Inventory map">
     <div className="inventory-map-controls">
-      <label>Group by <select aria-label="Group inventory by" value={lens.group} onChange={e => onLensChange({ group: e.target.value as MapDimension, focus: null, child: null })}>
+      <label className="market-scope__cohort"><Text role="label">Group by</Text><select className="market-control k-body" aria-label="Group inventory by" value={lens.group} onChange={e => onLensChange({ group: e.target.value as MapDimension, focus: null, child: null })}>
         {MAP_GROUPS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
       </select></label>
-      <label>Inside each box <select aria-label="Inventory sub-boxes" value={lens.inside} onChange={e => onLensChange({ inside: e.target.value as MapSubdivision, child: null })}>
+      <label className="market-scope__cohort"><Text role="label">Inside each box</Text><select className="market-control k-body" aria-label="Inventory sub-boxes" value={lens.inside} onChange={e => onLensChange({ inside: e.target.value as MapSubdivision, child: null })}>
         <option value="none">Total lots</option><option value="make">Brands</option><option value="model">Models</option><option value="year">Years</option><option value="lot">Individual vehicles</option>
       </select></label>
-      {lens.focus != null && <button type="button" onClick={() => onLensChange({ focus: null, child: null })}>← All {plural(lens.group)}</button>}
-      {lens.child != null && <button type="button" onClick={() => onLensChange({ child: null })}>Clear sub-box selection</button>}
+      {lens.focus != null && <button type="button" className="market-control" onClick={() => onLensChange({ focus: null, child: null })}><Text role="label">← All {plural(lens.group)}</Text></button>}
+      {lens.child != null && <button type="button" className="market-control" onClick={() => onLensChange({ child: null })}><Text role="label">Clear sub-box selection</Text></button>}
     </div>
-    <div className="inventory-map-key"><span>Box size = number of open lots{lens.inside === 'lot' ? ' · Each small box = one vehicle' : ''}</span><span>{lens.inside === 'lot' ? 'Hover or focus to identify · Select to inspect' : `Select ${lens.group === 'make' ? 'a brand to see its models' : 'a box to narrow the inventory'}`}</span></div>
-    {pending && <p role="status">Reading recorded classifications…</p>}
-    {failed && <p role="status">Recorded classifications could not be loaded. <button onClick={onRetryTaxonomy}>Retry classifications</button></p>}
-    {!pending && !failed && width > 0 && rects.length === 0 && <p role="status">No captured lots remain in this map group. <button onClick={() => onLensChange({ focus: null, child: null })}>Show all map groups</button></p>}
+    <div className="inventory-map-key"><Text role="caption">Box size = number of open lots{lens.inside === 'lot' ? ' · Each small box = one vehicle' : ''}</Text><Text role="caption">{lens.inside === 'lot' ? 'Hover or focus to identify · Select to inspect' : `Select ${lens.group === 'make' ? 'a brand to see its models' : 'a box to narrow the inventory'}`}</Text></div>
+    {pending && <p role="status" className="k-body">Reading recorded classifications…</p>}
+    {failed && <p role="status" className="k-body">Recorded classifications could not be loaded. <button type="button" className="market-control" onClick={onRetryTaxonomy}><Text role="label">Retry classifications</Text></button></p>}
+    {!pending && !failed && width > 0 && rects.length === 0 && <p role="status" className="k-body">No captured lots remain in this map group. <button type="button" className="market-control" onClick={() => onLensChange({ focus: null, child: null })}><Text role="label">Show all map groups</Text></button></p>}
     <div ref={ref} className="inventory-map-canvas" style={{ height: list ? 'auto' : pending || failed || (width > 0 && rects.length === 0) ? 0 : height }} aria-label={`Captured inventory by ${MAP_GROUPS.find(g => g.id === lens.group)?.label}`} onMouseLeave={() => setHovered(null)}>
       {!pending && !failed && list && <div className="inventory-map-remainder">
         <div className="inventory-map-list-heading"><button type="button" className="inventory-map-back" onClick={() => { setList(null); requestAnimationFrame(() => ref.current?.querySelector<HTMLButtonElement>('[data-map-more]')?.focus({ preventScroll: true })); }}>← Back to map</button>
@@ -142,10 +143,10 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
         </div>;
       })}
     </div>
-    <div className="inventory-map-description" aria-live="polite">{hovered ?? `${auctions.length.toLocaleString('en-US')} captured lots · Bring a Trailer${needsTaxonomy ? ' · Unrecorded classifications are included' : ''}`}</div>
-    {!pending && !failed && <details className="inventory-map-notes"><summary>Map notes · {groups.length} groups as a list</summary>
-      <label className="inventory-map-pulse-control"><input type="checkbox" checked={pulses} onChange={e => setPulses(e.target.checked)} /> Pulse on recorded bid increases <span>· 60-second refreshes</span></label>
-      <p className="inventory-map-note">Pulses show recorded bid increases between 60-second refreshes, not every individual bid. Source delay and complete platform coverage are unknown. Bid numbers have unverified currency.{updates > 0 && pulses ? ` ${updates} lot${updates === 1 ? '' : 's'} updated.` : ''}</p>
+    <Text role="body" as="div" className="inventory-map-description" aria-live="polite">{hovered ?? `${auctions.length.toLocaleString('en-US')} captured lots · Bring a Trailer${needsTaxonomy ? ' · Unrecorded classifications are included' : ''}`}</Text>
+    {!pending && !failed && <details className="inventory-map-notes"><summary><Text role="label">Map notes · {groups.length} groups as a list</Text></summary>
+      <label className="inventory-map-pulse-control k-body"><input type="checkbox" checked={pulses} onChange={e => setPulses(e.target.checked)} /> Pulse on recorded bid increases <span>· 60-second refreshes</span></label>
+      <p className="inventory-map-note k-caption">Pulses show recorded bid increases between 60-second refreshes, not every individual bid. Source delay and complete platform coverage are unknown. Bid numbers have unverified currency.{updates > 0 && pulses ? ` ${updates} lot${updates === 1 ? '' : 's'} updated.` : ''}</p>
       <div className="inventory-map-list">{groups.map(g => <button type="button" key={g.key} onClick={() => select(lens.group, g)} aria-label={`Focus ${g.name}: ${g.lots.length} captured lots`}>
         <span>{identity(g, lens.group, true)}</span><span>{g.lots.length}</span>
       </button>)}</div>

@@ -171,3 +171,11 @@
 .market-bid { font-weight: 700; padding: 1px 3px; transition: background 180ms cubic-bezier(.16,1,.3,1), color 180ms cubic-bezier(.16,1,.3,1); }
 .market-bid--risen { background: var(--success); color: var(--bg); }
 .market-bid--stale { color: var(--text-disabled); }
+
+/* Captured listings: the same frame, masthead and scope strip as the auction board. */
+.market-listings__scroll { overflow-x: auto; margin-top: 8px; }
+.market-listings { width: 100%; text-align: left; border-collapse: collapse; }
+.market-listings th { padding: 4px 0; border-bottom: 2px solid var(--border); }
+.market-listings td { padding: 8px 8px 8px 0; border-top: 2px solid var(--border); vertical-align: top; }
+.market-listing__image { float: left; margin-right: 8px; object-fit: cover; background: var(--surface); }
+.market-listing__image[hidden] { display: none; }
