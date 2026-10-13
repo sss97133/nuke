@@ -1,0 +1,50 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const fixture = vi.hoisted(() => ({ from: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from } }));
+import { readCapturedListings, sourceLink } from './useCapturedListings';
+
+const vehicleId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+function row(id: string, vehicle_id: string | null = null, source_url = 'https://www.craigslist.org/view/d/bangor-miata/2TNyMpPJLHFnrK9iPF2Fyq') {
+  return { id, vehicle_id, source_url, source_platform: 'craigslist', source_listing_id: '7982350344', current_price: 0,
+    event_status: 'active', created_at: '2026-10-13T02:31:04.821+00:00', updated_at: '2026-10-13T02:32:00Z' };
+}
+function query(data: unknown[], error: Error | null = null) {
+  const q: any = { then: (resolve: any) => Promise.resolve({ data, error }).then(resolve) };
+  for (const name of ['select', 'in', 'eq', 'is', 'or', 'order', 'limit', 'abortSignal']) q[name] = vi.fn(() => q);
+  return q;
+}
+beforeEach(() => fixture.from.mockReset());
+describe('public captured listing boundary', () => {
+  it('preserves actual unresolved presentations but withholds hidden/missing linked parents and arbitrary URLs', async () => {
+    const events = query([row('unresolved'), row('hidden', vehicleId), row('not-public-source', null, 'https://internal.example/private'), row('public', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')]);
+    const vehicles = query([{ id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', year: null, make: null, model: null }]);
+    fixture.from.mockImplementation((table: string) => table === 'vehicle_events' ? events : vehicles);
+    const result = await readCapturedListings('craigslist');
+    expect(result.items.map(r => r.id)).toEqual(['unresolved', 'public']);
+    expect(result.items[0]).toMatchObject({ vehicle_id: null, vehicle: null, source_listing_id: '7982350344', current_price: 0 });
+    expect(result.items[1].vehicle?.id).toBe('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    expect(vehicles.eq).toHaveBeenCalledWith('is_public', true);
+    expect(vehicles.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(vehicles.or).toHaveBeenCalledWith('listing_kind.is.null,listing_kind.neq.non_vehicle_item');
+    expect(events.select.mock.calls[0][0]).not.toMatch(/metadata|contact|seller/);
+  });
+  it('advances bounded source-scoped cursor even when an entire scanned page is withheld', async () => {
+    const events = query(Array.from({ length: 51 }, (_, i) => row(`${String(i).padStart(8, '0')}-0000-0000-0000-000000000000`, vehicleId)));
+    fixture.from.mockImplementation((table: string) => table === 'vehicle_events' ? events : query([]));
+    const first = await readCapturedListings('craigslist');
+    expect(first.items).toEqual([]); expect(first.next?.id).toBe('00000049-0000-0000-0000-000000000000');
+    await readCapturedListings('craigslist', first.next);
+    expect(events.in).toHaveBeenCalledWith('source_platform', ['craigslist']);
+    expect(events.limit).toHaveBeenCalledWith(51);
+    expect(events.or.mock.calls.at(-1)[0]).toContain('id.lt.00000049-0000-0000-0000-000000000000');
+  });
+  it('does not turn failed parent eligibility checks into unresolved rows or successful emptiness', async () => {
+    fixture.from.mockImplementation((table: string) => table === 'vehicle_events' ? query([row('linked', vehicleId)]) : query([], new Error('reader unavailable')));
+    await expect(readCapturedListings()).rejects.toThrow('reader unavailable');
+  });
+  it('rejects credential URLs, hostile domains and non-listing Facebook URLs', () => {
+    for (const url of ['javascript:alert(1)', 'https://craigslist.org.attacker.example/123.html', 'https://user:secret@craigslist.org/123.html']) expect(sourceLink('craigslist', url)).toBeNull();
+    expect(sourceLink('facebook_marketplace', 'https://www.facebook.com/messages/123')).toBeNull();
+    expect(sourceLink('facebook_marketplace', 'https://www.facebook.com/marketplace/item/123456/')).toContain('/item/123456/');
+  });
+});
