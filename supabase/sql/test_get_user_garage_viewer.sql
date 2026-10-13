@@ -34,7 +34,9 @@ CREATE TABLE public.vehicle_user_permissions (vehicle_id uuid, user_id uuid, rol
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, image_url text,
   created_at timestamptz DEFAULT now(), is_document boolean, vision_gate_status text);
 CREATE TABLE public.nuke_estimates (vehicle_id uuid, comp_method text, estimated_value numeric, calculated_at timestamptz);
--- The gate as the contract needs it: an admitted frame is not a document and not rejected.
+-- The gate as the contract needs it: an admitted frame is not a document and not rejected. This stub admits
+-- pending and review_needed frames that production's predicate mostly excludes: the contract proves the reader
+-- calls the gate for a stranger, not what the gate admits (that is the gate's own contract).
 CREATE FUNCTION public.vehicle_image_gallery_eligible(public.vehicle_images) RETURNS boolean LANGUAGE sql STABLE AS
 $$ SELECT coalesce(($1).is_document, false) = false AND coalesce(($1).vision_gate_status, 'approved') NOT LIKE 'rejected%' $$;
 GRANT USAGE ON SCHEMA public, auth TO authenticated, service_role, anon;
@@ -78,6 +80,10 @@ BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END I
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text) TO authenticated, service_role, anon;
 
 -- 1. A signed-in stranger: the public projection only, no money, an admitted frame only.
+--    Note the interim asymmetry this asserts: v6 is held only by a co_owner permission, so a stranger sees it
+--    as owner while the owner's own branch (the live reader, unchanged here) omits it. Production has the same
+--    shape today (one vehicle reads owner to strangers and contributor to its owner). The ownership-source
+--    unification follow-up must flip this assertion on purpose, never by accident.
 SET ROLE authenticated;
 SET test.auth_uid = '20000000-0000-0000-0000-000000000009';
 SET test.auth_role = 'authenticated';
