@@ -949,6 +949,27 @@ a more efficient form: "ensuring the model grows as data is discovered and needi
 but very little keys, foreign keys, joins, edges, residuals, queries ... our job is to put name and meaning to it."
 This section is the index he asked for, the process in the card's own words, and the proposal. It installs nothing.
 
+### Public-readiness criteria corrected, owner direction 2026-10-12
+
+The owner rejected any-binding coverage as a useful headline and required criteria derived from
+production-grade public exploration. Field-slot and canonical-claim counts point toward missing
+structure but do not establish even basic public-use acceptance. The owner also rejected unknown
+Facebook-wide size as an excuse for having no acquisition goal: Facebook is a larger platform
+entity whose channels, markets, publishers, presentations, media and interactions need scoped work.
+
+The [theory card's public-use criteria](data-machine.md#public-use-readiness-owner-correction-2026-10-12)
+now define per-capability evidence/identity/public-reader/freshness/quality gates, ready/blocked/
+not-assessed populations, full-population denominators and net supported-answer gain. The Facebook
+contract requires an intended target inventory, enumeration witnesses, capture depth, revisit
+obligations and retained-population reconciliation. Source-level history can be useful before an
+asset match; unknown global platform size does not erase target-plan or retained-backlog obligations.
+
+This entry records criteria preparation, not a measured readiness numerator or completed launch.
+Implementation belongs to existing source/stack/assay and `db-stats`/SystemStatus owners. Closure
+requires versioned public capability specifications, automated population reconciliation, independent
+quality evidence, anonymous end-to-end assays and dated before/after ready counts. Existing source,
+privacy and operational holds remain. Preserve older field/capture metrics as dated diagnostics.
+
 ### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
 
 | Question | Where | What it establishes |

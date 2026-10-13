@@ -49,6 +49,13 @@ claims. See `docs/ledger/README.md` for the distinction between active guidance 
 
 Data-model progress reports must put the full population and its measurement date beside the
 numerator, then show the eligible population, net usable coverage gained and remaining backlog.
+Choose the measurement from the intended public activity before counting. Follow the
+public-use readiness criteria in `docs/ledger/theory/data-machine.md`: per-capability ready,
+blocked and not-assessed populations, anonymous source-to-reader acceptance, quality/freshness
+evidence and net supported-answer gain. Any-binding coverage, eleven-field fullness and
+canonical-claim presence are diagnostics, not public readiness. For Facebook/source collection,
+declare intended channels/markets, target enumeration, capture depth and revisit obligations;
+recent capture batches are neither platform nor retained-population denominators.
 Label estimates and unknown denominators explicitly. A fixed cohort is validation scope; completed
 source-property work and distinct vehicles touched are processing measures, not modeled-fleet
 coverage. Follow the fleet-relative reporting contract in `docs/ledger/theory/data-machine.md`.
