@@ -79,6 +79,130 @@ count/fold/assay owners and dated receipts; do not manufacture a denominator, st
 for each update or mint another dashboard. If a necessary measure is missing, name its existing owner
 and the missing measurement before claiming fleet impact.
 
+## Public-use readiness, owner correction 2026-10-12
+
+The delivery goal is public exploration of trustworthy asset evidence: find an example, inspect
+what supports its identity and configuration, navigate its presentations and history, and obtain
+qualified comparisons or other declared answers. Define acceptance from those activities before
+counting fields. Any registered binding, eleven filled fields, canonical-claim presence, described
+tables and captured batches are processing diagnostics. None is a public-readiness headline.
+
+### Measure delivered capabilities
+
+| Public activity | Unit and population | Acceptance for a supported answer |
+|---|---|---|
+| Find and open an example | Public vehicle record; all public, undeleted vehicle records, with non-vehicle exclusions reported | Actual anonymous search/browse reaches the correct stable record and detail route; identity facets have attributed support; ambiguous identity remains visible without an invented physical-vehicle merge. |
+| Inspect identity, configuration and condition | Record × declared question; all applicable public records, including ones lacking evidence | The reader exposes relevant retained claims/media and attribution, configuration context, units and clocks; conflicting claims and unknowns survive. Each displayed conclusion traces to its admitted inputs and method. A seller assertion remains an assertion. |
+| Follow presentations, asking prices and history | Publicly eligible presentation/episode × question; include single-sighting episodes | Correct source/episode keys, original price/unit witnesses and ordered source/processing clocks reach the reader. Repeats are idempotent. One sighting yields one observation; duration needs its declared evidence. Observed span is a lower bound, disappearance is not a sale, and an earlier state excludes later evidence. |
+| Compare examples and read market movement | Declared subject × comparison question, plus its candidate episode population | Reader returns qualifying members, exclusions, unresolved candidates, source/window coverage and matching rules. Amounts, currencies, asking prices, bids and sale outcomes remain distinct. A qualified measure requires the stated evidence and uncertainty; a browse group alone is insufficient. |
+| Use a derived assessment or forecast | Eligible subject × versioned question × cutoff | Inputs and calculation are replayable; held-out evaluation against the declared baseline establishes the method's error/calibration in its intended population. Unsupported assessments stay unavailable. Shipping basic exploration does not certify an unvalidated forecast. |
+
+These are separate capabilities with separate gates. Do not average them into a completeness
+score. A record can support attributed inspection while its valuation is blocked. An unresolved
+listing can support source history while physical-vehicle identity remains unresolved.
+
+For every advertised capability, write a versioned acceptance specification with the required
+evidence/relationships, eligible grain, public route/API, supported output, refusal conditions,
+freshness limit, latency/error objective and assay method. Register it through existing stack and
+assay owners. Test anonymous access, keyboard/navigation behavior and evidence drill-through,
+not just an admin/service response or a dependency being present. Freshness and service objectives
+must be explicit per capability before its release verdict; they are not established by this document.
+
+### Readiness counts and release evidence
+
+Every assessment partitions its declared eligible population into **ready**, **blocked** and
+**not assessed**. The three counts must reconcile to that denominator. Not-applicable exclusions
+are separate, rule-qualified counts beside the full population; absence of evidence does not make
+a record inapplicable. Never drop unknown identity, missing fields, private-reader failures or a
+failed page from the assessment silently. Private records remain outside public eligibility with
+their count/unknown scope reported; this contract does not grant access to them.
+
+Report public record reach separately from supported-answer coverage. Honest withholding can
+pass a reader's refusal assay, but does not count as an available supported answer. Readiness is
+the conjunction of the capability's evidence, identity/context, public delivery, freshness and
+quality gates. An unassessed gate cannot pass. A useful headline is **ready answers / eligible
+record-question pairs**, broken out by named question, with **ready records / full public record
+population** for the stated capability. No complete-model percentage is defined by these counts.
+
+Each report carries contract version, population/filter identity, grain, measurement window,
+exhaustion status and evidence stage. Show full retained/public and capability-eligible populations
+together, then ready/blocked/not-assessed counts and reason breakdowns. Compare the same manifest
+and contract before/after: newly ready, regressed, net gain, new arrivals and departures are distinct.
+Report remaining blockers, ready-output throughput, incoming work and backlog trend. A cached census
+can anchor a dated population; a sample cannot replace its unmeasured readiness numerator.
+
+Quality evidence includes independently checked attribution/unit/episode errors, contradictions,
+held-out selection method and uncertainty, plus anonymous-reader success, response time and staleness
+by relevant source/configuration strata. Zero errors in a small test is not fleet accuracy. Known
+critical privacy leaks, wrong-entity attribution, unsupported factual output or future-evidence
+leakage block the affected public release until repaired. Passing fixtures establishes their cases;
+unmeasured correctness or service behavior remains unassessed, rather than a claimed production pass.
+
+Measure source fidelity separately from physical truth: faithfully quoting an engine claim does
+not establish the installed engine. Evaluate derived extraction/identity/condition judgments against
+independent references with unresolved cases retained. Report both the tested population and its
+relation to the full eligible population; give error bounds and untested strata. Require a passing
+ordinary case, disagreement case, unknown case, private-record negative control and cutoff/replay
+case for each applicable advertised output. A fallback answer cannot bypass the same evidence gates.
+
+Keep blocked counts per gate and their intersections; one record may lack several relationships.
+Choose deterministic repairs by the measured affected population and expected newly supported
+answers, then verify actual net gain and regressions. Do not select work because a tiny fixture is
+easy to finish. Reuse existing retained evidence, writers, folds and readers across the full eligible
+population; no per-node LLM dependency or new population census per status update.
+
+### Facebook acquisition and model acceptance
+
+Facebook is a platform entity, not one feed or a vehicle population. Distinguish its channels
+(Marketplace, groups and pages), geographic/search markets, publishers or account identities,
+listing/post presentations, media, interactions and later sightings. A listing ID identifies a
+source presentation; a physical-asset link needs separate evidence. The same asset can recur across
+presentations and channels. Publisher identity, location, source assertions and promoted rank have
+their own provenance. Vehicles are the present product scope, not the platform's complete ontology.
+
+Define the acquisition objective as a versioned target inventory through existing source owners:
+channel, geography/radius, category, query/filter, priority, access state, discovery/revisit cadence,
+and evidence depth needed by the public question. Include intended but unconfigured, inaccessible
+or held targets in the backlog. The owner's 1960–1990 preference prioritizes discovery and revisits;
+it does not discard other observed vehicles or unknown years. A chosen search surface cannot silently
+become the definition of the whole market.
+
+| Measurement | Denominator and pass condition |
+|---|---|
+| Intended reach | All declared target scopes, including blocked/unconfigured channels and markets; report discovered, configured, visited within cadence and inaccessible separately. Target count does not measure inventory size. |
+| Enumeration coverage | Source-ID manifest for each target/window, with pagination/continuation, filters, ranking/personalization and exhaustion evidence. Report observed keys, keys retained and unvisited pages/unknown tails. A displayed or exhausted personalized result set establishes that surface only, not all Facebook inventory. |
+| Capture depth | All enumerated eligible listing/post IDs, plus the full retained source population assessed separately; required source text, media witnesses, original identities/clocks and acknowledged retention are checked per question. Missing media is not completed image evidence. |
+| Repeat observation and freshness | All listings due under the declared revisit rule, including failed/blocked visits; report on-time retained revisits, stale/unvisited IDs and gaps. Preserve asking-price history and distinguish source event time, observation time and processing time. |
+| Model and public answer coverage | Retained presentation/question population partitioned by the readiness gates above; report unresolved asset/publisher/context links and reader failures without suppressing useful source-level histories. Private capture availability is not anonymous public delivery. |
+
+There are three different inventories: intended source scope, observed source keys in declared
+surfaces, and retained database records. Reconcile them rather than substituting a new capture batch
+for any of them. Database row estimates are discovery evidence until exact keys/grain are reconciled.
+Do not divide repeated sightings by vehicle records or extrapolate a captured slice to platform size.
+When the global platform denominator is unavailable, still report progress against the declared
+target plan and retained backlog, with uncovered channels/markets explicit. This defines work to
+reach; it does not authorize new access, source activation, public grants or release of existing holds.
+
+### Implementation boundary
+
+These are owner-directed acceptance criteria, not an implemented readiness census or a launch
+certificate. Extend existing `db-stats`/SystemStatus, stack contracts/coverage and their assays,
+`intake-reader-reconciliation.sql`, source target owners and canonical folds. The current intake
+receipt reader establishes bounded acknowledged operations; stack dependency coverage establishes
+declared structure. Neither presently supplies these whole-population public-readiness verdicts.
+The next implementation must name missing gates and connect their evidence to existing consumers
+before reporting a ready numerator. Preserve historical measurements with their original meanings.
+
+The next checkpoint is a capability acceptance matrix: advertised question, owning reader/fold,
+required evidence and relationships, public caller, population rule, freshness/service objectives,
+assay and current ready/blocked/not-assessed status. Start with the existing public browse/detail,
+evidence/history and market readers and their registered questions, rather than inventing a new
+dashboard. Apply deterministic predicates in batches to retained populations, reconcile all pages
+and failures, and independently check public delivery and semantic accuracy. For Facebook, pair
+that matrix with the intended channel/market target manifest and the full retained presentation
+backlog. Missing contracts and unconfigured targets are assigned work, not exclusions that improve
+the percentage. This checkpoint must precede another headline about model coverage or pace.
+
 The read-only `scripts/discovery/intake-reader-reconciliation.sql` locates gaps between retained
 source, observation, fold and current reader. `configuration-catalog-relations.sql` drills existing
 property/model/OEM relationships and proposes owned repairs. Both require explicit bounded inputs;
