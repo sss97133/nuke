@@ -714,20 +714,29 @@ struct MarketTreemapView: View {
         // let a truncated sum masquerade as the whole. (Make view via market_position
         // is complete, so it reads plain "N listed".)
         let truncated = isTop && groupBy != .make && nodes.count >= 250
-        return HStack(spacing: 8) {
-            Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-            Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "listed")
-                .font(.system(.caption)).foregroundStyle(.secondary)
-            Spacer(minLength: 6)
-            // The live color key — endpoints + the current ramp.
-            Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.secondary)
-            LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
-                           startPoint: .leading, endPoint: .trailing)
-                .frame(width: 42, height: 6).clipShape(Capsule())
-            Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "listed")
+                    .font(.system(.caption)).foregroundStyle(.secondary)
+                Spacer(minLength: 6)
+                // The live color key — endpoints + the current ramp.
+                Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 42, height: 6).clipShape(Capsule())
+                Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            // The denominator under the number (fleet-relative reporting): what population
+            // this is, and that its view records no refresh clock, which the app will not
+            // invent. The count is the market pulse view's grouped public records.
+            Text("public records with a listing, by \(groupBy.label.lowercased()) · market pulse view · refresh clock not recorded")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
         }
         .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 2)
     }

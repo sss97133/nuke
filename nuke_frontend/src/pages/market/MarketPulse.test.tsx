@@ -21,13 +21,17 @@ vi.mock('./useMarketRowDetails', async importOriginal => ({
   useMarketRowDetails: () => ({ data: fixture.details }), useMarketRowSpecs: () => ({ data: fixture.specs }),
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
-vi.mock('./RecordedSalesComparison', () => ({ default: ({ make, onMakeChange, onViewChange }: any) => <section aria-label="Recorded sales comparison">
-  <span>Comparison scope {make ?? 'all'}</span>
-  <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
-  <button onClick={() => onViewChange('inventory')}>Use inventory view</button>
-  <button onClick={() => onMakeChange('FORD')}>Choose Ford cohort</button>
-  <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
-</section> }));
+vi.mock('./RecordedSalesComparison', () => ({
+  default: () => <section aria-label="Recorded sales comparison">Recorded sales chart</section>,
+  MarketScopeControls: ({ make, onMakeChange, onViewChange, children }: any) => <>
+    <span>Comparison scope {make ?? 'all'}</span>
+    <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
+    <button onClick={() => onViewChange('inventory')}>Use inventory view</button>
+    <button onClick={() => onMakeChange('FORD')}>Choose Ford cohort</button>
+    <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
+    {children}
+  </>,
+}));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 
 import MarketPulse from './MarketPulse';
@@ -313,6 +317,31 @@ describe('market answer -> supporting lots', () => {
   });
 });
 
+
+describe('the market document', () => {
+  it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
+    await render('make=PORSCHE');
+    const h1 = container.querySelector('h1')!;
+    expect(h1.textContent).toBe('Open lots');
+    expect(h1.className).toContain('k-entity');
+    expect(container.querySelector('.k-masthead__result .k-measure')?.textContent).toBe('3');
+    expect(container.querySelector('.k-masthead__result .k-caption')?.textContent).toMatch(/^recorded /);
+    expect(container.querySelector('[aria-label="Market scope"] .k-coverage')?.textContent).toContain('3 of 4 captured BaT vehicle lots');
+    expect(container.textContent?.match(/Market explorer|Market cohort|captured vehicle auctions/)).toBeNull();
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    await click('Use recorded sales view');
+    expect(container.querySelector('h1')?.textContent).toBe('Recorded sales');
+    expect(container.querySelector('.k-masthead__result')).toBeNull();
+    expect(container.textContent).toContain('Recorded sales chart');
+  });
+  it('keeps the scope strip and the masthead when the live board cannot be read', async () => {
+    fixture.pulse.data = undefined; fixture.pulse.isLoading = false; fixture.pulse.isError = true;
+    await render();
+    expect(container.querySelector('h1')?.textContent).toBe('Open lots');
+    expect(container.querySelector('[aria-label="Market scope"]')).toBeTruthy();
+    expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
+  });
+});
 
 describe('inline market row inspection', () => {
   it('keeps the inspected row under its panel when its deadline passes and a refresh removes it', async () => {

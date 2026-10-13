@@ -64,6 +64,12 @@ struct NukeCaptureApp: App {
                     ExploreView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
+                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
+                    // unless one was injected. Verifies the viewer-dependent money rule.
+                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
+                                   date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {

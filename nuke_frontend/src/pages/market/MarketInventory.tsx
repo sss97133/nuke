@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Text } from '../../kit';
 import CapturedListings from './CapturedListings';
 const MarketPulse = lazy(() => import('./MarketPulse'));
 const AUCTION_LENS_PARAMS = ['view', 'lot', 'make', 'model', 'live', 'sort', 'bidRange', 'inspect', 'day', 'salesScope', 'days', 'benchmark', 'series', 'board'];
@@ -11,11 +12,12 @@ export default function MarketInventory({ onUnavailable }: { onUnavailable?: Rea
   const [params, setParams] = useSearchParams();
   const collection = params.get('collection') ?? (params.has('source') && !AUCTION_LENS_PARAMS.some(key => params.has(key)) ? 'listings' : 'auctions');
   const auctions = collection === 'auctions';
-  return <>
-    <nav aria-label="Market collection" style={{ display: 'flex', gap: 12, padding: '12px' }}>
-      <button aria-pressed={auctions} onClick={() => { const next = new URLSearchParams(params); next.set('collection', 'auctions'); setParams(next); }}>BaT auctions</button>
-      <button aria-pressed={!auctions} onClick={() => { const next = new URLSearchParams(params); next.set('collection', 'listings'); setParams(next); }}>Captured listings</button>
-    </nav>
-    {auctions ? <Suspense fallback={<p role="status">Reading auction board…</p>}><MarketPulse onUnavailable={onUnavailable} /></Suspense> : <CapturedListings />}
-  </>;
+  // The other retained population, one link away. The auction page places it in its scope strip.
+  const other = <button type="button" className="market-control" aria-pressed={false}
+    onClick={() => { const next = new URLSearchParams(params); next.set('collection', auctions ? 'listings' : 'auctions'); setParams(next); }}>
+    <Text role="label">{auctions ? 'Captured listings' : 'BaT auctions'}</Text>
+  </button>;
+  return auctions
+    ? <Suspense fallback={<p role="status">Reading auction board…</p>}><MarketPulse onUnavailable={onUnavailable} collection={other} /></Suspense>
+    : <><nav aria-label="Market collection" className="market-collection">{other}</nav><CapturedListings /></>;
 }

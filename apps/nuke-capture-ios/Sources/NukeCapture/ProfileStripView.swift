@@ -132,6 +132,77 @@ struct ProfileHeaderBlock: View {
     }
 }
 
+/// The read's timeline section (#1033): the record's dated events by day and kind, with its
+/// coverage. The build instrument above it is the owner's work rhythm (photos and sessions);
+/// this is the record's event ledger (service, maintenance, modification, repair, pending
+/// analysis), the same grain the web's day pages read. Renders the kind totals, the latest
+/// days, and the denominator last; nothing is shown that the document did not carry.
+struct ProfileTimelineCard: View {
+    let timeline: ProfileSection.Timeline
+    /// How many days to list before the rest is stated as a count.
+    var shownDays = 6
+
+    private var kindTotals: [(kind: String, n: Int)] {
+        var totals: [String: Int] = [:]
+        for d in timeline.days { for (k, n) in d.kinds { totals[k, default: 0] += n } }
+        return totals.map { (kind: $0.key, n: $0.value) }.sorted { $0.n == $1.n ? $0.kind < $1.kind : $0.n > $1.n }
+    }
+
+    private static func name(_ kind: String) -> String {
+        kind.replacingOccurrences(of: "_", with: " ")
+    }
+
+    private static func day(_ s: String) -> String {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: s) else { return s }
+        let out = DateFormatter(); out.locale = Locale(identifier: "en_US_POSIX"); out.timeZone = TimeZone(identifier: "UTC")
+        out.dateFormat = "MMM d, yyyy"
+        return out.string(from: d)
+    }
+
+    var body: some View {
+        if !timeline.days.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("RECORD EVENTS")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 6)
+                // Kind totals: what the record's events are, by count.
+                Text(kindTotals.map { "\(Self.name($0.kind)) \($0.n.formatted())" }.joined(separator: " · "))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .padding(.bottom, 8)
+                VStack(spacing: 0) {
+                    ForEach(Array(timeline.days.prefix(shownDays)), id: \.day) { d in
+                        LabeledContent {
+                            Text(d.kinds.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+                                    .map { "\(Self.name($0.key)) \($0.value)" }.joined(separator: " · "))
+                                .font(.system(.footnote, design: .monospaced))
+                                .multilineTextAlignment(.trailing)
+                        } label: {
+                            Text(Self.day(d.day)).font(.footnote).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 5)
+                        Divider()
+                    }
+                }
+                if timeline.days.count > shownDays {
+                    Text("\(timeline.days.count - shownDays) earlier days")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 6)
+                }
+                Text(timeline.coverage.sentence)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 8)
+            }
+            .nukeCard()
+        }
+    }
+}
+
 /// The evidence behind a claim, as the web's SourceView states it: when it was observed, who said
 /// it, how far it is trusted, where to read it. A record field also opens the existing full
 /// provenance drill, so the kit's popover and the app's deep drill are one path, not two.
