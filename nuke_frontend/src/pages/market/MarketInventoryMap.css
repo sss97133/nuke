@@ -34,20 +34,16 @@
 .inventory-map button:hover { background: var(--bg); outline: 2px solid var(--text-secondary); outline-offset: -2px; }
 .inventory-map button[data-map-more] { background: var(--bg); }
 .inventory-map button[data-map-more] .inventory-map-name { color: var(--text-secondary); }
-.inventory-map-more-preview { display: flex; flex-direction: column; gap: 10px; align-self: stretch; margin: 16px 0 auto; font-size: 11px; }
-.inventory-map-more-preview > span { display: flex; justify-content: space-between; gap: 12px; }
-.inventory-map-more-preview > span > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.inventory-map-more-preview > span > span:last-child { font-family: 'Courier New', monospace; }
 .inventory-map button[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: -2px; }
 .inventory-map button:focus-visible, .inventory-map select:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .inventory-map-pulse::after { content: ''; position: absolute; inset: 0; background: var(--text); pointer-events: none; animation: inventory-bid-pulse 1800ms ease-out both; }
 .inventory-map-whole, .inventory-map-heading { position: relative; }
 @keyframes inventory-bid-pulse { 0%, 12% { opacity: .24; } 100% { opacity: 0; } }
-.inventory-map-list, .inventory-map-settings { font-size: 11px; margin-top: 8px; }
-.inventory-map-list summary, .inventory-map-settings summary { cursor: pointer; padding: 4px 0; }
+.inventory-map-notes { font-size: 11px; margin-top: 4px; }
+.inventory-map-notes summary { cursor: pointer; padding: 4px 0; }
 .inventory-map-pulse-control { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; padding: 4px 0; }
 .inventory-map-pulse-control > span { color: var(--text-secondary); }
-.inventory-map-list > div, .inventory-map-list-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px; margin-top: 6px; }
+.inventory-map-list, .inventory-map-list-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px; margin-top: 6px; }
 .inventory-map-list-grid { max-height: 420px; overflow-y: auto; }
 .inventory-map-list button, .inventory-map-list-grid button { border: 2px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 12px; text-align: left; }
 .inventory-map-list-grid button { position: relative; }
@@ -60,6 +56,6 @@
   .inventory-map-controls label { flex: 1 1 150px; flex-direction: column; align-items: stretch; gap: 4px; }
   .inventory-map-controls select, .inventory-map-controls button, .inventory-map-pulse-control { min-height: 44px; }
   .inventory-map-roomy > .inventory-map-whole { padding: 12px; }
-  .inventory-map-list > div, .inventory-map-list-grid { grid-template-columns: 1fr; }
+  .inventory-map-list, .inventory-map-list-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .inventory-map-pulse::after { animation: none; opacity: .14; } .inventory-map-group, .inventory-map-child { transition: none; } }
