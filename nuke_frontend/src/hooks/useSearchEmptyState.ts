@@ -51,43 +51,28 @@ export function useSearchEmptyState(enabled: boolean) {
       .order('sale_price', { ascending: false })
       .limit(8);
 
-    // Top makes by count (sample 5000 for speed)
-    const makesQuery = applyNonAutoFilters(
-      supabase
-        .from('vehicles')
-        .select('make')
-        .eq('is_public', true)
-        .not('make', 'is', null)
-        .not('primary_image_url', 'is', null)
-    ).limit(5000);
+    // Makes with their true counts, from the ledger's by-brand view (vehicles with a recorded price), and the
+    // planner's estimate of the public total: neither walks the table, so neither can time out.
+    const makesQuery = supabase.rpc('treemap_by_brand');
+    const countQuery = supabase
+      .from('vehicles')
+      .select('id', { count: 'planned', head: true })
+      .eq('is_public', true);
 
-    // Total count
-    const countQuery = applyNonAutoFilters(
-      supabase
-        .from('vehicles')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-    );
-
-    Promise.all([recentQuery, notableQuery, makesQuery, countQuery]).then(
+    // One slow or failed reader must not blank the others.
+    Promise.allSettled([recentQuery, notableQuery, makesQuery, countQuery]).then(
       ([recentRes, notableRes, makesRes, countRes]) => {
-        if (recentRes.data) setRecentVehicles(recentRes.data as FeaturedVehicle[]);
-        if (notableRes.data) setNotableSales(notableRes.data as FeaturedVehicle[]);
-        if (countRes.count != null) setTotalCount(countRes.count);
-
-        if (makesRes.data) {
-          const counts = new Map<string, number>();
-          for (const row of makesRes.data as { make: string }[]) {
-            const m = row.make;
-            if (m) counts.set(m, (counts.get(m) || 0) + 1);
-          }
-          const sorted = [...counts.entries()]
-            .sort((a, b) => b[1] - a[1])
+        if (recentRes.status === 'fulfilled' && recentRes.value.data) setRecentVehicles(recentRes.value.data as FeaturedVehicle[]);
+        if (notableRes.status === 'fulfilled' && notableRes.value.data) setNotableSales(notableRes.value.data as FeaturedVehicle[]);
+        if (countRes.status === 'fulfilled' && countRes.value.count != null) setTotalCount(countRes.value.count);
+        if (makesRes.status === 'fulfilled' && Array.isArray(makesRes.value.data)) {
+          const sorted = (makesRes.value.data as { name: string; count: number }[])
+            .filter((row) => row.name && row.count > 0)
+            .sort((a, b) => b.count - a.count)
             .slice(0, 12)
-            .map(([make, count]) => ({ make, count }));
+            .map((row) => ({ make: row.name, count: row.count }));
           setTopMakes(sorted);
         }
-
         setLoading(false);
       }
     );
