@@ -10,7 +10,7 @@ function row(id: string, vehicle_id: string | null = null, source_url = 'https:/
 }
 function query(data: unknown[], error: Error | null = null) {
   const q: any = { then: (resolve: any) => Promise.resolve({ data, error }).then(resolve) };
-  for (const name of ['select', 'in', 'eq', 'is', 'or', 'order', 'limit', 'abortSignal']) q[name] = vi.fn(() => q);
+  for (const name of ['select', 'in', 'eq', 'is', 'or', 'order', 'limit', 'abortSignal', 'lt']) q[name] = vi.fn(() => q);
   return q;
 }
 beforeEach(() => fixture.from.mockReset());
@@ -46,5 +46,12 @@ describe('public captured listing boundary', () => {
     for (const url of ['javascript:alert(1)', 'https://craigslist.org.attacker.example/123.html', 'https://user:secret@craigslist.org/123.html']) expect(sourceLink('craigslist', url)).toBeNull();
     expect(sourceLink('facebook_marketplace', 'https://www.facebook.com/messages/123')).toBeNull();
     expect(sourceLink('facebook_marketplace', 'https://www.facebook.com/marketplace/item/123456/')).toContain('/item/123456/');
+  });
+  it('retains records with unknown landing clocks at the end of cursor traversal', async () => {
+    const events = query([{ ...row('unknown-clock'), created_at: null }]); fixture.from.mockReturnValue(events);
+    const result = await readCapturedListings('craigslist', { at: null, id: vehicleId });
+    expect(result.items[0].created_at).toBeNull();
+    expect(events.order).toHaveBeenCalledWith('created_at', { ascending: false, nullsFirst: false });
+    expect(events.is).toHaveBeenCalledWith('created_at', null); expect(events.lt).toHaveBeenCalledWith('id', vehicleId);
   });
 });

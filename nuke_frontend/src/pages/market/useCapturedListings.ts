@@ -4,11 +4,11 @@ import { supabase } from '../../lib/supabase';
 export const LISTING_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl', 'bat', 'cars_and_bids', 'mecum', 'barrettjackson'] as const;
 export const CLASSIFIED_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl'];
 const PAGE_SIZE = 50;
-type Cursor = { at: string; id: string };
+type Cursor = { at: string | null; id: string };
 export type CapturedListing = {
   id: string; vehicle_id: string | null; source_platform: string; source_listing_id: string | null;
   source_url: string | null; current_price: number | null; event_status: string | null;
-  created_at: string; updated_at: string | null;
+  created_at: string | null; updated_at: string | null;
   vehicle: { id: string; year: number | null; make: string | null; model: string | null; primary_image_url?: string | null } | null;
 };
 const SOURCE_HOSTS: Record<string, string> = {
@@ -36,10 +36,11 @@ export async function readCapturedListings(source = 'classifieds', cursor?: Curs
   let query = supabase.from('vehicle_events')
     .select('id,vehicle_id,source_platform,source_listing_id,source_url,current_price,event_status,created_at,updated_at')
     .in('source_platform', source === 'classifieds' ? CLASSIFIED_SOURCES : source ? [source] : [...LISTING_SOURCES])
-    .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(PAGE_SIZE + 1).abortSignal(requestSignal);
+    .order('created_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).limit(PAGE_SIZE + 1).abortSignal(requestSignal);
   if (cursor) {
-    if (!/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.at) || !/^[a-f0-9-]{36}$/i.test(cursor.id)) throw new Error('Invalid cursor');
-    query = query.or(`created_at.lt.${cursor.at},and(created_at.eq.${cursor.at},id.lt.${cursor.id})`);
+    if (cursor.at !== null && !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.at) || !/^[a-f0-9-]{36}$/i.test(cursor.id)) throw new Error('Invalid cursor');
+    query = cursor.at === null ? query.is('created_at', null).lt('id', cursor.id)
+      : query.or(`created_at.lt.${cursor.at},created_at.is.null,and(created_at.eq.${cursor.at},id.lt.${cursor.id})`);
   }
   const { data, error } = await query;
   if (error) throw error;
