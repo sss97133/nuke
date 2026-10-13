@@ -26,10 +26,16 @@ count_rawfetch()  { bash "$GD/no-raw-fetch.sh" 2>/dev/null | grep -cE ':[0-9]+:'
 count_testimony() { node "$GD/no-raw-testimony-insert.mjs" 2>/dev/null | grep -c '^VIOLATION' || true; }
 count_labels()    { node "$GD/no-schema-baked-labels.mjs" --all 2>/dev/null | grep -oE '[0-9]+ baked-label' | grep -oE '^[0-9]+' || echo 0; }
 secrets_ok()      { bash "$GD/no-committed-secrets.sh" >/tmp/ci_sec.out 2>&1; }
+# design-system counts come from one eslint pass (scripts/guardrails/design-violations.mjs); read per rule
+DESIGN_RULES="no-inline-style no-font-props no-hardcoded-colors no-border-radius no-box-shadow no-gradient no-banned-fonts"
+design_prepare() { node "$GD/design-violations.mjs" --json >/tmp/ci_design.json 2>/dev/null || echo '{}' >/tmp/ci_design.json; }
+count_design()    { python3 -c "import json;print(json.load(open('/tmp/ci_design.json')).get('$1',0))" 2>/dev/null || echo 0; }
 
 # --- baseline capture mode ---
 if [ "${CI_WRITE_BASELINE:-0}" = 1 ]; then
   g=$(count_ghost); rf=$(count_rawfetch); ti=$(count_testimony); sl=$(count_labels)
+  design_prepare
+  design_json=$(python3 -c "import json;d=json.load(open('/tmp/ci_design.json'));print(', '.join('\"%s\": %d' % (k, d.get(k,0)) for k in '$DESIGN_RULES'.split()))")
   cat > "$BASE" <<JSON
 {
   "generated": "$(date -u +%F)",
@@ -39,7 +45,8 @@ if [ "${CI_WRITE_BASELINE:-0}" = 1 ]; then
     "no-raw-fetch":             { "violations": $rf, "note": "external fetches bypassing archiveFetch. Burn down opportunistically." },
     "no-raw-testimony-insert":  { "violations": $ti, "note": "raw writes to testimony tables. Should trend to 0." },
     "no-committed-secrets":     { "violations": 0, "note": "HARD zero — any hit blocks regardless of mode." },
-    "no-schema-baked-labels":   { "violations": $sl, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." }
+    "no-schema-baked-labels":   { "violations": $sl, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." },
+    "design-system":            { $design_json, "note": "eslint design-system rules over nuke_frontend/src (src/kit exempt), counted by scripts/guardrails/design-violations.mjs. Each rule ratchets on its own." }
   }
 }
 JSON
@@ -77,6 +84,8 @@ else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat /tmp/c
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"
+design_prepare
+for rule in $DESIGN_RULES; do ratchet "design/$rule" "$(count_design $rule)" "$(b design-system $rule)"; done
 if secrets_ok; then grn "  ✓ secrets clean"; else red "  ✗ SECRET DETECTED"; cat /tmp/ci_sec.out; fail=1; fi
 ylw "  • schema-baked-labels $(count_labels) (advisory, non-blocking)"
 
