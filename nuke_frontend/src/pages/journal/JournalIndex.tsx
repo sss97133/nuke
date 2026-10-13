@@ -57,18 +57,20 @@ export default function JournalIndex() {
     <div style={styles.page}>
       <div style={styles.chrome}>
         <span>NUKE · JOURNAL</span>
-        <span>SUBSTRATE-PROJECTED · LAST 90 DAYS</span>
+        <span>LAST 90 DAYS</span>
       </div>
       <h1 style={styles.header}>JOURNAL</h1>
       <div style={styles.meta}>
-        EACH DATE PROJECTS A SHOP WORK-LOG FROM SUBSTRATE.<br />
-        ATOM-ATTRIBUTED · ARCHIVE-HORIZON COMPLIANT.
+        A DAY OF SHOP WORK AS ITS PHOTOS, RECEIPTS AND PAYMENTS RECORD IT.
       </div>
 
       {loading && <div style={styles.meta}>LOADING…</div>}
       {error && <div style={styles.meta}>ERROR · {error}</div>}
 
-      {!loading && !error && (
+      {!loading && !error && rows.every((r) => r.photo_count === 0 && r.receipt_count === 0 && Number(r.payment_total) === 0 && Number(r.receipt_total) === 0) && (
+        <div style={styles.meta}>NO PUBLIC WORK-LOG ENTRIES IN THE LAST 90 DAYS.</div>
+      )}
+      {!loading && !error && rows.some((r) => r.photo_count > 0 || r.receipt_count > 0 || Number(r.payment_total) > 0 || Number(r.receipt_total) > 0) && (
         <div style={styles.table}>
           {rows.map((r) => {
             const dt = new Date(r.date + "T12:00:00Z");
@@ -97,7 +99,7 @@ export default function JournalIndex() {
       )}
 
       <div style={styles.footer}>
-        SURFACE ADAPTED TO: PUBLIC VIEWER · SUBSTRATE COMPOSED VIA vw_journal_density + project_work_log
+        PUBLIC VIEW · DAYS WITH NO PUBLIC RECORD ARE NOT LISTED
       </div>
     </div>
   );

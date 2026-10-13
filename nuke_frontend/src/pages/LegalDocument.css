@@ -1,0 +1,14 @@
+/* A legal document from public/*.md: kit roles for the type, this file for the spacing. */
+.legal-page { max-width: 760px; margin: 0 auto; }
+.legal-page__body { display: grid; gap: 6px; }
+.legal-page__body p, .legal-page__body ul, .legal-page__body ol { margin: 0; }
+.legal-page__body ul, .legal-page__body ol { padding-left: 18px; display: grid; gap: 3px; }
+.legal-page__body h2 { margin: 10px 0 0; }
+.legal-page__body h3 { margin: 6px 0 0; }
+.legal-page__body hr { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
+.legal-page__body a { color: var(--text); text-decoration: underline; }
+.legal-page__body blockquote { margin: 0; padding-left: 10px; border-left: 2px solid var(--border); }
+.legal-page__table-wrap { overflow-x: auto; }
+.legal-page__body table { border-collapse: collapse; width: 100%; }
+.legal-page__body th, .legal-page__body td { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.legal-page__body th { border-bottom-width: 2px; }

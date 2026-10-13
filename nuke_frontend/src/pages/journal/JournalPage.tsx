@@ -131,7 +131,7 @@ export default function JournalPage() {
     <div style={styles.page}>
       <div style={styles.chrome}>
         <span>NUKE · JOURNAL</span>
-        <span>SURFACE: PUBLIC · SUBSTRATE-PROJECTED</span>
+        <span>PUBLIC VIEW</span>
       </div>
 
       <h1 style={styles.header}>{date}</h1>
@@ -149,7 +149,7 @@ export default function JournalPage() {
 
       {data?.result === "insufficient_substrate" && (
         <div style={styles.empty}>
-          NO SHOP SUBSTRATE RECORDED FOR {date}.<br />
+          NO SHOP WORK IN THE PUBLIC RECORD FOR {date}.<br />
           <span style={styles.meta}>{data.note}</span>
         </div>
       )}
@@ -239,8 +239,7 @@ export default function JournalPage() {
       )}
 
       <div style={styles.footer}>
-        SURFACE ADAPTED TO: PUBLIC VIEWER · ATOM-ATTRIBUTED VIA PROJECTION_EVENT ·{" "}
-        ARCHIVE-HORIZON COMPLIANT (50/500/5000 YR)
+        PUBLIC VIEW · EACH ENTRY IS ATTRIBUTED TO THE PHOTO, RECEIPT OR PAYMENT IT CAME FROM
       </div>
     </div>
   );

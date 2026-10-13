@@ -95,6 +95,8 @@ interface VehicleCardDenseProps {
   showPriceChange?: boolean;
   /** Controls whether price badges/overlays are shown on cards */
   showPriceOverlay?: boolean;
+  /** The coverage grade (A–F) earns its place only when the card is fed the whole record; a six-field card would grade every vehicle E. */
+  showGrade?: boolean;
   /** Controls whether the semi-transparent detail overlay is shown on image */
   showDetailOverlay?: boolean;
   /** Home feed: compact vs info-dense card details */
@@ -184,6 +186,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showSocial = false,
   showPriceChange = false,
   showPriceOverlay = true,
+  showGrade = true,
   showDetailOverlay = true,
   infoDense = false,
   sourceStampUrl,
@@ -1856,7 +1859,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     />
                   ) : null}
                 {/* Vehicle Data Profile Grade (F, E, D, C, B, A, S, SSS) */}
-                {(() => {
+                {showGrade && (() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   if (!tierLabel) return null;
                   const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
