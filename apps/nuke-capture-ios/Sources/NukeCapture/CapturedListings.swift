@@ -149,7 +149,7 @@ struct CapturedListingsView: View {
                     } header: {
                         Text(coverageSentence).font(.system(size: 9, design: .monospaced)).textCase(nil)
                     } footer: {
-                        Text("An asking price is the seller's assertion as retained; a listing's presence is one sighting, not a sale or a current availability.")
+                        Text("A recorded amount is the seller's assertion as retained, in a currency the reader does not record; a listing's presence is one sighting, not a sale or a current availability.")
                     }
                 }
                 .listStyle(.plain)
@@ -197,12 +197,14 @@ struct CapturedListingsView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.headline).font(.subheadline.weight(.semibold)).lineLimit(2)
                 HStack(spacing: 8) {
-                    if let p = row.current_price, p > 0 {
-                        Text(p.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                    // The web's "Recorded amount" column: a bare number and "currency unrecorded";
+                    // the reader retains no currency, so the phone asserts none (CapturedListings.tsx).
+                    if let p = row.current_price, p.isFinite {
+                        Text(Int(p.rounded()).formatted())
                             .font(.system(.footnote, design: .monospaced).weight(.semibold)).monospacedDigit()
-                        Text("asking").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                        Text("recorded amount · currency unrecorded").font(.caption2).foregroundStyle(.secondary)
                     } else {
-                        Text("no price retained").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                        Text("amount unrecorded").font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                     Text(CapturedListings.sourceName(row.source_platform).uppercased())

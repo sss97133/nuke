@@ -90,8 +90,11 @@ struct ExploreView: View {
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "pulse" { return .treemap }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "live" { return .live }
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "listings" { return .listings }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
         #endif
-        return .map
+        // Land where the web Market tab lands: the open board, the one population with a
+        // recorded clock (market_pulse_live). Map, Pulse and Listings stay one tap away.
+        return .live
     }()
     enum LandingMode: Hashable { case metros, treemap, map, live, listings }
 
