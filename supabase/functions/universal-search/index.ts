@@ -547,8 +547,7 @@ Deno.serve(async (req) => {
             vehicles = await directSearch();
           } else {
             // Consume raw candidates before relevance/display filters. This
-            // assumes one ordered reader stream; the live RPC's independent
-            // exact/trigram offsets still need a DB-side branch-boundary fix.
+            // uses the SQL reader's single ordered candidate stream.
             const ranked = useCandidates(data || [], 'ranked').filter((r: any) => (r.relevance || 0) >= 0.85);
             if (ranked.length) {
               const enriched = await publicVehiclesByIds(ranked.map((r: any) => r.id));
