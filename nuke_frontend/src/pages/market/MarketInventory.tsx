@@ -19,5 +19,5 @@ export default function MarketInventory({ onUnavailable }: { onUnavailable?: Rea
   </button>;
   return auctions
     ? <Suspense fallback={<p role="status">Reading auction board…</p>}><MarketPulse onUnavailable={onUnavailable} collection={other} /></Suspense>
-    : <><nav aria-label="Market collection" className="market-collection">{other}</nav><CapturedListings /></>;
+    : <CapturedListings collection={other} />;
 }

@@ -4,6 +4,8 @@ import './kit.css';
 
 type TextProps = {
   role: Role;
+  /** List density: the same role at list size. Only entity and measure have a dense form. */
+  dense?: boolean;
   as?: React.ElementType;
   children: React.ReactNode;
   className?: string;
@@ -13,7 +15,8 @@ type TextProps = {
 };
 
 /** The only way to set type on a page: a role, never a size. Sizes live in kit.css. */
-export function Text({ role, as, children, className, ...rest }: TextProps) {
+export function Text({ role, dense, as, children, className, ...rest }: TextProps) {
   const Tag: React.ElementType = as ?? 'span';
-  return <Tag className={className ? `k-${role} ${className}` : `k-${role}`} {...rest}>{children}</Tag>;
+  const roleClass = dense && (role === 'entity' || role === 'measure') ? `k-${role} k-${role}--dense` : `k-${role}`;
+  return <Tag className={className ? `${roleClass} ${className}` : roleClass} {...rest}>{children}</Tag>;
 }

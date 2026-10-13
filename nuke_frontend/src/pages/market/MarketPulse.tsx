@@ -7,7 +7,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, useMarketPulse, useInventoryTaxonomy, type BidBucket, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -39,11 +39,12 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'newest', label: 'First seen' },
 ];
 
+// Bids are US dollars: Bring a Trailer runs every auction in USD and reports the bid as a dollar amount.
 function bidNumber(n: number | null | undefined, compact = false): string {
   if (n == null) return '—';
-  if (compact && Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (compact && Math.abs(n) >= 10_000) return `${Math.round(n / 1_000)}K`;
-  return `${Math.round(n).toLocaleString('en-US')}`;
+  if (compact && Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (compact && Math.abs(n) >= 10_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
 const left = timeLeft;
@@ -62,9 +63,158 @@ function Countdown({ endsAt, strong }: { endsAt: number; strong?: boolean }) {
   const now = useSecondClock();
   const remaining = endsAt - now;
   return (
-    <span className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
+    <Text role="measure" dense className={strong || remaining < HOUR ? 'market-countdown market-countdown--soon' : 'market-countdown'}>
       {remaining <= 0 ? 'Awaiting result' : left(remaining)}
+    </Text>
+  );
+}
+
+// ---- The building block (docs/schematics/homepage.md): one number placed in its own history ----------------
+// Each earlier week at this weekday and hour is a tick; now is the block; the sentence ranks now among them,
+// counted, never labelled. The page scans every series that has such a history and shows only those at an edge.
+
+function pctChange(now: number, before: number): number | null {
+  return before > 0 ? ((now - before) / before) * 100 : null;
+}
+
+function signed(pct: number): string {
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+}
+
+function rankOf(value: number, readings: { v: number }[]): { below: number; above: number; n: number; text: string | null } {
+  const n = readings.length;
+  const below = readings.filter((r) => value > r.v).length;
+  const above = readings.filter((r) => value < r.v).length;
+  const text = n === 0 ? null
+    : below === n ? `higher than all ${n}`
+    : above === n ? `lower than all ${n}`
+    : below >= above ? `higher than ${below} of ${n}` : `lower than ${above} of ${n}`;
+  return { below, above, n, text };
+}
+
+function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number }) {
+  const lo = Math.min(value, ...readings.map((r) => r.v));
+  const hi = Math.max(value, ...readings.map((r) => r.v));
+  const span = hi - lo;
+  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5) * 160;
+  const { n, text: rank } = rankOf(value, readings);
+  return (
+    <span className="market-range">
+      <Text role="label">Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</Text>
+      <Text role="measure" dense>{fmt(lo, true)}</Text>
+      <svg className="market-range__bar" viewBox="0 0 160 12" width="160" height="12" aria-hidden="true">
+        <rect className="market-range__track" x="0" y="5" width="160" height="2" />
+        {readings.map((r) => <rect key={r.day} className="market-range__tick" x={x(r.v) - 1} y="2" width="2" height="8"><title>{`${r.day}: ${fmt(r.v)}`}</title></rect>)}
+        <rect className="market-range__now" x={x(value) - 3} y="0" width="6" height="12"><title>{`Now: ${fmt(value)}`}</title></rect>
+      </svg>
+      <Text role="measure" dense>{fmt(hi, true)}</Text>
+      {rank && <Text role="label" className="market-range__verdict">{rank} {weekdayUtc}s at this hour</Text>}
     </span>
+  );
+}
+
+interface Series {
+  key: string;
+  what: string; // what is measured
+  set: string; // the comparison set
+  value: number; // now
+  readings: { day: string; v: number }[]; // the same weekday and hour in earlier weeks
+  fmt: (n: number, compact?: boolean) => string;
+}
+
+interface Edge extends Series { depth: number; beyond: number }
+
+const EDGE_MIN_READINGS = 6;
+const EDGE_MAX = 6;
+const MAKE_MIN_AUCTIONS = 5;
+
+function count(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function edgeOf(s: Series): Edge | null {
+  const { below, above, n } = rankOf(s.value, s.readings);
+  if (n < EDGE_MIN_READINGS) return null;
+  const top = below >= n - 1;
+  const bottom = above >= n - 1;
+  if (!top && !bottom) return null;
+  const vs = s.readings.map((r) => r.v);
+  const lo = Math.min(...vs);
+  const hi = Math.max(...vs);
+  const span = hi - lo || Math.abs(hi) || 1;
+  // depth 0 = beyond every reading, 1 = beyond all but one; beyond = how far past the far end, in spans.
+  return { ...s, depth: n - Math.max(below, above), beyond: top ? (s.value - hi) / span : (lo - s.value) / span };
+}
+
+// Series: the whole board's current bids, auctions with a bid, and bid per auction; and, once 6 weeks of live
+// readings carry them, the same per make.
+export function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
+  const bidded = live.filter((a) => a.currentBid != null);
+  const bids = bidded.reduce((s, a) => s + (a.currentBid ?? 0), 0);
+  const withN = readings.filter((r) => r.n != null && (r.n as number) > 0);
+  const out: Series[] = [
+    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: bidNumber },
+    { key: 'n', what: 'Auctions with a bid', set: 'all live BaT auctions', value: bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.n as number })), fmt: count },
+  ];
+  if (bidded.length > 0) {
+    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => bidNumber(v) });
+  }
+  const byMake = readings.filter((r) => r.byMake != null);
+  if (byMake.length >= EDGE_MIN_READINGS) {
+    const now = new Map<string, [number, number]>();
+    for (const a of bidded) {
+      const m = now.get(a.make) ?? [0, 0];
+      now.set(a.make, [m[0] + (a.currentBid ?? 0), m[1] + 1]);
+    }
+    const makes = new Set([...now.keys(), ...byMake.flatMap((r) => Object.keys(r.byMake as object))]);
+    for (const make of makes) {
+      if (make === NO_MAKE) continue;
+      const past = byMake.map((r) => ({ day: r.day, bm: (r.byMake as Record<string, [number, number]>)[make] ?? [0, 0] }));
+      const cur = now.get(make) ?? [0, 0];
+      if (Math.max(cur[1], ...past.map((p) => p.bm[1])) < MAKE_MIN_AUCTIONS) continue;
+      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: bidNumber });
+      out.push({ key: `n:${make}`, what: `${make} · auctions with a bid`, set: `live BaT auctions of ${make}`, value: cur[1], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[1]) })), fmt: count });
+    }
+  }
+  return out;
+}
+
+function shortDay(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+// Only what is at an edge of its own history earns a strip here; the board's own reading always sits in the masthead.
+function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string> }) {
+  const edges = useMemo(
+    () => series.map(edgeOf).filter((e): e is Edge => e != null).sort((a, b) => a.depth - b.depth || b.beyond - a.beyond).slice(0, EDGE_MAX),
+    [series]
+  );
+  if (edges.length === 0) return null;
+  return (
+    <section className="market-edges" aria-label="Edges of the board's own history">
+      <div className="market-edges__head">
+        <Text role="label">Top or bottom 2 of its own history now · {edges.length} of {series.length} series, each against its own readings at {hourUtc}:00 UTC on earlier {weekdayUtc}s</Text>
+      </div>
+      {edges.map((e) => {
+        const weeks = Math.round((Date.now() - Date.parse(`${e.readings[0].day}T00:00:00Z`)) / (7 * DAY));
+        const rebuilt = e.readings.filter((r) => archiveDays.has(r.day)).length;
+        return (
+          <div key={e.key} className="market-edge">
+            <div className="market-edge__head">
+              <Text role="entity" dense>{e.what}</Text>
+              <Text role="measure" dense>{e.fmt(e.value)}</Text>
+              <Text role="label">now</Text>
+            </div>
+            <RangeBar value={e.value} readings={e.readings} fmt={e.fmt} weekdayUtc={weekdayUtc} weeks={weeks} />
+            <Text role="caption" as="div">
+              Window: {hourUtc}:00 UTC on {weekdayUtc}s, {shortDay(e.readings[0].day)} to {shortDay(e.readings[e.readings.length - 1].day)}, and now.
+              {' '}Count: {e.readings.length} readings.
+              {' '}Set: {e.set} (BAT-LIVE-BIDS index, read hourly from the live board{rebuilt ? `; ${rebuilt} of the readings rebuilt from BaT bid history, 96% of auctions` : ''}).
+            </Text>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -79,12 +229,12 @@ const STALE_MS = 45 * 60_000;
 
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
-    <span
+    <Text role="measure" dense
       title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       className={`market-bid${risen ? ' market-bid--risen' : stale ? ' market-bid--stale' : ''}`}
     >
       {bidNumber(auction.currentBid)}
-    </span>
+    </Text>
   );
 }
 
@@ -118,7 +268,7 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
   return (
     <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
       <div className="market-lot-close">
-        <span className="market-lot-label">Closes in</span>
+        <Text role="label">Closes in</Text>
         <Countdown endsAt={a.endsAt} />
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
@@ -127,25 +277,25 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
       </button>
       <div className="market-lot-identity">
         <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
-          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>{title(a)}</button>
+          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity" dense>{title(a)}</Text></button>
         <div className="market-lot-facts">
           {facts.map(f => <button type="button" key={f.field} onClick={() => onInspect(a, 'vehicle')}
             title={`${f.label}: ${f.value}${f.conflict ? ' · differing reports' : ''}`}
             aria-label={`Inspect ${f.label.toLowerCase()} for ${title(a)}: ${f.value}${f.conflict ? ', differing reports' : ''}`}>
-            {f.value}{f.conflict && <span aria-hidden="true"> †</span>}
+            <Text role="body">{f.value}{f.conflict && <span aria-hidden="true"> †</span>}</Text>
           </button>)}
-          {!facts.length && specs.isError && <span>Specifications unavailable</span>}
+          {!facts.length && specs.isError && <Text role="caption">Specifications unavailable</Text>}
         </div>
         <div className="market-lot-context">
-          {detail?.location && <span>{detail.location}</span>}
-          {a.noReserve && <span>No reserve</span>}
-          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}>Source: BaT</button>
+          {detail?.location && <Text role="caption">{detail.location}</Text>}
+          {a.noReserve && <Text role="caption">No reserve</Text>}
+          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}><Text role="caption">Source: BaT</Text></button>
         </div>
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
-          fallback={<span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
+          fallback={<span><Text role="label">Recorded bid</Text><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
       </button>
     </div>
   );
@@ -265,6 +415,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
+    if (key === 'view' && value === 'sales' && (!next.get('make') || next.get('make') === 'all') && largestMake) next.set('make', largestMake);
     if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
     next.delete('lot');
     setParams(next, { replace: key === 'live' || key === 'bidRange' || key === 'sort', preventScrollReset: true });
@@ -317,6 +468,23 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
   const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
+  const todayUtc = new Date(now).toISOString().slice(0, 10);
+  const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
+  const edgeInput = useMemo(() => data?.sameHour && sameHour.data ? edgeSeries(live, sameHour.data) : [], [data?.sameHour, sameHour.data, live]);
+  const archiveDays = useMemo(() => new Set((sameHour.data ?? []).filter((r) => r.source === 'archive').map((r) => r.day)), [sameHour.data]);
+  const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
+  const cohortBids = useMemo(() => cohort.reduce((s, a) => s + (a.currentBid ?? 0), 0), [cohort]);
+  const boardReadings = useMemo(() => (sameHour.data ?? []).flatMap((r) => {
+    if (make == null) return [{ day: r.day, v: r.bids }];
+    const bm = r.byMake?.[make];
+    return bm ? [{ day: r.day, v: Number(bm[0]) }] : [];
+  }), [sameHour.data, make]);
+  // The largest open cohort opens the recorded-sales view when no make is chosen, so the view never opens empty.
+  const largestMake = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
+    return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
+  }, [live]);
   // The board has no bound currency contract: no monetary heat, no hot/cold verdicts, until units can be matched.
   const figures = useMemo(() => {
     const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0 };
@@ -366,14 +534,25 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   // The page as a document: the population is the entity, its count the headline result, and the scope strip
   // carries the view, the cohort and the coverage of the cohort within the captured population.
+  const weekAgoPct = data?.weekAgo && make == null ? pctChange(liveBids, data.weekAgo.bids) : null;
   const masthead = (
     <Masthead result={view === 'inventory' ? <>
-      <Text role="measure" as="div">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text>
+      <div className="market-masthead__count"><Text role="measure">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text> <Text role="label">open lots</Text></div>
       {data?.syncedAt != null && <Text role="caption" as="div" title={data.source}>recorded {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}</Text>}
+      {data?.weekAgo && weekAgoPct != null && <Text role="caption" as="div" title={`${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)} a week ago${data.weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+        vs same time last week {data.weekAgo.source === 'archive' ? '≈' : ''}{signed(weekAgoPct)} from {bidNumber(data.weekAgo.bids, true)}</Text>}
     </> : undefined}>
-      <Text role="entity" as="h1">{view === 'inventory' ? 'Open lots' : 'Recorded sales'}</Text>
+      <Text role="entity" as="h1">{view !== 'inventory' ? 'Recorded sales' : isLoading || cohortBids <= 0 ? 'Open lots' : `${bidNumber(cohortBids, true)} on the board${make ? ` · ${make}` : ''}`}</Text>
     </Masthead>
   );
+  // The board's own reading in its own history, always: the owner's building block (docs/schematics/homepage.md).
+  const boardStrip = view === 'inventory' && data?.sameHour && boardReadings.length > 0 ? (
+    <div className="k-section market-pulse-strip" role="group" aria-label="The board in its own history">
+      <RangeBar value={cohortBids} readings={boardReadings} fmt={bidNumber} weekdayUtc={data.sameHour.weekdayUtc}
+        weeks={Math.max(boardReadings.length, Math.round((Date.now() - Date.parse(`${boardReadings[0].day}T00:00:00Z`)) / (7 * DAY)))} />
+      <Text role="caption" as="div">Current bids{make ? ` on ${make} lots` : ''} at {data.sameHour.hourUtc}:00 UTC on earlier {data.sameHour.weekdayUtc}s · {boardReadings.length} readings · BAT-LIVE-BIDS index, read hourly from the live board.</Text>
+    </div>
+  ) : null;
   const scope = (
     <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
       <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
@@ -392,6 +571,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   return (
     <div className="market-explorer">
       {masthead}
+      {boardStrip}
 
       {view === 'inventory' && isError && data && <div role="status" className="market-status">Refresh failed. Showing the last fetched board. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry</Text></button></div>}
 
@@ -399,6 +579,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
 
       {scope}
+
+      {view === 'inventory' && data?.sameHour && edgeInput.length > 0 &&
+        <EdgeStrips series={edgeInput} hourUtc={data.sameHour.hourUtc} weekdayUtc={data.sameHour.weekdayUtc} archiveDays={archiveDays} />}
 
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 
@@ -424,7 +607,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       </div>
 
       {!isLoading && <details open={selectedBid != null} className="market-distribution">
-        <summary><Text role="label">Filter live lots by recorded bid number · currency unverified</Text></summary>
+        <summary><Text role="label">Filter live lots by current bid</Text></summary>
         <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
       </details>}
 
@@ -440,7 +623,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       <section className="market-board__frame">
         <div className="market-board__head">
           <Text role="caption">
-            {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`} · source bid units unverified
+            {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`}
             {make ? ` · ${make}` : ''}
             {model ? ` · recorded model ${model}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
@@ -478,7 +661,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
       {view === 'inventory' && data?.source && (
         <Text role="caption" as="p" className="market-source">
-          Source: {data.source}. Current bid is a recorded listing number; its unit and freshness need source evidence. Monetary totals, medians and hot/cold comparisons are withheld until currencies can be matched.
+          Source: {data.source}. Bids are US dollars as Bring a Trailer records them; a bid's freshness is the record's last write, shown beside it.
         </Text>
       )}
     </div>
@@ -512,12 +695,12 @@ function BidDistribution({ distribution, lots, scope, selected, onSelect, fetche
         })}
       </div>
       <Text role="caption" as="div" className="market-distribution__note">
-        Recorded bid numbers · source currency unknown · ranges group raw numbers, not comparable monetary values. Choose a range to see its lots.
+        Current bids in US dollars as recorded. Choose a range to see its lots.
       </Text>
       <details className="market-notes">
         <summary><Text role="label">Scope, source and timing</Text></summary>
         <p className="k-body">One public, undeleted vehicle record marked live on Bring a Trailer with a recorded end in the future. Make and auction-window filters define this distribution; selecting a bid range narrows the supporting list. Each bar counts lots, including unrecorded bids in the denominator. A recorded zero stays zero.</p>
-        <p className="k-body">These are recorded listing numbers, not sold prices or a valuation. Their source currencies are unknown, so monetary aggregates and comparison tags are withheld. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
+        <p className="k-body">These are current bids, not sold prices or a valuation. Condition, restoration and build class are not matched. Open a lot's Nuke record for evidence or its BaT link for the attributed listing.</p>
         <p className="k-body">Board fetched {clock(fetchedAt)}. Latest record write is a vehicle-row update by any writer. Source read time and bid event time are unavailable in the full board reader; the bounded Ending next panel exposes captured source clocks separately. BaT's board is scheduled to be read every 15 minutes; that schedule does not prove freshness.</p>
       </details>
     </section>

@@ -10,6 +10,16 @@
 .k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }
 .k-label   { font: 700 8px/1.4 Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
 
+/* Density: the same role at list size, for rows. Only entity and measure have a dense form;
+   body, caption and label are already list sizes. */
+.k-entity--dense  { font: 700 13px/1.2 Arial, sans-serif; letter-spacing: -0.01em; }
+.k-measure--dense { font: 700 12px/1.2 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+
+/* src/styles/tailwind-design-system-overrides.css sets `* { font-family: Arial !important }` for the whole app, so the
+   two Courier roles state their family with the same force; a class outranks the universal selector among !important rules.
+   Measured 2026-10-13: without this, every measure and caption on nuke.ag computed to Arial. */
+.k-measure, .k-caption { font-family: 'Courier New', monospace !important; }
+
 /* Containers. 2 px frames a section; 1 px rules the rows inside it. */
 .k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }
 .k-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
