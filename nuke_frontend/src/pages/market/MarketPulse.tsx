@@ -1,8 +1,8 @@
 import React, { createContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
-import { defaultRangeExtractor, useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { Text } from '../../kit';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
@@ -469,20 +469,35 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   );
 }
 
-// The virtualizer measures expanded rows; these are estimates for closed rows.
-const ROW_H = 110;
-const ROW_H_NARROW = 154;
+// A row reads its specifications once the viewer reaches it, never for every row on the page at once.
+function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || seen) return;
+    if (typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setSeen(true); io.disconnect(); }
+    }, { rootMargin: '200px 0px' });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [seen]);
+  return [ref, seen];
+}
 
-function BoardRow({ a, risen, stale, detail, visible, expanded, onInspect }: {
-  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; visible: boolean; expanded: boolean;
+function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean;
   onInspect: (a: LiveAuction, view: LotInspection) => void;
 }) {
-  const specs = useMarketRowSpecs(a.id, visible && !!detail);
+  const [rowRef, seen] = useSeen<HTMLDivElement>();
+  const reached = (seen || expanded) && !!detail;
+  const specs = useMarketRowSpecs(a.id, reached);
   const facts = selectRowFacts(specs.data ?? [], title(a));
   const bidReading = detail?.currentBid != null ? { ...a, currentBid: detail.currentBid,
     updatedAt: detail.recordedAt ? Date.parse(detail.recordedAt) : a.updatedAt } : a;
   return (
-    <div className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
+    <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
       <div className="market-lot-close">
         <span className="market-lot-label">Closes in</span>
         <Countdown endsAt={a.endsAt} />
@@ -510,63 +525,38 @@ function BoardRow({ a, risen, stale, detail, visible, expanded, onInspect }: {
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
-        <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={visible && !!detail}
+        <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
           fallback={<span><span className="market-lot-label">Recorded bid</span><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
       </button>
     </div>
   );
 }
 
-// Every row stays reachable by scrolling; only the ones near the viewport are in the DOM.
-function Board({ rows, risenIds, narrow, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
-  rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; activityId: string | null;
+// The board is read a page at a time: PAGE lots, named in the URL (board=n), so a page is a link and the
+// document never grows past one page. A shared link to a lot opens the page that holds it.
+export const PAGE = 24;
+
+function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null;
   inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
 }) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState(0);
+  const details = useMarketRowDetails(rows);
+  const arrival = useRef(activityId);
   useLayoutEffect(() => {
-    const measure = () => {
-      if (listRef.current) setOffset(listRef.current.getBoundingClientRect().top + window.scrollY);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(document.body);
-    return () => ro.disconnect();
-  }, []);
-  const rowH = narrow ? ROW_H_NARROW : ROW_H;
-  const selectedIndex = rows.findIndex(a => a.id === activityId);
-  const initialSelection = useRef(activityId);
-  const v = useWindowVirtualizer({ count: rows.length, estimateSize: () => rowH, overscan: 3, scrollMargin: offset, scrollPaddingStart: 64,
-    getItemKey: index => rows[index].id,
-    rangeExtractor: range => Array.from(new Set([...defaultRangeExtractor(range), ...(selectedIndex >= 0 ? [selectedIndex] : [])])).sort((a, b) => a - b),
-  });
-  useLayoutEffect(() => {
-    if (initialSelection.current === activityId && activityId && selectedIndex >= 0 && offset > 0) {
-      v.scrollToIndex(selectedIndex, { align: 'start' });
-      initialSelection.current = null;
-    }
-  }, [activityId, selectedIndex, offset, v]);
-  const items = v.getVirtualItems();
-  // Metadata is batched by stable 24-row pages; scrolling does not launch one request per cell.
-  const firstVisible = v.range?.startIndex ?? items[0]?.index ?? 0;
-  const pageStart = Math.floor(firstVisible / 24) * 24;
-  const page = rows.slice(pageStart, pageStart + 24);
-  const nextPage = rows.slice(pageStart + 24, pageStart + 48);
-  const details = useMarketRowDetails(page);
-  const following = useMarketRowDetails(items.some(i => i.index >= pageStart + 24) ? nextPage : []);
-  const selected = useMarketRowDetails(selectedIndex >= 0 && (selectedIndex < pageStart || selectedIndex >= pageStart + 48) ? [rows[selectedIndex]] : []);
+    // Arriving on a link to a lot puts that row at the top of the viewport.
+    if (!arrival.current || arrival.current !== activityId) return;
+    document.querySelector(`[data-vehicle-id="${activityId}"]`)?.scrollIntoView({ block: 'start' });
+    arrival.current = null;
+  }, [activityId]);
   return (
-    <div ref={listRef} style={{ height: v.getTotalSize(), position: 'relative' }}>
-      {items.map((item) => {
-        const a = rows[item.index];
-        const detail = details.data?.get(a.id) ?? following.data?.get(a.id) ?? selected.data?.get(a.id);
+    <div className="market-board-rows">
+      {rows.map((a) => {
+        const detail = details.data?.get(a.id);
         const expanded = a.id === activityId;
         return (
-          <div key={a.id} data-index={item.index} ref={v.measureElement} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail}
-              visible={expanded || (item.index >= firstVisible && item.index <= (v.range?.endIndex ?? firstVisible + 12))}
-              expanded={expanded} onInspect={onInspect} />
+          <div key={a.id}>
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} onInspect={onInspect} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -623,7 +613,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const openActivity = (auction: LiveAuction, view: LotInspection) => {
     const next = new URLSearchParams(params);
     if (activityId === auction.id && inspection === view) { next.delete('lot'); next.delete('inspect'); }
-    else { setPinnedAuction(auction); next.set('lot', auction.id); next.set('inspect', view); }
+    else { setPinnedAuction(auction); next.set('lot', auction.id); next.set('inspect', view); next.delete('board'); }
     setParams(next, { preventScrollReset: true });
   };
   const setInspection = (view: LotInspection) => {
@@ -653,6 +643,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     else if (value == null) next.delete(key);
     else next.set(key, value);
     if (key === 'live' || (key === 'make' && value != null) || key === 'bidRange') next.set('board', '1');
+    else if (key !== 'board') next.delete('board');
     if (key === 'live' || key === 'make') next.delete('bidRange');
     if (key === 'make' || key === 'view') {
       next.delete('model');
@@ -668,7 +659,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
+    ['model', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
@@ -680,7 +671,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       const value = change[key];
       if (value == null) next.delete(keys[key]); else next.set(keys[key], value);
     }
-    next.delete('lot'); setParams(next, { preventScrollReset: true });
+    next.delete('lot'); next.delete('board'); setParams(next, { preventScrollReset: true });
   };
   const selectMapGroup = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false) => {
     if (dimension === 'lot') { mapInspection.current = group.lots[0].id; openActivity(group.lots[0], 'auction'); return; }
@@ -752,6 +743,18 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     return rows;
   }, [scoped, selectedBid, sort, heat, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
 
+  // One page of the board. A link to a lot opens its page; a filter change returns to the first page.
+  const pages = Math.max(1, Math.ceil(board.length / PAGE));
+  const boardParam = Number(params.get('board'));
+  const selectedIndex = activityId ? board.findIndex(a => a.id === activityId) : -1;
+  const page = Number.isInteger(boardParam) && boardParam >= 1 ? Math.min(boardParam, pages)
+    : selectedIndex >= 0 ? Math.floor(selectedIndex / PAGE) + 1 : 1;
+  const pageRows = useMemo(() => board.slice((page - 1) * PAGE, page * PAGE), [board, page]);
+  const goToPage = (n: number) => {
+    setParam('board', String(n));
+    requestAnimationFrame(() => boardRef.current?.scrollIntoView({ block: 'start' }));
+  };
+
   if (!data && isError && view === 'inventory' && !activityId) return <>
     <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
     <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
@@ -775,7 +778,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
 
-      {activityId && (view !== 'inventory' || !board.some(a => a.id === activityId)) &&
+      {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
 
       <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
@@ -824,7 +827,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </div>
 
 
-      <div ref={boardRef} tabIndex={-1} aria-label="Supporting live lots">
+      <div ref={boardRef} tabIndex={-1} className="market-board" aria-label="Supporting live lots">
       <section style={{ border: '2px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>
           <span style={label}>
@@ -862,8 +865,15 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}>Clear market filters</button></div>}
-        {isLoading || mapFilterPending ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind}
+        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind}
           activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
+        {!isLoading && !mapFilterPending && board.length > 0 && (
+          <nav className="market-board-pager" aria-label="Board pages">
+            <Text role="caption">{`${((page - 1) * PAGE + 1).toLocaleString('en-US')}–${Math.min(page * PAGE, board.length).toLocaleString('en-US')} of ${board.length.toLocaleString('en-US')} lots`}</Text>
+            {page > 1 && <button type="button" className="market-board-page" aria-label={`Previous ${PAGE} lots`} onClick={() => goToPage(page - 1)}><Text role="label">← Previous {PAGE}</Text></button>}
+            {page < pages && <button type="button" className="market-board-page" aria-label={`Next ${PAGE} lots`} onClick={() => goToPage(page + 1)}><Text role="label">Next {PAGE} →</Text></button>}
+          </nav>
+        )}
       </section>
       </div>
       </>}
