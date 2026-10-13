@@ -392,6 +392,16 @@ describe('the board in its own history', () => {
     expect(container.querySelector('[aria-label="The board in its own history"]')?.textContent).toContain('lower than 4 of 7 Saturdays');
     expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
   });
+  it('opens a chosen brand on its decades, and a decade box on its cars', async () => {
+    fixture.pulse.data.auctions[0].year = 1995;
+    await render('make=PORSCHE');
+    expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('era');
+    expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('lot');
+    const nineties = container.querySelector('[data-map-group="1990–1999"]')!;
+    expect(nineties.querySelector('[data-map-lot="later"]')).toBeTruthy();
+    await act(async () => nineties.querySelector<HTMLButtonElement>('[data-map-lot="later"]')!.click());
+    expect(window.location.search).toContain('lot=later');
+  });
   it('opens recorded sales on the largest open cohort instead of an empty form', async () => {
     await render();
     await click('Use recorded sales view');

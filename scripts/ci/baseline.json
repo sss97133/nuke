@@ -7,6 +7,6 @@
     "no-raw-testimony-insert":  { "violations": 2, "note": "raw writes to testimony tables. Should trend to 0." },
     "no-committed-secrets":     { "violations": 0, "note": "HARD zero — any hit blocks regardless of mode." },
     "no-schema-baked-labels":   { "violations": 284, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." },
-    "design-system":            { "no-inline-style": 19969, "no-font-props": 18296, "no-hardcoded-colors": 1338, "no-border-radius": 37, "no-box-shadow": 4, "no-gradient": 2, "no-banned-fonts": 135, "note": "eslint design-system rules over nuke_frontend/src (src/kit exempt), counted by scripts/guardrails/design-violations.mjs, seeded 2026-10-12. Each rule ratchets on its own: lower it as pages move onto the kit, never raise it." }
+    "design-system":            { "no-inline-style": 19967, "no-font-props": 18292, "no-hardcoded-colors": 1338, "no-border-radius": 37, "no-box-shadow": 4, "no-gradient": 2, "no-banned-fonts": 135, "note": "eslint design-system rules over nuke_frontend/src (src/kit exempt), counted by scripts/guardrails/design-violations.mjs, seeded 2026-10-12. Each rule ratchets on its own: lower it as pages move onto the kit, never raise it." }
   }
 }

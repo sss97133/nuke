@@ -24,7 +24,8 @@ export function mapLens(params: URLSearchParams, make: string | null): Inventory
   const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'era' : 'make');
   // A brand box shows its decades unless the viewer chooses otherwise: a readable cut of the brand's open lots
   // (recorded models on BaT are too fine-grained to label inside a box: 104 models for 155 Porsche lots).
-  const inside = (['none', 'make', 'model', 'year', 'era', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'era' : 'none');
+  // A decade box inside a chosen brand shows the cars themselves, each a door to its record.
+  const inside = (['none', 'make', 'model', 'year', 'era', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'era' : group === 'era' && make ? 'lot' : 'none');
   return { group, inside, focus: params.get('mapFocus'), child: inside === 'none' ? null : params.get('mapChild') };
 }
 

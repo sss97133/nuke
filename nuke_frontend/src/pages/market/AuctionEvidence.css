@@ -173,6 +173,7 @@
 .market-edge__head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .market-range { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .market-range__bar { width: 160px; height: 12px; display: block; }
+.market-pulse-strip .market-range__bar { width: min(420px, 60vw); }
 .market-range__track { fill: var(--border); }
 .market-range__tick { fill: var(--text-secondary); }
 .market-range__now { fill: var(--text); }
