@@ -970,6 +970,36 @@ requires versioned public capability specifications, automated population reconc
 quality evidence, anonymous end-to-end assays and dated before/after ready counts. Existing source,
 privacy and operational holds remain. Preserve older field/capture metrics as dated diagnostics.
 
+### Executable public inventory acceptance matrix, prepared 2026-10-13
+
+The owner clarified that Facebook is one source in the broader goal: Nuke should replace daily
+listing rounds. Extend the existing public-reader assay through
+`bash scripts/check-ingestion-health.sh --public-readers --acceptance-matrix /private/manifest.json --out /private/new-matrix.json`.
+The versioned `public_inventory_acceptance_v1` input contains `population`, `assessments`, `targets`
+and `targetPlanComplete`. It compiles public find/open, attributed inspection and one-inventory
+contracts, including original source evidence, new/change/repeat membership, clocks, asking-price
+units, collection gaps and history. Existing owners include HomePage/MarketPulse, Search/useSearchPage,
+`universal-search`, VehicleProfile and provenance readers; routes are candidate owners, not runtime passes.
+
+Gate declarations need matching subject/capability/gate receipts and qualified method/clock/digest
+metadata. Public delivery requires anonymous runtime evidence; source fidelity and semantic quality
+require independent review. Missing objectives, missing measured service/freshness metrics, private or
+fixture delivery, future/wrong-scope receipts and unresolved gates cannot pass. Held or underspecified
+source/channel/region/query/cadence/depth targets remain blocked or not assessed. Configured targets do
+not establish enumeration, capture or revisit coverage. Failed reader/source gates retain reason codes.
+
+This compiler has no network, writer, source activation or inference. Private output is exclusive-create,
+with input and assay hashes. It classifies supplied declarations; it does not independently validate
+those receipts, produce a fleet readiness percentage, certify a release or grant public access. A
+complete explicit manifest must reconcile its declared pair count; mixed capabilities are reported
+separately, with no averaged readiness score. The first executed private matrix contains declared
+capabilities and known source-scope blockers, not a population census or newly modeled records.
+
+Focused offline failure/scope contracts passed before publication. Delivery and actual public-reader
+acceptance remain separate stages. Next: bind the required gates to existing actual reader/quality
+assays and reconcile retained populations; resolve the public inventory gap without counting private
+Facebook history or isolated ingestion success as one-place public usability.
+
 ### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
 
 | Question | Where | What it establishes |

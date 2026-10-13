@@ -5,6 +5,10 @@
  * No counts over the store, raw testimony reconstruction, intake, writes or inference.
  * Example: bash scripts/check-ingestion-health.sh --public-readers --env /private/env
  *   --out /private/new-receipt.jsonl --until 2026-10-05T13:28:04Z --scope sold
+ * Offline contract/source-target matrix (no network or environment): same command with
+ *   --acceptance-matrix /private/manifest.json --out /private/new-matrix.json
+ * Schema public_inventory_acceptance_v1: population, assessments[], targets[], targetPlanComplete.
+ * Compiles supplied gate receipts; does not independently verify them or measure fleet readiness.
  */
 import { open, realpath, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -868,10 +872,167 @@ export async function runCoverage(client, o, { now = Date.now, emit = async () =
   return report;
 }
 
+// Versioned acceptance compiler, not a new reader, collector or launch certificate.
+// Gate inputs are declared assay receipts; this mode performs no network requests.
+const MATRIX_VERSION = 'public_inventory_acceptance_v1';
+const COMMON_GATES = ['evidence', 'identity_context', 'public_delivery', 'source_fidelity', 'semantic_quality', 'refusal_controls', 'freshness', 'service'];
+export const PUBLIC_ACCEPTANCE = Object.freeze([
+  { id: 'find_open', question: 'Can I find an example and open the correct record in Nuke?',
+    grain: 'public_vehicle_record', eligibility: 'public, undeleted vehicle records; missing identity remains eligible',
+    routes: ['/search', '/vehicle/:vehicleId'], owners: ['Search', 'useSearchPage', 'universal-search', 'VehicleProfile'],
+    requirements: ['supported identity facets', 'stable public record key', 'search-to-detail navigation'], gates: COMMON_GATES },
+  { id: 'attributed_inspection', question: 'What supports this example identity, configuration and condition?',
+    grain: 'public_record_question', eligibility: 'applicable public record/question pairs, including missing evidence',
+    routes: ['/vehicle/:vehicleId', '/vehicle/:vehicleId/observation/:obsId'],
+    owners: ['VehicleProfile', 'get_vehicle_specs', 'get_field_provenance'],
+    requirements: ['source witness', 'claim versus interpretation', 'configuration context and units', 'visible disagreement and unknowns'],
+    gates: [...COMMON_GATES, 'configuration_context', 'units_conflicts'] },
+  { id: 'one_inventory', question: 'Can Nuke replace my source rounds with new, changed and repeated listings?',
+    grain: 'public_presentation_question', eligibility: 'publicly eligible source presentations, including unresolved assets and single sightings',
+    routes: ['/?tab=market', '/search', '/vehicle/:vehicleId'],
+    owners: ['HomePage/MarketPulse', 'Search/useSearchPage', 'universal-search', 'listing_feeds', 'public-reader-coverage'],
+    requirements: ['original source evidence', 'listing versus asset identity', 'new/change/repeat membership',
+      'asking price and unit witnesses', 'source and processing clocks', 'freshness and collection gaps', 'history without outbound source rounds'],
+    gates: [...COMMON_GATES, 'presentation_identity', 'new_change_repeat', 'episode_clocks', 'price_units', 'collection_gaps', 'historical_cutoff'],
+    knownBoundary: 'FacebookListingHistory/db-stats listing_history is a private bounded diagnostic, not this public inventory' },
+].map(c => Object.freeze({ ...c, routes: Object.freeze(c.routes), owners: Object.freeze(c.owners),
+  requirements: Object.freeze(c.requirements), gates: Object.freeze(c.gates) })));
+const MATRIX_KEY = /^[a-z0-9_.:-]{1,100}$/;
+const matrixKey = v => typeof v === 'string' && MATRIX_KEY.test(v);
+const BASIS = new Set(['anonymous_runtime', 'deterministic_population_assay', 'independent_review']);
+const reasonKey = v => typeof v === 'string' && /^[a-z0-9_]{1,80}$/.test(v);
+const count = v => Number.isSafeInteger(v) && v >= 0;
+const realClock = v => typeof v === 'string' && Number.isFinite(Date.parse(v));
+
+export function acceptanceMatrix(input, now = Date.now()) {
+  if (!object(input) || input.schemaVersion !== MATRIX_VERSION || !object(input.population) ||
+    !matrixKey(input.population.key) || !['explicit_manifest', 'exhausted_manifest'].includes(input.population.kind) ||
+    !realClock(input.population.measuredAt) || Date.parse(input.population.measuredAt) > now ||
+    !Array.isArray(input.assessments) || input.assessments.length > 2000 ||
+    !Array.isArray(input.targets) || input.targets.length > 200 || typeof input.targetPlanComplete !== 'boolean' || (input.targetPlanComplete && input.targets.length === 0))
+    throw new AssayError('invalid_acceptance_manifest');
+  const contracts = new Map(PUBLIC_ACCEPTANCE.map(c => [c.id, c]));
+  const seen = new Set();
+  const rows = input.assessments.map(a => {
+    const c = contracts.get(a?.capability);
+    if (!c || !matrixKey(a.key) || !object(a.gates)) throw new AssayError('invalid_acceptance_subject');
+    const composite = `${a.capability}/${a.key}`;
+    if (seen.has(composite)) throw new AssayError('duplicate_acceptance_subject');
+    seen.add(composite);
+    if (Object.keys(a.gates).some(g => !c.gates.includes(g))) throw new AssayError('unknown_acceptance_gate');
+    const objectives = a.objectives;
+    if (objectives != null && (!object(objectives) ||
+      !Number.isFinite(objectives.freshnessSeconds) || objectives.freshnessSeconds <= 0 ||
+      !Number.isFinite(objectives.p95Ms) || objectives.p95Ms <= 0 ||
+      !Number.isFinite(objectives.errorRateMax) || objectives.errorRateMax < 0 || objectives.errorRateMax > 1))
+      throw new AssayError('invalid_acceptance_objectives');
+    const reasons = [];
+    let failed = false;
+    const gates = c.gates.map(name => {
+      const g = a.gates[name];
+      if (!g || g.status === 'not_assessed') { reasons.push(`${name}_unassessed`); return { gate: name, status: 'not_assessed' }; }
+      if (!object(g) || !['passed', 'failed'].includes(g.status)) throw new AssayError('invalid_acceptance_gate');
+      if (g.status === 'failed') {
+        if (!reasonKey(g.reason)) throw new AssayError('invalid_acceptance_reason');
+        failed = true; reasons.push(`${name}:${g.reason}`); return { gate: name, status: 'failed', reason: g.reason };
+      }
+      const r = g.receipt;
+      if (!object(r) || !matrixKey(r.id) || !/^[a-f0-9]{64}$/.test(r.sha256 ?? '') ||
+        r.capability !== c.id || r.key !== a.key || r.gate !== name || !realClock(r.measuredAt) || Date.parse(r.measuredAt) > now ||
+        !BASIS.has(r.basis) || (name === 'public_delivery' && r.basis !== 'anonymous_runtime') ||
+        (['source_fidelity', 'semantic_quality'].includes(name) && r.basis !== 'independent_review')) {
+        reasons.push(`${name}_receipt_unqualified`); return { gate: name, status: 'not_assessed' };
+      }
+      return { gate: name, status: 'passed', receipt: { id: r.id, sha256: r.sha256, measuredAt: r.measuredAt, basis: r.basis } };
+    });
+    if (!objectives) reasons.push('freshness_service_objectives_missing');
+    // Objectives need measured metrics, not a passed flag or a provider timeout.
+    for (const name of ['freshness', 'service']) {
+      const g = gates.find(g => g.gate === name);
+      if (g.status !== 'passed' || !objectives) continue;
+      const metrics = a.gates[name].metrics;
+      const valid = object(metrics) && (name === 'freshness'
+        ? Number.isFinite(metrics.ageSeconds) && metrics.ageSeconds >= 0
+        : Number.isFinite(metrics.p95Ms) && metrics.p95Ms >= 0 && Number.isFinite(metrics.errorRate) && metrics.errorRate >= 0 && metrics.errorRate <= 1);
+      if (!valid) { g.status = 'not_assessed'; reasons.push(`${name}_metrics_missing`); continue; }
+      if (name === 'freshness' ? metrics.ageSeconds > objectives.freshnessSeconds
+        : metrics.p95Ms > objectives.p95Ms || metrics.errorRate > objectives.errorRateMax) {
+        g.status = 'failed'; failed = true; reasons.push(`${name}_objective_failed`);
+      }
+    }
+    return { key: a.key, capability: c.id, state: failed ? 'blocked' : reasons.length ? 'not_assessed' : 'ready', reasons, objectives: objectives ? { freshnessSeconds: objectives.freshnessSeconds, p95Ms: objectives.p95Ms, errorRateMax: objectives.errorRateMax } : null, gates };
+  });
+  const declared = input.population.denominator ?? null;
+  if (declared !== null && !count(declared)) throw new AssayError('invalid_acceptance_denominator');
+  if (input.population.kind === 'exhausted_manifest' && declared !== rows.length) throw new AssayError('acceptance_population_not_reconciled');
+  const totals = { ready: 0, blocked: 0, not_assessed: 0 };
+  for (const row of rows) totals[row.state]++;
+  const targetSeen = new Set();
+  const targets = input.targets.map(t => {
+    if (!object(t) || !matrixKey(t.id) || !matrixKey(t.source) || targetSeen.has(t.id))
+      throw new AssayError('invalid_or_duplicate_source_target');
+    targetSeen.add(t.id);
+    if (!['unknown', 'planned', 'permitted', 'blocked', 'held'].includes(t.access)) throw new AssayError('invalid_target_access');
+    const fields = ['channel', 'region', 'query', 'priority', 'evidenceDepth'];
+    for (const key of fields) if (t[key] != null && (typeof t[key] !== 'string' || !t[key].trim() || t[key].length > 300)) throw new AssayError('invalid_target_scope');
+    for (const key of ['discoveryCadenceSeconds', 'revisitCadenceSeconds']) if (t[key] != null && (!Number.isFinite(t[key]) || t[key] <= 0)) throw new AssayError('invalid_target_cadence');
+    const reasons = [...fields, 'discoveryCadenceSeconds', 'revisitCadenceSeconds'].filter(k => t[k] == null).map(k => `${k}_missing`);
+    if (t.access !== 'permitted') reasons.push(`access_${t.access}`);
+    return { id: t.id, source: t.source, ...Object.fromEntries(fields.map(k => [k, t[k] ?? null])),
+      access: t.access, discoveryCadenceSeconds: t.discoveryCadenceSeconds ?? null, revisitCadenceSeconds: t.revisitCadenceSeconds ?? null,
+      state: ['blocked', 'held'].includes(t.access) ? 'blocked' : reasons.length ? 'not_assessed' : 'configured_only', reasons,
+      enumeration: 'not_assessed', captureDepth: 'not_assessed', revisitDelivery: 'not_assessed' };
+  });
+  return { schemaVersion: MATRIX_VERSION, evaluatedAt: new Date(now).toISOString(),
+    basis: 'supplied_gate_receipts; not independently verified by this offline compiler',
+    population: { key: input.population.key, kind: input.population.kind, measuredAt: input.population.measuredAt,
+      declaredDenominator: declared, inspectedPairs: rows.length, fullRetained: count(input.population.fullRetained) ? input.population.fullRetained : null,
+      fullPublic: count(input.population.fullPublic) ? input.population.fullPublic : null,
+      fleetReadinessMeasured: false, coverage: null },
+    criteria: PUBLIC_ACCEPTANCE.map(c => { const selected = rows.filter(r => r.capability === c.id);
+      return { ...c, freshnessObjective: null, serviceObjective: null,
+        state: selected.some(r => r.state === 'blocked') ? 'blocked' : !selected.length || selected.some(r => r.state === 'not_assessed') ? 'not_assessed' : 'ready_in_supplied_scope',
+        reasons: selected.length ? [...new Set(selected.flatMap(r => r.reasons))] : ['no_gate_assessments', 'freshness_service_objectives_missing'],
+        scopedTotals: { ready: selected.filter(r => r.state === 'ready').length, blocked: selected.filter(r => r.state === 'blocked').length,
+          not_assessed: selected.filter(r => r.state === 'not_assessed').length }, fullPopulationReadiness: null };
+    }), assessments: rows, scopedTotals: totals,
+    targetPlan: { declaredComplete: input.targetPlanComplete, coverageMeasured: false,
+      reasons: input.targetPlanComplete ? [] : ['intended_source_inventory_incomplete'], targets },
+    publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 };
+}
+
+async function runAcceptanceMatrix(args, print) {
+  if (args.length !== 4 || args[0] !== '--acceptance-matrix' || args[2] !== '--out') throw new AssayError('invalid_matrix_arguments');
+  let source, output;
+  try {
+    source = await open(args[1], 'r');
+    const stat = await source.stat();
+    if (!stat.isFile() || stat.size > 2_000_000) throw new AssayError('matrix_input_size_or_type');
+    const buffer = Buffer.alloc(2_000_001);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await source.read(buffer, length, buffer.length - length, null);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length > 2_000_000) throw new AssayError('matrix_input_size_or_type');
+    const result = acceptanceMatrix(JSON.parse(buffer.subarray(0, length).toString('utf8')));
+    result.assaySourceSha256 = createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex');
+    result.inputSha256 = createHash('sha256').update(buffer.subarray(0, length)).digest('hex');
+    output = await privateOutput(args[3]);
+    await output.writeFile(JSON.stringify(result) + '\n');
+    print(JSON.stringify({ status: 'acceptance_matrix_compiled', scopedTotals: result.scopedTotals,
+      intendedTargets: result.targetPlan.targets.length, targetPlanComplete: result.targetPlan.declaredComplete,
+      fleetReadinessMeasured: false, publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 }));
+    return 0;
+  } finally { await source?.close(); await output?.close(); }
+}
+
 export async function main(args = process.argv.slice(2), deps = {}) {
   const print = deps.print ?? console.log;
   let file;
   try {
+    if (args[0] === '--acceptance-matrix') return await runAcceptanceMatrix(args, print);
     const o = options(args);
     if (o.env) { const require = createRequire(path.join(ROOT, 'nuke_frontend/package.json')); require('dotenv').config({ path: o.env, quiet: true }); }
     const config = anonymousConfiguration(deps.env ?? process.env);

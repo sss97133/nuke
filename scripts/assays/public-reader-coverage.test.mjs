@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -739,4 +739,91 @@ test('the manifest summary bounds combined strata across complete parents withou
   assert.equal(r.completedParents,2);assert.equal(m.headers,80);assert.equal(m.axes.stance.validStoredScore,80);
   assert.equal(Object.keys(m.axes.stance.strata).length,64);assert.equal(m.axes.stance.strataUnretained,16);
   assert.equal(m.gaps.stance_measurement_strata_budget_unmeasured,16);assert.equal(r.exitCode,0);
+});
+
+
+const matrixNow = Date.parse('2026-10-13T02:40:00Z');
+const matrixInput = extra => ({ schemaVersion: 'public_inventory_acceptance_v1',
+  population: { key: 'offline_fixture', kind: 'explicit_manifest', measuredAt: '2026-10-13T02:00:00Z', denominator: null },
+  targetPlanComplete: false, assessments: [], targets: [], ...extra });
+const readySubject = () => {
+  const capability = PUBLIC_ACCEPTANCE[0];
+  const gates = Object.fromEntries(capability.gates.map(gate => [gate, { status: 'passed',
+    receipt: { id: 'offline_proof', sha256: 'a'.repeat(64), capability: capability.id, key: 'subject_1', gate,
+      measuredAt: '2026-10-13T02:00:00Z', basis: gate === 'public_delivery' ? 'anonymous_runtime'
+        : ['source_fidelity','semantic_quality'].includes(gate) ? 'independent_review' : 'deterministic_population_assay' },
+    ...(gate === 'freshness' ? { metrics: { ageSeconds: 10 } } : gate === 'service' ? { metrics: { p95Ms: 20, errorRate: 0 } } : {}) }]));
+  return { capability: capability.id, key: 'subject_1', objectives: { freshnessSeconds: 30, p95Ms: 50, errorRateMax: 0.01 }, gates };
+};
+
+test('empty acceptance matrix exposes unassessed public outcomes and no fleet percentage', () => {
+  const r = acceptanceMatrix(matrixInput(), matrixNow);
+  assert.equal(r.criteria.length,3); assert(r.criteria.every(c=>c.state==='not_assessed'));
+  assert.equal(r.population.coverage,null); assert.equal(r.population.fleetReadinessMeasured,false);
+  assert.equal(r.publicReadinessCertificate,false); assert.equal(r.networkRequests,0);
+  assert(r.criteria.find(c=>c.id==='one_inventory').knownBoundary.includes('private'));
+});
+
+test('supplied ready gates stay scoped and absence of objectives cannot pass', () => {
+  const a = readySubject(), r = acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow);
+  assert.equal(r.assessments[0].state,'ready'); assert.equal(r.population.coverage,null);
+  assert.equal(r.criteria[0].fullPopulationReadiness,null);
+  delete a.objectives;
+  const absent=acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow);
+  assert.equal(absent.assessments[0].state,'not_assessed');
+  assert(absent.assessments[0].reasons.includes('freshness_service_objectives_missing'));
+});
+
+test('private or fixture receipts cannot certify public delivery or independent quality', () => {
+  for (const basis of ['service_runtime','offline_fixture','deterministic_population_assay']) {
+    const a=readySubject();a.gates.public_delivery.receipt.basis=basis;
+    assert.equal(acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow).assessments[0].state,'not_assessed');
+  }
+  const a=readySubject();a.gates.semantic_quality.receipt.basis='anonymous_runtime';
+  assert.equal(acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow).assessments[0].state,'not_assessed');
+});
+
+test('gate witness must match subject, capability, gate and nonfuture clock', () => {
+  for (const [k,v] of [['key','other'],['capability','one_inventory'],['gate','service'],['measuredAt','2027-01-01T00:00:00Z']]) {
+    const a=readySubject();a.gates.evidence.receipt[k]=v;
+    assert.equal(acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow).assessments[0].state,'not_assessed');
+  }
+});
+
+test('failed, missing and stale evidence preserve blocker reasons; metrics are required', () => {
+  const a=readySubject();a.gates.evidence={status:'failed',reason:'missing_source_witness'};delete a.gates.identity_context;
+  const r=acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow).assessments[0];
+  assert.equal(r.state,'blocked');assert(r.reasons.includes('evidence:missing_source_witness'));
+  assert(r.reasons.includes('identity_context_unassessed'));
+  const b=readySubject();b.gates.freshness.metrics.ageSeconds=31;
+  assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow).assessments[0].state,'blocked');
+  delete b.gates.freshness.metrics;
+  assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow).assessments[0].state,'not_assessed');
+});
+
+test('matrix refuses duplicate subjects, unknown gates and false population reconciliation', () => {
+  const a=readySubject();assert.throws(()=>acceptanceMatrix(matrixInput({assessments:[a,a]}),matrixNow));
+  a.gates.made_up={status:'passed'};assert.throws(()=>acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow));
+  assert.throws(()=>acceptanceMatrix(matrixInput({population:{key:'bad_total',kind:'exhausted_manifest',measuredAt:'2026-10-13T02:00:00Z',denominator:10}}),matrixNow));
+});
+
+test('configured targets are not collection coverage; missing scope and held access remain work', () => {
+  const r=acceptanceMatrix(matrixInput({targets:[{id:'fb_marketplace',source:'facebook',channel:'Marketplace',access:'held'}]}),matrixNow);
+  const t=r.targetPlan.targets[0];assert.equal(t.state,'blocked');assert(t.reasons.includes('region_missing'));
+  assert(t.reasons.includes('access_held'));assert.equal(t.enumeration,'not_assessed');assert.equal(r.targetPlan.coverageMeasured,false);
+  assert(r.targetPlan.reasons.includes('intended_source_inventory_incomplete'));
+});
+
+test('matrix CLI performs no network and retains a private non-overwritten receipt', async () => {
+  const dir=await mkdtemp(path.join(tmpdir(),'public-acceptance-'));
+  try {
+    const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.json');
+    await writeFile(input,JSON.stringify(matrixInput()));
+    const prints=[];const dependencies={print:x=>prints.push(x),env:{},client:{parents(){throw new Error('network forbidden')}}};
+    assert.equal(await main(['--acceptance-matrix',input,'--out',out],dependencies),0);
+    const r=JSON.parse(await readFile(out,'utf8'));assert.equal(r.networkRequests,0);assert.equal(r.criteria[0].state,'not_assessed');
+    assert.equal((await stat(out)).mode & 0o777,0o600);
+    assert.equal(await main(['--acceptance-matrix',input,'--out',out],dependencies),1);
+    assert.equal(await main(['--acceptance-matrix',input,'--out',out,'--live','true'],dependencies),1);
+  } finally { await rm(dir,{recursive:true,force:true}); }
 });
