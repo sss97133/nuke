@@ -153,7 +153,9 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   `claude-log-done` (both local). Codex lanes keep their working receipts under `~/nuke-logs/<lane>/`.
 - Merge your own PR once every check is green (owner, 2026-10-12), one at a time when it carries a
   migration or a function so the deploy run applies each; then verify the live surface and say which
-  stage was reached: implemented, tested, merged, deployed or runtime-verified.
+  stage was reached: implemented, tested, merged, deployed or runtime-verified. Green means every job
+  the workflows define ran and passed: "nothing pending" with jobs missing is a broken workflow, not a
+  pass (2026-10-13, four PRs merged while `frontend-tests` ran zero jobs).
 - Read a file before changing it, and keep changes surgical. A fix is a few lines, not a rewrite.
 
 ## Rules by area
