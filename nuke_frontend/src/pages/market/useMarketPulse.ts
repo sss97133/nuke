@@ -56,13 +56,13 @@ export interface MarketPulse {
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
-// Disjoint raw numeric ranges. Source units are unverified; missing is not zero.
+// Disjoint ranges of the current bid in US dollars; missing is not zero.
 export const BID_BUCKETS = [
-  { id: 'under10k', label: 'Under 10,000' },
-  { id: '10k25k', label: '10,000–24,999' },
-  { id: '25k50k', label: '25,000–49,999' },
-  { id: '50k100k', label: '50,000–99,999' },
-  { id: '100kplus', label: '100,000+' },
+  { id: 'under10k', label: 'Under $10,000' },
+  { id: '10k25k', label: '$10,000–24,999' },
+  { id: '25k50k', label: '$25,000–49,999' },
+  { id: '50k100k', label: '$50,000–99,999' },
+  { id: '100kplus', label: '$100,000+' },
   { id: 'unknown', label: 'Unrecorded' },
 ] as const;
 export type BidBucket = typeof BID_BUCKETS[number]['id'];
@@ -137,7 +137,8 @@ async function fetchPulse(): Promise<MarketPulse> {
 }
 
 // One BAT-LIVE-BIDS reading at an hour (market_index_values, public read): current bids and live auctions with a
-// bid across the board, and, on live readings (from 2026-09-27), the same two per make.
+// bid across the board, and, on live readings (from 2026-09-27), the same two per make. Written hourly by the
+// bat-live-bids-snapshot job; 100 readings from 2026-06-29 on 2026-10-13.
 export interface HourReading {
   day: string; // value_date, UTC
   bids: number;
@@ -170,11 +171,12 @@ async function fetchSameHour(hourUtc: string, todayUtc: string): Promise<HourRea
     }));
 }
 
-// Re-read when the UTC hour turns; within the hour the readings don't change.
+// Re-read when the UTC hour turns; within the hour the readings don't change. Off until the board names its hour.
 export function useSameHourReadings(hourUtc: string, todayUtc: string) {
   return useQuery({
     queryKey: ['market-same-hour', todayUtc, hourUtc],
     queryFn: () => fetchSameHour(hourUtc, todayUtc),
+    enabled: hourUtc !== '',
     staleTime: 30 * 60_000,
     retry: 1,
   });

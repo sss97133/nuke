@@ -39,6 +39,12 @@ enum NukeImage {
             let path = raw[r.upperBound...]
             return URL(string: "\(Config.supabaseURL.absoluteString)/storage/v1/render/image/public/vehicle-photos/\(path)?width=\(width)&quality=\(quality)&resize=contain")
         }
+        // Bring a Trailer's CDN resizes on ?w=; a bare original is a 2048-wide, ~11 MB decode for a
+        // 64-point cell. Other CDNs pass through as-is (the render service can't transcode them).
+        if let u = URL(string: raw), let host = u.host?.lowercased(),
+           host == "bringatrailer.com" || host.hasSuffix(".bringatrailer.com"), u.query == nil {
+            return URL(string: raw + "?w=\(width)")
+        }
         return URL(string: raw)   // external CDN: use as-is (render can't transcode it)
     }
 }

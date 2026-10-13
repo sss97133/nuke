@@ -19,6 +19,10 @@ Five text roles, in `kit.css`. The entity name is always the largest text on a p
 
 These five numbers are the whole typographic argument. Change them here or not at all.
 
+A list row keeps the same roles at list density: `<Text role="entity" dense>` (13 px) names the row
+and `<Text role="measure" dense>` (12 px) carries its number. `dense` does nothing to body, caption or
+label, whose sizes are already list sizes. Seven numbers in all, still only in `kit.css`.
+
 ## Inputs
 
 `types.ts` holds the shapes a page may render. A `Claim` carries its source, clock and trust. A

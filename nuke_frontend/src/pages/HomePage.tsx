@@ -57,6 +57,7 @@ function useTreemapBrands() {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
+    if (typeof (supabase as any)?.rpc !== 'function' || typeof (supabase as any)?.from !== 'function') return;
     supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
@@ -181,6 +182,7 @@ function useRepresentativeImages(items: TreemapNode[] | null, make?: string | nu
 const fmtNum = (n: number) => n?.toLocaleString() ?? '--';
 const fmtMoney = (n: number) => {
   if (!n) return '--';
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()}K`;
   return `$${n.toLocaleString()}`;
@@ -558,9 +560,12 @@ function useSearchPreview(query: string) {
 // MAIN TREEMAP HOMEPAGE
 // ────────────────────────────────────────────────────────────
 
-function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
+// The ledger as a map: every public vehicle record by make, area = count, color = median sale price, drilling
+// to models, years and vehicles. `embedded` renders it under the app header as the first section of the
+// market page (no header bar of its own, a fixed height) instead of as a page of its own.
+export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
-  usePageTitle('Nuke — Vehicle Intelligence');
+  usePageTitle(embedded ? 'Market' : 'Nuke — Vehicle Intelligence');
   const { recordInterest } = useInterests();
 
   // Drill-down state
@@ -570,15 +575,16 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   // Narrow-viewport flag — hides decorative chrome when the header would crush.
   // Threshold matches AppHeader's 768px collapse but tighter (640px) since the
   // treemap header has its own logo+search+browse triple, not the AppHeader's grid.
-  const [isNarrow, setIsNarrow] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches
-  );
+  // matchMedia is absent in jsdom and some embedded webviews; without it the page is treated as wide.
+  const canMatchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+  const [isNarrow, setIsNarrow] = useState(() => canMatchMedia && window.matchMedia('(max-width: 640px)').matches);
   useEffect(() => {
+    if (!canMatchMedia) return;
     const mql = window.matchMedia('(max-width: 640px)');
     const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
-  }, []);
+  }, [canMatchMedia]);
 
   // Prefetch cache: hover-triggered data loaded before click
   const prefetchCache = useRef<Map<string, TreemapNode[]>>(new Map());
@@ -699,6 +705,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
       setDims({ w: Math.floor(r.width), h: Math.floor(r.height) });
     };
     measure();
+    if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
@@ -808,15 +815,16 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: embedded ? '72vh' : '100vh',
+        minHeight: embedded ? 440 : undefined,
         background: 'var(--bg)',
         color: 'var(--text)',
         fontFamily: 'Arial, sans-serif',
         overflow: 'hidden',
       }}
     >
-      {/* ─── HEADER BAR ─── */}
-      <div
+      {/* ─── HEADER BAR (the page's own; the app header stands in for it when embedded) ─── */}
+      {!embedded && <div
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -950,7 +958,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         >
           FEED
         </button>
-      </div>
+      </div>}
 
       {/* ─── BREADCRUMB / NAVIGATION BAR ─── */}
       <div
@@ -1006,7 +1014,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
-              {fmtNum(totalCount)} vehicles / {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} total value
+              {fmtNum(totalCount)} vehicles · {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} recorded sale value{embedded ? ' · counts as of the last refresh of the ledger\u2019s views' : ''}
             </span>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1207,14 +1215,14 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
               cursor: 'pointer',
             }}
           >
-            BROWSE ALL
+            {embedded ? 'OPEN LOTS BELOW' : 'BROWSE ALL'}
           </button>
-          <a
+          {!embedded && <a
             href="https://nuke.ag"
             style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-disabled)', textDecoration: 'none' }}
           >
             nuke.ag
-          </a>
+          </a>}
         </div>
       </div>
 
@@ -1308,7 +1316,10 @@ export default function HomePage() {
       </nav>
 
       <Suspense fallback={<TabSkeleton />}>
-        {activeTab === 'market' && <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />}
+        {activeTab === 'market' && <>
+          <TreemapHomePage embedded onBrowse={() => document.querySelector('.market-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
+        </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
         {activeTab === 'feed' && <FeedPage />}
       </Suspense>
