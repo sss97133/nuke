@@ -1,7 +1,6 @@
-import { fetchCraigslistFeed } from "./feedFetch.ts";
+import { fetchCraigslistFeed, type CraigslistArchiveOptions, type CraigslistArchiveResult } from "./feedFetch.ts";
 import { fetchPage } from "../_shared/hybridFetcher.ts";
 import { failureCategoryFor, intakeThrottle, selectIntakeFeeds } from "./ledger.ts";
-import type { ArchiveFetchOptions, ArchiveFetchResult } from "../_shared/archiveFetch.ts";
 
 const url = "https://lasvegas.craigslist.org/search/cta?min_auto_year=1960";
 const html = `<html><title>Cars</title>${"public listing ".repeat(100)}</html>`;
@@ -16,16 +15,15 @@ async function withFetch(
   globalThis.fetch = mock;
   try { await test(); } finally { globalThis.fetch = original; }
 }
-function archived(value: Partial<ArchiveFetchResult>): ArchiveFetchResult {
-  return { html: null, markdown: null, source: "direct", cached: false, snapshotId: null,
-    url, platform: "craigslist", statusCode: 200, error: null, costCents: 0, ...value };
+function archived(value: Partial<CraigslistArchiveResult>): CraigslistArchiveResult {
+  return { html: null, statusCode: 200, error: null, ...value };
 }
 
 Deno.test("Craigslist requests fresh archived public HTML without a renderer", async () => {
-  const calls: ArchiveFetchOptions[] = [];
+  const calls: CraigslistArchiveOptions[] = [];
   equal(await fetchCraigslistFeed(url, async (requested, options) => {
     equal(requested, url); calls.push(options);
-    return archived({ html, snapshotId: "raw-ack" });
+    return archived({ html });
   }), { html, error: null });
   equal(calls, [{ platform: "craigslist", skipCache: true, useFirecrawl: false,
     includeMarkdown: false, directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds" }]);
