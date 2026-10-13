@@ -179,6 +179,9 @@ struct LiveInventoryMapView: View {
             .frame(height: 16)
             .contentShape(Rectangle())
             .onTapGesture { onSelect(box.make, nil) }
+            .accessibilityElement()
+            .accessibilityLabel("\(box.title), \(box.count) open lots")
+            .accessibilityAddTraits(.isButton)
         }
     }
 
@@ -206,6 +209,9 @@ struct LiveInventoryMapView: View {
             .onTapGesture {
                 if box.make == nil { onSelect(c.item.key, nil) } else { onSelect(box.make, c.item.key) }
             }
+            .accessibilityElement()
+            .accessibilityLabel(box.make == nil ? "\(label), \(c.item.count) open lots" : "\(box.title) \(label), \(c.item.count) open lots")
+            .accessibilityAddTraits(.isButton)
             .position(x: r.midX - box.rect.minX, y: r.midY - box.rect.minY)
     }
 }

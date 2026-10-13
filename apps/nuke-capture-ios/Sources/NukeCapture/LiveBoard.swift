@@ -26,43 +26,40 @@ struct LiveAuction: Decodable, Identifiable {
     let listingUrl: String?
     let title: String?
     /// Expected-price band from comparable sales on the lot's model page; nil when the lot is not priced.
-    let band: Band?
+    /// Parsed once at decode time: the list sorts on it, and parsing an ISO string per
+    /// comparison cost about 100 ms of main thread per evaluation over 1,100 lots.
+    let endsAtDate: Date?
+    /// The expected-price band (positions 12 to 16) is decoded on the web and rendered
+    /// nowhere; the phone does not read it either. Owner call before a graded band shows.
 
-    struct Band {
-        let p10: Double
-        let p50: Double
-        let p90: Double
-        let tier: String
-        let comps: Int
-    }
-
+    /// One row is a positional array; a value whose type drifted is read as missing, never
+    /// as a reason to drop the whole board (the web coerces with Number()).
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
-        id = try c.decode(String.self)
-        year = try c.decodeIfPresent(Int.self)
-        make = try c.decodeIfPresent(String.self)
-        model = try c.decodeIfPresent(String.self)
-        currentBid = try c.decodeIfPresent(Double.self)
-        endsAt = try c.decodeIfPresent(String.self)
-        updatedAt = try c.decodeIfPresent(String.self)
-        listedAt = try c.decodeIfPresent(String.self)
-        imageUrl = try c.decodeIfPresent(String.self)
-        noReserve = (try c.decodeIfPresent(Bool.self)) ?? false
-        listingUrl = try c.decodeIfPresent(String.self)
-        title = try c.decodeIfPresent(String.self)
-        let p10 = try c.decodeIfPresent(Double.self)
-        let p50 = try c.decodeIfPresent(Double.self)
-        let p90 = try c.decodeIfPresent(Double.self)
-        let tier = try c.decodeIfPresent(String.self)
-        let comps = try c.decodeIfPresent(Int.self)
-        if let p10, let p50, let p90 {
-            band = Band(p10: p10, p50: p50, p90: p90, tier: tier ?? "", comps: comps ?? 0)
-        } else {
-            band = nil
+        func str() -> String? { (try? c.decodeIfPresent(String.self)) ?? { _ = try? c.decode(AnyScalar.self); return nil }() }
+        func num() -> Double? {
+            if let d = try? c.decodeIfPresent(Double.self) { return d }
+            if let s = try? c.decodeIfPresent(String.self) { return Double(s) }
+            _ = try? c.decode(AnyScalar.self); return nil
         }
+        func int() -> Int? { num().map { Int($0) } }
+        id = try c.decode(String.self)
+        year = int()
+        make = str()
+        model = str()
+        currentBid = num()
+        endsAt = str()
+        updatedAt = str()
+        listedAt = str()
+        imageUrl = str()
+        noReserve = (try? c.decodeIfPresent(Bool.self)) ?? false
+        listingUrl = str()
+        title = str()
+        endsAtDate = ProfileClock.date(endsAt)
     }
 
-    var endsAtDate: Date? { ProfileClock.date(endsAt) }
+    /// Only a row with a real vehicle id can navigate; a malformed id is skipped, never replaced by a random one.
+    var vehicleUUID: UUID? { UUID(uuidString: id) }
 
     /// The listing's own title, else the identity the board carries. BaT publishes titles
     /// with HTML entities ("Chairs &#038; Flares"); the few that occur are decoded here.
@@ -83,24 +80,78 @@ struct LiveAuction: Decodable, Identifiable {
     }
 }
 
+/// A scalar of any JSON type, consumed and discarded when a positional value is not what the row promised.
+struct AnyScalar: Decodable {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { return }
+        if (try? c.decode(Double.self)) != nil { return }
+        if (try? c.decode(String.self)) != nil { return }
+        if (try? c.decode(Bool.self)) != nil { return }
+        throw DecodingError.dataCorruptedError(in: c, debugDescription: "not a scalar")
+    }
+}
+
+/// An array whose undecodable elements are skipped and counted instead of failing the whole array.
+struct LossyArray<Element: Decodable>: Decodable {
+    let elements: [Element]
+    let skipped: Int
+    private struct Any_: Decodable { init(from decoder: Decoder) throws {} }
+    init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        var out: [Element] = []
+        var bad = 0
+        while !c.isAtEnd {
+            if let e = try? c.decode(Element.self) { out.append(e) } else { _ = try? c.decode(Any_.self); bad += 1 }
+        }
+        elements = out; skipped = bad
+    }
+}
+
 /// The board: its clock, its source sentence and its lots.
 struct LiveBoard: Decodable {
     let synced_at: String?
     let source: String?
-    let auctions: [LiveAuction]
+    private let rows: LossyArray<LiveAuction>
+    var auctions: [LiveAuction] { rows.elements }
+    var skippedRows: Int { rows.skipped }
 
-    /// The population line (fleet-relative reporting): how many open lots, whose page, read when.
-    var coverageSentence: String {
-        let clock = ProfileClock.date(synced_at).map { d -> String in
+    private enum CodingKeys: String, CodingKey { case synced_at, source, rows = "auctions" }
+
+    /// `synced_at` is max(vehicles.updated_at) over live rows: the last record write by any
+    /// writer, not the source read time (which the board does not carry). The web says both;
+    /// so does the phone, and warns when that write clock is more than 45 minutes behind.
+    var syncedAtDate: Date? { ProfileClock.date(synced_at) }
+    static let staleAfter: TimeInterval = 45 * 60
+
+    /// Lots still open at `now`, the web's count (`endsAt > now`); a lot that closed since the
+    /// last poll is not an open lot.
+    func open(at now: Date) -> [LiveAuction] {
+        auctions.filter { ($0.endsAtDate ?? .distantFuture) > now }
+    }
+
+    /// The population line (fleet-relative reporting): how many open lots, the record clock
+    /// and what it is, the source read time's absence, and a lag warning when it applies.
+    func coverageSentence(at now: Date) -> String {
+        let clock = syncedAtDate.map { d -> String in
             let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC")
             f.dateFormat = "MMM d, HH:mm"
             return f.string(from: d) + "Z"
         } ?? "clock missing"
-        return "\(auctions.count.formatted()) open lots · recorded \(clock) · \(source ?? "source unnamed")"
+        var parts = ["\(open(at: now).count.formatted()) open lots · source bid units unverified",
+                     "record updated \(clock) by a writer · source read time unavailable"]
+        if let d = syncedAtDate, now.timeIntervalSince(d) > Self.staleAfter { parts.append("recent record writes are behind") }
+        if skippedRows > 0 { parts.append("\(skippedRows) rows unreadable, skipped") }
+        return parts.joined(separator: " · ")
     }
 
-    static func fetch() async throws -> LiveBoard {
-        try await SupabaseService.client.rpc("market_pulse_live").execute().value
+    // One read per 30 seconds across lens switches, as the web caches it (useMarketPulse staleTime).
+    private static var cached: (board: LiveBoard, at: Date)?
+    static func fetch(maxAge: TimeInterval = 30) async throws -> LiveBoard {
+        if let c = cached, Date().timeIntervalSince(c.at) < maxAge { return c.board }
+        let board: LiveBoard = try await SupabaseService.client.rpc("market_pulse_live").execute().value
+        cached = (board, Date())
+        return board
     }
 }
 
@@ -118,8 +169,14 @@ struct LiveBoardView: View {
     }()
     @State private var filterDecade: String? = nil
 
+    /// The clock the board is read against; set when a read lands so one evaluation shares it.
+    @State private var now = Date()
+
+    /// The web's population: lots still open now (`endsAt > now`), ending soonest first.
+    private var openLots: [LiveAuction] { board?.open(at: now) ?? [] }
+
     private var lots: [LiveAuction] {
-        (board?.auctions ?? [])
+        openLots
             .filter { filterMake == nil || LiveInventory.make($0) == filterMake }
             .filter { filterDecade == nil || LiveInventory.decade($0) == filterDecade }
             .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
@@ -127,7 +184,7 @@ struct LiveBoardView: View {
 
     private var filterLine: String? {
         guard let m = filterMake else { return nil }
-        return [m, filterDecade].compactMap { $0 }.joined(separator: " · ") + " · \(lots.count.formatted()) of \((board?.auctions.count ?? 0).formatted()) open lots"
+        return [m, filterDecade].compactMap { $0 }.joined(separator: " · ") + " · \(lots.count.formatted()) of \(openLots.count.formatted()) open lots"
     }
 
     var body: some View {
@@ -136,38 +193,42 @@ struct LiveBoardView: View {
                 List {
                     // The board drawn as the web draws it: brands as boxes, decades inside.
                     Section {
-                        LiveInventoryMapView(lots: board.auctions) { make, decade in
+                        LiveInventoryMapView(lots: openLots) { make, decade in
                             filterMake = make; filterDecade = decade
                         }
                         .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                         .listRowBackground(Color.clear)
                         if let f = filterLine {
                             HStack(spacing: 8) {
-                                Text(f).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+                                Text(f).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
                                 Spacer(minLength: 0)
                                 Button("All") { filterMake = nil; filterDecade = nil }.font(.caption2)
                             }
                             .listRowBackground(Color.clear)
                         }
                     } header: {
-                        Text(board.coverageSentence)
-                            .font(.system(size: 9, design: .monospaced))
+                        Text(board.coverageSentence(at: now))
+                            .font(.caption2.monospaced())
                             .textCase(nil)
                     }
                     Section {
                         ForEach(lots) { lot in
-                            NavigationLink(value: VehicleHeaderRow(id: UUID(uuidString: lot.id) ?? UUID(), year: lot.year, make: lot.make,
-                                                                   model: lot.model, trim: nil, primary_image_url: lot.imageUrl,
-                                                                   city: nil, state: nil)) {
-                                row(lot)
+                            if let uuid = lot.vehicleUUID {
+                                NavigationLink(value: VehicleHeaderRow(id: uuid, year: lot.year, make: lot.make,
+                                                                       model: lot.model, trim: nil, primary_image_url: lot.imageUrl,
+                                                                       city: nil, state: nil)) {
+                                    row(lot)
+                                }
+                            } else {
+                                row(lot)   // a row without a readable vehicle id opens nothing, never a random record
                             }
                         }
                     } header: {
                         Text(filterMake == nil ? "Ending soonest" : "Ending soonest in the selection")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.caption2.monospaced())
                             .textCase(nil)
                     } footer: {
-                        Text("Current bids as the board recorded them; a band is the expected hammer from comparable sales on the lot's model page and shows only when the lot is priced.")
+                        Text("Bids as the board recorded them, in the source's units, which the reader does not verify. The record clock is the last write to the row, not the source read time.")
                     }
                 }
                 .listStyle(.plain)
@@ -200,6 +261,7 @@ struct LiveBoardView: View {
     private func load() async {
         do {
             board = try await LiveBoard.fetch()
+            now = Date()
             loadError = false
         } catch {
             if board == nil { loadError = true }
@@ -220,37 +282,29 @@ struct LiveBoardView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(lot.headline).font(.subheadline.weight(.semibold)).lineLimit(2)
                 HStack(spacing: 8) {
-                    if let bid = lot.currentBid {
-                        Text(bid.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                    // The web's bidNumber: a bare number, no currency sign, under "bid units unverified".
+                    if let bid = lot.currentBid, bid.isFinite {
+                        Text(Int(bid.rounded()).formatted())
                             .font(.system(.footnote, design: .monospaced).weight(.semibold)).monospacedDigit()
-                        Text("bid").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                        Text("bid").font(.caption2.monospaced()).foregroundStyle(.secondary)
                     } else {
-                        Text("no bid recorded").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                        Text("no bid recorded").font(.caption2.monospaced()).foregroundStyle(.secondary)
                     }
                     if lot.noReserve {
-                        Text("NO RESERVE").font(.system(size: 9, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
+                        Text("NO RESERVE").font(.caption2.monospaced().weight(.semibold)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                     if let ends = lot.endsAtDate {
                         TimelineView(.periodic(from: .now, by: 30)) { ctx in
                             Text(Self.remaining(ends, now: ctx.date))
-                                .font(.system(size: 10, design: .monospaced)).monospacedDigit()
+                                .font(.caption2.monospaced()).monospacedDigit()
                                 .foregroundStyle(ends.timeIntervalSince(ctx.date) < 3600 ? .red : .secondary)
                         }
                     }
                 }
-                if let b = lot.band {
-                    Text("expected \(Self.k(b.p10)) – \(Self.k(b.p90)) · mid \(Self.k(b.p50)) · \(b.comps) comps")
-                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
-                }
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private static func k(_ v: Double) -> String {
-        v >= 1000 ? "$\((v / 1000).formatted(.number.precision(.fractionLength(v < 10_000 ? 1 : 0))))k"
-                  : v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
     }
 
     static func remaining(_ ends: Date, now: Date) -> String {
