@@ -17,9 +17,14 @@ beforeEach(() => {
   fixture.query = { data: { pages: [{ items: [{ id: 'listing', vehicle_id: null, vehicle: null, source_platform: 'craigslist', source_listing_id: '7000000000', source_url: 'https://www.craigslist.org/view/d/fixture-listing/SyntheticShareToken0000', current_price: 0, event_status: 'active', created_at: '2026-10-13T02:31:04Z', updated_at: '2026-10-13T02:32:00Z' }] }] }, hasNextPage: true, fetchNextPage: fixture.more };
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-async function render(query = '') { window.history.replaceState({}, '', '/?' + query); await act(async () => root.render(<BrowserRouter><MarketInventory /></BrowserRouter>)); }
-it('makes unresolved source presentations discoverable at the normal market landing without claiming live availability or currency', async () => {
-  await render();
+async function render(query = 'collection=listings') { window.history.replaceState({}, '', '/?' + query); await act(async () => root.render(<BrowserRouter><MarketInventory /></BrowserRouter>)); }
+it('opens the existing explorer at Market and keeps unresolved source presentations one explicit collection away', async () => {
+  await render('tab=market');
+  expect(container.textContent).toContain('Existing BaT bid board');
+  expect(fixture.source).not.toHaveBeenCalled();
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Captured listings')!.click());
+  expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
   expect(container.textContent).toContain('Vehicle unresolved'); expect(container.textContent).toContain('7000000000');
   expect(container.textContent).toContain('0 · currency unrecorded'); expect(container.textContent).toContain('availability and source-wide coverage are unverified');
   expect(container.textContent).toContain('Source observation time unrecorded');

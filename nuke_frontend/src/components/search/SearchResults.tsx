@@ -28,13 +28,15 @@ interface SearchResultsProps {
   loading?: boolean;
   activeFilter?: SearchFilter;
   onFilterChange?: (next: SearchFilter) => void;
-  totalCount?: number;
+  totalCount?: number | null;
   hasMore?: boolean;
+  paginationLimited?: boolean;
   onLoadMore?: () => void;
   loadingMore?: boolean;
+  loadMoreError?: string | null;
 }
 
-const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, onLoadMore, loadingMore }: SearchResultsProps) => {
+const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, paginationLimited, onLoadMore, loadingMore, loadMoreError }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { recordView } = useViewHistory();
@@ -869,7 +871,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           )}
 
           {/* Load More button */}
-          {hasMore && onLoadMore && (
+          {paginationLimited && <p role="status">Refine your search to see more results.</p>}
+          {loadMoreError && !paginationLimited && <p role="status">{loadMoreError}</p>}
+          {hasMore && !paginationLimited && onLoadMore && (
             <div style={{
               display: 'flex',
               justifyContent: 'center',
