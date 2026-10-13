@@ -7,21 +7,19 @@ import { Masthead, Strip, Facet, ClaimView, SourceView, Text, formatMeasure } fr
 import { VehiclePerformance } from '../stacks/VehicleCohort';
 import type { ProfileFacet } from '../stacks/bidPopulationReader';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { useVehiclePriceFacts } from './hooks/useVehiclePriceFacts';
 import { isAuctionPresentation } from './buildAuctionPulse';
 import { useProfileDocument } from './profileDocument';
 
 /**
  * The vehicle header through the kit: identity and the one headline price stay in view;
  * the strip of recorded facts scrolls with the page. Every fact is a claim with a source,
- * and the strip states how many of them are attributed.
+ * and the strip states how many of them are attributed. The document comes from one
+ * viewer-scoped read (vehicle_profile_read); the viewer is whoever the database says it is.
  */
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
-  const { vehicle, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess } = useVehicleProfile();
-  const { priceFacts } = useVehiclePriceFacts(vehicle?.id);
-  const viewer = isRowOwner || isVerifiedOwner ? 'owner' : hasContributorAccess ? 'contributor' : 'anon';
+  const { vehicle, auctionPulse } = useVehicleProfile();
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
-  const doc = useProfileDocument(vehicle, priceFacts, priceOwnedByLiveStack, viewer);
+  const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const sticky = useRef<HTMLDivElement>(null);
   const stripBoundary = useRef<HTMLDivElement>(null);
   const [activeFacet, setActiveFacet] = useState<ProfileFacet | null>(null);
