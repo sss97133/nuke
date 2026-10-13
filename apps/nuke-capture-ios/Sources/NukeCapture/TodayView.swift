@@ -439,9 +439,13 @@ private struct LiveMetricsStrip: View {
             // from the measured rate (C4: "estimating…" until a real rate exists).
             if engine.backfillRemaining > 0 {
                 Text(engine.isPaused ? "Uploads paused · \(engine.backfillRemaining) photos queued"
+                     : engine.thermalHold
+                        ? "Uploads waiting · the phone is hot or in Low Power Mode · \(engine.backfillRemaining) photos queued, resumes when it cools"
                      : engine.isSyncing
                         ? Self.etaLine(remaining: engine.backfillRemaining,
                                        perMinute: engine.uploadsPerMinute)
+                     : engine.foregroundBudgetReached
+                        ? "\(engine.backfillRemaining) photos queued for the overnight job (power + Wi-Fi) · Sync Now pushes \(Config.foregroundBackfillBudget) more"
                         : "\(engine.backfillRemaining) photos queued · Sync Now to retry")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
