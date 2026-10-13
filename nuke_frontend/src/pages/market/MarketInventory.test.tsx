@@ -35,6 +35,15 @@ it('keeps source filtering and Market navigation in the URL and retains existing
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT auctions')!.click());
   expect(container.textContent).toContain('Existing BaT bid board');
 });
+it('shows the retained source observation separately from admission and update clocks', async () => {
+  const row = fixture.query.data.pages[0].items[0];
+  row.source_observed_at = '2026-10-12T01:02:03Z';
+  await render();
+  expect(container.textContent).toContain(`Source observation time ${new Date(row.source_observed_at).toLocaleString()}`);
+  expect(container.textContent).toContain(`Retained ${new Date(row.created_at).toLocaleString()}`);
+  expect(container.textContent).toContain(`Record updated ${new Date(row.updated_at).toLocaleString()}`);
+  expect(container.textContent).not.toContain('Source observation time unrecorded');
+});
 it('opens the unchanged auction board for a legacy lot deep link', async () => {
   await render('tab=market&lot=retained-lot'); expect(container.textContent).toContain('Existing BaT bid board');
   expect(container.querySelector('section[aria-label="Captured listings"]')).toBeNull();

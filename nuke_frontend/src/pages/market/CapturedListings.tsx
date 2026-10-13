@@ -44,7 +44,7 @@ export default function CapturedListings() {
             <div>{href ? <a href={href} target="_blank" rel="noopener noreferrer">{sourceName(row.source_platform)} · original listing</a> : <span>{sourceName(row.source_platform)} · source link unrecorded</span>}</div></td>
           <td>{row.current_price == null || !Number.isFinite(Number(row.current_price)) ? 'Unrecorded' : `${Number(row.current_price).toLocaleString()} · currency unrecorded`}</td>
           <td><details><summary>{row.event_status ? `Recorded ${row.event_status}` : 'Listing evidence'}</summary>
-            <div>Source ID {row.source_listing_id || 'unrecorded'}</div><div>Retained {clock(row.created_at)}</div><div>Record updated {clock(row.updated_at)}</div><div>Source observation time unrecorded</div>
+            <div>Source ID {row.source_listing_id || 'unrecorded'}</div><div>Retained {clock(row.created_at)}</div><div>Record updated {clock(row.updated_at)}</div><div>Source observation time {row.source_observed_at ? clock(row.source_observed_at) : 'unrecorded'}</div>
           </details></td>
         </tr>;
       })}</tbody>
