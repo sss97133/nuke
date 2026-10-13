@@ -15,14 +15,25 @@
 import Foundation
 
 /// Who the database says is reading: decided by auth.uid() inside the read, never by the client.
+/// A viewer value the app does not know fails closed to anon.
 enum ProfileViewer: String, Decodable {
     case anon, contributor, owner
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ProfileViewer(rawValue: raw) ?? .anon
+    }
 }
 
 /// Where a claim came from: the evidence class, and a pointer at the evidence.
 struct ClaimSource: Decodable {
+    /// An evidence class the app does not know is read as the record (legacy), dim and open,
+    /// never as a reason to drop the whole document.
     enum Kind: String, Decodable {
         case listing, owner, image, document, agent, model, legacy
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .legacy
+        }
         /// The web's SOURCE_KIND_LABEL, used when a source carries no label of its own.
         var displayName: String {
             switch self {
@@ -66,7 +77,10 @@ enum ClaimValue: Decodable {
     var text: String {
         switch self {
         case .string(let s): return s
-        case .number(let n): return n == n.rounded() ? String(Int(n)) : String(n)
+        case .number(let n):
+            // A whole number prints without a fraction; never through Int(n), which traps past Int range.
+            if n.isFinite, n == n.rounded(), abs(n) < 1e15 { return n.formatted(.number.precision(.fractionLength(0)).grouping(.never)) }
+            return String(n)
         }
     }
 }
