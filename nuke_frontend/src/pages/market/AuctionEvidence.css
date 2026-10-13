@@ -175,5 +175,7 @@
 .market-listings { width: 100%; text-align: left; border-collapse: collapse; }
 .market-listings th { padding: 4px 0; border-bottom: 2px solid var(--border); }
 .market-listings td { padding: 8px 8px 8px 0; border-top: 2px solid var(--border); vertical-align: top; }
+/* The shared nameplate (brand rule #904) keeps its artwork; at list density its model text takes the row's entity size from the kit wrapper. */
+.market-listings .vehicle-identity__model { font: inherit; }
 .market-listing__image { float: left; margin-right: 8px; object-fit: cover; background: var(--surface); }
 .market-listing__image[hidden] { display: none; }

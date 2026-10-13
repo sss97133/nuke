@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
-import { Masthead, Text } from '../../kit';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
+import { Masthead, Text } from '../../kit';
 import PrivateCaptureHistory from './PrivateCaptureHistory';
 import { LISTING_SOURCES, sourceLink, sourceName, useCapturedListings } from './useCapturedListings';
 
@@ -34,7 +34,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
         const next = new URLSearchParams(params); next.set('collection', 'listings');
         next.set('source', event.target.value); setParams(next);
       }}><option value="classifieds">Classified listings</option><option value="">All supported sources</option>{LISTING_SOURCES.map(value => <option key={value} value={value}>{sourceName(value)}</option>)}</select></label>
-      <Text role="caption" className="k-strip__coverage">Captured listings; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</Text>
+      <Text role="caption" className="market-scope__note">Captured listings; availability and source-wide coverage are unverified. Private capture history appears separately when permitted.</Text>
     </div>
     {query.isPending && <p role="status" className="k-body">Reading retained listings…</p>}
     {query.isError && <p role="status" className="k-body">Listings could not be refreshed. {rows.length ? 'Showing the last fetched records.' : ''} <button type="button" className="market-control" onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
@@ -47,7 +47,7 @@ export default function CapturedListings({ collection }: { collection?: ReactNod
         const image = vehicleImage(row.vehicle?.primary_image_url);
         return <tr key={row.id}>
           <td>{image && <img className="market-listing__image" src={image} width="80" height="60" loading="lazy" alt="Vehicle record image" onError={event => { event.currentTarget.hidden = true; }} />}
-            <Text role="body" as="div">{row.vehicle ? <PrefetchLink to={`/vehicle/${row.vehicle.id}`} aria-label={identity || 'Vehicle identity unrecorded'}>
+            <Text role="entity" dense as="div">{row.vehicle ? <PrefetchLink to={`/vehicle/${row.vehicle.id}`} aria-label={identity || 'Vehicle identity unrecorded'}>
             {row.vehicle.make && row.vehicle.model ? <VehicleIdentity year={row.vehicle.year} make={row.vehicle.make} model={row.vehicle.model} />
               : row.vehicle.make ? <>{row.vehicle.year ?? ''} <MakeIdentity make={row.vehicle.make} /></> : identity || 'Vehicle identity unrecorded'}
           </PrefetchLink> : <span>Vehicle unresolved</span>}</Text>
