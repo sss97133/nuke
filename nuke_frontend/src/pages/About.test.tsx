@@ -2,7 +2,9 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import About from './About';
 import { parseEvidence, plain } from './aboutEvidence';
 
@@ -49,12 +51,18 @@ describe('parseEvidence', () => {
 
 describe('About', () => {
   let root: Root, container: HTMLDivElement;
-  beforeEach(() => { (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
-  afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+  // The page fetches /evidence.md, the file the daily stats job writes into public/; the test serves that very file.
+  const served = readFileSync(resolve(__dirname, '../../public/evidence.md'), 'utf8');
+  beforeEach(() => {
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (url === '/evidence.md' ? new Response(served, { status: 200 }) : new Response('', { status: 404 }))));
+    container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
+  });
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 
   async function render() {
     await act(async () => { root.render(<MemoryRouter><About /></MemoryRouter>); });
-    // The evidence block arrives by dynamic import; give it a few turns.
+    // The evidence block arrives by fetch; give it a few turns.
     for (let i = 0; i < 40 && !container.querySelector('table'); i++) await act(async () => { await new Promise(r => setTimeout(r, 25)); });
   }
   const text = () => container.textContent || '';
@@ -72,7 +80,16 @@ describe('About', () => {
     expect(container.querySelector('[style]')).toBeNull();
   });
 
-  it('renders the daily-measured grading block from docs/POSITIONING.md with its date and coverage', async () => {
+  it('says so, and links the document, when the block cannot be loaded', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));
+    await act(async () => { root.render(<MemoryRouter><About /></MemoryRouter>); });
+    for (let i = 0; i < 40 && !/did not load/.test(text()); i++) await act(async () => { await new Promise(r => setTimeout(r, 25)); });
+    expect(text()).toMatch(/The grading table did not load here/);
+    expect(container.querySelector('table')).toBeNull();
+    expect(link('docs/POSITIONING.md')?.getAttribute('href')).toBe('https://github.com/sss97133/nuke/blob/main/docs/POSITIONING.md');
+  });
+
+  it('renders the daily-measured grading block from /evidence.md with its date and coverage', async () => {
     await render();
     const table = container.querySelector('table[aria-label="Graded models"]');
     expect(table).not.toBeNull();

@@ -7,13 +7,13 @@ import './About.css';
 
 /**
  * What Nuke is, in the one voice of docs/POSITIONING.md, with the evidence a stranger can check.
- * The grading table is the block the daily stats job writes into that document, loaded here as the
- * document itself; the page carries no number of its own.
+ * The grading table is the block the daily stats job writes beside that document, served as /evidence.md and
+ * parsed here; the page carries no number of its own.
  */
 const REPO = 'https://github.com/sss97133/nuke';
 
-// The repository's docs/POSITIONING.md, outside this package: the build runs from the whole checkout (deploy-vercel.yml).
-const loadEvidence = () => import('../../../docs/POSITIONING.md?raw').then(m => parseEvidence(m.default));
+/** /evidence.md is the block scripts/data/readme-stats.mjs writes into nuke_frontend/public every morning beside docs/POSITIONING.md. */
+const loadEvidence = () => fetch('/evidence.md', { cache: 'no-cache' }).then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))).then(parseEvidence);
 
 const About: React.FC = () => {
   usePageTitle('About');
@@ -79,7 +79,7 @@ const About: React.FC = () => {
           <Text role="label" as="h2">What you can check</Text>
           <Text role="body" as="p">
             The grading table did not load here. It is the evidence block of <a href={`${REPO}/blob/main/docs/POSITIONING.md`}>docs/POSITIONING.md</a>,
-            rewritten daily from the live database.
+            rewritten every morning from the live database.
           </Text>
         </section>
       )}
