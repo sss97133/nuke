@@ -33,6 +33,9 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
     // fetch carries just the title parts, the hero, and the location.
     let city: String?
     let state: String?
+    /// The record's image count (denormalized on vehicles, kept by triggers): the population the
+    /// gallery's loaded rows are a window onto. Optional: the search door's rows do not carry it.
+    var image_count: Int? = nil
 
     /// "YEAR MAKE MODEL TRIM" — only the parts that exist, never a lone "—".
     var title: String {
@@ -630,7 +633,7 @@ struct VehicleDetailView: View {
                             ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
                             InvestmentProofView(vehicleId: vehicleId).id("proof")
                         }
-                        photoStrip
+                        photoStrip.id("photos")
                         assetWindow.id("asset")
                         specTable.id("specs")
                         webCTA
@@ -1437,7 +1440,10 @@ struct VehicleDetailView: View {
                     Text("PHOTOS")
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     Spacer()
-                    Text(images.count.formatted() + (reachedEnd ? "" : "+"))
+                    // Loaded against the record (web #1051: "n of N", never what loaded as the whole).
+                    // The record's count includes frames the gate or analysis has not admitted, so the
+                    // two numbers are named, not reconciled.
+                    Text(photosCountLine)
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16)
@@ -1468,6 +1474,14 @@ struct VehicleDetailView: View {
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
         }
+    }
+
+    private var photosCountLine: String {
+        let loaded = images.count.formatted()
+        if let total = vehicle?.image_count, total > images.count {
+            return "\(loaded) loaded of \(total.formatted()) on the record" + (reachedEnd ? "" : " · more pages")
+        }
+        return loaded + (reachedEnd ? "" : "+")
     }
 
     /// `images` (taken_at DESC) grouped into ordered day-clusters — the Photos 'Days' shape.
@@ -1646,7 +1660,7 @@ struct VehicleDetailView: View {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
-                .select("id,year,make,model,trim,city,state,primary_image_url")
+                .select("id,year,make,model,trim,city,state,primary_image_url,image_count")
                 .eq("id", value: vehicleId)
                 .limit(1)
                 .execute()
