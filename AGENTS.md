@@ -143,7 +143,13 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
 ## Working alongside other agents
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`.
-- When several sessions run, one lane list says who owns what. Tell the others before you push.
+- When several sessions run, one lane list says who owns what: `.claude/LANES.md` in the shared checkout
+  (local, not committed). Codex threads register there too, with the path of their pickup file. Tell the
+  others before you push. Handoffs go in `.claude/handoffs/`; finished work is logged to `DONE.md` with
+  `claude-log-done` (both local). Codex lanes keep their working receipts under `~/nuke-logs/<lane>/`.
+- Merge your own PR once every check is green (owner, 2026-10-12), one at a time when it carries a
+  migration or a function so the deploy run applies each; then verify the live surface and say which
+  stage was reached: implemented, tested, merged, deployed or runtime-verified.
 - Read a file before changing it, and keep changes surgical. A fix is a few lines, not a rewrite.
 
 ## Rules by area
