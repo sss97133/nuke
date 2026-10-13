@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings, isAuctionPresentation } from './buildAuctionPulse';
+import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult, isAuctionPresentation } from './buildAuctionPulse';
 
 const listing = {
   id: 'event-1', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/synthetic-soft-close',
@@ -28,6 +28,17 @@ describe('classified and auction price meaning', () => {
   });
   it('refreshes the existing reader when source/type qualification changes', () => {
     expect(auctionReaderRevision({ ...listing, event_type: 'listing' })).not.toBe(auctionReaderRevision({ ...listing, event_type: 'auction' }));
+  });
+  it('clears an active auction after a successful nonauction refresh, while a read failure preserves prior knowledge', () => {
+    let pulse = buildAuctionPulseFromReadResult({ data: [{ ...listing, event_type: 'auction' }], error: null }, 'synthetic-vehicle');
+    const prior = pulse;
+    expect(prior).toMatchObject({ platform: 'bat', listing_status: 'active', current_bid: listing.current_price });
+    const failure = new Error('read unavailable');
+    expect(() => { pulse = buildAuctionPulseFromReadResult({ data: null, error: failure }, 'synthetic-vehicle'); }).toThrow(failure);
+    expect(pulse).toBe(prior);
+    pulse = buildAuctionPulseFromReadResult({ data: [{ ...listing, event_type: 'listing' }], error: null }, 'synthetic-vehicle');
+    expect(pulse).toBeNull();
+    expect(buildAuctionPulseFromReadResult({ data: [], error: null }, 'synthetic-vehicle')).toBeNull();
   });
 });
 

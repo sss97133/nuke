@@ -39,6 +39,13 @@ export function isAuctionPresentation(row: any): boolean {
   } catch { return false; }
 }
 
+// A successful empty/disqualified read clears a prior pulse. A failed read
+// cannot establish that an auction disappeared; callers retain their state.
+export function buildAuctionPulseFromReadResult(result: { data: any[] | null; error: unknown }, vehicleId: string): any | null {
+  if (result.error) throw result.error;
+  return buildAuctionPulseFromExternalListings(result.data ?? [], vehicleId);
+}
+
 export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForRows: string): any | null {
   // vehicle_events is the canonical reader; its IDs must not enter the legacy listing sync writer.
   const arr = (Array.isArray(rows) ? rows : []).filter(isAuctionPresentation).map((r) => r?.source_url ? {
