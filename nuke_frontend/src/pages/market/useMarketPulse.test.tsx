@@ -74,6 +74,7 @@ describe('the payload names its slots', () => {
     fixture.rpc.mockResolvedValue({ data: { v: 3, columns: moved, auctions: [row] }, error: null });
     await expect(fetchPulse()).rejects.toThrow(/names its slots \[id, year, make, model, reserve_met, current_bid/);
     expect(() => assertPulseColumns(PULSE_COLUMNS.slice(0, 16))).toThrow(/this reader expects/);
+    expect(() => assertPulseColumns([...PULSE_COLUMNS, 'heat'])).not.toThrow(); // appended slots are fine
   });
   it('still decodes a v1 payload that names nothing', async () => {
     fixture.rpc.mockResolvedValue({ data: { auctions: [row] }, error: null });

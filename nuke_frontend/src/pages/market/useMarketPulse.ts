@@ -106,11 +106,14 @@ export const PULSE_COLUMNS = [
   'band_p10', 'band_p50', 'band_p90', 'band_tier', 'band_comps',
 ] as const;
 
+/** A payload that names its slots must name these first, in this order. Slots appended after them are fine (a
+ *  later version may add a server-computed verdict at the end); a slot moved, renamed or missing is refused. The
+ *  phone's BoardContract applies the same rule. */
 export function assertPulseColumns(columns: unknown): void {
   if (!Array.isArray(columns)) return; // a v1 payload names nothing; the positions are taken on trust as before
   const got = columns.map(String);
-  if (got.length !== PULSE_COLUMNS.length || got.some((c, i) => c !== PULSE_COLUMNS[i])) {
-    throw new Error(`market_pulse_live names its slots [${got.join(', ')}]; this reader expects [${PULSE_COLUMNS.join(', ')}]`);
+  if (got.length < PULSE_COLUMNS.length || PULSE_COLUMNS.some((c, i) => c !== got[i])) {
+    throw new Error(`market_pulse_live names its slots [${got.join(', ')}]; this reader expects [${PULSE_COLUMNS.join(', ')}] first`);
   }
 }
 
