@@ -151,10 +151,49 @@ final class SyncEngine: ObservableObject {
     private var seenSet: [String]
 
     private var changeObserver: PhotoLibraryObserver?
+
+    // ─── Thermal and power hold ────────────────────────────────────────────────
+    // The drain and the sync pass stop between photos when iOS reports the device
+    // seriously hot or Low Power Mode is on, and resume on their own when it cools or
+    // the mode is turned off. The queue is persisted, so nothing is lost. Before this,
+    // nothing in the app read the thermal state (owner, 2026-10-13: "the phone gets
+    // HELLA hot once I open the app").
+    @Published private(set) var thermalHold = false
+    /// Set when a foreground pass stopped at its budget with work left for the background job.
+    @Published private(set) var foregroundBudgetReached = false
+    private var thermalObserver: NSObjectProtocol?
+    private var powerObserver: NSObjectProtocol?
+
+    /// True when the device should not be doing bulk photo work right now.
+    static var deviceTooHotOrLow: Bool {
+        let p = ProcessInfo.processInfo
+        return p.thermalState == .serious || p.thermalState == .critical || p.isLowPowerModeEnabled
+    }
+    private func refreshThermalHold() {
+        let hold = Self.deviceTooHotOrLow
+        if hold != thermalHold { thermalHold = hold }
+    }
+    private func observeThermalAndPower() {
+        let center = NotificationCenter.default
+        thermalObserver = center.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.thermalOrPowerChanged() }
+        }
+        powerObserver = center.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.thermalOrPowerChanged() }
+        }
+        refreshThermalHold()
+    }
+    private func thermalOrPowerChanged() async {
+        let was = thermalHold
+        refreshThermalHold()
+        // Cooled down, or Low Power Mode off: pick the persisted queue back up.
+        if was, !thermalHold, started, !isPaused { await resumeBackfillIfNeeded() }
+    }
     private var pendingRescan: Task<Void, Never>?
     private var started = false
 
     private init() {
+        defer { observeThermalAndPower() }
         totalSynced = defaults.integer(forKey: Key.totalSynced)
         totalSkippedOffShop = defaults.integer(forKey: Key.totalSkipped)
         seenSet = defaults.stringArray(forKey: Key.seenSet) ?? []
@@ -380,6 +419,9 @@ final class SyncEngine: ObservableObject {
             // cleanly; un-processed assets retry next pass because the
             // watermark below only advances on failures == 0.
             if Task.isCancelled { failed += 1; break }
+            // A hot or low-power device stops here; the watermark does not advance past
+            // this pass (failures > 0), so the remainder is re-found when it cools.
+            if Self.deviceTooHotOrLow { refreshThermalHold(); failed += 1; break }
 
             // ── Gate 1 (privacy, on-device): GPS site-gate + ownership check ──
             // Confirmed ignition sites; falls back to the hardcoded
@@ -554,15 +596,21 @@ final class SyncEngine: ObservableObject {
 
     /// Resume a persisted queue (after relaunch or un-pause). No-op when
     /// the queue is empty.
+    /// Foreground resume: budgeted, so an open of the app pushes a bounded slice and
+    /// the power + Wi-Fi background job carries the rest.
     func resumeBackfillIfNeeded() async {
         let queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
         guard !queue.isEmpty else { return }
         backfillRemaining = queue.count
-        await drainBackfill()
+        await drainBackfill(foregroundBudget: Config.foregroundBackfillBudget)
     }
 
-    private func drainBackfill() async {
+    private func drainBackfill(foregroundBudget: Int? = nil) async {
         guard !isSyncing, !isPaused else { return }
+        refreshThermalHold()
+        if thermalHold { return }                       // the queue persists; thermalOrPowerChanged resumes it
+        foregroundBudgetReached = false
+        var attemptedInPass = 0
         guard let userId = SupabaseService.currentUserId else {
             lastError = "Not signed in"
             return
@@ -620,6 +668,12 @@ final class SyncEngine: ObservableObject {
 
             for asset in assets {
                 if Task.isCancelled || isPaused { return }
+                if Self.deviceTooHotOrLow { refreshThermalHold(); return }   // persisted; resumes on cool-down
+                if let budget = foregroundBudget {
+                    if attemptedInPass >= budget { foregroundBudgetReached = true; return }
+                    attemptedInPass += 1
+                    if attemptedInPass > 1 { try? await Task.sleep(for: .milliseconds(Config.foregroundBackfillPaceMs)) }
+                }
 
                 // Same gate as sync() — backfill candidates came from
                 // confirmed clusters, but the gate is the gate.
