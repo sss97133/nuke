@@ -406,6 +406,8 @@ describe('the board in its own history', () => {
     await render();
     await click('Use recorded sales view');
     expect(window.location.search).toContain('make=PORSCHE');
+    await render('view=sales');
+    expect(container.textContent).toContain('Comparison scope PORSCHE');
   });
 });
 

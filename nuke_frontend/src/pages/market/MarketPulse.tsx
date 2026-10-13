@@ -466,8 +466,15 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const boardRef = useRef<HTMLDivElement>(null);
 
   const makeParam = params.get('make')?.toUpperCase();
-  const make = makeParam === 'ALL' ? null : makeParam ?? null;
   const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
+  // Recorded sales never opens empty: without a chosen make it reads the largest open cohort.
+  const liveForDefault = data?.auctions ?? [];
+  const defaultMake = view === 'sales' && (!makeParam || makeParam === 'ALL') ? (() => {
+    const counts = new Map<string, number>();
+    for (const a of liveForDefault) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
+    return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
+  })() : null;
+  const make = makeParam === 'ALL' ? defaultMake : makeParam ?? defaultMake;
   const model = make ? params.get('model') : null;
   const inventoryLens = mapLens(params, make);
   const lotParam = params.get('lot');
