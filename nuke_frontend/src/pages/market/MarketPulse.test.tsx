@@ -134,6 +134,16 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('mapInside=none');
     expect(container.querySelector('[data-map-group="PORSCHE"] .inventory-map-child')).toBeNull();
   });
+  it('keeps every model as a cell inside its brand instead of folding them into a list box', async () => {
+    fixture.pulse.data.auctions = [...fixture.pulse.data.auctions,
+      ...Array.from({ length: 60 }, (_, i) => ({ ...lot(`p-${i}`, 'PORSCHE', null, 1), model: `Model ${i}` })),
+      ...Array.from({ length: 12 }, (_, i) => lot(`f-${i}`, 'FORD', null, 1))];
+    await render();
+    const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
+    expect(porsche.querySelectorAll('.inventory-map-child')).toHaveLength(61);
+    expect(porsche.textContent).not.toContain('more models');
+    expect(porsche.querySelector('button[aria-label^="Local fixture: 3 captured lots"]')).toBeTruthy();
+  });
   it('opens an individual lot in the existing evidence route without a nested button', async () => {
     const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
     fixture.pulse.data.auctions[0].id = id;

@@ -50,11 +50,11 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
         const children = roomy ? squarify(rect.node.remainder.map(node => ({ node, area: node.lots.length })), 0, 0, rect.w - 4, rect.h - 48) : [];
         return { ...rect, expanded: roomy, children, childDimension: lens.group as MapDimension | 'lot' };
       }
+      // Inside a box every member keeps its area, down to a pixel: a brand's models read as a distribution
+      // (one model dominating, a long tail), labelled where there is room and identified by hover or focus elsewhere.
       const expanded = lens.inside !== 'none' && lens.inside !== lens.group && roomy;
       const childGroups = expanded ? inventoryGroups(rect.node.lots, lens.inside as MapDimension | 'lot', taxonomy) : [];
-      const children = lens.inside === 'lot'
-        ? squarify(childGroups.map(node => ({ node, area: 1 })), 0, 0, rect.w - 4, rect.h - 48)
-        : readableInventoryLayout(childGroups, rect.w - 4, rect.h - 48);
+      const children = squarify(childGroups.map(node => ({ node, area: lens.inside === 'lot' ? 1 : node.lots.length })), 0, 0, rect.w - 4, rect.h - 48);
       return { ...rect, expanded, children, childDimension: lens.inside as MapDimension | 'lot' };
     });
   }, [groups, lens.focus, lens.inside, lens.group, taxonomy, width, height]);
@@ -124,7 +124,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
             const changed = pulses && child.node.lots.some(a => risenIds.has(a.id));
             const dimension = childDimension;
             const more = 'remainder' in child.node ? child.node.remainder as InventoryMapGroup[] | undefined : undefined;
-            const labeled = dimension !== 'lot' || (child.w >= 52 && child.h >= 42);
+            const labeled = child.w >= 56 && child.h >= 44;
             const lot = dimension === 'lot' ? child.node.lots[0] : null;
             const vehicleLabel = lot ? [lot.year, lens.group === 'make' ? null : lot.make, lot.model].filter(Boolean).join(' ') : null;
             return <button type="button" key={child.node.key} data-map-lot={dimension === 'lot' && !more ? child.node.lots[0].id : undefined}
@@ -135,7 +135,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
               onMouseEnter={() => setHovered(describe(child.node, dimension))} onFocus={() => setHovered(describe(child.node, dimension))}
               onClick={() => more ? showList(more, dimension, node.name, node.key) : select(dimension, child.node, !node.remainder)}>
               {labeled && <span className="inventory-map-name">{more ? `${more.length} more ${plural(dimension)}` : vehicleLabel || identity(child.node, dimension, child.w >= 160)}</span>}
-              {dimension !== 'lot' && count(child.node)}
+              {labeled && dimension !== 'lot' && count(child.node)}
               {labeled && (more || (dimension === 'lot' && child.w >= 88 && child.h >= 68)) && <span className="inventory-map-action">{more ? 'Open list' : 'Inspect'} →</span>}
             </button>;
           })}</div>}
