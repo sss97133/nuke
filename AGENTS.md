@@ -142,7 +142,11 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
 
 ## Working alongside other agents
 - Work in your own worktree:
-  `git worktree add ~/.worktrees/<task> -b <branch> origin/main`.
+  `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
+  `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the
+  pre-commit type check finds `tsc` (a fresh worktree has no dependencies installed). When the PR is
+  merged, `git worktree remove ~/.worktrees/<task>`; the branch may stay. A worktree is about 500 MB,
+  and on 2026-10-13 the laptop held 404 of them (382 GB) with 14 GB of disk left.
 - When several sessions run, one lane list says who owns what: `.claude/LANES.md` in the shared checkout
   (local, not committed). Codex threads register there too, with the path of their pickup file. Tell the
   others before you push. Handoffs go in `.claude/handoffs/`; finished work is logged to `DONE.md` with
