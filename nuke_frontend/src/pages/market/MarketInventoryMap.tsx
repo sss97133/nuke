@@ -37,6 +37,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
   useEffect(() => { setHovered(null); setList(null); }, [lens.group, lens.inside, lens.focus]);
 
   const height = width < 640 ? 480 : 520;
+  const singleMake = useMemo(() => new Set(auctions.map(a => a.make)).size === 1, [auctions]);
   const groups = useMemo(() => inventoryGroups(auctions, lens.group, taxonomy), [auctions, lens.group, taxonomy]);
   const listedGroups = useMemo(() => list ? inventoryGroups(auctions.filter(a => list.parentKey == null
     || mapValue(a, lens.group, taxonomy) === list.parentKey), list.dimension, taxonomy).filter(g => list.keys.includes(g.key)) : [],
@@ -127,7 +128,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
             const more = 'remainder' in child.node ? child.node.remainder as InventoryMapGroup[] | undefined : undefined;
             const labeled = child.w >= 56 && child.h >= 44;
             const lot = dimension === 'lot' ? child.node.lots[0] : null;
-            const vehicleLabel = lot ? [lot.year, lens.group === 'make' ? null : lot.make, lot.model].filter(Boolean).join(' ') : null;
+            const vehicleLabel = lot ? [lot.year, lens.group === 'make' || singleMake ? null : lot.make, lot.model].filter(Boolean).join(' ') : null;
             return <button type="button" key={child.node.key} data-map-lot={dimension === 'lot' && !more ? child.node.lots[0].id : undefined}
               data-map-more={!!more || undefined}
               className={`inventory-map-child${!labeled ? ' inventory-map-pixel' : ''}${changed ? ' inventory-map-pulse' : ''}`} aria-pressed={active(child.node)}

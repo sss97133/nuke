@@ -72,7 +72,7 @@ export const SearchEmptyState: React.FC<Props> = ({
               fontSize: '8px', fontWeight: 800, letterSpacing: '1px',
               color: 'var(--text-disabled)', textTransform: 'uppercase',
             }}>
-              VEHICLES INDEXED
+              VEHICLES WITH A RECORDED PRICE
             </div>
           </div>
         )}

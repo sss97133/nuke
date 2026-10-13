@@ -45,18 +45,16 @@ export function useSearchEmptyState(enabled: boolean) {
     // Makes with their true counts, from the ledger's by-brand view (vehicles with a recorded price), and the
     // planner's estimate of the public total: neither walks the table, so neither can time out.
     const makesQuery = supabase.rpc('treemap_by_brand');
-    const countQuery = supabase
-      .from('vehicles')
-      .select('id', { count: 'planned', head: true })
-      .eq('is_public', true);
 
     // One slow or failed reader must not blank the others.
-    Promise.allSettled([boardQuery, makesQuery, countQuery]).then(
-      ([boardRes, makesRes, countRes]) => {
+    Promise.allSettled([boardQuery, makesQuery]).then(
+      ([boardRes, makesRes]) => {
         if (boardRes.status === 'fulfilled') { setRecentVehicles(boardRes.value.recent); setNotableSales(boardRes.value.notable); }
-        if (countRes.status === 'fulfilled' && countRes.value.count != null) setTotalCount(countRes.value.count);
         if (makesRes.status === 'fulfilled' && Array.isArray(makesRes.value.data)) {
-          const sorted = (makesRes.value.data as { name: string; count: number }[])
+          const rows = makesRes.value.data as { name: string; count: number }[];
+          // The same total the ledger map states: vehicles with a recorded price, summed over makes.
+          setTotalCount(rows.reduce((sum, row) => sum + (row.count > 0 ? row.count : 0), 0));
+          const sorted = rows
             .filter((row) => row.name && row.count > 0)
             .sort((a, b) => b.count - a.count)
             .slice(0, 12)
