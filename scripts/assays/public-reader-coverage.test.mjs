@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, acquireIdentityEvidence, inspectIdentityEvidence, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -844,6 +844,159 @@ test('old low-age freshness receipts expire by elapsed time since measurement', 
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const streamSubject = key => ({ type: 'subject', key, grain: 'public_vehicle_record', capabilities: ['find_open'] });
+const identityFields = ['year', 'make', 'model'];
+const identityHash = 'e'.repeat(64);
+function identitySubject(n, plausible = 0) {
+  return { vehicleId: id(n), publicEligible: true, values: { year: 1960, make: 'synthetic', model: 'offline' }, identitySha256: identityHash,
+    facets: Object.fromEntries(identityFields.map(f => [f, { typedCount: plausible, plausibleCount: plausible, otherTypedCount: 0, legacyCount: 0, legacyMatchingCount: 0 }])) };
+}
+function identityConfig(config, budget = {}) {
+  return { mode: 'public_identity_evidence_v1', configuration: config,
+    budget: { batchSize: 200, maxRequests: 100, pauseMs: 100, until: new Date(matrixNow + 60000).toISOString(), ...budget } };
+}
+function identityReply(mode, extra = {}) {
+  return { schemaVersion: 'public_identity_evidence_v1', mode, measuredAt: new Date(matrixNow).toISOString(), ownerSha256: 'f'.repeat(64), ...extra };
+}
+function identityInventory(subjects, candidates = [], hasMore = false) {
+  const last = candidates.at(-1);
+  return identityReply('inventory', { subjects, candidates, hasMore, candidatePageExhausted: !hasMore,
+    nextCursor: hasMore ? { vehicleId: last.vehicleId, observationId: last.observationId } : null });
+}
+function identityClaim(n, field, serial) {
+  return { vehicleId: id(n), propertyKey: field, observationId: id(serial), sourceObservationId: id(serial + 10000),
+    method: 'retained_listing_property_projection_v1', profile: 'offline' };
+}
+function identityChecked(c) {
+  return { ...c, publicEligible: true, custodyMatches: true, matchesDisplayedValue: true, qualified: true, identitySha256: identityHash,
+    sourceId: id(999), sourceRecordedAt: new Date(matrixNow - 1000).toISOString(), sourceObservedAt: null,
+    claimRecordedAt: new Date(matrixNow - 1000).toISOString(), claimObservedAt: new Date(matrixNow - 1000).toISOString(),
+    sourceEventTimeStatus: 'unknown', identityResolutionStatus: 'unverified' };
+}
+const identityDeps = { now: () => matrixNow, pause: async () => {} };
+
+test('identity evidence distinguishes unsupported lineage, disagreement, refused witnesses and unknowns', () => {
+  const s = identitySubject(1, 1), claims = identityFields.map((f, i) => identityChecked(identityClaim(1, f, 10 + i)));
+  assert.equal(inspectIdentityEvidence(s, claims).evidenceGate, 'passed');
+  assert.equal(inspectIdentityEvidence(s, claims).readiness, 'not_assessed');
+  claims[0].matchesDisplayedValue = false;
+  assert.equal(inspectIdentityEvidence(s, claims).facets.year.state, 'value_disagreement');
+  claims[0].qualified = false; claims[0].custodyMatches = false;
+  assert.equal(inspectIdentityEvidence(s, claims).facets.year.state, 'invalid_supported_witness');
+  s.facets.year.legacyCount = 1;
+  assert.equal(inspectIdentityEvidence(s, claims).facets.year.state, 'unsupported_method');
+  assert.equal(inspectIdentityEvidence(s, claims, false).facets.model.state, 'incomplete');
+  assert.equal(inspectIdentityEvidence(identitySubject(2), []).facets.year.state, 'missing_in_supported_paths');
+});
+
+test('identity acquisition exhausts source candidates without calling the population ready', async t => {
+  const { config } = await populationFixture(t, [1, 2].map(n => streamSubject(id(n))));
+  const candidates = identityFields.map((f, i) => identityClaim(1, f, i + 10)), rows = [], calls = [];
+  const result = await acquireIdentityEvidence(identityConfig(config), { ...identityDeps, emit: r => rows.push(r), query: async a => {
+    calls.push(a);
+    return a.mode === 'inventory' ? identityInventory([identitySubject(1, 1), identitySubject(2)], candidates)
+      : identityReply('custody', { results: candidates.map(identityChecked) });
+  } });
+  assert.equal(calls.length, 2); assert.equal(result.inspected, 2); assert.equal(result.collected, 2);
+  assert.deepEqual(result.evidenceGateTotals, { passed: 1, not_assessed: 1 });
+  assert.equal(result.ready, 0); assert.equal(result.notAssessed, 2); assert.equal(result.fullPopulationAcquired, true);
+  assert.equal(result.population.fullRetained.count, 12); assert.equal(result.anonymousDeliveryMeasured, false);
+  assert.equal(rows.filter(r => r.type === 'identity_evidence').length, 2);
+});
+
+test('identity acquisition verifies every manifest byte before any production read', async t => {
+  const { config } = await populationFixture(t, [streamSubject(id(1))]);
+  await writeFile(config.manifest.path, '\n', { flag: 'a' });
+  let calls = 0;
+  await assert.rejects(acquireIdentityEvidence(identityConfig(config), { ...identityDeps, query: () => { calls++; } }), /stream_data_after_end/);
+  assert.equal(calls, 0);
+});
+
+test('identity acquisition accounts for private, missing and failed batches and stops after two failures', async t => {
+  const { config } = await populationFixture(t, [1, 2, 3, 4].map(n => streamSubject(id(n))));
+  let calls = 0; const rows = [];
+  const result = await acquireIdentityEvidence(identityConfig(config, { batchSize: 1 }), { ...identityDeps, emit: r => rows.push(r), query: () => {
+    calls++;
+    if (calls === 1) return identityInventory([{ vehicleId: id(1), publicEligible: false }]);
+    throw new Error('PRIVATE DATABASE ERROR');
+  } });
+  assert.equal(calls, 3); assert.equal(result.inspected, 3); assert.equal(result.collected, 1);
+  assert.equal(result.stopReason, 'identity_read_failed'); assert.equal(result.uninspectedInFullPopulation, 1);
+  assert.equal(result.notAssessed, 4); assert.equal(result.fullPopulationAcquired, false);
+  assert.equal(JSON.stringify(rows).includes('PRIVATE DATABASE ERROR'), false);
+  assert.equal(rows[1].reason, 'cohort_member_not_public_now');
+});
+
+test('identity acquisition refuses foreign, duplicate, changed and incomplete custody results', async t => {
+  const { config } = await populationFixture(t, [streamSubject(id(1))]);
+  const candidates = identityFields.map((f, i) => identityClaim(1, f, 10 + i));
+  for (const mutate of [
+    r => { r.results[0].vehicleId = id(9); }, r => { r.results[1] = r.results[0]; },
+    r => { r.results.pop(); }, r => { r.results[0].identitySha256 = 'a'.repeat(64); },
+    r => { r.ownerSha256 = 'b'.repeat(64); }, r => { r.results[0].publicEligible = false; },
+    r => { r.results[0].sourceObservationId = id(999); }, r => { delete r.results[0].sourceRecordedAt; },
+  ]) {
+    const result = await acquireIdentityEvidence(identityConfig(config), { ...identityDeps, query: a => {
+      if (a.mode === 'inventory') return identityInventory([identitySubject(1, 1)], candidates);
+      const r = identityReply('custody', { results: candidates.map(identityChecked) }); mutate(r); return r;
+    } });
+    assert.equal(result.evidenceGateTotals.passed, 0); assert.equal(result.collected, 0);
+    assert.equal(result.facets.year.incomplete, 1);
+  }
+});
+
+test('identity pagination consumes every candidate and refuses a false exhausted tail', async t => {
+  const { config } = await populationFixture(t, [streamSubject(id(1))]);
+  const candidates = Array.from({ length: 101 }, (_, i) => identityClaim(1, identityFields[i % 3], i + 10));
+  const s = identitySubject(1);
+  for (const c of candidates) { s.facets[c.propertyKey].typedCount++; s.facets[c.propertyKey].plausibleCount++; }
+  let requests = 0;
+  const result = await acquireIdentityEvidence(identityConfig(config), { ...identityDeps, query: a => {
+    requests++;
+    if (a.mode === 'custody') return identityReply('custody', { results: candidates.filter(c => a.candidateIds.includes(c.observationId)).map(identityChecked) });
+    if (!a.cursor) return identityInventory([s], candidates.slice(0, 100), true);
+    assert.equal(a.cursor.observationId, candidates[99].observationId);
+    return identityInventory([s], candidates.slice(100));
+  } });
+  assert.equal(requests, 4); assert.equal(result.evidenceGateTotals.passed, 1);
+  const bad = await acquireIdentityEvidence(identityConfig(config), { ...identityDeps, query: a => a.mode === 'inventory'
+    ? identityInventory([s], candidates.slice(0, 100)) : identityReply('custody', { results: candidates.slice(0, 100).map(identityChecked) }) });
+  assert.equal(bad.collected, 0); assert.equal(bad.reasons.identity_candidate_exhaustion_mismatch, 1);
+});
+
+test('identity request budget cannot turn an unvisited custody page into missing evidence', async t => {
+  const { config } = await populationFixture(t, [1, 2].map(n => streamSubject(id(n))));
+  const candidates = identityFields.map((f, i) => identityClaim(1, f, i + 10));
+  let calls = 0;
+  const result = await acquireIdentityEvidence(identityConfig(config, { batchSize: 1, maxRequests: 1 }), {
+    ...identityDeps, query: () => { calls++; return identityInventory([identitySubject(1, 1)], candidates); } });
+  assert.equal(calls, 1); assert.equal(result.stopReason, 'identity_request_budget');
+  assert.equal(result.collected, 0); assert.equal(result.inspected, 1); assert.equal(result.uninspectedInFullPopulation, 1);
+  assert.equal(result.facets.year.incomplete, 1); assert.equal(result.notAssessed, 2);
+});
+
+test('identity CLI writes exclusive private hashed segments and preserves dated population scope', async t => {
+  const { config, dir } = await populationFixture(t, [streamSubject(id(1))]);
+  const inputPath = path.join(dir, 'identity-config.json'), out = path.join(dir, 'identity.jsonl');
+  await writeFile(inputPath, JSON.stringify(identityConfig(config)));
+  const deps = { ...identityDeps, print: () => {}, query: () => identityInventory([identitySubject(1)]) };
+  assert.equal(await main(['--identity-evidence', inputPath, '--out', out], deps), 0);
+  assert.equal((await stat(out)).mode & 0o777, 0o600);
+  const text = await readFile(out, 'utf8'), lines = text.trimEnd().split('\n'), last = JSON.parse(lines.at(-1));
+  assert.equal(last.precedingOutputSha256, digest(lines.slice(0, -1).join('\n') + '\n'));
+  assert.equal(last.precedingOutputRows, 2); assert.equal(last.population.measuredAt, config.population.measuredAt);
+  assert.equal(await main(['--identity-evidence', inputPath, '--out', out], deps), 1);
+  assert.equal(await readFile(out, 'utf8'), text);
+});
+
+test('identity segments cannot claim skipped subjects were measured or accept an arbitrary resume key', async t => {
+  const { config } = await populationFixture(t, [1, 2].map(n => streamSubject(id(n))));
+  const input = { ...identityConfig(config), after: id(1) };
+  const result = await acquireIdentityEvidence(input, { ...identityDeps, query: a => identityInventory(a.vehicleIds.map(v => identitySubject(Number(v.slice(-12))))) });
+  assert.equal(result.inspected, 1); assert.equal(result.uninspectedInFullPopulation, 1);
+  assert.equal(result.fullPopulationAcquired, false); assert.equal(result.notAssessed, 2);
+  input.after = id(3);
+  await assert.rejects(acquireIdentityEvidence(input, { ...identityDeps, query: () => { throw Error('must not query'); } }), /resume_key_outside_manifest/);
+});
 const streamAssessment = key => {
   const a = readySubject(); a.key = key;
   for (const gate of Object.values(a.gates)) gate.receipt.key = key;
