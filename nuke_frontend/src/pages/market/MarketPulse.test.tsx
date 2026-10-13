@@ -58,6 +58,7 @@ function button(prefix: string) {
 }
 async function click(prefix: string) { await act(async () => button(prefix).click()); }
 function boardTitles() { return [...container.querySelectorAll<HTMLElement>('.market-lot-row')].map(a => a.dataset.vehicleId); }
+function cohortCount() { return container.querySelector('.k-masthead__result .k-measure')?.textContent; }
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -268,7 +269,9 @@ describe('market answer -> supporting lots', () => {
     expect(boardTitles().slice(-1)).toEqual(['other-make']);
     await click('Choose all live makes');
     expect(window.location.search).toContain('make=all');
-    expect(button('Live lots').textContent).toContain('4');
+    expect(cohortCount()).toBe('4');
+    expect([...container.querySelectorAll('button')].some(b => b.textContent === 'Live lots')).toBe(false);
+    expect(container.querySelector('[aria-label="Open inventory filters"]')?.textContent).not.toContain('Ending < 1 h');
   });
   it('keeps unknown separate from zero and assigns each boundary exactly once', () => {
     const bids = [null, 0, 9_999, 10_000, 24_999, 25_000, 49_999, 50_000, 99_999, 100_000, NaN, -1];
@@ -284,10 +287,12 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('source currency unknown');
     expect(container.textContent).not.toContain('USD');
     expect(container.textContent).not.toContain('$');
-    expect(button('Live lots').textContent).toContain('3');
+    expect(cohortCount()).toBe('3');
     expect(container.textContent).toContain('3 of 4 captured BaT vehicle lots');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
-    await click('Live lots');
+    await click('Ending < 24 h');
+    expect(button('Ending < 24 h').getAttribute('aria-pressed')).toBe('true');
+    await click('Ending < 24 h');
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
     expect(window.location.search).toContain('board=1');
   });
@@ -313,11 +318,11 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('No open lots match these filters');
     expect(container.textContent).toContain('0 of 0 lots have a recorded bid number');
     expect(container.textContent).not.toContain('Median current bid');
-    await click('Clear market filters'); expect(button('Live lots').textContent).toContain('4');
+    await click('Clear market filters'); expect(cohortCount()).toBe('4');
   });
   it('distinguishes loading, failure, and a failed refresh with previously fetched data', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
-    await render(); expect(button('Live lots').textContent).toContain('…');
+    await render(); expect(cohortCount()).toBe('…');
     expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeNull();
     fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render(); expect(container.textContent).toContain('could not be loaded');
