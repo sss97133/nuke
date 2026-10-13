@@ -32,6 +32,15 @@
  * Stream paths are relative to the comparison file. Both sides use the same
  * population filter, grain and capability eligibility rules. Arrivals/departures,
  * prior unknowns and changed objectives remain separate from shared transitions.
+ * Operator identity-witness acquisition (existing read-only Management API path):
+ *   --identity-evidence /private/config.json --out /private/new-segment.jsonl
+ * Config: {mode:public_identity_evidence_v1, configuration:<reconciliation config>,
+ *   after?:<last UUID>, budget:{batchSize:1..200,maxRequests:1..10000,pauseMs:100..60000,until}}.
+ * Each private segment reports its dated full denominator, current read window,
+ * exact source-path exhaustion and uninspected population. `after` selects a
+ * segment, not proof that earlier segments completed. Terminal hashes certify
+ * receipt bytes only. Source support is one gate; anonymous delivery, independent
+ * quality, freshness and service remain unassessed. No database or model writes.
  */
 import { open, realpath, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
@@ -39,6 +48,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readQuery } from './data-model-coverage.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PROJECT = 'https://qkgaybvrernstplzjaam.supabase.co';
@@ -1450,10 +1460,245 @@ async function runAcceptanceMatrix(args, print) {
   } finally { await source?.close(); await output?.close(); }
 }
 
+// Operator evidence acquisition shares this assay owner but is NOT an anonymous
+// delivery test. Every query uses the existing read-only, five-second q.sh path.
+const IDENTITY_FIELDS = ['year', 'make', 'model'];
+const IDENTITY_VERSION = 'public_identity_evidence_v1';
+
+function identityInput(input, now) {
+  reconciliationContract(input?.configuration, now);
+  const b = input.budget;
+  if (input.mode !== IDENTITY_VERSION || input.configuration.population.grain !== 'public_vehicle_record' ||
+    input.configuration.capabilities.length !== 1 || input.configuration.capabilities[0].id !== 'find_open' ||
+    !object(b) || !Number.isInteger(b.batchSize) || b.batchSize < 1 || b.batchSize > 200 ||
+    !Number.isInteger(b.maxRequests) || b.maxRequests < 1 || b.maxRequests > 10000 ||
+    !Number.isInteger(b.pauseMs) || b.pauseMs < 100 || b.pauseMs > 60000 ||
+    !streamClock(b.until) || Date.parse(b.until) <= now || Date.parse(b.until) > now + 14 * 3600000 ||
+    !UUID.test(input.after ?? ZERO)) throw new AssayError('invalid_identity_evidence_scope');
+  return { ...b, after: (input.after ?? ZERO).toLowerCase(), until: Date.parse(b.until) };
+}
+
+function identitySubjects(rows, ids) {
+  if (!Array.isArray(rows) || rows.length !== ids.length) throw new AssayError('identity_subject_response_incomplete');
+  for (let i = 0; i < rows.length; i++) {
+    const s = rows[i];
+    if (s?.vehicleId !== ids[i] || typeof s.publicEligible !== 'boolean') throw new AssayError('identity_subject_scope_invalid');
+    if (!s.publicEligible) {
+      if (s.values != null || s.facets != null) throw new AssayError('identity_private_payload_refused');
+      continue;
+    }
+    if (!object(s.values) || !object(s.facets) || !DIGEST.test(s.identitySha256 ?? '')) throw new AssayError('identity_subject_shape_invalid');
+    for (const field of IDENTITY_FIELDS) {
+      const f = s.facets[field];
+      if (!object(f) || !['typedCount', 'plausibleCount', 'otherTypedCount', 'legacyCount', 'legacyMatchingCount'].every(k => count(f[k])) ||
+        f.typedCount !== f.plausibleCount + f.otherTypedCount || f.legacyMatchingCount > f.legacyCount)
+        throw new AssayError('identity_inventory_counts_invalid');
+    }
+  }
+}
+
+// This classifies only support in the declared source paths. Legacy testimony
+// and unimplemented methods remain visible and cannot establish absence or pass.
+export function inspectIdentityEvidence(subject, results, complete = true) {
+  const facets = {};
+  for (const field of IDENTITY_FIELDS) {
+    const f = subject.facets?.[field], claims = results.filter(r => r.propertyKey === field);
+    let state = 'incomplete';
+    if (complete && subject.publicEligible && f && claims.length === f.plausibleCount) {
+      if (claims.some(r => r.qualified === true && r.matchesDisplayedValue === true)) state = 'qualified';
+      else if (claims.some(r => r.custodyMatches === true && r.matchesDisplayedValue === false)) state = 'value_disagreement';
+      else if (f.otherTypedCount > 0 || f.legacyCount > 0) state = 'unsupported_method';
+      else if (claims.some(r => r.custodyMatches === false)) state = 'invalid_supported_witness';
+      else if (claims.length) state = 'incomplete';
+      else state = 'missing_in_supported_paths';
+    }
+    const qualified = claims.filter(r => r.qualified === true && r.matchesDisplayedValue === true);
+    facets[field] = { state, ...(f ?? {}), qualifiedWitnesses: qualified.length,
+      // Three replayable examples suffice to witness presence; counts above still
+      // exhaust all candidates. This cap never establishes absence or completeness.
+      witnesses: qualified.slice(0, 3).map(r => ({ observationId: r.observationId,
+        sourceObservationId: r.sourceObservationId, sourceId: r.sourceId,
+        sourceRecordedAt: r.sourceRecordedAt, sourceObservedAt: r.sourceObservedAt,
+        claimRecordedAt: r.claimRecordedAt, claimObservedAt: r.claimObservedAt,
+        sourceEventTimeStatus: r.sourceEventTimeStatus, identityResolutionStatus: r.identityResolutionStatus,
+        modelLabelScope: r.modelLabelScope })) };
+  }
+  const supported = IDENTITY_FIELDS.every(f => facets[f].state === 'qualified');
+  return { type: 'identity_evidence', key: subject.vehicleId, publicEligible: subject.publicEligible,
+    facets, ...(subject.publicEligible ? { displayedIdentity: subject.values, identitySha256: subject.identitySha256 } : {}),
+    evidenceGate: supported ? 'passed' : 'not_assessed',
+    // A missing supported path is not a global absence proof. The other seven
+    // acceptance gates, including independent semantic review, are untouched.
+    readiness: 'not_assessed', collectionExhausted: complete,
+    reason: supported ? 'supported_displayed_identity' : subject.publicEligible === true ? 'identity_support_incomplete'
+      : subject.publicEligible === false ? 'cohort_member_not_public_now' : 'public_eligibility_unassessed' };
+}
+
+export async function acquireIdentityEvidence(input, { query, emit = async () => {}, now = Date.now,
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  const b = identityInput(input, now()), c = input.configuration, verified = {};
+  // Validate the WHOLE dated manifest before issuing any live query. Incomplete
+  // input tails must not initiate an expensive partial census.
+  let previous = '', afterFound = b.after === ZERO;
+  for await (const s of reconciliationStream(c.manifest, c.population, 'subject', verified)) {
+    if (!UUID.test(s.key ?? '') || s.key !== s.key.toLowerCase() || s.key <= previous ||
+      s.grain !== c.population.grain || JSON.stringify(s.capabilities) !== '["find_open"]')
+      throw new AssayError('identity_manifest_subject_invalid');
+    previous = s.key;
+    if (s.key === b.after) afterFound = true;
+  }
+  if (!afterFound) throw new AssayError('identity_resume_key_outside_manifest');
+  const startedAt = new Date(now()).toISOString(), totals = {}, reasons = {}, retryRanges = [], gateTotals = { passed: 0, not_assessed: 0 };
+  let requests = 0, inspected = 0, collected = 0, lastKey = b.after, stopReason = 'manifest_exhausted', failures = 0, ownerHash;
+  await emit({ type: 'manifest', schemaVersion: IDENTITY_VERSION, population: c.population,
+    sourceManifest: verified, startedAt, after: b.after, budget: b,
+    anonymous: false, evidenceOnly: true, databaseWrites: 0, modelCalls: 0 });
+  async function request(args) {
+    if (requests >= b.maxRequests || now() >= b.until) throw new AssayError('identity_request_budget');
+    if (requests) await pause(b.pauseMs);
+    if (now() >= b.until) throw new AssayError('identity_request_budget');
+    requests++;
+    const r = await query(args);
+    if (r?.schemaVersion !== IDENTITY_VERSION || r.mode !== args.mode || !realClock(r.measuredAt) ||
+      Date.parse(r.measuredAt) > now() + 1000 || !DIGEST.test(r.ownerSha256 ?? ''))
+      throw new AssayError('identity_reader_contract_invalid');
+    if (ownerHash && ownerHash !== r.ownerSha256) throw new AssayError('identity_owner_changed');
+    ownerHash = r.ownerSha256;
+    return r;
+  }
+  async function batch(ids) {
+    let subjects, cursor = null, prior = '', complete = false, batchReason = null;
+    const batchResponses = createHash('sha256');
+    const bySubject = new Map(ids.map(id => [id, []])), seen = new Set();
+    const readStartedAt = new Date(now()).toISOString();
+    try {
+      do {
+        const r = await request({ mode: 'inventory', vehicleIds: ids, cursor });
+        batchResponses.update(JSON.stringify(r) + '\n');
+        identitySubjects(r.subjects, ids);
+        if (subjects && hash(subjects) !== hash(r.subjects)) throw new AssayError('identity_inventory_changed');
+        subjects = r.subjects;
+        if (!Array.isArray(r.candidates) || r.candidates.length > 100 || typeof r.hasMore !== 'boolean' ||
+          r.candidatePageExhausted !== !r.hasMore || r.hasMore && r.candidates.length !== 100)
+          throw new AssayError('identity_candidate_page_invalid');
+        for (const item of r.candidates) {
+          const key = `${item.vehicleId}:${item.observationId}`;
+          if (!bySubject.has(item.vehicleId) || !UUID.test(item.observationId ?? '') ||
+            !UUID.test(item.sourceObservationId ?? '') ||
+            !IDENTITY_FIELDS.includes(item.propertyKey) || key <= prior || seen.has(item.observationId))
+            throw new AssayError('identity_candidate_scope_invalid');
+          prior = key; seen.add(item.observationId);
+          if (seen.size > 10000) throw new AssayError('identity_candidate_memory_budget');
+        }
+        if (r.candidates.length) {
+          const checked = await request({ mode: 'custody', vehicleIds: ids,
+            candidateIds: r.candidates.map(x => x.observationId) });
+          batchResponses.update(JSON.stringify(checked) + '\n');
+          if (!Array.isArray(checked.results) || checked.results.length !== r.candidates.length)
+            throw new AssayError('identity_custody_response_incomplete');
+          const expected = new Map(r.candidates.map(x => [x.observationId, x]));
+          for (const item of checked.results) {
+            const candidate = expected.get(item.observationId);
+            if (!candidate || item.vehicleId !== candidate.vehicleId || item.propertyKey !== candidate.propertyKey ||
+              typeof item.qualified !== 'boolean' || typeof item.matchesDisplayedValue !== 'boolean' ||
+              ![true, false, null].includes(item.custodyMatches) ||
+              item.qualified && (item.custodyMatches !== true || item.publicEligible !== true) ||
+              item.identitySha256 !== subjects.find(s => s.vehicleId === item.vehicleId)?.identitySha256)
+              throw new AssayError('identity_custody_scope_invalid');
+            if (item.qualified && (item.sourceObservationId !== candidate.sourceObservationId || !UUID.test(item.sourceId ?? '') ||
+              !['sourceRecordedAt', 'claimRecordedAt', 'claimObservedAt'].every(k => realClock(item[k]) && Date.parse(item[k]) <= now()) ||
+              item.sourceObservedAt != null && (!realClock(item.sourceObservedAt) || Date.parse(item.sourceObservedAt) > now()) ||
+              item.sourceEventTimeStatus !== 'unknown' || item.identityResolutionStatus !== 'unverified'))
+              throw new AssayError('identity_witness_receipt_invalid');
+            expected.delete(item.observationId);
+            bySubject.get(item.vehicleId).push(item);
+          }
+        }
+        cursor = r.nextCursor;
+        const last = r.candidates.at(-1);
+        if (r.hasMore && (!last || cursor?.vehicleId !== last.vehicleId || cursor?.observationId !== last.observationId) ||
+          !r.hasMore && cursor !== null) throw new AssayError('identity_cursor_invalid');
+        complete = !r.hasMore;
+      } while (!complete);
+      for (const s of subjects) for (const field of IDENTITY_FIELDS) if (s.publicEligible &&
+        bySubject.get(s.vehicleId).filter(r => r.propertyKey === field).length !== s.facets[field].plausibleCount)
+        throw new AssayError('identity_candidate_exhaustion_mismatch');
+      failures = 0;
+    } catch (e) {
+      complete = false; failures++;
+      batchReason = e instanceof AssayError ? e.code : 'identity_read_failed';
+      retryRanges.push({ after: lastKey, through: ids.at(-1), reason: batchReason });
+      if (batchReason === 'identity_request_budget' || batchReason === 'identity_owner_changed' || failures >= 2) stopReason = batchReason;
+    }
+    const batchResponseSha256 = batchResponses.digest('hex');
+    for (const id of ids) {
+      const s = subjects?.find(s => s.vehicleId === id) ?? { vehicleId: id, publicEligible: null };
+      const row = inspectIdentityEvidence(s, bySubject.get(id), complete);
+      if (batchReason) row.reason = batchReason;
+      Object.assign(row, { readStartedAt, measuredAt: new Date(now()).toISOString(), ownerSha256: ownerHash ?? null, batchResponseSha256 });
+      for (const [field, f] of Object.entries(row.facets)) {
+        totals[field] ??= {}; incrementReasons(totals[field], f.state);
+      }
+      incrementReasons(reasons, row.reason); gateTotals[row.evidenceGate]++; inspected++; if (complete) collected++; lastKey = id;
+      await emit(row);
+    }
+  }
+  let ids = [];
+  for await (const s of reconciliationStream(c.manifest, c.population, 'subject', {})) {
+    if (s.key <= b.after) continue;
+    if (stopReason !== 'manifest_exhausted') break;
+    if (requests >= b.maxRequests || now() >= b.until) { stopReason = 'identity_request_budget'; break; }
+    ids.push(s.key);
+    if (ids.length === b.batchSize) { await batch(ids); ids = []; }
+  }
+  if (ids.length && stopReason === 'manifest_exhausted') await batch(ids);
+  const result = { type: 'summary', schemaVersion: IDENTITY_VERSION, population: c.population,
+    startedAt, completedAt: new Date(now()).toISOString(), after: b.after, resumeAfter: lastKey,
+    inspected, collected, uninspectedInFullPopulation: c.population.denominator - inspected,
+    segmentExhausted: stopReason === 'manifest_exhausted', fullPopulationAcquired: b.after === ZERO && collected === c.population.denominator,
+    stopReason, requests, facets: totals, evidenceGateTotals: gateTotals, reasons, retryRanges, ownerSha256: ownerHash ?? null,
+    ready: 0, blocked: 0, notAssessed: c.population.denominator,
+    publicReadinessCertificate: false, anonymousDeliveryMeasured: false, databaseWrites: 0, modelCalls: 0 };
+  await emit(result); return result;
+}
+
+async function runIdentityAcquisition(args, print, deps) {
+  if (args.length !== 4 || args[2] !== '--out') throw new AssayError('invalid_identity_arguments');
+  let source, output;
+  try {
+    source = await open(args[1], constants.O_RDONLY | constants.O_NONBLOCK);
+    if (!(await source.stat()).isFile() || (await source.stat()).size > 2_000_000) throw new AssayError('identity_config_size_or_type');
+    const bytes = Buffer.alloc(2_000_001);
+    let size = 0;
+    while (size < bytes.length) { const r = await source.read(bytes, size, bytes.length - size, null); if (!r.bytesRead) break; size += r.bytesRead; }
+    if (size > 2_000_000) throw new AssayError('identity_config_size_or_type');
+    const input = JSON.parse(bytes.subarray(0, size).toString('utf8'));
+    for (const name of ['manifest', 'assessments']) input.configuration[name].path = path.resolve(path.dirname(path.resolve(args[1])), input.configuration[name].path);
+    const sql = await readFile(path.join(ROOT, 'scripts/discovery/public-identity-evidence.sql'), 'utf8');
+    const assaySourceSha256 = createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex');
+    output = await privateOutput(args[3]);
+    const digest = createHash('sha256'); let rows = 0;
+    const result = await acquireIdentityEvidence(input, { ...deps,
+      query: deps.query ?? (args => readQuery(sql.replace(/\$1\b/g, () => `'${JSON.stringify(args).replaceAll("'", "''")}'`), 'receipt')),
+      emit: async row => {
+        if (row.type === 'manifest') Object.assign(row, { assaySourceSha256,
+          sqlSha256: createHash('sha256').update(sql).digest('hex'), inputSha256: createHash('sha256').update(bytes.subarray(0, size)).digest('hex') });
+        if (row.type === 'summary') Object.assign(row, { precedingOutputRows: rows, precedingOutputSha256: digest.digest('hex') });
+        const line = JSON.stringify(row) + '\n';
+        if (row.type !== 'summary') { digest.update(line); rows++; }
+        await output.writeFile(line);
+        if (row.type === 'identity_evidence' && rows % 1000 === 0) print(JSON.stringify({ status: 'identity_acquisition_running', inspected: rows - 1, eligiblePopulation: input.configuration.population.denominator }));
+      } });
+    print(JSON.stringify(result));
+    return result.segmentExhausted ? 0 : 2;
+  } finally { await source?.close(); await output?.close(); }
+}
+
 export async function main(args = process.argv.slice(2), deps = {}) {
   const print = deps.print ?? console.log;
   let file;
   try {
+    if (args[0] === '--identity-evidence') return await runIdentityAcquisition(args, print, deps);
     if (args[0] === '--compare-populations') return await runPopulationComparison(args, print, (deps.now ?? Date.now)());
     if (args[0] === '--reconcile-population') return await runPopulationReconciliation(args, print, (deps.now ?? Date.now)());
     if (args[0] === '--acceptance-matrix') return await runAcceptanceMatrix(args, print);

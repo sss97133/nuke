@@ -248,9 +248,16 @@ current result to its baseline. Retain private receipts and separate implemented
 tested, merged, deployed and runtime-verified stages. This reader repair adds no
 semantic claims or modeled-fleet coverage; broader held-out accuracy remains open.
 
-## Prepared public search pagination repair, 2026-10-13
+## Delivered public search pagination repair, 2026-10-13
 
-**Prepared and locally tested; deployment and runtime remain unverified.**
+**Merged in PR1016 and deployed by run 38407458224 on October 13.** The live
+definition and preserved function identity/permissions match the checked migration.
+The bounded anonymous Alvis sequence passed. PR1013 delivered API/UI cursor
+consumption, and PR1027 restored the SQL reader's order after mixed-result sorting.
+The final anonymous 94+100 continuation matched the SQL prefix with no overlap;
+all 195 queried parents passed public eligibility. Anonymous browser search reached
+194 loaded results and opened the first stable detail and source-claims panel.
+These cases do not establish whole-population search quality or service objectives.
 This repair establishes no new public-ready records or fleet coverage.
 The existing `search_vehicles_fts(text,integer,boolean,integer)` reader
 is the owner; no new production reader, table, count, grant or index is added.
@@ -312,15 +319,20 @@ One local warm run with nested-plan logging took 2.118 ms before / 1.885 ms afte
 for the full first page, and 11.373 ms for the boundary page. These are synthetic
 single-run diagnostics, not a production speedup, p95 or service objective.
 Production's previously observed estimate of roughly 42,171 public Porsche rows
-scanned and 19,594 eligible rows sorted is still an unresolved latency concern.
+scanned and 19,594 eligible rows sorted motivated the separate index below.
 Deep offsets still sort/visit preceding candidates and now decrement the offset
 in PL/pgSQL. Separate HTTP requests do not share a snapshot: concurrent eligibility
 or rank changes can still move records across pages.
 
-### Separate exact-make index proposal, prepared 2026-10-13
+### Separate exact-make index, delivered 2026-10-13
 
-**Implemented and tested only in a disposable local database; uncommitted,
-unpublished and undeployed.** The pagination migration does not build an index.
+**Merged in PR1022 and deployed by run 38414268903 on October 13.** The normal
+merge trigger did not appear; the existing exact-file deployment workflow applied
+the reviewed migration from incorporating main. Live definition and valid/ready/live
+flags were verified. The same anonymous Porsche requests changed from a 15,157 ms
+SQL timeout to 252 ms / 101 rows, and from 16,666 ms to 409 ms at the search edge. These
+individual observations establish bounded behavior, not fleet p95 or causal isolation.
+The pagination migration does not build an index.
 The separate [index migration](../../supabase/migrations/20261013110000_vehicles_public_make_search_rank.sql)
 targets the observed exact-make scan/sort with this all-make access path:
 
@@ -398,22 +410,19 @@ job invokes the same runner with `--ci-service`, restricted to its localhost
 disposable database; both paths assert the actual nested plan and drift refusals.
 
 Image/view-count changes maintain additional index entries and can reduce HOT
-update opportunities. Production storage, write amplification, current key
-widths, concurrent-build duration within 120 s, cold/warm reader performance,
-and unchanged public results remain unverified. This index does not resolve
+update opportunities. The live index uses 40,681,472 bytes; exact structure and
+validity and the bounded requests above are verified. Production write
+amplification and broader cold/warm reader performance remain unverified. This index does not resolve
 broad ILIKE/year-prefix scans, low auto-classification acceptance, or the cost
 of large offsets. After any authorized checked delivery, retain exact index
 structure/validity, size, lock state, and same-request before/after results and
 plans; report the reader improvements separately from public readiness.
 
-Before any authorized delivery, refresh the live definition and permission
-receipt, review this guarded migration and run its fixture through applicable
-CI. After the existing migration deployment path, verify the exact definition,
-unchanged permissions, anonymous ordinary/private controls, boundary IDs and
-cold/warm latency using declared public requests. Keep production acceptance
-unverified until those checks pass; no fixture establishes population readiness.
+Future changes still require refreshed live definitions/permissions, applicable
+CI and production checks. The receipts above establish their stated boundaries;
+neither fixtures nor a bounded runtime case establish population readiness.
 
-## Prepared exact retained-work assay aggregation, 2026-10-13
+## Delivered exact retained-work assay aggregation, 2026-10-13
 
 The existing `assay_retained_listing_properties()` returned `unavailable / read_failed`
 with SQLSTATE `57014` while the scheduled worker was succeeding. Successful cron
@@ -424,8 +433,10 @@ the existing 200-row custody check took 982.926 ms. Custody selection read only 
 entries from each end of the completed index. These are dated component timings,
 not a sum measured from one complete assay invocation.
 
-`20261013144500_consolidate_retained_listing_assay.sql` is implemented and locally
-tested only. It aggregates the entire work relation once by property/status and
+`20261013144500_consolidate_retained_listing_assay.sql` merged in PR1030 after all
+24 actual checks passed or completed neutrally, and deployed through run38419105278.
+The live definition and OID/owner/ACL/configuration match the reviewed migration.
+It aggregates the entire work relation once by property/status and
 derives the exact status, completed, failed, due, property and recent-completion
 counts from that small result. Global `COUNT(DISTINCT observation_id)` remains a
 separate exact pass. Custody selection/checking, the recent attribution join, JSON
@@ -456,6 +467,60 @@ clock fixture tests recent-join semantics without rewriting immutable testimony.
 The scale timings therefore do not model production custody cost, cold storage or
 concurrent ingestion. Lifetime aggregation remains linear in retained work; this
 repair does not guarantee the assay stays below its budget at every future size.
-Production speedup, renewed full-assay availability and fleet readiness remain
-unverified. After checked delivery, measure the existing full assay once under its
-existing budget and retain `unavailable` if it cannot complete.
+At 15:08:42 UTC the existing full assay completed within its five-second statement
+limit (4,624 ms connector wall time): 504,750 done, 39 pending and six failed work
+items, with 21 due. The existing 200-row custody sample had zero stale results;
+full custody remains unverified. The returned health is `failed`, not healthy.
+Source replay remains unfinished. This restores exact accounting, not fleet
+readiness; preserve `unavailable` if a later read cannot complete.
+
+## Identity source-witness population assay, 2026-10-13
+
+The existing `public-reader-coverage` operator now has an identity acquisition
+mode for a fixed, hash-verified population manifest. Its question is whether the
+displayed year, make and model each have an attributed source witness through
+the existing retained-listing custody owners. This is one evidence gate for
+`find_open`, not a physical-identity judgment or release certificate.
+
+```sh
+bash scripts/check-ingestion-health.sh --public-readers \
+  --identity-evidence /private/operator-config.json --out /private/new-segment.jsonl
+```
+
+The configuration embeds an existing population-reconciliation configuration and
+declares `mode: public_identity_evidence_v1`, a finite request/time budget, batch
+size up to 200, and a pause of at least 100 ms between requests. Optional `after`
+selects the next manifest segment; it does not certify an earlier segment. The
+runner verifies the entire original manifest before making any live request,
+then reuses `q.sh` with read-only transactions, a 5 s statement limit and 1 s lock
+limit. No schema, testimony, grants, worker capacity or source access changes.
+
+Each batch exhausts the indexed active typed and legacy Y/M/M candidate paths.
+Plausible retained-listing claims are enumerated with 100-key pages and explicit
+lookahead, then checked by original-observation primary key through
+`retained_listing_property_result_matches`. Public child/source eligibility,
+property/method/profile, recording clocks and displayed-value agreement are
+required. Year comparison is exact; make/model use trim and case normalization.
+Unknown source-event time and unverified physical identity stay explicit.
+
+Private subjects reveal no values. Failed/changed/oversized/incomplete batches
+remain unassessed, retain retry ranges, and never become evidence of absence.
+Two consecutive read failures stop the run. A bounded memory ceiling can stop a
+dense batch; it cannot qualify a missing facet. Method-definition fingerprints
+and identity fingerprints prevent silently combining changed inputs across pages.
+
+Private per-record receipts retain full candidate counts and up to three
+qualified claim/source references per facet. Output distinguishes qualified
+support, disagreement, invalid supported witnesses, unsupported methods, missing
+support in the declared paths and incomplete reads. Legacy badges and filled
+fields cannot pass; missing support in these paths cannot establish global
+absence across other evidence owners. Terminal counts and hashes make incomplete
+output distinguishable from a completed segment.
+
+The dated full stored/public/eligible denominators accompany every summary.
+Independent source-fidelity/semantic review, anonymous delivery, identity/context,
+refusal controls, freshness and service remain separate unassessed gates. Thus
+source-support gains cannot be reported as newly ready records. The private
+full-manifest accounting control traversed 632,014 keys within a 128 MB heap;
+its replies were synthetic and establish no production coverage. Production
+population acquisition and its measured source-support distribution remain pending.
