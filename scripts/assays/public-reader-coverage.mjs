@@ -955,7 +955,14 @@ export function acceptanceMatrix(input, now = Date.now()) {
         ? Number.isFinite(metrics.ageSeconds) && metrics.ageSeconds >= 0
         : Number.isFinite(metrics.p95Ms) && metrics.p95Ms >= 0 && Number.isFinite(metrics.errorRate) && metrics.errorRate >= 0 && metrics.errorRate <= 1);
       if (!valid) { g.status = 'not_assessed'; reasons.push(`${name}_metrics_missing`); continue; }
-      if (name === 'freshness' ? metrics.ageSeconds > objectives.freshnessSeconds
+      // ageSeconds is source age at receipt measurement; elapsed time keeps an
+      // old low-age receipt from remaining fresh indefinitely. No service TTL is inferred.
+      const effectiveAgeSeconds = name === 'freshness'
+        ? metrics.ageSeconds + (now - Date.parse(g.receipt.measuredAt)) / 1000 : null;
+      g.metrics = name === 'freshness' ? { measuredAt: g.receipt.measuredAt,
+        ageSecondsAtMeasurement: metrics.ageSeconds, effectiveAgeSeconds }
+        : { measuredAt: g.receipt.measuredAt, p95Ms: metrics.p95Ms, errorRate: metrics.errorRate };
+      if (name === 'freshness' ? effectiveAgeSeconds > objectives.freshnessSeconds
         : metrics.p95Ms > objectives.p95Ms || metrics.errorRate > objectives.errorRateMax) {
         g.status = 'failed'; failed = true; reasons.push(`${name}_objective_failed`);
       }

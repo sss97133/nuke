@@ -750,7 +750,7 @@ const readySubject = () => {
   const capability = PUBLIC_ACCEPTANCE[0];
   const gates = Object.fromEntries(capability.gates.map(gate => [gate, { status: 'passed',
     receipt: { id: 'offline_proof', sha256: 'a'.repeat(64), capability: capability.id, key: 'subject_1', gate,
-      measuredAt: '2026-10-13T02:00:00Z', basis: gate === 'public_delivery' ? 'anonymous_runtime'
+      measuredAt: gate === 'freshness' ? new Date(matrixNow).toISOString() : '2026-10-13T02:00:00Z', basis: gate === 'public_delivery' ? 'anonymous_runtime'
         : ['source_fidelity','semantic_quality'].includes(gate) ? 'independent_review' : 'deterministic_population_assay' },
     ...(gate === 'freshness' ? { metrics: { ageSeconds: 10 } } : gate === 'service' ? { metrics: { p95Ms: 20, errorRate: 0 } } : {}) }]));
   return { capability: capability.id, key: 'subject_1', objectives: { freshnessSeconds: 30, p95Ms: 50, errorRateMax: 0.01 }, gates };
@@ -826,4 +826,16 @@ test('matrix CLI performs no network and retains a private non-overwritten recei
     assert.equal(await main(['--acceptance-matrix',input,'--out',out],dependencies),1);
     assert.equal(await main(['--acceptance-matrix',input,'--out',out,'--live','true'],dependencies),1);
   } finally { await rm(dir,{recursive:true,force:true}); }
+});
+
+
+test('old low-age freshness receipts expire by elapsed time since measurement', () => {
+  const a=readySubject();a.gates.freshness.receipt.measuredAt='2026-10-13T02:00:00Z';
+  const r=acceptanceMatrix(matrixInput({assessments:[a]}),matrixNow).assessments[0];
+  assert.equal(r.state,'blocked');assert(r.reasons.includes('freshness_objective_failed'));
+  const g=r.gates.find(g=>g.gate==='freshness');
+  assert.deepEqual(g.metrics,{measuredAt:'2026-10-13T02:00:00Z',ageSecondsAtMeasurement:10,effectiveAgeSeconds:2410});
+  const b=readySubject();b.gates.freshness.receipt.measuredAt=new Date(matrixNow-20_000).toISOString();
+  assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow).assessments[0].state,'ready');
+  assert.equal(acceptanceMatrix(matrixInput({assessments:[b]}),matrixNow+1).assessments[0].state,'blocked');
 });
