@@ -9,7 +9,8 @@
       "inlineStyled": 505,
       "snakeTokens": 0,
       "money": 1,
-      "plateText": 0
+      "plateText": 0,
+      "roleFonts": 0
     },
     "e08bf694-970f-4cbe-8a74-8715158a0f2e": {
       "requests": 80,
@@ -18,7 +19,8 @@
       "inlineStyled": 1301,
       "snakeTokens": 0,
       "money": 0,
-      "plateText": 0
+      "plateText": 0,
+      "roleFonts": 0
     },
     "be853856-e450-4d0e-b2a1-613391956ad6": {
       "requests": 97,
@@ -27,7 +29,8 @@
       "inlineStyled": 310,
       "snakeTokens": 0,
       "money": 1,
-      "plateText": 0
+      "plateText": 0,
+      "roleFonts": 0
     }
   }
 }

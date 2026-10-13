@@ -17,6 +17,8 @@
 //   snakeTokens  snake_case tokens in the visible text (internal vocabulary reaching a human)
 //   money        dollar amounts in the visible text (an anonymous reader's view of money)
 //   plateText    license-plate-looking text next to the word PLATE
+//   roleFonts    kit measure and caption elements whose computed family is not Courier New (the app's universal
+//                Arial override in tailwind-design-system-overrides.css; the kit states its family with !important)
 //   loadMs       time to network idle (reported, never gated: too noisy to ratchet)
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -29,7 +31,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const BASELINE = path.join(ROOT, 'scripts', 'ci', 'profile-baseline.json');
 const OUT = process.env.PROFILE_CONTRACT_OUT || path.join(ROOT, 'profile-contract-out');
 const SITE = process.env.PROFILE_CONTRACT_SITE || 'https://nuke.ag';
-const GATED = ['requests', 'errors', 'fontSizes', 'inlineStyled', 'snakeTokens', 'money', 'plateText'];
+const GATED = ['requests', 'errors', 'fontSizes', 'inlineStyled', 'snakeTokens', 'money', 'plateText', 'roleFonts'];
 
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : { vehicles: {} };
 const vehicles = Object.keys(baseline.vehicles || {});
@@ -74,6 +76,7 @@ async function measureOnce(id) {
       money: (text.match(/\$\s?\d[\d,]*/g) || []).length,
       // a PLATE label followed by anything but the mask (an unmasked plate reads like 'PLATE Utah 04AP4')
       plateText: (text.match(/\bPLATE\s*(?!\u2022\u2022\u2022\u2022)[A-Za-z0-9][A-Za-z0-9 -]{3,}/g) || []).length,
+      roleFonts: [...root.querySelectorAll('.k-measure, .k-caption')].filter(el => !/^"?Courier New/i.test(getComputedStyle(el).fontFamily)).length,
       loggedOut: /LOGIN|SIGN IN|LOG IN/i.test(document.body.innerText),
       title: document.title,
     };
