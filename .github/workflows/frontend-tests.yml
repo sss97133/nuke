@@ -407,7 +407,7 @@ jobs:
       - name: Verify Craigslist public fetch stops access denials without a renderer or immediate retry
         run: |
           deno test supabase/functions/poll-listing-feeds/feedFetch.test.ts
-          deno test --no-check --allow-env supabase/functions/extract-craigslist/index.test.ts
+          deno test --no-check --allow-env supabase/functions/poll-listing-feeds/craigslistExtractor.test.ts
       - name: Verify ingest writes no vehicle from a URL slug when the page extractor failed
         run: |
           deno test supabase/functions/ingest/slugStub.test.ts

@@ -35,7 +35,7 @@ globalThis.fetch = async (input, init) => {
 let handler: (req: Request) => Promise<Response>;
 // deno-lint-ignore no-explicit-any
 (Deno as any).serve = (fn: typeof handler) => { handler = fn; };
-await import("./index.ts");
+await import("../extract-craigslist/index.ts");
 
 for (const status of [403, 429]) {
   Deno.test({ name: `Craigslist detail HTTP ${status} archives the failure once without a renderer, queue write or capture ACK`,
