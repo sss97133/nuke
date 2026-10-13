@@ -24,8 +24,17 @@
  * Descriptor sha256 covers the entire file, including the end receipt. Empty receipts are valid.
  * All input tails/counts/hashes must reconcile before a final summary is emitted. A partial
  * output without its terminal reconciled summary is not a completed population measurement.
+ * Compare complete populations without loading either manifest into memory:
+ *   --compare-populations /private/comparison.json --out /private/delta.jsonl
+ * Config: {schemaVersion: as above, mode: population_comparison_v1,
+ *   before: {evaluatedAt, configuration: <full reconciliation config>},
+ *   after: {evaluatedAt, configuration: <full reconciliation config>}}.
+ * Stream paths are relative to the comparison file. Both sides use the same
+ * population filter, grain and capability eligibility rules. Arrivals/departures,
+ * prior unknowns and changed objectives remain separate from shared transitions.
  */
 import { open, realpath, readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -1075,7 +1084,7 @@ function reconciliationContract(input, now) {
 // Fixed read buffers plus one bounded JSONL record; never readFile on a population.
 // A digest authenticates the supplied bytes, not the truth of an exporter's assertions.
 async function* reconciliationStream(descriptor, population, type, verified) {
-  const file = await open(descriptor.path, 'r');
+  const file = await open(descriptor.path, constants.O_RDONLY | constants.O_NONBLOCK);
   try {
     const before = await file.stat();
     if (!before.isFile()) throw new AssayError('stream_not_regular_file');
@@ -1226,7 +1235,7 @@ async function runPopulationReconciliation(args, print, now) {
   if (args.length !== 4 || args[0] !== '--reconcile-population' || args[2] !== '--out') throw new AssayError('invalid_reconciliation_arguments');
   let source, output;
   try {
-    source = await open(args[1], 'r');
+    source = await open(args[1], constants.O_RDONLY | constants.O_NONBLOCK);
     const stat = await source.stat();
     if (!stat.isFile() || stat.size > 2_000_000) throw new AssayError('reconciliation_config_size_or_type');
     const buffer = Buffer.alloc(2_000_001);
@@ -1259,11 +1268,166 @@ async function runPopulationReconciliation(args, print, now) {
   } finally { await source?.close(); await output?.close(); }
 }
 
+// Turn the existing reconciler into a pull stream with one pending row. Both
+// sides still validate every original manifest/receipt byte and terminal tail;
+// comparison never trusts a supplied summary or loads a population into memory.
+function pullReconciliation(input, now) {
+  let item, release, wake, finished = false, stopped = false, failure;
+  const task = reconcilePopulation(input, { now, emit: row => {
+    if (stopped) throw new AssayError('comparison_stopped');
+    return new Promise((resolve, reject) => {
+      item = row; release = { resolve, reject }; wake?.(); wake = undefined;
+    });
+  } }).catch(error => { failure = error; }).finally(() => { finished = true; wake?.(); });
+  return {
+    async next() {
+      while (item === undefined && !finished) await new Promise(resolve => { wake = resolve; });
+      if (item !== undefined) {
+        const value = item, ack = release; item = release = undefined; ack.resolve();
+        return { value, done: false };
+      }
+      if (failure) throw failure;
+      return { done: true };
+    },
+    async return() { stopped = true; release?.reject(new AssayError('comparison_stopped')); await task; },
+  };
+}
+
+const COMPARISON_VERSION = 'population_comparison_v1';
+const STATES = ['ready', 'blocked', 'not_assessed'];
+const stateCounts = () => Object.fromEntries(STATES.map(state => [state, 0]));
+const transitions = () => Object.fromEntries(STATES.map(state => [state, stateCounts()]));
+
+export async function comparePopulations(input, { now = Date.now(), emit = async () => {} } = {}) {
+  if (input?.schemaVersion !== MATRIX_VERSION || input?.mode !== COMPARISON_VERSION ||
+    !streamClock(input.before?.evaluatedAt) || !streamClock(input.after?.evaluatedAt) ||
+    Date.parse(input.before.evaluatedAt) > Date.parse(input.after.evaluatedAt) || Date.parse(input.after.evaluatedAt) > now)
+    throw new AssayError('invalid_comparison_contract_or_clocks');
+  const before = input.before.configuration, after = input.after.configuration;
+  const beforeContracts = reconciliationContract(before, Date.parse(input.before.evaluatedAt));
+  const afterContracts = reconciliationContract(after, Date.parse(input.after.evaluatedAt));
+  if (Date.parse(before.population.measuredAt) > Date.parse(after.population.measuredAt) ||
+    ['start', 'end'].some(key => Date.parse(before.population.window[key]) > Date.parse(after.population.window[key])))
+    throw new AssayError('comparison_population_chronology_reversed');
+  if (before.population.grain !== after.population.grain || before.population.filter !== after.population.filter ||
+    beforeContracts.size !== afterContracts.size || [...beforeContracts].some(([id, c]) => {
+      const other = afterContracts.get(id);
+      return !other || c.grain !== other.grain || c.eligibilityRule !== other.eligibilityRule;
+    })) throw new AssayError('comparison_population_or_capability_rule_changed');
+  const summaries = Object.fromEntries([...beforeContracts.keys()].map(id => [id, {
+    id, grain: beforeContracts.get(id).grain, eligibilityRule: beforeContracts.get(id).eligibilityRule,
+    sharedPairs: 0, beforeTotals: stateCounts(), afterTotals: stateCounts(),
+    arrivals: stateCounts(), departures: stateCounts(), transitions: transitions(),
+    unchangedObjectiveTransitions: transitions(), changedObjectiveTransitions: transitions(),
+    objectiveChanges: 0,
+  }]));
+  const left = pullReconciliation(before, Date.parse(input.before.evaluatedAt));
+  const right = pullReconciliation(after, Date.parse(input.after.evaluatedAt));
+  const completed = {};
+  async function nextAssessment(stream, side) {
+    for (;;) {
+      const row = await stream.next();
+      if (row.done) {
+        if (!completed[side]) throw new AssayError('comparison_reconciliation_incomplete');
+        return null;
+      }
+      if (row.value.type === 'assessment') return row.value;
+      if (row.value.type === 'summary') completed[side] = row.value;
+    }
+  }
+  const order = (a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 :
+    a.capability < b.capability ? -1 : a.capability > b.capability ? 1 : 0;
+  try {
+    await emit({ type: 'manifest', schemaVersion: MATRIX_VERSION, mode: COMPARISON_VERSION, status: 'in_progress',
+      evaluatedAt: new Date(now).toISOString(), before: before.population, after: after.population,
+      publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 });
+    let a = await nextAssessment(left, 'before'), b = await nextAssessment(right, 'after');
+    while (a || b) {
+      const direction = !a ? 1 : !b ? -1 : order(a, b);
+      const s = summaries[(direction <= 0 ? a : b).capability];
+      if (direction < 0) { s.beforeTotals[a.state]++; s.departures[a.state]++; a = await nextAssessment(left, 'before'); }
+      else if (direction > 0) { s.afterTotals[b.state]++; s.arrivals[b.state]++; b = await nextAssessment(right, 'after'); }
+      else {
+        s.beforeTotals[a.state]++; s.afterTotals[b.state]++; s.sharedPairs++; s.transitions[a.state][b.state]++;
+        const changed = JSON.stringify(a.evaluation?.objectives ?? null) !== JSON.stringify(b.evaluation?.objectives ?? null);
+        s[changed ? 'changedObjectiveTransitions' : 'unchangedObjectiveTransitions'][a.state][b.state]++;
+        if (changed) s.objectiveChanges++;
+        if (a.state !== b.state || changed) await emit({ type: 'transition', key: a.key, grain: a.grain,
+          capability: a.capability, before: a.state, after: b.state, objectivesChanged: changed });
+        a = await nextAssessment(left, 'before'); b = await nextAssessment(right, 'after');
+      }
+    }
+    for (const s of Object.values(summaries)) {
+      for (const side of ['before', 'after']) {
+        const original = completed[side].capabilities.find(c => c.id === s.id);
+        if (STATES.some(state => original.totals[state] !== s[`${side}Totals`][state]))
+          throw new AssayError('comparison_totals_mismatch');
+        s[`${side}EligibleCount`] = original.eligibleCount;
+      }
+      s.newlyReadyUnderUnchangedObjectives = s.unchangedObjectiveTransitions.blocked.ready + s.unchangedObjectiveTransitions.not_assessed.ready;
+      s.noLongerReadyUnderUnchangedObjectives = s.unchangedObjectiveTransitions.ready.blocked + s.unchangedObjectiveTransitions.ready.not_assessed;
+      s.netReadyChangeUnderUnchangedObjectives = s.newlyReadyUnderUnchangedObjectives - s.noLongerReadyUnderUnchangedObjectives;
+      s.newlyReadyDecisions = s.transitions.blocked.ready + s.transitions.not_assessed.ready;
+      s.noLongerReadyDecisions = s.transitions.ready.blocked + s.transitions.ready.not_assessed;
+      s.netReadyDecisionChangeInSharedPopulation = s.newlyReadyDecisions - s.noLongerReadyDecisions;
+      s.netReadyPopulationChange = s.afterTotals.ready - s.beforeTotals.ready;
+      if (s.netReadyPopulationChange !== s.netReadyDecisionChangeInSharedPopulation + s.arrivals.ready - s.departures.ready)
+        throw new AssayError('comparison_delta_mismatch');
+    }
+    const result = { type: 'summary', schemaVersion: MATRIX_VERSION, mode: COMPARISON_VERSION, status: 'reconciled',
+      evaluatedAt: new Date(now).toISOString(), before: { evaluatedAt: input.before.evaluatedAt, population: completed.before.population, inputs: completed.before.inputs },
+      after: { evaluatedAt: input.after.evaluatedAt, population: completed.after.population, inputs: completed.after.inputs },
+      capabilities: Object.values(summaries),
+      basis: 'Recomputed supplied gate receipts at their declared evaluation times; decision changes are not proof of repair causality. Newly assessed, changed-objective and population transitions remain separate.',
+      populationReconciled: true, gateEvidenceIndependentlyVerified: false, fleetReadinessMeasured: false,
+      publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 };
+    await emit(result); return result;
+  } finally { await Promise.all([left.return(), right.return()]); }
+}
+
+async function runPopulationComparison(args, print, now) {
+  if (args.length !== 4 || args[0] !== '--compare-populations' || args[2] !== '--out') throw new AssayError('invalid_comparison_arguments');
+  let source, output;
+  try {
+    source = await open(args[1], constants.O_RDONLY | constants.O_NONBLOCK);
+    const stat = await source.stat();
+    if (!stat.isFile() || stat.size > 2_000_000) throw new AssayError('comparison_config_size_or_type');
+    const buffer = Buffer.alloc(2_000_001);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await source.read(buffer, length, buffer.length - length, null);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length > 2_000_000) throw new AssayError('comparison_config_size_or_type');
+    const bytes = buffer.subarray(0, length), input = JSON.parse(bytes.toString('utf8'));
+    for (const side of ['before', 'after']) for (const name of ['manifest', 'assessments']) {
+      const descriptor = input[side]?.configuration?.[name];
+      if (!descriptor || typeof descriptor.path !== 'string') throw new AssayError('invalid_comparison_stream');
+      descriptor.path = path.resolve(path.dirname(path.resolve(args[1])), descriptor.path);
+    }
+    output = await privateOutput(args[3]);
+    const assaySourceSha256 = createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex');
+    const inputSha256 = createHash('sha256').update(bytes).digest('hex'), digest = createHash('sha256');
+    let rows = 0;
+    const result = await comparePopulations(input, { now, emit: async row => {
+      if (row.type === 'manifest') Object.assign(row, { assaySourceSha256, inputSha256 });
+      if (row.type === 'summary') Object.assign(row, { precedingOutputRows: rows, precedingOutputSha256: digest.digest('hex'), assaySourceSha256, inputSha256 });
+      const line = JSON.stringify(row) + '\n';
+      if (row.type !== 'summary') { digest.update(line); rows++; }
+      await output.writeFile(line);
+    } });
+    print(JSON.stringify({ status: 'population_comparison_reconciled', capabilities: result.capabilities,
+      publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 }));
+    return 0;
+  } finally { await source?.close(); await output?.close(); }
+}
+
 async function runAcceptanceMatrix(args, print) {
   if (args.length !== 4 || args[0] !== '--acceptance-matrix' || args[2] !== '--out') throw new AssayError('invalid_matrix_arguments');
   let source, output;
   try {
-    source = await open(args[1], 'r');
+    source = await open(args[1], constants.O_RDONLY | constants.O_NONBLOCK);
     const stat = await source.stat();
     if (!stat.isFile() || stat.size > 2_000_000) throw new AssayError('matrix_input_size_or_type');
     const buffer = Buffer.alloc(2_000_001);
@@ -1290,6 +1454,7 @@ export async function main(args = process.argv.slice(2), deps = {}) {
   const print = deps.print ?? console.log;
   let file;
   try {
+    if (args[0] === '--compare-populations') return await runPopulationComparison(args, print, (deps.now ?? Date.now)());
     if (args[0] === '--reconcile-population') return await runPopulationReconciliation(args, print, (deps.now ?? Date.now)());
     if (args[0] === '--acceptance-matrix') return await runAcceptanceMatrix(args, print);
     const o = options(args);

@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, stat, writeFile, rm, symlink, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -1041,4 +1042,135 @@ test('population CLI is offline, exclusive/private, and hashes its complete outp
   assert.equal((await stat(output)).mode & 0o777, 0o600);
   assert.equal(await main(['--reconcile-population', input, '--out', output], deps), 1);
   assert.equal(await main(['--reconcile-population', input, '--out', output, '--live', 'true'], deps), 1);
+});
+
+const comparisonInput = (before, after) => ({ schemaVersion: 'public_inventory_acceptance_v1', mode: 'population_comparison_v1',
+  before: { evaluatedAt: new Date(matrixNow).toISOString(), configuration: structuredClone(before) },
+  after: { evaluatedAt: new Date(matrixNow).toISOString(), configuration: structuredClone(after) } });
+const blockedAssessment = key => {
+  const a = streamAssessment(key); a.gates.evidence = { status: 'failed', reason: 'source_witness_missing' }; return a;
+};
+
+test('population comparison separates shared readiness transitions, unknowns, arrivals and departures', async t => {
+  const before = await populationFixture(t, ['a', 'b', 'c', 'd', 'e'].map(streamSubject),
+    [blockedAssessment('a'), streamAssessment('b'), streamAssessment('d'), streamAssessment('e')]);
+  const after = await populationFixture(t, ['a', 'b', 'c', 'd', 'f'].map(streamSubject),
+    [streamAssessment('a'), blockedAssessment('b'), streamAssessment('c'), streamAssessment('f')]);
+  const rows = [], r = await comparePopulations(comparisonInput(before.config, after.config), { now: matrixNow, emit: x => rows.push(x) });
+  const c = r.capabilities[0];
+  assert.equal(c.sharedPairs, 4);
+  assert.deepEqual(c.beforeTotals, { ready: 3, blocked: 1, not_assessed: 1 });
+  assert.deepEqual(c.afterTotals, { ready: 3, blocked: 1, not_assessed: 1 });
+  assert.deepEqual(c.arrivals, { ready: 1, blocked: 0, not_assessed: 0 });
+  assert.deepEqual(c.departures, { ready: 1, blocked: 0, not_assessed: 0 });
+  assert.equal(c.newlyReadyDecisions, 2); assert.equal(c.noLongerReadyDecisions, 2);
+  assert.equal(c.netReadyDecisionChangeInSharedPopulation, 0); assert.equal(c.netReadyPopulationChange, 0);
+  assert.equal(c.newlyReadyUnderUnchangedObjectives, 1); assert.equal(c.noLongerReadyUnderUnchangedObjectives, 1);
+  assert.equal(c.netReadyChangeUnderUnchangedObjectives, 0);
+  assert.equal(c.unchangedObjectiveTransitions.blocked.ready, 1);
+  assert.equal(c.changedObjectiveTransitions.not_assessed.ready, 1);
+  assert.equal(c.changedObjectiveTransitions.ready.not_assessed, 1);
+  assert.equal(c.objectiveChanges, 2);
+  assert.equal(rows.filter(x => x.type === 'transition').length, 4);
+  assert.equal(rows.at(-1).status, 'reconciled');
+  assert.equal(r.before.population.fullRetained.count, 15); assert.equal(r.after.population.fullPublic.count, 10);
+  assert.equal(r.publicReadinessCertificate, false); assert.equal(r.gateEvidenceIndependentlyVerified, false);
+});
+
+test('changed service objectives cannot masquerade as an improvement under the same objectives', async t => {
+  const a = streamAssessment('a'), b = streamAssessment('a');
+  a.objectives.p95Ms = 1; // A fails service; B passes only because the objective changes.
+  const before = await populationFixture(t, [streamSubject('a')], [a]);
+  const after = await populationFixture(t, [streamSubject('a')], [b]);
+  const r = await comparePopulations(comparisonInput(before.config, after.config), { now: matrixNow });
+  assert.equal(r.capabilities[0].transitions.blocked.ready, 1);
+  assert.equal(r.capabilities[0].unchangedObjectiveTransitions.blocked.ready, 0);
+  assert.equal(r.capabilities[0].changedObjectiveTransitions.blocked.ready, 1);
+  assert.equal(r.capabilities[0].newlyReadyUnderUnchangedObjectives, 0);
+  assert.equal(r.capabilities[0].netReadyChangeUnderUnchangedObjectives, 0);
+});
+
+test('comparison applies each evaluation clock and exposes freshness expiry as a regression', async t => {
+  const fixture = await populationFixture(t, [streamSubject('a')], [streamAssessment('a')]);
+  const input = comparisonInput(fixture.config, fixture.config);
+  input.after.evaluatedAt = new Date(matrixNow + 31_000).toISOString();
+  const r = await comparePopulations(input, { now: matrixNow + 31_000 });
+  assert.equal(r.capabilities[0].unchangedObjectiveTransitions.ready.blocked, 1);
+  assert.equal(r.capabilities[0].netReadyChangeUnderUnchangedObjectives, -1);
+});
+
+test('comparison refuses changed eligibility, grain, contract and reversed/future clocks', async t => {
+  const fixture = await populationFixture(t);
+  for (const mutate of [i => { i.after.configuration.population.filter += ' narrower'; },
+    i => { i.after.configuration.capabilities[0].eligibilityRule += ' narrower'; },
+    i => { i.after.configuration.population.grain = 'vehicle_record'; },
+    i => { i.mode = 'other'; }, i => { i.after.evaluatedAt = '2027-01-01T00:00:00Z'; },
+    i => { i.after.configuration.population.measuredAt = '2026-10-12T02:00:00Z';
+      i.after.configuration.population.window = { start: '2026-10-12T01:00:00Z', end: '2026-10-12T02:00:00Z' }; },
+    i => { i.before.evaluatedAt = new Date(matrixNow + 1).toISOString(); }]) {
+    const input = structuredClone(comparisonInput(fixture.config, fixture.config)); mutate(input);
+    await assert.rejects(comparePopulations(input, { now: matrixNow }));
+  }
+});
+
+test('a broken tail on either population fails comparison without a completion summary or hung producer', async t => {
+  for (const side of ['before', 'after']) for (const name of ['manifest', 'assessments']) {
+    const before = await populationFixture(t, ['a', 'b'].map(streamSubject), [streamAssessment('a')]);
+    const after = await populationFixture(t, ['a', 'b'].map(streamSubject), [streamAssessment('b')]);
+    const input = comparisonInput(before.config, after.config), descriptor = input[side].configuration[name];
+    const bytes = (await readFile(descriptor.path, 'utf8')).slice(0, -1);
+    await writeFile(descriptor.path, bytes); descriptor.sha256 = digest(bytes);
+    const rows = [];
+    await assert.rejects(comparePopulations(input, { now: matrixNow, emit: x => rows.push(x) }), /stream_truncated/);
+    assert.equal(rows.some(x => x.type === 'summary'), false);
+  }
+});
+
+test('large comparison preserves the missing tail and handles empty populations in bounded pull streams', async t => {
+  const size = 30_001;
+  function* subjects() { for (let i = 0; i < size; i++) yield streamSubject(id(i)); }
+  const before = await populationFixture(t, subjects(), [], size);
+  const after = await populationFixture(t, subjects(), [streamAssessment(id(size - 1))], size);
+  const r = await comparePopulations(comparisonInput(before.config, after.config), { now: matrixNow });
+  assert.equal(r.capabilities[0].sharedPairs, size);
+  assert.equal(r.capabilities[0].transitions.not_assessed.ready, 1);
+  assert.equal(r.capabilities[0].transitions.not_assessed.not_assessed, size - 1);
+  const empty = await populationFixture(t, [], []);
+  const arrival = await comparePopulations(comparisonInput(empty.config, after.config), { now: matrixNow });
+  assert.equal(arrival.capabilities[0].sharedPairs, 0); assert.equal(arrival.capabilities[0].arrivals.ready, 1);
+  assert.equal(arrival.capabilities[0].arrivals.not_assessed, size - 1);
+});
+
+test('comparison CLI is offline, private, exclusive and records its complete output digest', async t => {
+  const fixture = await populationFixture(t, [streamSubject('a')], []);
+  const input = path.join(fixture.dir, 'comparison.json'), out = path.join(fixture.dir, 'delta.jsonl');
+  const config = comparisonInput(fixture.config, fixture.config);
+  for (const side of ['before', 'after']) for (const name of ['manifest', 'assessments'])
+    config[side].configuration[name].path = path.basename(config[side].configuration[name].path);
+  await writeFile(input, JSON.stringify(config));
+  const deps = { now: () => matrixNow, print() {}, env: {}, client: { parents() { throw new Error('network forbidden'); } } };
+  assert.equal(await main(['--compare-populations', input, '--out', out], deps), 0);
+  const lines = (await readFile(out, 'utf8')).trimEnd().split('\n'), result = JSON.parse(lines.at(-1));
+  assert.equal(result.status, 'reconciled'); assert.equal(result.capabilities[0].netReadyPopulationChange, 0);
+  assert.equal(result.precedingOutputSha256, digest(lines.slice(0, -1).join('\n') + '\n'));
+  assert.equal(result.precedingOutputRows, 1); assert.equal(result.inputSha256, digest(await readFile(input)));
+  assert.equal(result.networkRequests, 0); assert.equal((await stat(out)).mode & 0o777, 0o600);
+  assert.equal(await main(['--compare-populations', input, '--out', out], deps), 1);
+  assert.equal(await main(['--compare-populations', input, '--out', out, '--live', 'true'], deps), 1);
+});
+
+test('non-regular stream and configuration paths refuse without waiting for a FIFO writer', async t => {
+  const fixture = await populationFixture(t, [], []);
+  const fifo = path.join(fixture.dir, 'pipe'); execFileSync('mkfifo', [fifo]);
+  const input = comparisonInput(fixture.config, fixture.config);
+  input.after.configuration.manifest.path = fifo;
+  const config = path.join(fixture.dir, 'fifo-comparison.json'); await writeFile(config, JSON.stringify(input));
+  const modulePath = new URL('./public-reader-coverage.mjs', import.meta.url).pathname;
+  for (const [mode, file] of [['--compare-populations', config], ['--compare-populations', fifo],
+    ['--reconcile-population', fifo], ['--acceptance-matrix', fifo]]) {
+    const result = spawnSync(process.execPath, [modulePath, mode, file, '--out', path.join(fixture.dir, `out-${mode}-${path.basename(file)}`)],
+      { encoding: 'utf8', timeout: 2000 });
+    assert.equal(result.error, undefined); assert.equal(result.status, 1);
+    assert.match(result.stdout, /stream_not_regular_file|config_size_or_type|input_size_or_type/);
+  }
 });
