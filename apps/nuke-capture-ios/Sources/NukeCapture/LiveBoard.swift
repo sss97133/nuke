@@ -41,26 +41,32 @@ struct LiveAuction: Decodable, Identifiable {
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
         // Each helper consumes exactly one position. A null is consumed by decodeNil; a value of
-        // the wrong type is consumed by AnyScalar. (The first version used decodeIfPresent under
+        // the wrong type is consumed by AnyValue. (The first version used decodeIfPresent under
         // `try?`, whose flattened nil could not tell "null" from "threw", so a null was consumed
         // twice and every field after it shifted one place: a lot with no image URL read its
         // listing URL as its title and its band one position off. Caught by the band test, 2026-10-13.)
+        // A value of the wrong shape, scalar or not, is consumed by a reader that reads nothing
+        // (AnyValue), so the next helper always sees the next position (review round two, 2026-10-13:
+        // an object in a slot had emptied the rest of the row).
+        func skip() { _ = try? c.decode(AnyValue.self) }
         func str() -> String? {
             if (try? c.decodeNil()) == true { return nil }
             if let s = try? c.decode(String.self) { return s }
-            _ = try? c.decode(AnyScalar.self); return nil
+            skip(); return nil
         }
+        /// A finite number, from a number or a numeric string; "nan", "inf" and 1e400 read as missing.
         func num() -> Double? {
             if (try? c.decodeNil()) == true { return nil }
-            if let d = try? c.decode(Double.self) { return d }
-            if let s = try? c.decode(String.self) { return Double(s) }
-            _ = try? c.decode(AnyScalar.self); return nil
+            if let d = try? c.decode(Double.self) { return d.isFinite ? d : nil }
+            if let s = try? c.decode(String.self) { return Double(s).flatMap { $0.isFinite ? $0 : nil } }
+            skip(); return nil
         }
-        func int() -> Int? { num().map { Int($0) } }
+        /// An integer only when in range, so a huge value never traps in Int(_:).
+        func int() -> Int? { num().flatMap { abs($0) < 1e15 ? Int($0) : nil } }
         func bool() -> Bool {
             if (try? c.decodeNil()) == true { return false }
             if let b = try? c.decode(Bool.self) { return b }
-            _ = try? c.decode(AnyScalar.self); return false
+            skip(); return false
         }
         id = try c.decode(String.self)
         year = int()
@@ -125,17 +131,8 @@ struct LiveAuction: Decodable, Identifiable {
     }
 }
 
-/// A scalar of any JSON type, consumed and discarded when a positional value is not what the row promised.
-struct AnyScalar: Decodable {
-    init(from decoder: Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil() { return }
-        if (try? c.decode(Double.self)) != nil { return }
-        if (try? c.decode(String.self)) != nil { return }
-        if (try? c.decode(Bool.self)) != nil { return }
-        throw DecodingError.dataCorruptedError(in: c, debugDescription: "not a scalar")
-    }
-}
+/// A value of any JSON shape, consumed and discarded when a position is not what the row promised.
+struct AnyValue: Decodable { init(from decoder: Decoder) throws {} }
 
 /// An array whose undecodable elements are skipped and counted instead of failing the whole array.
 struct LossyArray<Element: Decodable>: Decodable {
@@ -499,7 +496,7 @@ struct HeatReadingSheet: View {
                     }
                 }
                 Section {
-                    Text("Hot is 1.25× the typical bid or more; cold is 0.8× or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, over 36,700 BaT sales; past 120 hours left there is no verdict. How lots tagged this way finished is shown on nuke.ag from a table typed into its page; it joins here when a read carries it.")
+                    Text("Hot is \(LiveBoardView.multiple(LiveAuction.hotAt)) the typical bid or more; cold is \(LiveBoardView.multiple(LiveAuction.coldAt)) or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, from sold BaT lots (the payload carries the curve, not its sample or window); past \(Int(LiveAuction.heatMaxHours)) hours left there is no verdict. How lots tagged this way finished is shown on nuke.ag from a table typed into its page; it joins here when a read carries it.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

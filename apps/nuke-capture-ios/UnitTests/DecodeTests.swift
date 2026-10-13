@@ -75,6 +75,15 @@ final class DecodeTests: XCTestCase {
         XCTAssertNil(board.auctions[1].currentBid)           // a non-number is missing, not fatal
         XCTAssertFalse(board.auctions[1].noReserve)
         XCTAssertNil(board.auctions[2].vehicleUUID)          // a bad id opens nothing
+        // A non-scalar in a slot is consumed as one position; a non-finite number reads as missing, never traps.
+        let odd = try decode(LiveBoard.self, #"{"synced_at":null,"source":"t","auctions":[["69c01291-6232-4df8-ad9e-82eaac792462",{"year":1},["x"],"M3","nan","2026-10-13T18:00:00+00:00",null,null,null,false,null,"Title",1,2,3,"d","1e400"]]}"#)
+        XCTAssertEqual(odd.auctions.count, 1)
+        XCTAssertNil(odd.auctions[0].year)
+        XCTAssertEqual(odd.auctions[0].model, "M3")
+        XCTAssertNil(odd.auctions[0].currentBid)
+        XCTAssertEqual(odd.auctions[0].title, "Title")
+        XCTAssertEqual(odd.auctions[0].band?.p50, 2)
+        XCTAssertEqual(odd.auctions[0].band?.comps, 0)
         XCTAssertEqual(board.open(at: Date(timeIntervalSince1970: 1_792_000_000)).count, 0)
     }
 
