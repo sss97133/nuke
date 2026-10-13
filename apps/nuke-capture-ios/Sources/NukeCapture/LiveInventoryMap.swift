@@ -188,6 +188,8 @@ struct LiveInventoryMapView: View {
         let share = min(1.0, Double(c.item.count) / Double(max(1, box.count)))
         let opacity: Double = box.make == nil ? 0.18 : 0.12 + 0.5 * share
         let label: String = box.make == nil ? c.item.key.capitalized : c.item.key
+        // The hit area must be the cell, so the gesture and its content shape go on the sized
+        // rectangle before `.position` wraps it in a container the size of the whole box.
         Rectangle()
             .fill(Color.accentColor.opacity(opacity))
             .frame(width: max(0, r.width), height: max(0, r.height))
@@ -200,10 +202,10 @@ struct LiveInventoryMapView: View {
                         .padding(2)
                 }
             }
-            .position(x: r.midX - box.rect.minX, y: r.midY - box.rect.minY)
             .contentShape(Rectangle())
             .onTapGesture {
                 if box.make == nil { onSelect(c.item.key, nil) } else { onSelect(box.make, c.item.key) }
             }
+            .position(x: r.midX - box.rect.minX, y: r.midY - box.rect.minY)
     }
 }
