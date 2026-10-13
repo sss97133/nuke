@@ -2,13 +2,13 @@ import React, { createContext, useCallback, useEffect, useLayoutEffect, useMemo,
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { Text } from '../../kit';
+import { CoverageView, Masthead, Text } from '../../kit';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, type BidBucket, type BidCurve, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
-import RecordedSalesComparison, { type MarketSalesLens } from './RecordedSalesComparison';
+import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 
@@ -578,7 +578,7 @@ function inWindow(a: LiveAuction, w: Window, now: number, heat?: Heat | null): b
   }
 }
 
-export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.ReactNode }) {
+export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
   const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt } = useMarketPulse();
   const [params, setParams] = useSearchParams();
@@ -755,8 +755,28 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
     requestAnimationFrame(() => boardRef.current?.scrollIntoView({ block: 'start' }));
   };
 
+
+  // The page as a document: the population is the entity, its count the headline result, and the scope strip
+  // carries the view, the cohort and the coverage of the cohort within the captured population.
+  const masthead = (
+    <Masthead result={view === 'inventory' ? <>
+      <Text role="measure" as="div">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text>
+      {data?.syncedAt != null && <Text role="caption" as="div" title={data.source}>recorded {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}</Text>}
+    </> : undefined}>
+      <Text role="entity" as="h1">{view === 'inventory' ? 'Open lots' : 'Recorded sales'}</Text>
+    </Masthead>
+  );
+  const scope = (
+    <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
+      <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
+      {view === 'inventory' && !isLoading && data && <CoverageView className="k-strip__coverage"
+        c={{ n: cohort.length, of: live.length, grain: 'captured BaT vehicle lots', as_of: data.syncedAt != null ? new Date(data.syncedAt).toISOString() : null }} />}
+    </div>
+  );
+
   if (!data && isError && view === 'inventory' && !activityId) return <>
-    <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
+    {masthead}
+    {scope}
     <div role="status" style={{ padding: 12 }}>Live BaT bids could not be loaded. <button onClick={() => refetch()}>Retry live board</button></div>
     {onUnavailable}
   </>;
@@ -764,30 +784,18 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   return (
     <ExplainContext.Provider value={openExplain}>
     <div className="market-explorer" style={{ fontFamily: 'Arial, sans-serif', color: 'var(--text)', background: 'var(--bg)', padding: '12px 12px 32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.14em' }}>MARKET</span>
-          <span style={label}>Bring a Trailer · captured vehicle auctions</span>
-        </div>
-        {view === 'inventory' && data?.syncedAt != null && (
-          <span style={label} title={data.source}>
-            Latest record write {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}
-          </span>
-        )}
-      </div>
+      {masthead}
 
       {view === 'inventory' && isError && data && <div role="status">Refresh failed. Showing the last fetched board. <button onClick={() => refetch()}>Retry</button></div>}
 
       {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
 
-      <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} />
+      {scope}
+
+      {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 
       {view === 'inventory' && <>
-      <div style={{ fontSize: 12, margin: '8px 0', lineHeight: 1.4 }}>
-        <strong>Open inventory · {make ?? 'All makes'}</strong>{' · '}
-        {isLoading ? 'Reading captured lots…' : `${cohort.length.toLocaleString('en-US')} of ${live.length.toLocaleString('en-US')} captured BaT vehicle lots`}
-      </div>
       {make && <div aria-label="Inventory drill path" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
         <button style={{ ...label, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('make', null)}>All captured makes</button>
         {make && <><span aria-hidden="true">→</span><button style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)', background: 'var(--bg)', border: '2px solid var(--border)', padding: 6 }} onClick={() => setParam('model', null)}><MakeLogo make={make} />{make}</button></>}
