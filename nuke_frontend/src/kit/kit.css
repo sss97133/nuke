@@ -10,7 +10,7 @@
 .k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }
 .k-label   { font: 700 8px/1.4 Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
 
-/* Containers. One border weight, one padding. */
+/* Containers. 2 px frames a section; 1 px rules the rows inside it. */
 .k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }
 .k-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .k-masthead { display: flex; align-items: center; gap: 12px; min-height: 36px; }
@@ -39,3 +39,10 @@
   .k-masthead { flex-wrap: wrap; }
   .k-masthead__result { margin-left: 0; text-align: left; }
 }
+
+/* Rows: a titled group of label/value lines inside a section. */
+.k-rows { display: grid; gap: 0; margin-top: 8px; }
+.k-rows:first-child { margin-top: 0; }
+.k-rows__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 2px 0; }
+.k-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.k-row__value { text-align: right; overflow-wrap: anywhere; }
