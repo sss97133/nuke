@@ -30,10 +30,12 @@ type ClaimViewProps = {
   label?: string;
   role?: Role;
   format?: (value: Claim['value']) => string;
+  /** Rendered under the source, for a drill the caller owns (a stack link, a note). */
+  extra?: React.ReactNode;
 };
 
 /** A fact on the page. Its value is a button into its evidence; it cannot render without a source. */
-export function ClaimView({ claim, label, role = 'measure', format }: ClaimViewProps) {
+export function ClaimView({ claim, label, role = 'measure', format, extra }: ClaimViewProps) {
   const [open, setOpen] = useState(false);
   const boundary = useRef<HTMLSpanElement>(null);
   const text = format ? format(claim.value) : String(claim.value);
@@ -45,6 +47,7 @@ export function ClaimView({ claim, label, role = 'measure', format }: ClaimViewP
     </button>
     <HeaderPopover open={open} title="Source" width={300} align="right" dismissBoundaryRef={boundary} onClose={() => setOpen(false)}>
       <SourceView claim={claim} />
+      {extra}
     </HeaderPopover>
   </span>;
 }

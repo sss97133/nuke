@@ -33,3 +33,9 @@
 .k-facet { all: unset; cursor: pointer; padding: 4px 6px; border-bottom: 2px solid transparent; white-space: nowrap; }
 .k-facet:hover, .k-facet[aria-expanded="true"] { border-bottom-color: var(--text); }
 .k-facet:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* Phones: the masthead wraps and the result drops under the entity. */
+@media (max-width: 420px) {
+  .k-masthead { flex-wrap: wrap; }
+  .k-masthead__result { margin-left: 0; text-align: left; }
+}
