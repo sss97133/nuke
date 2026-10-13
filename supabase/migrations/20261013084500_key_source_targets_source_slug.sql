@@ -1,14 +1,14 @@
 -- source_targets: key source_slug to the source registry (key gap, repair loop; data-machine-cases.md section 12).
 -- No row is written; no column is added.
 --
--- WHY. public.v_residual tags source_targets {describe,key}, rank_mrows 1.6 (read 2026-10-13 08:42Z): it has no
+-- WHY. public.v_residual tags source_targets {describe,key}, rank_mrows 1.6 (read 2026-10-13 08:35-08:43Z): it has no
 -- foreign key in or out (fk_in + fk_out = 0). Higher-ranked gaps of an allowed kind had no repair to make tonight:
 -- vehicle_images and auction_comments (owner) carry only undeclared write receipts from before their writers sent
 -- headers; vehicle_observations (owner) has open PRs #909 and #986; write_receipts (key) keys by table name and
 -- transaction id, which no foreign key can reference. source_slug names the source of each discovered listing URL and
 -- nothing in the catalog says which source registry it belongs to.
 --
--- EVIDENCE (read-only, prod, 2026-10-13 08:42-08:47Z through scripts/data/q.sh):
+-- EVIDENCE (read-only, prod, 2026-10-13 08:35-08:43Z through scripts/data/q.sh):
 --   785,126 rows on 10 distinct source_slug values, NOT NULL, all 10 present in observation_sources.slug, which is
 --   UNIQUE (observation_sources_slug_key): mecum, bat, bonhams, barnfinds, hemmings, barrett-jackson, pcarmarket,
 --   collecting-cars, gooding, broad-arrow. No orphan row, so the key is added validated.
@@ -28,7 +28,7 @@
 -- CONTRACT: supabase/sql/test_source_targets_source_key.sql (PostgreSQL 17, synthetic rows, CI job
 -- metric-fold-health-contract in .github/workflows/frontend-tests.yml). It ran only in CI: there is no local Postgres
 -- run in the session that wrote it.
--- MEASURED BEFORE: v_residual source_targets gaps {describe,key}, rank_mrows 1.6 (2026-10-13 08:42Z).
+-- MEASURED BEFORE: v_residual source_targets gaps {describe,key}, rank_mrows 1.6 (2026-10-13 08:35-08:43Z).
 -- EXPECTED AFTER: gaps {describe}, rank_mrows 0.8.
 
 BEGIN;
