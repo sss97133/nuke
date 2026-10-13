@@ -461,7 +461,7 @@ const results = await nuke.search.query('air-cooled porsche under 100k');
         <div style={s.prose}>
           A valuation returns the comparable sales it rests on, the source of each, and its coverage: how many
           lots, over which window. No number arrives without them, and the live model's error is graded in
-          public on the <Link to="/about" style={s.link}>about page</Link>, by lot, with its date.
+          public on the <Link to="/about">about page</Link>, by lot, with its date.
         </div>
         <Code>{`const val = await nuke.valuations.get({
   make: 'Porsche', model: '911', year: 1973
