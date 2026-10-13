@@ -285,14 +285,14 @@ struct LiveBoardView: View {
         guard filterMake == nil, let board, let wk = board.weekAgo, let before = wk.bids, before > 0 else { return nil }
         let nowBids = openLots.reduce(0.0) { $0 + ($1.currentBid ?? 0) }
         let pct = (nowBids - before) / before * 100
-        let signed = (pct >= 0 ? "+" : "") + String(format: "%.1f", pct) + "%"
+        let signed = (pct >= 0 ? "+" : "") + LedgerMap.oneDecimal(pct) + "%"
         return "vs same time last week \(wk.source == "archive" ? "≈" : "")\(signed) from \(Self.bidNumber(before, compact: true))"
     }
 
     /// The web's bidNumber: BaT runs every auction in US dollars and reports the bid as one (#1061).
     static func bidNumber(_ n: Double?, compact: Bool = false) -> String {
         guard let n, n.isFinite else { return "—" }
-        if compact, abs(n) >= 1_000_000 { return "$" + String(format: "%.1f", n / 1_000_000) + "M" }
+        if compact, abs(n) >= 1_000_000 { return "$" + LedgerMap.oneDecimal(n / 1_000_000) + "M" }
         if compact, abs(n) >= 10_000 { return "$\(Int((n / 1_000).rounded()))K" }
         return "$" + Int(n.rounded()).formatted()
     }
@@ -303,7 +303,7 @@ struct LiveBoardView: View {
     }
     /// Past 3× the comps mostly do not describe the car, so it reads as 3×+ rather than a precise number.
     static func multiple(_ ratio: Double) -> String {
-        ratio >= 3 ? "3×+" : ratio < 0.1 ? "<0.1×" : String(format: "%.1f×", ratio)
+        ratio >= 3 ? "3×+" : ratio < 0.1 ? "<0.1×" : LedgerMap.oneDecimal(ratio) + "×"
     }
 
     @State private var reading: LiveAuction?
@@ -312,6 +312,13 @@ struct LiveBoardView: View {
         Group {
             if let board {
                 List {
+                    // The Market tab's first section on the web: the ledger as a map (every record
+                    // with a recorded price), the open board below it.
+                    Section {
+                        LedgerMapView()
+                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 4, trailing: 12))
+                            .listRowBackground(Color.clear)
+                    }
                     // The board drawn as the web draws it: brands as boxes, decades inside.
                     Section {
                         LiveInventoryMapView(lots: openLots) { make, decade in

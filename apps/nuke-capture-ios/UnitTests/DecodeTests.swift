@@ -114,6 +114,22 @@ final class DecodeTests: XCTestCase {
         XCTAssertNil(broken.weekAgo)
     }
 
+    func testLedgerMapRowsDecodeAtEveryLevelAndFormatAsTheWebDoes() throws {
+        // treemap_by_brand carries min and max; treemap_years does not. Both decode to the same node.
+        let brand = try decode([LedgerNode].self, #"[{"name":"CHEVROLET","count":151479,"value":5400000000,"median_price":36000,"min_price":100,"max_price":3500000,"sold_count":40000,"auction_count":9000,"avg_bids":12,"avg_watchers":400}]"#)
+        XCTAssertEqual(brand.first?.median_price, 36000)
+        let year = try decode([LedgerNode].self, #"[{"name":"1969","count":812,"value":40600000,"median_price":50000,"sold_count":300,"auction_count":100,"avg_bids":10,"avg_watchers":200}]"#)
+        XCTAssertNil(year.first?.min_price)
+        XCTAssertEqual(year.first?.count, 812)
+        // The leaf: a recorded sale price wins, else the sold price, as the web's useTreemapVehicles maps it.
+        let leaf = try decode([LedgerVehicle].self, #"[{"id":"e08bf694-970f-4cbe-8a74-8715158a0f2e","year":1977,"make":"Chevrolet","model":"Blazer","listing_title":null,"bat_listing_title":null,"sale_price":null,"sold_price":42000,"primary_image_url":null,"mileage":null}]"#)
+        XCTAssertEqual(leaf.first?.price, 42000)
+        XCTAssertEqual(leaf.first?.name, "1977 Chevrolet Blazer")
+        XCTAssertEqual(LedgerMap.money(36_000), "$36K")
+        XCTAssertEqual(LedgerMap.money(1_250_000), "$1.3M")
+        XCTAssertEqual(LedgerMap.money(0), "--")
+    }
+
     func testCalendarDayDecodesTheMaskedShapeFor1048() throws {
         let day = try decode(CalendarDay.self, #"{"day":"2026-02-02","photos":3,"events":0,"work":2,"work_minutes":120,"work_cost":null,"money_masked":true}"#)
         XCTAssertNil(day.work_cost)

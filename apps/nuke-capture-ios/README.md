@@ -65,6 +65,11 @@ Standing rules the code carries:
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
+- **Explore opens as the Market tab opens.** The ledger as a map first (`LedgerMap.swift`: `treemap_by_brand`,
+  `treemap_models_by_brand`, `treemap_years`, then the `vehicles` leaf, the web's readers column for column; area =
+  count, color = median, the web's captions; the unreadable tail folded into a box of its own cells with the list
+  behind its title, as the inventory map folds its tail), the open board below it (web #1061). A capped level
+  (200 models a brand, 200 records a model) states its denominator.
 - **The board is the web's board.** `market_pulse_live` is read once per 30 s and rendered as nuke.ag renders it:
   bids in dollars (BaT runs every auction in USD; web #1061), the heat tag per lot computed exactly as
   `MarketPulse.tsx heatOf` (curve share by tier at hours left, typical = band p50 × share, hot ≥ 1.25×, cold ≤ 0.8×,
@@ -80,7 +85,8 @@ Standing rules the code carries:
   profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
-  the first hot or cold lot's reading on the board, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
+  the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
+  ledger map, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
   (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).
