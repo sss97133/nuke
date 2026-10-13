@@ -5,6 +5,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
+const NotFound = React.lazy(() => import('../pages/NotFound'));
 const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
 const DataDeletion = React.lazy(() => import('../pages/DataDeletion'));
@@ -307,8 +308,8 @@ export const DomainRoutes = () => {
           </Route>
         </Route>
 
-        {/* ── Fallback ─────────────────────────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ── Fallback: a path with no page says so, instead of landing on the board unannounced ── */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );
