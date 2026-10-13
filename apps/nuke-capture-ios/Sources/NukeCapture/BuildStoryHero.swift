@@ -20,6 +20,8 @@ struct BuildStoryHero: View {
     let make: String?
     let model: String?
     let trim: String?
+    /// Identity tokens from the document's masthead (the web's rule), nil before the read lands.
+    var identityTokens: [String]? = nil
     let takenAt: String?
     let loaded: Bool
     let onTap: () -> Void
@@ -41,7 +43,7 @@ struct BuildStoryHero: View {
             Button(action: onTap) { heroPhoto(urlStr) }
                 .buttonStyle(.plain)
                 .overlay(alignment: .bottomLeading) {
-                    IdentityChips(year: year, make: make, model: model, trim: trim,
+                    IdentityChips(year: year, make: make, model: model, trim: trim, tokens: identityTokens,
                                   onScrim: true, onDrill: onDrillCohort)
                         .padding(16)
                         .allowsHitTesting(onDrillCohort != nil)
@@ -54,7 +56,7 @@ struct BuildStoryHero: View {
                 .overlay {
                     VStack(spacing: 8) {
                         Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.secondary)
-                        IdentityChips(year: year, make: make, model: model, trim: trim,
+                        IdentityChips(year: year, make: make, model: model, trim: trim, tokens: identityTokens,
                                       onScrim: false, onDrill: onDrillCohort)
                     }
                 }
@@ -125,10 +127,14 @@ struct IdentityChips: View {
     let make: String?
     let model: String?
     let trim: String?
+    /// The document's identity tokens (VehicleIdentity, the web's rule) when the read is present;
+    /// the raw row fields above are the fallback before the read lands.
+    var tokens: [String]? = nil
     var onScrim: Bool = true          // white on the hero scrim vs primary on a plate
     let onDrill: (() -> Void)?
 
     private var parts: [String] {
+        if let tokens, !tokens.isEmpty { return tokens }
         var p: [String] = []
         if let year { p.append(String(year)) }   // String(): avoid "1,977" locale formatting
         if let make, !make.isEmpty { p.append(make) }
