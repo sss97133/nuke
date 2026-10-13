@@ -9,6 +9,21 @@
  *   --acceptance-matrix /private/manifest.json --out /private/new-matrix.json
  * Schema public_inventory_acceptance_v1: population, assessments[], targets[], targetPlanComplete.
  * Compiles supplied gate receipts; does not independently verify them or measure fleet readiness.
+ * Full dated-population reconciliation (offline, bounded memory):
+ *   --reconcile-population /private/config.json --out /private/new-report.jsonl
+ * Config: schemaVersion as above, mode: population_reconciliation_v1,
+ * population: { key, grain, filter, measuredAt, window: {start,end}, denominator,
+ *   fullRetained: {count,grain}, fullPublic: {count,grain}, evidenceStage: cached_census|dated_export,
+ *   sourceReceipt: {id,sha256} }, capabilities: [{id,grain,eligibilityRule,eligibleCount}],
+ * manifest / assessments: {path,rows,sha256,exhausted:true}. Paths are relative to config.
+ * Subject JSONL: {type:subject,key,grain,capabilities:[sorted applicable capability IDs]}.
+ * Assessment JSONL: {type:assessment,key,grain,capability,gates,objectives?} (existing gate format).
+ * Sort subjects by ASCII key; assessments by key then capability. No duplicate keys/pairs.
+ * Both streams end with {type:end,populationKey,grain,measuredAt,window,rows,exhausted:true,
+ *   sha256:<digest of all preceding exact JSONL bytes>}. Every line includes its final LF.
+ * Descriptor sha256 covers the entire file, including the end receipt. Empty receipts are valid.
+ * All input tails/counts/hashes must reconcile before a final summary is emitted. A partial
+ * output without its terminal reconciled summary is not a completed population measurement.
  */
 import { open, realpath, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -904,6 +919,60 @@ const reasonKey = v => typeof v === 'string' && /^[a-z0-9_]{1,80}$/.test(v);
 const count = v => Number.isSafeInteger(v) && v >= 0;
 const realClock = v => typeof v === 'string' && Number.isFinite(Date.parse(v));
 
+function assessAcceptanceSubject(a, now) {
+  const c = PUBLIC_ACCEPTANCE.find(c => c.id === a?.capability);
+  if (!c || !matrixKey(a.key) || !object(a.gates)) throw new AssayError('invalid_acceptance_subject');
+  if (Object.keys(a.gates).some(g => !c.gates.includes(g))) throw new AssayError('unknown_acceptance_gate');
+  const objectives = a.objectives;
+  if (objectives != null && (!object(objectives) ||
+    !Number.isFinite(objectives.freshnessSeconds) || objectives.freshnessSeconds <= 0 ||
+    !Number.isFinite(objectives.p95Ms) || objectives.p95Ms <= 0 ||
+    !Number.isFinite(objectives.errorRateMax) || objectives.errorRateMax < 0 || objectives.errorRateMax > 1))
+    throw new AssayError('invalid_acceptance_objectives');
+  const reasons = [];
+  let failed = false;
+  const gates = c.gates.map(name => {
+    const g = a.gates[name];
+    if (!g || g.status === 'not_assessed') { reasons.push(`${name}_unassessed`); return { gate: name, status: 'not_assessed' }; }
+    if (!object(g) || !['passed', 'failed'].includes(g.status)) throw new AssayError('invalid_acceptance_gate');
+    if (g.status === 'failed') {
+      if (!reasonKey(g.reason)) throw new AssayError('invalid_acceptance_reason');
+      failed = true; reasons.push(`${name}:${g.reason}`); return { gate: name, status: 'failed', reason: g.reason };
+    }
+    const r = g.receipt;
+    if (!object(r) || !matrixKey(r.id) || !/^[a-f0-9]{64}$/.test(r.sha256 ?? '') ||
+      r.capability !== c.id || r.key !== a.key || r.gate !== name || !realClock(r.measuredAt) || Date.parse(r.measuredAt) > now ||
+      !BASIS.has(r.basis) || (name === 'public_delivery' && r.basis !== 'anonymous_runtime') ||
+      (['source_fidelity', 'semantic_quality'].includes(name) && r.basis !== 'independent_review')) {
+      reasons.push(`${name}_receipt_unqualified`); return { gate: name, status: 'not_assessed' };
+    }
+    return { gate: name, status: 'passed', receipt: { id: r.id, sha256: r.sha256, measuredAt: r.measuredAt, basis: r.basis } };
+  });
+  if (!objectives) reasons.push('freshness_service_objectives_missing');
+  // Objectives need measured metrics, not a passed flag or a provider timeout.
+  for (const name of ['freshness', 'service']) {
+    const g = gates.find(g => g.gate === name);
+    if (g.status !== 'passed' || !objectives) continue;
+    const metrics = a.gates[name].metrics;
+    const valid = object(metrics) && (name === 'freshness'
+      ? Number.isFinite(metrics.ageSeconds) && metrics.ageSeconds >= 0
+      : Number.isFinite(metrics.p95Ms) && metrics.p95Ms >= 0 && Number.isFinite(metrics.errorRate) && metrics.errorRate >= 0 && metrics.errorRate <= 1);
+    if (!valid) { g.status = 'not_assessed'; reasons.push(`${name}_metrics_missing`); continue; }
+    // ageSeconds is source age at receipt measurement; elapsed time keeps an
+    // old low-age receipt from remaining fresh indefinitely. No service TTL is inferred.
+    const effectiveAgeSeconds = name === 'freshness'
+      ? metrics.ageSeconds + (now - Date.parse(g.receipt.measuredAt)) / 1000 : null;
+    g.metrics = name === 'freshness' ? { measuredAt: g.receipt.measuredAt,
+      ageSecondsAtMeasurement: metrics.ageSeconds, effectiveAgeSeconds }
+      : { measuredAt: g.receipt.measuredAt, p95Ms: metrics.p95Ms, errorRate: metrics.errorRate };
+    if (name === 'freshness' ? effectiveAgeSeconds > objectives.freshnessSeconds
+      : metrics.p95Ms > objectives.p95Ms || metrics.errorRate > objectives.errorRateMax) {
+      g.status = 'failed'; failed = true; reasons.push(`${name}_objective_failed`);
+    }
+  }
+  return { key: a.key, capability: c.id, state: failed ? 'blocked' : reasons.length ? 'not_assessed' : 'ready', reasons, objectives: objectives ? { freshnessSeconds: objectives.freshnessSeconds, p95Ms: objectives.p95Ms, errorRateMax: objectives.errorRateMax } : null, gates };
+}
+
 export function acceptanceMatrix(input, now = Date.now()) {
   if (!object(input) || input.schemaVersion !== MATRIX_VERSION || !object(input.population) ||
     !matrixKey(input.population.key) || !['explicit_manifest', 'exhausted_manifest'].includes(input.population.kind) ||
@@ -911,63 +980,13 @@ export function acceptanceMatrix(input, now = Date.now()) {
     !Array.isArray(input.assessments) || input.assessments.length > 2000 ||
     !Array.isArray(input.targets) || input.targets.length > 200 || typeof input.targetPlanComplete !== 'boolean' || (input.targetPlanComplete && input.targets.length === 0))
     throw new AssayError('invalid_acceptance_manifest');
-  const contracts = new Map(PUBLIC_ACCEPTANCE.map(c => [c.id, c]));
   const seen = new Set();
   const rows = input.assessments.map(a => {
-    const c = contracts.get(a?.capability);
-    if (!c || !matrixKey(a.key) || !object(a.gates)) throw new AssayError('invalid_acceptance_subject');
-    const composite = `${a.capability}/${a.key}`;
+    const row = assessAcceptanceSubject(a, now);
+    const composite = `${row.capability}/${row.key}`;
     if (seen.has(composite)) throw new AssayError('duplicate_acceptance_subject');
     seen.add(composite);
-    if (Object.keys(a.gates).some(g => !c.gates.includes(g))) throw new AssayError('unknown_acceptance_gate');
-    const objectives = a.objectives;
-    if (objectives != null && (!object(objectives) ||
-      !Number.isFinite(objectives.freshnessSeconds) || objectives.freshnessSeconds <= 0 ||
-      !Number.isFinite(objectives.p95Ms) || objectives.p95Ms <= 0 ||
-      !Number.isFinite(objectives.errorRateMax) || objectives.errorRateMax < 0 || objectives.errorRateMax > 1))
-      throw new AssayError('invalid_acceptance_objectives');
-    const reasons = [];
-    let failed = false;
-    const gates = c.gates.map(name => {
-      const g = a.gates[name];
-      if (!g || g.status === 'not_assessed') { reasons.push(`${name}_unassessed`); return { gate: name, status: 'not_assessed' }; }
-      if (!object(g) || !['passed', 'failed'].includes(g.status)) throw new AssayError('invalid_acceptance_gate');
-      if (g.status === 'failed') {
-        if (!reasonKey(g.reason)) throw new AssayError('invalid_acceptance_reason');
-        failed = true; reasons.push(`${name}:${g.reason}`); return { gate: name, status: 'failed', reason: g.reason };
-      }
-      const r = g.receipt;
-      if (!object(r) || !matrixKey(r.id) || !/^[a-f0-9]{64}$/.test(r.sha256 ?? '') ||
-        r.capability !== c.id || r.key !== a.key || r.gate !== name || !realClock(r.measuredAt) || Date.parse(r.measuredAt) > now ||
-        !BASIS.has(r.basis) || (name === 'public_delivery' && r.basis !== 'anonymous_runtime') ||
-        (['source_fidelity', 'semantic_quality'].includes(name) && r.basis !== 'independent_review')) {
-        reasons.push(`${name}_receipt_unqualified`); return { gate: name, status: 'not_assessed' };
-      }
-      return { gate: name, status: 'passed', receipt: { id: r.id, sha256: r.sha256, measuredAt: r.measuredAt, basis: r.basis } };
-    });
-    if (!objectives) reasons.push('freshness_service_objectives_missing');
-    // Objectives need measured metrics, not a passed flag or a provider timeout.
-    for (const name of ['freshness', 'service']) {
-      const g = gates.find(g => g.gate === name);
-      if (g.status !== 'passed' || !objectives) continue;
-      const metrics = a.gates[name].metrics;
-      const valid = object(metrics) && (name === 'freshness'
-        ? Number.isFinite(metrics.ageSeconds) && metrics.ageSeconds >= 0
-        : Number.isFinite(metrics.p95Ms) && metrics.p95Ms >= 0 && Number.isFinite(metrics.errorRate) && metrics.errorRate >= 0 && metrics.errorRate <= 1);
-      if (!valid) { g.status = 'not_assessed'; reasons.push(`${name}_metrics_missing`); continue; }
-      // ageSeconds is source age at receipt measurement; elapsed time keeps an
-      // old low-age receipt from remaining fresh indefinitely. No service TTL is inferred.
-      const effectiveAgeSeconds = name === 'freshness'
-        ? metrics.ageSeconds + (now - Date.parse(g.receipt.measuredAt)) / 1000 : null;
-      g.metrics = name === 'freshness' ? { measuredAt: g.receipt.measuredAt,
-        ageSecondsAtMeasurement: metrics.ageSeconds, effectiveAgeSeconds }
-        : { measuredAt: g.receipt.measuredAt, p95Ms: metrics.p95Ms, errorRate: metrics.errorRate };
-      if (name === 'freshness' ? effectiveAgeSeconds > objectives.freshnessSeconds
-        : metrics.p95Ms > objectives.p95Ms || metrics.errorRate > objectives.errorRateMax) {
-        g.status = 'failed'; failed = true; reasons.push(`${name}_objective_failed`);
-      }
-    }
-    return { key: a.key, capability: c.id, state: failed ? 'blocked' : reasons.length ? 'not_assessed' : 'ready', reasons, objectives: objectives ? { freshnessSeconds: objectives.freshnessSeconds, p95Ms: objectives.p95Ms, errorRateMax: objectives.errorRateMax } : null, gates };
+    return row;
   });
   const declared = input.population.denominator ?? null;
   if (declared !== null && !count(declared)) throw new AssayError('invalid_acceptance_denominator');
@@ -1008,6 +1027,238 @@ export function acceptanceMatrix(input, now = Date.now()) {
     publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 };
 }
 
+const RECONCILIATION_VERSION = 'population_reconciliation_v1';
+const DIGEST = /^[a-f0-9]{64}$/;
+const POPULATION_GRAINS = new Set(['vehicle_record', ...PUBLIC_ACCEPTANCE.map(c => c.grain)]);
+const streamClock = v => typeof v === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(v) && realClock(v);
+const MAX_STREAM_LINE = 1_000_000;
+const MAX_REASON_SETS = 16_384;
+
+function reconciliationContract(input, now) {
+  const p = input?.population;
+  if (!object(input) || input.schemaVersion !== MATRIX_VERSION || input.mode !== RECONCILIATION_VERSION ||
+    !object(p) || !matrixKey(p.key) || !POPULATION_GRAINS.has(p.grain) ||
+    typeof p.filter !== 'string' || !p.filter.trim() || p.filter.length > 4000 ||
+    !streamClock(p.measuredAt) || !object(p.window) || !streamClock(p.window.start) || !streamClock(p.window.end) ||
+    Date.parse(p.window.start) > Date.parse(p.window.end) || Date.parse(p.window.end) > Date.parse(p.measuredAt) ||
+    Date.parse(p.measuredAt) > now || !count(p.denominator) ||
+    !['cached_census', 'dated_export'].includes(p.evidenceStage) || !object(p.sourceReceipt) ||
+    !matrixKey(p.sourceReceipt.id) || !DIGEST.test(p.sourceReceipt.sha256 ?? '') ||
+    !Array.isArray(input.capabilities) || !input.capabilities.length || input.capabilities.length > PUBLIC_ACCEPTANCE.length)
+    throw new AssayError('invalid_reconciliation_contract');
+  for (const name of ['fullRetained', 'fullPublic']) {
+    const full = p[name];
+    if (!object(full) || !count(full.count) || !POPULATION_GRAINS.has(full.grain) ||
+      (full.grain === p.grain && full.count < p.denominator)) throw new AssayError('invalid_full_population_denominator');
+  }
+  if ((p.fullRetained.grain === p.fullPublic.grain ||
+    (p.fullRetained.grain === 'vehicle_record' && p.fullPublic.grain === 'public_vehicle_record')) &&
+    p.fullRetained.count < p.fullPublic.count) throw new AssayError('invalid_full_population_denominator');
+  const contracts = new Map();
+  for (const spec of input.capabilities) {
+    const c = PUBLIC_ACCEPTANCE.find(c => c.id === spec?.id);
+    if (!c || contracts.has(c.id) || c.grain !== p.grain || spec.grain !== c.grain ||
+      typeof spec.eligibilityRule !== 'string' || !spec.eligibilityRule.trim() || spec.eligibilityRule.length > 4000 ||
+      !count(spec.eligibleCount) || spec.eligibleCount > p.denominator)
+      throw new AssayError('invalid_capability_population_or_grain');
+    contracts.set(c.id, { ...c, eligibilityRule: spec.eligibilityRule, eligibleCount: spec.eligibleCount });
+  }
+  for (const name of ['manifest', 'assessments']) {
+    const d = input[name];
+    if (!object(d) || typeof d.path !== 'string' || !d.path || !count(d.rows) ||
+      !DIGEST.test(d.sha256 ?? '') || d.exhausted !== true) throw new AssayError('invalid_or_unexhausted_stream_descriptor');
+  }
+  if (input.manifest.rows !== p.denominator) throw new AssayError('population_descriptor_count_mismatch');
+  return contracts;
+}
+
+// Fixed read buffers plus one bounded JSONL record; never readFile on a population.
+// A digest authenticates the supplied bytes, not the truth of an exporter's assertions.
+async function* reconciliationStream(descriptor, population, type, verified) {
+  const file = await open(descriptor.path, 'r');
+  try {
+    const before = await file.stat();
+    if (!before.isFile()) throw new AssayError('stream_not_regular_file');
+    const whole = createHash('sha256'), content = createHash('sha256');
+    const buffer = Buffer.alloc(64 * 1024);
+    let pending = Buffer.alloc(0), rows = 0, bytes = 0, ended = false, contentDigest;
+    while (true) {
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
+      if (!bytesRead) break;
+      bytes += bytesRead;
+      const chunk = buffer.subarray(0, bytesRead);
+      whole.update(chunk);
+      pending = Buffer.concat([pending, chunk]);
+      let start = 0, end;
+      while ((end = pending.indexOf(10, start)) !== -1) {
+        const line = pending.subarray(start, end + 1); start = end + 1;
+        if (ended) throw new AssayError('stream_data_after_end');
+        if (line.length > MAX_STREAM_LINE) throw new AssayError('stream_line_too_large');
+        let row;
+        try { row = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(line)); }
+        catch { throw new AssayError('invalid_stream_json'); }
+        if (!object(row)) throw new AssayError('invalid_stream_row');
+        if (row.type === 'end') {
+          contentDigest = content.digest('hex');
+          if (row.populationKey !== population.key || row.grain !== population.grain ||
+            row.measuredAt !== population.measuredAt || row.window?.start !== population.window.start ||
+            row.window?.end !== population.window.end || row.exhausted !== true ||
+            row.rows !== rows || rows !== descriptor.rows || row.sha256 !== contentDigest)
+            throw new AssayError('stream_end_receipt_mismatch');
+          ended = true;
+        } else {
+          if (row.type !== type) throw new AssayError('unexpected_stream_row_type');
+          content.update(line); rows++;
+          if (!count(rows) || rows > descriptor.rows) throw new AssayError('stream_row_count_exceeded');
+          yield row;
+        }
+      }
+      pending = Buffer.from(pending.subarray(start));
+      if (pending.length > MAX_STREAM_LINE) throw new AssayError('stream_line_too_large');
+    }
+    if (pending.length || !ended) throw new AssayError('stream_truncated_or_end_missing');
+    const after = await file.stat(), sha256 = whole.digest('hex');
+    if (bytes !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs ||
+      after.ctimeMs !== before.ctimeMs) throw new AssayError('stream_changed_during_reconciliation');
+    if (sha256 !== descriptor.sha256) throw new AssayError('stream_sha256_mismatch');
+    Object.assign(verified, { rows, bytes, sha256, contentSha256: contentDigest, exhausted: true });
+  } finally { await file.close(); }
+}
+
+function incrementReasons(map, key) {
+  if (!Object.hasOwn(map, key) && Object.keys(map).length >= MAX_REASON_SETS) throw new AssayError('reconciliation_reason_budget_exceeded');
+  map[key] = (map[key] ?? 0) + 1;
+}
+
+export async function reconcilePopulation(input, { now = Date.now(), emit = async () => {} } = {}) {
+  const contracts = reconciliationContract(input, now), p = input.population;
+  const verifiedManifest = {}, verifiedAssessments = {}, reasonSets = {};
+  const summary = Object.fromEntries([...contracts].map(([id, c]) => [id, {
+    id, grain: c.grain, eligibilityRule: c.eligibilityRule, eligibleCount: c.eligibleCount,
+    notApplicableInManifest: p.denominator - c.eligibleCount, assessmentReceipts: 0, missingAssessments: 0,
+    totals: { ready: 0, blocked: 0, not_assessed: 0 }, reasons: {},
+    gates: Object.fromEntries(c.gates.map(g => [g, { passed: 0, failed: 0, not_assessed: 0, reasons: {} }])),
+    failedGateIntersections: {}, unassessedGateIntersections: {}, gateStateIntersections: {},
+  }]));
+  const missing = new Map([...contracts].map(([id]) => [id, assessAcceptanceSubject({ key: 'missing', capability: id, gates: {} }, now)]));
+  const manifest = reconciliationStream(input.manifest, p, 'subject', verifiedManifest);
+  const receipts = reconciliationStream(input.assessments, p, 'assessment', verifiedAssessments);
+  let previousSubject = null, previousReceipt = null, subjects = 0, pairs = 0;
+  async function nextReceipt() {
+    const n = await receipts.next();
+    if (n.done) return null;
+    const a = n.value;
+    if (!matrixKey(a.key) || !contracts.has(a.capability)) throw new AssayError('invalid_or_ineligible_assessment_key');
+    if (a.grain !== p.grain) throw new AssayError('assessment_grain_mismatch');
+    if (previousReceipt !== null && (a.key < previousReceipt.key ||
+      (a.key === previousReceipt.key && a.capability <= previousReceipt.capability)))
+      throw new AssayError('duplicate_or_unsorted_assessment_key');
+    previousReceipt = { key: a.key, capability: a.capability };
+    return a;
+  }
+  await emit({ type: 'manifest', schemaVersion: MATRIX_VERSION, mode: RECONCILIATION_VERSION, status: 'in_progress',
+    evaluatedAt: new Date(now).toISOString(), population: p, capabilities: [...contracts.values()],
+    basis: 'supplied_gate_receipts; offline byte/count/scope reconciliation, not independent receipt verification',
+    publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 });
+  try {
+    let assessment = await nextReceipt();
+    for await (const subject of manifest) {
+      if (!matrixKey(subject.key) || subject.grain !== p.grain) throw new AssayError('invalid_subject_key_or_grain');
+      if (previousSubject !== null && subject.key <= previousSubject) throw new AssayError('duplicate_or_unsorted_subject_key');
+      previousSubject = subject.key;
+      if (!Array.isArray(subject.capabilities) || !subject.capabilities.length ||
+        subject.capabilities.some((id, i) => !contracts.has(id) || (i > 0 && id <= subject.capabilities[i - 1])))
+        throw new AssayError('invalid_subject_capability_membership');
+      subjects++;
+      if (assessment && assessment.key < subject.key) throw new AssayError('unmatched_assessment_key');
+      if (assessment?.key === subject.key && !subject.capabilities.includes(assessment.capability)) throw new AssayError('ineligible_assessment_key');
+      for (const capability of subject.capabilities) {
+        const supplied = assessment?.key === subject.key && assessment.capability === capability;
+        const row = supplied ? assessAcceptanceSubject(assessment, now) : missing.get(capability);
+        // The legacy matrix already withholds overall readiness without objectives.
+        // Population gate totals must also withhold these two individual passes.
+        if (supplied && !row.objectives) for (const gate of row.gates) {
+          if (['freshness', 'service'].includes(gate.gate) && gate.status === 'passed') {
+            gate.status = 'not_assessed'; row.reasons.push(`${gate.gate}_objective_unassessed`);
+          }
+        }
+        const s = summary[capability];
+        s.totals[row.state]++; pairs++;
+        supplied ? s.assessmentReceipts++ : s.missingAssessments++;
+        for (const reason of row.reasons) incrementReasons(s.reasons, reason);
+        for (const gate of row.gates) {
+          s.gates[gate.gate][gate.status]++;
+          for (const reason of row.reasons.filter(r => r.startsWith(`${gate.gate}_`) || r.startsWith(`${gate.gate}:`)))
+            incrementReasons(s.gates[gate.gate].reasons, reason);
+        }
+        incrementReasons(s.failedGateIntersections, row.gates.filter(g => g.status === 'failed').map(g => g.gate).join('+') || 'none');
+        incrementReasons(s.unassessedGateIntersections, row.gates.filter(g => g.status === 'not_assessed').map(g => g.gate).join('+') || 'none');
+        incrementReasons(s.gateStateIntersections, row.gates.map(g => `${g.gate}:${g.status}`).join('|'));
+        const reasonSet = { state: row.state, reasons: row.reasons, gates: row.gates.map(g => ({ gate: g.gate, status: g.status, ...(g.reason ? { reason: g.reason } : {}) })) };
+        const reasonSetId = hash(reasonSet);
+        if (!reasonSets[reasonSetId]) {
+          if (Object.keys(reasonSets).length >= MAX_REASON_SETS) throw new AssayError('reconciliation_reason_budget_exceeded');
+          reasonSets[reasonSetId] = reasonSet;
+        }
+        await emit({ type: 'assessment', key: subject.key, grain: p.grain, capability, state: row.state,
+          assessmentProvided: supplied, reasonSet: reasonSetId, ...(supplied ? { evaluation: row } : {}) });
+        if (supplied) assessment = await nextReceipt();
+      }
+      if (assessment?.key === subject.key) throw new AssayError('ineligible_assessment_key');
+    }
+    if (assessment) throw new AssayError('unmatched_assessment_key');
+    if (subjects !== p.denominator) throw new AssayError('population_count_mismatch');
+    for (const s of Object.values(summary)) {
+      if (Object.values(s.totals).reduce((a, b) => a + b, 0) !== s.eligibleCount) throw new AssayError('capability_denominator_mismatch');
+    }
+    const result = { type: 'summary', schemaVersion: MATRIX_VERSION, mode: RECONCILIATION_VERSION, status: 'reconciled',
+      evaluatedAt: new Date(now).toISOString(), population: { ...p, inspectedSubjects: subjects, inspectedPairs: pairs, exhausted: true },
+      inputs: { manifest: verifiedManifest, assessments: verifiedAssessments }, capabilities: Object.values(summary), reasonSets,
+      unmeasuredCapabilities: PUBLIC_ACCEPTANCE.filter(c => !contracts.has(c.id)).map(c => ({ id: c.id, grain: c.grain, state: 'not_assessed', eligibleCount: null })),
+      populationReconciled: true, gateEvidenceIndependentlyVerified: false, fleetReadinessMeasured: false,
+      publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 };
+    await emit(result);
+    return result;
+  } finally { await manifest.return(); await receipts.return(); }
+}
+
+async function runPopulationReconciliation(args, print, now) {
+  if (args.length !== 4 || args[0] !== '--reconcile-population' || args[2] !== '--out') throw new AssayError('invalid_reconciliation_arguments');
+  let source, output;
+  try {
+    source = await open(args[1], 'r');
+    const stat = await source.stat();
+    if (!stat.isFile() || stat.size > 2_000_000) throw new AssayError('reconciliation_config_size_or_type');
+    const buffer = Buffer.alloc(2_000_001);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await source.read(buffer, length, buffer.length - length, null);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length > 2_000_000) throw new AssayError('reconciliation_config_size_or_type');
+    const bytes = buffer.subarray(0, length), input = JSON.parse(bytes.toString('utf8'));
+    reconciliationContract(input, now);
+    for (const name of ['manifest', 'assessments']) input[name].path = path.resolve(path.dirname(path.resolve(args[1])), input[name].path);
+    output = await privateOutput(args[3]);
+    const assaySourceSha256 = createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex');
+    const inputSha256 = createHash('sha256').update(bytes).digest('hex'), digest = createHash('sha256');
+    let buffered = '', outputRows = 0;
+    const result = await reconcilePopulation(input, { now, emit: async row => {
+      if (row.type === 'manifest') Object.assign(row, { assaySourceSha256, inputSha256 });
+      if (row.type === 'summary') Object.assign(row, { precedingOutputRows: outputRows, precedingOutputSha256: digest.digest('hex'), assaySourceSha256, inputSha256 });
+      const line = JSON.stringify(row) + '\n';
+      if (row.type !== 'summary') { digest.update(line); outputRows++; }
+      buffered += line;
+      if (buffered.length >= 64 * 1024 || row.type === 'summary') { await output.writeFile(buffered); buffered = ''; }
+    } });
+    print(JSON.stringify({ status: 'population_reconciled', populationKey: result.population.key,
+      inspectedSubjects: result.population.inspectedSubjects, capabilities: result.capabilities.map(c => ({ id: c.id, eligibleCount: c.eligibleCount, totals: c.totals })),
+      publicReadinessCertificate: false, databaseWrites: 0, modelCalls: 0, networkRequests: 0 }));
+    return 0;
+  } finally { await source?.close(); await output?.close(); }
+}
+
 async function runAcceptanceMatrix(args, print) {
   if (args.length !== 4 || args[0] !== '--acceptance-matrix' || args[2] !== '--out') throw new AssayError('invalid_matrix_arguments');
   let source, output;
@@ -1039,6 +1290,7 @@ export async function main(args = process.argv.slice(2), deps = {}) {
   const print = deps.print ?? console.log;
   let file;
   try {
+    if (args[0] === '--reconcile-population') return await runPopulationReconciliation(args, print, (deps.now ?? Date.now)());
     if (args[0] === '--acceptance-matrix') return await runAcceptanceMatrix(args, print);
     const o = options(args);
     if (o.env) { const require = createRequire(path.join(ROOT, 'nuke_frontend/package.json')); require('dotenv').config({ path: o.env, quiet: true }); }
