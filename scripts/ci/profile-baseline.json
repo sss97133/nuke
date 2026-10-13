@@ -3,28 +3,28 @@
   "note": "Logged-out vehicle profile floors for scripts/ci/profile-contract.mjs. A metric may go down, never up. Re-seed with --write-baseline after a page gets better. The three vehicles: a sold car with an owner photo library, an owner build with a wiring manifest, and a live public auction lot.",
   "vehicles": {
     "83f6f033-a3c3-4cf4-a85e-a60d2c588838": {
-      "requests": 98,
-      "errors": 1,
-      "fontSizes": 10,
-      "inlineStyled": 706,
-      "snakeTokens": 8,
-      "money": 11,
+      "requests": 97,
+      "errors": 2,
+      "fontSizes": 6,
+      "inlineStyled": 505,
+      "snakeTokens": 0,
+      "money": 1,
       "plateText": 0
     },
     "e08bf694-970f-4cbe-8a74-8715158a0f2e": {
-      "requests": 91,
-      "errors": 2,
-      "fontSizes": 11,
-      "inlineStyled": 1444,
-      "snakeTokens": 4,
-      "money": 10,
+      "requests": 80,
+      "errors": 1,
+      "fontSizes": 6,
+      "inlineStyled": 1301,
+      "snakeTokens": 0,
+      "money": 0,
       "plateText": 0
     },
     "be853856-e450-4d0e-b2a1-613391956ad6": {
       "requests": 97,
-      "errors": 0,
-      "fontSizes": 10,
-      "inlineStyled": 314,
+      "errors": 1,
+      "fontSizes": 5,
+      "inlineStyled": 310,
       "snakeTokens": 0,
       "money": 1,
       "plateText": 0

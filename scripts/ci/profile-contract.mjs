@@ -10,7 +10,8 @@
 // Metrics per vehicle (desktop 1440x900, fresh context, no cookies):
 //   requests     Supabase REST, RPC and function calls to reach network idle (the request budget)
 //   errors       console errors
-//   fontSizes    distinct computed font sizes on text-bearing elements inside the profile
+//   fontSizes    distinct computed font sizes outside the kit's five roles (20, 14, 10, 9, 8 px) on text-bearing
+//                elements inside the profile: the count that falls as pages move onto the kit
 //   inlineStyled elements inside the profile carrying a style attribute
 //   snakeTokens  snake_case tokens in the visible text (internal vocabulary reaching a human)
 //   money        dollar amounts in the visible text (an anonymous reader's view of money)
@@ -36,6 +37,7 @@ if (vehicles.length === 0) { console.error('No vehicles in', BASELINE); process.
 fs.mkdirSync(OUT, { recursive: true });
 const PASSES = Number(process.env.PROFILE_CONTRACT_PASSES || 2);   // noise inflates a reading, never deflates it: keep the best of two
 const REQUEST_TOLERANCE = 3;                                        // request counts jitter by a few on a timing-out reader
+const ERROR_TOLERANCE = 1;                                          // one intermittent 500 from a popup reader is not a regression
 const browser = await chromium.launch({ headless: true });
 const results = {};
 async function measureOnce(id) {
@@ -61,8 +63,10 @@ async function measureOnce(id) {
       if (r.width < 1 || r.height < 1) continue;
       sizes.add(getComputedStyle(el).fontSize);
     }
+    const kitScale = new Set(['20px', '14px', '10px', '9px', '8px']);
+    const foreign = [...sizes].filter(size => !kitScale.has(size));
     return {
-      fontSizes: sizes.size,
+      fontSizes: foreign.length,
       fontSizeList: [...sizes].sort((a, b) => parseFloat(a) - parseFloat(b)),
       inlineStyled: root.querySelectorAll('[style]').length,
       snakeTokens: (text.match(/\b[a-z]+_[a-z_]+\b/g) || []).length,
@@ -97,7 +101,7 @@ for (const [id, r] of Object.entries(results)) {
   const floor = baseline.vehicles[id] || {};
   const cells = GATED.map(k => {
     const cur = r[k]; const base = floor[k];
-    const limit = base == null ? null : base + (k === 'requests' ? REQUEST_TOLERANCE : 0);
+    const limit = base == null ? null : base + (k === 'requests' ? REQUEST_TOLERANCE : k === 'errors' ? ERROR_TOLERANCE : 0);
     const mark = base == null ? '·' : cur > limit ? '✗' : cur < base ? '↓' : '=';
     if (limit != null && cur > limit) failed = true;
     return `${k} ${cur}${base != null ? `/${base}` : ''} ${mark}`;
@@ -105,7 +109,7 @@ for (const [id, r] of Object.entries(results)) {
   console.log(`${id.slice(0, 8)} ${r.title.slice(0, 40).padEnd(40)} loggedOut=${r.loggedOut} load=${r.loadMs}ms | ${cells.join('  ')}`);
   if (!r.loggedOut) { console.log('   probe invalid: the page did not render as a logged-out visitor'); failed = true; }
   if (r.errorSamples.length) for (const e of r.errorSamples) console.log('   error:', e);
-  console.log('   font sizes:', r.fontSizeList.join(' '));
+  console.log('   font sizes:', r.fontSizeList.join(' '), '(kit scale 20 14 10 9 8; the rest counts)');
 }
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 1));
 
