@@ -164,6 +164,8 @@
 .market-board__empty { padding: 12px; }
 .market-source { margin: 8px 0 0; }
 /* Edges: a number in its own history (range, a tick per earlier week, a block for now, a counted verdict). */
+.market-masthead__count { display: flex; align-items: baseline; gap: 4px; justify-content: flex-end; }
+.market-pulse-strip { display: grid; gap: 4px; }
 .market-edges { border: 2px solid var(--border); margin: 0 0 12px; }
 .market-edges__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 6px 8px; border-bottom: 2px solid var(--border); }
 .market-edge { padding: 8px; border-top: 2px solid var(--border); }

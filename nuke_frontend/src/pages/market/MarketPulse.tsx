@@ -7,7 +7,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BoardReading, type HourReading, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type HourReading, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -183,21 +183,17 @@ function shortDay(day: string): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
-function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays, weekAgo, bids }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string>; weekAgo: BoardReading | null; bids: number }) {
+// Only what is at an edge of its own history earns a strip here; the board's own reading always sits in the masthead.
+function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string> }) {
   const edges = useMemo(
     () => series.map(edgeOf).filter((e): e is Edge => e != null).sort((a, b) => a.depth - b.depth || b.beyond - a.beyond).slice(0, EDGE_MAX),
     [series]
   );
-  if (series.length === 0) return null;
-  const scanned = `${series.length} series scanned, each against its own readings at ${hourUtc}:00 UTC on earlier ${weekdayUtc}s`;
-  const pct = weekAgo ? pctChange(bids, weekAgo.bids) : null;
+  if (edges.length === 0) return null;
   return (
     <section className="market-edges" aria-label="Edges of the board's own history">
       <div className="market-edges__head">
-        <Text role="label">{edges.length ? `Top or bottom 2 of its own history now · ${edges.length} of ${scanned}` : `None in the top or bottom 2 of its own history now · ${scanned}`}</Text>
-        {weekAgo && pct != null && <Text role="caption" title={`${bidNumber(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
-          current bids {bidNumber(bids, true)} · vs same time last week {weekAgo.source === 'archive' ? '≈' : ''}{signed(pct)} from {bidNumber(weekAgo.bids, true)}
-        </Text>}
+        <Text role="label">Top or bottom 2 of its own history now · {edges.length} of {series.length} series, each against its own readings at {hourUtc}:00 UTC on earlier {weekdayUtc}s</Text>
       </div>
       {edges.map((e) => {
         const weeks = Math.round((Date.now() - Date.parse(`${e.readings[0].day}T00:00:00Z`)) / (7 * DAY));
@@ -471,18 +467,24 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
+  const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
   const edgeInput = useMemo(() => data?.sameHour && sameHour.data ? edgeSeries(live, sameHour.data) : [], [data?.sameHour, sameHour.data, live]);
   const archiveDays = useMemo(() => new Set((sameHour.data ?? []).filter((r) => r.source === 'archive').map((r) => r.day)), [sameHour.data]);
   const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
+  const cohortBids = useMemo(() => cohort.reduce((s, a) => s + (a.currentBid ?? 0), 0), [cohort]);
+  const boardReadings = useMemo(() => (sameHour.data ?? []).flatMap((r) => {
+    if (make == null) return [{ day: r.day, v: r.bids }];
+    const bm = r.byMake?.[make];
+    return bm ? [{ day: r.day, v: Number(bm[0]) }] : [];
+  }), [sameHour.data, make]);
   // The largest open cohort opens the recorded-sales view when no make is chosen, so the view never opens empty.
   const largestMake = useMemo(() => {
     const counts = new Map<string, number>();
     for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
     return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
   }, [live]);
-  const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
   // The board has no bound currency contract: no monetary heat, no hot/cold verdicts, until units can be matched.
   const figures = useMemo(() => {
     const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0 };
@@ -532,14 +534,25 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   // The page as a document: the population is the entity, its count the headline result, and the scope strip
   // carries the view, the cohort and the coverage of the cohort within the captured population.
+  const weekAgoPct = data?.weekAgo && make == null ? pctChange(liveBids, data.weekAgo.bids) : null;
   const masthead = (
     <Masthead result={view === 'inventory' ? <>
-      <Text role="measure" as="div">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text>
+      <div className="market-masthead__count"><Text role="measure">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text> <Text role="label">open lots</Text></div>
       {data?.syncedAt != null && <Text role="caption" as="div" title={data.source}>recorded {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}</Text>}
+      {data?.weekAgo && weekAgoPct != null && <Text role="caption" as="div" title={`${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)} a week ago${data.weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+        vs same time last week {data.weekAgo.source === 'archive' ? '≈' : ''}{signed(weekAgoPct)} from {bidNumber(data.weekAgo.bids, true)}</Text>}
     </> : undefined}>
-      <Text role="entity" as="h1">{view === 'inventory' ? 'Open lots' : 'Recorded sales'}</Text>
+      <Text role="entity" as="h1">{view !== 'inventory' ? 'Recorded sales' : isLoading || cohortBids <= 0 ? 'Open lots' : `${bidNumber(cohortBids, true)} on the board${make ? ` · ${make}` : ''}`}</Text>
     </Masthead>
   );
+  // The board's own reading in its own history, always: the owner's building block (docs/schematics/homepage.md).
+  const boardStrip = view === 'inventory' && data?.sameHour && boardReadings.length > 0 ? (
+    <div className="k-section market-pulse-strip" role="group" aria-label="The board in its own history">
+      <RangeBar value={cohortBids} readings={boardReadings} fmt={bidNumber} weekdayUtc={data.sameHour.weekdayUtc}
+        weeks={Math.max(boardReadings.length, Math.round((Date.now() - Date.parse(`${boardReadings[0].day}T00:00:00Z`)) / (7 * DAY)))} />
+      <Text role="caption" as="div">Current bids{make ? ` on ${make} lots` : ''} at {data.sameHour.hourUtc}:00 UTC on earlier {data.sameHour.weekdayUtc}s · {boardReadings.length} readings · BAT-LIVE-BIDS index, read hourly from the live board.</Text>
+    </div>
+  ) : null;
   const scope = (
     <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
       <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
@@ -558,6 +571,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   return (
     <div className="market-explorer">
       {masthead}
+      {boardStrip}
 
       {view === 'inventory' && isError && data && <div role="status" className="market-status">Refresh failed. Showing the last fetched board. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry</Text></button></div>}
 
@@ -567,7 +581,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {scope}
 
       {view === 'inventory' && data?.sameHour && edgeInput.length > 0 &&
-        <EdgeStrips series={edgeInput} hourUtc={data.sameHour.hourUtc} weekdayUtc={data.sameHour.weekdayUtc} archiveDays={archiveDays} weekAgo={data.weekAgo} bids={liveBids} />}
+        <EdgeStrips series={edgeInput} hourUtc={data.sameHour.hourUtc} weekdayUtc={data.sameHour.weekdayUtc} archiveDays={archiveDays} />}
 
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 

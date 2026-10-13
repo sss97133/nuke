@@ -361,16 +361,25 @@ describe('the board in its own history', () => {
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
     fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 3, byMake: null, source: i === 0 ? 'archive' : 'live' }));
     await render('make=all');
+    expect(container.querySelector('h1')?.textContent).toBe('$125K on the board');
+    expect(container.querySelector('.k-masthead')?.textContent).toContain('vs same time last week +25.0% from $100K');
+    const strip = container.querySelector('[aria-label="The board in its own history"]')!;
+    expect(strip.textContent).toContain('Same time on Saturdays · last 7 weeks');
+    expect(strip.textContent).toContain('higher than all 7 Saturdays at this hour');
+    expect(strip.querySelectorAll('.market-range__tick')).toHaveLength(7);
     const edges = container.querySelector('[aria-label="Edges of the board\'s own history"]')!;
     expect(edges.textContent).toContain('Current bids');
     expect(edges.textContent).toContain('$125,000');
-    expect(edges.textContent).toContain('higher than all 7 Saturdays at this hour');
-    expect(edges.textContent).toContain('vs same time last week +25.0% from $100K');
     expect(edges.textContent).toContain('1 of the readings rebuilt from BaT bid history');
-    expect(edges.querySelector('.market-range')!.querySelectorAll('.market-range__tick')).toHaveLength(7);
   });
-  it('renders nothing of the kind when the board has no hour', async () => {
+  it('renders nothing of the kind when the board has no hour, and no edge section when nothing is at an edge', async () => {
     await render();
+    expect(container.querySelector('[aria-label="The board in its own history"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
+    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
+    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 100_000 + i * 10_000, n: 3, byMake: null, source: 'live' }));
+    await render('make=all');
+    expect(container.querySelector('[aria-label="The board in its own history"]')?.textContent).toContain('lower than 4 of 7 Saturdays');
     expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
   });
   it('opens recorded sales on the largest open cohort instead of an empty form', async () => {
@@ -384,7 +393,7 @@ describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
     await render('make=PORSCHE');
     const h1 = container.querySelector('h1')!;
-    expect(h1.textContent).toBe('Open lots');
+    expect(h1.textContent).toBe('$25K on the board · PORSCHE');
     expect(h1.className).toContain('k-entity');
     expect(container.querySelector('.k-masthead__result .k-measure')?.textContent).toBe('3');
     expect(container.querySelector('.k-masthead__result .k-caption')?.textContent).toMatch(/^recorded /);
