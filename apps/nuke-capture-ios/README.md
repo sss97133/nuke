@@ -65,6 +65,13 @@ Standing rules the code carries:
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
+- **The board is the web's board.** `market_pulse_live` is read once per 30 s and rendered as nuke.ag renders it:
+  bids in dollars (BaT runs every auction in USD; web #1061), the heat tag per lot computed exactly as
+  `MarketPulse.tsx heatOf` (curve share by tier at hours left, typical = band p50 × share, hot ≥ 1.25×, cold ≤ 0.8×,
+  no verdict past 120 h), the reading rows behind the tag, the week-ago line from `baseline.week_ago`. The track
+  record of lots tagged this way is typed into the web page, not carried by a read, so the phone states that and
+  waits (market lane plans a table + view, 2026-10-13). Prove a board change lot-for-lot against the live site as a
+  stranger (Playwright pattern in memory `reference_logged_out_live_check_playwright.md`).
 - **Coverage on every counter.** A count without its population and clock is not shown; say "unknown"
   instead of guessing (fleet-relative reporting, `docs/ledger/theory/data-machine.md`).
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
@@ -72,7 +79,8 @@ Standing rules the code carries:
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
   profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
-  results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
+  results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
+  the first hot or cold lot's reading on the board, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
   (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).
