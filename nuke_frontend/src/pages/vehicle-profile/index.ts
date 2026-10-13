@@ -1,5 +1,4 @@
 // Export all VehicleProfile components
-export { default as VehicleHeader } from './VehicleHeader';
 export { default as VehicleHeroImage } from './VehicleHeroImage';
 export { default as VehicleBasicInfo } from './VehicleBasicInfo';
 export { default as VehicleCommentsSection } from './VehicleCommentsSection';

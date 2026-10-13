@@ -137,12 +137,6 @@
   overflow: visible;
 }
 
-/* VehicleHeader wrapper: keep mounted for data/context, hide visually.
-   VehicleSubHeader (rendered separately) is the visible badge bar. */
-.vehicle-profile-page > .vehicle-profile-sub-header {
-  display: none !important;
-}
-
 /* Specs belong to the page content; identity and price own the sticky header. */
 .vehicle-profile-page .vp-sub-header {
   display: flex !important;
