@@ -70,8 +70,12 @@ Standing rules the code carries:
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
   DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
-  profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs`. A session injected once
-  persists in the simulator Keychain; terminate and relaunch, or use an explicit screen hook.
+  profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
+  `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
+  results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
+  (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
+  terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
+  capture: a launch hook on a stale install looks like a code bug (2026-10-13).
 
 **Shipping to TestFlight.** The owner's phone is the test surface. Three paths; use the first that works
 and say which, with the delivery stage (implemented → built → archived → uploaded → on the phone).

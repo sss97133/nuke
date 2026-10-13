@@ -16,6 +16,8 @@ struct UniversalSearchRequest: Encodable {
     let offset: Int
     /// The door returns organizations and people too; the Explore grid asks for vehicles only.
     let types: [String]
+    /// A later page continues the reader page one selected (the door refuses a source change mid-walk).
+    let vehicle_source: String?
 }
 
 struct UniversalSearchHit: Decodable, Identifiable {
@@ -65,11 +67,15 @@ struct UniversalSearchResponse: Decodable {
 }
 
 enum UniversalSearch {
-    /// One page of vehicle hits for a query, through the door the web uses.
-    static func vehicles(query: String, limit: Int = 60, offset: Int = 0) async throws -> UniversalSearchResponse {
+    /// The web asks for 100 (useSearchPage.ts); so does the phone.
+    static let pageSize = 100
+
+    /// One page of vehicle hits for a query, through the door the web uses. Pages after the
+    /// first carry the door's `next_offset` and the `vehicle_source` it chose on page one.
+    static func vehicles(query: String, limit: Int = pageSize, offset: Int = 0, source: String? = nil) async throws -> UniversalSearchResponse {
         try await SupabaseService.client.functions.invoke(
             "universal-search",
-            options: FunctionInvokeOptions(body: UniversalSearchRequest(query: query, limit: limit, offset: offset, types: ["vehicle"]))
+            options: FunctionInvokeOptions(body: UniversalSearchRequest(query: query, limit: limit, offset: offset, types: ["vehicle"], vehicle_source: source))
         )
     }
 }
