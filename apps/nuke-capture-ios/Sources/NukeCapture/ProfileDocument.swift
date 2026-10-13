@@ -82,24 +82,26 @@ struct Claim: Decodable {
     /// Trust as the web shows it: a whole percentage, clamped.
     var trustPercent: Int { Int((min(1, max(0, trust)) * 100).rounded()) }
 
-    /// The claim on the app's one trust ladder (RootedValue.swift). A legacy claim has nothing
-    /// beneath it but the record itself, so it is a facade here: dim, labelled, and it refuses the
-    /// tap. The web says the same thing in words inside its popover; the phone says it by grammar.
+    /// The claim on the app's one trust ladder (RootedValue.swift), as the web's ClaimView treats
+    /// it: every claim opens to its source and trust. A legacy claim is the record itself, dim but
+    /// open; an attributed claim carries a source; a model output is projected. Nothing is "proven"
+    /// from the read alone: the read does not say a row was owner-confirmed, so no seal is filled.
     var rootStatus: RootStatus {
         switch source.kind {
-        case .owner, .document: return .proven
-        case .listing, .image, .agent: return .attributed
+        case .owner, .document, .listing, .image, .agent: return .attributed
         case .model: return .projected
-        case .legacy: return .facade
+        case .legacy: return .recorded
         }
     }
 
-    /// The freshness line under a value: the observed day when the claim carries a clock. A legacy
-    /// value with a clock says which record it is and when; without one, RootedValueView's own
-    /// "unverified" subscript stands.
+    /// The line under a value: the observed day when the claim carries a clock, and for a legacy
+    /// value the record it is and its trust, since no observation stands beneath it.
     var decayLine: String? {
-        guard let day = ProfileClock.day(observed_at) else { return nil }
-        return source.kind == .legacy ? "\(source.label ?? "legacy record") · \(day)" : day
+        let day = ProfileClock.day(observed_at)
+        if source.kind == .legacy {
+            return [source.label ?? "legacy record", day, "trust \(trustPercent)%"].compactMap { $0 }.joined(separator: " · ")
+        }
+        return day
     }
 
     /// The source line of the web's SourceView: the label the read gave, or the class name, then the method.
