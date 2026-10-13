@@ -7,6 +7,7 @@
  *   README.md               <!-- intake:start --> … <!-- intake:end -->        (rows landed per day, per layer)
  *   docs/library/README.md  <!-- library-stats:start --> … <!-- library-stats:end --> (the library's own files)
  *   docs/POSITIONING.md     <!-- evidence:start --> … <!-- evidence:end -->    (graded predictions, stack registry, vein V012)
+ *   nuke_frontend/public/evidence.md   the same evidence block, whole, served as /evidence.md for the About page
  *
  * Every database query runs inside `begin read only … commit` on the Supabase
  * Management API (the same path scripts/data/q.sh uses), so this script cannot
@@ -33,6 +34,7 @@ const README = resolve(ROOT, 'README.md');
 const LIBRARY = resolve(ROOT, 'docs', 'library');
 const LIBRARY_README = resolve(LIBRARY, 'README.md');
 const POSITIONING = resolve(ROOT, 'docs', 'POSITIONING.md');
+const EVIDENCE_PUBLIC = resolve(ROOT, 'nuke_frontend', 'public', 'evidence.md');
 const DRY = process.argv.includes('--dry-run');
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -516,12 +518,14 @@ async function main() {
     console.log(db, '\n', intake, '\n', lib, '\n', evidence);
     return;
   }
-  // Splice all four before writing any, so a missing marker in one file leaves every file as it was.
+  // Splice all before writing any, so a missing marker in one file leaves every file as it was.
   const readme = spliceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db);
   const writes = [
     [README, splice(readme, README, '<!-- intake:start -->', '<!-- intake:end -->', intake)],
     [LIBRARY_README, spliceBlock(LIBRARY_README, '<!-- library-stats:start -->', '<!-- library-stats:end -->', lib)],
     [POSITIONING, spliceBlock(POSITIONING, '<!-- evidence:start -->', '<!-- evidence:end -->', evidence)],
+    // The About page (nuke_frontend/src/pages/About.tsx) fetches this file and renders the block with its date.
+    [EVIDENCE_PUBLIC, evidence + '\n'],
   ];
   for (const [file, text] of writes) writeFileSync(file, text);
   console.log(db, '\n', intake, '\n', lib, '\n', evidence);

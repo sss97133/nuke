@@ -1,0 +1,19 @@
+/* The About page: kit roles for every piece of type; this file only places them. */
+.about-page { max-width: 760px; margin: 0 auto; }
+.about-page p { margin: 0; }
+.about-block { display: grid; gap: 6px; }
+.about-sentence { max-width: 52ch; }
+.about-page a { color: var(--text); text-decoration: underline; }
+.about-table-wrap { overflow-x: auto; margin: 8px 0; }
+.about-grades { border-collapse: collapse; width: 100%; }
+.about-grades th, .about-grades td { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+.about-grades th { border-bottom-width: 2px; white-space: normal; }
+.about-grades td:first-child { padding-right: 14px; }
+.about-rows { display: grid; grid-template-columns: minmax(110px, 170px) 1fr; gap: 0 12px; margin: 0; }
+.about-rows dt, .about-rows dd { margin: 0; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.about-rows dd { overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .about-grades td { white-space: normal; }
+  .about-rows { grid-template-columns: 1fr; }
+  .about-rows dt { border-bottom: 0; padding-bottom: 0; }
+}

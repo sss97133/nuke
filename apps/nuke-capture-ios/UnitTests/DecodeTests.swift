@@ -78,6 +78,42 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(board.open(at: Date(timeIntervalSince1970: 1_792_000_000)).count, 0)
     }
 
+    func testLiveBoardReadsTheBandCurveAndBaselineAndGradesHeatAsTheWebDoes() throws {
+        let json = """
+        {"synced_at":"2026-10-13T22:00:00+00:00","source":"test",
+         "curve":{"d":[[168,0.4505],[120,0.6076],[96,0.6392],[72,0.6632],[48,0.6902],[24,0.70],[12,0.75],[1,0.80]]},
+         "baseline":{"week_ago":{"n":1100,"at":"2026-10-06T21:00:00+00:00","bids":37600000,"source":"live"}},
+         "auctions":[
+          ["69c01291-6232-4df8-ad9e-82eaac792462",2023,"PORSCHE","911",650000,"2026-10-14T16:45:00+00:00",null,null,null,false,null,"Sport Classic",478000,552000,700000,"d",15],
+          ["11111111-1111-1111-1111-111111111111",1953,"ALFA ROMEO","1900C",40000,"2026-10-14T16:50:00+00:00",null,null,null,false,null,null,null,null,null,null,null],
+          ["22222222-2222-2222-2222-222222222222",1990,"BMW","M3",30000,"2026-10-21T00:00:00+00:00",null,null,null,false,null,null,20000,30000,40000,"d",9]
+        ]}
+        """
+        let board = try decode(LiveBoard.self, json)
+        let now = try XCTUnwrap(ProfileClock.date("2026-10-13T22:06:40+00:00"))
+        XCTAssertEqual(board.auctions[0].band?.p50, 552000)        // after three nulls and a false: every position still its own
+        XCTAssertEqual(board.auctions[0].title, "Sport Classic")
+        XCTAssertEqual(board.auctions[0].band?.comps, 15)
+        XCTAssertNil(board.auctions[1].band)                       // no p10/p50/p90: no band, as useMarketPulse maps it
+        XCTAssertEqual(board.weekAgo?.bids, 37_600_000)
+        let hot = try XCTUnwrap(board.auctions[0].heat(curve: board.curve, at: now))
+        XCTAssertEqual(hot.state, .hot)
+        XCTAssertEqual(hot.hoursLeft, 18.64, accuracy: 0.01)
+        // 18.64 h sits between the 24 h (0.70) and 12 h (0.75) marks: 0.70 + 0.05 × (24 − 18.64) / 12
+        XCTAssertEqual(hot.share, 0.7223, accuracy: 0.001)
+        XCTAssertEqual(hot.ratio, 650000 / (552000 * 0.7223), accuracy: 0.01)
+        XCTAssertNil(board.auctions[1].heat(curve: board.curve, at: now))   // no band, no verdict
+        XCTAssertNil(board.auctions[2].heat(curve: board.curve, at: now))   // 170 h left: past the 120 h ceiling, no verdict
+        XCTAssertEqual(LiveBoardView.multiple(1.602), "1.6×")
+        XCTAssertEqual(LiveBoardView.multiple(3.4), "3×+")
+        XCTAssertEqual(LiveBoardView.bidNumber(650000), "$650,000")
+        XCTAssertEqual(LiveBoardView.bidNumber(37_600_000, compact: true), "$37.6M")
+        XCTAssertEqual(LiveBoardView.about(405_720), 406_000)
+        let broken = try decode(LiveBoard.self, #"{"synced_at":null,"source":"t","curve":{"d":"not points"},"baseline":{"week_ago":{"bids":"x"}},"auctions":[]}"#)
+        XCTAssertEqual(broken.curve?.tiers.isEmpty, true)          // a malformed curve reads as absent, never as a crash
+        XCTAssertNil(broken.weekAgo)
+    }
+
     func testCalendarDayDecodesTheMaskedShapeFor1048() throws {
         let day = try decode(CalendarDay.self, #"{"day":"2026-02-02","photos":3,"events":0,"work":2,"work_minutes":120,"work_cost":null,"money_masked":true}"#)
         XCTAssertNil(day.work_cost)
