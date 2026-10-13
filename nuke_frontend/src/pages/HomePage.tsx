@@ -1234,7 +1234,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
 // ────────────────────────────────────────────────────────────
 
 const FeedPage = lazy(() => import('../feed/components/FeedPage'));
-const MarketPulse = lazy(() => import('./market/MarketPulse'));
+const MarketPulse = lazy(() => import('./market/MarketInventory'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 
 type TabId = 'market' | 'garage' | 'feed';
