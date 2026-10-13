@@ -51,11 +51,18 @@ export interface UrlExtraction {
 }
 
 export interface SearchMeta {
-  total_count: number;
+  total_count: number | null;
+  returned_count: number;
   offset: number;
   limit: number;
   has_more: boolean;
+  pagination_limited: boolean;
+  next_offset: number | null;
+  vehicle_source: 'ranked' | 'direct' | 'ilike' | 'year' | null;
 }
+
+const loadedSummary = (count: number, query: string, limited = false) =>
+  `Loaded ${count.toLocaleString()} results for "${query}".${limited ? ' Refine your search to see more results.' : ''}`;
 
 export interface VehicleFilters {
   make: string;
@@ -159,8 +166,10 @@ export function useSearchPage() {
   const [loading, setLoading] = useState(() => Boolean(query));
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [resultFilter, setResultFilter] = useState<SearchFilter>('all');
   const lastQueryRef = useRef('');
+  const loadMoreRequestRef = useRef<string | null>(null);
 
   // Initialize filters from URL params
   const [filters, setFilters] = useState<VehicleFilters>(() => ({
@@ -205,9 +214,11 @@ export function useSearchPage() {
   useEffect(() => {
     const q = query.trim();
     if (!q) {
+      lastQueryRef.current = '';
       setResults([]);
       setSearchSummary('');
       setSearchMeta(null);
+      setLoadMoreError(null);
       setBrowseStats(null);
       setLoading(false);
       setUrlExtraction(null);
@@ -217,6 +228,10 @@ export function useSearchPage() {
 
     if (q === lastQueryRef.current) return;
     lastQueryRef.current = q;
+    loadMoreRequestRef.current = null;
+    setLoadingMore(false);
+    setLoadMoreError(null);
+    setSearchMeta(null);
 
     // UUID detection — redirect to vehicle page
     if (UUID_RE.test(q)) {
@@ -307,52 +322,76 @@ export function useSearchPage() {
       if (lastQueryRef.current !== q) return;
       const { data, error } = searchRes;
 
-      if (error || !data) {
+      if (error || !data || data.success === false || !Array.isArray(data.results)) {
         setSearchSummary('Search failed.');
         setResults([]);
         setLoading(false);
         return;
       }
 
-      const mapped = (data.results || []).map(mapRawResult);
+      const mapped: SearchResult[] = data.results.map(mapRawResult);
       // Prioritize results with images — users see photos, not placeholders
       mapped.sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0));
       setResults(mapped);
 
-      const total = data.meta?.total_count ?? mapped.length;
-      setSearchSummary(`Found ${total.toLocaleString()} results for "${q}".`);
+      setSearchSummary(loadedSummary(mapped.length, q, data.meta?.pagination_limited === true));
       setSearchMeta(data.meta || null);
       // Funnel: the first-query moment. Zero-result queries are the gap list.
-      track('search_results', { q, total });
+      track('search_results', { q, loaded_count: mapped.length, total: data.meta?.total_count ?? null });
 
       setLoading(false);
+    }).catch(() => {
+      if (lastQueryRef.current !== q) return;
+      setSearchSummary('Search failed.');
+      setResults([]); setSearchMeta(null); setLoading(false);
     });
   }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Load more results
   const handleLoadMore = useCallback(async () => {
-    if (!searchMeta || !searchMeta.has_more || loadingMore) return;
+    if (!searchMeta || !searchMeta.has_more || loadingMore || loadMoreRequestRef.current) return;
+    const q = query.trim(), nextOffset = searchMeta.next_offset;
+    if (searchMeta.pagination_limited) {
+      setSearchSummary(loadedSummary(results.length, q, true));
+      return;
+    }
+    if (!Number.isSafeInteger(nextOffset) || nextOffset == null || nextOffset <= searchMeta.offset || !searchMeta.vehicle_source) {
+      setLoadMoreError('More results could not be loaded. Try again.');
+      setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
+      return;
+    }
+    const requestKey = `${q}/${nextOffset}`;
+    loadMoreRequestRef.current = requestKey;
     setLoadingMore(true);
+    setLoadMoreError(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('universal-search', {
-        body: { query: query.trim(), limit: 100, offset: searchMeta.offset + searchMeta.limit,
+        body: { query: q, limit: 100, offset: nextOffset, vehicle_source: searchMeta.vehicle_source,
           ...(parsedQuery.priceMin != null || parsedQuery.priceMax != null ? { includeAI: false } : {}) },
       });
 
-      if (!error && data?.results) {
-        const newResults = (data.results as any[]).map(mapRawResult);
-        const existingIds = new Set(results.map(r => r.id));
-        const unique = newResults.filter(r => !existingIds.has(r.id));
-        setResults(prev => [...prev, ...unique]);
-        if (data.meta) setSearchMeta(data.meta);
-        const total = data.meta?.total_count ?? searchMeta.total_count;
-        setSearchSummary(`Found ${total.toLocaleString()} results for "${query.trim()}".`);
+      if (lastQueryRef.current !== q) return;
+      if (error || data?.success === false || !Array.isArray(data?.results) || !data.meta || data.meta.offset !== nextOffset ||
+        data.meta.vehicle_source !== searchMeta.vehicle_source || typeof data.meta.has_more !== 'boolean' ||
+        (data.meta.pagination_limited === true
+          ? !data.meta.has_more || data.meta.next_offset !== null
+          : data.meta.has_more ? !Number.isSafeInteger(data.meta.next_offset) || data.meta.next_offset <= nextOffset : data.meta.next_offset !== null)) {
+        throw new Error('Search page failed');
       }
+      const newResults = (data.results as any[]).map(mapRawResult);
+      const existingIds = new Set(results.map(r => r.id));
+      const unique = newResults.filter(r => !existingIds.has(r.id));
+      setResults(prev => [...prev, ...unique]);
+      setSearchMeta(data.meta);
+      setSearchSummary(loadedSummary(results.length + unique.length, q, data.meta.pagination_limited === true));
     } catch {
-      // ignore
+      if (lastQueryRef.current === q) {
+        setLoadMoreError('More results could not be loaded. Try again.');
+        setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
+      }
     } finally {
-      setLoadingMore(false);
+      if (loadMoreRequestRef.current === requestKey) { loadMoreRequestRef.current = null; setLoadingMore(false); }
     }
   }, [searchMeta, loadingMore, query, results, parsedQuery.priceMin, parsedQuery.priceMax]);
 
@@ -413,6 +452,7 @@ export function useSearchPage() {
     searchMeta,
     handleLoadMore,
     loadingMore,
+    loadMoreError,
     browseStats,
     detectedMake,
     urlExtraction,

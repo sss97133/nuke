@@ -28,13 +28,15 @@ interface SearchResultsProps {
   loading?: boolean;
   activeFilter?: SearchFilter;
   onFilterChange?: (next: SearchFilter) => void;
-  totalCount?: number;
+  totalCount?: number | null;
   hasMore?: boolean;
+  paginationLimited?: boolean;
   onLoadMore?: () => void;
   loadingMore?: boolean;
+  loadMoreError?: string | null;
 }
 
-const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, onLoadMore, loadingMore }: SearchResultsProps) => {
+const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, paginationLimited, onLoadMore, loadingMore, loadMoreError }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { recordView } = useViewHistory();
@@ -514,14 +516,16 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             color: 'var(--text)',
             marginBottom: '8px',
           }}>
-            No results for &ldquo;{searchQuery}&rdquo;
+            {hasMore || paginationLimited ? 'No matching results loaded' : 'No results'} for &ldquo;{searchQuery}&rdquo;
           </div>
           <p style={{
             fontSize: '12px',
             color: 'var(--text-muted)',
             margin: '0 0 28px 0',
           }}>
-            Try different keywords, check spelling, or search by make and model.
+            {hasMore && !paginationLimited
+              ? 'More results may be available. Load more to continue.'
+              : 'Try different keywords, check spelling, or search by make and model.'}
           </p>
           {filterBy !== 'all' && (
             <button
@@ -868,46 +872,49 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             </div>
           )}
 
-          {/* Load More button */}
-          {hasMore && onLoadMore && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              padding: '24px 0 12px',
-            }}>
-              <button
-                onClick={onLoadMore}
-                disabled={loadingMore}
-                style={{
-                  padding: '10px 32px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  border: '2px solid var(--text)',
-                  background: loadingMore ? 'var(--surface)' : 'var(--bg)',
-                  color: loadingMore ? 'var(--text-secondary)' : 'var(--text)',
-                  cursor: loadingMore ? 'not-allowed' : 'pointer',
-                  transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-                onMouseEnter={(e) => {
-                  if (!loadingMore) {
-                    e.currentTarget.style.background = 'var(--text)';
-                    e.currentTarget.style.color = 'var(--bg)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loadingMore) {
-                    e.currentTarget.style.background = 'var(--bg)';
-                    e.currentTarget.style.color = 'var(--text)';
-                  }
-                }}
-              >
-                {loadingMore ? 'Loading...' : `Load more${totalCount ? ` (${results.length} of ${totalCount.toLocaleString()})` : ''}`}
-              </button>
-            </div>
-          )}
         </>
+      )}
+
+      {/* Continuation belongs to the candidate stream, even when this view is empty. */}
+      {paginationLimited && <p role="status">Refine your search to see more results.</p>}
+      {loadMoreError && !paginationLimited && <p role="status">{loadMoreError}</p>}
+      {hasMore && !paginationLimited && onLoadMore && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '24px 0 12px',
+        }}>
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            style={{
+              padding: '10px 32px',
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              border: '2px solid var(--text)',
+              background: loadingMore ? 'var(--surface)' : 'var(--bg)',
+              color: loadingMore ? 'var(--text-secondary)' : 'var(--text)',
+              cursor: loadingMore ? 'not-allowed' : 'pointer',
+              transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => {
+              if (!loadingMore) {
+                e.currentTarget.style.background = 'var(--text)';
+                e.currentTarget.style.color = 'var(--bg)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loadingMore) {
+                e.currentTarget.style.background = 'var(--bg)';
+                e.currentTarget.style.color = 'var(--text)';
+              }
+            }}
+          >
+            {loadingMore ? 'Loading...' : `Load more${totalCount ? ` (${results.length} of ${totalCount.toLocaleString()})` : ''}`}
+          </button>
+        </div>
       )}
     </div>
   );
