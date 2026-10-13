@@ -126,3 +126,99 @@ def run_description_checks(sql, read, rejects, claim, passed):
     for role in ('anon','authenticated'):
         assert sql(f"SELECT has_function_privilege('{role}','claim_retained_listing_properties(text,integer)','EXECUTE')") == 'f'
     passed('quote/hash/capture/truncation/privacy/supersession withdrawals invalidate readers and completion; forged tuples and repeat migration refused')
+    run_interpretation_correction_checks(sql, read, rejects, passed)
+
+
+def run_interpretation_correction_checks(sql, read, rejects, passed):
+    """Synthetic legacy interpretation repair, not a sale-time or accuracy assay.
+
+    The successor was admitted by the real retained-property validator above.
+    Only the deliberately wrong legacy interpretation is fixture-seeded here;
+    supersession itself must use the unchanged owner relay, never a flag edit.
+    """
+    def literal(value):
+        return "'" + value.replace("'", "''") + "'"
+
+    vehicle = '60000001-0000-4000-8000-000000000001'
+    control = '60000001-0000-4000-8000-000000000002'
+    source = '93000000-0000-4000-8000-000000000001'
+    prop = 'c0f743ae-dc94-4dfd-98ef-514b76f74a9b'
+    wrong = 'ce000000-0000-4000-8000-000000000001'
+    actor = 'ce000001-0000-4000-8000-000000000001'
+    successor = sql(f"SELECT observation_id FROM retained_listing_property_work WHERE source_observation_id='{source}' AND property_id='{prop}'")
+    assert sql(f"SELECT retained_listing_property_result_matches('{source}','{prop}','{successor}')") == 't'
+    sql(f"""ALTER TABLE vehicle_observations ADD COLUMN IF NOT EXISTS lineage_chain uuid[];
+      CREATE TABLE vehicle_ownerships(vehicle_id uuid,owner_profile_id uuid,is_current boolean);
+      CREATE TABLE ownership_verifications(vehicle_id uuid,user_id uuid,status text);
+      CREATE TABLE vehicle_contributors(vehicle_id uuid,user_id uuid);
+      CREATE TABLE reattribution_audit(observation_type text,old_observation_id uuid,old_vehicle_id uuid,
+        new_observation_id uuid,new_vehicle_id uuid,reason text,actor_user_id uuid);
+      CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $role$
+        SELECT current_setting('role',true) $role$;
+      UPDATE vehicles SET owner_id='{actor}' WHERE id='{vehicle}';
+      INSERT INTO vehicle_observations(id,vehicle_id,kind,property_id,source_id,source_url,
+        raw_source_ref,observed_at,ingested_at,extraction_method,agent_model,confidence_score,
+        structured_data,content_hash,content_text)
+      SELECT '{wrong}',vehicle_id,'specification','{prop}',source_id,source_url,
+        'vehicle_observations:'||id,observed_at,'2026-10-10T00:00:01Z','llm_extraction',
+        'synthetic_mistaken_interpretation_v0',.99,
+        jsonb_build_object('engine_configuration','V8','source_observation_id',id,
+          'factory_configuration_status','unknown','current_configuration_status','unknown'),
+        'synthetic-mistaken-engine-interpretation','Synthetic wrong interpretation; original prose says inline-four.'
+      FROM vehicle_observations WHERE id='{source}';""")
+    relay = Path('supabase/migrations/20260927180000_supersede_observation_owner_relay.sql').read_text()
+    sql(relay[relay.index('create function public.supersede_observation_relay'):])
+
+    def answer(relation='public.vehicle_canonical', subject=vehicle):
+        return read(f"""SELECT jsonb_agg(jsonb_build_object('property_id',property_id,
+          'observation_id',observation_id,'value',structured_data,'content',content_text)
+          ORDER BY property_id,observation_id) FROM {relation} WHERE vehicle_id='{subject}'""")
+
+    before = answer()
+    assert next(x for x in before if x['property_id'] == prop)['value']['engine_configuration'] == 'V8'
+    unaffected = answer(subject=control)
+    other_properties = [x for x in before if x['property_id'] != prop]
+    before_provenance = read(f"SELECT get_field_provenance('{vehicle}','engine_configuration')")
+    assert any(x['id'] == wrong for x in before_provenance['observations'])
+    # sql() opens a connection per call: fixture-only persisted inputs/view are
+    # needed here, rather than connection-local temporary objects. The entire
+    # database is disposable and guarded against production by the test driver.
+    # Replay these typed inputs and the exact selector, not merely its output;
+    # this two-vehicle scope does not establish a historical RPC.
+    sql(f"CREATE TABLE correction_frozen_inputs AS SELECT to_jsonb(o) AS input FROM vehicle_observations o WHERE vehicle_id IN('{vehicle}','{control}')")
+    selector = sql("SET search_path=''; SELECT pg_get_viewdef('public.vehicle_canonical'::regclass,true); RESET search_path;").splitlines()[1:-1]
+    selector = '\n'.join(selector)
+    assert 'public.vehicle_observations' in selector
+    frozen_relation = "jsonb_populate_recordset(NULL::public.vehicle_observations,(SELECT jsonb_agg(input) FROM public.correction_frozen_inputs))"
+    sql('CREATE VIEW correction_frozen_answer AS ' + selector.replace('public.vehicle_observations', frozen_relation))
+    assert answer('public.correction_frozen_answer') == before
+    preserved = sql(f"SELECT md5(jsonb_agg(to_jsonb(o)-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain'] ORDER BY id)::text) FROM vehicle_observations o WHERE id IN('{source}','{wrong}','{successor}')")
+    correction = f"SELECT supersede_observation_relay('{wrong}','{successor}','{actor}','synthetic owner engine correction')"
+    def relay(query=correction):
+        # Role and invocation must share one connection. The definer's auth.role
+        # mock reads the caller's role setting, rather than current_user.
+        return json.loads(sql(f'SET ROLE service_role; {query}; RESET ROLE;').splitlines()[-2])
+
+    rejects('SET ROLE authenticated; ' + correction)
+    rejects('SET ROLE anon; ' + correction)
+    rejects('SET ROLE service_role; ' + f"SELECT supersede_observation_relay('{wrong}','{successor}','{control}','synthetic wrong actor')")
+    first = relay()
+    assert first['superseded'] and not first['already'] and first['superseded_by'] == successor
+    after = answer()
+    selected = next(x for x in after if x['property_id'] == prop)
+    assert selected['observation_id'] == successor and selected['value']['engine_configuration'] == 'I4'
+    assert selected['value']['factory_configuration_status'] == 'unknown'
+    assert selected['value']['current_configuration_status'] == 'unknown'
+    assert [x for x in after if x['property_id'] != prop] == other_properties
+    assert answer(subject=control) == unaffected
+    provenance = read(f"SELECT get_field_provenance('{vehicle}','engine_configuration')")
+    assert not any(x['id'] == wrong for x in provenance['observations'])
+    assert any(x['id'] == successor and x['source_observation_id'] == source for x in provenance['observations'])
+    assert preserved == sql(f"SELECT md5(jsonb_agg(to_jsonb(o)-ARRAY['is_superseded','superseded_by','superseded_at','lineage_chain'] ORDER BY id)::text) FROM vehicle_observations o WHERE id IN('{source}','{wrong}','{successor}')")
+    assert sql(f"SELECT superseded_by='{successor}' AND superseded_at IS NOT NULL AND lineage_chain=ARRAY['{successor}'::uuid] FROM vehicle_observations WHERE id='{wrong}'") == 't'
+    assert relay()['already']
+    assert sql('SELECT count(*) FROM reattribution_audit') == '1'
+    assert sql(f"SELECT actor_user_id='{actor}' AND reason='superseded via synthetic owner engine correction' FROM reattribution_audit") == 't'
+    assert answer() == after and answer(subject=control) == unaffected
+    assert answer('public.correction_frozen_answer') == before
+    passed('sanctioned semantic supersession: V8 interpretation -> admitted I4 claim; original testimony/audit/retry/control preserved; exact canonical selector replays frozen earlier inputs (not historical RPC or accuracy proof)')
