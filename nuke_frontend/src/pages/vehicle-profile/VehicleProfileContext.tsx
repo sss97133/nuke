@@ -17,6 +17,7 @@ import { useViewHistory } from '../../hooks/useViewHistory';
 import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
+import { isVerifiedOwnerOf } from './ownerStatus';
 import { withTimeout } from '../../lib/withTimeout';
 import { resolveCurrencyCode } from '../../utils/currency';
 import { useVehicleIntel } from './hooks/useVehicleIntel';
@@ -174,12 +175,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     return (ownershipVerifications || []).find((v: any) => v?.user_id === uid) || null;
   }, [ownershipVerifications, session?.user?.id]);
 
-  const isVerifiedOwner = Boolean(vehicle?.ownership_verified) || (() => {
-    if (!userOwnershipClaim) return false;
-    const hasTitle = !!userOwnershipClaim.title_document_url && userOwnershipClaim.title_document_url !== 'pending';
-    const hasId = !!userOwnershipClaim.drivers_license_url && userOwnershipClaim.drivers_license_url !== 'pending';
-    return userOwnershipClaim.status === 'approved' && hasTitle && hasId;
-  })();
+  // Verified ownership belongs to the signed-in person the record or an approved claim names, never to every reader of a flagged vehicle.
+  const isVerifiedOwner = isVerifiedOwnerOf(vehicle, session?.user?.id, userOwnershipClaim);
 
   const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
   const canTriggerProofAnalysis = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess || isAdminUser);
