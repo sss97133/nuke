@@ -26,6 +26,7 @@ CI_WRITE_BASELINE=1 scripts/ci/verify.sh  # re-seed baseline.json from current c
 | raw-fetch regression fixtures | **gate** | must pass | internal URL continuations, external pages and Firecrawl |
 | `no-raw-testimony-insert` (must use `ingest-observation`) | **ratchet** | 2 | should trend to 0 |
 | `no-schema-baked-labels` (label-as-projection) | advisory | 282 | never blocks; informational |
+| `design-system/*` (seven eslint rules over `src`, `src/kit` exempt) | **ratchet**, one floor per rule | seeded 2026-10-12 | `node scripts/guardrails/design-violations.mjs` to list; `--list <rule>` for sites. The kit is the only place type and inline style may be set. |
 
 **Ratchet rule:** a check fails only when its count **exceeds** the baseline — i.e. you *added* a
 violation. Pre-existing debt doesn't block you; new debt does. As you fix violations, lower the
