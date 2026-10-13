@@ -14,7 +14,7 @@ async function run(scenario = "new", token = "test-key") {
     source_observation_id: `11111111-1111-4111-8111-${String(i).padStart(12,"0")}`,property_id,
     mode: property_id === INTERIOR ? "retained_listing_interior_color_v1" : "retained_listing_exterior_color_v1",
   }))).flat();
-  const persisted = new Map<string, any>(), calls: { path: string; method: string }[] = [];
+  const persisted = new Map<string, any>(), calls: { path: string; method: string; parentRead: boolean }[] = [];
   let writes = 0;
   const original = globalThis.fetch;
   const respond = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -24,7 +24,7 @@ async function run(scenario = "new", token = "test-key") {
     const url = new URL(typeof resource === "string" ? resource : resource instanceof URL ? resource.href : resource.url);
     const options = init as { method?: string; body?: unknown } | undefined;
     const method = options?.method ?? "GET", payload = typeof options?.body === "string" ? JSON.parse(options.body) : null;
-    calls.push({path:url.pathname,method});
+    calls.push({path:url.pathname,method,parentRead:method === "GET" && url.pathname.endsWith("vehicle_observations") && url.searchParams.has("id")});
     if (url.pathname.endsWith("/auth/v1/user")) return respond({id:VID,role:"authenticated",app_metadata:{},user_metadata:{}});
     assert(url.pathname.startsWith("/rest/v1/"));
     if (url.pathname.endsWith("claim_retained_listing_properties")) return respond(rows);
@@ -76,6 +76,16 @@ Deno.test("scheduled sixty-property drain uses real canonical selector/SDK/hash 
   const r = await run();assert(r.status === 200 && r.body.stored === 60 && r.body.writes === 60 && r.writes === 60);
   assert(r.replay.stored === 60 && r.replay.writes === 0 && r.replay.duplicates === 60);
   assert(r.body.completion_failures === 0 && r.body.provider_calls === 0 && r.body.model_calls === 0);
+  const parentReads = r.calls.filter(c => c.parentRead).length;
+  console.log(JSON.stringify({ assay: "same_60_claims_twice", parent_reads: parentReads,
+    completed: r.body.stored + r.replay.stored, new_claims: r.writes, replay_duplicates: r.replay.duplicates,
+    input_lookups: r.body.input_lookups, replay_input_lookups: r.replay.input_lookups }));
+  assert(parentReads === 60); // 30 distinct captures in each independent drain.
+  for (const batch of [r.body, r.replay]) {
+    assert(batch.input_lookups.reads_started === 32); // Parent, public vehicle and registered source reads only.
+    assert(batch.input_lookups.in_flight_shares > 0);
+    assert(Object.values(batch.input_lookups).reduce<number>((sum, n) => sum + Number(n), 0) === 180);
+  }
   assert(r.calls.every(c => c.path.startsWith("/rest/v1/")));
   for (const o of r.persisted.values()) {
     assert(o.structured_data.source_observed_at === null && o.structured_data.observed_at_basis === "source_testimony_recorded_at");

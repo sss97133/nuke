@@ -3,6 +3,7 @@ import { useBuildProfile, type ManifestDevice } from './hooks/useBuildProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { supabase } from '../../lib/supabase';
+import { useVehicleProfile } from './VehicleProfileContext';
 
 interface Props {
   vehicleId: string;
@@ -54,6 +55,9 @@ const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
 
 const BuildManifestPanel: React.FC<Props> = ({ vehicleId }) => {
   const { manifest, manifestStats, snapshots, loading } = useBuildProfile(vehicleId);
+  // The build record is public; its costs are owner-only (owner rule 2026-09-28). Anonymous readers see a masked price.
+  const { isRowOwner, isVerifiedOwner, hasContributorAccess } = useVehicleProfile();
+  const canSeeMoney = isRowOwner || isVerifiedOwner || hasContributorAccess;
   const queryClient = useQueryClient();
   const [groupBy, setGroupBy] = useState<GroupBy>('zone');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['engine_bay', 'dash']));
@@ -319,7 +323,7 @@ const BuildManifestPanel: React.FC<Props> = ({ vehicleId }) => {
 
                             {/* Price */}
                             <span style={{ fontFamily: 'var(--vp-font-mono)', textAlign: 'right', minWidth: '32px', color: 'var(--vp-pencil)' }}>
-                              {d.price != null ? fmt(d.price) : ''}
+                              {d.price != null ? (canSeeMoney ? fmt(d.price) : <span title="Cost is visible to the owner">$•••</span>) : ''}
                             </span>
                           </div>
 

@@ -5,7 +5,6 @@ import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { TimelineEventService } from '../services/timelineEventService';
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
-const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
@@ -13,8 +12,7 @@ import '../styles/barcode-timeline.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
-import { useVehiclePriceFacts, priceKindLabel } from './vehicle-profile/hooks/useVehiclePriceFacts';
-import { getVehicleIdentityTokens } from '../utils/vehicleIdentity';
+import { useVehiclePriceFacts } from './vehicle-profile/hooks/useVehiclePriceFacts';
 import VehicleMasthead from './vehicle-profile/VehicleMasthead';
 import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
@@ -37,26 +35,13 @@ const VehicleProfileInner: React.FC = () => {
   const ctx = useVehicleProfile();
 
   // Aliases from context — single source of truth
-  const { vehicleId, vehicle, session, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { vehicleId, vehicle, session, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
   const { priceFacts } = useVehiclePriceFacts(vehicleId ?? undefined);
   const selectedEpisode = useOrderBook(vehicleId ?? '', new URLSearchParams(location.search).get('performanceLot') ?? 'latest');
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Measure VehicleHeader height for sticky positioning
-  useEffect(() => {
-    const el = vehicleHeaderRef.current;
-    if (!el) return;
-    const update = () => ctx.setVehicleHeaderHeight(el.offsetHeight);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [vehicle, auctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
@@ -213,16 +198,6 @@ const VehicleProfileInner: React.FC = () => {
             This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
           </div>
         )}
-        {/* Legacy header remains mounted for its data/context. */}
-        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header">
-          <React.Suspense fallback={null}>
-            <VehicleHeader
-              primaryPriceElsewhere={!!priceKindLabel(priceFacts) && (vehicle as any).listing_kind !== 'non_vehicle_item' && getVehicleIdentityTokens(vehicle).primary.some(token => token.kind === 'model')}
-              onClaimClick={() => setShowOwnershipClaim(true)}
-            />
-          </React.Suspense>
-        </div>
-
         <VehicleMasthead key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
