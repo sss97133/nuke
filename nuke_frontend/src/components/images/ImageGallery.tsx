@@ -185,13 +185,15 @@ const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' |
     const variant = image.variants[size];
     if (variant) return variant;
     
-    // Fallback order: try other sizes in order of preference
+    // Fallback order: try other sizes in order of preference. An empty variants object ({} on every
+    // iPhoto, archive and upload row) must not short-circuit to the original: a 241 px tile loading a
+    // 3024x4032 original made one profile view 198 MB (measured 2026-10-13). Transform instead.
     if (size === 'thumbnail') {
-      return image.variants.thumbnail || image.variants.medium || image.thumbnail_url || image.image_url;
+      return image.variants.thumbnail || image.variants.medium || image.thumbnail_url || supabaseTransformUrl(image.image_url, 200);
     } else if (size === 'medium') {
-      return image.variants.medium || image.variants.large || image.variants.thumbnail || image.medium_url || image.image_url;
+      return image.variants.medium || image.variants.large || image.variants.thumbnail || image.medium_url || supabaseTransformUrl(image.image_url, 800);
     } else if (size === 'large') {
-      return image.variants.large || image.variants.full || image.variants.medium || image.large_url || image.image_url;
+      return image.variants.large || image.variants.full || image.variants.medium || image.large_url || supabaseTransformUrl(image.image_url, 1600);
     }
   }
   

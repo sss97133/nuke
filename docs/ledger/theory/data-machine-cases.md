@@ -1000,6 +1000,28 @@ acceptance remain separate stages. Next: bind the required gates to existing act
 assays and reconcile retained populations; resolve the public inventory gap without counting private
 Facebook history or isolated ingestion success as one-place public usability.
 
+### Full-population reconciliation, prepared 2026-10-13
+
+The same assay now accepts `--reconcile-population /private/config.json --out /private/report.jsonl`.
+The `population_reconciliation_v1` mode joins a sorted, exhausted subject manifest to separately
+sorted assessment receipts with bounded memory. It retains every eligible member: absent assessments
+remain `not_assessed`. Each capability has its own eligible denominator, ready/blocked/not-assessed
+totals, gate reasons and intersections. Other capability grains remain explicitly unmeasured.
+
+The configuration binds the population filter, full retained/public denominators and their grains,
+UTC measurement window, source receipt, and the row counts and SHA-256 hashes of both streams.
+Each stream must end with a matching dated exhaustion receipt and content digest. Duplicates,
+unmatched or ineligible assessments, grain/window/count mismatches, incomplete tails and changed
+files fail reconciliation. Only a terminal `reconciled` summary establishes completion; a partial
+output is not a completed census. Private output includes the configuration and assay hashes plus
+the digest of all preceding output rows. The existing explicit-manifest mode remains available.
+
+This remains an offline compiler of supplied gate evidence. Matching file hashes cannot establish
+source fidelity, independent review or anonymous runtime delivery. A windowed cached export is
+dated evidence, not an atomic or current production snapshot. Reconciliation alone neither adds
+usable records nor produces a launch certificate. Before/after supported-answer comparison and
+the actual population gate assays remain required.
+
 ### Where the process is defined (checked against origin/main and the live database, 2026-10-06 20:40Z)
 
 | Question | Where | What it establishes |
