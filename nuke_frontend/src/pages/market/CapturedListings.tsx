@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
+import PrivateCaptureHistory from './PrivateCaptureHistory';
 import { LISTING_SOURCES, sourceLink, sourceName, useCapturedListings } from './useCapturedListings';
 
 function clock(value: string | null) {
@@ -50,5 +51,6 @@ export default function CapturedListings() {
       })}</tbody>
     </table></div>
     {query.hasNextPage && <button disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? 'Reading more…' : 'Load more listings'}</button>}
+    <PrivateCaptureHistory source={source} />
   </section>;
 }
