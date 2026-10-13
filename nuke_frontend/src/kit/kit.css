@@ -1,0 +1,35 @@
+/* The kit: the only file that sets type. Five roles, a handful of containers.
+   Everything else on a page consumes these classes; scripts/guardrails/design-violations.mjs
+   counts and ratchets every font or inline-style declaration outside src/kit.
+   Colors and the border token come from unified-design-system.css. */
+
+/* Roles. The entity name is always the largest text on a page; a measure never outranks it. */
+.k-entity  { font: 700 20px/1.1 Arial, sans-serif; letter-spacing: -0.02em; color: var(--text); }
+.k-measure { font: 700 14px/1.2 'Courier New', monospace; font-variant-numeric: tabular-nums; color: var(--text); }
+.k-body    { font: 400 10px/1.5 Arial, sans-serif; color: var(--text); }
+.k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }
+.k-label   { font: 700 8px/1.4 Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
+
+/* Containers. One border weight, one padding. */
+.k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }
+.k-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.k-masthead { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+.k-masthead__result { margin-left: auto; text-align: right; }
+.k-strip { display: flex; align-items: center; gap: 8px; min-height: 28px; overflow-x: auto; scrollbar-width: none; }
+.k-strip__coverage { margin-left: auto; white-space: nowrap; }
+.k-measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 16px; }
+.k-measure-block { display: grid; gap: 2px; padding: 6px 0 6px 10px; border-left: 2px solid var(--border); }
+.k-measure-block:first-child { border-left: 0; padding-left: 0; }
+.k-coverage { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+
+/* A claim is a button into its evidence. The button carries no type of its own. */
+.k-claim { position: relative; display: inline-flex; flex-direction: column; gap: 2px; }
+.k-claim__value { all: unset; cursor: pointer; display: inline; }
+.k-claim__value:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.k-claim__source { display: grid; gap: 4px; }
+.k-claim__source p { margin: 0; display: flex; gap: 8px; align-items: baseline; }
+
+/* A facet is a dimension member you can open. */
+.k-facet { all: unset; cursor: pointer; padding: 4px 6px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.k-facet:hover, .k-facet[aria-expanded="true"] { border-bottom-color: var(--text); }
+.k-facet:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
