@@ -32,7 +32,16 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
   const html = fetchResult.html;
   console.log(`[Craigslist] Fetched ${html.length} bytes (source: ${fetchResult.source}, cached: ${fetchResult.cached})`);
 
-  return extractFromHtml(html, url);
+  const extracted = extractFromHtml(html, url);
+  if (fetchResult.snapshotId) {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data, error } = await supabase.from('listing_page_snapshots')
+      .select('id, fetched_at').eq('id', fetchResult.snapshotId).eq('platform', 'craigslist').eq('success', true).maybeSingle();
+    if (!error && data?.fetched_at && Number.isFinite(Date.parse(data.fetched_at))) {
+      extracted.source_capture = { snapshot_id: data.id, observed_at: new Date(data.fetched_at).toISOString() };
+    }
+  }
+  return extracted;
 }
 
 Deno.serve(async (req) => {

@@ -32,6 +32,12 @@ export type VehicleEventWriteResult =
 type Client = { from: (table: string) => any };
 type LiveRow = { id: string; metadata: Record<string, unknown> | null; sold_at?: string | null; ended_at?: string | null };
 
+/** Opt-in retained-listing policy. Existing auction landers keep their current behavior. */
+export interface VehicleEventWritePolicy {
+  preserveEventStatus?: boolean;
+  sourceObservedAt?: string;
+}
+
 const CLOCK_FIELDS = ['sold_at', 'ended_at'] as const;
 const CLOCK_METADATA = [
   'clock_locked_by_supersession', 'episode_supersessions',
@@ -79,21 +85,36 @@ function err(e: { message?: string; code?: string } | string): VehicleEventWrite
     : { action: 'error', error: String(e.message ?? e), code: e.code ?? null };
 }
 
-async function updateLive(supabase: Client, live: LiveRow, row: VehicleEventRow): Promise<VehicleEventWriteResult> {
+async function updateLive(supabase: Client, live: LiveRow, row: VehicleEventRow, policy: VehicleEventWritePolicy): Promise<VehicleEventWriteResult> {
+  const prior = Date.parse(String(live.metadata?.source_observed_at ?? ''));
+  const incoming = Date.parse(policy.sourceObservedAt ?? '');
+  if (Number.isFinite(prior) && Number.isFinite(incoming) && incoming < prior) {
+    return { action: 'skipped', reason: 'older source observation' };
+  }
   const { patch, locked } = patchForLiveRow(live, row);
-  const upd = await supabase.from('vehicle_events').update(patch).eq('id', live.id).select('id').limit(1);
+  if (policy.preserveEventStatus) delete patch.event_status;
+  let update = supabase.from('vehicle_events').update(patch).eq('id', live.id);
+  if (policy.sourceObservedAt) {
+    // Compare the metadata version we merged, including supersession locks: a concurrent writer must win.
+    update = live.metadata == null ? update.is('metadata', null) : update.eq('metadata', JSON.stringify(live.metadata));
+  }
+  const upd = await update.select('id').limit(1);
   if (upd.error) return err(upd.error);
+  if (policy.sourceObservedAt && (!Array.isArray(upd.data) || upd.data.length === 0)) {
+    return { action: 'skipped', reason: 'listing changed during projection; retry' };
+  }
   return { action: locked ? 'updated_clock_locked' : 'updated', id: live.id };
 }
 
-export async function writeVehicleEventByKey(supabase: Client, row: VehicleEventRow): Promise<VehicleEventWriteResult> {
+export async function writeVehicleEventByKey(supabase: Client, row: VehicleEventRow, policy: VehicleEventWritePolicy = {}): Promise<VehicleEventWriteResult> {
   if (!row.vehicle_id) return { action: 'skipped', reason: 'no vehicle_id' };
   if (!row.source_platform) return { action: 'skipped', reason: 'no source_platform' };
   if (!row.source_listing_id) return { action: 'skipped', reason: 'no source_listing_id' };
+  if (policy.sourceObservedAt && !Number.isFinite(Date.parse(policy.sourceObservedAt))) return { action: 'skipped', reason: 'invalid source observation clock' };
 
   const sel = await readByKey(supabase, row);
   if (sel.error) return err(sel.error);
-  if (Array.isArray(sel.data) && sel.data.length > 0) return await updateLive(supabase, sel.data[0] as LiveRow, row);
+  if (Array.isArray(sel.data) && sel.data.length > 0) return await updateLive(supabase, sel.data[0] as LiveRow, row, policy);
 
   const ins = await supabase.from('vehicle_events').insert(row).select('id').limit(1);
   if (!ins.error) {
@@ -103,7 +124,7 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
   if (String(ins.error.code ?? '') === '23505') {
     const again = await readByKey(supabase, row);
     if (again.error) return err(again.error);
-    if (Array.isArray(again.data) && again.data.length > 0) return await updateLive(supabase, again.data[0] as LiveRow, row);
+    if (Array.isArray(again.data) && again.data.length > 0) return await updateLive(supabase, again.data[0] as LiveRow, row, policy);
   }
   return err(ins.error);
 }

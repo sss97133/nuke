@@ -74,6 +74,9 @@ export interface CraigslistCapture {
   posted_at: string | null;
   updated_at: string | null;
   attributes: CraigslistAttributes;
+  /** Archive receipt, carried only by the fetching extractor. Not the processing clock. */
+  source_capture?: { snapshot_id: string; observed_at: string };
+  asking_price?: number | null;
 }
 
 // ─── text helpers ────────────────────────────────────────────────────────
@@ -380,6 +383,13 @@ export function pickCapture(obj: unknown): CraigslistCapture | null {
     updated_at: isoUtcOrNull(o.updated_at),
     attributes,
   };
+  const receipt = o.source_capture as Record<string, unknown> | undefined;
+  const clock = receipt && isoUtcOrNull(receipt.observed_at);
+  if (receipt && typeof receipt.snapshot_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receipt.snapshot_id) && clock) {
+    capture.source_capture = { snapshot_id: receipt.snapshot_id, observed_at: clock };
+  }
+  const price = o.asking_price ?? o.price;
+  if (typeof price === "number" && Number.isFinite(price) && price >= 0) capture.asking_price = price;
   return captureHasContent(capture) ? capture : null;
 }
 
@@ -389,5 +399,7 @@ export function pickCapture(obj: unknown): CraigslistCapture | null {
  */
 export function captureFields(obj: unknown): Record<string, unknown> {
   const c = pickCapture(obj);
-  return c ? { post_id: c.post_id, posted_at: c.posted_at, updated_at: c.updated_at, attributes: c.attributes } : {};
+  return c ? { post_id: c.post_id, posted_at: c.posted_at, updated_at: c.updated_at, attributes: c.attributes,
+    ...(c.source_capture ? { source_capture: c.source_capture } : {}),
+    ...(c.asking_price !== undefined ? { asking_price: c.asking_price } : {}) } : {};
 }

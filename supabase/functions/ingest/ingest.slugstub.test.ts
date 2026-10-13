@@ -24,6 +24,7 @@ interface Seen {
 let seen: Seen[] = [];
 let persistedVehicle: Record<string, unknown> | null = null;
 let publicPage: ((req: Request) => Response) | null = null;
+let clWorld: { observationId?: string; event?: Record<string, unknown>; failEventOnce?: boolean; failObservation?: boolean; afterEventRead?: () => void } | null = null;
 let extractor: (name: string, body: Record<string, unknown>) => Response = () => json({ error: "no extractor stubbed" }, 500);
 
 function json(body: unknown, status = 200): Response {
@@ -49,6 +50,32 @@ function json(body: unknown, status = 200): Response {
   if (url.pathname.startsWith("/auth/v1/")) return json({ code: 401, msg: "invalid JWT" }, 401);
   if (url.pathname.startsWith("/rest/v1/")) {
     const wantsObject = (req.headers.get("accept") ?? "").includes("vnd.pgrst.object");
+    if (clWorld) {
+      if (url.pathname === "/rest/v1/observation_sources" && isRead) return json({ id: "source-craigslist", base_trust_score: 0.4, supported_observations: ["listing"] });
+      if (url.pathname === "/rest/v1/vehicle_observations") {
+        if (isRead) return json(clWorld.observationId ? { id: clWorld.observationId } : null);
+        if (clWorld.failObservation) return json({ message: "observation unavailable", code: "57014" }, 500);
+        clWorld.observationId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        return json({ id: clWorld.observationId }, 201);
+      }
+      if (url.pathname === "/rest/v1/vehicle_events") {
+        if (isRead) {
+          const response = json(clWorld.event ? [clWorld.event] : []);
+          if (url.searchParams.get("select")?.includes("metadata")) {
+            clWorld.afterEventRead?.();
+            clWorld.afterEventRead = undefined;
+          }
+          return response;
+        }
+        if (req.method === "PATCH" && url.searchParams.get("metadata") !== `eq.${JSON.stringify(clWorld.event?.metadata)}`) return json([]);
+        if (clWorld.failEventOnce) {
+          clWorld.failEventOnce = false;
+          return json({ message: "projection unavailable", code: "57014" }, 500);
+        }
+        clWorld.event = { ...clWorld.event, ...JSON.parse(body!), id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" };
+        return json([{ id: clWorld.event.id }], req.method === "POST" ? 201 : 200);
+      }
+    }
     if (isRead) {
       if (url.pathname === "/rest/v1/vehicles" && persistedVehicle &&
         (url.searchParams.get("id") === `eq.${persistedVehicle.id}` ||
@@ -64,6 +91,7 @@ function json(body: unknown, status = 200): Response {
       });
     }
     const row = { id: crypto.randomUUID() };
+    if (clWorld && url.pathname === "/rest/v1/vehicles" && req.method === "POST") persistedVehicle = { ...JSON.parse(body!), ...row };
     return json(wantsObject ? row : [row], req.method === "POST" ? 201 : 200);
   }
   throw new Error(`unexpected request ${req.method} ${req.url}`);
@@ -266,6 +294,77 @@ Deno.test({
     const row = JSON.parse(vehicleInserts()[0].body!);
     equal([row.year, row.make, row.model, row.asking_price, row.status], [1993, "Chevrolet", "Corvette", 24500, "discovered"]);
     equal(row.description, "Two owners, recent service.");
+  },
+});
+
+// A sanitized source case through the real ingest handler, observation writer and keyed event writer.
+Deno.test({
+  name: "Craigslist retained observation ACK bridges to one parent/native listing episode; partial failure retries without another observation",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const listingUrl = "https://lasvegas.craigslist.org/cto/d/1993-chevrolet-corvette/1234567890.html";
+    const sourceCapture = { snapshot_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", observed_at: "2026-01-04T01:02:03.000Z" };
+    const data = { ...SUCCESS_BODY.data, post_id: "1234567890", posted_at: "2026-01-02T01:02:03.000Z", updated_at: null,
+      source_capture: sourceCapture, attributes: { raw: { year: "1993", makemodel: "chevrolet corvette" }, odometer: 12345 } };
+    extractor = () => json({ success: true, extracted: data });
+    clWorld = { failEventOnce: true };
+    try {
+      const first = (await ingest({ url: listingUrl })).result;
+      equal(first.status, "created");
+      const observation = JSON.parse(writes().find(r => r.path === "/rest/v1/vehicle_observations")!.body!);
+      equal([observation.vehicle_id, observation.source_identifier, observation.source_url, observation.observed_at],
+        [first.vehicle_id, data.post_id, listingUrl, sourceCapture.observed_at]);
+      equal(first.listing_capture.capture_landing.observation, "written");
+      equal(first.listing_capture.capture_landing.listing_event.action, "error");
+      const retry = (await ingest({ url: listingUrl })).result;
+      equal(retry.vehicle_id, first.vehicle_id);
+      equal(retry.listing_capture.capture_landing.observation, "duplicate");
+      equal(writes().filter(r => r.path === "/rest/v1/vehicle_observations").length, 0);
+      equal(retry.listing_capture.capture_landing.listing_event.action, "inserted");
+      equal([clWorld.event!.vehicle_id, clWorld.event!.source_platform, clWorld.event!.source_listing_id, clWorld.event!.source_url,
+        clWorld.event!.event_type, clWorld.event!.event_status, clWorld.event!.current_price],
+        [first.vehicle_id, "craigslist", data.post_id, listingUrl, "listing", "unknown", data.price]);
+      const metadata = clWorld.event!.metadata as Record<string, unknown>;
+      equal([metadata.observation_id, metadata.snapshot_id, metadata.source_observed_at],
+        [clWorld.observationId, sourceCapture.snapshot_id, sourceCapture.observed_at]);
+      const replay = (await ingest({ url: listingUrl })).result;
+      equal(replay.listing_capture.capture_landing.listing_event.action, "updated");
+      equal(writes().filter(r => r.path === "/rest/v1/vehicle_events" && r.method === "POST").length, 0);
+      clWorld.event!.event_status = "sold";
+      clWorld.event!.current_price = 26000;
+      clWorld.event!.metadata = { ...metadata, source_observed_at: "2026-01-05T01:02:03.000Z" };
+      const stale = (await ingest({ url: listingUrl })).result;
+      equal(stale.listing_capture.capture_landing.listing_event, { action: "skipped", reason: "older source observation" });
+      equal(writes().filter(r => r.path === "/rest/v1/vehicle_events").length, 0);
+      equal([clWorld.event!.event_status, clWorld.event!.current_price], ["sold", 26000]);
+      clWorld.event!.metadata = metadata;
+      clWorld.afterEventRead = () => {
+        clWorld!.event!.metadata = { ...metadata, source_observed_at: "2026-01-06T01:02:03.000Z", clock_locked_by_supersession: true };
+        clWorld!.event!.current_price = 27000;
+      };
+      const raced = (await ingest({ url: listingUrl })).result;
+      equal(raced.listing_capture.capture_landing.listing_event, { action: "skipped", reason: "listing changed during projection; retry" });
+      equal(clWorld.event!.current_price, 27000);
+      equal((clWorld.event!.metadata as Record<string, unknown>).clock_locked_by_supersession, true);
+    } finally { clWorld = null; persistedVehicle = null; }
+  },
+});
+
+Deno.test({
+  name: "Craigslist cannot project a listing episode without canonical observation ACK or archive clock receipt",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    for (const failObservation of [true, false]) {
+      const data = { ...SUCCESS_BODY.data, post_id: "1234567890", posted_at: "2026-01-02T01:02:03.000Z",
+        attributes: { raw: { year: "1993" } }, ...(failObservation ? { source_capture: {
+          snapshot_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", observed_at: "2026-01-04T01:02:03.000Z" } } : {}) };
+      extractor = () => json({ success: true, extracted: data });
+      clWorld = { failObservation };
+      try {
+        await ingest({ url: "https://lasvegas.craigslist.org/cto/d/1993-chevrolet-corvette/1234567890.html" });
+        equal(writes().filter(r => r.path === "/rest/v1/vehicle_events").length, 0);
+      } finally { clWorld = null; persistedVehicle = null; }
+    }
   },
 });
 

@@ -97,3 +97,51 @@ Deno.test("the queue row is plain JSON", () => {
   const row = buildQueueRow(extractFromHtml(page("modern-vin-17-full-block.html"), URL1));
   equal(JSON.parse(JSON.stringify(row)), row);
 });
+
+Deno.test({
+  name: "the fetching extractor carries the cached snapshot's actual clock from a keyed metadata read, without another source visit",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const originalFetch = globalThis.fetch;
+    const originalServe = Deno.serve;
+    const oldUrl = Deno.env.get("SUPABASE_URL");
+    const oldKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    Deno.env.set("SUPABASE_URL", "https://stub.supabase.test");
+    Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
+    const snapshot = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", fetched_at: "2026-01-04T01:02:03.456Z",
+      html: page("classic-vin-manual-truck.html"), markdown: null, html_storage_path: null, markdown_storage_path: null };
+    const requests: URL[] = [];
+    let handler: (req: Request) => Promise<Response>;
+    // deno-lint-ignore no-explicit-any
+    (Deno as any).serve = (fn: typeof handler) => { handler = fn; };
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(new Request(input, init).url);
+      requests.push(url);
+      equal(url.hostname, "stub.supabase.test", "only retained archive reads are permitted");
+      equal(url.pathname, "/rest/v1/listing_page_snapshots");
+      const keyed = url.searchParams.has("id");
+      if (keyed) {
+        equal([url.searchParams.get("id"), url.searchParams.get("platform"), url.searchParams.get("success")],
+          [`eq.${snapshot.id}`, "eq.craigslist", "eq.true"]);
+      }
+      return new Response(JSON.stringify(keyed ? { id: snapshot.id, fetched_at: snapshot.fetched_at } : [snapshot]),
+        { headers: { "content-type": "application/json" } });
+    };
+    try {
+      await import("./index.ts");
+      const response = await handler!(new Request("https://test.local/functions/v1/extract-craigslist", {
+        method: "POST", headers: { Authorization: "Bearer test-service-role-key", "Content-Type": "application/json" },
+        body: JSON.stringify({ url: URL1, save_to_db: false }),
+      }));
+      equal(response.status, 200);
+      const result = await response.json();
+      equal(result.extracted.source_capture, { snapshot_id: snapshot.id, observed_at: snapshot.fetched_at });
+      equal(requests.length, 2);
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.serve = originalServe;
+      if (oldUrl === undefined) Deno.env.delete("SUPABASE_URL"); else Deno.env.set("SUPABASE_URL", oldUrl);
+      if (oldKey === undefined) Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY"); else Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", oldKey);
+    }
+  },
+});
