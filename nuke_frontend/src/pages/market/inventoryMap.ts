@@ -8,7 +8,7 @@ export const MAP_GROUPS = [
   { id: 'era', label: 'Era (decade)' }, { id: 'year', label: 'Year' },
 ] as const;
 export type MapDimension = typeof MAP_GROUPS[number]['id'];
-export type MapSubdivision = 'none' | 'make' | 'model' | 'year' | 'lot';
+export type MapSubdivision = 'none' | 'make' | 'model' | 'year' | 'era' | 'lot';
 export interface InventoryMapLens {
   group: MapDimension;
   inside: MapSubdivision;
@@ -20,8 +20,9 @@ export const lotTitle = vehicleIdentity;
 
 export function mapLens(params: URLSearchParams, make: string | null): InventoryMapLens {
   const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'model' : 'make');
-  // A brand box shows its models unless the viewer chooses otherwise: the drill is visible before it is taken.
-  const inside = (['none', 'make', 'model', 'year', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'model' : 'none');
+  // A brand box shows its decades unless the viewer chooses otherwise: a readable cut of the brand's open lots
+  // (recorded models on BaT are too fine-grained to label inside a box: 104 models for 155 Porsche lots).
+  const inside = (['none', 'make', 'model', 'year', 'era', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'era' : 'none');
   return { group, inside, focus: params.get('mapFocus'), child: inside === 'none' ? null : params.get('mapChild') };
 }
 
