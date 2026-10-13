@@ -148,6 +148,10 @@ jobs:
         run: createdb dm_bat_live_pull_slots_ci
       - name: Verify the live pull's closing-slot cap, config slot count and pacing guards
         run: psql -X -v ON_ERROR_STOP=1 -d dm_bat_live_pull_slots_ci -f supabase/sql/test_bat_live_pull_slots.sql
+      - name: Create disposable live-pull in-flight slot database
+        run: createdb dm_bat_live_pull_inflight_ci
+      - name: Verify the live pull's run-time pause samples, per-slot in-flight accounting and row locking
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_bat_live_pull_inflight_ci -f supabase/sql/test_bat_live_pull_inflight_slots.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
