@@ -31,6 +31,7 @@
 import { normalizeDrivetrain, normalizeTransmission } from "../_shared/normalizeVehicle.ts";
 import { type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
 import type { ObservationInput, WriteResult } from "../_shared/observationWriter.ts";
+import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
 
 /** What matchOrCreateVehicle was handed (after ingest's gate), so the observation confirms it instead of disagreeing. */
 export interface WrittenColumns {
@@ -58,6 +59,8 @@ export interface CaptureLanding {
   confirmed: string[];
   conflicted: string[];
   errors: string[];
+  observation_id?: string;
+  listing_event?: VehicleEventWriteResult;
 }
 
 /** Craigslist says "gas"; the column's dominant spelling (93,571 + 61,487 rows, 2026-10-06) is "gasoline". "other" is not a fuel. */
@@ -105,6 +108,7 @@ export function captureObservationFields(
   put("condition", a.condition);
   put("listing_posted_at", capture.posted_at);
   put("listing_updated_at", capture.updated_at);
+  put("listing_asking_price", capture.asking_price);
   return out;
 }
 
@@ -115,6 +119,8 @@ export function ledgerFields(capture: CraigslistCapture, landing?: CaptureLandin
     posted_at: capture.posted_at,
     updated_at: capture.updated_at,
     attributes: capture.attributes,
+    ...(capture.source_capture ? { source_capture: capture.source_capture } : {}),
+    ...(capture.asking_price !== undefined ? { asking_price: capture.asking_price } : {}),
     ...(landing ? { capture_landing: landing } : {}),
   };
 }
@@ -197,6 +203,7 @@ export async function landCraigslistCapture(
         ...(args.isNewVehicle ? { testimonyOnly: COLUMNS_WRITTEN_AT_CREATION } : {}),
         observationKind: "listing",
         extractionMethod: "html_parse",
+        ...(capture.source_capture ? { observedAt: capture.source_capture.observed_at } : {}),
         // The verbatim block, so the observation stands on its own if the page is gone.
         rawData: { ...ledgerFields(capture), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
       }),
@@ -208,11 +215,38 @@ export async function landCraigslistCapture(
     landing.confirmed = result.confirmed;
     landing.conflicted = result.conflicted;
     landing.errors = result.errors.slice(0, 5);
+    if (result.observationId) landing.observation_id = result.observationId;
     if (vinWritable) {
       landing.vin = result.gapFilled.includes("vin") ? "filled"
         : result.confirmed.includes("vin") ? "confirmed"
         : result.conflicted.includes("vin") ? "conflict"
         : "not_written";
+    }
+    // A retained source receipt and canonical observation ACK precede the public listing projection.
+    // Retry after a projection failure may have a duplicate observation; it must still finish this relationship.
+    if (result.observationId && capture.post_id && capture.source_capture) {
+      try {
+        landing.listing_event = await withTimeout(writeVehicleEventByKey(deps.supabase, {
+          vehicle_id: vehicleId,
+          source_platform: "craigslist",
+          source_listing_id: capture.post_id,
+          source_url: listingUrl,
+          event_type: "listing",
+          event_status: "unknown",
+          ...(capture.asking_price != null ? { current_price: capture.asking_price } : {}),
+          metadata: {
+            source: "ingest", observation_id: result.observationId,
+            snapshot_id: capture.source_capture.snapshot_id,
+            source_observed_at: capture.source_capture.observed_at,
+            ...(capture.posted_at ? { listing_posted_at: capture.posted_at } : {}),
+            ...(capture.updated_at ? { listing_updated_at: capture.updated_at } : {}),
+          },
+        }, { preserveEventStatus: true, sourceObservedAt: capture.source_capture.observed_at }), args.timeoutMs ?? 8000);
+        if (landing.listing_event.action === "error") landing.errors.push(`listing event: ${landing.listing_event.error}`);
+      } catch (e) {
+        landing.listing_event = { action: "error", error: e instanceof Error ? e.message : String(e), code: null };
+        landing.errors.push(`listing event: ${landing.listing_event.error}`);
+      }
     }
   } catch (e) {
     landing.observation = "error";

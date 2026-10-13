@@ -255,6 +255,17 @@ Deno.test("pickCapture refuses anything that is not a Craigslist capture", () =>
   equal(pickCapture({ post_id: "7000000001", posted_at: "2026-01-02T11:04:05.000Z" }), null, "another source's own posted_at is not a capture");
 });
 
+Deno.test("archive identity and capture clock survive the JSON capture boundary; malformed receipts and amounts do not", () => {
+  const good = parseCapture(page("classic-vin-manual-truck.html"));
+  const receipt = { snapshot_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", observed_at: "2026-01-04T01:02:03.000Z" };
+  const picked = pickCapture({ ...good, source_capture: receipt, price: 24500 })!;
+  equal([picked.source_capture, picked.asking_price], [receipt, 24500]);
+  for (const source_capture of [{ ...receipt, snapshot_id: "opaque-token" }, { ...receipt, observed_at: "not-a-clock" }, {}]) {
+    equal(pickCapture({ ...good, source_capture, price: Infinity })!.source_capture, undefined);
+    equal(pickCapture({ ...good, source_capture, price: Infinity })!.asking_price, undefined);
+  }
+});
+
 Deno.test("pickCapture drops a malformed field and keeps the rest", () => {
   const good = parseCapture(page("classic-vin-manual-truck.html"));
   const c = pickCapture({

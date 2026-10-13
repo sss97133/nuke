@@ -31,6 +31,7 @@ export interface CraigslistExtracted {
   vin: string | null;
   /** The whole attribute block, a stable object: see CraigslistAttributes. */
   attributes: CraigslistAttributes;
+  source_capture?: { snapshot_id: string; observed_at: string };
 }
 
 function extractJsonLd(html: string): any | null {
