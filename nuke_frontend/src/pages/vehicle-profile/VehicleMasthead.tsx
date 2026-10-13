@@ -6,6 +6,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
+import { isAuctionPresentation, isClassifiedPresentation } from './buildAuctionPulse';
 
 /** Period identity artwork is resolved by the shared, sourced year/make/model catalogue. */
 export default function VehicleMasthead({ priceLotId }: { priceLotId?: string }) {
@@ -28,7 +29,8 @@ export default function VehicleMasthead({ priceLotId }: { priceLotId?: string })
     };
   }, [vehicle?.id]);
   if (!vehicle) return null;
-  const priceOwnedByLiveStack = !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
+  const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
+  const classifiedPrice = isClassifiedPresentation(priceFacts);
   const tokens = getVehicleIdentityTokens(vehicle, { transmissionStrategy: 'never' });
   const model = tokens.primary.find(token => token.kind === 'model')?.value;
   if (!model || (vehicle as any).listing_kind === 'non_vehicle_item') {
@@ -40,7 +42,8 @@ export default function VehicleMasthead({ priceLotId }: { priceLotId?: string })
     </h1>
     {!priceOwnedByLiveStack && priceFacts?.price_amount != null && priceKindLabel(priceFacts) && <div ref={priceBoundary} className="vp-masthead__result">
       <span>{priceFacts.price_kind === 'sold' ? 'Last recorded sale' : priceKindLabel(priceFacts)}</span>
-      <button type="button" onClick={() => setShowPriceSources(open => !open)} aria-label="Inspect recorded price sources" aria-haspopup="dialog" aria-expanded={showPriceSources}><strong>${Math.round(priceFacts.price_amount).toLocaleString('en-US')}</strong></button>
+      <button type="button" onClick={() => setShowPriceSources(open => !open)} aria-label="Inspect recorded price sources" aria-haspopup="dialog" aria-expanded={showPriceSources}><strong>{classifiedPrice ? '' : '$'}{Math.round(priceFacts.price_amount).toLocaleString('en-US')}</strong></button>
+      {classifiedPrice && <small>Currency unrecorded</small>}
     {showPriceSources && priceFacts && <HeaderPopover open title="Price source" width={300} align="right"
       dismissBoundaryRef={priceBoundary} onClose={() => setShowPriceSources(false)}>
       <div className="vp-price-source">

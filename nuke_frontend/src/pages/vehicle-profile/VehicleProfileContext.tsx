@@ -14,7 +14,7 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { withTimeout } from '../../lib/withTimeout';
@@ -629,15 +629,20 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
     const refreshAuctionPulse = async () => {
       try {
-        const { data: events } = await supabase
+        const result = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
           .limit(20);
 
-        const merged = buildAuctionPulseFromExternalListings(events || [], vehicle!.id);
+        const merged = buildAuctionPulseFromReadResult(result, vehicle!.id);
+        if (cancelled) return;
+        if (!merged) {
+          setAuctionPulse(null);
+          return;
+        }
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
         const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
 

@@ -6,7 +6,7 @@
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
 import type React from 'react';
-import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
 // ----- Hero Image Auto-Selection -----
@@ -561,7 +561,7 @@ export async function loadVehicleImpl({
       try {
         const { data } = await supabase
           .from('vehicle_events')
-          .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicleData.id)
           .order('updated_at', { ascending: false })
           .limit(10);
@@ -767,16 +767,14 @@ export async function loadVehicleImpl({
               .invoke('sync-bat-listing', { body: { externalListingId: extId } })
               .then(async () => {
                 // Refresh latest listing rows and re-derive pulse.
-                const { data } = await supabase
+                const result = await supabase
                   .from('vehicle_events')
-                  .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
                   .eq('vehicle_id', vehicleData.id)
                   .order('updated_at', { ascending: false })
                   .limit(10);
-                const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleData.id);
-                if (merged) {
-                  setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
-                }
+                const merged = buildAuctionPulseFromReadResult(result, vehicleData.id);
+                setAuctionPulse((prev: any) => merged ? ({ ...(prev || {}), ...merged }) : null);
               })
               .catch(() => {});
           }

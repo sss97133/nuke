@@ -1,4 +1,5 @@
 import React from 'react';
+import { isAuctionPresentation } from './buildAuctionPulse';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import { useVehicleProfile } from './VehicleProfileContext';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
@@ -16,7 +17,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   onMergeComplete,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
-  const activeExternal = !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
+  const activeExternal = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const { data: commentStats } = useAuctionCommentStats(activeExternal ? vehicle?.id : undefined, auctionPulse?.listing_url);
   if (!vehicle) return null;
 
@@ -62,7 +63,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       <React.Suspense fallback={null}><LiveAuctionBanner vehicleId={vehicle.id} /></React.Suspense>
 
       {/* External Auction Live Banner - Show if vehicle has active BaT/C&B/etc auction */}
-      {auctionPulse?.listing_url && ['active', 'live'].includes(String(auctionPulse?.listing_status || '').toLowerCase()) && (
+      {activeExternal && (
         <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}>
           <React.Suspense fallback={null}><ExternalAuctionLiveBanner
             sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
