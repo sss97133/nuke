@@ -149,12 +149,12 @@ export const SearchEmptyState: React.FC<Props> = ({
 
       {/* Notable Sales */}
       {notableSales.length > 0 && (
-        <VehicleGrid title="NOTABLE SALES" vehicles={notableSales} />
+        <VehicleGrid title="HIGHEST BIDS ON THE BOARD NOW" vehicles={notableSales} />
       )}
 
       {/* Recently Added */}
       {recentVehicles.length > 0 && (
-        <VehicleGrid title="RECENTLY ADDED" vehicles={recentVehicles} />
+        <VehicleGrid title="FIRST SEEN IN THE LAST DAY" vehicles={recentVehicles} />
       )}
     </div>
   );

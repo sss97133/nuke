@@ -97,7 +97,7 @@ type Row = [
   string | null, (string | null)?, (number | null)?, (number | null)?, (number | null)?, (string | null)?, (number | null)?,
 ];
 
-async function fetchPulse(): Promise<MarketPulse> {
+export async function fetchPulse(): Promise<MarketPulse> {
   const { data, error } = await supabase.rpc('market_pulse_live');
   if (error) throw error;
   const rows = ((data?.auctions ?? []) as Row[]);
