@@ -1,4 +1,6 @@
 -- get_vehicle_profile_data: trim the timeline rows to the columns the page reads.
+-- (Re-issue of 20261013153000, whose CREATE FUNCTION lacked its terminating semicolon and swallowed
+-- the COMMIT; that file never applied and is removed.)
 --
 -- Measured 2026-10-13 15:05Z as anon: the K5 (e08bf694) answers in 2.97 s cold / 0.30 s warm at 392 KB,
 -- of which timeline_events is 310 KB (100 rows × every column). Per column over those rows:
@@ -229,6 +231,6 @@ EXCEPTION
     RAISE WARNING 'get_vehicle_profile_data failed for vehicle %: %', p_vehicle_id, SQLERRM;
     RETURN NULL;
 END;
-$function$
+$function$;
 
 COMMIT;
