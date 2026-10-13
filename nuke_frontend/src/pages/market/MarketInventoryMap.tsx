@@ -84,7 +84,7 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
         {MAP_GROUPS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
       </select></label>
       <label>Inside each box <select aria-label="Inventory sub-boxes" value={lens.inside} onChange={e => onLensChange({ inside: e.target.value as MapSubdivision, child: null })}>
-        <option value="none">Total lots</option><option value="make">Brands</option><option value="model">Models</option><option value="year">Years</option><option value="lot">Individual vehicles</option>
+        <option value="none">Total lots</option><option value="make">Brands</option><option value="model">Models</option><option value="era">Decades</option><option value="year">Years</option><option value="lot">Individual vehicles</option>
       </select></label>
       {lens.focus != null && <button type="button" onClick={() => onLensChange({ focus: null, child: null })}>← All {plural(lens.group)}</button>}
       {lens.child != null && <button type="button" onClick={() => onLensChange({ child: null })}>Clear sub-box selection</button>}
