@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn() }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string) => { fixture.source(source); return fixture.query; } }));
 vi.mock('./MarketPulse', () => ({ default: () => <section>Existing BaT bid board</section> }));
+vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import MarketInventory from './MarketInventory';
 let container: HTMLDivElement, root: ReturnType<typeof createRoot>;
@@ -54,6 +55,9 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
   const link = container.querySelector('a[href="/vehicle/eligible"]');
   expect(link?.getAttribute('aria-label')).toBe('1963 Chevrolet Corvette');
   expect(link?.querySelector('.sr-only')?.textContent).toBe('1963 Chevrolet Corvette');
+  const visibleIdentity = link!.cloneNode(true) as HTMLElement;
+  visibleIdentity.querySelectorAll('.sr-only').forEach(node => node.remove());
+  expect(visibleIdentity.textContent?.match(/1963/g)).toHaveLength(1);
   const image = container.querySelector('img'); expect(image?.getAttribute('alt')).toBe('Vehicle record image');
   expect(image?.getAttribute('width')).toBe('80'); expect(image?.getAttribute('height')).toBe('60');
 });

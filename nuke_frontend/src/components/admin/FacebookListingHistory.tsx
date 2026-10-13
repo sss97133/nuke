@@ -11,7 +11,7 @@ type History = { listing_id: string; facebook_id: string; title: string | null; 
   first_observed_at: string; last_observed_at: string; observed_span_minutes: number;
   observation_count: number; search_sightings: number; detail_observations: number;
   same_query_revisits: number; observed_asking_changes: number; observations: Observation[] };
-type Reading = { contract: 'facebook_listing_history_v1'; section: 'listing_history'; status: 'measured';
+export type ListingHistoryReading = { contract: 'facebook_listing_history_v1'; section: 'listing_history'; status: 'measured';
   measured_at: string; capture_window_complete: boolean; rows: History[];
   summary: { selected_runs: number; acknowledged_runs: number; withheld_runs: number; retained_sightings: number;
     listing_histories: number; repeated_histories: number; histories_with_asking_changes: number };
@@ -21,8 +21,9 @@ type Reading = { contract: 'facebook_listing_history_v1'; section: 'listing_hist
 
 const at = (s: unknown) => typeof s === 'string' && Number.isFinite(Date.parse(s));
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
-export function validListingHistory(data: unknown): data is Reading {
-  const d = data as Reading;
+export const facebookListingUrl = (id: string) => /^\d+$/.test(id) ? `https://www.facebook.com/marketplace/item/${id}/` : null;
+export function validListingHistory(data: unknown): data is ListingHistoryReading {
+  const d = data as ListingHistoryReading;
   return d?.contract === 'facebook_listing_history_v1' && d.section === 'listing_history' && d.status === 'measured'
     && at(d.measured_at) && typeof d.capture_window_complete === 'boolean'
     && d.scope?.capture_limit === 100 && d.scope.listing_limit === 20
@@ -61,7 +62,7 @@ const asking = (o: Observation) => o.asking_amount === null ? 'Asking unmeasured
   : `${o.asking_amount.toLocaleString()} ${o.asking_currency ?? '· currency unknown'}`;
 
 export default function FacebookListingHistory({ busy = false }: { busy?: boolean }) {
-  const [reading,setReading] = useState<Reading | null>(null);
+  const [reading,setReading] = useState<ListingHistoryReading | null>(null);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState(false);
   const [facebookId,setFacebookId] = useState('');
@@ -104,7 +105,7 @@ export default function FacebookListingHistory({ busy = false }: { busy?: boolea
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%',borderCollapse: 'collapse' }}>
         <thead><tr>{['Source listing','Observed span','Search revisits / detail observations','Asking history'].map(s => <th scope="col" key={s} style={cell}>{s}</th>)}</tr></thead>
         <tbody>{reading.rows.map(h => <tr key={h.listing_id}>
-          <th scope="row" style={cell}><a href={`https://www.facebook.com/marketplace/item/${h.facebook_id}/`} target="_blank" rel="noopener noreferrer">{h.title || h.facebook_id}</a>
+          <th scope="row" style={cell}><a href={facebookListingUrl(h.facebook_id) ?? undefined} target="_blank" rel="noopener noreferrer">{h.title || h.facebook_id}</a>
             <div>{h.current_vehicle_id ? 'Current vehicle link exists' : 'Vehicle identity unresolved'}</div></th>
           <td style={cell}>{h.observed_span_minutes.toFixed(2)} min<div>{stamp(h.first_observed_at)} → {stamp(h.last_observed_at)}</div></td>
           <td style={cell}>{h.same_query_revisits} same-query revisits · {h.search_sightings} search sightings · {h.detail_observations} detail observations</td>
