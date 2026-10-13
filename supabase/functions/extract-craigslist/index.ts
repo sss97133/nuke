@@ -20,6 +20,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
     platform: 'craigslist',
     callerName: 'extract-craigslist',
     useFirecrawl: false,
+    directFetchOptions: { publicOnly: true },
     maxAgeSec: 86400, // 24h cache — CL listings change/expire frequently
   });
 
