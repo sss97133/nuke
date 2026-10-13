@@ -72,6 +72,7 @@ GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
+\ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -88,6 +89,8 @@ INSERT INTO public.vehicles (id, year, make, model, location) VALUES
 INSERT INTO public.vehicles (id, year, make, model, engine_size) VALUES
  ('10000000-0000-0000-0000-000000000006', 1966, 'Ford', 'Mustang', '4.7L  V8 ');
 INSERT INTO public.vehicles (id, year, make, model) VALUES ('10000000-0000-0000-0000-000000000007', 1998, 'Acura', 'NSX');
+INSERT INTO public.vehicles (id, year, make, model, body_style, transmission) VALUES
+ ('10000000-0000-0000-0000-000000000008', 1977, 'Chevrolet', 'K5 Blazer', 'SUV', 'AUTOMATIC 4WD');
 
 INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, source_type, source_confidence, extracted_at, status) VALUES
  ('10000000-0000-0000-0000-000000000001', 'engine_size',  '4.7L V8',   'user-submission_listing', 80, '2026-09-01T00:00:00Z', 'accepted'),
@@ -184,6 +187,10 @@ BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000007');
   PERFORM public.t_assert(d->'sections'->0->>'priceLabel' = 'Current bid' AND (d->'sections'->0->'price'->>'trust')::numeric = 0.7
     AND d->'sections'->0->'price'->'observed_at' = 'null'::jsonb, 'a live bid is the current bid, as of now');
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
+  PERFORM public.t_assert((SELECT string_agg(x->>'label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->1->'facets') WITH ORDINALITY AS t(x, o))
+    = 'SUV|Automatic 4WD', format('acronyms keep their capitals in title-cased labels; got %s', d->'sections'->1->'facets'));
 END $$;
 RESET ROLE;
 
