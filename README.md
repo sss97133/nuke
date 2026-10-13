@@ -115,6 +115,30 @@ The database describing itself (`v_schema_atlas`, `v_job_health`): 944 tables (6
 
 </details>
 
+<details>
+<summary>Intake and processing rates</summary>
+
+<!-- intake:start -->
+Measured 2026-10-13 07:21 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample whose n is in the header. Read-only. Nothing here is typed by hand.
+
+| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (1% page sample, n=196,307) | Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (0.1% page sample, n=52,836) | BaT lots read by the live pull (latest read per lot, so older days undercount) |
+|---|---:|---:|---:|---:|---:|---:|
+| 2026-10-12 | 10,977 | 0 sampled | 766 (183 / 518) | 21,588 | 0 sampled | 496 |
+| 2026-10-11 | 4,890 | 0 sampled | 487 (55 / 387) | 13,888 | 0 sampled | 232 |
+| 2026-10-10 | 12,078 | 0 sampled | 633 (120 / 458) | 32,476 | 0 sampled | 486 |
+| 2026-10-09 | 12,183 | 0 sampled | 847 (199 / 605) | 73,918 | 0 sampled | 227 |
+| 2026-10-08 | 9,934 | 0 sampled | 832 (219 / 578) | 11,903 | 0 sampled | 216 |
+| 2026-10-07 | 13,622 | 0 sampled | 893 (242 / 615) | 53,533 | 0 sampled | 202 |
+| 2026-10-06 | 13,041 | 0 sampled | 1,142 (242 / 576) | 66,509 | 0 sampled | 203 |
+
+- **Live pull at measurement:** 779 of 1,294 live BaT lots are more than 2 h past their next scheduled read, and 116 live lots have never been read (`monitored_auctions.next_poll_at`, `last_synced_at`).
+- **Source coverage:** 26,242 of 785,126 known listing targets extracted (3.3%), across 10 sources (`source_target_coverage`).
+- **Clocks:** comments `auction_comments.created_at`, sentiment `auction_comments.analyzed_at`, vehicles `vehicles.created_at` split by `canonical_platform`, images `vehicle_images.created_at`, vision `vehicle_images.vision_analyzed_at`, live-pull reads `monitored_auctions.last_synced_at`, which keeps only each lot's latest read.
+- **Sampled zeros:** `tablesample system` keeps whole pages at random, so a day's rows reach the sample 95% of the time only when they span at least 299 comment pages or 2,995 image pages. "0 sampled" rules out steady processing, not a small run.
+<!-- intake:end -->
+
+</details>
+
 ## License
 
 Proprietary. See [`LICENSE`](LICENSE).
