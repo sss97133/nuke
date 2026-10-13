@@ -58,6 +58,30 @@ jobs:
       - name: Verify the viewer-scoped profile document contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_read_ci -f supabase/sql/test_vehicle_profile_read.sql
 
+  day-receipt-money-mask-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable day-receipt database
+        run: createdb dm_refinement_day_receipt_ci
+      - name: Verify the day receipt and work calendar carry money only to owners
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_day_receipt_ci -f supabase/sql/test_day_receipt_money_mask.sql
+
   metric-fold-health-contract:
     runs-on: ubuntu-latest
     services:
@@ -93,6 +117,10 @@ jobs:
         run: createdb dm_residual_backlog_ci
       - name: Verify the ranked repair-backlog view over the old island view, its columns, gap rules, scope, grants and backlog script
         run: psql -X -v ON_ERROR_STOP=1 -d dm_residual_backlog_ci -f supabase/sql/test_residual_ranked_backlog.sql
+      - name: Create disposable graded-lot vision backlog database
+        run: createdb dm_graded_lot_vision_ci
+      - name: Verify the graded-lot vision backlog view, one row per lot with the newest grade, photo filters, cost constants and grants
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_graded_lot_vision_ci -f supabase/sql/test_graded_lot_vision_backlog.sql
       - name: Create disposable bounded pipeline pulse database
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings
