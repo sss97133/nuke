@@ -13,13 +13,17 @@ export function candidatePage<T>(rows: T[], offset: number, limit: number) {
 }
 
 // Category/own-vehicle/deep/fuzzy results must never displace a vehicle whose
-// candidate offset has already been consumed. Input order is the display order.
+// candidate offset has already been consumed. The Set retains reader order;
+// mixed-result scores may position supplements but cannot reorder that stream.
 export function preservePrimaryPage<T extends { id: string }>(results: T[], primaryIds: Set<string>, limit: number): T[] {
   const seen = new Set<string>();
   const unique = results.filter(r => {
     if (seen.has(r.id)) return false;
     seen.add(r.id); return true;
   });
-  let supplementalSlots = Math.max(0, limit - unique.filter(r => primaryIds.has(r.id)).length);
-  return unique.filter(r => primaryIds.has(r.id) || supplementalSlots-- > 0);
+  const byId = new Map(unique.map(r => [r.id, r]));
+  const primary = [...primaryIds].map(id => byId.get(id)).filter((r): r is T => r !== undefined);
+  let supplementalSlots = Math.max(0, limit - primary.length), primaryIndex = 0;
+  return unique.filter(r => primaryIds.has(r.id) || supplementalSlots-- > 0)
+    .map(r => primaryIds.has(r.id) ? primary[primaryIndex++] : r);
 }

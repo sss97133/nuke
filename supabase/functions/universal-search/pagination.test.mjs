@@ -147,6 +147,29 @@ test('vehicle-only searches use all slots and page membership follows raw candid
   assert.equal(last.results.length, 5); assert.equal(last.meta.has_more, false); assert.equal(last.meta.next_offset, null);
 });
 
+test('mixed display sorting preserves non-UUID candidate rank across first and later pages', async () => {
+  const ranked = rows(205).reverse().map((v, i) => ({ ...v, primary_image_url: i % 2 ? 'https://example.invalid/image' : null }));
+  const f = edgeFixture({ ranked, tags: Array.from({ length: 10 }, (_, i) => ({ tag_name: `tag_${i}`, confidence: 1000 })) });
+  const seen = [];
+  let offset = 0, source;
+  do {
+    const result = await f.search({ offset, vehicle_source: source });
+    assert.equal(result.status, 200);
+    seen.push(...result.results.filter(r => r.type === 'vehicle').map(r => r.id));
+    if (!offset) assert.equal(result.results.length, 100);
+    offset = result.meta.next_offset; source = result.meta.vehicle_source;
+  } while (offset !== null);
+  assert.deepEqual(seen, ranked.map(v => v.id));
+  const only = await f.search({ types: ['vehicle'] });
+  assert.deepEqual(only.results.map(v => v.id), ranked.slice(0, 100).map(v => v.id));
+});
+
+test('restoring reader order retains supplement positions and skips absent primary candidates', () => {
+  const first = row(2), second = row(1), supplement = { id: 'supplement' };
+  const result = preservePrimaryPage([supplement, second, first, first], new Set(['absent', first.id, second.id]), 3);
+  assert.deepEqual(result, [supplement, first, second]);
+});
+
 test('supplemental category and owned-vehicle ranking cannot evict any consumed primary ID', async () => {
   const f = edgeFixture({ verifiedUser: 'offline_user', owned: [row(304)], tags: Array.from({ length: 10 }, (_, i) => ({ tag_name: `tag_${i}`, confidence: 1000 })) });
   const r = await f.search({}, true);
