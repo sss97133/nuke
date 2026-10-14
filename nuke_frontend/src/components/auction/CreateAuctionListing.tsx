@@ -77,8 +77,27 @@ export default function CreateAuctionListing() {
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
         .select(`
-          *,
+          id,
+          year,
+          make,
+          model,
+          trim,
+          vin,
+          mileage,
+          color,
+          interior_color,
+          engine_size,
+          transmission,
+          drivetrain,
+          body_style,
+          description,
+          highlights,
+          equipment,
+          modifications,
+          known_flaws,
+          recent_service_history,
           timeline_events (
+
             event_type,
             event_date,
             description,

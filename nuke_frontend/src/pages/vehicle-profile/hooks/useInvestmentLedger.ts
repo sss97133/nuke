@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../../../lib/privateMoney';
 import type { WorkOrderReceipt, VehicleReceipt, DealContact } from './useBuildStatus';
 
 export interface DealJacketRow {
@@ -50,7 +51,7 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
     queryFn: async () => {
       if (!vehicleId) return null;
 
-      const [dealRes, woRes, receiptsRes, vehicleRes] = await Promise.all([
+      const [dealRes, woRes, receiptsRes, vehicleRes, ownerBooks] = await Promise.all([
         // All deal jackets for this vehicle, ordered by sold_date
         supabase
           .from('deal_jackets')
@@ -74,12 +75,14 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
           .eq('vehicle_id', vehicleId)
           .eq('status', 'processed')
           .order('receipt_date'),
-        // Vehicle row for purchase_price, created_at, owner_id
+        // Vehicle row for created_at, owner_id
         supabase
           .from('vehicles')
-          .select('purchase_price, created_at, owner_id')
+          .select('created_at, owner_id')
           .eq('id', vehicleId)
           .maybeSingle(),
+        // The purchase price is the owner's: empty for everyone else
+        fetchVehicleOwnerBooks([vehicleId]),
       ]);
 
       if (dealRes.error) throw new Error(dealRes.error.message);
@@ -166,7 +169,8 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
         dealJackets,
         workOrders,
         receipts,
-        purchasePrice: vehicleRes.data?.purchase_price != null ? Number(vehicleRes.data.purchase_price) : null,
+        purchasePrice: ownerBooks.get(vehicleId)?.purchase_price != null ? Number(ownerBooks.get(vehicleId)?.purchase_price) : null,
+
         createdAt: vehicleRes.data?.created_at ?? null,
         ownerName,
       };

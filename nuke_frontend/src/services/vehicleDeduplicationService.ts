@@ -5,7 +5,11 @@
 
 import { supabase } from '../lib/supabase';
 
+// The candidate fields a duplicate review compares (a select('*') on vehicles is not granted).
+const DEDUP_COLUMNS = 'id, vin, year, make, model, trim, color, mileage, current_value, sale_price, description, notes, user_id, uploaded_by, is_public, created_at, primary_image_url';
+
 interface DuplicateMatch {
+
   existingVehicle: any;
   newVehicle: any;
   matchType: 'vin_exact' | 'year_make_model' | 'fuzzy';
@@ -29,7 +33,7 @@ export class VehicleDeduplicationService {
     if (vehicle.vin && vehicle.vin.length >= 11 && !vehicle.vin.startsWith('VIVA-')) {
       const { data: vinMatches } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(DEDUP_COLUMNS)
         .eq('vin', vehicle.vin);
 
       if (vinMatches && vinMatches.length > 0) {
@@ -50,7 +54,7 @@ export class VehicleDeduplicationService {
     if (vehicle.year && vehicle.make && vehicle.model) {
       const { data: ymmMatches } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(DEDUP_COLUMNS)
         .eq('year', vehicle.year)
         .ilike('make', vehicle.make)
         .ilike('model', vehicle.model);
@@ -77,7 +81,7 @@ export class VehicleDeduplicationService {
     if (vehicle.year && vehicle.make && vehicle.model) {
       const { data: fuzzyMatches } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(DEDUP_COLUMNS)
         .gte('year', vehicle.year - 1)
         .lte('year', vehicle.year + 1)
         .ilike('make', `%${vehicle.make.substring(0, 4)}%`);
@@ -122,12 +126,13 @@ export class VehicleDeduplicationService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Get both vehicles
+      // Rows as the caller may see them (a select('*') on vehicles is not granted).
       const [keep, merge] = await Promise.all([
-        supabase.from('vehicles').select('*').eq('id', keepVehicleId).single(),
-        supabase.from('vehicles').select('*').eq('id', mergeVehicleId).single()
+        supabase.rpc('vehicle_row_read', { p_vehicle_id: keepVehicleId }),
+        supabase.rpc('vehicle_row_read', { p_vehicle_id: mergeVehicleId })
       ]);
 
-      if (keep.error || merge.error) {
+      if (keep.error || merge.error || !keep.data || !merge.data) {
         throw new Error('Vehicle not found');
       }
 

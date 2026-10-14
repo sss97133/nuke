@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../lib/privateMoney';
 
 export interface ValueLineItem {
   category: string;
@@ -64,18 +65,22 @@ export class ValuationEngine {
    */
   static async calculateValuation(vehicleId: string): Promise<ValuationResult> {
     try {
-      // 1. Get vehicle base data
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('purchase_price, purchase_date, make, model, year, vin, mileage')
-        .eq('id', vehicleId)
-        .single();
+      // 1. Get vehicle base data; the purchase facts are the owner's (empty for everyone else)
+      const [{ data: vehicle }, ownerBooks] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('make, model, year, vin, mileage')
+          .eq('id', vehicleId)
+          .single(),
+        fetchVehicleOwnerBooks([vehicleId]),
+      ]);
 
       if (!vehicle) {
         throw new Error('Vehicle not found');
       }
 
-      const purchasePrice = vehicle.purchase_price || 0;
+      const purchase = ownerBooks.get(vehicleId);
+      const purchasePrice = purchase?.purchase_price || 0;
       const lineItems: ValueLineItem[] = [];
       const warnings: string[] = [];
 
@@ -93,7 +98,8 @@ export class ValuationEngine {
           category: 'Purchase',
           description: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
           amount: purchasePrice,
-          date: vehicle.purchase_date || 'Unknown',
+          date: purchase?.purchase_date || 'Unknown',
+
           evidence: {
             type: 'title',
             imageUrls: (titleImages || []).map(i => i.variants?.thumbnail || i.image_url).filter(Boolean),
