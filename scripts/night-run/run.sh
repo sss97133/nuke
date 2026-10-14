@@ -27,6 +27,10 @@ for old in "$HOME"/.worktrees/night-run-*; do
   [ -n "$(find "$old" -maxdepth 0 -mtime +2)" ] && git -C "$REPO" worktree remove --force "$old" 2>/dev/null || true
 done
 git -C "$REPO" fetch -q origin main
+# The shared checkout is a stale branch and sessions started there load its docs, so refresh them from main.
+for f in AGENTS.md CLAUDE.md $(git -C "$HOME/nuke" ls-tree --name-only origin/main .claude/rules/ 2>/dev/null); do
+  git -C "$HOME/nuke" show "origin/main:$f" > "$HOME/nuke/$f" 2>/dev/null || true
+done
 # One worktree per night, detached at origin/main; the session branches from it for each PR.
 [ -d "$WT" ] || git -C "$REPO" worktree add -q --detach "$WT" origin/main
 # The pre-commit hook type-checks the frontend; share the main checkout's node_modules.

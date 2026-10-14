@@ -44,7 +44,7 @@ line in the report. If an item has no eligible candidate, record why and move on
   as `bash scripts/data/q.sh`. Send read-only SQL only. The script runs as a privileged role, so a write would
   land: no INSERT, UPDATE, DELETE, DDL or calls to functions that write. No `psql`, no `supabase` CLI, no
   curl to the project.
-  Keep each query at or under 55 s of statement time. When one is slow, narrow it; never lengthen the timeout.
+  Keep each query at or under 10 s of statement time (the role's `statement_timeout`). When one is slow, narrow it; never lengthen the timeout.
 - **Migrations:**
   - The filename timestamp is later than every file in `supabase/migrations` on `origin/main`, and later than
     any timestamp a `.claude/LANES.md` row announces.
