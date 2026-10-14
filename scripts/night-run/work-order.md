@@ -21,7 +21,9 @@ or PRs. A description or proposal is worthwhile only when it advances a demonstr
 open PRs and the shared lane list before duplicating another agent's work. Old night-run PRs may already
 contain the needed repair; read their current state first. Do not merge or change another lane's PR.
 
-Read `AGENTS.md`, applicable `.claude/rules/`, the relevant portions of
+Read current instructions with `git show origin/main:AGENTS.md` and the applicable `.claude/rules/`
+on origin/main, including `production-engineering.md` and `liveness-and-intent.md`. The retained
+worktree may be older; refresh instruction reads without overwriting the shared checkout. Read the relevant portions of
 `docs/ledger/theory/data-machine.md` and `data-machine-cases.md`, and targeted recent handoffs/DONE entries.
 Reuse context already read. Refresh only evidence that the next decision depends on. Read live
 `v_schema_atlas` for affected tables and `v_job_health` when jobs matter. Check canonical ownership in the
@@ -44,7 +46,8 @@ from that evidence. Do not launch extra agents or paid inference for routine ins
 
 - Production is READ ONLY. Use `scripts/data/q.sh "select ..."` exactly, never `bash scripts/data/q.sh`.
   No INSERT, UPDATE, DELETE, DDL, writing function calls, raw-write markers, `psql`, Supabase CLI, or curl
-  to production. Keep the configured timeout; narrow a slow query rather than lengthening it.
+  to production. Keep each query at or under the role's 10-second statement timeout; narrow a slow
+  query rather than lengthening it.
 - Work inside existing capabilities: bounded local code/test/documentation repairs and PR preparation.
   Existing schema-description and owner/key/fold repair proposals may be prepared for review under the
   migration rules below. New tables, new writers, production changes, paid services/capacity, access
