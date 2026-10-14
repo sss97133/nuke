@@ -39,8 +39,11 @@
 --   mc26    77      57       57          0         20  (19 automobilia, 1 boat)
 --   lf26    65      61       61          0          4  (status upcoming: the sale is 31 Oct)
 --   vehicles under the prefixes: mo26 39 -> 193, mc26 0 -> 57, lf26 0 -> 61; under /auctions/ 1,230 -> 1,502.
---   Day one: 272 vehicles created; vehicle_events +309 (191 MO26: 154 created + 37 feed vehicles that had none, 57, 61);
---   timeline_events +217 auction_sold (168 MO26, 49 MC26). Day two on: 0 created; the four runs update 192, 57, 61, 192.
+--   Day one: 272 vehicles created; vehicle_events +310, all source_platform 'rm-sothebys' (192 MO26: 154 created + 37 feed
+--   vehicles that had none + the lot written on 2026-10-10, whose event sits under the old label 'rmsothebys'; 57; 61);
+--   timeline_events +218 auction_sold (169 MO26, 49 MC26). Day two on: 0 created; the four runs update 192, 57, 61, 192.
+--   (Replayed through the real handler against a fake database holding prod's 39 existing MO26 rows: 154 vehicles inserted,
+--   38 updated, 192 events inserted, 154 images, 169 timeline rows; then the three passes together give 272, 310, 218.)
 --   Of MO26's 192, 173 are sold (169 with a price, 4 price withheld by RM) and 19 unsold; MC26's 57: 50 sold (49 priced).
 --
 -- STOP RULE. Pause (select cron.alter_job(job_id := 450, active := false)) on any of, checked after each of the first two
@@ -55,9 +58,9 @@
 --        with v as materialized (select id from vehicles where listing_url >= 'https://rmsothebys.com/auctions/'
 --          and listing_url < 'https://rmsothebys.com/auctiont' and listing_url like 'https://rmsothebys.com/auctions/%')
 --        select count(*) from vehicle_events ve join v on v.id = ve.vehicle_id
---         where ve.source_platform = 'rmsothebys' and ve.event_status = 'sold' and ve.sold_at is null;     -- 0
---        (it is 1 today: the one lot the extractor wrote on 2026-10-10, before MO26 had a sale day; the first MO26 run
---        fills it, because a clock is filled when null.)
+--         where ve.source_platform = 'rm-sothebys' and ve.event_status = 'sold' and ve.sold_at is null;    -- 0
+--        (0 today over 1,145 events, 1.3 s. The one lot written on 2026-10-10, before MO26 had a sale day, has its event
+--        under the old label 'rmsothebys' with sold_at NULL; this job writes a correct one under 'rm-sothebys'.)
 --   4. a lot written twice: select count(*) from (select regexp_replace(listing_url, '/+$', '') from vehicles
 --        where listing_url >= 'https://rmsothebys.com/auctions/' and listing_url < 'https://rmsothebys.com/auctiont'
 --          and listing_url like 'https://rmsothebys.com/auctions/mo26/%' group by 1 having count(*) > 1) d;      -- 0
@@ -71,8 +74,11 @@
 -- One run is still owed after 2026-10-31: LF26's lots go from upcoming to sold or unsold at the sale. Run LF26 once more
 -- on 2026-11-01 (re-enable, or {"action":"process","auction":"LF26","save_to_db":true,"limit":200} by hand).
 --
--- NOT DECIDED HERE. The extractor writes vehicle_events.source_platform 'rmsothebys'; the 2,474 older RM events say
--- 'rm-sothebys' (20261007031500 left the spelling to the platform-entity decision). This run adds 309 rows under the first.
+-- DECIDED (lead, 2026-10-14). RM events are written as 'rm-sothebys', the observation_sources slug and the label of the 2,474
+-- older RM events (20261007031500 had left the spelling open); #1124 does it with one constant and a test, so this job lands
+-- nothing under 'rmsothebys'. One stale pair remains for a supersession: the event (sold, sold_at NULL) and the timeline row
+-- dated 2026-10-10, the extraction day, of the lot written on 2026-10-10. Ids are in ~/nuke-logs/intake-free-sources-20261014/
+-- rm-non-vehicle-ids.txt, with the 81 existing RM rows that lack a year or make and 42 more that RM itself lists as not vehicles.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
