@@ -1,4 +1,5 @@
--- Stub signatures of the 31 revoked functions and the 4 kept ones, as of 2026-10-14. Test fixture only.
+-- Stub signatures of the 33 revoked functions and the 4 kept ones, and the owner-run photo view, as of 2026-10-14.
+-- Test fixture only.
 CREATE FUNCTION public.backfill_photo_analysis(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.backfill_sold_vehicles_comprehensive() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.backfill_vehicle_data_from_bat_listings() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
@@ -34,3 +35,7 @@ CREATE FUNCTION public.confirm_photo_intent(uuid,text) RETURNS void LANGUAGE plp
 CREATE FUNCTION public.analyze_organization_data_signals(uuid) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.get_fleet_documented_investment() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.l4_get_review_needed(uuid,integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.get_county_vehicles(text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE TABLE public.photo_rows_stub (id int);
+CREATE VIEW public.user_organized_photos AS SELECT id FROM public.photo_rows_stub;

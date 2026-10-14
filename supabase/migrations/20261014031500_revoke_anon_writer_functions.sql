@@ -12,10 +12,17 @@
 --   get_fleet_documented_investment()           per-vehicle investment dollars, returned to anyone
 --   find_vehicles_near(...)                     year, make, model, sale price, image, city, state and distance for
 --                                               any vehicle with GPS, private ones included
--- This revokes EXECUTE from PUBLIC, anon and authenticated on 31 functions and grants it to service_role explicitly.
+-- And two that go around policies fixed today (found by the security review after #1107 and #1109 deployed):
+--   l4_get_review_needed(uuid, integer)         frames held for review, with URLs, for any vehicle id, private
+--                                               ones included, past #1107's row policy
+--   get_county_vehicles(text)                   no caller anywhere; after #1109 it times out for anon
+-- The view user_organized_photos runs as its owner (no security_invoker) and was selectable by any signed-in
+-- account, anonymous sign-ins included: every gated frame and every sensitive frame with GPS and EXIF. No caller;
+-- SELECT is revoked from anon and authenticated.
+-- This revokes EXECUTE from PUBLIC, anon and authenticated on 33 functions and grants it to service_role explicitly.
 -- Their callers keep working: edge functions analysis-engine-coordinator, process-bat-extraction-queue,
 -- sync-live-auctions and photo-pipeline-orchestrator use the service role; cron job photo-pipeline-reset-stuck runs as
--- postgres, the owner. No web or phone code calls any of the 31 (main, 2026-10-14; the web's find_vehicles_near_gps is
+-- postgres, the owner. No web or phone code calls any of the 33 or the view (main, 2026-10-14; the web's find_vehicles_near_gps is
 -- a different function and is already closed to anon).
 -- Kept, reviewed: register_make_model_subject (the phone, the web and universal-search call it),
 -- validate_data_room_access_code (a public form), confirm_photo_intent (checks the caller),
@@ -59,7 +66,9 @@ DECLARE
     'public.sync_bat_live_auction_status()',
     'public.sync_edge_secrets_to_db()',
     'public.get_fleet_documented_investment()',
-    'public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text)'
+    'public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text)',
+    'public.l4_get_review_needed(uuid,integer)',
+    'public.get_county_vehicles(text)'
   ];
   s text;
   done int := 0;
@@ -82,6 +91,15 @@ BEGIN
     RAISE EXCEPTION 'a revoked function is still executable by anon or authenticated, or lost the service role';
   END IF;
   RAISE NOTICE 'revoked anon and authenticated EXECUTE on % owner-run functions', done;
+
+  -- The owner-run view: no signed-in or anonymous reads.
+  IF to_regclass('public.user_organized_photos') IS NOT NULL THEN
+    REVOKE SELECT ON public.user_organized_photos FROM PUBLIC, anon, authenticated;
+    IF has_table_privilege('authenticated', 'public.user_organized_photos', 'SELECT')
+       OR has_table_privilege('anon', 'public.user_organized_photos', 'SELECT') THEN
+      RAISE EXCEPTION 'user_organized_photos is still selectable by anon or authenticated';
+    END IF;
+  END IF;
 END
 $revoke$;
 
