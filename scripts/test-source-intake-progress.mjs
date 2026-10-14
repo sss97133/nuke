@@ -72,6 +72,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
+      if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };
       if (name.endsWith('/normalizeVehicle.ts')) return { isGarbageMake: () => false };
       if (name.endsWith('/urlNormalization.ts')) return { extractCraigslistCanonicalUrls: () => [] };
       if (name.endsWith('/archiveFetch.ts')) return { archiveFetch: options.archive ?? (() => { throw new Error('unexpected acquisition'); }) };
