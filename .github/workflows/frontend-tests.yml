@@ -748,6 +748,30 @@ jobs:
       - name: Verify actual market migration and public current-lot contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_activity -f supabase/sql/test_market_lot_activity.sql
 
+  pipeline-pulse-memo-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable pipeline pulse database
+        run: createdb dm_refinement_pipeline_pulse_memo_ci
+      - name: Verify the pulse answers as before and reads counted days from memory
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pipeline_pulse_memo_ci -f supabase/sql/test_pipeline_pulse_memo.sql
+
   discovery-contract:
     runs-on: ubuntu-latest
     steps:
