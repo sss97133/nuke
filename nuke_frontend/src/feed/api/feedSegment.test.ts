@@ -26,7 +26,7 @@ function handler(segment: any, failure?: string) {
   const source = readFileSync(resolve(process.cwd(), '../supabase/functions/feed-query/index.ts'), 'utf8').replace(/^import .*$/gm, '');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
   runInNewContext(code, { Deno: { env: { get: () => '' }, serve: (fn: any) => { serve = fn; } },
-    createClient: () => db, corsHeaders: {}, Request, Response, console: { warn() {}, error() {} } });
+    createClient: () => db, corsHeaders: {}, projectSecretKey: () => '', Request, Response, console: { warn() {}, error() {} } });
   const request = (body: any) => serve(new Request('https://fixture.test/feed-query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
   return { request, reads };
 }

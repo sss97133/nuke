@@ -8,6 +8,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -53,13 +54,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      projectSecretKey()!
     );
 
     // Verify user from JWT
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      projectPublishableKey()!,
       { global: { headers: { Authorization: authHeader } } }
     );
     const { data: { user }, error: authError } = await userClient.auth.getUser();

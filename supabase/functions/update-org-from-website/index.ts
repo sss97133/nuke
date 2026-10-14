@@ -11,7 +11,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,12 +28,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Require service role key authentication
-    const authHeader = req.headers.get('Authorization');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
-    const token = authHeader?.replace('Bearer ', '') ?? '';
-    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+    // Require the service role, judged as writeGuard judges it (2026-10-14)
+    if (!(await isServiceCaller(req))) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -50,7 +47,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     // Get current organization

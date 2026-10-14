@@ -25,6 +25,7 @@
  *   SUPABASE_SERVICE_ROLE_KEY — Auto-set by Supabase runtime
  */
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -247,7 +248,7 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceRoleKey = projectSecretKey()!;
     const processAlertUrl = `${supabaseUrl}/functions/v1/process-alert-email`;
 
     let totalQueued = 0;
