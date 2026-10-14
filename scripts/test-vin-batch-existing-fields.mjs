@@ -42,6 +42,7 @@ function fixture(existing) {
     Deno: { serve(callback) { handler = callback; }, env: { get() { return 'synthetic-only'; } } },
     createClient: () => database,
     requireWriteAuth: async () => null,
+    projectSecretKey: () => 'synthetic-only',
     NHTSA_FIELD_MAP: fieldMap,
     decodeVinsBatch: async () => new Map([[record.vin, { DisplacementCC: '1984' }]]),
     console: { log() {}, error() {} }, Response,

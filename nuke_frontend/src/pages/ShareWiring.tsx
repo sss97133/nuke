@@ -24,6 +24,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { ManifestDevice } from '../components/wiring/overlayCompute';
+import { BUILD_MANIFEST_PUBLIC_COLUMNS } from '../lib/buildManifestColumns';
 import { deriveHarness, SUBSYSTEMS, type DerivationInput } from '../components/wiring/harnessDerivation';
 import { buildConnectorModels } from '../components/wiring/connector-inspector/buildConnectorModels';
 import { COLORWAYS, ColorwayContext, frame, rule, textOn } from '../components/wiring/connector-inspector/colorways';
@@ -58,7 +59,7 @@ export default function ShareWiring() {
       const [vehicleRes, manifestRes] = await Promise.all([
         supabase.from('vehicles').select('year, make, model, vin').eq('id', vehicleId).maybeSingle(),
         supabase.from('vehicle_build_manifest')
-          .select('*')
+          .select(BUILD_MANIFEST_PUBLIC_COLUMNS)
           .eq('vehicle_id', vehicleId)
           .order('device_category')
           .order('device_name'),
