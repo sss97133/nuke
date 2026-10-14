@@ -82,6 +82,32 @@ jobs:
       - name: Verify market_pulse_live names its 17 row slots in order
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
 
+  reland-capture-relay-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable re-land database
+        run: createdb dm_refinement_reland_ci
+      - name: Verify the stranded-frame writer lands the phone row shape, idempotent by path
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_reland_ci -f supabase/sql/test_reland_capture_relay.sql
+      - name: Verify the re-land helpers
+        run: node --test scripts/photos/relandFrame.test.mjs
+
   market-pulse-live-heat-contract:
     runs-on: ubuntu-latest
     services:
