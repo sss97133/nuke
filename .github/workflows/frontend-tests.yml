@@ -1587,6 +1587,30 @@ jobs:
       - name: Verify strangers no longer read rejected or held frames, owners keep theirs
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_gate_ci -f supabase/sql/test_vehicle_images_public_policy_gate.sql
 
+  owner-view-writes-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable owner-view writes database
+        run: createdb dm_refinement_owner_views_ci
+      - name: Verify writes through owner-run views are denied to anon and authenticated, reads unchanged
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_owner_views_ci -f supabase/sql/test_owner_view_writes_revoked.sql
+
   vehicle-observations-keyed-indexes-contract:
     runs-on: ubuntu-latest
     services:
