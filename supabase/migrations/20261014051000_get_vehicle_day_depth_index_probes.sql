@@ -24,6 +24,7 @@
 -- Return shape, SECURITY DEFINER, STABLE, search_path and grants are as they were. No table, policy, row or cron change.
 -- Source guard: replaced only from the 2026-10-14 definition (md5 below); a re-run is a no-op.
 -- Contract: supabase/sql/test_get_vehicle_day_depth_perf.sql (CI job get-vehicle-day-depth-contract).
+-- definer-grants: default reviewed get_vehicle_day_depth: an existing public reader of the vehicle profile; CREATE OR REPLACE keeps its grants (anon, authenticated, service_role) and none are changed here
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
