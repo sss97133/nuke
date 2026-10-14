@@ -519,6 +519,30 @@ jobs:
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
 
+  county-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable county readers database
+        run: createdb dm_refinement_county_readers_ci
+      - name: Verify the county readers answer with public vehicles only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_readers_ci -f supabase/sql/test_county_readers_public_only.sql
+
   market-lot-activity-contract:
     runs-on: ubuntu-latest
     services:
