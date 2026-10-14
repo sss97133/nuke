@@ -53,16 +53,28 @@ interface DrillLevel {
 // DATA HOOKS
 // ────────────────────────────────────────────────────────────
 
+// The brand read is 94 KB and the map mounts twice on a market-tab load (the home branch first, then the embedded
+// one once the tab resolves), so one load fetched it twice (measured 2026-10-13, every logged-out capture). One
+// promise per page lifetime; a failed read is forgotten so the next mount retries.
+let brandsRead: Promise<TreemapNode[] | null> | null = null;
+function readTreemapBrands(): Promise<TreemapNode[] | null> {
+  if (!brandsRead) {
+    brandsRead = supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
+      if (error || !result) { brandsRead = null; return null; }
+      return result as TreemapNode[];
+    }, () => { brandsRead = null; return null; });
+  }
+  return brandsRead;
+}
+
 function useTreemapBrands() {
   const [data, setData] = useState<TreemapNode[] | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
     if (typeof (supabase as any)?.rpc !== 'function' || typeof (supabase as any)?.from !== 'function') return;
-    supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
-      if (!cancelled && result && !error) {
-        setData(result as TreemapNode[]);
-      }
+    readTreemapBrands().then((result) => {
+      if (!cancelled && result) setData(result);
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
