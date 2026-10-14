@@ -304,6 +304,30 @@ jobs:
       - name: Verify the build manifest carries money and contacts only to owners
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_manifest_money_ci -f supabase/sql/test_build_manifest_money_owner_only.sql
 
+  custom-circuits-build-state-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable build state database
+        run: createdb dm_refinement_build_state_ci
+      - name: Verify owner-only build state writes and read-only public grants
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_build_state_ci -f supabase/sql/test_custom_circuits_build_state_owner_only.sql
+
   k5-harness-rsi-pass1-contract:
     runs-on: ubuntu-latest
     services:
