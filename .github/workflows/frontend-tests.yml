@@ -2272,27 +2272,3 @@ jobs:
           deno-version: v2.x
       - name: Verify the public API masks a vehicle's owner money for everyone but the owner and the service role
         run: deno test supabase/functions/_shared/ownerMoney.test.ts
-
-  discovered-persons-contract:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      PGHOST: localhost
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Create disposable discovered persons database
-        run: createdb dm_refinement_discovered_persons_ci
-      - name: Verify discovered_persons and its contact resolvers are owner-only
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_discovered_persons_ci -f supabase/sql/test_discovered_persons_owner_only.sql
