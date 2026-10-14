@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
+import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, VEHICLE_OWNER_PII_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
 import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
 import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns';
 
@@ -11,7 +11,7 @@ import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns'
 // or returns every column after a write fails for every visitor. This scans the web's source for
 // such reads so a new one fails CI instead of the page.
 const PRIVATE: Record<string, readonly string[]> = {
-  vehicles: VEHICLE_PRIVATE_COLUMNS,
+  vehicles: [...VEHICLE_PRIVATE_COLUMNS, ...VEHICLE_OWNER_PII_COLUMNS],
   organization_vehicles: ORGANIZATION_VEHICLE_PRIVATE_COLUMNS,
 };
 const FILTERS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'containedBy',

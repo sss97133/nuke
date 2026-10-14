@@ -10,6 +10,12 @@ import { supabase } from './supabase';
 export const ORGANIZATION_VEHICLE_PRIVATE_COLUMNS = ['cost_basis', 'sale_price', 'asking_price', 'internal_notes'] as const;
 export const VEHICLE_PRIVATE_COLUMNS = ['purchase_price', 'purchase_date', 'purchase_location'] as const;
 
+// A third party's name and contact on a vehicle are personal details, never public. They are not granted to
+// anon or authenticated (migration 20261014160500_owner_contact_columns_owner_only), the same column grant as the
+// money above; the whole-row readers vehicle_row_read and get_vehicle_profile_data null them for every non-owner.
+// Kept apart from the money so each list reads true, and scanned by privateMoney.test.ts the same way.
+export const VEHICLE_OWNER_PII_COLUMNS = ['owner_name', 'owner_contact'] as const;
+
 export interface OrganizationVehicleBook {
   id: string;
   vehicle_id: string;
