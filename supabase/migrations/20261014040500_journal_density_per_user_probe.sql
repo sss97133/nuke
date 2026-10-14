@@ -3,12 +3,12 @@
 -- 20261014013500 (#1106, applied 03:51Z) made the journal's day index count every approved owner photo by the
 -- day it was taken. Its filter (taken_at in the last 90 days, gate approved, not a listing import) has no index
 -- that leads with taken_at, so the planner walked all of idx_vehicle_images_user_taken_at (vehicle_images: 52.5M
--- rows, 49 GB heap): over 60 s measured 03:55Z, so /api/journal would time out. The old view was fast only because
+-- rows, 49 GB heap): over 60 s measured 03:53Z, so /api/journal would time out. The old view was fast only because
 -- it counted a single source label and returned zeros.
 --
 -- Now the photo rows come from one index probe per user (public.profiles: 19 rows, every auth user has one),
 -- fenced with OFFSET 0 so the planner cannot flatten the probes into a full index walk: 1.1 s cold for all users,
--- measured 03:58Z (29 approved owner photos over 15 days in the window). A photo with no user is not shop work
+-- measured 03:54Z (29 approved owner photos over 15 days in the window). A photo with no user is not shop work
 -- documented by anyone and does not count. Columns, meaning and grants are unchanged.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
