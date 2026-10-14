@@ -328,12 +328,24 @@ struct ActorVehiclesView: View {
 /// door to the actor. An auction house is where the vehicle sold, not who sold it: "Sold on".
 struct VehicleActorLinks: View {
     let vehicleId: String
-    struct Link: Hashable { let route: ActorRoute; let line: String }
+    struct Link: Hashable { let route: ActorRoute; let line: String; var venue: Bool = false }
     @State private var links: [Link] = []
 
-    static func line(roles: [String], type: String?) -> String {
-        let venue = ["auction_house", "platform", "marketplace"].contains(type ?? "")
-        if venue, roles.contains("sold_by"), roles.allSatisfy({ $0 == "sold_by" }) { return "Sold on" }
+    /// A platform is where a vehicle was listed, never its seller, consigner or shop, whatever role the record
+    /// gives it: the record names Bring a Trailer consigner on 93,473 vehicles and Facebook Marketplace (typed
+    /// "collection") consigner on 91,870 (review 2026-10-14). Types first; a short list of platform names covers
+    /// rows typed wrong until the data lane corrects them.
+    static let venueTypes: Set<String> = ["auction_house", "platform", "marketplace"]
+    static let venueNames: Set<String> = ["bring a trailer", "facebook marketplace", "cars & bids", "carsandbids", "ebay motors",
+                                          "ebay", "craigslist", "hemmings", "pcarmarket", "collecting cars", "hagerty marketplace",
+                                          "classiccars.com", "autotrader", "mecum", "mecum auctions", "barrett-jackson",
+                                          "rm sotheby's", "gooding & company", "bonhams"]
+    static func isVenue(type: String?, name: String?) -> Bool {
+        venueTypes.contains(type ?? "") || venueNames.contains((name ?? "").trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
+    static func line(roles: [String], type: String?, name: String? = nil) -> String {
+        if isVenue(type: type, name: name) { return roles.contains("sold_by") ? "Sold on" : "Listed on" }
         let order: [(String, String)] = [("sold_by", "sold"), ("consigner", "consigned"), ("owner", "owned"), ("service_provider", "serviced")]
         let words = order.filter { roles.contains($0.0) }.map(\.1)
         guard !words.isEmpty else { return "Linked to" }
@@ -345,18 +357,27 @@ struct VehicleActorLinks: View {
         if !links.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(links, id: \.self) { link in
-                    NavigationLink {
-                        ActorProfileView(route: link.route)
-                    } label: {
+                    if link.venue {
+                        // A venue is where it was listed: stated, not a door to a dealer's measures.
                         HStack(spacing: 6) {
                             Text(link.line).font(.caption).foregroundStyle(.secondary)
-                            Text(link.route.name ?? "an organization").font(.subheadline.weight(.semibold)).lineLimit(1)
+                            Text(link.route.name ?? "a platform").font(.subheadline).lineLimit(1)
                             Spacer()
-                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                         }
-                        .contentShape(Rectangle())
+                    } else {
+                        NavigationLink {
+                            ActorProfileView(route: link.route)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(link.line).font(.caption).foregroundStyle(.secondary)
+                                Text(link.route.name ?? "an organization").font(.subheadline.weight(.semibold)).lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(14)
@@ -397,12 +418,13 @@ struct VehicleActorLinks: View {
             // Sellers and consigners first, then owners, then shops; private organizations stay out.
             // Who sold or consigned it first, then owners, then the venue it sold on, then shops.
             let rank: (Link) -> Int = { l in
-                l.line == "Sold on" ? 2 : l.line.hasPrefix("Sold") || l.line.hasPrefix("Consigned") ? 0 : l.line.hasPrefix("Owned") ? 1 : 3
+                l.venue ? 2 : l.line.hasPrefix("Sold") || l.line.hasPrefix("Consigned") ? 0 : l.line.hasPrefix("Owned") ? 1 : 3
             }
             links = roles.compactMap { id, rs in
                 guard let org = byId[id] else { return nil }
                 return Link(route: ActorRoute(kind: "organization", id: id, name: org.business_name),
-                            line: Self.line(roles: rs, type: org.business_type))
+                            line: Self.line(roles: rs, type: org.business_type, name: org.business_name),
+                            venue: Self.isVenue(type: org.business_type, name: org.business_name))
             }
             .sorted { (rank($0), $0.route.name ?? "") < (rank($1), $1.route.name ?? "") }
         } catch {

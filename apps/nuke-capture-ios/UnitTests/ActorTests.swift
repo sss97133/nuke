@@ -60,6 +60,12 @@ final class ActorTests: XCTestCase {
     func testAVehiclesOrganizationsReadAsOneRowEachWithTheVenueSaid() {
         XCTAssertEqual(VehicleActorLinks.line(roles: ["sold_by", "consigner"], type: "dealer"), "Sold and consigned by")
         XCTAssertEqual(VehicleActorLinks.line(roles: ["sold_by"], type: "auction_house"), "Sold on")
+        // A platform is the venue whatever role the record gives it, and a platform typed wrong is caught by name.
+        XCTAssertEqual(VehicleActorLinks.line(roles: ["consigner"], type: "auction_house", name: "Bring a Trailer"), "Listed on")
+        XCTAssertEqual(VehicleActorLinks.line(roles: ["service_provider"], type: "auction_house"), "Listed on")
+        XCTAssertEqual(VehicleActorLinks.line(roles: ["consigner"], type: "collection", name: "Facebook Marketplace"), "Listed on")
+        XCTAssertTrue(VehicleActorLinks.isVenue(type: "collection", name: " Facebook Marketplace "))
+        XCTAssertFalse(VehicleActorLinks.isVenue(type: "dealer", name: "Viva! Las Vegas Autos"))
         XCTAssertEqual(VehicleActorLinks.line(roles: ["owner"], type: "dealer"), "Owned by")
         XCTAssertEqual(VehicleActorLinks.line(roles: ["service_provider"], type: "shop"), "Serviced by")
     }
