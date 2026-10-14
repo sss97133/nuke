@@ -1996,7 +1996,7 @@ test on a disposable PG17. (2) The phone renders measures and tables through the
 search, from a vehicle's seller or owner link and from the map. (3) The same read for a person (garage, work,
 disclosure), then the per-ZIP aggregate for the map.
 
-### 13.12 The wiring harness as a stack (owner, 2026-10-14 05:40Z)
+### 13.12 The wiring harness as a stack (owner, 2026-10-14)
 
 **Owner direction, in substance.** Each vehicle has its own extensive data model with its unique data, queried with
 SQL in Postgres: "a series of tables and descriptions, that's how we're supposed to be storing an entire wiring
@@ -2085,7 +2085,7 @@ diff against today's file is the audit. (3) Port the checks to SQL (H2) and the 
 (4) Load the factory generation as the first baseline (H5) and one more build as the first cohort member. (5) The
 harness stack page, rendered from rows, coverage first, every number a door.
 
-#### 13.12.1 RSI pass on 13.12, and step 1: the VEC map (lead, 2026-10-14 06:30Z)
+#### 13.12.1 RSI pass on 13.12, and step 1: the VEC map (lead, 2026-10-14)
 
 The owner left the judgment to the machine ("it's up to you, that's why we're supposed to be doing RSI"). The lead
 re-read 13.12 against the theory card, VEC's class model and the live rows, and found nine faults in its own draft.
@@ -2171,6 +2171,7 @@ Until then it is untestable and says so.
 | (Nuke) policy rows | limits as versioned data | `wiring_policy_rules` | 0 rows |
 | (Nuke) baseline | the factory harness | `factory_harness_circuits` | 71 factory rows mixed with 60 build rows |
 
-**Next (step 2 begins).** Four missing grains go to `schema_proposals` before any table: signal, net, segment
-(wire element occurrence) and topology (node, segment, routing), plus `Mating` as a relation between plug rows. Then
+**Next (step 2 begins).** Filed as `schema_proposals` 006d44ec (add_table, open, 2026-10-14 05:21Z): signal, net,
+segment (wire element occurrence), topology node and routing, with landmarks extended into topology branches,
+`Mating` as a key between plug rows, and variant links reaching segments and wire ends. A curator approves it. Then
 #110 is re-ingested end to end from its own citations as the first case (H1), with its diff against today's rows.
