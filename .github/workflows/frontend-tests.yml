@@ -1270,6 +1270,8 @@ jobs:
           deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
+      - name: Verify RM Sotheby's writes only vehicles, reads each lot once, finds a vehicle before writing it again, and calls an unheld lot upcoming
+        run: deno test supabase/functions/extract-rmsothebys/
 
   my-unorganized-photo-count-contract:
     runs-on: ubuntu-latest
