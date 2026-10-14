@@ -328,6 +328,30 @@ jobs:
       - name: Verify design state, options, protection, keys, evidence and self-measurement
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi1_ci -f supabase/sql/test_k5_harness_rsi_pass1.sql
 
+  k5-harness-rsi-pass2-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable RSI pass 2 database
+        run: createdb dm_refinement_k5_rsi2_ci
+      - name: Verify the cited cavity models and the cavity and housing keys
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi2_ci -f supabase/sql/test_k5_harness_rsi_pass2.sql
+
   k5-harness-reshape-contract:
     runs-on: ubuntu-latest
     services:
