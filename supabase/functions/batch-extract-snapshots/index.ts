@@ -21,6 +21,11 @@
  * that runs: the response counts regex_empty rows and ai_blocked calls, and a regex-empty queue row ends with status
  * 'regex_empty' rather than 'completed'. no_ai with mode "ai" or a platform that has no regex parser is a 400.
  *
+ * Two database refusals no longer fail a row (writeRules.ts): a parsed sale_price is written only to a vehicle already marked
+ * sold (guard_vehicle_sale_price refuses any other, and refused the whole update with it), and a VIN already on another
+ * vehicle is dropped from the update (enforce_vin_uniqueness, which the old retry did not recognize). The response counts
+ * sale_price_withheld and vin_conflicts.
+ *
  * Queue mode: a claimed row whose vehicle no longer exists ends with status 'no_vehicle'. It used to stay 'processing',
  * come back to 'pending' after 5 minutes and be claimed first again (the claim orders by vehicle_id): measured
  * 2026-10-14, 43% of the first 2,000 pending Barrett-Jackson rows and all 127 Bonhams rows have no vehicle.
@@ -34,6 +39,7 @@ import { drainBatSaleQueue } from "./batSaleQueue.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
 import { orphanVehicleIds } from "./queueRows.ts";
+import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,7 +93,7 @@ Deno.serve(async (req) => {
     const gate = makeAiGate(noAi, parseWithAI);
     console.log(`[batch-extract] v2 batch=${batchSize} platform=${platform} mode=${mode} dry=${dryRun} offset=${offset} force=${force} queue=${useQueue} no_ai=${noAi}`);
 
-    const selectFields = `id, year, make, model, trim, vin, mileage, horsepower, torque, engine_type, engine_displacement, transmission, drivetrain, body_style, color, color_primary, interior_color, description, sale_price, bat_auction_url, discovery_url, listing_url, extractor_version`;
+    const selectFields = `id, year, make, model, trim, vin, mileage, horsepower, torque, engine_type, engine_displacement, transmission, drivetrain, body_style, color, color_primary, interior_color, description, sale_price, sale_status, auction_outcome, bat_auction_url, discovery_url, listing_url, extractor_version`;
 
     let vehicles: any[] = [];
     let queueItems: { vehicle_id: string; snapshot_url: string }[] = [];
@@ -214,6 +220,8 @@ Deno.serve(async (req) => {
     let noSnapshot = 0;
     let errors = 0;
     let fieldsTotal = 0;
+    let salePriceWithheld = 0; // parsed prices not written because the vehicle is not marked sold (writeRules.ts)
+    let vinConflicts = 0; // parsed VINs not written because another vehicle already holds them (writeRules.ts)
     const sampleResults: any[] = [];
 
     // Helper: read HTML from Supabase Storage when inline html is null
@@ -407,6 +415,12 @@ Deno.serve(async (req) => {
           const existingEmpty = existing === null || existing === undefined || String(existing).trim() === "";
 
           if (existingEmpty) {
+            // The database refuses a price on a vehicle that is not marked sold and fails the whole row with it.
+            // A price alone is not a sale: leave it unwritten and count it (the snapshot is kept; it can be read again).
+            if (dbField === "sale_price" && !salePriceWritable(vehicle)) {
+              salePriceWithheld++;
+              continue;
+            }
             updatePayload[dbField] = newVal;
             fieldsUpdated.push(dbField);
           } else if (force) {
@@ -456,8 +470,9 @@ Deno.serve(async (req) => {
             .update(updatePayload)
             .eq("id", vehicle.id);
 
-          // If VIN unique constraint fails, retry without VIN
-          if (uErr?.message?.includes("unique constraint") && updatePayload.vin) {
+          // If the VIN is already on another vehicle (the unique index, or enforce_vin_uniqueness), retry without it
+          if (isUniqueViolation(uErr) && updatePayload.vin) {
+            vinConflicts++;
             delete updatePayload.vin;
             const vinIdx = fieldsUpdated.indexOf("vin");
             if (vinIdx >= 0) fieldsUpdated.splice(vinIdx, 1);
@@ -562,6 +577,8 @@ Deno.serve(async (req) => {
       extracted,
       skipped,
       no_snapshot: noSnapshot,
+      sale_price_withheld: salePriceWithheld,
+      vin_conflicts: vinConflicts,
       errors,
       fields_filled: fieldsTotal,
       sample_results: sampleResults,
