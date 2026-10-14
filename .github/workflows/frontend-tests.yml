@@ -669,6 +669,30 @@ jobs:
       - name: Verify unknown estimates, genuine zero and existing reader access
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_delta_ci -f supabase/sql/test_market_value_delta_unknown.sql
 
+  vehicle-images-policy-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable image policy contract database
+        run: createdb dm_refinement_image_gate_ci
+      - name: Verify strangers no longer read rejected or held frames, owners keep theirs
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_gate_ci -f supabase/sql/test_vehicle_images_public_policy_gate.sql
+
   valuation-source-sale-contract:
     runs-on: ubuntu-latest
     services:
