@@ -747,6 +747,30 @@ jobs:
       - name: Verify extraction_metadata's write policy is service_role only (anon wrote and deleted rows before; anon and authenticated refused after while still reading; service_role writes; describe clause rewritten; re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_extraction_metadata_ci -f supabase/sql/test_extraction_metadata_write_policy.sql
 
+  vehicles-priced-sales-indexes-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_priced_sales_ci
+      - name: Verify the partial indexes serve the price-history statement and change no answer
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_priced_sales_ci -f supabase/sql/test_vehicles_priced_sales_indexes.sql
+
   image-projection:
     runs-on: ubuntu-latest
     services:
