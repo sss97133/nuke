@@ -604,7 +604,7 @@ struct VehicleDetailView: View {
                     if mapContext != nil {
                         Color.clear.frame(height: condensedBarHeight)
                         loadState
-                        if let raw = vehicle?.primary_image_url, !raw.isEmpty {
+                        if let raw = firstPaintURL, !raw.isEmpty {
                             CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: { Color(uiColor: .secondarySystemFill) }
@@ -710,14 +710,34 @@ struct VehicleDetailView: View {
     // we only transform its rendered output.
     // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
     // profile paints first (loadVehicleData.ts, "Initialize leadImageUrl from primary_image_url")
-    // before selectBestHeroImage replaces it with a screened frame. It is reached only when no
-    // admitted frame exists. Measured 2026-10-13 on 300 public vehicles with a primary_image_url:
-    // 36 had no admitted frame at all, and 69 had a primary_image_url with no vehicle_images row
-    // behind it (a listing URL written straight onto the vehicle). Keep it beside the web's rule,
-    // and move both onto a lead in the document when the read grows its gallery section.
+    // before selectBestHeroImage replaces it with a screened frame, under the web's two guards:
+    // not an import-queue or organization-logo path, and not a storage path that names another
+    // vehicle (imageFilterUtils.ts isMismatchedVehicleImage). It is reached only when no admitted
+    // frame exists. Measured 2026-10-13 on 300 public vehicles with a primary_image_url: 36 had no
+    // admitted frame at all, and 69 had a primary_image_url with no vehicle_images row behind it.
+    // Move both onto a lead in the document when the read grows its gallery section.
+    private var firstPaintURL: String? {
+        guard let raw = vehicle?.primary_image_url?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        let lower = raw.lowercased()
+        if lower.contains("import_queue") || lower.contains("organization-logos/") || lower.contains("organization_logos/") { return nil }
+        if Self.namesAnotherVehicle(raw, expected: vehicleId) { return nil }
+        return raw
+    }
+    /// The web's isMismatchedVehicleImage: a storage path under vehicle-images/vehicles/<uuid>/ or
+    /// vehicle-images/<uuid>/ that names a different vehicle is not this vehicle's picture.
+    static func namesAnotherVehicle(_ url: String, expected: String) -> Bool {
+        let target = expected.lowercased()
+        guard !target.isEmpty else { return false }
+        let path = url.range(of: "/vehicle-images/").map { String(url[$0.upperBound...]) } ?? url
+        let parts = path.split(separator: "?")[0].split(separator: "/").map(String.init).filter { !$0.isEmpty }
+        guard let first = parts.first else { return false }
+        let candidate: String? = (first == "vehicles" && parts.count > 1 && UUID(uuidString: parts[1]) != nil) ? parts[1]
+            : (UUID(uuidString: first) != nil ? first : nil)
+        return candidate.map { $0.lowercased() != target } ?? false
+    }
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
-            imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
+            imageURL: heroImage?.image_url ?? firstPaintURL,
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
             takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
@@ -1129,7 +1149,7 @@ struct VehicleDetailView: View {
     @MainActor private func buildShareCard() async -> UIImage? {
         // Match the on-screen hero (latest frame), not the drift-prone primary_image_url,
         // so the shared card shows the build's current state.
-        let heroURL = NukeImage.thumb(heroImage?.image_url ?? vehicle?.primary_image_url, width: 1200)
+        let heroURL = NukeImage.thumb(heroImage?.image_url ?? firstPaintURL, width: 1200)
         let hero = heroURL == nil ? nil : await RemoteImageCache.shared.image(heroURL!)
         var strip: [UIImage] = []
         for img in images where strip.count < 3 {
@@ -1159,7 +1179,7 @@ struct VehicleDetailView: View {
     private var galleryURLs: [String] {
         let urls = images.compactMap { $0.image_url }
         if !urls.isEmpty { return urls }
-        if let primary = vehicle?.primary_image_url { return [primary] }
+        if let primary = firstPaintURL { return [primary] }
         return []
     }
 
