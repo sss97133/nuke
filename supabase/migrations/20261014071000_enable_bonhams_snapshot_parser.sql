@@ -17,6 +17,13 @@
 -- vehicles need extraction" and leave all 50 in 'processing', to be re-claimed every 5 minutes for ever (the livelock #1127
 -- fixes). Check the deploy first: the deployed source (Supabase get_edge_function batch-extract-snapshots) must contain aiGate.ts.
 --
+-- VAULT. The command authenticates with get_service_role_key_for_cron(), which reads the key from public._app_secrets. The leaked
+-- service-role key is being turned off and the vault given the new one. Until the vault holds a key the functions accept,
+-- every run of this job is refused with 401 by requireWriteAuth and lands nothing. Check before merging, read-only (Logs
+-- Explorer, last 2 hours): job 419 poll-listing-feeds runs every 15 minutes through the same function and must show only 200s.
+--   select log_attributes['response.status_code'] as status, count(*) from logs where source = 'function_edge_logs'
+--     and log_attributes['request.pathname'] = '/functions/v1/poll-listing-feeds' group by 1;     -- 200 only, no 401
+--
 -- BOUND. 12 runs an hour, at most 50 rows each, 127 rows in all; nothing is read from the bucket because no row has a vehicle.
 -- No Firecrawl, no AI, no other host.
 --
