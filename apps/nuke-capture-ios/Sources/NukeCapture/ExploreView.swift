@@ -529,7 +529,7 @@ struct ExploreView: View {
             guard res.success else { throw URLError(.badServerResponse) }
             // Actors the door matched by name lead the results: an organization opens its measures,
             // a person their profile. Vehicles follow in the grid.
-            actorHits = res.results.filter { $0.type == "organization" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
+            actorHits = res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
             let rows = Self.photosFirst(res.results.compactMap(\.headerRow))
             results = rows
             loadMoreError = nil
@@ -628,7 +628,7 @@ struct ExploreView: View {
             ForEach(actorHits) { hit in
                 Group {
                     if let route = hit.actorRoute {
-                        NavigationLink { ActorProfileView(route: route) } label: { actorRow(hit, icon: "building.2") }
+                        NavigationLink { ActorProfileView(route: route) } label: { actorRow(hit, icon: route.kind == "identity" ? "person.crop.circle" : "building.2") }
                     } else {
                         NavigationLink { ProfileView(userId: hit.id.lowercased(), isOwn: false) } label: { actorRow(hit, icon: "person") }
                     }

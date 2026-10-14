@@ -46,6 +46,17 @@ final class ActorTests: XCTestCase {
         if case .unknown = read.sections[4] {} else { XCTFail("an unknown section decodes as unknown") }
     }
 
+    func testAMarketParticipantReadsAsAnIdentity() throws {
+        let subject = try JSONDecoder().decode(ActorSubject.self, from: Data(#"{"kind":"identity","id":"a6f5b702-7611-42b7-befd-f91175a5244e","name":"VivaLasVegasAutos","type":"bat","place":null,"zip":null,"handle":"VivaLasVegasAutos"}"#.utf8))
+        XCTAssertEqual(subject.typeLabel, "Bring a Trailer member @VivaLasVegasAutos")
+        // The door's identity hit id is "external_<uuid>"; the route carries the bare id and the identity kind.
+        let hit = try JSONDecoder().decode(UniversalSearchHit.self, from: Data(#"{"id":"external_a6f5b702-7611-42b7-befd-f91175a5244e","type":"external_identity","title":"VivaLasVegasAutos","subtitle":"bat @VivaLasVegasAutos"}"#.utf8))
+        XCTAssertEqual(hit.actorRoute, ActorRoute(kind: "identity", id: "a6f5b702-7611-42b7-befd-f91175a5244e", name: "VivaLasVegasAutos"))
+        let org = try JSONDecoder().decode(UniversalSearchHit.self, from: Data(#"{"id":"C433D27E-2159-4F8C-B4AE-32A5E44A77CF","type":"organization","title":"Viva! Las Vegas Autos"}"#.utf8))
+        XCTAssertEqual(org.actorRoute?.kind, "organization")
+        XCTAssertEqual(org.actorRoute?.id, "c433d27e-2159-4f8c-b4ae-32a5e44a77cf")
+    }
+
     func testAVehiclesOrganizationsReadAsOneRowEachWithTheVenueSaid() {
         XCTAssertEqual(VehicleActorLinks.line(roles: ["sold_by", "consigner"], type: "dealer"), "Sold and consigned by")
         XCTAssertEqual(VehicleActorLinks.line(roles: ["sold_by"], type: "auction_house"), "Sold on")

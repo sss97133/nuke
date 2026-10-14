@@ -19,9 +19,19 @@ struct ActorSubject: Decodable, Hashable {
     let type: String?
     let place: String?
     let zip: String?
+    /// An identity's handle on its platform (identity kind only).
+    let handle: String?
 
     var typeLabel: String? {
         guard let type, !type.isEmpty else { return nil }
+        if kind == "identity" {
+            switch type {
+            case "bat": return "Bring a Trailer member" + (handle.map { " @\($0)" } ?? "")
+            case "cars_and_bids", "carsandbids": return "Cars & Bids member"
+            case "pcarmarket": return "PCARMARKET member"
+            default: return type.replacingOccurrences(of: "_", with: " ").capitalized + " member"
+            }
+        }
         switch type {
         case "dealer", "dealership": return "Dealer"
         case "auction_house": return "Auction house"
@@ -360,6 +370,18 @@ struct VehicleActorLinks: View {
     private func load() async {
         struct Row: Decodable { let organization_id: String; let relationship_type: String }
         struct Org: Decodable { let id: String; let business_name: String?; let business_type: String? }
+        struct Seller: Decodable { let bat_seller: String? }
+        struct Identity: Decodable { let id: String; let handle: String }
+        // The Bring a Trailer seller handle, as an identity whose measures open from here.
+        var sellerLink: Link?
+        if let seller: [Seller] = try? await SupabaseService.client.from("vehicles").select("bat_seller").eq("id", value: vehicleId).limit(1).execute().value,
+           let handle = seller.first?.bat_seller, !handle.isEmpty,
+           let ids: [Identity] = try? await SupabaseService.client.from("external_identities").select("id,handle")
+               .eq("platform", value: "bat").eq("handle", value: handle).limit(1).execute().value,
+           let identity = ids.first {
+            sellerLink = Link(route: ActorRoute(kind: "identity", id: identity.id, name: "@" + identity.handle), line: "Listed on Bring a Trailer by")
+        }
+        defer { if let sellerLink, !links.contains(sellerLink) { links.insert(sellerLink, at: 0) } }
         do {
             let rows: [Row] = try await SupabaseService.client.from("organization_vehicles")
                 .select("organization_id,relationship_type").eq("vehicle_id", value: vehicleId)
