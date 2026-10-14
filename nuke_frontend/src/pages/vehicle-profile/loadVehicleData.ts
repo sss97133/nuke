@@ -331,6 +331,18 @@ export interface LoadVehicleParams {
   setAuctionPulse: (pulse: any) => void;
 }
 
+/**
+ * The observation total the profile shows ("N in the record"). The profile RPC carries it in stats; its timeout fallback
+ * and a VIN-keyed load read the vehicle row instead, which holds the same maintained total (vehicles.observation_count).
+ * Either is a number the page can use as it stands; only when neither exists does the page count the rows itself, and
+ * that exact count runs the row policy over every observation of the vehicle (measured 2026-10-14: K5 mean 6.2 s).
+ */
+export function observationTotal(fromRpc: number | null, row: unknown): number | null {
+  if (typeof fromRpc === 'number') return fromRpc;
+  const column = (row as { observation_count?: unknown } | null | undefined)?.observation_count;
+  return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
+}
+
 export async function loadVehicleImpl({
   vehicleId,
   session,
@@ -531,6 +543,8 @@ export async function loadVehicleImpl({
       }
 
     }
+
+    rpcLoaded.observationCount = observationTotal(rpcLoaded.observationCount, vehicleData);
 
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {
