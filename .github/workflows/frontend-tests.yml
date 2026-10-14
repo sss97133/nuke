@@ -615,6 +615,30 @@ jobs:
       - name: Verify actual market migration and public current-lot contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_activity -f supabase/sql/test_market_lot_activity.sql
 
+  vehicle-image-gallery-eligible-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable gallery eligibility database
+        run: createdb dm_refinement_gallery_eligible_ci
+      - name: Verify the inlinable gallery predicate answers as the live one did, row for row
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gallery_eligible_ci -f supabase/sql/test_vehicle_image_gallery_eligible_inline.sql
+
   discovery-contract:
     runs-on: ubuntu-latest
     steps:
