@@ -40,8 +40,13 @@ struct UniversalSearchHit: Decodable, Identifiable {
 
     /// An organization hit as a door to its actor document.
     var actorRoute: ActorRoute? {
-        guard type == "organization", UUID(uuidString: id) != nil else { return nil }
-        return ActorRoute(kind: "organization", id: id.lowercased(), name: title)
+        if type == "organization", UUID(uuidString: id) != nil { return ActorRoute(kind: "organization", id: id.lowercased(), name: title) }
+        // A market participant: the door sends "external_<uuid>" (the web routes it to /profile/external/<uuid>).
+        if type == "external_identity", id.hasPrefix("external_") {
+            let raw = String(id.dropFirst("external_".count))
+            if UUID(uuidString: raw) != nil { return ActorRoute(kind: "identity", id: raw.lowercased(), name: title) }
+        }
+        return nil
     }
 
     /// The grid's row, from the door's vehicle hit. Trim is not in the hit; the detail page reads it.
@@ -86,5 +91,5 @@ enum UniversalSearch {
         )
     }
     /// Page one also asks for the actors the door matches by name (organizations and people, first page only).
-    static let firstPageTypes = ["vehicle", "organization", "user"]
+    static let firstPageTypes = ["vehicle", "organization", "user", "external_identity"]
 }
