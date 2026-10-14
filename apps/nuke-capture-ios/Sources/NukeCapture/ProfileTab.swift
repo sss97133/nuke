@@ -178,7 +178,7 @@ struct ProfileTab: View {
                 } else {
                     List(results) { row in
                         NavigationLink {
-                            ProfileView(userId: row.id.uuidString.lowercased(), isOwn: false)
+                            ProfileView(userId: row.id.uuidString.lowercased(), isOwn: false, onSignIn: onSignIn)
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(row.username ?? row.id.uuidString.prefix(8).lowercased())
@@ -267,7 +267,9 @@ struct ProfileView: View {
     @State private var signInNeeded = false
     var onSignIn: (() -> Void)? = nil
     private static func isPermissionDenied(_ error: Error) -> Bool {
-        (error as? PostgrestError)?.code == "42501"
+        // 42501: EXECUTE denied. PGRST301/PGRST303: PostgREST rejected the JWT (expired, bad) before any grant.
+        guard let code = (error as? PostgrestError)?.code else { return false }
+        return ["42501", "PGRST301", "PGRST303"].contains(code)
     }
     // Offline fallback (LocalStore garage_vehicle mirror, write-through cache of
     // get_user_garage). When the live call fails, we render the last-cached rows
@@ -333,10 +335,10 @@ struct ProfileView: View {
             if signInNeeded {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Sign in to see the garage, calendar and latest work", systemImage: "person.crop.circle.badge.questionmark")
+                        Label(isOwn ? "Sign in to see your garage, calendar and latest work" : "Sign in to see the calendar and latest work", systemImage: "person.crop.circle.badge.questionmark")
                             .font(.subheadline)
                             .foregroundStyle(Color.primary)
-                        Text("These readers answer only a signed-in viewer; the public record of each vehicle is open from Explore.")
+                        Text("Those readers answer only a signed-in viewer. The public vehicles below are what any visitor sees, as on nuke.ag.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if let onSignIn {
@@ -646,12 +648,10 @@ struct ProfileView: View {
     //     one row down — each car drills to its own WorthBracketView, C10).
     /// Defensible fleet worth = sum of the class-stratified "est" values already on
     /// the garage rows (get_user_garage only emits defensible estimates).
-    private var fleetWorth: Double {
-        currentGarage.compactMap(\.current_value).filter { $0 > 0 }.reduce(0, +)
-    }
-    private var fleetPricedCount: Int {
-        currentGarage.filter { ($0.current_value ?? 0) > 0 }.count
-    }
+    /// Zero until the garage reader carries a defense verdict per vehicle: the same rule that hides
+    /// an undefended estimate on the vehicle page (#1065) hides its sum here.
+    private var fleetWorth: Double { 0 }
+    private var fleetPricedCount: Int { 0 }
 
     /// The Tenet-9 worth-hiring sentence — proven LABOR across the fleet, not a
     /// vanity count. Lifetime totals, distinct from the "this year" producer chips
@@ -668,7 +668,7 @@ struct ProfileView: View {
     /// fleet is defensibly priced — never a firm fleet number (the valuation law).
     private var fleetWorthLine: String {
         guard fleetPricedCount > 0 else {
-            return "Not priced yet — a body of work, not a comp average"
+            return "Not priced by the reader — a body of work, not a comp average"
         }
         let money = fleetWorth.formatted(.currency(code: "USD").precision(.fractionLength(0)))
         let thin = fleetPricedCount < currentGarage.count
@@ -780,19 +780,51 @@ struct ProfileView: View {
                     }
                 }
                 Spacer()
-                if let val = v.current_value, val > 0 {
-                    // A modeled comp-estimate (rooted in nuke_estimates), labeled "est"
-                    // so it never reads as a firm price. Only the defensible
-                    // (class-stratified) estimates reach here — see get_user_garage.
-                    Text("est \(val.formatted(.currency(code: "USD").precision(.fractionLength(0))))")
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                }
+                // No estimate on a garage row: get_user_garage's current_value is the class-stratified
+                // model estimate that the vehicle page hides unless the market defends it (#1065, the
+                // web's marketDefends), and the garage reader carries no such verdict. It returns when
+                // the reader does (review round two, 2026-10-13).
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
             }
         }
     }
 
+    /// A stranger's view of a garage, as the web's VehicleCollection reads it for a public profile:
+    /// the vehicles the person holds by an active owner or co_owner permission or an approved
+    /// title, public only, not deleted, newest first, 50 at most. Never get_user_garage, which is
+    /// the owner's own reader: SECURITY DEFINER with no viewer check, it answers any signed-in
+    /// account with private and deleted vehicles and purchase prices (review round two,
+    /// 2026-10-13; migration 20260709180000 called its anon revoke "NOT the root fix").
+    private func loadPublicGarage() async {
+        garageError = false
+        defer { garageLoaded = true }
+        struct IdRow: Decodable { let vehicle_id: String }
+        do {
+            async let permsT: [IdRow] = SupabaseService.client.from("vehicle_user_permissions").select("vehicle_id")
+                .eq("user_id", value: userId).is("revoked_at", value: nil).in("role", values: ["owner", "co_owner"]).execute().value
+            async let titlesT: [IdRow] = SupabaseService.client.from("ownership_verifications").select("vehicle_id")
+                .eq("user_id", value: userId).eq("status", value: "approved").execute().value
+            let ids = Array(Set((try await permsT + titlesT).map(\.vehicle_id)))
+            guard !ids.isEmpty else { garage = []; garageIsCached = false; return }
+            let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
+                .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
+                .in("id", values: ids).eq("is_public", value: true).is("deleted_at", value: nil)
+                .order("year", ascending: false).limit(50).execute().value
+            garage = metadata.map { m in
+                GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
+                              model: m.normalized_model?.isEmpty == false ? m.normalized_model : m.model,
+                              trim_name: m.trim, image_url: m.primary_image_url, current_value: nil,
+                              image_count: m.image_count ?? 0, relationship: "owner", vin: m.vin)
+            }
+            garageIsCached = false; garageCachedAt = nil
+        } catch {
+            NSLog("NukeCapture public garage load failed: %@", String(describing: error))
+            garageError = true
+        }
+    }
+
     private func loadGarage() async {
+        guard isOwn else { await loadPublicGarage(); return }
         garageError = false
         do {
             async let legacyRows: [GarageVehicle] = SupabaseService.client
@@ -1075,7 +1107,7 @@ struct ProfileView: View {
             }
             loadError = nil
         } catch {
-            if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; return }
+            if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; profileSettled = true; return }
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
