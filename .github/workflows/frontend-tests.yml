@@ -776,3 +776,27 @@ jobs:
         run: createdb dm_fold_description
       - name: Verify full native listing prose and qualified public reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_description -f supabase/sql/test_vehicle_listing_description_reader.sql
+
+  actor-profile-read-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable actor-profile database
+        run: createdb dm_refinement_actor_profile_ci
+      - name: Verify actor_profile_read returns measures with peer ranks and no amounts
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_actor_profile_ci -f supabase/sql/test_actor_profile_read.sql
