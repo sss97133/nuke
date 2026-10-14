@@ -2084,3 +2084,93 @@ measurement, then keyed and folded into the instance graph. The registry becomes
 diff against today's file is the audit. (3) Port the checks to SQL (H2) and the configuration to a query (H4).
 (4) Load the factory generation as the first baseline (H5) and one more build as the first cohort member. (5) The
 harness stack page, rendered from rows, coverage first, every number a door.
+
+#### 13.12.1 RSI pass on 13.12, and step 1: the VEC map (lead, 2026-10-14 06:30Z)
+
+The owner left the judgment to the machine ("it's up to you, that's why we're supposed to be doing RSI"). The lead
+re-read 13.12 against the theory card, VEC's class model and the live rows, and found nine faults in its own draft.
+
+**What was wrong or missing.**
+1. *The design was put in the log.* A harness design is intent, not observation. The log holds observations of the
+   world (makers' part specifications, the truck's measurements, receipts, photos, tests) and statement events (an
+   owner call, a builder's practice, an agent interpretation with its method). The design is a fold over decision
+   events, and every planned value is a **prediction** graded by the as-built **outcome**: planned length against
+   measured cut length, predicted drop against measured drop under load. The harness stack has a prediction layer from
+   the first decided wire.
+2. *One connectivity level was too few.* VEC keeps `Signal` (what it means), `Net` / `Connection` (what is electrically
+   joined), `WireElementReference` (the physical wire) and `Topology` (where it runs) apart. Criterion 1 becomes four
+   levels: signal → net → segment → route.
+3. *"Checks in SQL" contradicted an existing decision.* `wiring_policy_rules` was created as "Physics stays in code;
+   policy (limits, ...) in rows" and holds 0 rows. Corrected: limits and policies are versioned rows; physics is code
+   that reads only rows; every result is a row with its inputs and rule version; a failing result blocks the state
+   change it guards.
+4. *Coverage had no denominator.* Completeness needs a contract per grain stored as data (what a closed wire end, a
+   placed device, a protected net requires). The wire-closure protocol's fields are that contract, kept today as a
+   markdown rule.
+5. *Lengths were treated as values.* A segment's planned length is computed from the route graph plus the pad rule;
+   the digital twin's measured paths become topology rows.
+6. *Electrical behaviour was missing.* Every net carries its load model and its protection element (fuse, or PDM output
+   with its current setting) as data, and margins are computed from them. 19 of 40 assigned PDM outputs have no
+   current setting today.
+7. *Privacy was missing.* Money and people's contact details are owner-only at the source (the manifest leak found the
+   same night, PRs #1147 and #1148).
+8. *H5 over-claimed.* A standalone-ECU restomod is mostly new circuits, so the factory harness cannot "account for"
+   528 wires. The test is the classification itself: each of the 71 factory circuits kept, replaced or deleted, and
+   each K5 net factory-derived or new. That measures how far the build departs.
+9. *Provenance exists and is laundered.* The instance tables have `source`, `method`, `observed_at` and `trust`, but
+   every live K5 row cites the export: 390 wires "k5_registry v5", 138 "April 2026 whole-truck plan", 795 wire ends
+   "k5_registry v5" and 96 "k5-wiring", all at trust T3. The registry carries per-field citations (the ~470 cited
+   fields `audit_citations.py` reads), and the loader flattens them away. Re-ingest carries each field's own
+   citation into its observation.
+
+**Criteria, revised (supersedes the list above).**
+1. Four connectivity levels, each a grain with a key: signal → net → segment (one physical wire) → route (topology
+   node and segment). A wire through a bulkhead is one net and two segments mated at a cavity.
+2. Library and instance are separate (VEC's specification and occurrence): no library row names a vehicle.
+3. Every reference is a key; an unresolved one is a candidate row with its text and a status.
+4. Three evidence kinds, never mixed: observations (with source document, speaker relation, both clocks, trust),
+   decisions (author, rationale, the observations they rest on) and computed results (inputs and rule version).
+   Another vehicle's document informs a baseline, never this vehicle's fact.
+5. The design is a fold over decision events; replaying any date is a query.
+6. Planned values are predictions and are graded against as-built outcomes.
+7. Variants are data: configuration and variant membership on every instance row (plug, segment, end), and a
+   configuration is a query.
+8. Limits and policies are versioned rows; physics is code reading only rows; results are rows; a failing result
+   blocks its transition.
+9. Completeness is computed against per-grain contracts stored as data, across every harness instance in the
+   database.
+10. Lengths come from the route graph; margins come from each net's load model and protection element.
+11. Every output reads the rows (book, diagrams, cut list, formboard, carts, page).
+12. Every column is described; money and contacts are masked at the source; a second vehicle or a factory generation
+    lands in the same tables.
+
+**Hypotheses, revised.** H1 becomes four-level: #110 as signal "coolant temp", one net, two segments mated at 61-pin
+cavity w, routed over twin topology. H2 tests policy rows plus code: limits for terminal range, seal range and cavity
+move into `wiring_policy_rules`, and the recomputed verdicts must match `check_plug_ends.py` on all 939 ends. H3 and H4
+stand. H5 becomes the classification in fault 8. New, *H6, the design as prediction*: once segments are cut, planned
+length against measured length per segment gives the twin's calibration (median error and 80 % range) by route type.
+Until then it is untestable and says so.
+
+**Step 1 result: VEC concepts against the live tables.**
+
+| VEC concept | Meaning | Nuke today | Verdict |
+|---|---|---|---|
+| `PartVersion` + specifications (`ConnectorHousingSpecification`, terminal, cavity seal, `WireElement`, `CoreSpecification`) | the part master | `catalog_parts` (10,853), `wire_catalog` (107), `connector_specifications`, `component_library` (84) | Exists; no instance keys into it |
+| `Slot` / `Cavity` | positions in a housing | `connector_cavity_layouts` (467 cavities, 46 models) | Exists; D38999 25-61 twice; not keyed to the housing part |
+| Component specification with its pins | a device model and its pins | `device_pin_maps` (1,156) | Conflated: 1,100 rows also carry one vehicle's wiring |
+| Component occurrence (`Role`, `Placement`) | this device on this truck, placed | `vehicle_build_manifest` (141) and device rows in `harness_endpoints` | Two tables for one concept; placement is three columns plus a text source |
+| Connector occurrence, `Mating` | a plug half on the truck and the half it mates with | plug rows in `harness_endpoints` (e.g. FIREWALL-CABIN / -ENGINE) | No mating relation |
+| `CavityReference` + `ContactPoint` | one wire end: cavity, terminal, seal | `wire_termination_specs` (891) | Right grain; part numbers are text, nine keys empty |
+| `WireElementReference` | one physical wire | inside `vehicle_custom_circuits` | Conflated with the connection |
+| `Connection` / `ConnectionEnd` / `Net` | what is electrically joined | inside `vehicle_custom_circuits`; splices as plug rows | No net table |
+| `Signal` | what it means | `circuit_name` and `signal_type` text | No table |
+| `TopologyNode` / `TopologySegment` / `Routing` | the route graph and what rides each branch | `vehicle_harness_landmarks`, `harness_bundle_definitions` (both idle); the twin lives outside the database | Absent in practice |
+| `Configuration` / `Variant` / `UsageNode` / `Module` | options and their members | `wiring_decisions` (`opt-*`) + `wiring_decision_links` (`coupled_with`, plugs only) | Partial: membership on plugs, not on segments or ends |
+| `DocumentVersion` | the source document | `wiring_reference_documents` (idle), library extracts in git, `source` strings | Not keyed; flattened to the export |
+| (Nuke) testimony per value | source, relation, clocks, trust | columns on the instance tables | Present, all pointing at the export |
+| (Nuke) policy rows | limits as versioned data | `wiring_policy_rules` | 0 rows |
+| (Nuke) baseline | the factory harness | `factory_harness_circuits` | 71 factory rows mixed with 60 build rows |
+
+**Next (step 2 begins).** Four missing grains go to `schema_proposals` before any table: signal, net, segment
+(wire element occurrence) and topology (node, segment, routing), plus `Mating` as a relation between plug rows. Then
+#110 is re-ingested end to end from its own citations as the first case (H1), with its diff against today's rows.
