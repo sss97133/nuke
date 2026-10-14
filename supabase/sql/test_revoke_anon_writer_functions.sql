@@ -18,7 +18,7 @@ END $$;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 \ir helpers/writer_function_stubs_20261014.sql
-GRANT SELECT ON public.user_organized_photos TO authenticated;
+GRANT SELECT ON public.user_organized_photos, public.user_photo_inbox TO authenticated;
 -- As Supabase's default privileges do for new functions in public.
 DO $$
 DECLARE f regprocedure;
@@ -41,7 +41,8 @@ CREATE FUNCTION public.t_count(p_role text, p_kept boolean) RETURNS int LANGUAGE
 SELECT public.t_assert(public.t_count('anon', false) = 33 AND public.t_count('authenticated', false) = 33,
   format('before: 33 open to anon (%s) and authenticated (%s)', public.t_count('anon', false), public.t_count('authenticated', false)));
 
-SELECT public.t_assert(has_table_privilege('authenticated', 'public.user_organized_photos', 'SELECT'), 'before: signed-in accounts read the photo view');
+SELECT public.t_assert(has_table_privilege('authenticated', 'public.user_organized_photos', 'SELECT')
+  AND has_table_privilege('authenticated', 'public.user_photo_inbox', 'SELECT'), 'before: signed-in accounts read both photo views');
 
 -- 2. The revoke.
 \ir ../migrations/20261014031500_revoke_anon_writer_functions.sql
@@ -52,7 +53,9 @@ SELECT public.t_assert(public.t_count('anon', false) = 0 AND public.t_count('aut
 SELECT public.t_assert(public.t_count('service_role', false) = 33, format('after: the service role keeps all 33 (%s)', public.t_count('service_role', false)));
 SELECT public.t_assert(public.t_count('anon', true) = 4, format('after: the four reviewed functions stay public (%s)', public.t_count('anon', true)));
 SELECT public.t_assert(NOT has_table_privilege('authenticated', 'public.user_organized_photos', 'SELECT')
-  AND NOT has_table_privilege('anon', 'public.user_organized_photos', 'SELECT'), 'after: the photo view is closed to signed-in and anonymous callers');
+  AND NOT has_table_privilege('anon', 'public.user_organized_photos', 'SELECT')
+  AND NOT has_table_privilege('authenticated', 'public.user_photo_inbox', 'SELECT')
+  AND NOT has_table_privilege('anon', 'public.user_photo_inbox', 'SELECT'), 'after: both photo views are closed to signed-in and anonymous callers');
 
 -- 4. A rerun is a no-op, and a signature that no longer exists is skipped.
 DROP FUNCTION public.refresh_equipment_hours();

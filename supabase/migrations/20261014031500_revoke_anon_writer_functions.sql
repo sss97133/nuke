@@ -16,9 +16,10 @@
 --   l4_get_review_needed(uuid, integer)         frames held for review, with URLs, for any vehicle id, private
 --                                               ones included, past #1107's row policy
 --   get_county_vehicles(text)                   no caller anywhere; after #1109 it times out for anon
--- The view user_organized_photos runs as its owner (no security_invoker) and was selectable by any signed-in
--- account, anonymous sign-ins included: every gated frame and every sensitive frame with GPS and EXIF. No caller;
--- SELECT is revoked from anon and authenticated.
+-- Two views run as their owner (no security_invoker) and were selectable by any signed-in account, anonymous
+-- sign-ins included. Neither has a caller; all privileges are revoked from PUBLIC, anon and authenticated:
+--   user_organized_photos   every gated frame, and sensitive frames with GPS and EXIF
+--   user_photo_inbox        unorganized camera-roll frames of every user (74,917 rows, 18,015 with GPS, 2026-10-14)
 -- This revokes EXECUTE from PUBLIC, anon and authenticated on 33 functions and grants it to service_role explicitly.
 -- Their callers keep working: edge functions analysis-engine-coordinator, process-bat-extraction-queue,
 -- sync-live-auctions and photo-pipeline-orchestrator use the service role; cron job photo-pipeline-reset-stuck runs as
@@ -92,14 +93,17 @@ BEGIN
   END IF;
   RAISE NOTICE 'revoked anon and authenticated EXECUTE on % owner-run functions', done;
 
-  -- The owner-run view: no signed-in or anonymous reads.
-  IF to_regclass('public.user_organized_photos') IS NOT NULL THEN
-    REVOKE SELECT ON public.user_organized_photos FROM PUBLIC, anon, authenticated;
-    IF has_table_privilege('authenticated', 'public.user_organized_photos', 'SELECT')
-       OR has_table_privilege('anon', 'public.user_organized_photos', 'SELECT') THEN
-      RAISE EXCEPTION 'user_organized_photos is still selectable by anon or authenticated';
+  -- The owner-run views: no signed-in or anonymous access.
+  FOREACH s IN ARRAY ARRAY['public.user_organized_photos', 'public.user_photo_inbox'] LOOP
+    IF to_regclass(s) IS NULL THEN
+      RAISE NOTICE 'skipped, no longer exists: %', s;
+      CONTINUE;
     END IF;
-  END IF;
+    EXECUTE format('REVOKE ALL ON %s FROM PUBLIC, anon, authenticated', to_regclass(s));
+    IF has_table_privilege('authenticated', to_regclass(s), 'SELECT') OR has_table_privilege('anon', to_regclass(s), 'SELECT') THEN
+      RAISE EXCEPTION '% is still selectable by anon or authenticated', s;
+    END IF;
+  END LOOP;
 END
 $revoke$;
 

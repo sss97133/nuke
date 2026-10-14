@@ -1,4 +1,4 @@
--- Stub signatures of the 33 revoked functions and the 4 kept ones, and the owner-run photo view, as of 2026-10-14.
+-- Stub signatures of the 33 revoked functions and the 4 kept ones, and the two owner-run photo views, as of 2026-10-14.
 -- Test fixture only.
 CREATE FUNCTION public.backfill_photo_analysis(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.backfill_sold_vehicles_comprehensive() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
@@ -39,3 +39,4 @@ CREATE FUNCTION public.l4_get_review_needed(uuid,integer) RETURNS void LANGUAGE 
 CREATE FUNCTION public.get_county_vehicles(text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE TABLE public.photo_rows_stub (id int);
 CREATE VIEW public.user_organized_photos AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.user_photo_inbox AS SELECT id FROM public.photo_rows_stub;
