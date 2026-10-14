@@ -20,6 +20,16 @@ import { rmListingUrlVariants } from './lotUrl.ts';
 // RM Sotheby's - we'll store metadata in origin_metadata instead of linking to org table
 const RM_SOTHEBYS_NAME = "RM Sotheby's";
 
+/**
+ * The platform label RM's events, resolver lookups and observations are written under. It is the observation_sources slug
+ * ("RM Sotheby's") and the label of 2,474 vehicle_events rows; this function used to write 'rmsothebys', which 1 row carries
+ * (counted 2026-10-14). Decided by the lead the same day. It equals what the shared normalizeSource gives for 'rmsothebys'.
+ * Not changed: vehicles.discovery_source and profile_origin keep 'rmsothebys' and 'rmsothebys_import' (of the 1,430 RM rows
+ * under /auctions/, 1,383 of the 1,392 that have a discovery_source say 'rmsothebys' and 1,390 say 'rmsothebys_import'); the
+ * database derives canonical_platform and platform_source from them as 'rm-sothebys'.
+ */
+export const RM_PLATFORM = 'rm-sothebys';
+
 export interface ExtractedVehicle {
   url: string;
   title: string;
@@ -76,7 +86,7 @@ export async function saveVehicle(
   // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
   let { vehicleId: resolvedId } = await deps.resolveExisting(supabase, {
     url: vehicle.url,
-    platform: 'rmsothebys',
+    platform: RM_PLATFORM,
     discoveryUrlIlikePattern: discoveryUrlIlikePattern(vehicle.url),
   });
 
@@ -116,7 +126,7 @@ export async function saveVehicle(
     if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
     deps.writeObservation(supabase, {
       vehicleId: resolvedId,
-      source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
+      source: { platform: RM_PLATFORM, url: vehicle.url, trustScore: 0.85 },
       fields: obsFields,
       // A re-read of an upcoming or unsold lot is a listing, not a sale result (the new-vehicle path already says so).
       observationKind: vehicle.sold ? "sale_result" : "listing",
@@ -180,7 +190,7 @@ export async function saveVehicle(
       if (vehicle.lot_number) obsFields.lot_number = vehicle.lot_number;
       deps.writeObservation(supabase, {
         vehicleId,
-        source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
+        source: { platform: RM_PLATFORM, url: vehicle.url, trustScore: 0.85 },
         fields: obsFields,
         observationKind: vehicle.sold ? "sale_result" : "listing",
         extractionMethod: "rmsothebys_api",
@@ -214,7 +224,7 @@ export async function saveVehicle(
   // Create vehicle_events record by its listing key (see _shared/vehicleEventWrite.ts for why not upsert)
   const episode = await deps.writeEvent(supabase, {
     vehicle_id: vehicleId,
-    source_platform: 'rmsothebys',
+    source_platform: RM_PLATFORM,
     event_type: 'auction',
     source_url: vehicle.url,
     source_listing_id: listingUrlKey || vehicle.lot_number,

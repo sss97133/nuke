@@ -1,6 +1,7 @@
 // Run: deno test supabase/functions/extract-rmsothebys/
 // saveVehicle through a stub PostgREST client and stand-in writers that record what they are asked to do.
-import { saveVehicle, type ExtractedVehicle, type SaveDeps } from './saveVehicle.ts';
+import { RM_PLATFORM, saveVehicle, type ExtractedVehicle, type SaveDeps } from './saveVehicle.ts';
+import { normalizeSource } from '../_shared/normalizeVehicle.ts';
 
 function equal(actual: unknown, expected: unknown, what = '') {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -41,12 +42,13 @@ function stubClient(answers: Record<string, { data?: unknown; error?: { message:
 function deps(opts: { resolved?: string | null; episode?: string } = {}) {
   const observations: any[] = [];
   const events: any[] = [];
+  const resolverCalls: any[] = [];
   const d: SaveDeps = {
-    resolveExisting: async () => ({ vehicleId: opts.resolved ?? null }),
+    resolveExisting: async (_s, options) => { resolverCalls.push(options); return { vehicleId: opts.resolved ?? null }; },
     writeObservation: async (_s, input) => { observations.push(input); return {}; },
     writeEvent: async (_s, row) => { events.push(row); return { action: opts.episode ?? 'inserted' }; },
   };
-  return { d, observations, events };
+  return { d, observations, events, resolverCalls };
 }
 
 const URL_SLASH = 'https://rmsothebys.com/auctions/mo26/lots/r0007-1954-buick-skylark/';
@@ -170,4 +172,22 @@ Deno.test('a failed vehicle insert is thrown, not swallowed', async () => {
   let message = '';
   try { await saveVehicle(client, lot(), d); } catch (e) { message = (e as Error).message; }
   equal(message.includes('duplicate key value'), true);
+});
+
+Deno.test("RM's events, resolver lookups and observations use the canonical slug 'rm-sothebys', never 'rmsothebys'", async () => {
+  equal(RM_PLATFORM, 'rm-sothebys');
+  equal(RM_PLATFORM, normalizeSource('rmsothebys'), 'the constant is what the shared normalizer says:');
+  const paths: Array<[string, { resolved?: string | null; episode?: string }, Record<string, unknown>]> = [
+    ['a new lot', { episode: 'inserted' }, { 'vehicles.insert': { data: { id: 'v-new' } } }],
+    ['a vehicle found by its listing_url', { episode: 'inserted' }, { 'vehicles.select': { data: { id: 'v-feed' } } }],
+    ['a vehicle the resolver finds by its episode', { resolved: 'v-known', episode: 'updated' }, {}],
+  ];
+  for (const [label, opts, answers] of paths) {
+    const { client } = stubClient(answers as Record<string, { data?: unknown }>);
+    const { d, events, observations, resolverCalls } = deps(opts);
+    await saveVehicle(client, lot(), d);
+    equal(resolverCalls.map((c) => c.platform), [RM_PLATFORM], `${label}: resolver platform:`);
+    equal(events.map((e) => e.source_platform), [RM_PLATFORM], `${label}: event source_platform:`);
+    equal(observations.map((o) => o.source.platform), [RM_PLATFORM], `${label}: observation source:`);
+  }
 });
