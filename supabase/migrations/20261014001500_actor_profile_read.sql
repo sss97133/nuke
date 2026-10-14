@@ -29,19 +29,65 @@
 --                           costs are on record (presence only). Not aggregated at read time for a venue (an
 --                           auction house, marketplace or platform) or an organization with more than 5,000 links:
 --                           Bring a Trailer's 100,852 linked vehicles took 27 s on 2026-10-14.
---   table "Vehicles by role" organization only, outside the venue guard.
+--   table "Vehicles by role" organization only, behind the same venue and size guard.
 -- organization_seller_stats has row security and no read policy, so the read is SECURITY DEFINER with this fixed
 -- projection. Revokes get_org_profile_fast, which returned whole business rows (emails, phones, private
 -- organizations) to anyone.
 -- Contract: supabase/sql/test_actor_profile_read.sql (CI job actor-profile-read-contract).
 
-set lock_timeout = '5s';
-set statement_timeout = '60s';
+-- Autocommit is required: supabase-deploy.yml applies with psql -f, each statement outside a transaction block.
+-- The concurrent build follows 20261013110000: refuse on lock waiters, idle transactions or another build, and
+-- verify the index is valid with the expected definition after it, so a timed-out build (20261011233715) is never
+-- skipped by IF NOT EXISTS on a retry and left for every identity read to scan around.
+SET statement_timeout = '120s';
+SET lock_timeout = '10s';
+
+DO $preflight$
+DECLARE
+  target oid := to_regclass('public.external_identities_platform_lower_handle_idx');
+  expected constant text := 'CREATE INDEX external_identities_platform_lower_handle_idx ON public.external_identities USING btree (platform, lower(handle))';
+BEGIN
+  IF EXISTS (SELECT FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock')
+    OR EXISTS (SELECT FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = current_database()
+      AND state IN ('idle in transaction', 'idle in transaction (aborted)'))
+    OR EXISTS (SELECT FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = current_database()
+      AND state = 'active' AND query ~* '\mexternal_identities\M')
+    OR EXISTS (SELECT FROM pg_stat_progress_create_index WHERE pid <> pg_backend_pid())
+  THEN
+    RAISE EXCEPTION 'Identity handle index requires an idle DDL lane without lock waiters, idle transactions or active builds';
+  END IF;
+
+  IF target IS NOT NULL AND (
+    NOT EXISTS (SELECT FROM pg_index WHERE indexrelid = target AND indrelid = 'public.external_identities'::regclass
+      AND indisvalid AND indisready AND indislive)
+    OR pg_get_indexdef(target) IS DISTINCT FROM expected
+  ) THEN
+    RAISE EXCEPTION 'Identity handle index conflict or invalid state; inspect the existing object before retry: %', pg_get_indexdef(target);
+  END IF;
+END
+$preflight$;
 
 -- Case-insensitive handle lookups for the identity variants (692,838 rows). Built concurrently, so writers to
--- external_identities are not blocked (supabase-deploy runs each statement outside a transaction block).
+-- external_identities are not blocked.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS external_identities_platform_lower_handle_idx
   ON public.external_identities (platform, lower(handle));
+
+DO $verify$
+DECLARE
+  target oid := to_regclass('public.external_identities_platform_lower_handle_idx');
+  expected constant text := 'CREATE INDEX external_identities_platform_lower_handle_idx ON public.external_identities USING btree (platform, lower(handle))';
+BEGIN
+  IF target IS NULL OR NOT EXISTS (
+    SELECT FROM pg_index WHERE indexrelid = target AND indrelid = 'public.external_identities'::regclass
+      AND indisvalid AND indisready AND indislive
+  ) OR pg_get_indexdef(target) IS DISTINCT FROM expected THEN
+    RAISE EXCEPTION 'Identity handle index is not ready/valid with the expected definition after build';
+  END IF;
+  IF EXISTS (SELECT FROM pg_stat_activity WHERE wait_event_type = 'Lock') THEN
+    RAISE EXCEPTION 'Lock waiters observed after identity handle index build; stop and inspect';
+  END IF;
+END
+$verify$;
 
 CREATE OR REPLACE FUNCTION public.actor_profile_read(p_kind text, p_id uuid)
  RETURNS jsonb
@@ -133,9 +179,10 @@ BEGIN
     SELECT * INTO s FROM public.organization_seller_stats WHERE organization_id = p_id;
     IF FOUND AND coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0) > 0 THEN
       SELECT count(*) FILTER (WHERE c.st IS NOT NULL) AS n, count(*) FILTER (WHERE c.st < me.st) AS lt,
-             bool_or(c.organization_id = p_id) AS in_cohort
+             bool_or(c.organization_id = p_id) AS in_cohort,
+             count(*) FILTER (WHERE c.st IS NOT NULL AND c.bt IN ('', 'other')) AS untyped
         INTO k
-        FROM (SELECT ss.organization_id, ss.total_sold::numeric / nullif(coalesce(ss.total_sold, 0) + coalesce(ss.total_unsold, 0), 0) AS st
+        FROM (SELECT ss.organization_id, coalesce(po.business_type, '') AS bt, ss.total_sold::numeric / nullif(coalesce(ss.total_sold, 0) + coalesce(ss.total_unsold, 0), 0) AS st
                 FROM public.organization_seller_stats ss
                 JOIN public.organizations po ON po.id = ss.organization_id AND po.is_public = true
                      AND coalesce(po.business_type, '') NOT IN ('auction_house', 'marketplace', 'platform')
@@ -147,7 +194,10 @@ BEGIN
         'method', 'sold ÷ (sold + unsold) on organization-attributed listings with a recorded outcome (listing_activity_v1); '
                   || coalesce(s.evidence_summary->>'outcome_conflicts', '0') || ' outcome and '
                   || coalesce(s.evidence_summary->>'identity_conflicts', '0') || ' identity conflicts in its inputs; '
-                  || 'ranked among public selling organizations with five or more recorded outcomes, venues excluded',
+                  || CASE WHEN k.in_cohort AND k.n >= 2
+                          THEN 'ranked among ' || k.n || ' public selling organizations with five or more recorded outcomes, venues excluded; '
+                               || k.untyped || ' of the ' || k.n || ' carry no business type, so this is not a dealer-only peer group'
+                          ELSE 'not ranked: fewer than five recorded outcomes' END,
         'coverage', jsonb_build_object('n', coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 'of', coalesce(s.total_listings, 0),
                                        'grain', 'listings with a recorded outcome',
                                        'as_of', coalesce(s.evidence_summary->>'latest_input_extracted_at', s.calculated_at::text)),
@@ -365,3 +415,6 @@ DO $$ BEGIN
     EXECUTE $c$COMMENT ON FUNCTION public.get_org_profile_fast(uuid) IS 'Superseded by actor_profile_read (2026-10-14) and revoked from PUBLIC, anon and authenticated: it returned whole business rows, contact details included.'$c$;
   END IF;
 END $$;
+
+RESET lock_timeout;
+RESET statement_timeout;

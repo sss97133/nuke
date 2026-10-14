@@ -180,6 +180,7 @@ BEGIN
   m := public.t_measure(d, 'performance', 'Sell-through');
   PERFORM public.t_assert((m->>'value')::numeric = 90.0 AND (m->'rank'->>'n')::int = 6 AND (m->'rank'->>'p')::numeric = 80.0, format('fallback 90.0 at P80 of 6, venue excluded; got %s', m));
   PERFORM public.t_assert(m->>'method' LIKE '%2 outcome and 7 identity conflicts%', format('conflicts named; got %s', m->>'method'));
+  PERFORM public.t_assert(m->>'method' LIKE '%ranked among 6 public selling organizations%3 of the 6 carry no business type%', format('cohort make-up named; got %s', m->>'method'));
   PERFORM public.t_assert(m->'coverage'->>'as_of' LIKE '2026-09-30%', format('clock = inputs extraction; got %s', m->'coverage'));
   PERFORM public.t_assert(public.t_measure(d, 'performance', 'Bids per listing') IS NULL, 'no per-listing means without their coverage');
   -- 8. A venue is not aggregated.
