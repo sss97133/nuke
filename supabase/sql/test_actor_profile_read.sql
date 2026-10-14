@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_actor_profile -f this-file.sql
 -- Proves actor_profile_read for both kinds, as anon, one public projection, no amount anywhere:
---   an organization with a linked Bring a Trailer handle sells from its listing pages, the same number the handle's
+--   an organization with a linked Bring a Trailer handle sells from its lot rows (not the events table), the same number the handle's
 --   identity read gives (case variants of the handle counted once); an organization with no link falls back to the
 --   seller-stats fold, ranked among public selling organizations with venues excluded, its conflicts named and its
 --   clock the inputs' extraction; a venue is not aggregated; bidding shows values with the snapshot's date and no
@@ -34,6 +34,8 @@ CREATE TABLE public.vehicles (id uuid PRIMARY KEY, year integer, make text, is_p
 CREATE TABLE public.organization_vehicles (organization_id uuid, vehicle_id uuid, relationship_type text, status text);
 CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_url text, event_type text,
   event_status text, seller_external_identity_id uuid, created_at timestamptz DEFAULT '2026-09-30T00:00:00Z');
+CREATE TABLE public.auction_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source text, source_url text,
+  outcome text, seller_external_identity_id uuid, scraped_at timestamptz, updated_at timestamptz DEFAULT '2026-09-30T00:00:00Z');
 CREATE TABLE public.auction_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, author_external_identity_id uuid, comment_type text);
 CREATE TABLE public.mv_bidder_profiles (bat_username text PRIMARY KEY, total_bids bigint, auctions_entered bigint, wins bigint,
   win_rate numeric, avg_bid numeric, max_bid numeric, first_seen timestamp, last_seen timestamp);
@@ -82,20 +84,26 @@ INSERT INTO public.external_identities VALUES
  ('00000000-0000-0000-0000-0000000000e4', 'bat', 'desertseller', NULL),
  ('00000000-0000-0000-0000-0000000000e2', 'bat', 'quietlurker', NULL),
  ('00000000-0000-0000-0000-0000000000e3', 'bat', 'someoneelse', NULL);
--- D's listing pages: A sold; B ended then sold; C sold, also under a URL variant; D ended unsold; D2 its relist,
--- sold, recorded under the lowercase variant; E only pending. Six listings over five vehicles; 4 sold, 1 unsold.
--- Another identity's listing and a non-auction event are excluded.
+-- D's lot rows (auction_events, the canonical lot row): A sold; B reserve not met, then a second lot row on the same
+-- page sold; C sold, also under a URL variant on a duplicate vehicle record; D bid to (ended without a sale); D2 its
+-- relist, sold, keyed to the lowercase variant; E still live. Six listing pages; 4 sold, 1 unsold, 1 without an outcome.
+-- Another seller's lot (F, G) is excluded.
+INSERT INTO public.auction_events (vehicle_id, source, source_url, outcome, seller_external_identity_id, scraped_at) VALUES
+ ('00000000-0000-0000-0000-000000000101', 'bat', 'https://bringatrailer.com/listing/a', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-01'),
+ ('00000000-0000-0000-0000-000000000102', 'bat', 'https://bringatrailer.com/listing/b', 'reserve_not_met', '00000000-0000-0000-0000-0000000000e1', '2026-09-02'),
+ ('00000000-0000-0000-0000-000000000102', 'bat', 'https://bringatrailer.com/listing/b', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-03'),
+ ('00000000-0000-0000-0000-000000000103', 'bat', 'https://bringatrailer.com/listing/c', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-04'),
+ ('00000000-0000-0000-0000-000000000107', 'bat', 'https://BringATrailer.com/listing/c/?utm=x', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-05'),
+ ('00000000-0000-0000-0000-000000000104', 'bat', 'https://bringatrailer.com/listing/d', 'bid_to', '00000000-0000-0000-0000-0000000000e1', '2026-09-06'),
+ ('00000000-0000-0000-0000-000000000104', 'bat', 'https://bringatrailer.com/listing/d-2', 'sold', '00000000-0000-0000-0000-0000000000e4', '2026-09-20'),
+ ('00000000-0000-0000-0000-000000000105', 'bat', 'https://bringatrailer.com/listing/e', 'live', '00000000-0000-0000-0000-0000000000e1', '2026-09-08'),
+ ('00000000-0000-0000-0000-000000000106', 'bat', 'https://bringatrailer.com/listing/f', 'sold', '00000000-0000-0000-0000-0000000000e3', '2026-09-09'),
+ ('00000000-0000-0000-0000-000000000108', 'bat', 'https://bringatrailer.com/listing/g', 'sold', '00000000-0000-0000-0000-0000000000e3', '2026-09-25');
+-- The events table disagrees, as it did for Viva on 2026-10-14: it credits D with G (another seller's lot) and calls
+-- D's bid-to lot sold, both later than D's last lot. The read takes the lot rows, so neither moves D's numbers or clock.
 INSERT INTO public.vehicle_events (vehicle_id, source_url, event_type, event_status, seller_external_identity_id, created_at) VALUES
- ('00000000-0000-0000-0000-000000000101', 'https://bringatrailer.com/listing/a', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-01'),
- ('00000000-0000-0000-0000-000000000102', 'https://bringatrailer.com/listing/b', 'auction', 'ended', '00000000-0000-0000-0000-0000000000e1', '2026-09-02'),
- ('00000000-0000-0000-0000-000000000102', 'https://bringatrailer.com/listing/b', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-03'),
- ('00000000-0000-0000-0000-000000000103', 'https://bringatrailer.com/listing/c', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-04'),
- ('00000000-0000-0000-0000-000000000103', 'https://BringATrailer.com/listing/c/?utm=x', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-05'),
- ('00000000-0000-0000-0000-000000000104', 'https://bringatrailer.com/listing/d', 'auction', 'ended', '00000000-0000-0000-0000-0000000000e1', '2026-09-06'),
- ('00000000-0000-0000-0000-000000000104', 'https://bringatrailer.com/listing/d-2', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e4', '2026-09-20'),
- ('00000000-0000-0000-0000-000000000105', 'https://bringatrailer.com/listing/e', 'auction', 'pending', '00000000-0000-0000-0000-0000000000e1', '2026-09-08'),
- ('00000000-0000-0000-0000-000000000106', 'https://bringatrailer.com/listing/f', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e3', '2026-09-09'),
- ('00000000-0000-0000-0000-000000000101', 'https://bringatrailer.com/listing/a', 'service', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-10');
+ ('00000000-0000-0000-0000-000000000108', 'https://bringatrailer.com/listing/g', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-25'),
+ ('00000000-0000-0000-0000-000000000104', 'https://bringatrailer.com/listing/d', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1', '2026-09-26');
 -- Comments: 4 answers on D's own listed vehicles, 1 answer on another seller's vehicle (not counted), 1 observation.
 INSERT INTO public.auction_comments (vehicle_id, author_external_identity_id, comment_type) VALUES
  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
@@ -144,14 +152,15 @@ SET ROLE anon;
 DO $$
 DECLARE d jsonb; i jsonb; m jsonb; sec jsonb;
 BEGIN
-  -- 1. The linked dealer sells from its listing pages: six listings over five vehicles, 4 sold of 5 with an outcome.
+  -- 1. The linked dealer sells from its lot rows: six listing pages, 4 sold of 5 with an outcome; the events table's
+  --    extra lot and wrong outcome do not count.
   d := public.actor_profile_read('organization', '00000000-0000-0000-0000-0000000000d1');
   PERFORM public.t_assert(d->'subject'->>'name' = 'Desert Classics' AND (d->'subject'->>'handles')::int = 2 AND d->'subject'->>'venue' = 'false', format('dealer subject; got %s', d->'subject'));
   PERFORM public.t_assert((public.t_measure(d, 'performance', 'Listings')->>'value')::int = 6, format('six listings; got %s', public.t_measure(d, 'performance', 'Listings')));
-  PERFORM public.t_assert((public.t_measure(d, 'performance', 'Vehicles')->>'value')::int = 5, 'five vehicles behind them');
+  PERFORM public.t_assert(public.t_measure(d, 'performance', 'Vehicles') IS NULL, 'no vehicle count: duplicate vehicle records of one lot would inflate it');
   m := public.t_measure(d, 'performance', 'Sell-through');
   PERFORM public.t_assert((m->>'value')::numeric = 80.0 AND m->'rank' = 'null'::jsonb AND (m->'coverage'->>'n')::int = 5 AND (m->'coverage'->>'of')::int = 6, format('sell-through 80.0 on 5 of 6; got %s', m));
-  PERFORM public.t_assert(m->'coverage'->>'as_of' LIKE '2026-09-20%', format('clock = latest captured listing event; got %s', m->'coverage'));
+  PERFORM public.t_assert(m->'coverage'->>'as_of' LIKE '2026-09-20%', format('clock = latest capture of its lots, not the later events; got %s', m->'coverage'));
   -- 2. Its handle's identity read gives the same number (the lowercase variant reads the same account).
   i := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e4');
   PERFORM public.t_assert(public.t_measure(i, 'performance', 'Sell-through') = m, format('one seller, one sell-through; org %s, identity %s', m, public.t_measure(i, 'performance', 'Sell-through')));

@@ -9,10 +9,13 @@
 --                 (984 Bring a Trailer handles are split by case on 2026-10-14; one account, one count).
 --
 -- Sections (kit Section shapes, nuke_frontend/src/kit/types.ts; the phone's twin is ProfileDocument.swift):
---   measures "performance"  Selling. From the listing pages vehicle_events records with the actor's identities as
---                           seller (one per normalized listing URL, a relist its own listing; sold if any event
---                           recorded a sale, unsold if it ended without one), so an organization and its handle
---                           read the same number. An organization with no linked identity falls back to
+--   measures "performance"  Selling. From the lot rows (auction_events, the canonical lot row, its seller keyed to
+--                           external_identities by 20261006213000) with the actor's identities as seller: one per
+--                           normalized listing page, a relist its own listing; sold if any lot on the page sold,
+--                           unsold if it ended without a sale (reserve not met, bid to, no sale). An organization
+--                           and its handle read the same number. Not vehicle_events: on 2026-10-14 it credited Viva
+--                           with 4 lots Bring a Trailer shows under other sellers and called 5 of Viva's
+--                           reserve-not-met lots sold (each checked on the listing page). An organization with no linked identity falls back to
 --                           organization_seller_stats (compute-org-seller-stats, listing_activity_v1), ranked among
 --                           public selling organizations with five or more recorded outcomes, venues excluded, its
 --                           conflicts named and its clock the latest extraction of its inputs. Seller ranks from
@@ -107,7 +110,7 @@ DECLARE
   venue boolean := false;
   o record; e record; s record; k record; r record;
   -- selling from listing pages
-  l_total int := 0; l_sold int := 0; l_unsold int := 0; l_vehicles int := 0; l_last timestamptz; l_vehicle_ids uuid[];
+  l_total int := 0; l_sold int := 0; l_unsold int := 0; l_last timestamptz; l_vehicle_ids uuid[];
   -- talking
   t_comments int := 0; t_lots int := 0; t_answers int := 0;
   -- bidding
@@ -139,35 +142,33 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- 1. Selling from listing pages, for any actor with identities.
+  -- 1. Selling from the lot rows, for any actor with identities: one per listing page.
   IF ids IS NOT NULL THEN
-    SELECT count(*), count(*) FILTER (WHERE sold), count(*) FILTER (WHERE NOT sold AND ended),
-           count(DISTINCT vehicle_id), max(last_at), array_agg(DISTINCT vehicle_id) FILTER (WHERE vehicle_id IS NOT NULL)
-      INTO l_total, l_sold, l_unsold, l_vehicles, l_last, l_vehicle_ids
-      FROM (SELECT lower(regexp_replace(regexp_replace(ve.source_url, '[?#].*$', ''), '/+$', '')) AS u,
-                   bool_or(ve.event_status = 'sold') AS sold,
-                   bool_or(ve.event_status IN ('ended', 'unsold', 'reserve_not_met')) AS ended,
-                   min(ve.vehicle_id::text)::uuid AS vehicle_id,
-                   max(ve.created_at) AS last_at
-              FROM public.vehicle_events ve
-             WHERE ve.seller_external_identity_id = ANY (ids) AND ve.event_type = 'auction' AND ve.source_url IS NOT NULL
+    SELECT count(*), count(*) FILTER (WHERE sold), count(*) FILTER (WHERE NOT sold AND ended), max(last_at)
+      INTO l_total, l_sold, l_unsold, l_last
+      FROM (SELECT lower(regexp_replace(regexp_replace(ae.source_url, '[?#].*$', ''), '/+$', '')) AS u,
+                   bool_or(ae.outcome = 'sold') AS sold,
+                   bool_or(ae.outcome IN ('reserve_not_met', 'bid_to', 'no_sale')) AS ended,
+                   max(coalesce(ae.scraped_at, ae.updated_at)) AS last_at
+              FROM public.auction_events ae
+             WHERE ae.seller_external_identity_id = ANY (ids) AND ae.source_url IS NOT NULL
              GROUP BY 1) l;
+    -- The vehicle records behind those lots (a duplicate record of one car counts as its own), for answers to bidders.
+    SELECT array_agg(DISTINCT ae.vehicle_id) FILTER (WHERE ae.vehicle_id IS NOT NULL) INTO l_vehicle_ids
+      FROM public.auction_events ae
+     WHERE ae.seller_external_identity_id = ANY (ids) AND ae.source_url IS NOT NULL;
   END IF;
 
   items := '[]'::jsonb;
   IF l_total > 0 THEN
     items := items || jsonb_build_object(
       'label', 'Listings', 'unit', 'listings', 'value', l_total,
-      'method', 'auction listings recorded with this actor''s handle as seller, one per listing page; a relist counts as its own listing',
-      'coverage', jsonb_build_object('n', l_total, 'of', l_total, 'grain', 'listings', 'as_of', l_last), 'rank', NULL);
-    items := items || jsonb_build_object(
-      'label', 'Vehicles', 'unit', 'vehicles', 'value', l_vehicles,
-      'method', 'distinct vehicle records behind those listings',
-      'coverage', jsonb_build_object('n', l_vehicles, 'of', l_total, 'grain', 'listings', 'as_of', l_last), 'rank', NULL);
+      'method', 'Bring a Trailer lots whose lot row names this actor''s handle as seller, one per listing page; a relist counts as its own listing; live lots count, without an outcome',
+      'coverage', jsonb_build_object('n', l_total, 'of', l_total, 'grain', 'listing pages', 'as_of', l_last), 'rank', NULL);
     IF l_sold + l_unsold > 0 THEN
       items := items || jsonb_build_object(
         'label', 'Sell-through', 'unit', '%', 'value', round(100.0 * l_sold / (l_sold + l_unsold), 1),
-        'method', 'sold ÷ (sold + ended unsold) on listings with a recorded outcome; no peer rank until a per-seller fold exists',
+        'method', 'sold ÷ (sold + ended without a sale: reserve not met, bid to, no sale) on listing pages with a recorded outcome; no peer rank until a per-seller fold exists',
         'coverage', jsonb_build_object('n', l_sold + l_unsold, 'of', l_total, 'grain', 'listings with a recorded outcome', 'as_of', l_last), 'rank', NULL);
     END IF;
     sections := sections || jsonb_build_object(
