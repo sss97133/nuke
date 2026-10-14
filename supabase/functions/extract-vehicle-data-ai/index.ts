@@ -247,7 +247,8 @@ Deno.serve(async (req) => {
     // Initialize Supabase for LLM config
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      projectSecretKey()!
+      projectSecretKey()!,
+      { global: { headers: { 'X-Nuke-Writer': 'extract-vehicle-data-ai' } } },
     )
 
     // Get LLM config with automatic fallback chain
