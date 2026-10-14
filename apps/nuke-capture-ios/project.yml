@@ -137,6 +137,10 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: UnitTests
+      # The hot/cold contract shared with the web (#1088): the same JSON its vitest reads, so one file
+      # binds both clients' verdicts. A change to it runs this target too (ios-build.yml paths).
+      - path: ../../nuke_frontend/src/pages/market/__fixtures__/heat-fixture-20261013T2300Z.json
+        buildPhase: resources
     dependencies:
       - target: NukeCapture-iOS
     settings:

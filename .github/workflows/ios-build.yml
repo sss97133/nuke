@@ -15,10 +15,13 @@ on:
     paths:
       - apps/nuke-capture-ios/**
       - .github/workflows/ios-build.yml
+      # Fixtures the phone's tests share with the web (the hot/cold contract).
+      - nuke_frontend/src/pages/market/__fixtures__/**
   push:
     branches: [main]
     paths:
       - apps/nuke-capture-ios/**
+      - nuke_frontend/src/pages/market/__fixtures__/**
 
 concurrency:
   group: ios-build-${{ github.ref }}

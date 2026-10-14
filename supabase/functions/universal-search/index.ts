@@ -814,21 +814,25 @@ Deno.serve(async (req) => {
     // --- EXTERNAL IDENTITIES (BaT users, etc.) ---
     if (firstPage && allowedTypes.includes('external_identity')) {
       searches.push((async () => {
-        const { data: identities } = await supabase
+        // The table's columns are handle and display_name. The select named username and avatar_url, which do
+        // not exist, so PostgREST refused every call and identity search returned nothing from 2026-01-23 until
+        // 2026-10-14; the error is now logged instead of swallowed.
+        const { data: identities, error: identityError } = await supabase
           .from('external_identities')
-          .select('id, username, display_name, platform, profile_url, avatar_url')
-          .or(`username.ilike."${escapePostgrestValue(searchPattern)}",display_name.ilike."${escapePostgrestValue(searchPattern)}"`)
+          .select('id, handle, display_name, platform, profile_url')
+          .or(`handle.ilike."${escapePostgrestValue(searchPattern)}",display_name.ilike."${escapePostgrestValue(searchPattern)}"`)
           .limit(Math.ceil(sanitizedLimit / 4));
+        if (identityError) console.error('universal-search: external identity search failed', identityError.message);
 
         for (const ei of identities || []) {
-          const displayName = ei.display_name || ei.username || 'Unknown';
+          const displayName = ei.display_name || ei.handle || 'Unknown';
 
           results.push({
             id: `external_${ei.id}`,
             type: 'external_identity',
             title: displayName,
-            subtitle: `${ei.platform} ${ei.username ? `@${ei.username}` : ''}`.trim(),
-            image_url: ei.avatar_url,
+            subtitle: `${ei.platform} ${ei.handle ? `@${ei.handle}` : ''}`.trim(),
+            image_url: undefined,
             relevance_score: 0.6,
             metadata: { platform: ei.platform, profile_url: ei.profile_url }
           });

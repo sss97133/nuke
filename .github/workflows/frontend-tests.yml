@@ -82,6 +82,30 @@ jobs:
       - name: Verify market_pulse_live names its 17 row slots in order
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
 
+  market-pulse-live-heat-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable board-verdict database
+        run: createdb dm_refinement_pulse_heat_ci
+      - name: Verify the verdict in the read reproduces the clients' fixture
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_heat_ci -f supabase/sql/test_market_pulse_live_heat.sql
+
   journal-density-counts-only-contract:
     runs-on: ubuntu-latest
     services:
@@ -543,6 +567,30 @@ jobs:
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
 
+  county-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable county readers database
+        run: createdb dm_refinement_county_readers_ci
+      - name: Verify the county readers answer with public vehicles only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_readers_ci -f supabase/sql/test_county_readers_public_only.sql
+
   market-lot-activity-contract:
     runs-on: ubuntu-latest
     services:
@@ -693,6 +741,30 @@ jobs:
       - name: Verify unknown estimates, genuine zero and existing reader access
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_delta_ci -f supabase/sql/test_market_value_delta_unknown.sql
 
+  vehicle-images-policy-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable image policy contract database
+        run: createdb dm_refinement_image_gate_ci
+      - name: Verify strangers no longer read rejected or held frames, owners keep theirs
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_gate_ci -f supabase/sql/test_vehicle_images_public_policy_gate.sql
+
   valuation-source-sale-contract:
     runs-on: ubuntu-latest
     services:
@@ -749,6 +821,30 @@ jobs:
           node-version: '22'
       - name: Verify nullable episode ancestry, source custody and two-session races
         run: node scripts/discovery/sale-episode-source-integrity-test.mjs
+
+  storage-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable storage policy contract database
+        run: createdb dm_refinement_storage_policies_ci
+      - name: Verify no identity lists, uploads, overwrites or deletes in the two buckets
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_storage_policies_ci -f supabase/sql/test_storage_objects_close_open_policies.sql
 
   vitest:
     runs-on: ubuntu-latest
@@ -848,3 +944,27 @@ jobs:
         run: createdb dm_fold_description
       - name: Verify full native listing prose and qualified public reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_description -f supabase/sql/test_vehicle_listing_description_reader.sql
+
+  device-attribution-owner-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable device-attribution database
+        run: createdb dm_refinement_device_attribution_ci
+      - name: Verify a phone frame is refused before the fix and lands after it
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_device_attribution_ci -f supabase/sql/test_device_attribution_as_owner.sql
