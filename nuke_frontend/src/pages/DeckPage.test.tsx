@@ -4,8 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ user: null as null | { id: string; email: string } }));
+const fixture = vi.hoisted(() => ({ user: null as null | { id: string; email: string }, isAdmin: false }));
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user, session: null, loading: false }) }));
+vi.mock('../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: fixture.isAdmin, loading: false, refresh: () => {} }) }));
 vi.mock('../components/deck/useDeckData', () => ({
   useDeckData: () => ({
     slides: [{ id: 'slide-1', deck_id: 'synthetic-deck', slide_index: 0, slide_type: 'title', bg_type: 'light', content: {}, entity_slugs: [] }],
@@ -23,7 +24,7 @@ import DeckPage from './DeckPage';
 
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
-  fixture.user = null;
+  fixture.user = null; fixture.isAdmin = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
@@ -38,7 +39,7 @@ async function open() {
   ));
 }
 
-describe('DeckPage: only a signed-in editor edits', () => {
+describe('DeckPage: only an admin edits', () => {
   it('a visitor reads the deck with no editing controls', async () => {
     await open();
     expect(container.textContent).toContain('slide editable=false');
@@ -47,8 +48,15 @@ describe('DeckPage: only a signed-in editor edits', () => {
     expect(container.textContent).not.toContain('slide editor');
   });
 
-  it('a signed-in editor gets the toolbar and the slide editor', async () => {
-    fixture.user = { id: 'user-1', email: 'editor@example.com' };
+  it('a signed-in account that is not an admin reads the deck with no editing controls', async () => {
+    fixture.user = { id: 'user-2', email: 'someone@example.com' };
+    await open();
+    expect(container.textContent).toContain('slide editable=false');
+    expect(container.textContent).not.toContain('Editing as');
+  });
+
+  it('an admin gets the toolbar and the slide editor', async () => {
+    fixture.user = { id: 'user-1', email: 'editor@example.com' }; fixture.isAdmin = true;
     await open();
     expect(container.textContent).toContain('Editing as editor');
     expect(container.textContent).toContain('slide editable=true');

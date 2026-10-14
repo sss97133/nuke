@@ -1683,6 +1683,30 @@ jobs:
       - name: Verify unknown estimates, genuine zero and existing reader access
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_delta_ci -f supabase/sql/test_market_value_delta_unknown.sql
 
+  signed-in-open-updates-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable signed-in open updates database
+        run: createdb dm_refinement_signed_in_open_updates_ci
+      - name: Verify a signed-in stranger rewrites none of the 11 tables and the real writers still write
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_signed_in_open_updates_ci -f supabase/sql/test_close_signed_in_open_updates.sql
+
   popup-public-cohort-contract:
     runs-on: ubuntu-latest
     services:
