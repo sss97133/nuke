@@ -995,6 +995,30 @@ jobs:
       - name: Verify the inlinable gallery predicate answers as the live one did, row for row
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gallery_eligible_ci -f supabase/sql/test_vehicle_image_gallery_eligible_inline.sql
 
+  organization-roles-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable organization roles database
+        run: createdb dm_refinement_organization_roles_ci
+      - name: Verify a stranger cannot seat itself as an organization owner or manager
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_organization_roles_ci -f supabase/sql/test_organization_roles_not_self_granted.sql
+
   map-public-cells-contract:
     runs-on: ubuntu-latest
     services:
@@ -1834,27 +1858,3 @@ jobs:
         run: createdb dm_refinement_card_images_ci
       - name: Verify one thumbnail per vehicle under the vehicle_images row policies
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_card_images_ci -f supabase/sql/test_vehicle_card_images.sql
-
-  organization-roles-contract:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      PGHOST: localhost
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Create disposable organization roles database
-        run: createdb dm_refinement_organization_roles_ci
-      - name: Verify a stranger cannot seat itself as an organization owner or manager
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_organization_roles_ci -f supabase/sql/test_organization_roles_not_self_granted.sql
