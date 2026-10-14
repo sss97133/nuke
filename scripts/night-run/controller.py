@@ -258,8 +258,6 @@ class Controller:
             return 0
         if now < self.state.get("next_check", 0):
             return 0
-        if self.state["status"] == "complete" and self.state.get("completed_day") == day:
-            return 0
         if self.state["status"] == "waiting_review":
             snapshot = self.pr_state(self.state["handoff"]["prs"])
             if snapshot == self.state.get("pr_snapshot"):

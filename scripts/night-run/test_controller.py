@@ -125,6 +125,13 @@ class ContinuationTests(unittest.TestCase):
             self.assertEqual(invoke.call_args.args[1], 2700)
         self.assertEqual(self.controller.state["handoff"], goal)
 
+    def test_completed_step_can_advance_mandate_with_remaining_daily_budget(self):
+        self.controller.state.update(status="complete", completed_day=c.budget_day(time.time()), spent_seconds=100)
+        with patch.object(self.controller, "prepare") as prepare, patch.object(self.controller, "worktree", return_value=self.wt), patch.object(self.controller, "invoke", return_value=0) as invoke:
+            self.controller.tick(self.lock.fileno())
+            prepare.assert_called_once()
+            self.assertEqual(invoke.call_args.args[1], 2600)
+
     def test_pending_review_is_cheap_and_merge_resumes_same_objective(self):
         self.invoke()
         pending = [{"number": 123, "state": "OPEN", "headRefOid": "a"}]

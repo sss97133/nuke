@@ -7,8 +7,8 @@ The machine must be awake and the user launchd domain available; this is not a c
 
 The controller keeps one objective, acceptance criteria, Claude session ID and worktree across turns
 and days. A successful CLI return becomes a checkpoint. An active checkpoint runs again on the next
-wake-up while allowance remains. A completed objective is archived; a new objective can be selected
-in the next daily window. Existing old nightly PRs/worktrees are not deleted or automatically adopted.
+wake-up while allowance remains. A completed objective is archived; the next wake-up can select another
+objective while daily allowance remains. Existing old nightly PRs/worktrees are not deleted or automatically adopted.
 The work order tells the agent to inspect those PRs before choosing duplicate work.
 
 - `active`: authorized work remains. Budget/backoff may defer the next invocation.
