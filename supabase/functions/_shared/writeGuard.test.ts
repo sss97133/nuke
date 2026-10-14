@@ -11,6 +11,7 @@ import {
   authenticateWriter,
   decodeJwt,
   isServiceCaller,
+  requireAdminOrService,
   requireOwnerOrService,
   requireWriteAuth,
   type WriteGuardDeps,
@@ -323,6 +324,55 @@ Deno.test("owner-only: owner lookup fails → the owner is refused too (fails cl
 Deno.test("owner-only: no token → 403; OPTIONS → not judged", async () => {
   assertEquals((await requireOwnerOrService(req(), { deps: deps({ fetch: ownerLookup(OWNER) }) }))?.status, 403);
   assertEquals(await requireOwnerOrService(req({}, "OPTIONS"), { deps: deps() }), null);
+});
+
+// ── requireAdminOrService (2026-10-14) ─────────────────────────────────────────────
+const ADMIN = "0b9f107a-0000-4000-8000-0000000000a1";
+const adminLookup = (admins: string[], status = 200, seen: string[] = []): typeof fetch => ((input: RequestInfo | URL, init?: RequestInit) => {
+  const u = String(input);
+  if (u.includes("/rest/v1/admin_users")) {
+    seen.push(((init?.headers ?? {}) as Record<string, string>).apikey ?? "");
+    const id = new URL(u).searchParams.get("user_id")?.replace(/^eq\./, "") ?? "";
+    const active = new URL(u).searchParams.get("is_active") === "eq.true";
+    return Promise.resolve(new Response(JSON.stringify(active && admins.includes(id) ? [{ user_id: id }] : []), { status }));
+  }
+  return Promise.resolve(new Response("", { status: 401 }));
+}) as typeof fetch;
+
+Deno.test("admin-only: a secret key passes without a lookup", async () => {
+  const seen: string[] = [];
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${CRON_KEY}` }), { deps: deps({ fetch: adminLookup([], 200, seen) }) });
+  assertEquals(res, null);
+  assertEquals(seen, []);
+});
+
+Deno.test("admin-only: an active admin's sign-in passes; the lookup uses the injected secret key", async () => {
+  const token = await es256({ role: "authenticated", sub: ADMIN, exp: NOW + 600 });
+  const seen: string[] = [];
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN], 200, seen) }) });
+  assertEquals(res, null);
+  assertEquals(seen, [INJECTED_KEY]);
+});
+
+Deno.test("admin-only: any other signed-in user, an anonymous sign-in included → 403", async () => {
+  for (const extra of [{}, { is_anonymous: true }]) {
+    const token = await es256({ role: "authenticated", sub: "0b9f107a-0000-4000-8000-0000000000f9", exp: NOW + 600, ...extra });
+    const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN]) }) });
+    assertEquals(res?.status, 403);
+    assertEquals((await res!.json()).reason, "admins only");
+  }
+});
+
+Deno.test("admin-only: admin lookup fails → the admin is refused too (fails closed)", async () => {
+  const token = await es256({ role: "authenticated", sub: ADMIN, exp: NOW + 600 });
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN], 500) }) });
+  assertEquals(res?.status, 403);
+});
+
+Deno.test("admin-only: no token or the publishable key → 403; OPTIONS → not judged", async () => {
+  assertEquals((await requireAdminOrService(req(), { deps: deps({ fetch: adminLookup([ADMIN]) }) }))?.status, 403);
+  assertEquals((await requireAdminOrService(req({ authorization: `Bearer ${PUBLISHABLE_KEY}` }), { deps: deps({ fetch: adminLookup([ADMIN]) }) }))?.status, 403);
+  assertEquals(await requireAdminOrService(req({}, "OPTIONS"), { deps: deps() }), null);
 });
 
 // ── supabaseKeys: which key a function sends, which keys it accepts ──────────────────

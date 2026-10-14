@@ -402,6 +402,45 @@ export async function isServiceCaller(req: Request, opts: WriteGuardOptions = {}
 }
 
 /**
+ * For functions an admin runs as Nuke (the admin inbox's replies): the service key, or a caller with an active
+ * admin_users row, the rule useAdminAccess and RequireAdmin apply in the web app. "Signed in" is not enough,
+ * because sign-up is open and auto-confirmed and anonymous sign-in is on. Call it after requireWriteAuth and before
+ * anything else. Returns null for the service key or an active admin, otherwise a 403 to send back. It fails closed:
+ * if admin_users can't be read, only the service key passes. OPTIONS is never judged. 2026-10-14.
+ */
+export async function requireAdminOrService(req: Request, opts: WriteGuardOptions = {}): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const verdict = await authenticateWriter(req, opts);
+  if (verdict.ok && verdict.caller.kind === "service_role") return null;
+  const callerId = verdict.ok && verdict.caller.kind === "user" ? verdict.caller.userId : null;
+  let isAdmin = false;
+  if (callerId && /^[0-9a-f-]{36}$/i.test(callerId)) {
+    const deps = withDefaults(opts.deps);
+    const url = deps.env("SUPABASE_URL");
+    const key = projectSecretKey(deps.env);
+    try {
+      const r = await deps.fetch(
+        `${url}/rest/v1/admin_users?user_id=eq.${callerId}&is_active=eq.true&select=user_id&limit=1`,
+        { headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` } },
+      );
+      if (r.ok) {
+        const rows = await r.json();
+        isAdmin = Array.isArray(rows) && rows[0]?.user_id === callerId;
+      }
+    } catch {
+      isAdmin = false;
+    }
+  }
+  if (isAdmin) return null;
+  const path = (() => { try { return new URL(req.url).pathname; } catch { return "?"; } })();
+  console.warn(`[writeGuard] admin-only refused ${req.method} ${path}: ${callerId ? "not an active admin" : "no user"}`);
+  return new Response(JSON.stringify({ error: "forbidden", reason: "admins only" }), {
+    status: 403,
+    headers: { ...CORS, ...(opts.headers ?? {}), "Content-Type": "application/json" },
+  });
+}
+
+/**
  * For functions that act AS the platform owner: send mail as Nuke, read the owner's books.
  * "Signed in" is not enough there, because sign-up is open and auto-confirmed. Call it after
  * requireWriteAuth. Returns null for the service key or the company owner
