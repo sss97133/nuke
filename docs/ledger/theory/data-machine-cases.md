@@ -2175,3 +2175,39 @@ Until then it is untestable and says so.
 segment (wire element occurrence), topology node and routing, with landmarks extended into topology branches,
 `Mating` as a key between plug rows, and variant links reaching segments and wire ends. A curator approves it. Then
 #110 is re-ingested end to end from its own citations as the first case (H1), with its diff against today's rows.
+
+#### 13.12.2 Step 2, dry run on wire #110 (lead, 2026-10-14)
+
+The harness tables went live with migration 20261014060000 (PR #1156; 5 tables, 75 of 75 columns described). Before
+writing #110 into them, a read-only dry run asked what each of its facts would key to. The answer locates step 2's
+real work.
+
+**What #110 is, across its records.** The cited closure of 2026-05-13 says M22759/32 tan/white, a Metri-Pack 150 sensor
+plug and a WPCTS30 pigtail. The registry today says M22759/16-22 yellow/red (colour basis: Dave's Bronco sheet, a
+practice from another vehicle) and a GT150 plug; its own wire row still names a Metri-Pack terminal while its end rows
+say GT150 12191818. Four versions of the same wire, none of them superseded in the database: the history the new
+tables can carry and the old ones overwrote.
+
+**What its facts can key to today.**
+- Cavities: 1 of 4 wire ends resolves, and only by translation ("B04" in the harness, "B4" in
+  `connector_cavity_layouts`). The library stores the D38999 25-61 insert twice (`D38999_J61`,
+  `mil_spec_D38999_24WJ61SN`), both with invented names (R1P1 to R4P20) instead of the MIL-STD-1560 letters the
+  harness uses ("w"). The standard letters and positions are already transcribed in the repo from MILNEC
+  p. B-22 (`scripts/generate_connector_build_sheets.py`, `CAV_XY`). No GT150 2-way layout exists.
+- Parts: the wire-end table carries nine catalog keys and fills none. `catalog_parts` holds M22759/16-22 in solid
+  colours only (no -42 yellow/red), the M800-KIT-N Superseal kit and a GT150 2-way female housing (15497399), but not
+  the D38999/24WJ61SN receptacle, the /26WJ61PN plug, the M39029/56-351 and /58-363 contacts, the GT150 terminal
+  12191818 or seal 15366021.
+- Catalogs: eight parallel tables hold parts (`catalog_parts`, `parts_catalog`, `part_catalog`,
+  `intelligent_parts_catalog`, `ebay_parts_catalog`, `wire_catalog`, `electrical_system_catalog`, `tool_catalog`).
+  `catalog_parts` is the one the harness foreign keys point at.
+- Lengths: one 4.6 ft zone estimate for the whole wire; never split at the firewall. Each segment's planned length
+  is unknown, with that reason, until routing exists.
+
+**Step 2, in order.** (a) Name `catalog_parts` the part master for harness keys and record the other seven as feeders
+or retired, through `schema_proposals` (no data moves in this step). (b) Library repairs from cited sources: the 25-61
+insert once, with standard letters and positions from MILNEC p. B-22; a GT150 2-way layout; one cavity-naming rule
+for housings (molded numbers) with the ECU's A/B labels mapped at the instance. (c) Catalog rows for #110's missing
+parts, each with its supplier page as source and no price. (d) #110 itself: signal, net, two segments mated at cavity
+w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
+the new rows return the same four wire ends; the diff is published with the change.
