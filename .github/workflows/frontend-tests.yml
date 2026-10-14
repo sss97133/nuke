@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '0 7 * * *' # daily
 
+concurrency:
+  # A newer push to a pull request supersedes its older run; pushes to main, the schedule and manual runs never cancel.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   published-buyer-profile-contract:
     runs-on: ubuntu-latest
@@ -545,6 +550,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # The merge commit and its base, so the replay scope below can diff a pull request.
+          fetch-depth: 2
+      - name: Scope the retained-listing replay to what it reads
+        id: retained
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # The four replay steps below take about 20 minutes and read only the files their script names, and the
+          # files those name. A pull request that changes none of them cannot change their result, so it skips them;
+          # pushes to main, the daily schedule and manual runs always replay.
+          if [ "$EVENT" != pull_request ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          seen=' '; queue='scripts/test-retained-listing-intake.py'
+          while [ -n "$queue" ]; do
+            set -- $queue; f=$1; shift; queue="$*"
+            case "$seen" in (*" $f "*) continue ;; esac
+            seen="$seen$f "
+            [ -f "$f" ] || continue
+            queue="$queue $(grep -ohE '(supabase|scripts)/[A-Za-z0-9_./-]+[.](py|mjs|js|ts|sql)' "$f" | sort -u | tr '\n' ' ')"
+          done
+          seen="$seen.github/workflows/frontend-tests.yml "
+          hits=$(git diff --name-only HEAD^1 HEAD | while read -r c; do case "$seen" in (*" $c "*) echo "$c" ;; esac; done)
+          echo "replay reads $(echo $seen | wc -w | tr -d ' ') files"
+          if [ -n "$hits" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this pull request changes: $hits"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "::notice::Retained-listing replay skipped: this pull request changes none of the files it reads. It runs on main and daily."
+          fi
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -563,18 +596,22 @@ jobs:
           RETAINED_PROPERTY_TEST_EXTERIOR=1 node scripts/discovery/retained-listing-property-test.mjs
           RETAINED_PROPERTY_TEST_POWERTRAIN=1 node scripts/discovery/retained-listing-property-test.mjs
       - name: Verify retained listing scheduled intake and canonical completion
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_intake_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_intake_ci
       - name: Verify retained listing replay reaches recent claims and exhausts both fronts
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_two_front_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_two_front_ci --two-front
       - name: Verify retained listing120 staging, leases and canonical source custody
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_bulk_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_bulk_ci --two-front --bulk120
       - name: Verify full retained replay, exact assay equality and 500k aggregation plans
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_powertrain_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain --description --odometer --identity --vin-label --craigslist-odometer --craigslist-year --native-year --native-identity --public-identity-evidence
