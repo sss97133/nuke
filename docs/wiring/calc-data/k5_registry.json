@@ -41867,8 +41867,7 @@
    "vendor": "digikey",
    "captured": "2026-09-26",
    "status": "NOT ordered — ordering paused 2026-09-26; reference only",
-   "line_count": 10,
-   "total": 313.37
+   "line_count": 10
   },
   {
    "captured": "2026-09-26",
@@ -41878,8 +41877,7 @@
    "vendor": "prowire",
    "captured": "2026-09-26",
    "status": "NOT ordered — ordering paused 2026-09-26 (K5_WIRING_STATE 0l); reference only",
-   "line_count": 96,
-   "total": 3620.23
+   "line_count": 96
   }
  ],
  "diff": [
