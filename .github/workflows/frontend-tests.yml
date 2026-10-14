@@ -1887,6 +1887,30 @@ jobs:
       - name: Verify full native listing prose and qualified public reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_description -f supabase/sql/test_vehicle_listing_description_reader.sql
 
+  timeline-view-invoker-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable timeline view database
+        run: createdb dm_refinement_timeline_view_ci
+      - name: Verify writes through vehicle_timeline_events obey the row policies for owner, contributor and stranger
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_timeline_view_ci -f supabase/sql/test_vehicle_timeline_events_invoker.sql
+
   burst-total-one-pass-contract:
     runs-on: ubuntu-latest
     services:
