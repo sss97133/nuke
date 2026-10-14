@@ -82,6 +82,30 @@ jobs:
       - name: Verify market_pulse_live names its 17 row slots in order
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
 
+  treemap-refresh-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable treemap database
+        run: createdb dm_refinement_treemap_ci
+      - name: Verify the map refresh is concurrent only where a unique index allows it
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_treemap_ci -f supabase/sql/test_treemap_refresh_all.sql
+
   market-pulse-live-heat-contract:
     runs-on: ubuntu-latest
     services:
