@@ -226,7 +226,7 @@ const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }>
         color: '#666',
         lineHeight: 1.5,
       }}>
-        <span>{fmt(node.count)} vehicles</span>
+        <span>{fmt(node.count)} sold</span>
       </div>
 
       {/* Median price */}
@@ -318,7 +318,7 @@ const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }
         color: '#666',
         lineHeight: 1.5,
       }}>
-        {fmt(node.count)} vehicles
+        {fmt(node.count)} sold
       </div>
 
       {/* Prices */}
@@ -340,7 +340,7 @@ const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }
           color: '#aaa',
           marginTop: 4,
         }}>
-          {Math.round((node.sold_count / node.auction_count) * 100)}% sold ({fmt(node.sold_count)}/{fmt(node.auction_count)})
+          {Math.round((node.sold_count / node.auction_count) * 100)}% sold of {fmt(node.auction_count)} known outcomes
         </div>
       )}
     </Link>

@@ -42,7 +42,7 @@ export function useSearchEmptyState(enabled: boolean) {
       };
     });
 
-    // Makes with their true counts, from the ledger's by-brand view (vehicles with a recorded price), and the
+    // Makes with their true counts, from the ledger's by-brand view (public vehicles with a confirmed sale), and the
     // planner's estimate of the public total: neither walks the table, so neither can time out.
     const makesQuery = supabase.rpc('treemap_by_brand');
 
@@ -52,7 +52,7 @@ export function useSearchEmptyState(enabled: boolean) {
         if (boardRes.status === 'fulfilled') { setRecentVehicles(boardRes.value.recent); setNotableSales(boardRes.value.notable); }
         if (makesRes.status === 'fulfilled' && Array.isArray(makesRes.value.data)) {
           const rows = makesRes.value.data as { name: string; count: number }[];
-          // The same total the ledger map states: vehicles with a recorded price, summed over makes.
+          // The same total the ledger map states: vehicles with a confirmed sale, summed over makes.
           setTotalCount(rows.reduce((sum, row) => sum + (row.count > 0 ? row.count : 0), 0));
           const sorted = rows
             .filter((row) => row.name && row.count > 0)
