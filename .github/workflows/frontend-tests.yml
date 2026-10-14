@@ -944,3 +944,27 @@ jobs:
         run: createdb dm_refinement_device_attribution_ci
       - name: Verify a phone frame is refused before the fix and lands after it
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_device_attribution_ci -f supabase/sql/test_device_attribution_as_owner.sql
+
+  vehicles-priced-sales-indexes-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_priced_sales_ci
+      - name: Verify the partial indexes serve the price-history statement and change no answer
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_priced_sales_ci -f supabase/sql/test_vehicles_priced_sales_indexes.sql
