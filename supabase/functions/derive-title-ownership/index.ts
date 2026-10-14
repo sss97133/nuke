@@ -35,6 +35,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runWithChain } from "../_shared/claudeSubscriptionAuth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const MODEL = "claude-opus-4-8";
 const BUCKET = "user-documents";
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     // Caller identity (RLS): only ever their own documents.
     const caller = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      projectPublishableKey()!,
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: userData } = await caller.auth.getUser();
@@ -105,7 +106,7 @@ Deno.serve(async (req) => {
     // the dispatcher proves itself with the shared secret instead.
     const internalSecret = req.headers.get("x-nuke-internal");
     const isServiceRole = roleOf(authHeader) === "service_role"
-      || (!!internalSecret && internalSecret === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+      || (!!internalSecret && internalSecret === projectSecretKey());
     const bodyPeek = await req.clone().json().catch(() => ({}));
     const userId = userData?.user?.id ?? (isServiceRole ? bodyPeek.user_id : undefined);
     if (!userId) return json({ error: "Invalid session", service_role: isServiceRole }, 401);
@@ -114,7 +115,7 @@ Deno.serve(async (req) => {
     // NOT taken from this client — userId came from the verified JWT above.
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
 
     const body = await req.json().catch(() => ({}));
@@ -295,7 +296,7 @@ Deno.serve(async (req) => {
 
       const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${projectSecretKey()}` },
         body: JSON.stringify(payload),
       });
       const out = await res.json();
@@ -326,7 +327,7 @@ Deno.serve(async (req) => {
 /** Downscale server-side via the storage render endpoint; `resize=contain` or the
  *  document's corners get cropped away (the default is cover). */
 async function fetchDocumentAsBase64(admin: any, path: string): Promise<string | null> {
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const key = projectSecretKey()!;
   const url = `${Deno.env.get("SUPABASE_URL")}/storage/v1/render/image/authenticated/${BUCKET}/${path}?width=${RENDER_WIDTH}&resize=contain&quality=85`;
   let res = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   if (!res.ok) {

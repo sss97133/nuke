@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
     // 1) extract-bat-core (core: HTML snapshot + clean identity + essentials/images/auction_events)
     // 2) extract-auction-comments (comments/bids) (non-critical)
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceKey = projectSecretKey() ?? '';
     if (!supabaseUrl || !serviceKey) {
       return json(500, { success: false, error: 'Server not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing)' });
     }

@@ -30,6 +30,7 @@ import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -1150,7 +1151,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
