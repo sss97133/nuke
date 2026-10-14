@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only, from the repo root:
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi1 -f supabase/sql/test_k5_harness_rsi_pass1.sql
--- Proves 20261014103000_k5_harness_rsi_pass1.sql on top of the reshape: design state (contradicted, candidate), options
+-- Proves 20261014113000_k5_harness_rsi_pass1_reissue.sql on top of the reshape: design state (contradicted, candidate), options
 -- at segment grain, PDM protection from the pin library, catalog keys on wire ends, evidence links, the stack
 -- registration and the coverage view.
 \set ON_ERROR_STOP on
@@ -23,17 +23,25 @@ END $$;
 
 -- The live shapes both harness migrations touch (only the columns they use).
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean, user_id uuid, owner_id uuid);
-CREATE TABLE public.pdm_units (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, unit_name text, model text,
-  channel_count integer, rated_amps numeric, notes text);
-CREATE TABLE public.pdm_channels (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), pdm_unit_id uuid, channel_number integer,
-  channel_group_name text, fuse_rating_amps numeric, notes text);
+CREATE TABLE public.pdm_units (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, unit_name text NOT NULL,
+  model text NOT NULL, channel_count integer NOT NULL CHECK (channel_count > 0), rated_amps numeric, notes text,
+  UNIQUE (vehicle_id, unit_name));
+CREATE TABLE public.pdm_channels (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), pdm_unit_id uuid NOT NULL REFERENCES public.pdm_units(id),
+  channel_number integer NOT NULL, channel_group_name text, fuse_rating_amps numeric, notes text, UNIQUE (pdm_unit_id, channel_number));
 CREATE TABLE public.device_pin_maps (device_model text, pin_number text, pin_function text, max_current_amps numeric);
 CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_identifier text, structured_data jsonb);
 CREATE TABLE public.stacks (stack_id text, version integer, name text, question text, family text, path text[],
   external_dimensions text[], who_cares text, scoring text, status text, thesis_vein_id text, thesis_vein_version integer,
   source text, supersedes_version integer, registered_at timestamptz, registered_by text, PRIMARY KEY (stack_id, version));
-CREATE TABLE public.stack_needs (stack_id text, version integer, layer text, kind text, object text, denominator text,
-  fresh_within interval, note text, substrate text);
+CREATE TABLE public.stack_substrates (substrate text PRIMARY KEY, declared_table text, declared_at timestamptz,
+  declared_by text, note text, source text NOT NULL, registered_at timestamptz NOT NULL, registered_by text NOT NULL);
+INSERT INTO public.stack_substrates (substrate, source, registered_at, registered_by) VALUES ('text fold', 'fixture', now(), 'fixture');
+-- The live shape: substrate is generated from an abstract need's text and must be a declared substrate.
+CREATE TABLE public.stack_needs (stack_id text NOT NULL, version integer NOT NULL, layer text NOT NULL, kind text NOT NULL,
+  object text NOT NULL, denominator text, fresh_within interval, note text,
+  substrate text GENERATED ALWAYS AS (CASE WHEN kind = 'abstract' THEN object ELSE NULL END) STORED
+    REFERENCES public.stack_substrates(substrate),
+  FOREIGN KEY (stack_id, version) REFERENCES public.stacks(stack_id, version));
 CREATE TABLE public.catalog_parts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), part_number text);
 CREATE TABLE public.harness_designs (id uuid PRIMARY KEY, vehicle_id uuid);
 CREATE TABLE public.harness_endpoints (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), design_id uuid, code text, name text,
@@ -155,7 +163,7 @@ INSERT INTO public.vehicle_observations (id, vehicle_id, source_identifier, stru
 
 
 \i supabase/migrations/20261014101500_k5_harness_reshape_v1_reissue.sql
-\i supabase/migrations/20261014103000_k5_harness_rsi_pass1.sql
+\i supabase/migrations/20261014113000_k5_harness_rsi_pass1_reissue.sql
 
 DO $$
 DECLARE n int; got text;
@@ -202,7 +210,7 @@ BEGIN
   IF got IS DISTINCT FROM 'endpoint/supports termination/needs_bench termination/supports' THEN RAISE EXCEPTION 'evidence links: %', got; END IF;
 
   -- the model measures itself
-  SELECT count(*) INTO n FROM public.stack_needs WHERE stack_id = 'SH';
+  SELECT count(*) INTO n FROM public.stack_needs WHERE stack_id = 'SH' AND (kind <> 'abstract' OR substrate IS NOT NULL);
   IF n <> 13 THEN RAISE EXCEPTION 'SH needs: got %, want 13', n; END IF;
   SELECT numerator INTO n FROM public.v_harness_coverage WHERE measure = 'nets with protection';
   IF n <> 3 THEN RAISE EXCEPTION 'coverage view: nets with protection %', n; END IF;

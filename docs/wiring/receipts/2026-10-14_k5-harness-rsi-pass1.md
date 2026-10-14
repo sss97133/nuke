@@ -4,7 +4,7 @@ change_type: data_model
 scope: harness_evidence (new); harness_segments.design_status/design_note; wiring_decision_links target check; K5 pdm_units/pdm_channels; wire-end catalog keys; stack SH in the stack registry; v_harness_coverage
 proposal: schema_proposals 50296583 (approved for build 2026-10-14 under owner direction)
 case: docs/ledger/theory/data-machine-cases.md 13.12.2
-migration: supabase/migrations/20261014103000_k5_harness_rsi_pass1.sql
+migration: supabase/migrations/20261014113000_k5_harness_rsi_pass1_reissue.sql
 contract: supabase/sql/test_k5_harness_rsi_pass1.sql (PG17, CI job k5-harness-rsi-pass1-contract)
 ---
 
