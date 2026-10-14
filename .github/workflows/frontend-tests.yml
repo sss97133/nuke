@@ -1812,6 +1812,30 @@ jobs:
       - name: Verify the findings reader returns the old projection rows under the image row policies
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_findings_ci -f supabase/sql/test_vehicle_image_findings.sql
 
+  open-insert-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable open insert policies database
+        run: createdb dm_refinement_open_insert_ci
+      - name: Verify anon no longer inserts where the policy checked nothing
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_open_insert_ci -f supabase/sql/test_open_insert_policies.sql
+
   storage-policies-contract:
     runs-on: ubuntu-latest
     services:
