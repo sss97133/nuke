@@ -43,6 +43,7 @@ import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
 import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
@@ -1055,7 +1056,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "").trim();
+    const serviceRoleKey = (projectSecretKey() ?? "").trim();
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 

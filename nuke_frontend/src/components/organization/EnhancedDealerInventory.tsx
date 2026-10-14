@@ -7,6 +7,7 @@ import MarkAsDuplicateButton from '../vehicle/MarkAsDuplicateButton';
 import QuickStatusBadge from './QuickStatusBadge';
 import FlagProblemButton from './FlagProblemButton';
 import ResilientImage from '../images/ResilientImage';
+import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../../lib/privateMoney';
 
 interface DealerVehicle {
   id: string;
@@ -37,6 +38,8 @@ interface DealerVehicle {
     current_value?: number;
     mileage?: number;
     sale_status?: string | null;
+    asking_price?: number | null;
+    sale_price?: number | null;
   };
   thumbnail_url?: string;
   thumbnail_sources?: string[] | null;
@@ -78,6 +81,9 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
     const silent = opts?.silent === true;
     if (!silent) setLoading(true);
     try {
+      // The link's asking price, cost basis and sale price are the organization's books: its managers
+      // read them through the books reader; everyone else sees the vehicle's public asking and sale price.
+      const booksPromise = fetchOrganizationVehicleBooks(organizationId);
       // Load ALL vehicles (active, sold, archived) - smart display will categorize them
       const { data, error } = await supabase
         .from('organization_vehicles')
@@ -87,12 +93,9 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           relationship_type,
           status,
           listing_status,
-          asking_price,
-          cost_basis,
           days_on_lot,
           featured,
           sale_date,
-          sale_price,
           start_date,
           end_date,
           notes,
@@ -106,7 +109,9 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             vin,
             current_value,
             mileage,
-            sale_status
+            sale_status,
+            asking_price,
+            sale_price
           )
         `)
         .eq('organization_id', organizationId)
@@ -211,15 +216,20 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         }
       }
 
+      const books = await booksPromise;
       const enriched = validVehicles.map((v: any) => {
         // Normalize embedded vehicles relationship to a single object.
         // In some generated Supabase types, `vehicles` is typed as an array even though it's a many-to-one.
         const vehicleObj = Array.isArray(v.vehicles) ? (v.vehicles[0] ?? null) : v.vehicles;
         if (!vehicleObj) return null;
+        const booked = withOrganizationVehicleBook(v, books);
 
         return {
-          ...v,
+          ...booked,
+          asking_price: booked.asking_price ?? vehicleObj.asking_price ?? null,
+          sale_price: booked.sale_price ?? vehicleObj.sale_price ?? null,
           vehicles: vehicleObj,
+
           thumbnail_url: thumbByVehicleId.get(v.vehicle_id) || null,
           thumbnail_sources: thumbSourcesByVehicleId.get(v.vehicle_id) || null,
         };

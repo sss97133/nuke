@@ -17,6 +17,7 @@ import React, { useEffect, useState } from 'react';
 import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { useViewHistory } from '../../hooks/useViewHistory';
@@ -154,7 +155,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     if (src) openPopup(<SourcePopup source={src} />, src.toUpperCase(), 420);
   };
   const handleCompClick = (comp: CompSale) => {
-    supabase.from('vehicles').select('*').eq('id', comp.id).single().then(({ data }) => {
+    supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', comp.id).single().then(({ data }) => {
       if (data) openPopup(<VehiclePopup vehicle={data as unknown as FeedVehicle} />, [comp.year, comp.model].filter(Boolean).join(' '), 480);
     });
   };

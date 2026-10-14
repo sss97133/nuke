@@ -8,6 +8,7 @@ import {
   RETAINED_VIN_BATCH_LIMIT,
   RETAINED_VIN_BATCH_MODE,
 } from "../ingest-observation/retainedVinBatch.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (data: unknown, status = 200) =>
@@ -78,7 +79,7 @@ export async function drainRetainedReferenceQueue(
   if (Date.now() - started >= 40000) transportReason = "batch_budget_deferred";
   else if (valid.length > 0) {
     try {
-      const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      const key = projectSecretKey(),
         url = Deno.env.get("SUPABASE_URL");
       if (!key || !url) throw new Error("credential_unavailable");
       const response = await fetch(`${url}/functions/v1/ingest-observation`, {

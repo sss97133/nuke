@@ -98,16 +98,17 @@ Deno.test("real scheduled drain refuses private parents and explicit unknown val
   const unknown = await run("unknown");assert(unknown.writes === 30 && unknown.body.refused === 30);
 });
 Deno.test("signed-in caller cannot claim scheduled work", async () => {
-  const secret = Deno.env.get("JWT_SIGNING_SECRET");Deno.env.set("JWT_SIGNING_SECRET","test-secret");
+  // A user session as Auth signs it since 2026-10-14: ES256, verified against the project JWKS.
+  const jwks = Deno.env.get("SUPABASE_JWKS");const pair = await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+  Deno.env.set("SUPABASE_JWKS",JSON.stringify({keys:[{...(await crypto.subtle.exportKey("jwk",pair.publicKey)),kid:"t",alg:"ES256"}]}));
   try {
     const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-    const base = `${encode({alg:"HS256",typ:"JWT"})}.${encode({role:"authenticated",sub:VID,exp:Math.floor(Date.now()/1000)+300})}`;
-    const key = await crypto.subtle.importKey("raw",new TextEncoder().encode("test-secret"),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-    const sig = new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(base)));
+    const base = `${encode({alg:"ES256",typ:"JWT",kid:"t"})}.${encode({role:"authenticated",sub:VID,exp:Math.floor(Date.now()/1000)+300})}`;
+    const sig = new Uint8Array(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},pair.privateKey,new TextEncoder().encode(base)));
     const token = `${base}.${btoa(String.fromCharCode(...sig)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_")}`;
     const r = await run("new",token);assert(r.status === 403 && r.writes === 0);
     assert(!r.calls.some(c => c.path.endsWith("claim_retained_listing_properties")));
-  } finally { if(secret===undefined)Deno.env.delete("JWT_SIGNING_SECRET");else Deno.env.set("JWT_SIGNING_SECRET",secret); }
+  } finally { if(jwks===undefined)Deno.env.delete("SUPABASE_JWKS");else Deno.env.set("SUPABASE_JWKS",jwks); }
 });
 for (const [i,key] of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()) {
   if (saved[i] === undefined) Deno.env.delete(key);else Deno.env.set(key,saved[i]!);

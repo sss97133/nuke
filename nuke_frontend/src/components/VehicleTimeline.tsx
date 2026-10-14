@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../lib/privateMoney';
+
 import AddEventWizard from './AddEventWizard';
 import { UniversalImageUpload } from './UniversalImageUpload';
 import TimelineEventComments from './TimelineEventComments';
@@ -217,17 +219,21 @@ const VehicleTimeline: React.FC<{
 
   const loadVehicleOwner = async () => {
     try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('user_id, current_value, asking_price, purchase_price, msrp')
-        .eq('id', vehicleId)
-        .single();
+      const [{ data, error }, ownerBooks] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('user_id, current_value, asking_price, msrp')
+          .eq('id', vehicleId)
+          .single(),
+        fetchVehicleOwnerBooks([vehicleId]),
+      ]);
       if (data && !error) {
         setVehicleOwner(data.user_id);
         setVehicleValueMeta({
           current_value: (data as any).current_value ?? null,
           asking_price: (data as any).asking_price ?? null,
-          purchase_price: (data as any).purchase_price ?? null,
+          purchase_price: ownerBooks.get(vehicleId)?.purchase_price ?? null,
+
           msrp: (data as any).msrp ?? null
         });
       }

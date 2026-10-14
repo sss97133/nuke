@@ -331,6 +331,18 @@ export interface LoadVehicleParams {
   setAuctionPulse: (pulse: any) => void;
 }
 
+/**
+ * The observation total the profile shows ("N in the record"). The profile RPC carries it in stats; its timeout fallback
+ * and a VIN-keyed load read the vehicle row instead, which holds the same maintained total (vehicles.observation_count).
+ * Either is a number the page can use as it stands; only when neither exists does the page count the rows itself, and
+ * that exact count runs the row policy over every observation of the vehicle (measured 2026-10-14: K5 mean 6.2 s).
+ */
+export function observationTotal(fromRpc: number | null, row: unknown): number | null {
+  if (typeof fromRpc === 'number') return fromRpc;
+  const column = (row as { observation_count?: unknown } | null | undefined)?.observation_count;
+  return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
+}
+
 export async function loadVehicleImpl({
   vehicleId,
   session,
@@ -406,7 +418,7 @@ export async function loadVehicleImpl({
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,purchase_price,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 
@@ -531,6 +543,8 @@ export async function loadVehicleImpl({
       }
 
     }
+
+    rpcLoaded.observationCount = observationTotal(rpcLoaded.observationCount, vehicleData);
 
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {

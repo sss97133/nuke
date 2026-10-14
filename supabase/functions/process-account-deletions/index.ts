@@ -15,8 +15,8 @@
  * NEVER deleted — account deletion anonymizes identity, never substrate.
  *
  * Invocation: cron (10-15 min cadence is fine) or manual. Deployed with
- * --no-verify-jwt, so it gates itself: the bearer token must be the
- * service role key.
+ * --no-verify-jwt, so it gates itself: the caller must be the service
+ * role (writeGuard's judgement).
  *
  * POST /functions/v1/process-account-deletions
  *   Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
@@ -24,7 +24,8 @@
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const BATCH_SIZE = 50;
 const BAN_DURATION = "876000h"; // ~100 years
@@ -38,33 +39,18 @@ Deno.serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
   if (!supabaseUrl || !serviceKey) {
     return json(500, { ok: false, error: "Supabase env vars not configured" });
   }
 
-  // Deployed --no-verify-jwt: require a service-grade key. This function
-  // bans auth users — it must never be callable with anon/user tokens.
-  // Exact match against the runtime-injected key is brittle across key
-  // rotations/formats (legacy JWT vs sb_secret_*), so fall back to a
-  // capability check: only a real service key can call the GoTrue admin API
-  // (GoTrue verifies the signature server-side; a forged unsigned
-  // role=service_role JWT fails).
-  const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!bearer) {
+  // Deployed --no-verify-jwt: require the service role. This function bans auth users — it must
+  // never be callable with anon/user tokens. Judged as writeGuard judges it: comparing the bearer
+  // with the runtime-injected key no longer works (the gateway hands functions a minted JWT for a
+  // secret key), and the old probe that called the GoTrue admin API with the caller's token is
+  // refused for every caller since the legacy keys were disabled (2026-10-14).
+  if (!(await isServiceCaller(req))) {
     return json(401, { ok: false, error: "Unauthorized" });
-  }
-  if (bearer !== serviceKey) {
-    const callerClient = createClient(supabaseUrl, bearer, {
-      auth: { persistSession: false },
-    });
-    const { error: gateErr } = await callerClient.auth.admin.listUsers({
-      page: 1,
-      perPage: 1,
-    });
-    if (gateErr) {
-      return json(401, { ok: false, error: "Unauthorized" });
-    }
   }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
