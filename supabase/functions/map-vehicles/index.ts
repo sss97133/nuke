@@ -7,6 +7,8 @@ import {
   rateLimitResponse,
 } from "../_shared/rateLimit.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { cellsAsOf, cellsCanAnswer, cellsClusterSql, cellsHistogramSql, readWithin } from "./cells.ts";
 
 const RATE_LIMIT_CONFIG = {
   namespace: "map-vehicles",
@@ -19,6 +21,8 @@ const RATE_LIMIT_CONFIG = {
  *
  * Queries vehicle_location_observations (VLO) instead of vehicles table.
  * Each observation is a location event (listing, sighting, auction, sale) at a point in time.
+ * Public, undeleted vehicles only: this function reads over a direct connection, where no row policy applies, so
+ * every read states the test itself. Unfiltered clusters and histograms come from mv_map_public_cells (cells.ts).
  *
  * ── MODES ──────────────────────────────────────────────────────────────────────
  *
@@ -68,7 +72,7 @@ Deno.serve(async (req) => {
     // Rate limiting
     const rlSupabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
     const clientIp = getClientIp(req);
     const rl = await checkRateLimit(rlSupabase, clientIp, RATE_LIMIT_CONFIG);
@@ -106,8 +110,6 @@ Deno.serve(async (req) => {
       const temporalPool = new Pool(dbUrl, 1, true);
       const temporalConn = await temporalPool.connect();
       try {
-        await temporalConn.queryObject("SET LOCAL statement_timeout = '15s'");
-
         const tConditions: string[] = [
           "vlo.county_fips IS NOT NULL",
           "vlo.latitude IS NOT NULL",
@@ -144,12 +146,12 @@ Deno.serve(async (req) => {
               SUM(COALESCE(v.sale_price, v.sold_price, 0)) AS value,
               ROUND(AVG(NULLIF(COALESCE(v.sale_price, v.sold_price, 0), 0)))::bigint AS avg
             FROM vlo_county vc
-            JOIN vehicles v ON v.id = vc.vehicle_id AND v.deleted_at IS NULL
+            JOIN vehicles v ON v.id = vc.vehicle_id AND v.is_public AND v.deleted_at IS NULL
             GROUP BY vc.fips
           `;
-          const { rows } = await temporalConn.queryObject<{
+          const { rows } = await readWithin<{
             fips: string; count: number; value: number; avg: number;
-          }>({ text: sql, args: tArgs });
+          }>(temporalConn, sql, tArgs);
 
           const totalCount = rows.reduce((s, r) => s + r.count, 0);
           const totalValue = rows.reduce((s, r) => s + Number(r.value), 0);
@@ -202,12 +204,12 @@ Deno.serve(async (req) => {
               SUM(COALESCE(v.sale_price, v.sold_price, 0)) AS value,
               ROUND(AVG(NULLIF(COALESCE(v.sale_price, v.sold_price, 0), 0)))::bigint AS avg
             FROM vlo_state vs
-            JOIN vehicles v ON v.id = vs.vehicle_id AND v.deleted_at IS NULL
+            JOIN vehicles v ON v.id = vs.vehicle_id AND v.is_public AND v.deleted_at IS NULL
             GROUP BY vs.state_fips
           `;
-          const { rows } = await temporalConn.queryObject<{
+          const { rows } = await readWithin<{
             code: string; count: number; value: number; avg: number;
-          }>({ text: sql, args: tArgs });
+          }>(temporalConn, sql, tArgs);
 
           const totalCount = rows.reduce((s, r) => s + r.count, 0);
           const totalValue = rows.reduce((s, r) => s + Number(r.value), 0);
@@ -251,7 +253,7 @@ Deno.serve(async (req) => {
 
     conditions.push(`vlo.latitude  BETWEEN $${p++} AND $${p++}`); args.push(south, north);
     conditions.push(`vlo.longitude BETWEEN $${p++} AND $${p++}`); args.push(west, east);
-    conditions.push(`vlo.confidence >= $${p++}`); args.push(minConfidence);
+    conditions.push(`vlo.confidence >= $${p++}::real`); args.push(minConfidence);
 
     if (timeStart) { conditions.push(`vlo.observed_at >= $${p++}`); args.push(timeStart); }
     if (timeEnd)   { conditions.push(`vlo.observed_at <= $${p++}`); args.push(timeEnd); }
@@ -274,26 +276,29 @@ Deno.serve(async (req) => {
     const conn = await pool.connect();
 
     try {
-      await conn.queryObject("SET LOCAL statement_timeout = '15s'");
-
       // ── HISTOGRAM MODE ──────────────────────────────────────────────────
       if (mode === "histogram") {
-        const sql = `
+        const asOf = cellsCanAnswer(params, minConfidence) ? await cellsAsOf(conn) : null;
+        const sql = asOf ? cellsHistogramSql(minConfidence) : `
           SELECT
             to_char(date_trunc('month', vlo.observed_at), 'YYYY-MM') AS month,
             COUNT(*)::int AS count
           FROM vehicle_location_observations vlo
+          JOIN vehicles v ON v.id = vlo.vehicle_id AND v.is_public AND v.deleted_at IS NULL
           WHERE ${where}
           GROUP BY 1
           ORDER BY 1
         `;
-        const { rows } = await conn.queryObject<{ month: string; count: number }>({
-          text: sql, args,
-        });
+        const { rows } = await readWithin<{ month: string; count: number }>(
+          conn, sql, asOf ? [south, north, west, east] : args,
+        );
 
         return json({
           buckets: rows,
-          meta: { min_confidence: minConfidence, bbox: [west, south, east, north] },
+          meta: {
+            min_confidence: minConfidence, bbox: [west, south, east, north],
+            public_only: true, served_from: asOf ? "mv_map_public_cells" : "live", cells_as_of: asOf,
+          },
         }, rlHdrs);
       }
 
@@ -318,16 +323,17 @@ Deno.serve(async (req) => {
       if (params.price_min) { vConditions.push(`v.sale_price >= $${vp++}`); vArgs.push(parseInt(params.price_min)); }
       if (params.price_max) { vConditions.push(`v.sale_price <= $${vp++}`); vArgs.push(parseInt(params.price_max)); }
 
-      const vehicleJoin = vConditions.length > 0
-        ? `JOIN vehicles v ON v.id = vlo.vehicle_id AND ${vConditions.join(" AND ")}`
-        : `JOIN vehicles v ON v.id = vlo.vehicle_id`;
+      const vehicleJoin = `JOIN vehicles v ON v.id = vlo.vehicle_id AND v.is_public AND v.deleted_at IS NULL${
+        vConditions.length > 0 ? ` AND ${vConditions.join(" AND ")}` : ""}`;
+      let asOf: string | null = null;
 
       // deno-lint-ignore no-explicit-any
       let features: any[] = [];
       let totalMatched = 0;
 
       if (clustered) {
-        const sql = `
+        asOf = cellsCanAnswer(params, minConfidence) ? await cellsAsOf(conn) : null;
+        const sql = asOf ? cellsClusterSql(precision as 0 | 1 | 2, minConfidence) : `
           SELECT
             ROUND(vlo.longitude::numeric, ${precision})::float8 AS lng,
             ROUND(vlo.latitude::numeric,  ${precision})::float8 AS lat,
@@ -344,11 +350,11 @@ Deno.serve(async (req) => {
           LIMIT $${vp}
         `;
         vArgs.push(limit);
-        const { rows } = await conn.queryObject<{
+        const { rows } = await readWithin<{
           lng: number; lat: number; count: number;
           sources: string[] | null; event_types: string[] | null;
           avg_confidence: number;
-        }>({ text: sql, args: vArgs });
+        }>(conn, sql, asOf ? [south, north, west, east, limit] : vArgs);
 
         totalMatched = rows.reduce((s, r) => s + r.count, 0);
         features = rows.map(r => ({
@@ -388,7 +394,7 @@ Deno.serve(async (req) => {
           LIMIT $${vp}
         `;
         vArgs.push(limit);
-        const { rows } = await conn.queryObject<{
+        const { rows } = await readWithin<{
           observation_id: string; vehicle_id: string;
           lng: number; lat: number;
           event_type: string; source: string | null;
@@ -398,7 +404,7 @@ Deno.serve(async (req) => {
           year: number | null; make: string | null; model: string | null;
           price: number | null; thumbnail: string | null;
           vehicle_status: string | null;
-        }>({ text: sql, args: vArgs });
+        }>(conn, sql, vArgs);
 
         totalMatched = rows.length;
         features = rows.map((r: any) => ({
@@ -432,6 +438,9 @@ Deno.serve(async (req) => {
           clustered,
           min_confidence: minConfidence,
           bbox: [west, south, east, north],
+          public_only: true,
+          served_from: asOf ? "mv_map_public_cells" : "live",
+          cells_as_of: asOf,
         },
       }, rlHdrs);
 

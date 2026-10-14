@@ -923,6 +923,36 @@ jobs:
       - name: Verify the inlinable gallery predicate answers as the live one did, row for row
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gallery_eligible_ci -f supabase/sql/test_vehicle_image_gallery_eligible_inline.sql
 
+  map-public-cells-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable map cells database
+        run: createdb dm_refinement_map_public_cells_ci
+      - name: Verify mv_map_public_cells answers the map's cluster and histogram reads as the live public reads do
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_map_public_cells_ci -f supabase/sql/test_map_public_cells.sql
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify map-vehicles reads the fold only for unfiltered requests, inside timed transactions
+        run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
+
   county-readers-contract:
     runs-on: ubuntu-latest
     services:
