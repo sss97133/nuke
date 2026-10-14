@@ -748,6 +748,30 @@ jobs:
       - name: Verify the organization events read joins one vehicle per returned event
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_events_org_ci -f supabase/sql/test_vehicle_events_org_index.sql
 
+  observations-comment-bid-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable comment index contract database
+        run: createdb dm_refinement_comment_bid_index_ci
+      - name: Verify the comments view reads only comment and bid rows once the partial index is valid
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_bid_index_ci -f supabase/sql/test_observations_comment_bid_index.sql
+
   market-lot-activity-contract:
     runs-on: ubuntu-latest
     services:
