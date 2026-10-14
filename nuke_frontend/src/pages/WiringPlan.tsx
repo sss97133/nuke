@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { supabase } from '../lib/supabase';
 import type { ManifestDevice } from '../components/wiring/overlayCompute';
+import { BUILD_MANIFEST_PUBLIC_COLUMNS } from '../lib/buildManifestColumns';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
 import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
 import { CommandPalette } from '../components/wiring/CommandPalette';
@@ -167,7 +168,7 @@ export default function WiringPlan() {
         const [vehicleRes, manifestRes] = await Promise.all([
           supabase.from('vehicles').select('year, make, model').eq('id', vehicleId).maybeSingle(),
           supabase.from('vehicle_build_manifest')
-            .select('*')
+            .select(BUILD_MANIFEST_PUBLIC_COLUMNS)
             .eq('vehicle_id', vehicleId)
             .order('device_category')
             .order('device_name'),
