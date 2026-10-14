@@ -3,12 +3,16 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ params: new URLSearchParams(), requests: [] as any[], navigate: vi.fn(),
-  respond: null as null | ((request: any) => any) }));
+  respond: null as null | ((request: any) => any), rpcCalls: [] as any[], vin: null as null | ((args: any) => any) }));
 vi.mock('react-router-dom', () => ({ useSearchParams: () => [fixture.params], useNavigate: () => fixture.navigate }));
 vi.mock('../lib/track', () => ({ track: vi.fn() }));
 vi.mock('../services/aiDataIngestion', () => ({ ingestVehicle: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: {
-  rpc: async () => ({ data: null }),
+  rpc: async (name: string, args: any) => {
+    fixture.rpcCalls.push([name, args]);
+    if (name === 'vehicle_by_vin_public' && fixture.vin) return fixture.vin(args);
+    return { data: null };
+  },
   functions: { invoke: async (_name: string, request: any) => {
     fixture.requests.push(request.body);
     if (fixture.respond) return fixture.respond(request.body);
@@ -27,7 +31,7 @@ let state: ReturnType<typeof useSearchPage>; let root: Root; let container: HTML
 function Harness() { state = useSearchPage(); return <div>{state.displayResults.map(r => <span key={r.id}>{r.id}</span>)}</div>; }
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null;
+  fixture.params = new URLSearchParams({ q: 'cool cars under $30,000' }); fixture.requests = []; fixture.respond = null; fixture.rpcCalls = []; fixture.vin = null;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -180,4 +184,23 @@ it('keeps pagination available when the price filter removes every loaded result
   await act(async () => state.handleLoadMore());
   expect(fixture.requests[1].offset).toBe(94);
   expect(state.displayResults.map(result => result.id)).toEqual(['vehicle_94']);
+});
+
+it('answers a VIN from the indexed public reader and never calls universal-search', async () => {
+  fixture.params = new URLSearchParams({ q: 'wmwsx3c52dt408613' });
+  fixture.vin = () => ({ error: null, data: [{ id: 'mini', vin: 'WMWSX3C52DT408613', year: 2013, make: 'Mini', model: 'Cooper S Coupe', image_url: null, sale_price: 12000, asking_price: null, is_for_sale: false, sale_status: 'sold' }] });
+  await act(async () => root.render(<Harness />));
+  expect(fixture.requests).toHaveLength(0);
+  expect(fixture.rpcCalls).toEqual([['vehicle_by_vin_public', { p_vin: 'WMWSX3C52DT408613' }]]);
+  expect(state.results.map(r => [r.id, r.type, r.title, r.metadata.sale_price])).toEqual([['mini', 'vehicle', '2013 Mini Cooper S Coupe', 12000]]);
+  expect(state.searchSummary).toBe('1 public vehicle in the ledger with VIN WMWSX3C52DT408613.');
+  expect(state.loading).toBe(false);
+});
+it('says when the ledger holds no public vehicle with that VIN', async () => {
+  fixture.params = new URLSearchParams({ q: 'WP0AA2A95ES123456' });
+  fixture.vin = () => ({ error: null, data: [] });
+  await act(async () => root.render(<Harness />));
+  expect(fixture.requests).toHaveLength(0);
+  expect(state.results).toEqual([]);
+  expect(state.searchSummary).toBe('No public vehicle with VIN WP0AA2A95ES123456 in the ledger.');
 });
