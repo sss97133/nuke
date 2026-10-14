@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '0 7 * * *' # daily
 
+concurrency:
+  # A newer push to a pull request supersedes its older run; pushes to main, the schedule and manual runs never cancel.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   published-buyer-profile-contract:
     runs-on: ubuntu-latest
@@ -82,6 +87,30 @@ jobs:
       - name: Verify market_pulse_live names its 17 row slots in order
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
 
+  treemap-refresh-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable treemap database
+        run: createdb dm_refinement_treemap_ci
+      - name: Verify the map refresh is concurrent only where a unique index allows it
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_treemap_ci -f supabase/sql/test_treemap_refresh_all.sql
+
   market-pulse-live-heat-contract:
     runs-on: ubuntu-latest
     services:
@@ -153,6 +182,30 @@ jobs:
         run: createdb dm_refinement_investment_ci
       - name: Verify the investment proof and timeline carry money only to owners
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_investment_ci -f supabase/sql/test_investment_readers_money_mask.sql
+
+  build-manifest-money-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable build-manifest database
+        run: createdb dm_refinement_manifest_money_ci
+      - name: Verify the build manifest carries money and contacts only to owners
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_manifest_money_ci -f supabase/sql/test_build_manifest_money_owner_only.sql
 
   day-receipt-money-mask-contract:
     runs-on: ubuntu-latest
@@ -521,6 +574,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # The merge commit and its base, so the replay scope below can diff a pull request.
+          fetch-depth: 2
+      - name: Scope the retained-listing replay to what it reads
+        id: retained
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # The four replay steps below take about 20 minutes and read only the files their script names, and the
+          # files those name. A pull request that changes none of them cannot change their result, so it skips them;
+          # pushes to main, the daily schedule and manual runs always replay.
+          if [ "$EVENT" != pull_request ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          seen=' '; queue='scripts/test-retained-listing-intake.py'
+          while [ -n "$queue" ]; do
+            set -- $queue; f=$1; shift; queue="$*"
+            case "$seen" in (*" $f "*) continue ;; esac
+            seen="$seen$f "
+            [ -f "$f" ] || continue
+            queue="$queue $(grep -ohE '(supabase|scripts)/[A-Za-z0-9_./-]+[.](py|mjs|js|ts|sql)' "$f" | sort -u | tr '\n' ' ')"
+          done
+          seen="$seen.github/workflows/frontend-tests.yml "
+          hits=$(git diff --name-only HEAD^1 HEAD | while read -r c; do case "$seen" in (*" $c "*) echo "$c" ;; esac; done)
+          echo "replay reads $(echo $seen | wc -w | tr -d ' ') files"
+          if [ -n "$hits" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this pull request changes: $hits"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "::notice::Retained-listing replay skipped: this pull request changes none of the files it reads. It runs on main and daily."
+          fi
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -539,18 +620,22 @@ jobs:
           RETAINED_PROPERTY_TEST_EXTERIOR=1 node scripts/discovery/retained-listing-property-test.mjs
           RETAINED_PROPERTY_TEST_POWERTRAIN=1 node scripts/discovery/retained-listing-property-test.mjs
       - name: Verify retained listing scheduled intake and canonical completion
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_intake_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_intake_ci
       - name: Verify retained listing replay reaches recent claims and exhausts both fronts
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_two_front_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_two_front_ci --two-front
       - name: Verify retained listing120 staging, leases and canonical source custody
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_bulk_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_bulk_ci --two-front --bulk120
       - name: Verify full retained replay, exact assay equality and 500k aggregation plans
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_powertrain_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain --description --odometer --identity --vin-label --craigslist-odometer --craigslist-year --native-year --native-identity --public-identity-evidence
@@ -590,6 +675,30 @@ jobs:
         run: createdb dm_refinement_county_readers_ci
       - name: Verify the county readers answer with public vehicles only
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_readers_ci -f supabase/sql/test_county_readers_public_only.sql
+
+  vehicle-events-org-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable vehicle events database
+        run: createdb dm_refinement_vehicle_events_org_ci
+      - name: Verify the organization events read joins one vehicle per returned event
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_events_org_ci -f supabase/sql/test_vehicle_events_org_index.sql
 
   market-lot-activity-contract:
     runs-on: ubuntu-latest
@@ -647,6 +756,30 @@ jobs:
       - name: Verify owner-run writers are closed to anon and authenticated, open to the service role
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_writer_functions_ci -f supabase/sql/test_revoke_anon_writer_functions.sql
 
+  vehicles-vin-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable VIN index contract database
+        run: createdb dm_refinement_vehicles_vin_ci
+      - name: Verify a VIN equality lookup reads an index, for the owner and for anon, with the same rows
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicles_vin_ci -f supabase/sql/test_vehicles_vin_equality_index.sql
+
   poller-ledger-contract:
     runs-on: ubuntu-latest
     steps:
@@ -668,6 +801,30 @@ jobs:
           deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
+
+  my-unorganized-photo-count-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable inbox count database
+        run: createdb dm_refinement_unorganized_count_ci
+      - name: Verify the inbox badge count is capped, own-rows-only and invoker-run
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_unorganized_count_ci -f supabase/sql/test_my_unorganized_photo_count.sql
 
   profile-fold-contract:
     runs-on: ubuntu-latest
