@@ -303,6 +303,30 @@ jobs:
       - name: Verify the user contribution calendar carries work cost only to its user
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_user_calendar_ci -f supabase/sql/test_user_calendar_money_mask.sql
 
+  get-vehicle-day-depth-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable day-depth contract database
+        run: createdb dm_refinement_day_depth_ci
+      - name: Verify the day-depth rewrite answers what the live function answers
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_day_depth_ci -f supabase/sql/test_get_vehicle_day_depth_perf.sql
+
   get-user-garage-viewer-contract:
     runs-on: ubuntu-latest
     services:
