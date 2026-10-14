@@ -1099,6 +1099,30 @@ jobs:
       - name: Verify nullable episode ancestry, source custody and two-session races
         run: node scripts/discovery/sale-episode-source-integrity-test.mjs
 
+  vehicle-image-findings-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable image findings database
+        run: createdb dm_refinement_image_findings_ci
+      - name: Verify the findings reader returns the old projection rows under the image row policies
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_findings_ci -f supabase/sql/test_vehicle_image_findings.sql
+
   storage-policies-contract:
     runs-on: ubuntu-latest
     services:
