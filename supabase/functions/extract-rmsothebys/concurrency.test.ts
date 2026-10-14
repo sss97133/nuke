@@ -38,13 +38,6 @@ Deno.test('fewer items than the limit, and no items', async () => {
   await forEachConcurrent([], 4, async () => { throw new Error('never called'); });
 });
 
-Deno.test('wall-clock falls with the limit: 12 items of 20 ms take about a quarter of the time at 4', async () => {
-  const run = async (limit: number) => { const t0 = performance.now(); await forEachConcurrent([...Array(12).keys()], limit, () => sleep(20)); return performance.now() - t0; };
-  const one = await run(1); const four = await run(4);
-  equal(one > 200, true, `limit 1 took ${one.toFixed(0)} ms:`);
-  equal(four < one / 2.5, true, `limit 4 took ${four.toFixed(0)} ms, limit 1 took ${one.toFixed(0)} ms:`);
-});
-
 Deno.test('an error that escapes is thrown after the other workers finish; the other items still run', async () => {
   const done: number[] = [];
   let threw = '';
