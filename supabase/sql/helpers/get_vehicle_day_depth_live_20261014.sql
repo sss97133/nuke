@@ -3,7 +3,10 @@
 -- supabase/sql/test_get_vehicle_day_depth_perf.sql.
 --   get_vehicle_day_depth(uuid)   md5(pg_get_functiondef) e8347b640d968eeee98af6511f8ca657  -- gitleaks:allow (md5 checksum of a function definition, not a secret)
 --   nuke_image_depth_score(...)   md5(pg_get_functiondef) 2bd969542e4b21c3061ab34f71c61b2c  -- gitleaks:allow (md5 checksum of a function definition, not a secret)
+--   vehicle_user_has_access(uuid,uuid)  md5(pg_get_functiondef) 0f13ceda2c2575ba9783c24bf84ab5bf  -- gitleaks:allow (md5 checksum of a function definition, not a secret)
 -- nuke_image_depth_score is the scoring formula the reader calls per day; the migration does not change it.
+-- vehicle_user_has_access is the access test the visibility check calls; the migration does not change it either. It consults
+-- optional tables only where they exist (to_regclass), so a contract database needs just vehicle_user_permissions.
 
 CREATE OR REPLACE FUNCTION public.nuke_image_depth_score(p_gated boolean, p_seen boolean, p_meta jsonb, p_placed boolean, p_clip boolean, p_connected boolean, p_confirmed boolean, p_stale boolean)
  RETURNS numeric
@@ -68,4 +71,91 @@ AS $function$
     count(*) filter (where placed)::int,
     coalesce(round(avg(nuke_image_depth_score(gated,seen,ai_scan_metadata,placed,clip,false,confirmed,stale)),4),0)
   from j group by d order by d;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.vehicle_user_has_access(p_vehicle_id uuid, p_user_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  has_perm boolean := false;
+begin
+  if p_user_id is null then
+    return false;
+  end if;
+
+  -- Direct vehicle-level permissions (legacy, optional)
+  if to_regclass('public.vehicle_user_permissions') is not null then
+    select true into has_perm
+    from public.vehicle_user_permissions vup
+    where vup.vehicle_id = p_vehicle_id
+      and vup.user_id = p_user_id
+      and coalesce(vup.is_active, true) = true
+      and vup.role = any (array[
+        'owner','co_owner','mechanic','appraiser','moderator','contributor','photographer','dealer_rep','sales_agent','restorer','consigner','board_member'
+      ]::text[])
+    limit 1;
+
+    if has_perm then
+      return true;
+    end if;
+  end if;
+
+  -- Vehicle contributors table (legacy collaborators)
+  if to_regclass('public.vehicle_contributors') is not null then
+    select true into has_perm
+    from public.vehicle_contributors vc
+    where vc.vehicle_id = p_vehicle_id
+      and vc.user_id = p_user_id
+      and coalesce(vc.status, 'active') = 'active'
+      and vc.role = any (array[
+        'owner','co_owner','restorer','moderator','consigner','mechanic','appraiser','photographer','sales_agent'
+      ]::text[])
+    limit 1;
+
+    if has_perm then
+      return true;
+    end if;
+  end if;
+
+  -- Organization contributors linked to this vehicle
+  if to_regclass('public.organization_vehicles') is not null and to_regclass('public.organization_contributors') is not null then
+    select true into has_perm
+    from public.organization_vehicles ov
+    where ov.vehicle_id = p_vehicle_id
+      and exists (
+        select 1
+        from public.organization_contributors oc
+        where oc.organization_id = ov.organization_id
+          and oc.user_id = p_user_id
+          and oc.status = 'active'
+          and oc.role = any (array[
+            'owner','co_founder','board_member','manager','employee','technician','contractor','moderator','contributor','photographer'
+          ]::text[])
+      )
+    limit 1;
+
+    if has_perm then
+      return true;
+    end if;
+  end if;
+
+  -- Verified ownership records
+  if to_regclass('public.ownership_verifications') is not null then
+    select true into has_perm
+    from public.ownership_verifications ov
+    where ov.vehicle_id = p_vehicle_id
+      and ov.user_id = p_user_id
+      and ov.status = 'approved'
+    limit 1;
+
+    if has_perm then
+      return true;
+    end if;
+  end if;
+
+  return false;
+end;
 $function$;
