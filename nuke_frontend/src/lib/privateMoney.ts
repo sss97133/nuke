@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 // The owner's money on two tables whose rows every visitor may read. These columns are not granted to
-// anon or authenticated (migration 20261014083000_private_money_columns_owner_only): a select that
+// anon or authenticated (migration 20261014093000_private_money_columns_owner_only): a select that
 // names one, filters or orders on one, or selects '*' on the table, fails with a permission error.
 // Read them through the two readers below (migration 20261014073000_private_money_readers), which
 // return rows to the people who keep those books and no rows to anyone else; one whole vehicles row

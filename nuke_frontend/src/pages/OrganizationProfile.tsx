@@ -14,6 +14,7 @@ import { OrganizationIntelligenceService, type OrganizationIntelligence, type Ta
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { getOrganizationProfileData, getOrganizationCompetitiveContext, type SellerTrackRecord, type CompetitiveContext } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
+import { fetchVehicleCardImages } from '../services/vehicleCardImages';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
@@ -1339,8 +1340,7 @@ export default function OrganizationProfile() {
 
           const [allVehiclesData, allImagesData, allNativeAuctionsData, allExternalAuctionsData, allBatAuctionsData, soldExternalListingsData, soldBatListingsData, endedVehicleListingsData, allExternalListingsData] = await Promise.all([
             runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
-
-            runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
+            runChunked(ids => fetchVehicleCardImages(ids)),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
             // external_listings -> vehicle_events. external_listings is granted to
             // service_role ONLY and carries ZERO RLS policies, so from a browser
