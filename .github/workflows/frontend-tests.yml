@@ -1584,3 +1584,27 @@ jobs:
         run: createdb dm_refinement_cron_key_ci
       - name: Verify cron sends the Vault secret key first, the old fallbacks after, to service_role only
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cron_key_ci -f supabase/sql/test_get_service_role_key_for_cron.sql
+
+  vehicle-card-images-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable vehicle card images database
+        run: createdb dm_refinement_card_images_ci
+      - name: Verify one thumbnail per vehicle under the vehicle_images row policies
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_card_images_ci -f supabase/sql/test_vehicle_card_images.sql
