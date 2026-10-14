@@ -43,3 +43,6 @@ CREATE VIEW public.user_organized_photos AS SELECT id FROM public.photo_rows_stu
 CREATE VIEW public.user_photo_inbox AS SELECT id FROM public.photo_rows_stub;
 CREATE FUNCTION public.get_clip_embed_batch(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE MATERIALIZED VIEW public.feed_items_view AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_contacts AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_deals AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_vehicles AS SELECT id FROM public.photo_rows_stub;

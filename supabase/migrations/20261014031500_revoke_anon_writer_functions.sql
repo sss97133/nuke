@@ -24,7 +24,11 @@
 --   user_photo_inbox        unorganized camera-roll frames of every user (74,917 rows, 18,015 with GPS, 2026-10-14)
 -- and the materialized view feed_items_view, readable logged out, holds 2,455 image rows of which 228 are gated; no
 -- reader (scripts/bat-url-parse-bulk-insert.mjs only refreshes it, as the owner).
--- This revokes EXECUTE from PUBLIC, anon and authenticated on 34 functions and grants it to service_role explicitly.
+-- Three owner-run deal views (hn-review, 2026-10-14) let any signed-in account read deal contacts and deal money
+-- that the tables themselves refuse, and let anon insert and signed-in accounts update through them:
+--   vlva_contacts, vlva_deals, vlva_vehicles. No caller in the repo or cron.
+-- This revokes EXECUTE from PUBLIC, anon and authenticated on 34 functions, grants it to service_role explicitly, and
+-- revokes every privilege on six views from PUBLIC, anon and authenticated.
 -- Their callers keep working: edge functions analysis-engine-coordinator, process-bat-extraction-queue,
 -- sync-live-auctions and photo-pipeline-orchestrator use the service role; cron job photo-pipeline-reset-stuck runs as
 -- postgres, the owner. No web or phone code calls any of the 34 or the three views (main, 2026-10-14; the web's find_vehicles_near_gps is
@@ -99,14 +103,16 @@ BEGIN
   RAISE NOTICE 'revoked anon and authenticated EXECUTE on % owner-run functions', done;
 
   -- The owner-run views: no signed-in or anonymous access.
-  FOREACH s IN ARRAY ARRAY['public.user_organized_photos', 'public.user_photo_inbox', 'public.feed_items_view'] LOOP
+  FOREACH s IN ARRAY ARRAY['public.user_organized_photos', 'public.user_photo_inbox', 'public.feed_items_view',
+                          'public.vlva_contacts', 'public.vlva_deals', 'public.vlva_vehicles'] LOOP
     IF to_regclass(s) IS NULL THEN
       RAISE NOTICE 'skipped, no longer exists: %', s;
       CONTINUE;
     END IF;
     EXECUTE format('REVOKE ALL ON %s FROM PUBLIC, anon, authenticated', to_regclass(s));
-    IF has_table_privilege('authenticated', to_regclass(s), 'SELECT') OR has_table_privilege('anon', to_regclass(s), 'SELECT') THEN
-      RAISE EXCEPTION '% is still selectable by anon or authenticated', s;
+    IF EXISTS (SELECT FROM unnest(ARRAY['anon', 'authenticated']) r, unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) pv
+                WHERE has_table_privilege(r, to_regclass(s), pv)) THEN
+      RAISE EXCEPTION '% still grants anon or authenticated a privilege', s;
     END IF;
   END LOOP;
 END

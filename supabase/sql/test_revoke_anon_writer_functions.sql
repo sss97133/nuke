@@ -20,6 +20,7 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 \ir helpers/writer_function_stubs_20261014.sql
 GRANT SELECT ON public.user_organized_photos, public.user_photo_inbox TO authenticated;
 GRANT SELECT ON public.feed_items_view TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.vlva_contacts, public.vlva_deals, public.vlva_vehicles TO anon, authenticated;
 -- As Supabase's default privileges do for new functions in public.
 DO $$
 DECLARE f regprocedure;
@@ -46,6 +47,9 @@ SELECT public.t_assert(has_table_privilege('authenticated', 'public.user_organiz
   AND has_table_privilege('authenticated', 'public.user_photo_inbox', 'SELECT')
   AND has_table_privilege('anon', 'public.feed_items_view', 'SELECT'), 'before: signed-in accounts read both photo views, anyone reads the feed');
 
+SELECT public.t_assert(has_table_privilege('anon', 'public.vlva_deals', 'INSERT') AND has_table_privilege('authenticated', 'public.vlva_contacts', 'SELECT'),
+  'before: the deal views take inserts from anon and reads from signed-in accounts');
+
 -- 2. The revoke.
 \ir ../migrations/20261014031500_revoke_anon_writer_functions.sql
 
@@ -60,6 +64,9 @@ SELECT public.t_assert(NOT has_table_privilege('authenticated', 'public.user_org
   AND NOT has_table_privilege('anon', 'public.user_photo_inbox', 'SELECT')
   AND NOT has_table_privilege('anon', 'public.feed_items_view', 'SELECT')
   AND NOT has_table_privilege('authenticated', 'public.feed_items_view', 'SELECT'), 'after: the photo views and the feed are closed to signed-in and anonymous callers');
+SELECT public.t_assert(NOT EXISTS (SELECT FROM unnest(ARRAY['public.vlva_contacts', 'public.vlva_deals', 'public.vlva_vehicles']) v,
+    unnest(ARRAY['anon', 'authenticated']) r, unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) pv
+  WHERE has_table_privilege(r, v::regclass, pv)), 'after: the deal views grant anon and authenticated nothing');
 
 -- 4. A rerun is a no-op, and a signature that no longer exists is skipped.
 DROP FUNCTION public.refresh_equipment_hours();
