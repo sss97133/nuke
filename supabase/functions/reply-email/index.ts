@@ -71,6 +71,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Replies go out from the nuke.ag addresses: only an active admin sends them (the admin inbox's own rule).
+    const { data: admin } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!admin) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { inbox_id, reply_html, reply_text } = await req.json();
 
     if (!inbox_id || (!reply_html && !reply_text)) {
