@@ -26,6 +26,7 @@ import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -434,7 +435,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      projectSecretKey()!
     );
 
     console.log(`[RMS] Action: ${action}, Auction: ${auction || 'N/A'}`);

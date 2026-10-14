@@ -1,4 +1,10 @@
 import { supabase } from '../lib/supabase';
+import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
+
+// Search results render as vehicle cards; the extra fields feed the filters and the radius check.
+// A select('*') on vehicles is not granted (lib/privateMoney).
+const SEARCH_RESULT_COLUMNS = `${VEHICLE_CARD_COLUMNS}, normalized_model, generation, color, zip_code, city, state, gps_latitude, gps_longitude, is_daily_driver, is_weekend_car, is_track_car, is_show_car, is_project_car, source, listing_kind, status`;
+
 
 // PostgREST ILIKE uses % and _ wildcards; escape them so user input can't accidentally turn into a wildcard query.
 export const escapePostgrestILike = (value: string): string => String(value || '').replace(/([%_\\])/g, '\\$1');
@@ -158,8 +164,9 @@ export class VehicleSearchService {
       const runQuery = async (includeListingKind: boolean) => {
         let query = supabase
           .from('vehicles')
-          .select('*')
+          .select(SEARCH_RESULT_COLUMNS)
           .neq('status', 'pending');
+
         // Keep non-vehicle items (parts/tools/memorabilia) out of the default vehicle search (when available).
         if (includeListingKind) {
           query = query.eq('listing_kind', 'vehicle');
@@ -287,7 +294,8 @@ export class VehicleSearchService {
         throw error;
       }
 
-      let results = (data || []) as VehicleSearchResult[];
+      let results = (data || []) as unknown as VehicleSearchResult[];
+
 
       // Hydrate profile info (username, full_name) without relying on FK joins
       try {

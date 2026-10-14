@@ -14,6 +14,7 @@ import {
   rateLimitHeaders,
   rateLimitResponse,
 } from '../_shared/rateLimit.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -200,7 +201,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     // ── Rate limiting ──────────────────────────────────────────────────────────

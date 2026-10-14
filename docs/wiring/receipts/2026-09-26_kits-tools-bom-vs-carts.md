@@ -15,7 +15,7 @@ Owner, 2026-09-26: "if we have a master list it should directly correspond to th
 
 ## What was built
 - **Cart snapshots**, captured from the owner's carts (read-only; browser tab closed after):
-  - `orders/prowire_Q27156_2026-09-26.json`: 96 lines, $3,620.23. The line sum equals the cart total.
+  - `orders/prowire_2026-09-26.json`: 96 lines. The line sum equals the cart total.
   - `orders/digikey_2026-09-26.json`: 10 lines, $313.37. The four fuse lines' prices were not captured; their $38.57 sum is derived.
   - `orders/other_2026-09-26.json`: ICT, the eBay D38999 pair, the eBay AFM8 + K43, the Amazon Blue Sea 2019 + MS25171-3S. None bought.
 - **Curated catalog** (`catalog/`). Every fact carries its source or `UNKNOWN: <what closes it>`.

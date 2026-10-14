@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { intakeThrottle, createIntakeBudget, readLandedBatch, readbackFor } from "../poll-listing-feeds/ledger.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
     const startedAt = Date.now();
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     const body = await req.json().catch(() => ({}));
@@ -149,7 +150,7 @@ Deno.serve(async (req) => {
         const extractResponse = await fetch(extractorUrl, {
           method: 'POST',
           headers: {
-            'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+            'Authorization': 'Bearer ' + projectSecretKey(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ url, save_to_db: true, ...(host === 'rmsothebys.com' ? { action: 'extract' } : {}) }),
@@ -189,7 +190,7 @@ Deno.serve(async (req) => {
             fetch(supabaseUrl + '/functions/v1/extract-auction-comments', {
               method: 'POST',
               headers: {
-                'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+                'Authorization': 'Bearer ' + projectSecretKey(),
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({ auction_url: url, vehicle_id: vehicleId }),
