@@ -1,4 +1,4 @@
--- Stub signatures of the 29 writer functions and the 4 kept ones, as of 2026-10-14. Test fixture only.
+-- Stub signatures of the 31 revoked functions and the 4 kept ones, as of 2026-10-14. Test fixture only.
 CREATE FUNCTION public.backfill_photo_analysis(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.backfill_sold_vehicles_comprehensive() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.backfill_vehicle_data_from_bat_listings() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
@@ -32,3 +32,5 @@ CREATE FUNCTION public.register_make_model_subject(text,text,integer,text,intege
 CREATE FUNCTION public.validate_data_room_access_code(uuid,text,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.confirm_photo_intent(uuid,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
 CREATE FUNCTION public.analyze_organization_data_signals(uuid) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.get_fleet_documented_investment() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;

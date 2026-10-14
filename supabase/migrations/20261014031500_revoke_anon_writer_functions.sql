@@ -1,4 +1,4 @@
--- Owner-run functions that write: no longer executable by anon or authenticated callers.
+-- Uncalled owner-run functions: no longer executable by anon or authenticated callers.
 --
 -- On 2026-10-14, 34 SECURITY DEFINER functions in public that contain INSERT, UPDATE or DELETE and are not triggers
 -- were executable by anon through the API; 33 check no identity. Supabase grants EXECUTE on new public functions to
@@ -8,10 +8,15 @@
 --   claim_*_queue_batch                         claim pipeline work items and stall the extraction and analysis queues
 --   enrich_*, *backfill*, rescore, quality      rewrite vehicles in batches, as often as they like, on a nano instance
 --   sync_edge_secrets_to_db()                   rewrite the secrets table (not readable by anon; still not theirs)
--- This revokes EXECUTE from PUBLIC, anon and authenticated on 29 of them and grants it to service_role explicitly.
+-- Two owner-run readers with no caller are closed too (found by the reviewer's sweep, read in their source):
+--   get_fleet_documented_investment()           per-vehicle investment dollars, returned to anyone
+--   find_vehicles_near(...)                     year, make, model, sale price, image, city, state and distance for
+--                                               any vehicle with GPS, private ones included
+-- This revokes EXECUTE from PUBLIC, anon and authenticated on 31 functions and grants it to service_role explicitly.
 -- Their callers keep working: edge functions analysis-engine-coordinator, process-bat-extraction-queue,
 -- sync-live-auctions and photo-pipeline-orchestrator use the service role; cron job photo-pipeline-reset-stuck runs as
--- postgres, the owner. No web or phone code calls any of the 29 (main, 2026-10-14).
+-- postgres, the owner. No web or phone code calls any of the 31 (main, 2026-10-14; the web's find_vehicles_near_gps is
+-- a different function and is already closed to anon).
 -- Kept, reviewed: register_make_model_subject (the phone, the web and universal-search call it),
 -- validate_data_room_access_code (a public form), confirm_photo_intent (checks the caller),
 -- analyze_organization_data_signals (the web calls it; it writes a cache of signals).
@@ -52,7 +57,9 @@ DECLARE
     'public.rescore_vehicles_batch(integer)',
     'public.reset_stuck_photo_pipeline_images()',
     'public.sync_bat_live_auction_status()',
-    'public.sync_edge_secrets_to_db()'
+    'public.sync_edge_secrets_to_db()',
+    'public.get_fleet_documented_investment()',
+    'public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text)'
   ];
   s text;
   done int := 0;
@@ -72,9 +79,9 @@ BEGIN
                AND (has_function_privilege('anon', to_regprocedure(x), 'EXECUTE')
                     OR has_function_privilege('authenticated', to_regprocedure(x), 'EXECUTE')
                     OR NOT has_function_privilege('service_role', to_regprocedure(x), 'EXECUTE'))) THEN
-    RAISE EXCEPTION 'a writer function is still executable by anon or authenticated, or lost the service role';
+    RAISE EXCEPTION 'a revoked function is still executable by anon or authenticated, or lost the service role';
   END IF;
-  RAISE NOTICE 'revoked anon and authenticated EXECUTE on % writer functions', done;
+  RAISE NOTICE 'revoked anon and authenticated EXECUTE on % owner-run functions', done;
 END
 $revoke$;
 
