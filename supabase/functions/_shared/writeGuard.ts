@@ -2,7 +2,8 @@
  * writeGuard — no edge function that writes to the database runs for an anonymous caller.
  *
  * Who gets through:
- *   (a) the project's service_role key — cron (get_service_role_key_for_cron()), CI, scripts,
+ *   (a) a project secret key (`sb_secret_…`, injected as SUPABASE_SECRET_KEYS), or the legacy
+ *       service_role key while the legacy keys are still enabled: cron, CI, scripts,
  *       function-to-function calls;
  *   (b) a signed-in user's JWT (role `authenticated`) — writes users trigger from nuke.ag;
  *   (c) with { apiKeys }: an `X-API-Key: nk_live_…` key, validated the same way apiKeyAuth.ts does;
@@ -16,15 +17,17 @@
  * with --no-verify-jwt, and even a gateway-verified anon JWT would still be anonymous.
  *
  * How a bearer token is judged, in order:
- *   1. exact match with SUPABASE_SERVICE_ROLE_KEY / SERVICE_ROLE_KEY env         → service_role
- *   2. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
- *   3. signature: HS256 against the project JWT secret (JWT_SIGNING_SECRET env), or
- *      ES256/RS256 against the project JWKS (SUPABASE_JWKS env or /auth/v1/.well-known/jwks.json)
- *   4. if step 3 can't run or fails, the platform is the authority: GoTrue /auth/v1/user for a
- *      user token, a one-row PostgREST HEAD for a service token. Still failing → refused.
- *   The platform-injected SUPABASE_SERVICE_ROLE_KEY is NOT always byte-equal to the dashboard
- *   key that cron and CI send (measured 2026-09-27: different digests), which is why step 1
- *   alone would break every scheduled job and steps 3–4 exist.
+ *   1. exact match with a key in SUPABASE_SECRET_KEYS                            → service_role
+ *   2. any other `sb_` key (a publishable key, an unknown or deleted secret key)  → refused
+ *   3. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
+ *   4. signature: ES256/RS256 against the project JWKS (SUPABASE_JWKS env or
+ *      /auth/v1/.well-known/jwks.json)
+ *   5. otherwise the platform is the authority: GoTrue /auth/v1/user for a user token, a one-row
+ *      PostgREST HEAD for a service token. Still failing → refused.
+ *   HS256 tokens (the legacy anon and service_role keys, and anything else signed with the legacy
+ *   JWT secret) always go to step 5. The platform keeps injecting the legacy values after the legacy
+ *   keys are disabled and the secret is revoked, so a match with the env proves nothing on its own;
+ *   the platform's answer follows the dashboard. 2026-10-14 key switch-over.
  *
  * Usage — first statement of the handler; OPTIONS passes through untouched so the function's
  * own CORS preflight keeps working:
@@ -37,14 +40,13 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hashApiKey } from "./apiKeyAuth.ts";
+import { publishableKey, secretKeys, serviceRoleKey } from "./supabaseKeys.ts";
 
-const SERVICE_KEY_ENV = ["SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY"];
-const JWT_SECRET_ENV = ["SUPABASE_JWT_SECRET", "JWT_SIGNING_SECRET", "VITE_SUPABASE_JWT_SECRET"];
 const REMOTE_TIMEOUT_MS = 6000;
 const JWKS_TTL_MS = 10 * 60 * 1000;
 
 export type WriteCaller =
-  | { kind: "service_role"; via: "env-match" | "jwt" | "remote" }
+  | { kind: "service_role"; via: "secret-key" | "jwt" | "remote" }
   | { kind: "user"; userId: string; via: "jwt" | "remote" }
   | { kind: "api_key"; userId: string | null; agentId: string | null; scopes: string[] }
   | { kind: "anonymous"; via: "exception" };
@@ -107,15 +109,12 @@ export function decodeJwt(token: string): DecodedJwt | null {
   }
 }
 
-async function verifyHs256(jwt: DecodedJwt, secret: string): Promise<boolean> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-  return await crypto.subtle.verify("HMAC", key, jwt.signature, new TextEncoder().encode(jwt.signingInput));
+/** Constant-time comparison for opaque keys. */
+function sameKey(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 interface Jwks {
@@ -172,16 +171,13 @@ async function verifyAsymmetric(jwt: DecodedJwt, jwks: Jwks): Promise<boolean | 
   return null;
 }
 
-/** true / false when a local check ran; null when nothing local could judge the token. */
+/**
+ * true / false when a local check ran; null when only the platform can judge the token.
+ * HS256 is never judged locally: whether the legacy JWT secret is still trusted is decided in the
+ * dashboard, and a copy of it in this function's env would not change when it is revoked.
+ */
 async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuardDeps>): Promise<boolean | null> {
   const alg = String(jwt.header.alg ?? "");
-  if (alg === "HS256") {
-    for (const name of JWT_SECRET_ENV) {
-      const secret = deps.env(name);
-      if (secret) return await verifyHs256(jwt, secret);
-    }
-    return null;
-  }
   if (alg === "ES256" || alg === "RS256") {
     const jwks = await loadJwks(deps);
     return jwks ? await verifyAsymmetric(jwt, jwks) : null;
@@ -193,7 +189,7 @@ async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuard
 
 async function remoteUserId(token: string, deps: Required<WriteGuardDeps>): Promise<string | null> {
   const base = deps.env("SUPABASE_URL");
-  const apikey = deps.env("SUPABASE_ANON_KEY") ?? deps.env("SUPABASE_SERVICE_ROLE_KEY");
+  const apikey = publishableKey(deps.env) ?? serviceRoleKey(deps.env);
   if (!base || !apikey) return null;
   try {
     const res = await deps.fetch(`${base}/auth/v1/user`, {
@@ -227,10 +223,12 @@ async function remoteServiceCheck(token: string, deps: Required<WriteGuardDeps>)
 // ── Token judgement ────────────────────────────────────────────────────────────
 
 export async function judgeToken(token: string, deps: Required<WriteGuardDeps>): Promise<WriteAuthResult> {
-  for (const name of SERVICE_KEY_ENV) {
-    const known = deps.env(name);
-    if (known && token === known) return { ok: true, caller: { kind: "service_role", via: "env-match" } };
+  // A secret key is opaque, so matching one the platform injected is the whole check. A key deleted
+  // in the dashboard disappears from SUPABASE_SECRET_KEYS and stops matching.
+  for (const key of Object.values(secretKeys(deps.env))) {
+    if (sameKey(token, key)) return { ok: true, caller: { kind: "service_role", via: "secret-key" } };
   }
+  if (token.startsWith("sb_")) return { ok: false, status: 401, reason: "not a secret key" };
 
   const jwt = decodeJwt(token);
   if (!jwt) return { ok: false, status: 401, reason: "token is not a JWT" };
@@ -272,7 +270,7 @@ async function judgeApiKey(
 ): Promise<WriteAuthResult> {
   const rawKey = rawHeader.startsWith("nk_live_") ? rawHeader.slice(8) : rawHeader;
   const url = deps.env("SUPABASE_URL");
-  const serviceKey = deps.env("SUPABASE_SERVICE_ROLE_KEY") ?? deps.env("SERVICE_ROLE_KEY");
+  const serviceKey = serviceRoleKey(deps.env);
   if (!url || !serviceKey) return { ok: false, status: 401, reason: "api key check unavailable" };
   const supabase = createClient(url, serviceKey);
   const { data, error } = await supabase.rpc("check_api_key_rate_limit", {
@@ -303,7 +301,10 @@ function withDefaults(deps?: WriteGuardDeps): Required<WriteGuardDeps> {
   };
 }
 
-/** Bearer token first; the `apikey` header second (cron and CI send the service key in both). */
+/**
+ * Bearer token first; the `apikey` header second. supabase-js copies its key into both; the new
+ * secret keys are meant to travel on `apikey` alone, which lands here.
+ */
 export function extractToken(req: Request): string | null {
   const auth = req.headers.get("authorization");
   if (auth && /^bearer\s+/i.test(auth)) {
@@ -388,7 +389,7 @@ export async function requireOwnerOrService(req: Request, opts: WriteGuardOption
   if (callerId) {
     const deps = withDefaults(opts.deps);
     const url = deps.env("SUPABASE_URL");
-    const key = deps.env("SUPABASE_SERVICE_ROLE_KEY") ?? deps.env("SERVICE_ROLE_KEY");
+    const key = serviceRoleKey(deps.env);
     try {
       const r = await deps.fetch(`${url}/rest/v1/parent_company?legal_name=eq.NUKE%20LTD&select=owner_user_id&limit=1`, {
         headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` },
