@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
+import { readVehicleNames } from "./vehicleNames";
 
 // Discovery surface for /journal: the last 90 days that hold a public record, one row per day with its photos,
 // receipts and payments (counts only) and the vehicle most photographed that day, named and linked when the
@@ -30,19 +30,6 @@ const styles: Record<string, React.CSSProperties> = {
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 const hasRecord = (r: DensityRow) => r.photo_count > 0 || r.receipt_count > 0 || r.payment_count > 0;
-
-/** Names of the public vehicles among the days' top vehicles. A vehicle the visitor cannot read stays unnamed. */
-async function readVehicleNames(ids: string[]): Promise<Record<string, string>> {
-  if (ids.length === 0 || typeof (supabase as any)?.from !== "function") return {};
-  const { data, error } = await supabase.from("vehicles").select("id, year, make, model").in("id", ids);
-  if (error || !data) return {};
-  const out: Record<string, string> = {};
-  for (const v of data as { id: string; year: number | null; make: string | null; model: string | null }[]) {
-    const name = [v.year, v.make, v.model].filter(Boolean).join(" ");
-    if (name) out[v.id] = name;
-  }
-  return out;
-}
 
 export default function JournalIndex() {
   const [rows, setRows] = useState<DensityRow[]>([]);
