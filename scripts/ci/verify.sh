@@ -25,6 +25,7 @@ count_ghost()     { node "$GD/no-dead-asset-references.mjs" --json >/tmp/ci_ghos
 count_rawfetch()  { bash "$GD/no-raw-fetch.sh" 2>/dev/null | grep -cE ':[0-9]+:' || true; }
 count_testimony() { node "$GD/no-raw-testimony-insert.mjs" 2>/dev/null | grep -c '^VIOLATION' || true; }
 count_labels()    { node "$GD/no-schema-baked-labels.mjs" --all 2>/dev/null | grep -oE '[0-9]+ baked-label' | grep -oE '^[0-9]+' || echo 0; }
+count_definer()   { node "$GD/no-default-grant-definer.mjs" --count 2>/dev/null || echo 0; }
 secrets_ok()      { bash "$GD/no-committed-secrets.sh" >/tmp/ci_sec.out 2>&1; }
 # design-system counts come from one eslint pass (scripts/guardrails/design-violations.mjs); read per rule
 DESIGN_RULES="no-inline-style no-font-props no-hardcoded-colors no-border-radius no-box-shadow no-gradient no-banned-fonts"
@@ -75,6 +76,8 @@ fi
 echo "• guardrails (ratchet)…"
 if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >/tmp/ci_image_health_tests.out 2>&1; then grn "  ✓ image-health failure assays"
 else red "  ✗ image-health failure assays FAILED"; cat /tmp/ci_image_health_tests.out; fail=1; fi
+if node --test "$GD/no-default-grant-definer.test.mjs" >/tmp/ci_definer_tests.out 2>&1; then grn "  ✓ definer-grants regression tests"
+else red "  ✗ definer-grants regression tests FAILED"; cat /tmp/ci_definer_tests.out; fail=1; fi
 if node --test "$GD/no-raw-fetch.test.mjs" >/tmp/ci_rawfetch_tests.out 2>&1; then grn "  ✓ raw-fetch regression tests"
 else red "  ✗ raw-fetch regression tests FAILED"; cat /tmp/ci_rawfetch_tests.out; fail=1; fi
 if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >/tmp/ci_declared_reader_tests.out 2>&1; then grn "  ✓ declared-source reader mapping"
@@ -84,6 +87,7 @@ else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat /tmp/c
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"
+ratchet "definer-grants"   "$(count_definer)"   "$(b no-default-grant-definer violations)"
 design_prepare
 for rule in $DESIGN_RULES; do ratchet "design/$rule" "$(count_design $rule)" "$(b design-system $rule)"; done
 if secrets_ok; then grn "  ✓ secrets clean"; else red "  ✗ SECRET DETECTED"; cat /tmp/ci_sec.out; fail=1; fi
