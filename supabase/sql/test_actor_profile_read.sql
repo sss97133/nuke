@@ -107,7 +107,9 @@ INSERT INTO public.auction_comments (vehicle_id, author_external_identity_id, co
 INSERT INTO public.mv_bidder_profiles VALUES
  ('DesertSeller', 60, 20, 5, 0.25, NULL, NULL, '2015-01-01', '2026-02-01'),
  ('desertseller', 10, 5, 1, 0.20, NULL, NULL, '2015-01-01', '2026-01-01'),
- ('B4', 25, 5, 0, 0.00, NULL, NULL, '2015-01-01', '2026-02-09');
+ ('B4', 25, 5, 0, 0.00, NULL, NULL, '2015-01-01', '2026-02-09'),
+ ('B5', 50, 30, 9, 0.30, NULL, NULL, '2015-01-01', '2026-01-15'),
+ ('B9', 3, 3, 3, 1.00, NULL, NULL, '2015-01-01', '2026-01-01');
 -- D's vehicles: 101..104 Ford of the 1970s, 105 a 1995 Chevrolet (public, undeleted); 107 private, 108 deleted.
 INSERT INTO public.vehicles (id, year, make, is_public, deleted_at, sale_price, sold_price, bat_sold_price, purchase_price) VALUES
  ('00000000-0000-0000-0000-000000000101', 1970, 'Ford', true, NULL, 41001, NULL, NULL, 23001),
@@ -153,10 +155,13 @@ BEGIN
   -- 2. Its handle's identity read gives the same number (the lowercase variant reads the same account).
   i := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e4');
   PERFORM public.t_assert(public.t_measure(i, 'performance', 'Sell-through') = m, format('one seller, one sell-through; org %s, identity %s', m, public.t_measure(i, 'performance', 'Sell-through')));
-  -- 3. Bidding: both variants summed (25 entered, 6 wins: 24.0%), the snapshot's date, no percentile.
+  -- 3. Bidding: both variants summed (25 entered, 6 wins: 24.0%), the snapshot's date, ranked among handles with
+  -- five or more auctions (desertseller 25, B4 5, B5 30; B9 has three): win rate 0.24 against 0.00 and 0.30, one
+  -- below of three: P50; auctions entered 25 against 5 and 30: P50.
   m := public.t_measure(i, 'bidding', 'Win rate');
-  PERFORM public.t_assert((m->>'value')::numeric = 24.0 AND m->'rank' = 'null'::jsonb AND m->'coverage'->>'as_of' LIKE '2026-02-09%', format('win rate 24.0, unranked, dated; got %s', m));
-  PERFORM public.t_assert((public.t_measure(i, 'bidding', 'Auctions entered')->>'value')::int = 25, 'auctions entered summed across variants');
+  PERFORM public.t_assert((m->>'value')::numeric = 24.0 AND (m->'rank'->>'p')::numeric = 50.0 AND (m->'rank'->>'n')::int = 3 AND m->'coverage'->>'as_of' LIKE '2026-02-09%', format('win rate 24.0 at P50 of 3, dated; got %s', m));
+  m := public.t_measure(i, 'bidding', 'Auctions entered');
+  PERFORM public.t_assert((m->>'value')::int = 25 AND (m->'rank'->>'p')::numeric = 50.0, format('auctions entered summed across variants, P50; got %s', m));
   -- 4. Talking: 6 comments on 5 lots; answers on own listed vehicles = 4 (the answer on vehicle 106 is not theirs).
   PERFORM public.t_assert((public.t_measure(d, 'talking', 'Comments')->>'value')::int = 6, 'six comments');
   m := public.t_measure(d, 'talking', 'Answers to bidders per listing');

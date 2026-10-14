@@ -19,8 +19,10 @@
 --                           listing pages wait for a per-seller fold (ranking every seller at read time took over
 --                           10 s on 2026-10-14).
 --   measures "bidding"      identity only: the bidder profile snapshot (mv_bidder_profiles, a table whose newest
---                           activity is 2026-02-09), values with the snapshot's date and no percentile: ranking
---                           private people's bidding is the owner's call (review 2026-10-14).
+--                           activity is 2026-02-09), case variants summed, each measure ranked among the 66,929
+--                           Bring a Trailer handles with five or more auctions entered and dated by the snapshot.
+--                           Handles are public, pseudonymous accounts whose bid and win counts Bring a Trailer
+--                           publishes on every member page; a rank adds relativity, never contact details or amounts.
 --   measures "talking"      comments by the actor's identities, and answers to bidders on its own listings.
 --   measures "specialization" and "open_books"  organization only: its public vehicles by decade and make against
 --                           the market's shares (market_pulse counts), and whether sale amounts and acquisition
@@ -170,18 +172,28 @@ BEGIN
     SELECT sum(auctions_entered), sum(total_bids), sum(wins) INTO b_entered, b_bids, b_wins
       FROM public.mv_bidder_profiles WHERE e.platform = 'bat' AND lower(bat_username) = lower(e.handle);
     IF coalesce(b_entered, 0) > 0 THEN
+      SELECT count(*) AS n,
+             count(*) FILTER (WHERE c.entered < b_entered) AS lt_entered,
+             count(*) FILTER (WHERE c.wins < coalesce(b_wins, 0)) AS lt_wins,
+             count(*) FILTER (WHERE c.wins::numeric / c.entered < coalesce(b_wins, 0)::numeric / b_entered) AS lt_rate
+        INTO k
+        FROM (SELECT sum(auctions_entered) AS entered, sum(wins) AS wins
+                FROM public.mv_bidder_profiles GROUP BY lower(bat_username) HAVING sum(auctions_entered) >= 5) c;
       items := items || jsonb_build_object(
         'label', 'Auctions entered', 'unit', 'auctions', 'value', b_entered,
-        'method', 'auctions the handle bid in, from the bidder profile snapshot; no percentile until the owner decides on ranking bidders',
-        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+        'method', 'auctions the handle bid in, from the bidder profile snapshot, ranked among handles with five or more',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap),
+        'rank', CASE WHEN b_entered >= 5 AND k.n >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_entered / (k.n - 1), 1), 'n', k.n) END);
       items := items || jsonb_build_object(
         'label', 'Wins', 'unit', 'auctions', 'value', coalesce(b_wins, 0),
-        'method', 'auctions the handle won, from the bidder profile snapshot',
-        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+        'method', 'auctions the handle won, from the bidder profile snapshot, ranked among handles with five or more auctions',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap),
+        'rank', CASE WHEN b_entered >= 5 AND k.n >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_wins / (k.n - 1), 1), 'n', k.n) END);
       items := items || jsonb_build_object(
         'label', 'Win rate', 'unit', '%', 'value', round(100.0 * coalesce(b_wins, 0) / b_entered, 1),
-        'method', 'wins ÷ auctions entered, from the bidder profile snapshot',
-        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+        'method', 'wins ÷ auctions entered, from the bidder profile snapshot, ranked among handles with five or more auctions',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap),
+        'rank', CASE WHEN b_entered >= 5 AND k.n >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_rate / (k.n - 1), 1), 'n', k.n) END);
     END IF;
     sections := sections || jsonb_build_object(
       'kind', 'measures', 'stack', 'bidding', 'title', 'Bidding',
@@ -344,7 +356,7 @@ $function$;
 REVOKE ALL ON FUNCTION public.actor_profile_read(text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.actor_profile_read(text, uuid) TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.actor_profile_read(text, uuid) IS
-  'An actor (organization or market identity) as a kit document of measures: selling from its listing pages, bidding (dated snapshot, no percentile), talking; for organizations also specialization against the market, open books as presence only and vehicles by role, not aggregated for venues or more than 5,000 links. One public projection; no amounts. Case ledger 13.11. 2026-10-14.';
+  'An actor (organization or market identity) as a kit document of measures: selling from its listing pages, bidding (dated snapshot, ranked), talking; for organizations also specialization against the market, open books as presence only and vehicles by role, not aggregated for venues or more than 5,000 links. One public projection; no amounts. Case ledger 13.11. 2026-10-14.';
 
 -- The superseded org reader returned whole business rows (emails, phones, private organizations) to anyone.
 DO $$ BEGIN
