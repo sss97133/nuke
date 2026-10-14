@@ -65,7 +65,8 @@ export default function DeckPage() {
   const { deckId } = useParams<{ deckId: string }>();
   const { slides, orgs, loading, error, refetch } = useDeckData(deckId || '');
   const { user } = useAuth();
-  const canEdit = true; // deck editing always enabled — auth handled at route level
+  // The route is public; saving a slide needs a signed-in editor (deck_slides_update_signed_in).
+  const canEdit = !!user;
   const [exporting, setExporting] = useState(false);
   const [brandSlug, setBrandSlug] = useState<string | null>(null);
   const [editingSlideIdx, setEditingSlideIdx] = useState<number | null>(null);
