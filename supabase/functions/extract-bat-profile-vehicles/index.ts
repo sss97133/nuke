@@ -5,6 +5,7 @@ import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { fetchBatPage } from '../_shared/batFetcher.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +84,7 @@ Deno.serve(async (req: Request) => {
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Extracting vehicles from BaT profile: ${profileUrl}`);

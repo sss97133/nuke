@@ -272,11 +272,10 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
       setCurrentUserId(user?.id || null);
 
       const [vehicleResult, imagesResult, relationshipResult, verificationResult] = await Promise.all([
-        supabase
-          .from('vehicles')
-          .select('*')
-          .eq('id', vehicleId)
-          .single(),
+        // The row as the caller may see it; the purchase facts come back only to the owner or a
+        // contributor with access (a select('*') on vehicles is not granted).
+        supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId }),
+
         supabase
           .from('vehicle_images')
           .select('id, image_url, is_primary')
@@ -301,7 +300,9 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
       ]);
 
       if (vehicleResult.error) throw vehicleResult.error;
+      if (!vehicleResult.data) throw new Error('Vehicle not found or access denied');
       setVehicle(vehicleResult.data);
+
       setImages(imagesResult.data || []);
       setMyRelationship(relationshipResult.data);
       setOwnershipVerification(verificationResult.data);

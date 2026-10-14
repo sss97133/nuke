@@ -14,6 +14,7 @@ const corsHeaders = {
 };
 import { checkRateLimit, getClientIp, rateLimitResponse } from "../_shared/rateLimit.ts";
 import { hashApiKey } from "../_shared/apiKeyAuth.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /** Generate a secure random API key (same pattern as api-keys-manage) */
 function generateApiKey(): string {
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // GET — Discovery manifest (no auth)

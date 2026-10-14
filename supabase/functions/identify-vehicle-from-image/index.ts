@@ -12,6 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getLLMConfig, callLLM, type AnalysisTier } from '../_shared/llmProvider.ts'
 import { callTierVision, parseJsonResponse } from '../_shared/agentTiers.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -378,7 +379,7 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || ''
+    const serviceRoleKey = projectSecretKey() || ''
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, detectSessionInUrl: false }

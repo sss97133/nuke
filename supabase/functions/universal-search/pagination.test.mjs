@@ -105,6 +105,7 @@ function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], v
     if (name === 'https://esm.sh/@supabase/supabase-js@2') return { createClient: () => client };
     if (name === './pagination.ts') return helperModule.exports;
     if (name === '../_shared/rateLimit.ts') return { checkRateLimit: async () => ({ allowed: true }), getClientIp: () => 'offline', rateLimitHeaders: () => ({}) };
+    if (name === '../_shared/supabaseKeys.ts') return { projectSecretKey: () => 'offline-service-key' };
     throw new Error(`Unexpected dependency ${name}`);
   };
   new Function('require', 'Deno', 'console', 'exports', handlerCode)(dependency,

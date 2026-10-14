@@ -50,7 +50,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
     try {
       let query = supabase
         .from('vehicles')
-        .select('id, year, make, model, current_value, purchase_price, msrp, created_at, uploaded_by, sale_price, vin');
+        .select('id, year, make, model, current_value, msrp, created_at, uploaded_by, sale_price, vin');
 
       // Filter based on context type
       switch (contextType) {
@@ -76,8 +76,9 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
           query = query.order('current_value', { ascending: false });
           break;
         case 'best_opportunity':
-          // Calculate ROI potential (current_value / purchase_price)
-          query = query.not('purchase_price', 'is', null).not('current_value', 'is', null);
+          // ROI needs the owner's purchase price, which readers cannot select; rank by current value.
+          query = query.not('current_value', 'is', null).order('current_value', { ascending: false });
+
           break;
         case 'most_documented':
           query = query.order('created_at', { ascending: true });
@@ -96,7 +97,9 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
 
       if (error) throw error;
 
-      let processedData = data || [];
+      // The owner's purchase price is not readable here; the shape keeps it as unknown.
+      let processedData: ComparableVehicle[] = (data || []).map((v) => ({ ...v, purchase_price: null }));
+
 
       // Post-process for best_opportunity
       if (sortBy === 'best_opportunity' && processedData.length > 0) {
