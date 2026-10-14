@@ -6,6 +6,9 @@ import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 import { parseQuery } from '../lib/search/queryParser';
 
+/* ─── A VIN: 17 characters, no I, O or Q ─── */
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/i;
+
 /* ─── URL detection ─── */
 const URL_RE = /^https?:\/\//i;
 const WWW_RE = /^www\./i;
@@ -296,7 +299,53 @@ export function useSearchPage() {
       return;
     }
 
-    // Not a URL — clear extraction state and do normal search
+    // A VIN: one indexed read through vehicle_by_vin_public (public rows only, the columns a card shows).
+    // universal-search filters vehicles with ilike on vin, which no index serves under the row policies:
+    // the page's own suggested VIN answered "Search failed." after 60 s (2026-10-13).
+    if (VIN_RE.test(q)) {
+      const vin = q.toUpperCase();
+      setUrlExtraction(null);
+      urlExtractionRef.current = null;
+      setLoading(true);
+      setResultFilter('all');
+      setBrowseStats(null);
+      setSearchMeta(null);
+      Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: vin })).then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (lastQueryRef.current !== q) return;
+        if (error || !Array.isArray(data)) {
+          setSearchSummary('Search failed.');
+          setResults([]);
+          setLoading(false);
+          return;
+        }
+        const mapped: SearchResult[] = (data as any[]).map((v) => mapRawResult({
+          id: v.id,
+          type: 'vin_match',
+          title: [v.year, v.make, v.model].filter(Boolean).join(' '),
+          subtitle: v.vin,
+          image_url: v.image_url || undefined,
+          relevance_score: 1,
+          metadata: {
+            year: v.year, make: v.make, model: v.model, vin: v.vin, image_url: v.image_url,
+            sale_price: v.sale_price, asking_price: v.asking_price, is_for_sale: v.is_for_sale, sale_status: v.sale_status,
+          },
+        }));
+        setResults(mapped);
+        setSearchSummary(mapped.length
+          ? `${mapped.length} public vehicle${mapped.length === 1 ? '' : 's'} in the ledger with VIN ${vin}.`
+          : `No public vehicle with VIN ${vin} in the ledger.`);
+        track('search_results', { q, loaded_count: mapped.length, total: mapped.length });
+        setLoading(false);
+      }, () => {
+        if (lastQueryRef.current !== q) return;
+        setSearchSummary('Search failed.');
+        setResults([]);
+        setLoading(false);
+      });
+      return;
+    }
+
+    // Not a URL or a VIN — clear extraction state and do normal search
     setUrlExtraction(null);
     urlExtractionRef.current = null;
     setLoading(true);

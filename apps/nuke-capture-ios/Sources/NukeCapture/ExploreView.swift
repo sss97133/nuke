@@ -563,8 +563,10 @@ struct ExploreView: View {
                   m.pagination_limited == true ? (more && m.next_offset == nil) : (more ? (m.next_offset ?? 0) > offset : m.next_offset == nil)
             else { throw URLError(.badServerResponse) }
             guard meta.query == searchMeta?.query else { return }
-            let page = res.results.compactMap(\.headerRow).filter { hit in !results.contains { $0.id == hit.id } }
-            results = Self.photosFirst(results + page)
+            // The web sorts photos first within each page and appends later pages in the door's order
+            // (useSearchPage.ts); re-sorting the whole walk had moved page one's photo-less hits to the end.
+            let page = Self.photosFirst(res.results.compactMap(\.headerRow).filter { hit in !results.contains { $0.id == hit.id } })
+            results = results + page
             searchMeta = SearchCoverage(query: meta.query, rows: results, meta: m, milliseconds: res.search_time_ms)
         } catch {
             NSLog("NukeCapture explore search page failed: %@", String(describing: error))

@@ -97,9 +97,30 @@ type Row = [
   string | null, (string | null)?, (number | null)?, (number | null)?, (number | null)?, (string | null)?, (number | null)?,
 ];
 
+/** The 17 slots of a market_pulse_live row, in the order this decode reads them. A v2 payload names its slots in
+ *  'columns'; the names must be these, or the payload is refused rather than decoded into the wrong fields.
+ *  supabase/sql/test_market_pulse_live_columns.sql pins the same list on the read. */
+export const PULSE_COLUMNS = [
+  'id', 'year', 'make', 'model', 'current_bid', 'ends_at', 'updated_at', 'listed_at',
+  'image_url', 'no_reserve', 'listing_url', 'title',
+  'band_p10', 'band_p50', 'band_p90', 'band_tier', 'band_comps',
+] as const;
+
+/** A payload that names its slots must name these first, in this order. Slots appended after them are fine (a
+ *  later version may add a server-computed verdict at the end); a slot moved, renamed or missing is refused. The
+ *  phone's BoardContract applies the same rule. */
+export function assertPulseColumns(columns: unknown): void {
+  if (!Array.isArray(columns)) return; // a v1 payload names nothing; the positions are taken on trust as before
+  const got = columns.map(String);
+  if (got.length < PULSE_COLUMNS.length || PULSE_COLUMNS.some((c, i) => c !== got[i])) {
+    throw new Error(`market_pulse_live names its slots [${got.join(', ')}]; this reader expects [${PULSE_COLUMNS.join(', ')}] first`);
+  }
+}
+
 export async function fetchPulse(): Promise<MarketPulse> {
   const { data, error } = await supabase.rpc('market_pulse_live');
   if (error) throw error;
+  assertPulseColumns(data?.columns);
   const rows = ((data?.auctions ?? []) as Row[]);
   const wk = data?.baseline?.week_ago;
   const sh = data?.baseline?.same_hour;
