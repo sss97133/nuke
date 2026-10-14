@@ -732,6 +732,30 @@ jobs:
       - name: Verify a VIN equality lookup reads an index, for the owner and for anon, with the same rows
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicles_vin_ci -f supabase/sql/test_vehicles_vin_equality_index.sql
 
+  transfer-seed-cron-key-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable transfer seed database
+        run: createdb dm_refinement_transfer_seed_ci
+      - name: Verify the auction-close transfer seeders send the cron key reader's key
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_transfer_seed_ci -f supabase/sql/test_transfer_seed_cron_key.sql
+
   poller-ledger-contract:
     runs-on: ubuntu-latest
     steps:
