@@ -291,3 +291,96 @@ Deno.test("one bid arriving by three transports with differently shaped frames i
   const other = await prepareBatLiveFrame(frames[1], target);
   assert.notEqual(other.source_identifier, pusher.source_identifier);
 });
+
+// Move Date.now by hand; the buffer reads its waits from the same clock the collector uses.
+async function withClock(start: number, run: (at: (ms: number) => void) => Promise<void>) {
+  const realNow = Date.now;
+  let now = start;
+  Date.now = () => now;
+  try { await run(ms => { now = start + ms; }); } finally { Date.now = realNow; }
+}
+
+Deno.test("a lot the intake keeps rejecting waits longer before each retry; a success starts it over", () => withClock(1_000_000, async at => {
+  let rejecting = true, attempts = 0;
+  const queue = new BatLiveBuffer(async () => { attempts++; if (rejecting) throw new Error("canonical vehicle auction event missing"); },
+    5000, { baseMs: 1000, maxMs: 30000 });
+  queue.push(frames[0]);
+  const attemptedAt: number[] = [];
+  for (let s = 0; s <= 140; s++) {
+    at(s * 1000);
+    const before = attempts;
+    await queue.flush().catch(() => {});
+    if (attempts > before) attemptedAt.push(s);
+  }
+  // 1, 2, 4, 8, 16 seconds, then the 30 second cap: 9 attempts in 140 seconds instead of 141.
+  assert.deepEqual(attemptedAt, [0, 1, 3, 7, 15, 31, 61, 91, 121]);
+  assert.equal(queue.pending, 1);
+  assert.match(queue.statusFor(target.id).error!, /canonical vehicle auction event missing/);
+  rejecting = false;
+  at(151_000);
+  await queue.flush();
+  assert.equal(queue.pending, 0);
+  assert.equal(queue.statusFor(target.id).error, null);
+  rejecting = true;
+  queue.push(frames[0]);
+  at(152_000);
+  await queue.flush().catch(() => {});
+  const before = attempts;
+  at(153_000);
+  await queue.flush().catch(() => {});
+  assert.equal(attempts, before + 1, "after a success the next failure waits one second again, not thirty");
+}));
+
+Deno.test("a lot inside its wait does not hold back another lot; a forced flush attempts it anyway", () => withClock(2_000_000, async at => {
+  const badId = target.id, goodId = "00000000-0000-0000-0000-000000000003";
+  const seen: string[] = [];
+  const queue = new BatLiveBuffer(async batch => {
+    seen.push(batch[0].monitored_auction_id);
+    if (batch[0].monitored_auction_id === badId) throw new Error("live source/parent binding mismatch");
+  }, 5000, { baseMs: 1000, maxMs: 30000 });
+  queue.push(frames[0]);
+  at(0);
+  await queue.flush().catch(() => {});
+  assert.deepEqual(seen, [badId]);
+  queue.push({ ...frames[1], monitored_auction_id: goodId });
+  at(500);
+  await queue.flush();
+  assert.deepEqual(seen, [badId, goodId], "the other lot drains while the bad lot waits");
+  assert.equal(queue.statusFor(goodId).pending, 0);
+  assert.equal(queue.statusFor(badId).pending, 1);
+  assert.match(queue.statusFor(badId).error!, /binding mismatch/);
+  await assert.rejects(() => queue.flush({ force: true }), /binding mismatch/);
+  assert.deepEqual(seen, [badId, goodId, badId], "the worker's last flush ignores the wait");
+  assert.equal(queue.pending, 1);
+}));
+
+Deno.test("without a retry policy a rejected lot is retried on every flush", async () => {
+  let attempts = 0;
+  const queue = new BatLiveBuffer(async () => { attempts++; throw new Error("database unavailable"); });
+  queue.push(frames[0]);
+  for (let i = 0; i < 5; i++) await queue.flush().catch(() => {});
+  assert.equal(attempts, 5);
+});
+
+Deno.test("a collector retries a lot the intake keeps rejecting with growing waits, not every second", () => withCollectorClock(async () => {
+  const good = { ...target, id: "00000000-0000-0000-0000-000000000003", post_id: target.post_id + 1 };
+  const attempts: Record<string, number> = { [target.id]: 0, [good.id]: 0 };
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+  } };
+  await assert.rejects(() => collectBatLive([{ ...target }, good], {
+    socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+    admit: async batch => {
+      if (!batch.length) return;
+      attempts[batch[0].monitored_auction_id]++;
+      if (batch[0].monitored_auction_id === target.id) throw new Error("live_intake_http_500");
+    },
+    missed: async t => ({ comments: [], metadata: { post_id: t.post_id, current_numeric: 100, count: 1 } }),
+  }, 40_000), /live_intake_http_500/);
+  // One attempt a second for 40 seconds before this change; now 1, 2, 4, 8, 16 second waits plus the final flush.
+  assert.ok(attempts[target.id] >= 5 && attempts[target.id] <= 9, `rejected lot attempts: ${attempts[target.id]}`);
+  assert.ok(attempts[good.id] >= 1, "the other lot is admitted");
+}));
