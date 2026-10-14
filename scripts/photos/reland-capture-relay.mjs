@@ -10,7 +10,8 @@
  * Run only after the phone's next sync (its own retry may land some of these first), and dry-run first:
  *   dotenvx run -f .env --quiet -- node scripts/photos/reland-capture-relay.mjs --limit 50            # dry run
  *   dotenvx run -f .env --quiet -- node scripts/photos/reland-capture-relay.mjs --write --limit 200   # bounded write
- * The service role key is read from the environment and never printed or logged.
+ * The secret key is read from the environment (SUPABASE_SECRET_KEY, else the legacy SUPABASE_SERVICE_ROLE_KEY) and never
+ * printed or logged.
  * Without OffsetTimeOriginal in a frame's EXIF, the wall-clock time is read in RELAND_TZ_OFFSET (default -07:00,
  * the phone's Las Vegas summer offset for June–July 2026, the months these frames were taken).
  */
@@ -24,9 +25,10 @@ import { frameFromExif, parseArgs, takenAt } from './relandFrame.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// The new secret key after the 2026-10 rotation, else the legacy service-role key; never printed.
+const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
-  console.error('needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment (run it through dotenvx)');
+  console.error('needs SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) in the environment (run it through dotenvx)');
   process.exit(2);
 }
 const fallbackOffset = process.env.RELAND_TZ_OFFSET || '-07:00';
