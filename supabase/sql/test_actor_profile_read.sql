@@ -26,7 +26,11 @@ CREATE TABLE public.organization_seller_stats (organization_id uuid PRIMARY KEY,
   total_unsold integer, avg_bid_count numeric, avg_comment_count numeric, avg_view_count numeric,
   calculated_at timestamptz DEFAULT '2026-10-13T23:50:00Z', evidence_summary jsonb DEFAULT '{}');
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, year integer, make text, is_public boolean DEFAULT true, deleted_at timestamptz,
-  sale_price numeric, sold_price numeric, bat_sold_price numeric, purchase_price numeric);
+  sale_price numeric, sold_price numeric, bat_sold_price numeric, purchase_price numeric, bat_seller text, auction_outcome text);
+CREATE TABLE public.external_identities (id uuid PRIMARY KEY, platform text, handle text, display_name text);
+CREATE TABLE public.auction_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, author_external_identity_id uuid, comment_type text);
+CREATE TABLE public.mv_bidder_profiles (bat_username text PRIMARY KEY, total_bids bigint, auctions_entered bigint, wins bigint,
+  win_rate numeric, avg_bid numeric, max_bid numeric, first_seen timestamp, last_seen timestamp);
 CREATE TABLE public.organization_vehicles (organization_id uuid, vehicle_id uuid, relationship_type text, status text);
 -- The market: 1970s are 10% and 1990s 40% of the year counts; Chevrolet is 20% of resolved makes.
 CREATE FUNCTION public.market_pulse(p_dimension text, p_limit integer DEFAULT 60)
@@ -40,6 +44,7 @@ RETURNS TABLE(name text, count bigint, value bigint, median_price bigint, image_
 $$;
 
 \ir ../migrations/20261014001500_actor_profile_read.sql
+\ir ../migrations/20261014013000_actor_profile_read_identities.sql
 
 -- Seeds. O1 is public, the subject. O2..O6 fill the cohort (five or more known outcomes each); O7 has too few
 -- outcomes to rank; O9 is private.
@@ -143,5 +148,66 @@ INSERT INTO public.organizations (id, business_name, business_type, is_public) V
 SET ROLE anon;
 SELECT public.t_assert(public.t_measure(public.actor_profile_read('organization', '00000000-0000-0000-0000-0000000000a7'), 'performance', 'Sell-through')->'rank' = 'null'::jsonb,
   'fewer than five known outcomes: a value, no rank');
+RESET ROLE;
+
+-- The identity kind. S1 is a seller handle with four listed public vehicles (3 sold, 1 reserve not met), one
+-- private and one deleted listing (excluded) and a listing under a handle that differs only by case (excluded);
+-- 5 comments on 2 lots, 4 of them seller responses; it also bid. B1..B4 fill the bidder cohort (five or more
+-- auctions entered); B9 entered three and is not ranked.
+INSERT INTO public.external_identities VALUES
+ ('00000000-0000-0000-0000-0000000000e1', 'bat', 'DesertSeller', 'DesertSeller'),
+ ('00000000-0000-0000-0000-0000000000e2', 'bat', 'quietlurker', NULL);
+INSERT INTO public.vehicles (id, year, make, is_public, deleted_at, bat_seller, auction_outcome) VALUES
+ ('00000000-0000-0000-0000-000000000101', 1970, 'Ford', true, NULL, 'DesertSeller', 'sold'),
+ ('00000000-0000-0000-0000-000000000102', 1971, 'Ford', true, NULL, 'DesertSeller', 'sold'),
+ ('00000000-0000-0000-0000-000000000103', 1972, 'Ford', true, NULL, 'DesertSeller', 'sold'),
+ ('00000000-0000-0000-0000-000000000104', 1973, 'Ford', true, NULL, 'DesertSeller', 'reserve_not_met'),
+ ('00000000-0000-0000-0000-000000000105', 1974, 'Ford', false, NULL, 'DesertSeller', 'sold'),
+ ('00000000-0000-0000-0000-000000000106', 1975, 'Ford', true, '2026-01-01', 'DesertSeller', 'sold'),
+ ('00000000-0000-0000-0000-000000000107', 1976, 'Ford', true, NULL, 'desertseller', 'sold');
+INSERT INTO public.auction_comments (vehicle_id, author_external_identity_id, comment_type) VALUES
+ ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
+ ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
+ ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
+ ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
+ ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000e1', 'observation');
+INSERT INTO public.mv_bidder_profiles VALUES
+ ('DesertSeller', 60, 20, 5, 0.25, NULL, NULL, '2015-01-01', '2026-02-01'),
+ ('B1', 10, 10, 1, 0.10, NULL, NULL, '2015-01-01', '2026-01-01'),
+ ('B2', 40, 20, 2, 0.10, NULL, NULL, '2015-01-01', '2026-01-01'),
+ ('B3', 90, 30, 9, 0.30, NULL, NULL, '2015-01-01', '2026-01-01'),
+ ('B4', 25, 5, 0, 0.00, NULL, NULL, '2015-01-01', '2026-02-09'),
+ ('B9', 3, 3, 3, 1.00, NULL, NULL, '2015-01-01', '2026-01-01');
+SET ROLE anon;
+DO $$
+DECLARE d jsonb; m jsonb; sec jsonb;
+BEGIN
+  d := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e1');
+  PERFORM public.t_assert(d->'subject'->>'kind' = 'identity' AND d->'subject'->>'name' = 'DesertSeller' AND d->'subject'->>'type' = 'bat', format('identity subject; got %s', d->'subject'));
+  -- Selling: four public, undeleted listings under the exact handle; 3 sold, 1 reserve not met: 75.0, no rank.
+  PERFORM public.t_assert((public.t_measure(d, 'performance', 'Vehicles listed')->>'value')::int = 4, 'four public listings under the exact handle');
+  m := public.t_measure(d, 'performance', 'Sell-through');
+  PERFORM public.t_assert((m->>'value')::numeric = 75.0 AND m->'rank' = 'null'::jsonb AND (m->'coverage'->>'n')::int = 4, format('sell-through 75.0, no rank; got %s', m));
+  -- Bidding: the cohort is DesertSeller, B1, B2, B3, B4. Auctions entered 20 against 10, 20, 30, 5: two below, so
+  -- 2 / 4 = 50.0. Win rate 0.25 against 0.10, 0.10, 0.30, 0.00: three below, so 75.0. Dated 2026-02-09.
+  m := public.t_measure(d, 'bidding', 'Auctions entered');
+  PERFORM public.t_assert((m->>'value')::int = 20 AND (m->'rank'->>'p')::numeric = 50.0 AND (m->'rank'->>'n')::int = 5, format('auctions entered P50 of 5; got %s', m));
+  m := public.t_measure(d, 'bidding', 'Win rate');
+  PERFORM public.t_assert((m->>'value')::numeric = 25.0 AND (m->'rank'->>'p')::numeric = 75.0, format('win rate 25.0 at P75; got %s', m));
+  PERFORM public.t_assert(m->'coverage'->>'as_of' LIKE '2026-02-09%', format('dated by the snapshot; got %s', m->'coverage'));
+  -- Talking: 5 comments on 2 lots; 4 seller responses over 4 listed vehicles: 1.0.
+  m := public.t_measure(d, 'talking', 'Comments');
+  PERFORM public.t_assert((m->>'value')::int = 5 AND (m->'coverage'->>'n')::int = 2, format('5 comments on 2 lots; got %s', m));
+  PERFORM public.t_assert((public.t_measure(d, 'talking', 'Answers to bidders per listed vehicle')->>'value')::numeric = 1.0, 'one answer per listed vehicle');
+
+  -- An identity that never sold, bid or commented reads with empty sections, never an error.
+  d := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e2');
+  PERFORM public.t_assert(d->'subject'->>'name' = 'quietlurker', 'display name falls back to the handle');
+  SELECT s INTO sec FROM jsonb_array_elements(d->'sections') s WHERE s->>'stack' = 'bidding';
+  PERFORM public.t_assert(jsonb_array_length(sec->'items') = 0 AND (sec->'coverage'->>'n')::int = 0, format('no bids: an empty section; got %s', sec));
+  PERFORM public.t_assert(public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000ff') IS NULL, 'unknown identity reads as nothing');
+  -- The organization kind is unchanged by the second migration.
+  PERFORM public.t_assert((public.t_measure(public.actor_profile_read('organization', '00000000-0000-0000-0000-0000000000a1'), 'performance', 'Sell-through')->>'value')::numeric = 90.0, 'organization kind unchanged');
+END $$;
 RESET ROLE;
 SELECT 'actor_profile_read contract: PASS' AS result;
