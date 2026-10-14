@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { readInventoryTaxonomy, useMarketPulse } from './useMarketPulse';
+import { assertPulseColumns, fetchPulse, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -57,5 +57,29 @@ describe('bounded public taxonomy reader', () => {
       const query = queries[0]; query.then = (resolve: any) => Promise.resolve({ data: null, error: new Error('reader unavailable') }).then(resolve); return query;
     });
     await expect(readInventoryTaxonomy(['a'])).rejects.toThrow('reader unavailable');
+  });
+});
+
+describe('the payload names its slots', () => {
+  const row = ['lot-1', 1973, 'Porsche', '911', 650000, '2026-10-14T17:05:00Z', '2026-10-13T23:00:00Z', '2026-10-07T00:00:00Z',
+    null, true, 'https://bringatrailer.com/listing/lot-1/', '1973 Porsche 911', 478000, 552000, 700000, 'd', 15];
+  it('decodes a v2 payload whose columns are the ones it reads by position', async () => {
+    fixture.rpc.mockResolvedValue({ data: { v: 2, columns: [...PULSE_COLUMNS], auctions: [row] }, error: null });
+    const pulse = await fetchPulse();
+    expect(pulse.auctions).toHaveLength(1);
+    expect(pulse.auctions[0]).toMatchObject({ id: 'lot-1', year: 1973, currentBid: 650000, noReserve: true, band: { p50: 552000, tier: 'd', comps: 15 } });
+  });
+  it('refuses a payload whose slots moved, instead of reading a bid as a year', async () => {
+    const moved = [...PULSE_COLUMNS]; moved.splice(4, 0, 'reserve_met'); moved.pop();
+    fixture.rpc.mockResolvedValue({ data: { v: 3, columns: moved, auctions: [row] }, error: null });
+    await expect(fetchPulse()).rejects.toThrow(/names its slots \[id, year, make, model, reserve_met, current_bid/);
+    expect(() => assertPulseColumns(PULSE_COLUMNS.slice(0, 16))).toThrow(/this reader expects/);
+    expect(() => assertPulseColumns([...PULSE_COLUMNS, 'heat'])).not.toThrow(); // appended slots are fine
+  });
+  it('still decodes a v1 payload that names nothing', async () => {
+    fixture.rpc.mockResolvedValue({ data: { auctions: [row] }, error: null });
+    const pulse = await fetchPulse();
+    expect(pulse.auctions[0].currentBid).toBe(650000);
+    expect(() => assertPulseColumns(undefined)).not.toThrow();
   });
 });

@@ -740,6 +740,9 @@ struct VehicleDetailView: View {
             imageURL: heroImage?.image_url ?? firstPaintURL,
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
+            // The title from the document's identity tokens (normalized model, series, trim, a high-signal
+            // transmission), the web's getVehicleIdentityTokens; the row's fields only before the read lands.
+            identityTokens: profile?.masthead.map { VehicleIdentity.tokens($0.identity_source).all },
             takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
             loaded: loaded,
             onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
