@@ -160,6 +160,30 @@ jobs:
       - name: Verify the map refresh is concurrent only where a unique index allows it
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_treemap_ci -f supabase/sql/test_treemap_refresh_all.sql
 
+  treemap-confirmed-sales-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable treemap sales database
+        run: createdb dm_refinement_treemap_sales_ci
+      - name: Verify the map counts confirmed sales of public records only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_treemap_sales_ci -f supabase/sql/test_treemap_confirmed_sales.sql
+
   market-pulse-live-heat-contract:
     runs-on: ubuntu-latest
     services:
