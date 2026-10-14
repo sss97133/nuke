@@ -7,16 +7,19 @@
  * endpoint that nobody chose. On 2026-10-14, 34 owner-run functions that write were open to anon this way (one could
  * end every live auction of a platform), and owner-run readers returned private vehicles (PRs #1109, #1111).
  *
- * RULE: a migration that creates (or replaces) a SECURITY DEFINER function states its grants in the same file:
- *   REVOKE ... ON FUNCTION <name> ... FROM PUBLIC ...   (then GRANT EXECUTE to the roles that should call it)
- * or carries the reviewed marker on its own line:
- *   -- definer-grants: default reviewed <name>
+ * RULE: a migration that creates, replaces or alters a function to SECURITY DEFINER states, in the same file, what each
+ * of PUBLIC, anon and authenticated may do with it: a REVOKE ... ON FUNCTION <name> ... FROM <role> or a
+ * GRANT ... ON FUNCTION <name> ... TO <role> naming each of the three. Revoking from PUBLIC alone is not enough: 286
+ * owner-run functions already carry explicit anon and authenticated grants, and CREATE OR REPLACE keeps them.
+ * The alternative is the reviewed marker on its own line, with a reason:
+ *   -- definer-grants: default reviewed <name>: <reason>
  *
  * SCOPE: migrations whose file name sorts at or after CUTOFF (new work); older files are the past, not the floor.
  * SQL is split into top-level statements with comments, quoted strings and dollar-quoted bodies skipped, so
  * "security definer" written inside a function body or a comment is not a definer attribute.
  *
- * EXIT: 0 clean, 1 violations. Flags: --count prints only the number of violations.
+ * EXIT: 0 clean, 1 violations, 2 scanner error. Flags: --count prints only the number of violations.
+ * Not scanned: functions created through EXECUTE inside a DO block.
  * Env: GUARDRAIL_REPO_ROOT (fixtures), GUARDRAIL_DEFINER_CUTOFF (default 20261014040000).
  */
 import fs from 'node:fs';
@@ -49,27 +52,48 @@ export function topLevelStatements(sql) {
   return out;
 }
 
-/** Names (schema-qualified, lower case) of SECURITY DEFINER functions a SQL file creates. */
+/** Names (schema-qualified, lower case) of functions a SQL file creates, replaces or alters as SECURITY DEFINER. */
 export function definerFunctions(sql) {
   const names = [];
   for (const st of topLevelStatements(sql)) {
-    const m = /^create\s+(?:or\s+replace\s+)?function\s+((?:"?[\w]+"?\.)?"?[\w]+"?)\s*\(/i.exec(st);
+    const m = /^(?:create\s+(?:or\s+replace\s+)?|alter\s+)function\s+((?:"?[\w]+"?\.)?"?[\w]+"?)\s*\(/i.exec(st);
     if (!m || !/\bsecurity\s+definer\b/i.test(st)) continue;
     let name = m[1].replace(/"/g, '').toLowerCase();
     if (!name.includes('.')) name = `public.${name}`;
-    names.push(name);
+    if (!names.includes(name)) names.push(name);
   }
   return names;
 }
 
-/** True when the file states the function's grants or carries the reviewed marker. */
+const ROLES = ['public', 'anon', 'authenticated'];
+
+/** The roles among PUBLIC, anon and authenticated that the file's REVOKE and GRANT statements name for a function. */
+export function rolesStated(sql, name) {
+  const bare = name.split('.').pop();
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const on = new RegExp(`\\bon\\s+function\\s+(?:public\\.)?"?${esc(bare)}"?\\s*\\(`, 'i');
+  const stated = new Set();
+  for (const st of topLevelStatements(sql)) {
+    if (!/^(?:revoke|grant)\b/i.test(st) || !on.test(st)) continue;
+    const tail = /\b(?:from|to)\b([\s\S]*)$/i.exec(st.replace(/\$body\$/g, ''));
+    if (!tail) continue;
+    for (const r of tail[1].split(',').map((x) => x.trim().toLowerCase().replace(/"/g, ''))) {
+      const role = r.split(/\s+/)[0];
+      if (ROLES.includes(role)) stated.add(role);
+    }
+  }
+  return stated;
+}
+
+/** True when the file states the function's grants for each of PUBLIC, anon and authenticated, or carries the
+ *  reviewed marker with a reason. */
 export function grantsStated(sql, name) {
   const bare = name.split('.').pop();
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const fn = `(?:public\\.)?"?${esc(bare)}"?\\b`;
-  const revoke = new RegExp(`revoke\\s+(?:all|execute)(?:\\s+privileges)?\\s+on\\s+function\\s+${fn}[^;]*?\\bfrom\\b[^;]*?\\bpublic\\b`, 'i');
-  const marker = new RegExp(`^\\s*--\\s*definer-grants:\\s*default\\s+reviewed\\s+(?:public\\.)?${esc(bare)}\\s*$`, 'im');
-  return revoke.test(sql) || marker.test(sql);
+  const marker = new RegExp(`^\\s*--\\s*definer-grants:\\s*default\\s+reviewed\\s+(?:public\\.)?${esc(bare)}\\s*:\\s*\\S.*$`, 'im');
+  if (marker.test(sql)) return true;
+  const stated = rolesStated(sql, name);
+  return ROLES.every((r) => stated.has(r));
 }
 
 export function scan(dir = DIR, cutoff = CUTOFF) {
@@ -87,10 +111,11 @@ export function scan(dir = DIR, cutoff = CUTOFF) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const v = scan();
+  let v;
+  try { v = scan(); } catch (e) { console.error(`no-default-grant-definer: scanner error: ${e.message}`); process.exit(2); }
   if (process.argv.includes('--count')) { console.log(v.length); process.exit(0); }
   for (const x of v) {
-    console.log(`VIOLATION ${x.file}: SECURITY DEFINER function ${x.name} relies on default grants; add REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated and GRANT EXECUTE to the roles meant to call it, or mark it "-- definer-grants: default reviewed ${x.name.split('.').pop()}"`);
+    console.log(`VIOLATION ${x.file}: SECURITY DEFINER function ${x.name} does not state what PUBLIC, anon and authenticated may do; REVOKE EXECUTE ON FUNCTION ... FROM each role it should not reach and GRANT EXECUTE ... TO each it should, or mark it "-- definer-grants: default reviewed ${x.name.split('.').pop()}: <reason>"`);
   }
   console.log(v.length ? `no-default-grant-definer: ${v.length} violation(s)` : 'no-default-grant-definer: clean');
   process.exit(v.length ? 1 : 0);
