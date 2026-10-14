@@ -1956,3 +1956,42 @@ versus planned action, event date/mileage and ownership-window relationships, wi
 and sanctioned admission. Qualify outcome histories before learning cost/reliability weights; missing records
 do not establish neglect or successful work. Measure resale reassurance against later price/liquidity
 separately from personal-use repair expense, downtime and useful service over an explicit buyer horizon.
+
+### 13.11 The owner on seeing actors: every endpoint a measure, relative, the map as the zoomed-out view (2026-10-14 00:00Z)
+
+**Owner direction, in substance.** Click-through runs on the phone end on incomplete data and on endpoints that
+mean nothing for the goal. The stacks exist to *see* users and organizations: a name and a list of cars is not
+that. What has meaning is performance and relativity, the measure. Opening Viva! Las Vegas Autos should show its
+stats: personality, era specialization, market performance and ROI, whether the actor reports its profits. The app
+is full click-through, every number a door; the map is the same view zoomed out: a ZIP where the actors are
+"stackmaxxing", fully open to audit, and showing how well they perform.
+
+**What that means for an endpoint.** An actor (organization or person) renders as a document of measures, each
+with its method, its population and a rank among a stated peer cohort above the rank floor (kit `Measure`,
+`RANK_FLOOR` 5). Four families, mapped to the stacks above: performance (sell-through on known outcomes, bids,
+comments and views per listing, volume; stacks 4 and 17), specialization (share of the actor's vehicles by
+decade and make against the market's share, a concentration ratio; stack 17), open books (of sold vehicles, how
+many carry a recorded sale amount; of held vehicles, how many carry a recorded acquisition cost; how many carry
+both, the vehicles whose ROI is computable; stack 15, amounts never shown to strangers, only the fact of
+disclosure), and documentation depth (photos, observations and work per vehicle against peers; the "stackmaxxing"
+measure). An unknown is stated as unknown with its denominator, never as zero. The map aggregates the same
+measures per ZIP or county over the actors located there (stack 1).
+
+**The worked case, read-only, 2026-10-14 00:08Z.** Viva! Las Vegas Autos (`organizations` c433d27e, dealer,
+Boulder City NV). From `organization_seller_stats` (contract `listing_activity_v1`, computed 2026-10-13 23:50Z):
+72 attributed listings, 31 sold, 5 unsold, 35 without a recorded outcome; sell-through 86.1% of known outcomes,
+the 59th percentile of 211 organizations with at least five known outcomes (median 83.6%); bids per listing the
+highest of the 211; views per listing the 5th percentile; volume the 42nd. From `organization_vehicles` joined
+to `vehicles` (owner, sold_by and consigner links, 137 vehicles with a year): 1970s 26% against 13% of the market
+(2.0×), 1980s 23% against 11% (2.1×), 2020s 10% against 3.7% (2.8×), 2000s 0.6×; Chevrolet 42, Ford 22, GMC 15.
+Open books: 54 of 74 sold vehicles carry a recorded sale amount; 15 of 63 held vehicles carry an acquisition cost.
+The listing-activity contract counts 0 priced sales where the vehicle rows carry 54 sale amounts: two populations,
+reconcile before either becomes a performance number. The organization row's own counters (`total_sold` 0,
+`gmv` 0, `total_auction_wins` 17) contradict both and are not measures. `organization_seller_stats` has row
+security and no read policy, so a stranger reads none of it today.
+
+**Build order.** (1) A typed read per actor kind returning the kit document (masthead, measures sections with
+coverage and peer rank, a table of the actor's vehicles by role), a public projection with no amounts; a contract
+test on a disposable PG17. (2) The phone renders measures and tables through the kit twin and reaches an actor from
+search, from a vehicle's seller or owner link and from the map. (3) The same read for a person (garage, work,
+disclosure), then the per-ZIP aggregate for the map.
