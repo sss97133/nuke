@@ -46,9 +46,10 @@ export interface ManifestSummary {
   devices_total: number;
   devices_purchased: number;
   devices_pending: number;
-  spent_usd: number;
-  pending_usd: number;
-  total_spec_usd: number;
+  // Null unless the viewer is the vehicle's owner (migration 20261014050000).
+  spent_usd: number | null;
+  pending_usd: number | null;
+  total_spec_usd: number | null;
 }
 
 export interface TechPacket {

@@ -12,6 +12,7 @@ import {
   scopeAllowsWriteTier,
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
@@ -28,7 +29,7 @@ import {
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SERVICE_ROLE_KEY = projectSecretKey()!;
 
 function getSupabase() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -292,7 +293,7 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (token === SERVICE_ROLE_KEY) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-    const alt = Deno.env.get("SERVICE_ROLE_KEY");
+    const alt = projectSecretKey();
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }

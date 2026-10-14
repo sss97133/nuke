@@ -350,9 +350,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
       // Get full vehicle data with modifications and images
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
-        .select('*')
+        .select('id, year, make, model, vin, mileage')
         .eq('id', vehicleId)
         .single();
+
 
       if (vehicleError || !vehicle) {
         return {

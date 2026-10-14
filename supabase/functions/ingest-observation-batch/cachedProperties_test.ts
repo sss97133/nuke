@@ -93,7 +93,8 @@ Deno.test('body parser refuses malformed JSON, arrays and empty bodies',async()=
 // Exercise the actual service-only HTTP handler using a fake PostgREST transport.
 let handler:(request:Request)=>Promise<Response>;
 const originalServe=Deno.serve,originalFetch=globalThis.fetch;
-Deno.env.set('SUPABASE_URL','https://batch-fixture.invalid');Deno.env.set('SUPABASE_SERVICE_ROLE_KEY','test-key');Deno.env.set('SUPABASE_JWT_SECRET','fixture-signing-secret');
+Deno.env.set('SUPABASE_URL','https://batch-fixture.invalid');Deno.env.set('SUPABASE_SERVICE_ROLE_KEY','test-key');const userSigner=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+Deno.env.set('SUPABASE_JWKS',JSON.stringify({keys:[{...(await crypto.subtle.exportKey('jwk',userSigner.publicKey)),kid:'fixture',alg:'ES256'}]}));
 Deno.serve=((callback:typeof handler)=>{handler=callback;})as typeof Deno.serve;
 let rpcCalls=0;
 globalThis.fetch=(async(input,init)=>{
@@ -104,11 +105,11 @@ await import('./index.ts');Deno.serve=originalServe;
 function request(body:unknown,token='test-key'){
  return new Request('https://batch-fixture.invalid/functions/v1/ingest-observation-batch',{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});
 }
+// A user session as Auth signs it since 2026-10-14: ES256, verified against the project JWKS.
 async function userToken(){
  const b64=(value:unknown)=>btoa(JSON.stringify(value)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
- const data=`${b64({alg:'HS256',typ:'JWT'})}.${b64({role:'authenticated',sub:id(999),exp:Math.floor(Date.now()/1000)+60})}`;
- const key=await crypto.subtle.importKey('raw',new TextEncoder().encode('fixture-signing-secret'),{name:'HMAC',hash:'SHA-256'},false,['sign']);
- const signature=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(data)));
+ const data=`${b64({alg:'ES256',typ:'JWT',kid:'fixture'})}.${b64({role:'authenticated',sub:id(999),exp:Math.floor(Date.now()/1000)+60})}`;
+ const signature=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},userSigner.privateKey,new TextEncoder().encode(data)));
  return`${data}.${btoa(String.fromCharCode(...signature)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')}`;
 }
 Deno.test('actual batch handler rejects anonymous and signed-in user before SQL',async()=>{

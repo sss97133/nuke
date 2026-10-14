@@ -1,6 +1,6 @@
 {
  "vendor": "prowire",
- "account_cart": "Q27156",
+ "account_cart": null,
  "captured": "2026-09-26",
  "method": "read back from prowireusa.com/cart in the owner's logged-in Chrome (one tab, read-only, closed after); line codes, quantities, extended prices",
  "status": "NOT ordered \u2014 ordering paused 2026-09-26 (K5_WIRING_STATE 0l); reference only",
@@ -646,7 +646,6 @@
   }
  ],
  "line_count": 96,
- "total": 3620.23,
  "sources": [
   "receipts/2026-09-25_orders-staged-prowire-ksv-ict.md (addenda through 2026-09-26 night)"
  ]

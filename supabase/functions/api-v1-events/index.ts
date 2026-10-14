@@ -27,6 +27,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const RESPONSE_HEADERS = {
   ...corsHeaders,
@@ -418,7 +419,7 @@ Deno.serve(async (req) => {
   // GET /v1/events?vin=... — read-back surface
   if (req.method === "GET") {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceKey = projectSecretKey();
     if (!supabaseUrl || !serviceKey) return jsonResponse({ error: "Server misconfigured" }, 500);
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const auth = await authenticateRequest(req, supabase, { endpoint: "events" });
@@ -431,7 +432,7 @@ Deno.serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceKey = projectSecretKey();
   if (!supabaseUrl || !serviceKey) {
     return jsonResponse({ error: "Server misconfigured" }, 500);
   }

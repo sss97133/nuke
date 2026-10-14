@@ -136,7 +136,7 @@ export class VehicleDataAPI {
             user_context: vehicleData.user_context
           })
         })
-        .select()
+        .select('id')
         .single();
 
       if (vehicleError) {
@@ -267,10 +267,10 @@ export class VehicleDataAPI {
    */
   async getVehicleProfile(vehicleId: string) {
     try {
-      // Get main vehicle data
+      // Get main vehicle data (explicit columns: the owner's purchase facts are not granted to readers)
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
-        .select('*')
+        .select('id, year, make, model, trim, vin, color, mileage, transmission, engine_size, body_style, drivetrain, user_id, created_at, updated_at')
         .eq('id', vehicleId)
         .single();
 
@@ -329,9 +329,15 @@ export class VehicleDataAPI {
       let query = supabase
         .from('vehicles')
         .select(`
-          *,
+          id,
+          year,
+          make,
+          model,
+          trim,
+          vin,
           vehicle_value_assessments(*)
         `);
+
 
       // Apply filters
       if (filters.make) query = query.eq('make', filters.make);
