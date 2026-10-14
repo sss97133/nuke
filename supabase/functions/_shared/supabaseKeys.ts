@@ -5,17 +5,19 @@
  * `SUPABASE_PUBLISHABLE_KEYS`) beside the legacy names (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`).
  * Docs: https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys (step 4).
  *
- * Measured 2026-10-14 (edge logs, the 12 hours before the legacy keys were disabled at 05:28Z): what this
- * project's functions read from SUPABASE_SERVICE_ROLE_KEY is already a secret key (`sb_secret_…`; ~650k function
- * requests used one, 791 used a legacy JWT). User-set secrets such as SERVICE_ROLE_KEY still hold legacy JWTs,
- * which the platform refuses since the switch. So every read goes through here, in this order:
- *   1. the legacy name, when the platform already puts a new key there (what functions send today, unchanged);
- *   2. the `default` key from the JSON map;
- *   3. the legacy env, JWT or not (refused by the platform since 2026-10-14; kept for other environments).
+ * The secret key a function sends (projectSecretKey), in order:
+ *   1. the secret key named `functions` in SUPABASE_SECRET_KEYS, when the owner creates one (a key only edge
+ *      functions hold, so it can be rotated alone);
+ *   2. SUPABASE_SERVICE_ROLE_KEY when the platform puts a secret key there (`sb_secret_…`): measured 2026-10-14, it
+ *      is what every deployed function sends, and the only key a function still on the old writeGuard accepts;
+ *   3. the secret key named `default`;
+ *   4. SUPABASE_SERVICE_ROLE_KEY as it is (a legacy JWT outside this project; refused here since 2026-10-14).
+ * The user-set secrets SERVICE_ROLE_KEY, JWT_SIGNING_SECRET, VITE_SUPABASE_JWT_SECRET and
+ * VITE_SUPABASE_SERVICE_ROLE_KEY held the legacy service key and JWT secret, both public; they were deleted on
+ * 2026-10-14 and nothing here reads them.
  *
- * The new keys travel on the `apikey` header, where supabase-js puts them. On a call to another edge function, the
- * gateway replaces a secret key on `Authorization: Bearer` with a JWT it mints (request header
- * sb-api-key-compatibility: minted), which writeGuard verifies against the project JWKS.
+ * The new keys travel on the `apikey` header, where supabase-js puts them. A function receives a secret key as the
+ * caller sent it, on `Authorization: Bearer` or on `apikey` (measured 2026-10-14), and writeGuard accepts either.
  */
 
 type Env = (name: string) => string | undefined;
@@ -37,30 +39,31 @@ function namedKeys(raw: string | undefined): Record<string, string> {
   }
 }
 
+const isJwt = (value: string) => value.split(".").length === 3;
+
 /** Every secret key the platform injects, by name. Empty until the project has secret keys. */
 export function secretKeys(env: Env = denoEnv): Record<string, string> {
   return namedKeys(env("SUPABASE_SECRET_KEYS"));
 }
 
 /**
- * Every opaque service key this function holds: the named secret keys, and a legacy-named env value that is
- * not a JWT (the platform puts a secret key there). A legacy JWT is never in this list: the legacy service key
- * is public, and only the platform can say whether it is still accepted.
+ * Every secret key a caller may present: each one in SUPABASE_SECRET_KEYS (the guide puts every secret key there under
+ * its own name, and each one is a service credential), and the platform's SUPABASE_SERVICE_ROLE_KEY when it is not a
+ * JWT. A legacy JWT is never in this list: the legacy service key is public.
  */
 export function knownSecretKeys(env: Env = denoEnv): string[] {
   const keys = new Set(Object.values(secretKeys(env)));
-  for (const name of ["SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY"]) {
-    const value = env(name);
-    if (value && value.split(".").length !== 3) keys.add(value);
-  }
+  const injected = env("SUPABASE_SERVICE_ROLE_KEY");
+  if (injected && !isJwt(injected)) keys.add(injected);
   return [...keys];
 }
 
-/** The server-side key: the secret key the platform injects, else the `default` secret key, else the legacy env. */
+/** The secret key this function sends, in the order in the header. */
 export function projectSecretKey(env: Env = denoEnv): string | undefined {
+  const named = secretKeys(env);
   const injected = env("SUPABASE_SERVICE_ROLE_KEY");
-  if (injected?.startsWith("sb_secret_")) return injected;
-  return secretKeys(env)["default"] ?? injected ?? env("SERVICE_ROLE_KEY");
+  return named["functions"] ?? (injected?.startsWith("sb_secret_") ? injected : undefined) ?? named["default"] ??
+    injected;
 }
 
 /** The public client key: the publishable key the platform injects, else the `default` one, else the legacy env. */
