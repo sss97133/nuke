@@ -1,29 +1,45 @@
 -- actor_profile_read(kind, id): an actor as a kit document of measures (case ledger 13.11, owner 2026-10-14).
 --
 -- The owner: an endpoint that shows a name and a list of cars means nothing; what has meaning is performance and
--- relativity. This read returns one document per actor, for every viewer the same public projection: counts,
--- shares and percentile ranks with their methods, populations and clocks, never an amount. Organizations now;
--- people next (a kind this version does not read returns NULL).
+-- relativity. This read returns one document per actor, the same public projection for every viewer, never an
+-- amount. Two kinds:
+--   organization  a public organization (organizations), its linked Bring a Trailer identities from
+--                 organization_external_profiles, its public vehicles by role.
+--   identity      a market participant (external_identities), counted with every case variant of its handle
+--                 (984 Bring a Trailer handles are split by case on 2026-10-14; one account, one count).
 --
 -- Sections (kit Section shapes, nuke_frontend/src/kit/types.ts; the phone's twin is ProfileDocument.swift):
---   measures "performance"     from organization_seller_stats (compute-org-seller-stats, contract
---                               listing_activity_v1): sell-through on known outcomes, listings, bids, comments and
---                               views per listing, each ranked among public organizations with five or more known
---                               outcomes (percent rank, 0 to 100; clients show it only at RANK_FLOOR 5 or more).
---   measures "specialization"  the organization's public vehicles (owner, sold_by, consigner links) by decade and
---                               make against the market's shares (market_pulse year and make counts, the nightly
---                               views the Pulse lens reads): a concentration ratio, 2.0 = twice the market's share.
---   measures "open_books"      of sold vehicles, the share whose record carries a sale amount; of held vehicles,
---                               the share carrying an acquisition cost; the vehicles carrying both (whose ROI is
---                               computable). Presence only: no amount leaves this function.
---   table    "Vehicles by role" link counts by relationship and status.
+--   measures "performance"  Selling. From the listing pages vehicle_events records with the actor's identities as
+--                           seller (one per normalized listing URL, a relist its own listing; sold if any event
+--                           recorded a sale, unsold if it ended without one), so an organization and its handle
+--                           read the same number. An organization with no linked identity falls back to
+--                           organization_seller_stats (compute-org-seller-stats, listing_activity_v1), ranked among
+--                           public selling organizations with five or more recorded outcomes, venues excluded, its
+--                           conflicts named and its clock the latest extraction of its inputs. Seller ranks from
+--                           listing pages wait for a per-seller fold (ranking every seller at read time took over
+--                           10 s on 2026-10-14).
+--   measures "bidding"      identity only: the bidder profile snapshot (mv_bidder_profiles, a table whose newest
+--                           activity is 2026-02-09), values with the snapshot's date and no percentile: ranking
+--                           private people's bidding is the owner's call (review 2026-10-14).
+--   measures "talking"      comments by the actor's identities, and answers to bidders on its own listings.
+--   measures "specialization" and "open_books"  organization only: its public vehicles by decade and make against
+--                           the market's shares (market_pulse counts), and whether sale amounts and acquisition
+--                           costs are on record (presence only). Not aggregated at read time for a venue (an
+--                           auction house, marketplace or platform) or an organization with more than 5,000 links:
+--                           Bring a Trailer's 100,852 linked vehicles took 27 s on 2026-10-14.
+--   table "Vehicles by role" organization only, outside the venue guard.
 -- organization_seller_stats has row security and no read policy, so the read is SECURITY DEFINER with this fixed
--- projection, for public organizations and public, undeleted vehicles only. Supersedes get_org_profile_fast
--- (no repo callers; it returns the whole business row).
+-- projection. Revokes get_org_profile_fast, which returned whole business rows (emails, phones, private
+-- organizations) to anyone.
 -- Contract: supabase/sql/test_actor_profile_read.sql (CI job actor-profile-read-contract).
 
 set lock_timeout = '5s';
-set statement_timeout = '30s';
+set statement_timeout = '60s';
+
+-- Case-insensitive handle lookups for the identity variants (692,838 rows). Built concurrently, so writers to
+-- external_identities are not blocked (supabase-deploy runs each statement outside a transaction block).
+CREATE INDEX CONCURRENTLY IF NOT EXISTS external_identities_platform_lower_handle_idx
+  ON public.external_identities (platform, lower(handle));
 
 CREATE OR REPLACE FUNCTION public.actor_profile_read(p_kind text, p_id uuid)
  RETURNS jsonb
@@ -35,181 +51,248 @@ CREATE OR REPLACE FUNCTION public.actor_profile_read(p_kind text, p_id uuid)
 AS $function$
 DECLARE
   v_now timestamptz := now();
-  o record;
-  s record;
-  k record;
-  r record;
+  subject jsonb;
   sections jsonb := '[]'::jsonb;
   items jsonb;
-  c_with_year int; c_with_make int; c_total int; c_sold int; c_sold_amt int; c_held int; c_held_cost int; c_both int; c_links int;
+  ids uuid[];
+  is_org boolean := p_kind = 'organization';
+  venue boolean := false;
+  o record; e record; s record; k record; r record;
+  -- selling from listing pages
+  l_total int := 0; l_sold int := 0; l_unsold int := 0; l_vehicles int := 0; l_last timestamptz; l_vehicle_ids uuid[];
+  -- talking
+  t_comments int := 0; t_lots int := 0; t_answers int := 0;
+  -- bidding
+  b_entered bigint; b_bids bigint; b_wins bigint; b_snap timestamptz;
+  -- organization vehicles
+  c_links int := 0; c_total int := 0; c_year int := 0; c_make int := 0; c_sold int := 0; c_sold_amt int := 0;
+  c_held int := 0; c_held_cost int := 0; c_both int := 0; top_decades jsonb; top_makes jsonb; mkt_n numeric;
 BEGIN
-  IF p_kind IS DISTINCT FROM 'organization' THEN
-    RETURN NULL;
-  END IF;
-  SELECT id, business_name, business_type, city, state, zip_code INTO o
-    FROM public.organizations WHERE id = p_id AND is_public = true;
-  IF NOT FOUND THEN
+  IF p_kind = 'organization' THEN
+    SELECT id, business_name, business_type, city, state, zip_code INTO o
+      FROM public.organizations WHERE id = p_id AND is_public = true;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    venue := coalesce(o.business_type, '') IN ('auction_house', 'marketplace', 'platform');
+    SELECT array_agg(DISTINCT ei.id) INTO ids
+      FROM public.organization_external_profiles op
+      JOIN public.external_identities ei ON ei.platform = 'bat' AND lower(ei.handle) = lower(op.username)
+     WHERE op.organization_id = p_id AND op.platform IN ('bringatrailer', 'bat');
+    subject := jsonb_build_object('kind', 'organization', 'id', o.id, 'name', o.business_name, 'type', o.business_type,
+      'place', nullif(concat_ws(', ', nullif(o.city, ''), nullif(o.state, '')), ''), 'zip', o.zip_code, 'venue', venue,
+      'handles', coalesce(array_length(ids, 1), 0));
+  ELSIF p_kind = 'identity' THEN
+    SELECT id, platform, handle, display_name INTO e FROM public.external_identities WHERE id = p_id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    SELECT array_agg(id) INTO ids FROM public.external_identities WHERE platform = e.platform AND lower(handle) = lower(e.handle);
+    subject := jsonb_build_object('kind', 'identity', 'id', e.id, 'name', coalesce(nullif(e.display_name, ''), e.handle),
+      'type', e.platform, 'place', NULL, 'zip', NULL, 'handle', e.handle, 'venue', false,
+      'handles', coalesce(array_length(ids, 1), 0));
+  ELSE
     RETURN NULL;
   END IF;
 
-  -- 1. Performance.
-  SELECT * INTO s FROM public.organization_seller_stats WHERE organization_id = p_id;
-  IF FOUND THEN
-    SELECT
-      count(*) FILTER (WHERE c.st IS NOT NULL) AS n_st, count(*) FILTER (WHERE c.st < me.st) AS lt_st,
-      count(*) FILTER (WHERE c.bids IS NOT NULL) AS n_bids, count(*) FILTER (WHERE c.bids < me.bids) AS lt_bids,
-      count(*) FILTER (WHERE c.comments IS NOT NULL) AS n_comments, count(*) FILTER (WHERE c.comments < me.comments) AS lt_comments,
-      count(*) FILTER (WHERE c.views IS NOT NULL) AS n_views, count(*) FILTER (WHERE c.views < me.views) AS lt_views,
-      count(*) FILTER (WHERE c.volume IS NOT NULL) AS n_volume, count(*) FILTER (WHERE c.volume < me.volume) AS lt_volume,
-      bool_or(c.organization_id = p_id) AS in_cohort
-    INTO k
-    FROM (SELECT organization_id,
-                 total_sold::numeric / nullif(coalesce(total_sold, 0) + coalesce(total_unsold, 0), 0) AS st,
-                 avg_bid_count AS bids, avg_comment_count AS comments, avg_view_count AS views,
-                 total_listings::numeric AS volume
-            FROM public.organization_seller_stats ss
-           WHERE coalesce(total_sold, 0) + coalesce(total_unsold, 0) >= 5
-             AND EXISTS (SELECT 1 FROM public.organizations po WHERE po.id = ss.organization_id AND po.is_public = true)) c
-    CROSS JOIN (SELECT s.total_sold::numeric / nullif(coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 0) AS st,
-                       s.avg_bid_count AS bids, s.avg_comment_count AS comments, s.avg_view_count AS views,
-                       s.total_listings::numeric AS volume) me;
+  -- 1. Selling from listing pages, for any actor with identities.
+  IF ids IS NOT NULL THEN
+    SELECT count(*), count(*) FILTER (WHERE sold), count(*) FILTER (WHERE NOT sold AND ended),
+           count(DISTINCT vehicle_id), max(last_at), array_agg(DISTINCT vehicle_id) FILTER (WHERE vehicle_id IS NOT NULL)
+      INTO l_total, l_sold, l_unsold, l_vehicles, l_last, l_vehicle_ids
+      FROM (SELECT lower(regexp_replace(regexp_replace(ve.source_url, '[?#].*$', ''), '/+$', '')) AS u,
+                   bool_or(ve.event_status = 'sold') AS sold,
+                   bool_or(ve.event_status IN ('ended', 'unsold', 'reserve_not_met')) AS ended,
+                   min(ve.vehicle_id::text)::uuid AS vehicle_id,
+                   max(ve.created_at) AS last_at
+              FROM public.vehicle_events ve
+             WHERE ve.seller_external_identity_id = ANY (ids) AND ve.event_type = 'auction' AND ve.source_url IS NOT NULL
+             GROUP BY 1) l;
+  END IF;
 
-    items := '[]'::jsonb;
-    IF coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0) > 0 THEN
+  items := '[]'::jsonb;
+  IF l_total > 0 THEN
+    items := items || jsonb_build_object(
+      'label', 'Listings', 'unit', 'listings', 'value', l_total,
+      'method', 'auction listings recorded with this actor''s handle as seller, one per listing page; a relist counts as its own listing',
+      'coverage', jsonb_build_object('n', l_total, 'of', l_total, 'grain', 'listings', 'as_of', l_last), 'rank', NULL);
+    items := items || jsonb_build_object(
+      'label', 'Vehicles', 'unit', 'vehicles', 'value', l_vehicles,
+      'method', 'distinct vehicle records behind those listings',
+      'coverage', jsonb_build_object('n', l_vehicles, 'of', l_total, 'grain', 'listings', 'as_of', l_last), 'rank', NULL);
+    IF l_sold + l_unsold > 0 THEN
       items := items || jsonb_build_object(
-        'label', 'Sell-through', 'unit', '%',
-        'value', round(100.0 * s.total_sold / (coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0)), 1),
-        'method', 'sold ÷ (sold + unsold) on attributed listings with a recorded outcome; ' || coalesce((s.evidence_summary->>'outcome_conflicts'), '0') || ' listings carry conflicting outcomes',
-        'coverage', jsonb_build_object('n', coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 'of', coalesce(s.total_listings, 0), 'grain', 'listings with a recorded outcome', 'as_of', s.calculated_at),
-        'rank', CASE WHEN k.in_cohort AND k.n_st >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_st / (k.n_st - 1), 1), 'n', k.n_st) END);
-    END IF;
-    IF s.total_listings IS NOT NULL THEN
-      items := items || jsonb_build_object(
-        'label', 'Listings', 'unit', 'listings', 'value', s.total_listings,
-        'method', 'auction listings attributed to the organization in retained public sources',
-        'coverage', jsonb_build_object('n', s.total_listings, 'of', s.total_listings, 'grain', 'attributed listings', 'as_of', s.calculated_at),
-        'rank', CASE WHEN k.in_cohort AND k.n_volume >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_volume / (k.n_volume - 1), 1), 'n', k.n_volume) END);
-    END IF;
-    IF s.avg_bid_count IS NOT NULL THEN
-      items := items || jsonb_build_object(
-        'label', 'Bids per listing', 'unit', 'bids', 'value', round(s.avg_bid_count, 1),
-        'method', 'mean of the highest retained bid counter per listing, known values only',
-        'coverage', jsonb_build_object('n', s.total_listings, 'of', s.total_listings, 'grain', 'attributed listings', 'as_of', s.calculated_at),
-        'rank', CASE WHEN k.in_cohort AND k.n_bids >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_bids / (k.n_bids - 1), 1), 'n', k.n_bids) END);
-    END IF;
-    IF s.avg_comment_count IS NOT NULL THEN
-      items := items || jsonb_build_object(
-        'label', 'Comments per listing', 'unit', 'comments', 'value', round(s.avg_comment_count, 1),
-        'method', 'mean of the highest retained comment counter per listing, known values only',
-        'coverage', jsonb_build_object('n', s.total_listings, 'of', s.total_listings, 'grain', 'attributed listings', 'as_of', s.calculated_at),
-        'rank', CASE WHEN k.in_cohort AND k.n_comments >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_comments / (k.n_comments - 1), 1), 'n', k.n_comments) END);
-    END IF;
-    IF s.avg_view_count IS NOT NULL THEN
-      items := items || jsonb_build_object(
-        'label', 'Views per listing', 'unit', 'views', 'value', round(s.avg_view_count, 0),
-        'method', 'mean of the highest retained view counter per listing, known values only',
-        'coverage', jsonb_build_object('n', s.total_listings, 'of', s.total_listings, 'grain', 'attributed listings', 'as_of', s.calculated_at),
-        'rank', CASE WHEN k.in_cohort AND k.n_views >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt_views / (k.n_views - 1), 1), 'n', k.n_views) END);
+        'label', 'Sell-through', 'unit', '%', 'value', round(100.0 * l_sold / (l_sold + l_unsold), 1),
+        'method', 'sold ÷ (sold + ended unsold) on listings with a recorded outcome; no peer rank until a per-seller fold exists',
+        'coverage', jsonb_build_object('n', l_sold + l_unsold, 'of', l_total, 'grain', 'listings with a recorded outcome', 'as_of', l_last), 'rank', NULL);
     END IF;
     sections := sections || jsonb_build_object(
       'kind', 'measures', 'stack', 'performance', 'title', 'Selling',
-      'coverage', jsonb_build_object('n', coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 'of', coalesce(s.total_listings, 0), 'grain', 'listings with a recorded outcome', 'as_of', s.calculated_at),
+      'coverage', jsonb_build_object('n', l_sold + l_unsold, 'of', l_total, 'grain', 'listings with a recorded outcome', 'as_of', l_last),
+      'items', items);
+  ELSIF is_org THEN
+    -- Fallback for an organization with no linked identity: the organization's seller-stats fold.
+    SELECT * INTO s FROM public.organization_seller_stats WHERE organization_id = p_id;
+    IF FOUND AND coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0) > 0 THEN
+      SELECT count(*) FILTER (WHERE c.st IS NOT NULL) AS n, count(*) FILTER (WHERE c.st < me.st) AS lt,
+             bool_or(c.organization_id = p_id) AS in_cohort
+        INTO k
+        FROM (SELECT ss.organization_id, ss.total_sold::numeric / nullif(coalesce(ss.total_sold, 0) + coalesce(ss.total_unsold, 0), 0) AS st
+                FROM public.organization_seller_stats ss
+                JOIN public.organizations po ON po.id = ss.organization_id AND po.is_public = true
+                     AND coalesce(po.business_type, '') NOT IN ('auction_house', 'marketplace', 'platform')
+               WHERE coalesce(ss.total_sold, 0) + coalesce(ss.total_unsold, 0) >= 5) c
+        CROSS JOIN (SELECT s.total_sold::numeric / nullif(coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 0) AS st) me;
+      items := items || jsonb_build_object(
+        'label', 'Sell-through', 'unit', '%',
+        'value', round(100.0 * s.total_sold / (coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0)), 1),
+        'method', 'sold ÷ (sold + unsold) on organization-attributed listings with a recorded outcome (listing_activity_v1); '
+                  || coalesce(s.evidence_summary->>'outcome_conflicts', '0') || ' outcome and '
+                  || coalesce(s.evidence_summary->>'identity_conflicts', '0') || ' identity conflicts in its inputs; '
+                  || 'ranked among public selling organizations with five or more recorded outcomes, venues excluded',
+        'coverage', jsonb_build_object('n', coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 'of', coalesce(s.total_listings, 0),
+                                       'grain', 'listings with a recorded outcome',
+                                       'as_of', coalesce(s.evidence_summary->>'latest_input_extracted_at', s.calculated_at::text)),
+        'rank', CASE WHEN k.in_cohort AND k.n >= 2 THEN jsonb_build_object('p', round(100.0 * k.lt / (k.n - 1), 1), 'n', k.n) END);
+    END IF;
+    sections := sections || jsonb_build_object(
+      'kind', 'measures', 'stack', 'performance', 'title', 'Selling',
+      'coverage', jsonb_build_object('n', coalesce(s.total_sold, 0) + coalesce(s.total_unsold, 0), 'of', coalesce(s.total_listings, 0),
+                                     'grain', 'listings with a recorded outcome',
+                                     'as_of', coalesce(s.evidence_summary->>'latest_input_extracted_at', s.calculated_at::text)),
       'items', items);
   ELSE
     sections := sections || jsonb_build_object(
       'kind', 'measures', 'stack', 'performance', 'title', 'Selling',
-      'coverage', jsonb_build_object('n', 0, 'of', 0, 'grain', 'attributed listings', 'as_of', NULL),
-      'items', '[]'::jsonb);
+      'coverage', jsonb_build_object('n', 0, 'of', 0, 'grain', 'listings', 'as_of', NULL), 'items', '[]'::jsonb);
   END IF;
 
-  -- The organization's public vehicles (owner, sold_by, consigner links): one row per vehicle, sold if any link says so.
-  -- The same set is a CTE in each query below; a STABLE function runs read-only and cannot stage it in a table.
+  -- 2. Bidding (identity only): the dated snapshot, values without a percentile.
+  IF NOT is_org THEN
+    items := '[]'::jsonb;
+    SELECT max(last_seen) INTO b_snap FROM public.mv_bidder_profiles;
+    SELECT sum(auctions_entered), sum(total_bids), sum(wins) INTO b_entered, b_bids, b_wins
+      FROM public.mv_bidder_profiles WHERE e.platform = 'bat' AND lower(bat_username) = lower(e.handle);
+    IF coalesce(b_entered, 0) > 0 THEN
+      items := items || jsonb_build_object(
+        'label', 'Auctions entered', 'unit', 'auctions', 'value', b_entered,
+        'method', 'auctions the handle bid in, from the bidder profile snapshot; no percentile until the owner decides on ranking bidders',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+      items := items || jsonb_build_object(
+        'label', 'Wins', 'unit', 'auctions', 'value', coalesce(b_wins, 0),
+        'method', 'auctions the handle won, from the bidder profile snapshot',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+      items := items || jsonb_build_object(
+        'label', 'Win rate', 'unit', '%', 'value', round(100.0 * coalesce(b_wins, 0) / b_entered, 1),
+        'method', 'wins ÷ auctions entered, from the bidder profile snapshot',
+        'coverage', jsonb_build_object('n', b_entered, 'of', b_entered, 'grain', 'auctions entered', 'as_of', b_snap), 'rank', NULL);
+    END IF;
+    sections := sections || jsonb_build_object(
+      'kind', 'measures', 'stack', 'bidding', 'title', 'Bidding',
+      'coverage', jsonb_build_object('n', coalesce(b_entered, 0), 'of', coalesce(b_entered, 0), 'grain', 'auctions entered in the bidder snapshot', 'as_of', b_snap),
+      'items', items);
+  END IF;
+
+  -- 3. Talking: comments by the actor's identities; answers to bidders counted on its own listings only.
+  IF ids IS NOT NULL THEN
+    SELECT count(*), count(DISTINCT vehicle_id),
+           count(*) FILTER (WHERE comment_type = 'seller_response' AND vehicle_id = ANY (coalesce(l_vehicle_ids, '{}'::uuid[])))
+      INTO t_comments, t_lots, t_answers
+      FROM public.auction_comments WHERE author_external_identity_id = ANY (ids);
+    items := '[]'::jsonb;
+    IF t_comments > 0 THEN
+      items := items || jsonb_build_object(
+        'label', 'Comments', 'unit', 'comments', 'value', t_comments,
+        'method', 'auction comments attributed to this actor''s handle',
+        'coverage', jsonb_build_object('n', t_lots, 'of', t_lots, 'grain', 'lots commented on', 'as_of', v_now), 'rank', NULL);
+      IF l_total > 0 THEN
+        items := items || jsonb_build_object(
+          'label', 'Answers to bidders per listing', 'unit', 'answers', 'value', round(t_answers::numeric / l_total, 1),
+          'method', 'seller responses on the actor''s own listed vehicles ÷ its listings',
+          'coverage', jsonb_build_object('n', t_answers, 'of', t_comments, 'grain', 'comments that answer bidders on its listings', 'as_of', v_now), 'rank', NULL);
+      END IF;
+    END IF;
+    sections := sections || jsonb_build_object(
+      'kind', 'measures', 'stack', 'talking', 'title', 'Talking',
+      'coverage', jsonb_build_object('n', t_comments, 'of', t_comments, 'grain', 'attributed comments', 'as_of', v_now),
+      'items', items);
+  END IF;
+
+  IF NOT is_org THEN
+    RETURN jsonb_build_object('subject', subject, 'viewer', 'anon', 'read_at', v_now, 'sections', sections);
+  END IF;
+
+  -- 4. Organization vehicles: specialization, open books, roles. A venue or a very large organization is not
+  -- aggregated at read time.
+  SELECT count(*) INTO c_links FROM public.organization_vehicles WHERE organization_id = p_id;
+  IF venue OR c_links > 5000 THEN
+    sections := sections || jsonb_build_object(
+      'kind', 'measures', 'stack', 'specialization', 'title', 'What they handle',
+      'coverage', jsonb_build_object('n', 0, 'of', c_links,
+                                     'grain', CASE WHEN venue THEN 'vehicle links; a venue lists other sellers'' vehicles, not aggregated'
+                                                   ELSE 'vehicle links; more than 5,000, not aggregated at read time' END,
+                                     'as_of', v_now),
+      'items', '[]'::jsonb);
+    RETURN jsonb_build_object('subject', subject, 'viewer', 'anon', 'read_at', v_now, 'sections', sections);
+  END IF;
+
   WITH av AS (
-      SELECT ve.id,
-             CASE WHEN ve.year BETWEEN 1885 AND 2100 THEN (ve.year / 10) * 10 END AS decade,
-             nullif(lower(btrim(ve.make)), '') AS make,
-             bool_or(ov.relationship_type = 'sold_by' OR ov.status IN ('sold', 'past')) AS sold,
-             (coalesce(ve.sale_price, 0) > 0 OR coalesce(ve.sold_price, 0) > 0 OR coalesce(ve.bat_sold_price, 0) > 0) AS has_amount,
-             coalesce(ve.purchase_price, 0) > 0 AS has_cost
-        FROM public.organization_vehicles ov
-        JOIN public.vehicles ve ON ve.id = ov.vehicle_id
-       WHERE ov.organization_id = p_id
-         AND ov.relationship_type IN ('owner', 'sold_by', 'consigner')
-         AND ve.is_public = true AND ve.deleted_at IS NULL
-       GROUP BY ve.id, ve.year, ve.make, ve.sale_price, ve.sold_price, ve.bat_sold_price, ve.purchase_price)
+    SELECT ve.id,
+           CASE WHEN ve.year BETWEEN 1885 AND 2100 THEN (ve.year / 10) * 10 END AS decade,
+           nullif(lower(btrim(ve.make)), '') AS make,
+           bool_or(ov.relationship_type = 'sold_by' OR ov.status IN ('sold', 'past')) AS sold,
+           (coalesce(ve.sale_price, 0) > 0 OR coalesce(ve.sold_price, 0) > 0 OR coalesce(ve.bat_sold_price, 0) > 0) AS has_amount,
+           coalesce(ve.purchase_price, 0) > 0 AS has_cost
+      FROM public.organization_vehicles ov
+      JOIN public.vehicles ve ON ve.id = ov.vehicle_id
+     WHERE ov.organization_id = p_id
+       AND ov.relationship_type IN ('owner', 'sold_by', 'consigner')
+       AND ve.is_public = true AND ve.deleted_at IS NULL
+     GROUP BY ve.id, ve.year, ve.make, ve.sale_price, ve.sold_price, ve.bat_sold_price, ve.purchase_price),
+  dec AS (SELECT decade, count(*) AS n FROM av WHERE decade IS NOT NULL GROUP BY decade ORDER BY count(*) DESC, decade LIMIT 3),
+  mk AS (SELECT make, count(*) AS n FROM av WHERE make IS NOT NULL GROUP BY make ORDER BY count(*) DESC, make LIMIT 3)
   SELECT count(*), count(decade), count(make),
          count(*) FILTER (WHERE sold), count(*) FILTER (WHERE sold AND has_amount),
          count(*) FILTER (WHERE NOT sold), count(*) FILTER (WHERE NOT sold AND has_cost),
-         count(*) FILTER (WHERE has_amount AND has_cost)
-    INTO c_total, c_with_year, c_with_make, c_sold, c_sold_amt, c_held, c_held_cost, c_both
+         count(*) FILTER (WHERE has_amount AND has_cost),
+         (SELECT jsonb_agg(jsonb_build_object('key', decade, 'n', n) ORDER BY n DESC, decade) FROM dec),
+         (SELECT jsonb_agg(jsonb_build_object('key', make, 'n', n) ORDER BY n DESC, make) FROM mk)
+    INTO c_total, c_year, c_make, c_sold, c_sold_amt, c_held, c_held_cost, c_both, top_decades, top_makes
     FROM av;
 
-  -- 2. Specialization: the three largest decades and makes, each against the market's share.
   items := '[]'::jsonb;
-  FOR r IN
-    WITH av AS (
-      SELECT ve.id,
-             CASE WHEN ve.year BETWEEN 1885 AND 2100 THEN (ve.year / 10) * 10 END AS decade,
-             nullif(lower(btrim(ve.make)), '') AS make,
-             bool_or(ov.relationship_type = 'sold_by' OR ov.status IN ('sold', 'past')) AS sold,
-             (coalesce(ve.sale_price, 0) > 0 OR coalesce(ve.sold_price, 0) > 0 OR coalesce(ve.bat_sold_price, 0) > 0) AS has_amount,
-             coalesce(ve.purchase_price, 0) > 0 AS has_cost
-        FROM public.organization_vehicles ov
-        JOIN public.vehicles ve ON ve.id = ov.vehicle_id
-       WHERE ov.organization_id = p_id
-         AND ov.relationship_type IN ('owner', 'sold_by', 'consigner')
-         AND ve.is_public = true AND ve.deleted_at IS NULL
-       GROUP BY ve.id, ve.year, ve.make, ve.sale_price, ve.sold_price, ve.bat_sold_price, ve.purchase_price),
-         mine AS (SELECT decade, count(*) AS n FROM av WHERE decade IS NOT NULL GROUP BY decade),
-         mkt AS (SELECT (y / 10) * 10 AS decade, sum(cnt) AS n
-                   FROM (SELECT CASE WHEN name ~ '^[0-9]{4}$' THEN name::int END AS y, count AS cnt
-                           FROM public.market_pulse('year', 300)) t
-                  WHERE y BETWEEN 1885 AND 2100 GROUP BY 1),
-         tot AS (SELECT (SELECT sum(n) FROM mine) AS mine_n, (SELECT sum(n) FROM mkt) AS mkt_n)
-    SELECT mine.decade, mine.n, (mine.n::numeric / tot.mine_n) / nullif(mkt.n::numeric / tot.mkt_n, 0) AS ratio
-      FROM mine JOIN mkt USING (decade) CROSS JOIN tot
-     ORDER BY mine.n DESC, mine.decade LIMIT 3
-  LOOP
-    items := items || jsonb_build_object(
-      'label', r.decade::text || 's', 'unit', '× market', 'value', round(r.ratio, 1),
-      'method', 'share of the organization''s public vehicles from the decade ÷ the decade''s share of public vehicle records (market_pulse year counts)',
-      'coverage', jsonb_build_object('n', r.n, 'of', c_with_year, 'grain', 'vehicles with a year', 'as_of', v_now),
-      'rank', NULL);
-  END LOOP;
-  FOR r IN
-    WITH av AS (
-      SELECT ve.id,
-             CASE WHEN ve.year BETWEEN 1885 AND 2100 THEN (ve.year / 10) * 10 END AS decade,
-             nullif(lower(btrim(ve.make)), '') AS make,
-             bool_or(ov.relationship_type = 'sold_by' OR ov.status IN ('sold', 'past')) AS sold,
-             (coalesce(ve.sale_price, 0) > 0 OR coalesce(ve.sold_price, 0) > 0 OR coalesce(ve.bat_sold_price, 0) > 0) AS has_amount,
-             coalesce(ve.purchase_price, 0) > 0 AS has_cost
-        FROM public.organization_vehicles ov
-        JOIN public.vehicles ve ON ve.id = ov.vehicle_id
-       WHERE ov.organization_id = p_id
-         AND ov.relationship_type IN ('owner', 'sold_by', 'consigner')
-         AND ve.is_public = true AND ve.deleted_at IS NULL
-       GROUP BY ve.id, ve.year, ve.make, ve.sale_price, ve.sold_price, ve.bat_sold_price, ve.purchase_price),
-         mine AS (SELECT make, count(*) AS n FROM av WHERE make IS NOT NULL GROUP BY make),
-         mkt AS (SELECT lower(btrim(name)) AS make, sum(count) AS n FROM public.market_pulse('make', 400)
-                  WHERE lower(btrim(name)) <> 'unresolved' GROUP BY 1),
-         tot AS (SELECT (SELECT sum(n) FROM mine) AS mine_n, (SELECT sum(n) FROM mkt) AS mkt_n)
-    SELECT mine.make, mine.n, (mine.n::numeric / tot.mine_n) / nullif(mkt.n::numeric / tot.mkt_n, 0) AS ratio
-      FROM mine JOIN mkt USING (make) CROSS JOIN tot
-     ORDER BY mine.n DESC, mine.make LIMIT 3
-  LOOP
-    items := items || jsonb_build_object(
-      'label', initcap(r.make), 'unit', '× market', 'value', round(r.ratio, 1),
-      'method', 'share of the organization''s public vehicles of the make ÷ the make''s share of public vehicle records (market_pulse make counts)',
-      'coverage', jsonb_build_object('n', r.n, 'of', c_with_make, 'grain', 'vehicles with a make', 'as_of', v_now),
-      'rank', NULL);
-  END LOOP;
+  IF top_decades IS NOT NULL THEN
+    SELECT sum(count) INTO mkt_n FROM public.market_pulse('year', 300) WHERE name ~ '^[0-9]{4}$' AND name::int BETWEEN 1885 AND 2100;
+    FOR r IN
+      SELECT (d->>'key')::int AS decade, (d->>'n')::int AS n,
+             (SELECT sum(count) FROM public.market_pulse('year', 300) m
+               WHERE m.name ~ '^[0-9]{4}$' AND (m.name::int / 10) * 10 = (d->>'key')::int) AS mkt
+        FROM jsonb_array_elements(top_decades) d
+    LOOP
+      IF coalesce(r.mkt, 0) > 0 AND coalesce(mkt_n, 0) > 0 THEN
+        items := items || jsonb_build_object(
+          'label', r.decade::text || 's', 'unit', '× market', 'value', round((r.n::numeric / c_year) / (r.mkt / mkt_n), 1),
+          'method', 'share of the organization''s public vehicles from the decade ÷ the decade''s share of public vehicle records (market_pulse year counts)',
+          'coverage', jsonb_build_object('n', r.n, 'of', c_year, 'grain', 'vehicles with a year', 'as_of', v_now), 'rank', NULL);
+      END IF;
+    END LOOP;
+  END IF;
+  IF top_makes IS NOT NULL THEN
+    SELECT sum(count) INTO mkt_n FROM public.market_pulse('make', 400) WHERE lower(btrim(name)) <> 'unresolved';
+    FOR r IN
+      SELECT d->>'key' AS make, (d->>'n')::int AS n,
+             (SELECT sum(count) FROM public.market_pulse('make', 400) m WHERE lower(btrim(m.name)) = d->>'key') AS mkt
+        FROM jsonb_array_elements(top_makes) d
+    LOOP
+      IF coalesce(r.mkt, 0) > 0 AND coalesce(mkt_n, 0) > 0 THEN
+        items := items || jsonb_build_object(
+          'label', initcap(r.make), 'unit', '× market', 'value', round((r.n::numeric / c_make) / (r.mkt / mkt_n), 1),
+          'method', 'share of the organization''s public vehicles of the make ÷ the make''s share of public vehicle records (market_pulse make counts)',
+          'coverage', jsonb_build_object('n', r.n, 'of', c_make, 'grain', 'vehicles with a make', 'as_of', v_now), 'rank', NULL);
+      END IF;
+    END LOOP;
+  END IF;
   sections := sections || jsonb_build_object(
     'kind', 'measures', 'stack', 'specialization', 'title', 'What they handle',
-    'coverage', jsonb_build_object('n', c_with_year, 'of', c_total, 'grain', 'public vehicles linked as owner, seller or consigner', 'as_of', v_now),
+    'coverage', jsonb_build_object('n', c_year, 'of', c_total, 'grain', 'public vehicles linked as owner, seller or consigner', 'as_of', v_now),
     'items', items);
 
-  -- 3. Open books: whether the record carries the money, never the money itself.
   items := '[]'::jsonb;
   IF c_sold > 0 THEN
     items := items || jsonb_build_object(
@@ -234,7 +317,6 @@ BEGIN
     'coverage', jsonb_build_object('n', c_sold_amt + c_held_cost, 'of', c_total, 'grain', 'public vehicles with money recorded', 'as_of', v_now),
     'items', items);
 
-  -- 4. Vehicles by role.
   SELECT coalesce(jsonb_agg(jsonb_build_array(
            jsonb_build_object('value', t.role, 'source', jsonb_build_object('kind', 'legacy', 'label', 'organization_vehicles'), 'observed_at', NULL, 'trust', 1),
            jsonb_build_object('value', t.active, 'source', jsonb_build_object('kind', 'legacy', 'label', 'organization_vehicles'), 'observed_at', NULL, 'trust', 1),
@@ -255,21 +337,19 @@ BEGIN
     'columns', jsonb_build_array('Role', 'Active', 'Past or sold'),
     'rows', items);
 
-  RETURN jsonb_build_object(
-    'subject', jsonb_build_object('kind', 'organization', 'id', o.id, 'name', o.business_name, 'type', o.business_type,
-                                  'place', nullif(concat_ws(', ', nullif(o.city, ''), nullif(o.state, '')), ''), 'zip', o.zip_code),
-    'viewer', 'anon',
-    'read_at', v_now,
-    'sections', sections);
+  RETURN jsonb_build_object('subject', subject, 'viewer', 'anon', 'read_at', v_now, 'sections', sections);
 END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.actor_profile_read(text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.actor_profile_read(text, uuid) TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.actor_profile_read(text, uuid) IS
-  'An actor (organization now; people next) as a kit document of measures: performance with peer ranks, specialization against the market, open books as presence only, vehicles by role. One public projection for every viewer; no amounts. Case ledger 13.11. 2026-10-14.';
+  'An actor (organization or market identity) as a kit document of measures: selling from its listing pages, bidding (dated snapshot, no percentile), talking; for organizations also specialization against the market, open books as presence only and vehicles by role, not aggregated for venues or more than 5,000 links. One public projection; no amounts. Case ledger 13.11. 2026-10-14.';
+
+-- The superseded org reader returned whole business rows (emails, phones, private organizations) to anyone.
 DO $$ BEGIN
   IF to_regprocedure('public.get_org_profile_fast(uuid)') IS NOT NULL THEN
-    EXECUTE $c$COMMENT ON FUNCTION public.get_org_profile_fast(uuid) IS 'Superseded by actor_profile_read (2026-10-14). No repo callers; returns the whole business row. Revoke after confirming no live callers.'$c$;
+    EXECUTE 'REVOKE EXECUTE ON FUNCTION public.get_org_profile_fast(uuid) FROM PUBLIC, anon, authenticated';
+    EXECUTE $c$COMMENT ON FUNCTION public.get_org_profile_fast(uuid) IS 'Superseded by actor_profile_read (2026-10-14) and revoked from PUBLIC, anon and authenticated: it returned whole business rows, contact details included.'$c$;
   END IF;
 END $$;
