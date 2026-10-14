@@ -1353,6 +1353,19 @@ for _k, _v in D0927B.items():
         _v = dict(_v, why=_d["why"] + " | " + _v["why"])
     _d.update(_v)
 
+# 2026-10-14: the harness model's geometry check (v_harness_segment_geometry) found four PDM30 -> Dakota VHX wires planned
+# shorter than the straight line between their plugs in the twin (3.59 ft): #119 and #120 at 1.5 ft, #71 and #39 at
+# 3.5 ft, all cut list v4.2 zone estimates. The twin routes this run as landmark L18 (PDM30 -> the DASH_CLUSTER anchor,
+# where the Dakota VHX box sits). length_ft is the route; the 15 % body pad (state row 33) is applied downstream
+# (kits_v5.py BOM feet), so it is not added here.
+_TWIN_L18 = ("twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in "
+             "= 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded "
+             "up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 "
+             "(state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; "
+             "not taped on the truck")
+for _k in ("119", "120", "71", "39"):
+    DECISIONS.setdefault(_k, {}).update(length_ft=3.7, length_basis=_TWIN_L18)
+
 # Subsystem for wires no subsystems.json list carries (v4.1/v4.2/05-14 additions + implied), by the section or
 # decision that added them — the recalc engine and the app toggle on this field, so every wire needs one.
 SUBSYSTEM_RULES = [
