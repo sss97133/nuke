@@ -1,20 +1,5 @@
--- Live on production 2026-10-14 (pg_get_functiondef): the organization manager check (20261014160000) and the SECURITY INVOKER
--- trigger that copies an organization's vehicle timeline events into its business timeline, with its trigger.
-CREATE OR REPLACE FUNCTION public.caller_manages_organization(p_organization_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  SELECT coalesce(auth.uid() IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.organization_contributors oc
-    WHERE oc.organization_id = p_organization_id
-      AND oc.user_id = auth.uid()
-      AND oc.status = 'active'
-      AND oc.role IN ('owner', 'manager', 'board_member')), false)
-$function$
-
-;
+-- Live on production 2026-10-14 (pg_get_functiondef): the SECURITY INVOKER trigger that copies an organization's vehicle
+-- timeline events into its business timeline, with its trigger.
 CREATE OR REPLACE FUNCTION public.create_org_timeline_from_vehicle_event()
  RETURNS trigger
  LANGUAGE plpgsql

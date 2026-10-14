@@ -1,12 +1,13 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_signed_in_own_name -f this-file.sql
 -- Proves that after 20261014223000_signed_in_inserts_in_own_name.sql a signed-in stranger (any account: sign-up is
--- open and anonymous sign-in is on) can no longer insert in someone else's name on the 11 tables, or grant themselves
--- a business role, while every client path still inserts in its own name (the defaults name the caller where a client
--- leaves the column out), the vehicle's editors and admins log prices, a business's manager grants roles, the
--- organization timeline trigger (now a definer) still copies a vehicle event named for the vehicle's user, and the
--- service role inserts everywhere; and that the live policies let the stranger do each of those. Starts from the live
--- policies and grants as read on 2026-10-14 and the live functions (helpers/org_timeline_and_manager_live_20261014.sql).
--- The seeds are a disposable database's rows.
+-- open and anonymous sign-in is on) can no longer insert in someone else's name on the 10 tables, while every client
+-- path still inserts in its own name (the defaults name the caller where a client leaves the column out), the
+-- vehicle's editors and admins log prices, the organization timeline trigger (now a definer) still copies a vehicle
+-- event named for the vehicle's user, and the service role inserts everywhere; and that the live policies let the
+-- stranger do each of those. Starts from the live policies, the live ACLs (relacl, attacl and proacl text as read on
+-- 2026-10-14, applied and then compared) and the live trigger (helpers/org_timeline_trigger_live_20261014.sql); after
+-- the migration the ACLs are compared again, to the exact text it should leave. The seeds are a disposable
+-- database's rows.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -33,15 +34,75 @@ CREATE FUNCTION public.t_as(p_uid text) RETURNS void LANGUAGE sql AS
 $$ SELECT set_config('request.jwt.claims', CASE WHEN p_uid = '' THEN '' ELSE json_build_object('sub', p_uid, 'role', 'authenticated')::text END, false) $$;
 GRANT EXECUTE ON FUNCTION public.t_as(text) TO anon, authenticated, service_role;
 
+-- ACL text helpers. Production's owner and grantor is postgres; here they are owp_table_owner, written back as postgres
+-- when compared.
+CREATE FUNCTION public.t_privs(p_letters text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT string_agg(p, ', ' ORDER BY ord) FROM (VALUES ('r', 'SELECT', 1), ('a', 'INSERT', 2), ('w', 'UPDATE', 3),
+    ('d', 'DELETE', 4), ('D', 'TRUNCATE', 5), ('x', 'REFERENCES', 6), ('t', 'TRIGGER', 7)) l(letter, p, ord)
+  WHERE strpos(p_letters, letter) > 0
+$$;
+-- Grants a table the API roles' privileges exactly as a live relacl text lists them, in its order.
+CREATE FUNCTION public.t_apply_relacl(p_tbl regclass, p_acl text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE item text; grantee text; letters text;
+BEGIN
+  FOR item IN SELECT unnest(string_to_array(trim(both '{}' from p_acl), ',')) LOOP
+    grantee := split_part(item, '=', 1);
+    letters := split_part(split_part(item, '=', 2), '/', 1);
+    CONTINUE WHEN grantee = 'postgres';
+    EXECUTE format('GRANT %s ON %s TO %s', public.t_privs(letters), p_tbl,
+      CASE WHEN grantee = '' THEN 'PUBLIC' ELSE quote_ident(grantee) END);
+  END LOOP;
+END $$;
+CREATE FUNCTION public.t_relacl(p_tbl regclass) RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT replace(relacl::text, 'owp_table_owner', 'postgres') FROM pg_class WHERE oid = p_tbl $$;
+CREATE FUNCTION public.t_attacl(p_tbl regclass, p_col text) RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT replace(attacl::text, 'owp_table_owner', 'postgres') FROM pg_attribute WHERE attrelid = p_tbl AND attname = p_col $$;
+CREATE FUNCTION public.t_proacl(p_fn regprocedure) RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT replace(proacl::text, 'owp_table_owner', 'postgres') FROM pg_proc WHERE oid = p_fn $$;
+
+-- The live relacl of each table (2026-10-14) and the text the migration must leave (anon loses INSERT and TRUNCATE,
+-- authenticated TRUNCATE). vehicles and organization_vehicles grant reads per column, so their API roles hold no
+-- table-level SELECT.
+CREATE TABLE public.t_acl (tbl text PRIMARY KEY, live text NOT NULL, after text NOT NULL);
+INSERT INTO public.t_acl VALUES
+  ('vehicles', '{postgres=arwdDxtm/postgres,anon=awdDxt/postgres,authenticated=awdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=wdxt/postgres,authenticated=awdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('vehicle_price_history', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('organization_vehicles', '{postgres=arwdDxtm/postgres,anon=awdDxt/postgres,authenticated=awdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=wdxt/postgres,authenticated=awdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('reference_libraries', '{postgres=arwdDxtm/postgres,anon=rxt/postgres,authenticated=arxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rxt/postgres,authenticated=arxt/postgres,service_role=arwdDxt/postgres}'),
+  ('image_tags', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('business_timeline_events', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('organization_images', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('tool_catalog', '{postgres=arwdDxtm/postgres,anon=rxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('timeline_event_comments', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}'),
+  ('work_order_edit_log', '{postgres=arwdDxtm/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}',
+               '{postgres=arwdDxtm/postgres,anon=rwdxt/postgres,authenticated=arwdxt/postgres,service_role=arwdDxt/postgres}');
+-- The live column ACL of a readable column on the two per-column tables, and of a money column (none).
+CREATE TABLE public.t_colacl (tbl text NOT NULL, col text NOT NULL, live text, PRIMARY KEY (tbl, col));
+INSERT INTO public.t_colacl VALUES
+  ('vehicles', 'uploaded_by', '{anon=r/postgres,authenticated=r/postgres}'),
+  ('vehicles', 'purchase_price', NULL),
+  ('organization_vehicles', 'linked_by_user_id', '{anon=r/postgres,authenticated=r/postgres}'),
+  ('organization_vehicles', 'sale_price', NULL);
+GRANT SELECT ON public.t_acl, public.t_colacl TO anon, authenticated, service_role, owp_table_owner;
+
 SET ROLE owp_table_owner;
 CREATE TABLE public.admin_users (user_id uuid, is_active boolean);
 CREATE TABLE public.vehicle_user_permissions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid NOT NULL, is_active boolean);
 CREATE TABLE public.organization_contributors (organization_id uuid, user_id uuid, role text, status text);
 GRANT SELECT ON public.admin_users, public.vehicle_user_permissions, public.organization_contributors TO anon, authenticated, service_role;
 
--- The 11 tables with the columns their policies and clients use, and their live insert policies verbatim.
+-- The 10 tables with the columns their policies and clients use, and their live insert policies verbatim.
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), uploaded_by uuid DEFAULT auth.uid(), user_id uuid,
-  owner_id uuid, year integer, make text, model text);
+  owner_id uuid, year integer, make text, model text, purchase_price numeric);
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY vehicles_authenticated_insert ON public.vehicles FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
 CREATE POLICY vehicles_read ON public.vehicles FOR SELECT USING (true);
@@ -49,7 +110,8 @@ CREATE TABLE public.vehicle_price_history (id uuid PRIMARY KEY DEFAULT gen_rando
 ALTER TABLE public.vehicle_price_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can log prices" ON public.vehicle_price_history FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
 CREATE POLICY vph_read ON public.vehicle_price_history FOR SELECT USING (true);
-CREATE TABLE public.organization_vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, vehicle_id uuid, linked_by_user_id uuid);
+CREATE TABLE public.organization_vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, vehicle_id uuid,
+  linked_by_user_id uuid, sale_price numeric);
 ALTER TABLE public.organization_vehicles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users/owners manage links" ON public.organization_vehicles
   USING (linked_by_user_id = (SELECT auth.uid())
@@ -86,13 +148,6 @@ CREATE POLICY "Only admins can modify tool catalog" ON public.tool_catalog
   WITH CHECK (EXISTS (SELECT 1 FROM admin_users au WHERE au.user_id = (SELECT auth.uid()) AND au.is_active = true));
 CREATE POLICY "Anyone can insert tool catalog" ON public.tool_catalog FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY tool_catalog_read ON public.tool_catalog FOR SELECT USING (true);
-CREATE TABLE public.business_user_roles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid, user_id uuid NOT NULL,
-  role_type text, status text DEFAULT 'active');
-ALTER TABLE public.business_user_roles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY business_user_roles_insert ON public.business_user_roles FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
-CREATE POLICY business_user_roles_update ON public.business_user_roles FOR UPDATE USING (user_id = (SELECT auth.uid()));
-CREATE POLICY business_user_roles_delete ON public.business_user_roles FOR DELETE USING (user_id = (SELECT auth.uid()));
-CREATE POLICY business_user_roles_select ON public.business_user_roles FOR SELECT USING (true);
 CREATE TABLE public.timeline_event_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_id uuid, user_id uuid NOT NULL, body text);
 ALTER TABLE public.timeline_event_comments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can create timeline comments" ON public.timeline_event_comments FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
@@ -100,40 +155,40 @@ CREATE POLICY "Users can create timeline event comments" ON public.timeline_even
 CREATE TABLE public.work_order_edit_log (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), row_id uuid, field_name text, edited_by uuid);
 ALTER TABLE public.work_order_edit_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Auth users can insert edit log" ON public.work_order_edit_log FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-GRANT ALL ON public.vehicles, public.vehicle_price_history, public.organization_vehicles, public.reference_libraries, public.image_tags,
-  public.business_timeline_events, public.timeline_events, public.organization_images, public.tool_catalog, public.business_user_roles,
-  public.timeline_event_comments, public.work_order_edit_log
-  TO anon, authenticated, service_role;
--- As live: anon's writes on reference_libraries and tool_catalog were revoked by 20261014183000; authenticated holds
--- no TRUNCATE there.
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.reference_libraries, public.tool_catalog FROM anon;
-REVOKE TRUNCATE ON public.reference_libraries, public.tool_catalog FROM authenticated;
-\ir helpers/org_timeline_and_manager_live_20261014.sql
+GRANT ALL ON public.timeline_events TO anon, authenticated, service_role;
+-- The live table ACLs, in their order; the per-column reads on the two per-column tables (every column but the money one).
+DO $$ DECLARE r record; BEGIN
+  FOR r IN SELECT * FROM public.t_acl LOOP PERFORM public.t_apply_relacl(('public.' || r.tbl)::regclass, r.live); END LOOP;
+END $$;
+GRANT SELECT (id, uploaded_by, user_id, owner_id, year, make, model) ON public.vehicles TO anon, authenticated;
+GRANT SELECT (id, organization_id, vehicle_id, linked_by_user_id) ON public.organization_vehicles TO anon, authenticated;
+\ir helpers/org_timeline_trigger_live_20261014.sql
+GRANT EXECUTE ON FUNCTION public.create_org_timeline_from_vehicle_event() TO anon, authenticated, service_role;
 RESET ROLE;
 
--- Seeds. S owns vehicle VS (uploaded and user); X is a stranger; A is an active admin; M manages organization G (an
--- active owner contributor); K holds a vehicle permission on VS.
+-- Seeds. S owns vehicle VS (uploaded and user); X is a stranger; A is an active admin; M manages organization G; K
+-- holds a vehicle permission on VS.
 INSERT INTO public.admin_users VALUES ('20000000-0000-0000-0000-0000000000a1', true);
 INSERT INTO public.vehicles (id, uploaded_by, user_id, year, make, model) VALUES
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000a5', '20000000-0000-0000-0000-0000000000a5', 1979, 'Chevrolet', 'K5');
--- ALLOW_RAW_TESTIMONY_WRITE: a seed row in this disposable PG17 test database, never production.
 INSERT INTO public.vehicle_user_permissions (vehicle_id, user_id, is_active) VALUES
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000c1', true);
 INSERT INTO public.organization_contributors VALUES
  ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000b1', 'owner', 'active');
-INSERT INTO public.business_user_roles (id, business_id, user_id, role_type) VALUES
- ('70000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000f9', 'consultant');
 
 CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END IF; END $$;
+CREATE FUNCTION public.t_assert_eq(p_got text, p_want text, p_what text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN IF p_got IS DISTINCT FROM p_want THEN RAISE EXCEPTION 'FAIL: % (got %, want %)', p_what, p_got, p_want; END IF; END $$;
 CREATE FUNCTION public.t_refused(p_sql text) RETURNS boolean LANGUAGE plpgsql AS $$
 BEGIN EXECUTE p_sql; RETURN false;
 EXCEPTION WHEN insufficient_privilege THEN RETURN true;
 END $$;
 CREATE FUNCTION public.t_rows(p_sql text) RETURNS bigint LANGUAGE plpgsql AS $$
 DECLARE n bigint; BEGIN EXECUTE p_sql; GET DIAGNOSTICS n = ROW_COUNT; RETURN n; END $$;
-GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text), public.t_refused(text), public.t_rows(text) TO anon, authenticated, service_role;
--- The inserts in someone else's name (S's, or for S's vehicle), one per table, and the stranger's self-grant.
+GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text), public.t_assert_eq(text, text, text), public.t_refused(text), public.t_rows(text)
+  TO anon, authenticated, service_role;
+-- The inserts in someone else's name (S's, or for S's vehicle), one per table.
 CREATE TABLE public.t_impersonations (tbl text PRIMARY KEY, stmt text NOT NULL);
 INSERT INTO public.t_impersonations VALUES
   ('vehicles', $q$INSERT INTO public.vehicles (uploaded_by, year, make) VALUES ('20000000-0000-0000-0000-0000000000a5', 1980, 'Planted')$q$),
@@ -144,12 +199,18 @@ INSERT INTO public.t_impersonations VALUES
   ('business_timeline_events', $q$INSERT INTO public.business_timeline_events (business_id, title, created_by) VALUES ('60000000-0000-0000-0000-000000000001', 'Planted', '20000000-0000-0000-0000-0000000000a5')$q$),
   ('organization_images', $q$INSERT INTO public.organization_images (organization_id, user_id) VALUES ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000a5')$q$),
   ('tool_catalog', $q$INSERT INTO public.tool_catalog (part_number) VALUES ('PLANTED-1')$q$),
-  ('business_user_roles', $q$INSERT INTO public.business_user_roles (business_id, user_id, role_type) VALUES ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000f9', 'owner')$q$),
   ('timeline_event_comments', $q$INSERT INTO public.timeline_event_comments (user_id, body) VALUES ('20000000-0000-0000-0000-0000000000a5', 'planted')$q$),
   ('work_order_edit_log', $q$INSERT INTO public.work_order_edit_log (field_name, edited_by) VALUES ('total', '20000000-0000-0000-0000-0000000000a5')$q$);
 GRANT SELECT ON public.t_impersonations TO anon, authenticated, service_role;
 
--- 1. Before: the stranger inserts in someone else's name on all 11, and promotes their own consultant row to owner.
+-- 0. The test database holds production's ACLs, compared as text: each table's relacl, a readable and a money
+--    column's attacl on the per-column tables, and the trigger function's proacl.
+SELECT public.t_assert_eq(public.t_relacl(('public.' || tbl)::regclass), live, 'live relacl rebuilt on ' || tbl) FROM public.t_acl;
+SELECT public.t_assert_eq(public.t_attacl(('public.' || tbl)::regclass, col), live, format('live attacl rebuilt on %s.%s', tbl, col)) FROM public.t_colacl;
+SELECT public.t_assert_eq(public.t_proacl('public.create_org_timeline_from_vehicle_event()'::regprocedure),
+  '{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}', 'live proacl rebuilt on the trigger');
+
+-- 1. Before: the stranger inserts in someone else's name on all 10.
 SET ROLE authenticated;
 SELECT public.t_as('20000000-0000-0000-0000-0000000000f9');
 BEGIN;
@@ -160,8 +221,6 @@ BEGIN
     PERFORM public.t_assert(public.t_rows(r.stmt) = 1, format('before: a stranger inserts on %s in another name', r.tbl));
   END LOOP;
 END $$;
-SELECT public.t_assert(public.t_rows($q$UPDATE public.business_user_roles SET role_type = 'owner' WHERE id = '70000000-0000-0000-0000-000000000001'$q$) = 1,
-  'before: a member promotes their own role to owner');
 ROLLBACK;
 RESET ROLE;
 
@@ -171,7 +230,14 @@ SET ROLE owp_table_owner;
 \ir ../migrations/20261014223000_signed_in_inserts_in_own_name.sql
 RESET ROLE;
 
--- 3. The stranger: every insert in another name refused, no self-promotion; anon inserts nowhere.
+-- 3. The ACLs it leaves, as text: anon without INSERT and TRUNCATE, authenticated without TRUNCATE; column and
+--    function ACLs untouched.
+SELECT public.t_assert_eq(public.t_relacl(('public.' || tbl)::regclass), after, 'relacl after the migration on ' || tbl) FROM public.t_acl;
+SELECT public.t_assert_eq(public.t_attacl(('public.' || tbl)::regclass, col), live, format('attacl untouched on %s.%s', tbl, col)) FROM public.t_colacl;
+SELECT public.t_assert_eq(public.t_proacl('public.create_org_timeline_from_vehicle_event()'::regprocedure),
+  '{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}', 'proacl untouched on the trigger');
+
+-- 4. The stranger: every insert in another name refused; anon inserts nowhere.
 SET ROLE authenticated;
 SELECT public.t_as('20000000-0000-0000-0000-0000000000f9');
 DO $$
@@ -181,8 +247,6 @@ BEGIN
     PERFORM public.t_assert(public.t_refused(r.stmt), format('a stranger insert on %s in another name is refused', r.tbl));
   END LOOP;
 END $$;
-SELECT public.t_assert(public.t_rows($q$UPDATE public.business_user_roles SET role_type = 'owner' WHERE id = '70000000-0000-0000-0000-000000000001'$q$) = 0,
-  'a member no longer promotes their own role');
 RESET ROLE;
 SET ROLE anon;
 SELECT public.t_as('');
@@ -195,13 +259,15 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- 4. Own-name inserts still work, including the client sites that leave the name to the default.
+-- 5. Own-name inserts still work, including the client sites that leave the name to the default.
 SET ROLE authenticated;
 SELECT public.t_as('20000000-0000-0000-0000-0000000000f9');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicles (id, year, make) VALUES ('10000000-0000-0000-0000-0000000000f9', 1985, 'Chevrolet')$q$) = 1,
   'a vehicle with uploaded_by left to the default');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicles (user_id, uploaded_by, year, make) VALUES ('20000000-0000-0000-0000-0000000000f9', NULL, 1986, 'Ford')$q$) = 1,
   'a vehicle naming the caller as user_id');
+SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicles (owner_id, uploaded_by, year, make) VALUES ('20000000-0000-0000-0000-0000000000f9', NULL, 1987, 'Dodge')$q$) = 1,
+  'a vehicle naming the caller as owner_id (the iOS insert)');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicle_price_history (vehicle_id, value) VALUES ('10000000-0000-0000-0000-0000000000f9', 9000)$q$) = 1,
   'price history on the caller''s own vehicle');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.organization_vehicles (organization_id, vehicle_id) VALUES ('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f9')$q$) = 1,
@@ -224,23 +290,16 @@ SELECT public.t_assert((SELECT uploaded_by FROM public.vehicles WHERE id = '1000
   AND (SELECT created_by FROM public.image_tags WHERE tag_name = 'bumper') = '20000000-0000-0000-0000-0000000000f9',
   'the defaults named the caller');
 
--- 5. Prices on another's vehicle: its permitted contributor and an admin; the catalog: an admin; roles: the manager.
+-- 6. Prices on another's vehicle: its permitted contributor and an admin; the catalog: an admin.
 SET ROLE authenticated;
 SELECT public.t_as('20000000-0000-0000-0000-0000000000c1');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicle_price_history (vehicle_id, value) VALUES ('10000000-0000-0000-0000-000000000001', 30000)$q$) = 1, 'the permitted contributor logs a price');
 SELECT public.t_as('20000000-0000-0000-0000-0000000000a1');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.vehicle_price_history (vehicle_id, value) VALUES ('10000000-0000-0000-0000-000000000001', 31000)$q$) = 1, 'an admin logs a price');
 SELECT public.t_assert(public.t_rows($q$INSERT INTO public.tool_catalog (part_number) VALUES ('FR80')$q$) = 1, 'an admin adds a catalog tool');
-SELECT public.t_as('20000000-0000-0000-0000-0000000000b1');
-SELECT public.t_assert(public.t_rows($q$INSERT INTO public.business_user_roles (business_id, user_id, role_type) VALUES ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000000e1', 'employee')$q$) = 1,
-  'the business''s manager grants a role');
-SELECT public.t_assert(public.t_rows($q$UPDATE public.business_user_roles SET role_type = 'manager' WHERE id = '70000000-0000-0000-0000-000000000001'$q$) = 1,
-  'the manager changes a role');
-SELECT public.t_as('20000000-0000-0000-0000-0000000000f9');
-SELECT public.t_assert(public.t_rows($q$DELETE FROM public.business_user_roles WHERE id = '70000000-0000-0000-0000-000000000001'$q$) = 1, 'a member still leaves');
 RESET ROLE;
 
--- 6. The organization timeline trigger (a definer now) still copies a vehicle event, named for the vehicle's user,
+-- 7. The organization timeline trigger (a definer now) still copies a vehicle event, named for the vehicle's user,
 --    when someone else records it.
 SET ROLE authenticated;
 SELECT public.t_as('20000000-0000-0000-0000-0000000000c1');
@@ -250,7 +309,7 @@ RESET ROLE;
 SELECT public.t_assert((SELECT created_by FROM public.business_timeline_events WHERE title = 'Brake job') = '20000000-0000-0000-0000-0000000000a5',
   'the trigger copied it into the business timeline, named for the vehicle''s user');
 
--- 7. The service role inserts everywhere; grants as left.
+-- 8. The service role inserts everywhere.
 SET ROLE service_role;
 SELECT public.t_as('');
 DO $$
@@ -261,10 +320,8 @@ BEGIN
   END LOOP;
 END $$;
 RESET ROLE;
-SELECT public.t_assert(NOT has_table_privilege('anon', 'public.' || tbl, 'INSERT,TRUNCATE') AND NOT has_table_privilege('authenticated', 'public.' || tbl, 'TRUNCATE'),
-  'no anon insert or API truncate on ' || tbl) FROM public.t_impersonations;
 
--- 8. Drift stops the migration, and it changes nothing: a policy that is neither the 2026-10-14 read nor this one's.
+-- 9. Drift stops the migration, and it changes nothing: a policy that is neither the 2026-10-14 read nor this one's.
 SET ROLE owp_table_owner;
 ALTER POLICY "Auth users can insert edit log" ON public.work_order_edit_log WITH CHECK (true);
 GRANT INSERT ON public.tool_catalog TO anon;

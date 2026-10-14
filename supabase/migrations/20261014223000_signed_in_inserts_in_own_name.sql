@@ -1,14 +1,12 @@
--- INSERT policies that any signed-in account passes, on 11 tables clients insert into: each insert must now be in the
--- caller's own name, or on a row the caller may edit; business roles are granted by the business's managers.
+-- INSERT policies that any signed-in account passes, on 10 tables clients insert into: each insert must now be in the
+-- caller's own name, or on a row the caller may edit.
 --
 -- Anyone can be authenticated on production (2026-10-14): sign-up is open with mailer_autoconfirm, and anonymous
 -- sign-ins are enabled. These policies checked WITH CHECK (true) or auth.uid() IS NOT NULL, so any account could insert
 -- in any name: a vehicle attributed to another user (vehicles, 1.01M rows), price history on anyone's vehicle
 -- (vehicle_price_history, 412k), a link from any vehicle to any organization (organization_vehicles, 348k), a
--- reference library, image tags, organization timeline events, images and comments, catalog tools, work order edit
--- log entries, and an active owner role on any business (business_user_roles), which the invite-code, dealer
--- inventory, buyer-monitor, shop-fee and timeline policies trust. business_user_roles_update let a member rewrite
--- their own role row the same way (the self-grant 20261014160000 closed for organization_contributors).
+-- reference library, image tags, organization timeline events, images and comments, catalog tools and work order
+-- edit log entries. business_user_roles, the eleventh table with such a policy, is 20261014210000's.
 --
 -- Each client insert site (web, iOS; 2026-10-14) was read for the name it writes:
 --   * vehicles: uploaded_by defaults to auth.uid(); the forms set uploaded_by, user_id or owner_id to the caller. The
@@ -29,8 +27,6 @@
 --   * organization_images, timeline_event_comments: the own-name policies that exist decide; the open ones go.
 --   * tool_catalog: no row since 2025-10-13; admins keep inserting through their policy, the open one goes.
 --   * work_order_edit_log: edited_by is the caller.
---   * business_user_roles: insert and update need caller_manages_organization(business_id) (an active owner, manager
---     or board member); a member still leaves through the delete policy.
 -- anon loses INSERT and TRUNCATE on these tables, authenticated TRUNCATE.
 -- Contract: supabase/sql/test_signed_in_inserts_in_own_name.sql.
 BEGIN;
@@ -58,10 +54,6 @@ BEGIN
       'authenticated', NULL, '(created_by = ( SELECT auth.uid() AS uid))'),
     ('organization_images', 'Users can upload org images', 'a', 'PUBLIC', NULL, v_uid, NULL, NULL, NULL),
     ('tool_catalog', 'Anyone can insert tool catalog', 'a', 'authenticated', NULL, 'true', NULL, NULL, NULL),
-    ('business_user_roles', 'business_user_roles_insert', 'a', 'PUBLIC', NULL, v_uid,
-      'authenticated', NULL, 'caller_manages_organization(business_id)'),
-    ('business_user_roles', 'business_user_roles_update', 'w', 'PUBLIC', '(user_id = ( SELECT auth.uid() AS uid))', NULL,
-      'authenticated', 'caller_manages_organization(business_id)', 'caller_manages_organization(business_id)'),
     ('timeline_event_comments', 'Authenticated users can create timeline comments', 'a', 'PUBLIC', NULL, v_uid, NULL, NULL, NULL),
     ('work_order_edit_log', 'Auth users can insert edit log', 'a', 'PUBLIC', NULL, '(auth.uid() IS NOT NULL)',
       'authenticated', NULL, '(edited_by = ( SELECT auth.uid() AS uid))')
@@ -88,9 +80,6 @@ BEGIN
                AND (encode(sha256(convert_to(p.prosrc, 'UTF8')), 'base64') <> 'EGVubf5c/rtrktwy0j7UJCBx4S2DuXpnXUPoTvtqbpc='
                  OR NOT ((NOT p.prosecdef AND p.proconfig IS NULL) OR (p.prosecdef AND p.proconfig = ARRAY['search_path=public'])))) THEN
     v_drift := concat_ws(', ', v_drift, 'create_org_timeline_from_vehicle_event()');
-  END IF;
-  IF to_regprocedure('public.caller_manages_organization(uuid)') IS NULL THEN
-    v_drift := concat_ws(', ', v_drift, 'caller_manages_organization(uuid) is missing');
   END IF;
   IF NULLIF(v_drift, '') IS NOT NULL THEN
     RAISE EXCEPTION 'signed-in inserts drifted from the 2026-10-14 read (%); not changing them', v_drift;
@@ -126,22 +115,15 @@ DROP POLICY IF EXISTS "Authenticated users can create timeline comments" ON publ
 ALTER POLICY "Auth users can insert edit log" ON public.work_order_edit_log TO authenticated
   WITH CHECK (edited_by = (SELECT auth.uid()));
 
--- 4. business_user_roles: granted by the business's managers.
-ALTER POLICY business_user_roles_insert ON public.business_user_roles TO authenticated
-  WITH CHECK (public.caller_manages_organization(business_id));
-ALTER POLICY business_user_roles_update ON public.business_user_roles TO authenticated
-  USING (public.caller_manages_organization(business_id))
-  WITH CHECK (public.caller_manages_organization(business_id));
-
 REVOKE INSERT, TRUNCATE ON
   public.vehicles, public.vehicle_price_history, public.organization_vehicles, public.reference_libraries,
   public.image_tags, public.business_timeline_events, public.organization_images, public.tool_catalog,
-  public.business_user_roles, public.timeline_event_comments, public.work_order_edit_log
+  public.timeline_event_comments, public.work_order_edit_log
   FROM anon;
 REVOKE TRUNCATE ON
   public.vehicles, public.vehicle_price_history, public.organization_vehicles, public.reference_libraries,
   public.image_tags, public.business_timeline_events, public.organization_images, public.tool_catalog,
-  public.business_user_roles, public.timeline_event_comments, public.work_order_edit_log
+  public.timeline_event_comments, public.work_order_edit_log
   FROM authenticated;
 
 -- After: row security is on; no INSERT or ALL policy on these tables admits PUBLIC, anon or authenticated with a check
@@ -151,7 +133,7 @@ DECLARE
   v_open text;
 BEGIN
   WITH t(tbl) AS (VALUES ('vehicles'), ('vehicle_price_history'), ('organization_vehicles'), ('reference_libraries'),
-    ('image_tags'), ('business_timeline_events'), ('organization_images'), ('tool_catalog'), ('business_user_roles'),
+    ('image_tags'), ('business_timeline_events'), ('organization_images'), ('tool_catalog'),
     ('timeline_event_comments'), ('work_order_edit_log'))
   SELECT string_agg(problem, '; ') INTO v_open FROM (
     SELECT t.tbl || ': row security off' AS problem
