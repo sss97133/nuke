@@ -42,13 +42,14 @@ CREATE TABLE public.vehicles (
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY vehicles_public_read ON public.vehicles FOR SELECT USING (coalesce(is_public, false));
 CREATE POLICY vehicles_service ON public.vehicles FOR ALL TO service_role USING (true) WITH CHECK (true);
--- The post-#1175 grant state: the table-wide SELECT is revoked, every column is granted (so owner_name and
--- owner_contact are readable until this migration), and UPDATE stays.
-REVOKE SELECT ON public.vehicles FROM anon, authenticated;
-GRANT SELECT (id, make, is_public, owner_id, user_id, uploaded_by, created_by_user_id, owner_name, owner_contact,
-  purchase_price, purchase_date, purchase_location) ON public.vehicles TO anon, authenticated;
-GRANT UPDATE ON public.vehicles TO authenticated;
-GRANT ALL ON public.vehicles TO service_role;  -- as production grants it; the service role keeps every column
+-- The live grant state, privilege for privilege (relacl and attacl read 2026-10-14; section 0 checks them): after #1175
+-- anon and authenticated hold awdDxt on the table but no table-wide SELECT, SELECT on every column except the three
+-- money columns (so owner_name and owner_contact are readable until this migration); the service role holds arwdDxt;
+-- nothing is granted to PUBLIC.
+GRANT INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.vehicles TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.vehicles TO service_role;
+GRANT SELECT (id, make, is_public, owner_id, user_id, uploaded_by, created_by_user_id, owner_name, owner_contact)
+  ON public.vehicles TO anon, authenticated;
 CREATE FUNCTION public.jsonb_mask_keys(j jsonb, p_keys text[]) RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path TO '' AS $fn$
   SELECT CASE jsonb_typeof(j)
     WHEN 'object' THEN coalesce((SELECT jsonb_object_agg(e.k, CASE WHEN e.k = ANY (p_keys) THEN 'null'::jsonb ELSE public.jsonb_mask_keys(e.v, p_keys) END) FROM jsonb_each(j) AS e(k,v)), '{}'::jsonb)
@@ -56,7 +57,11 @@ CREATE FUNCTION public.jsonb_mask_keys(j jsonb, p_keys text[]) RETURNS jsonb LAN
     ELSE j END; $fn$;
 CREATE FUNCTION public.vehicle_user_has_access(p_vehicle uuid, p_user uuid) RETURNS boolean LANGUAGE sql STABLE AS $fn$ SELECT false $fn$;
 \ir helpers/owner_contact_readers_live_20261014.sql
-GRANT EXECUTE ON FUNCTION public.vehicle_row_read(uuid), public.get_vehicle_profile_data(uuid) TO anon, authenticated, service_role;
+-- Live proacl for all four: anon, authenticated and service_role EXECUTE, no PUBLIC.
+REVOKE EXECUTE ON FUNCTION public.vehicle_row_read(uuid), public.get_vehicle_profile_data(uuid),
+  public.jsonb_mask_keys(jsonb, text[]), public.vehicle_user_has_access(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.vehicle_row_read(uuid), public.get_vehicle_profile_data(uuid),
+  public.jsonb_mask_keys(jsonb, text[]), public.vehicle_user_has_access(uuid, uuid) TO anon, authenticated, service_role;
 RESET ROLE;
 
 CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE plpgsql AS $$
@@ -64,6 +69,32 @@ BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END I
 CREATE FUNCTION public.t_refused(p_sql text) RETURNS boolean LANGUAGE plpgsql AS $$
 BEGIN EXECUTE p_sql; RETURN false; EXCEPTION WHEN insufficient_privilege THEN RETURN true; END $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean,text), public.t_refused(text) TO anon, authenticated, service_role;
+
+-- A table's or function's ACL as grantee:privileges, owner left out and grantor ignored, so the fixture (owned by
+-- veh_owner) and production (owned by postgres) compare. PUBLIC is grantee 0.
+CREATE FUNCTION public.t_acl(p_acl aclitem[], p_owner oid) RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT string_agg(g || ':' || privs, ';' ORDER BY g) FROM (
+    SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS g,
+           string_agg(a.privilege_type, ',' ORDER BY a.privilege_type) AS privs
+    FROM aclexplode(p_acl) a WHERE a.grantee <> p_owner GROUP BY 1) x $$;
+
+-- 0. The fixture's grants are production's (read 2026-10-14): the table ACL, the column ACLs of the twelve modeled
+--    columns, and the four functions' ACLs.
+SELECT public.t_assert(public.t_acl(c.relacl, c.relowner) = 'anon:DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE,UPDATE;authenticated:DELETE,INSERT,REFERENCES,TRIGGER,TRUNCATE,UPDATE;service_role:DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE',
+  'fixture: vehicles table ACL as live') FROM pg_class c WHERE c.oid = 'public.vehicles'::regclass;
+SELECT public.t_assert((
+  SELECT string_agg(col || '=' || coalesce(gr, '-'), ';' ORDER BY col) FROM (
+    SELECT a.attname AS col,
+           (SELECT string_agg(CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(x.grantee) END || ':' || x.privilege_type, ',' ORDER BY 1)
+            FROM aclexplode(a.attacl) x WHERE x.grantee <> c.relowner) AS gr
+    FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
+    WHERE c.oid = 'public.vehicles'::regclass AND a.attnum > 0 AND NOT a.attisdropped) z)
+  = 'created_by_user_id=anon:SELECT,authenticated:SELECT;id=anon:SELECT,authenticated:SELECT;is_public=anon:SELECT,authenticated:SELECT;make=anon:SELECT,authenticated:SELECT;owner_contact=anon:SELECT,authenticated:SELECT;owner_id=anon:SELECT,authenticated:SELECT;owner_name=anon:SELECT,authenticated:SELECT;purchase_date=-;purchase_location=-;purchase_price=-;uploaded_by=anon:SELECT,authenticated:SELECT;user_id=anon:SELECT,authenticated:SELECT',
+  'fixture: vehicles column ACLs as live');
+SELECT public.t_assert(public.t_acl(p.proacl, p.proowner) = 'anon:EXECUTE;authenticated:EXECUTE;service_role:EXECUTE',
+  format('fixture: %s ACL as live', p.oid::regprocedure))
+FROM pg_proc p WHERE p.oid IN ('public.vehicle_row_read(uuid)'::regprocedure, 'public.get_vehicle_profile_data(uuid)'::regprocedure,
+  'public.jsonb_mask_keys(jsonb, text[])'::regprocedure, 'public.vehicle_user_has_access(uuid, uuid)'::regprocedure);
 
 -- Seeds: V1 public, owned by O1, with a third party's name and contact. V2 private.
 INSERT INTO public.vehicles (id, make, is_public, owner_id, owner_name, owner_contact, purchase_price) VALUES
