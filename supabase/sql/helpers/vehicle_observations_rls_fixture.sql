@@ -77,6 +77,9 @@ CREATE POLICY vo_authenticated_read ON public.vehicle_observations FOR SELECT TO
                          OR (v.is_public = true AND observation_is_public(vehicle_observations.kind, vehicle_observations.structured_data)))));
 CREATE POLICY vo_service_role_all ON public.vehicle_observations FOR ALL TO public
   USING ((auth.jwt() ->> 'role') = 'service_role');
+-- observation_sources: row security on, one SELECT policy for authenticated only (anon reads no source rows).
+ALTER TABLE public.observation_sources ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_authenticated_read_observation_sources ON public.observation_sources FOR SELECT TO authenticated USING (true);
 GRANT SELECT ON public.vehicles, public.vehicle_observations, public.observation_sources TO anon, authenticated, service_role;
 
 -- The indexes production already has on the table that these reads can reach.
