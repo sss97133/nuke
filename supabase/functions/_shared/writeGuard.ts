@@ -2,39 +2,39 @@
  * writeGuard — no edge function that writes to the database runs for an anonymous caller.
  *
  * Who gets through:
- *   (a) a project secret key (`sb_secret_…`), or the service_role JWT the gateway mints for one, or
- *       the legacy service_role key only while the platform still accepts it: cron, CI, scripts,
- *       function-to-function calls;
- *   (b) a signed-in user's JWT (role `authenticated`) — writes users trigger from nuke.ag;
+ *   (a) a project secret key (`sb_secret_…`): cron, CI, scripts, function-to-function calls. Any key in
+ *       SUPABASE_SECRET_KEYS (the guide puts every secret key there under its own name) and the platform's
+ *       SUPABASE_SERVICE_ROLE_KEY when it is a secret key.
+ *       A function receives the key as the caller sent it, so either header works:
+ *         `Authorization: Bearer sb_secret_…`, or `apikey: sb_secret_…` (the guide's choice), or both;
+ *   (b) a signed-in user's JWT (role `authenticated`), signed by the project's current asymmetric
+ *       key (ES256) — writes users trigger from nuke.ag;
  *   (c) with { apiKeys }: an `X-API-Key: nk_live_…` key, validated the same way apiKeyAuth.ts does;
  *   (d) with { allowAnonymous }: one narrow, function-argued exception (today only the public
  *       share-page verdict in ingest-observation). The function passes the predicate; the guard
  *       still records that the caller was anonymous.
- * Everything else — no token, the public anon key, a forged or expired JWT — is refused with 401.
+ * Everything else — no token, a publishable or legacy anon key, a legacy service_role key, any HS256
+ * token, a forged or expired JWT — is refused with 401.
  *
  * Why the anon key is refused: it ships in nuke.ag's JavaScript bundle, so it proves nothing.
  * Why signatures are checked here instead of trusting the gateway: CI deploys every function
  * with --no-verify-jwt, and even a gateway-verified anon JWT would still be anonymous.
  *
  * How a bearer token is judged, in order:
- *   1. exact match with an opaque key this function holds (SUPABASE_SECRET_KEYS, or a
- *      legacy-named env whose value is not a JWT)                              → service_role
+ *   1. exact match with a secret key this function holds (supabaseKeys.knownSecretKeys)   → service_role
  *   2. any other `sb_secret_` key (created after this worker started, or deleted): a one-row
- *      PostgREST HEAD with it as the apikey decides                             → service_role or refused
- *   3. any other `sb_` key (a publishable key)                                    → refused
- *   4. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
+ *      PostgREST HEAD with it as the apikey decides                                       → service_role or refused
+ *   3. any other `sb_` key (a publishable key)                                              → refused
+ *   4. decode: not a JWT, expired, role `anon`, an unknown role, or HS256                  → refused
  *   5. signature: ES256/RS256 against the project JWKS (SUPABASE_JWKS env or
- *      /auth/v1/.well-known/jwks.json). The JWT the gateway mints for a secret key on a function
- *      call lands here.
- *   6. otherwise the platform is the authority: GoTrue /auth/v1/user for a user token, a one-row
- *      PostgREST HEAD for a service token. Still failing → refused.
- *   HS256 tokens (the legacy anon and service_role keys, and anything else signed with the legacy
- *   JWT secret) always go to step 6. The legacy JWT secret is public (git history) and copies of it and
- *   of the legacy keys stay in function secrets after the dashboard revokes them, so neither a local
- *   signature check nor a match with the env proves anything; the platform's answer follows the
- *   dashboard. 2026-10-14 key switch-over.
- * When the bearer is refused and the `apikey` header holds a secret key, that key is judged too (the
- * Supabase guide sends secret keys on `apikey`); nothing else on `apikey` counts.
+ *      /auth/v1/.well-known/jwks.json)
+ *   6. no usable key or a failed check: the platform decides (GoTrue /auth/v1/user for a user token,
+ *      a one-row PostgREST HEAD for a service token). Still failing → refused.
+ *   HS256 is the legacy shared-secret scheme: the legacy anon and service_role keys and anything signed with
+ *   the legacy JWT secret, which is public (git history) and was revoked on 2026-10-14. Nothing here holds or
+ *   reads that secret or the legacy keys, and no HS256 token is accepted.
+ * When the bearer is refused and the `apikey` header holds a secret key, that key is judged too;
+ * nothing else on `apikey` counts.
  *
  * Usage — first statement of the handler; OPTIONS passes through untouched so the function's
  * own CORS preflight keeps working:
@@ -180,8 +180,7 @@ async function verifyAsymmetric(jwt: DecodedJwt, jwks: Jwks): Promise<boolean | 
 
 /**
  * true / false when a local check ran; null when only the platform can judge the token.
- * HS256 is never judged locally: whether the legacy JWT secret is still trusted is decided in the
- * dashboard, and a copy of it in this function's env would not change when it is revoked.
+ * Only asymmetric tokens get here: judgeToken refuses HS256 before this check.
  */
 async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuardDeps>): Promise<boolean | null> {
   const alg = String(jwt.header.alg ?? "");
@@ -253,6 +252,9 @@ export async function judgeToken(token: string, deps: Required<WriteGuardDeps>):
   if (role === "anon") return { ok: false, status: 401, reason: "anon key" };
   if (role !== "service_role" && role !== "authenticated") {
     return { ok: false, status: 401, reason: `role '${role || "none"}' cannot write` };
+  }
+  if (String(jwt.header.alg ?? "") === "HS256") {
+    return { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" };
   }
 
   const local = await verifySignatureLocally(jwt, deps);
