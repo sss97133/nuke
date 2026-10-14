@@ -87,13 +87,19 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
   };
 }
 
+/** Wait between attempts for a lot the intake keeps rejecting: baseMs after the first failure, doubling with each
+ * further one, never more than maxMs. Without a policy a rejected lot is retried on every flush. */
+export interface BatLiveRetryPolicy { baseMs: number; maxMs: number }
+
 /** One acknowledgement loop, ordered within each lot. A rejected lot retains
  * its complete unacknowledged prefix while independent lots can still drain. */
 export class BatLiveBuffer {
   private frames: BatLiveFrame[] = [];
   private draining = false;
   private failures = new Map<string, string>();
-  constructor(private admit: (frames: BatLiveFrame[]) => Promise<void>, private capacity = 5000) {}
+  private waits = new Map<string, { failures: number; retryAt: number }>();
+  constructor(private admit: (frames: BatLiveFrame[]) => Promise<void>, private capacity = 5000,
+    private retry?: BatLiveRetryPolicy) {}
   get pending() { return this.frames.length; }
   get oldestReceivedAt() { return this.frames[0]?.received_at ?? null; }
   statusFor(id: string) {
@@ -105,14 +111,16 @@ export class BatLiveBuffer {
     if (this.frames.length >= this.capacity) throw new Error("bat_live_unacknowledged_capacity_exceeded");
     this.frames.push(frame);
   }
-  async flush() {
+  /** A lot still inside its wait is left alone (frames kept, last error kept) unless force is set, which the
+   * worker's final flush uses so no lot ends a worker unattempted. */
+  async flush(options: { force?: boolean } = {}) {
     if (this.draining) return;
     this.draining = true;
     try {
       const rejected = new Set<string>();
       let firstFailure: unknown;
       while (true) {
-        const next = this.frames.find(f => !rejected.has(f.monitored_auction_id));
+        const next = this.frames.find(f => !rejected.has(f.monitored_auction_id) && (options.force || this.due(f.monitored_auction_id)));
         if (!next) break;
         const id = next.monitored_auction_id;
         const batch = this.frames.filter(f => f.monitored_auction_id === id).slice(0, 50);
@@ -123,13 +131,24 @@ export class BatLiveBuffer {
           let remaining = batch.length;
           this.frames = this.frames.filter(f => f.monitored_auction_id !== id || remaining-- <= 0);
           this.failures.delete(id);
+          this.waits.delete(id);
         } catch (error) {
           rejected.add(id);
           this.failures.set(id, `admission:${String(error)}`.slice(0, 500));
+          this.wait(id);
           firstFailure ??= error;
         }
       }
       if (rejected.size) throw firstFailure;
     } finally { this.draining = false; }
+  }
+  private due(id: string) {
+    const wait = this.waits.get(id);
+    return !wait || Date.now() >= wait.retryAt;
+  }
+  private wait(id: string) {
+    if (!this.retry) return;
+    const failures = (this.waits.get(id)?.failures ?? 0) + 1;
+    this.waits.set(id, { failures, retryAt: Date.now() + Math.min(this.retry.maxMs, this.retry.baseMs * 2 ** (failures - 1)) });
   }
 }
