@@ -37,6 +37,7 @@ import {
   QUALITY_THRESHOLDS,
   type AgentTier,
 } from "../_shared/llmRouter.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,7 +54,7 @@ function json(status: number, body: unknown) {
 
 function getSupabase() {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const key = projectSecretKey() ?? "";
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
@@ -61,7 +62,7 @@ function getSupabase() {
 
 async function callFunction(name: string, body: any, timeoutMs = 120_000): Promise<any> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
 
   const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
     method: "POST",

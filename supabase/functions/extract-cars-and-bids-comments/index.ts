@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { firecrawlScrape } from '../_shared/firecrawl.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,7 +133,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     )
 
     const { auction_url, auction_event_id, vehicle_id } = await req.json()

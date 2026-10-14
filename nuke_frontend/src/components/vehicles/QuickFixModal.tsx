@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../../lib/privateMoney';
+
 
 type FixType = 'price' | 'vin' | 'mileage' | 'color' | 'images';
 
@@ -90,10 +92,14 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model, vin, mileage, color, purchase_price, current_value')
-        .in('id', vehicleIds);
+      // The purchase price is the owner's: read through the owner books reader, not the table.
+      const [{ data, error }, ownerBooks] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('id, year, make, model, vin, mileage, color, current_value')
+          .in('id', vehicleIds),
+        fetchVehicleOwnerBooks(vehicleIds),
+      ]);
 
       if (error) throw error;
 
@@ -102,9 +108,12 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
         year: v.year,
         make: v.make,
         model: v.model,
-        currentValue: v[config.dbField as keyof typeof v],
+        currentValue: config.dbField === 'purchase_price'
+          ? ownerBooks.get(v.id)?.purchase_price ?? null
+          : v[config.dbField as keyof typeof v],
         fixed: false
       }));
+
 
       setVehicles(vehicleData);
       

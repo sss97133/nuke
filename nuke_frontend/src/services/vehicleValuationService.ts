@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../lib/privateMoney';
 
 export interface VehicleValuation {
   // Core investment data
@@ -345,13 +346,22 @@ export class VehicleValuationService {
         }
       }
 
-      // 2. Get market data including MarketCheck validated sources
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('make, model, year, vin, current_value, purchase_price, msrp')
-        .eq('id', vehicleId)
-        .abortSignal(readSignal)
-        .single();
+      // 2. Get market data including MarketCheck validated sources. The purchase price is the
+      // owner's: only the owner's own valuation may fall back to it.
+      const [{ data: vehicleRow }, ownerBooks] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('make, model, year, vin, current_value, msrp')
+          .eq('id', vehicleId)
+          .abortSignal(readSignal)
+          .single(),
+        fetchVehicleOwnerBooks([vehicleId], readSignal),
+      ]);
+      const vehicle = vehicleRow
+
+        ? { ...vehicleRow, purchase_price: ownerBooks.get(vehicleId)?.purchase_price ?? null }
+        : null;
+
 
       let marketBase = 0;
       if (vehicle) {

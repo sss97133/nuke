@@ -6,6 +6,7 @@ import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { archiveFetch } from '../_shared/archiveFetch.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     } = await req.json()
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || `https://qkgaybvrernstplzjaam.supabase.co`
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || ''
+    const serviceRoleKey = projectSecretKey() || ''
     
     const supabase = createClient(
       supabaseUrl,

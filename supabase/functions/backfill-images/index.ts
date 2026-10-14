@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -191,7 +192,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     const body: BackfillRequest = await req.json();
@@ -723,7 +724,7 @@ Deno.serve(async (req: Request) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                  'Authorization': `Bearer ${projectSecretKey()}`
                 },
                 body: JSON.stringify({
                   image_url: publicUrl,
@@ -769,7 +770,7 @@ Deno.serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Authorization': `Bearer ${projectSecretKey()}`,
             },
             body: JSON.stringify({
               vehicle_id,

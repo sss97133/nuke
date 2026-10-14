@@ -22,6 +22,7 @@ import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -672,7 +673,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      projectSecretKey()!
     );
 
     // Mode 1: Single lot extraction

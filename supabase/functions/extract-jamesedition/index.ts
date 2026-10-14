@@ -22,6 +22,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrl } from '../_shared/urlNormalization.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const VERSION = '1.1.0';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
@@ -210,7 +211,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      projectSecretKey()!,
     );
 
     const body = await req.json().catch(() => ({}));
@@ -426,7 +427,7 @@ Deno.serve(async (req: Request) => {
             // Fire-and-forget: async image-vehicle match validation
             fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-image-vehicle-match`, {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+              headers: { 'Authorization': `Bearer ${projectSecretKey()}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ vehicle_id: vehicleId, batch_size: 10 }),
             }).catch(() => {});
           }
@@ -534,7 +535,7 @@ Deno.serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Authorization': `Bearer ${projectSecretKey()}`,
             },
             body: JSON.stringify({ action: 'extract', url: item.listing_url }),
           });

@@ -27,6 +27,7 @@ import {
   type AgentCallResult,
 } from "../_shared/llmRouter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +44,7 @@ function json(status: number, body: unknown) {
 
 function getSupabase() {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const key = projectSecretKey() ?? "";
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
@@ -449,7 +450,7 @@ async function dispatchAndReview(options: {
 
   const sb = getSupabase();
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
 
   // Step 1: Dispatch work to Haiku worker
   let haikuResult: any = { processed: 0 };

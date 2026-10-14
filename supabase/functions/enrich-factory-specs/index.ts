@@ -18,6 +18,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -415,7 +416,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+    const serviceRoleKey = (projectSecretKey() ?? "").trim();
     if (!supabaseUrl || !serviceRoleKey) throw new Error("Missing env vars");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
