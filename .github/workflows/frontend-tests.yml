@@ -726,6 +726,30 @@ jobs:
       - name: Verify nullable episode ancestry, source custody and two-session races
         run: node scripts/discovery/sale-episode-source-integrity-test.mjs
 
+  storage-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable storage policy contract database
+        run: createdb dm_refinement_storage_policies_ci
+      - name: Verify no identity lists, uploads, overwrites or deletes in the two buckets
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_storage_policies_ci -f supabase/sql/test_storage_objects_close_open_policies.sql
+
   vitest:
     runs-on: ubuntu-latest
     steps:
