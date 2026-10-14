@@ -47,9 +47,10 @@ const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
       // First, get basic vehicle data to check what fields exist
       const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('*')
+        .select('id, user_id, make, model, year, vin, color, mileage, msrp, current_value, engine_size, transmission, fuel_type, drivetrain, body_style')
         .eq('id', vehicleId)
         .single();
+
 
       if (!vehicleData) {
         setMetrics(null);

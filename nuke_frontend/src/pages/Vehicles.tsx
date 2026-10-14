@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
+
 import { readCachedSession } from '../utils/cachedSession';
 import { useAuthContext } from '../contexts/AuthContext';
 // AppLayout now provided globally by App.tsx
@@ -923,16 +925,18 @@ const VehiclesInner: React.FC = () => {
         try {
           const { data, error } = await supabase
             .from('vehicles')
-            .select('*')
+            .select(VEHICLE_CARD_COLUMNS)
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false });
+
 
           if (error) {
             console.error('Supabase error loading vehicles:', error);
           } else if (data) {
-            authenticatedVehicles = data.map(v => ({
+            authenticatedVehicles = (data as any[]).map(v => ({
               ...v,
               isAnonymous: false
+
             }));
           }
         } catch (error) {

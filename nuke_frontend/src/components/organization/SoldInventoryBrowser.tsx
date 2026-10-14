@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../../lib/privateMoney';
 
 interface SoldVehicle {
   id: string;
@@ -68,14 +69,20 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
       // Fetch organization_vehicles first (we'll filter "sold" using multiple indicators after enrichment).
       // IMPORTANT: many orgs do NOT consistently set `listing_status = 'sold'` on organization_vehicles,
       // but do set sale fields on the vehicle record or via external listings/proof.
-      const { data: orgVehicles, error: orgError } = await supabase
+      // The link's own sale price is the organization's books (its managers only); the public sale
+      // price comes from the vehicle and its listing events below.
+      const booksPromise = fetchOrganizationVehicleBooks(organizationId);
+      const { data: linkRows, error: orgError } = await supabase
         .from('organization_vehicles')
-        .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_price, sale_date, listing_status')
+        .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, listing_status')
         .eq('organization_id', organizationId)
         .or('status.eq.active,status.eq.sold,status.eq.archived')
         .order('created_at', { ascending: false });
 
       if (orgError) throw orgError;
+      const books = await booksPromise;
+      const orgVehicles = (linkRows || []).map((ov) => withOrganizationVehicleBook(ov, books));
+
 
       if (!orgVehicles || orgVehicles.length === 0) {
         setSoldVehicles([]);

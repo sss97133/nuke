@@ -24,6 +24,7 @@ import {
   type ProvenanceMetadata,
 } from "../_shared/batUpsertWithProvenance.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const PROPAGATION_VERSION = "bat-price-propagation:1.0.0";
 
@@ -34,7 +35,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  projectSecretKey()!,
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 

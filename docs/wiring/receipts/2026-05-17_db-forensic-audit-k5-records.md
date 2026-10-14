@@ -32,7 +32,7 @@
 - `source = owner_submission`, `profile_origin = manual_entry`, `status = merged`, `merged_into = e08bf694`, `deleted_at = 2026-03-20 07:33:58`.
 - Direct image_count = 0; observations = 0.
 - Storage folder `21501c21-…/hd_archive/` still owns 793 image rows — those rows were re-pointed (`vehicle_id` updated to e08bf694) but **the storage path was never rewritten**. So the folder URL is stale but rows live on the canonical vehicle.
-- Notes record an old (now-wrong) theory: *"Skylar's K5 build at this UUID is now canonical… e08bf694 is Scott Goldfarb's separate customer vehicle."* That theory was reversed by Skylar 2026-05-17.
+- Notes record an old (now-wrong) theory: *"Skylar's K5 build at this UUID is now canonical… e08bf694 is the client's separate customer vehicle."* That theory was reversed by Skylar 2026-05-17.
 - **Classification: ENTRY MISTAKE (Skylar's own placeholder).** Already merged correctly; no further action required.
 
 ## 2. The 70 1977-Blazer rows in total (by category)

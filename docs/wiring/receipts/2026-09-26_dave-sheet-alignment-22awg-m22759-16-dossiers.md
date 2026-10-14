@@ -99,7 +99,7 @@ Before swapping, confirm the blue seal fits terminal 12110847's seal crimp. The 
 - **It is a view, not an order:** the cart stays a reference and is rebuilt once from the finished list as a ProWire saved BOM. This was the owner-approved default ("sync the cart" overrides it).
 
 ## Cart state (unconfirmed)
-- **Before the crash:** ProWire Q27156 was read back at 96 lines, $3,620.23 (matching `orders/prowire_Q27156_2026-09-26.json`).
+- **Before the crash:** the ProWire cart was read back at 96 lines (matching `orders/prowire_2026-09-26.json`).
 - **The edits that followed:**
   - One UI click took 8 AWG red (M22759/16-8-2) from 30 to 29 ft, seen on screen.
   - The scripted quantity update after it was denied by the auto-mode classifier ("Real-World Transactions") and never ran.

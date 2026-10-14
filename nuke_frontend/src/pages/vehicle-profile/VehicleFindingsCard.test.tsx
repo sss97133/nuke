@@ -2,16 +2,27 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ rows: [] as Array<Record<string, unknown>>, owner: false, select: '' }));
+const fixture = vi.hoisted(() => ({
+  rows: [] as Array<Record<string, unknown>>, owner: false, select: '', rpcName: '', rpcArgs: null as unknown,
+  rpcError: null as null | { code?: string; message?: string }, fromCalls: 0,
+}));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ isRowOwner: fixture.owner, isVerifiedOwner: false, hasContributorAccess: false }) }));
-vi.mock('../../lib/supabase', () => ({ supabase: { from: () => ({ select: (s: string) => { fixture.select = s; return { eq: () => ({ limit: () => Promise.resolve({ data: fixture.rows, error: null }) }) }; } }) } }));
+// vehicle_image_findings answers {total, rows}: every frame read counts in total, a frame with nothing to report is not sent.
+const reported = (rows: Array<Record<string, unknown>>) => rows.filter(r => Object.values(r).some(v => v != null));
+vi.mock('../../lib/supabase', () => ({ supabase: {
+  rpc: (name: string, args: unknown) => {
+    fixture.rpcName = name; fixture.rpcArgs = args;
+    return Promise.resolve(fixture.rpcError ? { data: null, error: fixture.rpcError } : { data: { total: fixture.rows.length, rows: reported(fixture.rows) }, error: null });
+  },
+  from: () => { fixture.fromCalls++; return { select: (s: string) => { fixture.select = s; return { eq: () => ({ limit: () => Promise.resolve({ data: fixture.rows, error: null }) }) }; } }; },
+} }));
 import VehicleFindingsCard from './VehicleFindingsCard';
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  fixture.owner = false;
+  fixture.owner = false; fixture.rpcName = ''; fixture.rpcArgs = null; fixture.rpcError = null; fixture.fromCalls = 0; fixture.select = '';
   fixture.rows = [
     { byok_scene_type: 'exterior_front', byok_confidence: 0.9, vision_analyzed_at: '2026-06-23T22:24:03Z', license_plate: 'UT 04AP4', color_visible: 'factory_turquoise', make_guess: 'Ford' },
     { byok_scene_type: 'document', byok_confidence: 0.7, vision_analyzed_at: '2026-07-01T00:00:00Z', engine: '289ci V8', make_guess: 'Chevrolet', part_number: 'C5ZZ-6584-A' },
@@ -37,7 +48,10 @@ it('states coverage with the newest analysis clock, masks the plate for a visito
   expect(host.textContent).not.toContain('contamination');
   expect(host.textContent).not.toContain('Mean reported confidence');
   expect(host.querySelector('[style]')).toBeNull();
-  expect(fixture.select).toContain('vision_analyzed_at');
+  // one reader call, no per-key projections
+  expect(fixture.rpcName).toBe('vehicle_image_findings');
+  expect(fixture.rpcArgs).toEqual({ p_vehicle_id: 'v-1' });
+  expect(fixture.fromCalls).toBe(0);
 });
 
 it('shows the plate and the pipeline diagnostics to the owner', async () => {
@@ -53,5 +67,21 @@ it('shows the plate and the pipeline diagnostics to the owner', async () => {
 it('renders nothing when no image was analyzed', async () => {
   fixture.rows = [{ classifier: null }];
   await mount();
+  expect(host.textContent).toBe('');
+});
+
+it('reads the frames the old way only while the reader is not deployed', async () => {
+  fixture.rpcError = { code: 'PGRST202', message: 'Could not find the function public.vehicle_image_findings(p_vehicle_id) in the schema cache' };
+  await mount();
+  expect(fixture.fromCalls).toBe(1);
+  expect(fixture.select).toContain('classifier:ai_scan_metadata->classifier');
+  expect(fixture.select).toContain('vision_analyzed_at');
+  expect(host.textContent).toContain('2 of 3 images analyzed · Jul 1, 2026');
+});
+
+it('does not fall back to the heavy read when the reader fails for another reason', async () => {
+  fixture.rpcError = { code: '57014', message: 'canceling statement due to statement timeout' };
+  await mount();
+  expect(fixture.fromCalls).toBe(0);
   expect(host.textContent).toBe('');
 });

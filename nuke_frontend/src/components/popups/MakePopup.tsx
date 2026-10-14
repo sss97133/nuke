@@ -15,6 +15,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { ModelPopup } from './ModelPopup';
 import { SourcePopup } from './SourcePopup';
@@ -132,7 +133,7 @@ export function MakePopup({ make, searchQuery }: Props) {
   };
 
   const handleVehicleClick = (id: string, title: string) => {
-    supabase.from('vehicles').select('*').eq('id', id).single().then(({ data: v }) => {
+    supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', id).single().then(({ data: v }) => {
       if (v) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
     });
   };

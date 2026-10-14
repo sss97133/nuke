@@ -5,7 +5,7 @@
 ### M130
 | | |
 |---|---|
-| Price | $3,500 (Desert Performance invoice, 2019) |
+| Price | $••• (Desert Performance invoice, 2019) |
 | Connectors | 2: Connector A (34-pin Superseal) + Connector B (26-pin Superseal) |
 | Dimensions | 107 × 127 × 39 mm |
 | Weight | 290g |
@@ -85,7 +85,7 @@ The M1 is rarely needed for squarebody builds unless doing something extreme (tw
 ### PDM30
 | | |
 |---|---|
-| Price | $3,140 (Desert Performance invoice, verified) |
+| Price | $••• (Desert Performance invoice, verified) |
 | Channels | 30 (6 × 20A + 14 × 15A + 10 × 10A) |
 | Use case | Full street/show builds with all accessories |
 
@@ -104,7 +104,7 @@ Multiple PDMs communicate via CAN bus. The M130 has 1 CAN bus which handles both
 ## LTCD Wideband Controller
 | | |
 |---|---|
-| Price | $844 (Desert Performance invoice) |
+| Price | $••• (Desert Performance invoice) |
 | Function | Dual-channel wideband lambda interface |
 | Sensors | 2× Bosch LSU 4.9 |
 | Connection | CAN bus to ECU + analog outputs |
