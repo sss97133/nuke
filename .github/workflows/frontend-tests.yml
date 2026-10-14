@@ -58,6 +58,30 @@ jobs:
       - name: Verify the viewer-scoped profile document contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_read_ci -f supabase/sql/test_vehicle_profile_read.sql
 
+  market-pulse-live-columns-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable board-reader database
+        run: createdb dm_refinement_pulse_columns_ci
+      - name: Verify market_pulse_live names its 17 row slots in order
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
+
   investment-readers-money-mask-contract:
     runs-on: ubuntu-latest
     services:
