@@ -274,8 +274,6 @@ Deno.serve(async (req) => {
     const conn = await pool.connect();
 
     try {
-      await conn.queryObject("SET LOCAL statement_timeout = '15s'");
-
       // ── HISTOGRAM MODE ──────────────────────────────────────────────────
       if (mode === "histogram") {
         const sql = `
