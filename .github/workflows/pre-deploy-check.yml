@@ -63,6 +63,9 @@ jobs:
         working-directory: ./nuke_frontend
         run: npm run test -- src/components/admin/IntakeReadiness.test.tsx src/pages/SystemStatus.test.tsx src/components/organization/OrganizationSourceTargets.test.tsx
 
+      - name: Night-run continuation contracts
+        run: python3 scripts/night-run/test_controller.py
+
       - name: Email intake evidence contracts
         run: python3 scripts/email-alerts/test_intake.py
 
