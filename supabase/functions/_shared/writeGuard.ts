@@ -2,8 +2,8 @@
  * writeGuard — no edge function that writes to the database runs for an anonymous caller.
  *
  * Who gets through:
- *   (a) a project secret key (`sb_secret_…`, injected as SUPABASE_SECRET_KEYS), or the legacy
- *       service_role key while the legacy keys are still enabled: cron, CI, scripts,
+ *   (a) a project secret key (`sb_secret_…`), or the service_role JWT the gateway mints for one, or
+ *       the legacy service_role key only while the platform still accepts it: cron, CI, scripts,
  *       function-to-function calls;
  *   (b) a signed-in user's JWT (role `authenticated`) — writes users trigger from nuke.ag;
  *   (c) with { apiKeys }: an `X-API-Key: nk_live_…` key, validated the same way apiKeyAuth.ts does;
@@ -17,17 +17,24 @@
  * with --no-verify-jwt, and even a gateway-verified anon JWT would still be anonymous.
  *
  * How a bearer token is judged, in order:
- *   1. exact match with a key in SUPABASE_SECRET_KEYS                            → service_role
- *   2. any other `sb_` key (a publishable key, an unknown or deleted secret key)  → refused
- *   3. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
- *   4. signature: ES256/RS256 against the project JWKS (SUPABASE_JWKS env or
- *      /auth/v1/.well-known/jwks.json)
- *   5. otherwise the platform is the authority: GoTrue /auth/v1/user for a user token, a one-row
+ *   1. exact match with an opaque key this function holds (SUPABASE_SECRET_KEYS, or a
+ *      legacy-named env whose value is not a JWT)                              → service_role
+ *   2. any other `sb_secret_` key (created after this worker started, or deleted): a one-row
+ *      PostgREST HEAD with it as the apikey decides                             → service_role or refused
+ *   3. any other `sb_` key (a publishable key)                                    → refused
+ *   4. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
+ *   5. signature: ES256/RS256 against the project JWKS (SUPABASE_JWKS env or
+ *      /auth/v1/.well-known/jwks.json). The JWT the gateway mints for a secret key on a function
+ *      call lands here.
+ *   6. otherwise the platform is the authority: GoTrue /auth/v1/user for a user token, a one-row
  *      PostgREST HEAD for a service token. Still failing → refused.
  *   HS256 tokens (the legacy anon and service_role keys, and anything else signed with the legacy
- *   JWT secret) always go to step 5. The platform keeps injecting the legacy values after the legacy
- *   keys are disabled and the secret is revoked, so a match with the env proves nothing on its own;
- *   the platform's answer follows the dashboard. 2026-10-14 key switch-over.
+ *   JWT secret) always go to step 6. The legacy JWT secret is public (git history) and copies of it and
+ *   of the legacy keys stay in function secrets after the dashboard revokes them, so neither a local
+ *   signature check nor a match with the env proves anything; the platform's answer follows the
+ *   dashboard. 2026-10-14 key switch-over.
+ * When the bearer is refused and the `apikey` header holds a secret key, that key is judged too (the
+ * Supabase guide sends secret keys on `apikey`); nothing else on `apikey` counts.
  *
  * Usage — first statement of the handler; OPTIONS passes through untouched so the function's
  * own CORS preflight keeps working:
@@ -40,7 +47,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hashApiKey } from "./apiKeyAuth.ts";
-import { publishableKey, secretKeys, serviceRoleKey } from "./supabaseKeys.ts";
+import { knownSecretKeys, projectPublishableKey, projectSecretKey } from "./supabaseKeys.ts";
 
 const REMOTE_TIMEOUT_MS = 6000;
 const JWKS_TTL_MS = 10 * 60 * 1000;
@@ -189,7 +196,7 @@ async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuard
 
 async function remoteUserId(token: string, deps: Required<WriteGuardDeps>): Promise<string | null> {
   const base = deps.env("SUPABASE_URL");
-  const apikey = publishableKey(deps.env) ?? serviceRoleKey(deps.env);
+  const apikey = projectPublishableKey(deps.env) ?? projectSecretKey(deps.env);
   if (!base || !apikey) return null;
   try {
     const res = await deps.fetch(`${base}/auth/v1/user`, {
@@ -225,8 +232,14 @@ async function remoteServiceCheck(token: string, deps: Required<WriteGuardDeps>)
 export async function judgeToken(token: string, deps: Required<WriteGuardDeps>): Promise<WriteAuthResult> {
   // A secret key is opaque, so matching one the platform injected is the whole check. A key deleted
   // in the dashboard disappears from SUPABASE_SECRET_KEYS and stops matching.
-  for (const key of Object.values(secretKeys(deps.env))) {
+  for (const key of knownSecretKeys(deps.env)) {
     if (sameKey(token, key)) return { ok: true, caller: { kind: "service_role", via: "secret-key" } };
+  }
+  if (token.startsWith("sb_secret_")) {
+    // Not injected here: a key made after this worker started, a deleted key, or a guess.
+    return (await remoteServiceCheck(token, deps))
+      ? { ok: true, caller: { kind: "service_role", via: "remote" } }
+      : { ok: false, status: 401, reason: "secret key rejected by the platform" };
   }
   if (token.startsWith("sb_")) return { ok: false, status: 401, reason: "not a secret key" };
 
@@ -270,7 +283,7 @@ async function judgeApiKey(
 ): Promise<WriteAuthResult> {
   const rawKey = rawHeader.startsWith("nk_live_") ? rawHeader.slice(8) : rawHeader;
   const url = deps.env("SUPABASE_URL");
-  const serviceKey = serviceRoleKey(deps.env);
+  const serviceKey = projectSecretKey(deps.env);
   if (!url || !serviceKey) return { ok: false, status: 401, reason: "api key check unavailable" };
   const supabase = createClient(url, serviceKey);
   const { data, error } = await supabase.rpc("check_api_key_rate_limit", {
@@ -333,6 +346,11 @@ export async function authenticateWriter(req: Request, opts: WriteGuardOptions =
       ? await judgeToken(token, deps)
       : { ok: false, status: 401, reason: "no token" };
     if (verdict.ok) return verdict;
+    const apikey = req.headers.get("apikey")?.trim();
+    if (apikey && apikey !== token && apikey.startsWith("sb_secret_")) {
+      const viaApikey = await judgeToken(apikey, deps);
+      if (viaApikey.ok) return viaApikey;
+    }
     if (opts.allowAnonymous && (await opts.allowAnonymous(req))) {
       return { ok: true, caller: { kind: "anonymous", via: "exception" } };
     }
@@ -372,6 +390,16 @@ export async function requireWriteAuth(req: Request, opts: WriteGuardOptions = {
 }
 
 /**
+ * For a function with a service-only path: true when the caller is the service role, judged exactly as
+ * requireWriteAuth judges it. Use it instead of comparing the bearer with an env key: the gateway hands
+ * functions a minted JWT, not the key the caller sent, and a legacy key in the env proves nothing.
+ */
+export async function isServiceCaller(req: Request, opts: WriteGuardOptions = {}): Promise<boolean> {
+  const verdict = await authenticateWriter(req, opts);
+  return verdict.ok && verdict.caller.kind === "service_role";
+}
+
+/**
  * For functions that act AS the platform owner: send mail as Nuke, read the owner's books.
  * "Signed in" is not enough there, because sign-up is open and auto-confirmed. Call it after
  * requireWriteAuth. Returns null for the service key or the company owner
@@ -389,7 +417,7 @@ export async function requireOwnerOrService(req: Request, opts: WriteGuardOption
   if (callerId) {
     const deps = withDefaults(opts.deps);
     const url = deps.env("SUPABASE_URL");
-    const key = serviceRoleKey(deps.env);
+    const key = projectSecretKey(deps.env);
     try {
       const r = await deps.fetch(`${url}/rest/v1/parent_company?legal_name=eq.NUKE%20LTD&select=owner_user_id&limit=1`, {
         headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` },

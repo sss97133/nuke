@@ -41,6 +41,7 @@ import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METH
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBatchLookups } from "./retainedListingDrain.ts";
 import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -258,7 +259,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
   let retainedListingBudget = false, retainedSaleBudget = false;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    projectSecretKey() ?? "",
     {
       auth: { persistSession: false, autoRefreshToken: false },
       // Receipt attribution is a producer declaration, never authorization.
@@ -875,7 +876,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
     if (vehicleId && input.kind && input.defer_analysis !== true) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      const serviceKey = projectSecretKey() ?? "";
       fetch(`${supabaseUrl}/functions/v1/analysis-engine-coordinator`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },

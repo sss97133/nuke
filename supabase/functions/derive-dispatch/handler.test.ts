@@ -6,8 +6,8 @@ function assert(value: unknown, message = 'assertion failed'): asserts value {
 function equal(actual: unknown, expected: unknown) {
   assert(JSON.stringify(actual) === JSON.stringify(expected), `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
-const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-const SERVICE_KEY = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ role: 'service_role' })}.offline`;
+// The platform injects a secret key under SUPABASE_SERVICE_ROLE_KEY (measured 2026-10-14); writeGuard matches it exactly.
+const SERVICE_KEY = 'sb_secret_test_dispatch_01';
 const OWNER_ID = '90000000-0000-4000-8000-000000000001';
 const SOURCE_ID = '20000000-0000-4000-8000-000000000001';
 const OBSERVATION_ID = '30000000-0000-4000-8000-000000000001';
