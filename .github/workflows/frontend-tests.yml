@@ -543,30 +543,6 @@ jobs:
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
 
-  burst-total-one-pass-contract:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      PGHOST: localhost
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Create disposable contract database
-        run: createdb dm_refinement_burst_total_ci
-      - name: Verify the one-pass burst total answers what the per-day loop answered
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_burst_total_ci -f supabase/sql/test_burst_total_one_pass.sql
-
   county-readers-contract:
     runs-on: ubuntu-latest
     services:
@@ -845,6 +821,30 @@ jobs:
         run: createdb dm_refinement_storage_policies_ci
       - name: Verify no identity lists, uploads, overwrites or deletes in the two buckets
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_storage_policies_ci -f supabase/sql/test_storage_objects_close_open_policies.sql
+
+  burst-total-one-pass-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_burst_total_ci
+      - name: Verify the one-pass burst total answers what the per-day loop answered
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_burst_total_ci -f supabase/sql/test_burst_total_one_pass.sql
 
   vitest:
     runs-on: ubuntu-latest
