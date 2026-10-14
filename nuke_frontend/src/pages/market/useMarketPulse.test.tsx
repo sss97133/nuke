@@ -59,3 +59,24 @@ describe('bounded public taxonomy reader', () => {
     await expect(readInventoryTaxonomy(['a'])).rejects.toThrow('reader unavailable');
   });
 });
+
+describe('a v3 payload carries the verdict and the track record', () => {
+  const row = ['lot-1', 1973, 'Porsche', '911', 650000, '2026-10-14T17:05:00Z', '2026-10-13T23:00:00Z', '2026-10-07T00:00:00Z',
+    null, true, 'https://bringatrailer.com/listing/lot-1/', '1973 Porsche 911', 478000, 552000, 700000, 'd', 15,
+    { ratio: 1.595485, state: 'hot', typical_now: 407400.1, share: 0.738043, hours_left: 18.08 }];
+  it('reads slot 17 as the verdict from the read, and the thresholds and backtest rows', async () => {
+    fixture.rpc.mockResolvedValue({ data: { v: 3, auctions: [row],
+      thresholds: { hot: 1.25, cold: 0.8, max_hours: 120 },
+      backtest: [{ horizon_hours: 120, label: '5 days', hot_above: 0.784, cold_below: 0.781, n_hot: null, n_cold: null, run_at: '2026-09-28T00:00:00+00:00', population: '10,065 BaT lots', lots_sold: 10065, source: 'scripts/market/live-bands.sql' }] }, error: null });
+    const pulse = await fetchPulse();
+    expect(pulse.auctions[0].serverHeat).toEqual({ ratio: 1.595485, state: 'hot', typicalNow: 407400.1, share: 0.738043, hoursLeft: 18.08 });
+    expect(pulse.thresholds).toEqual({ hot: 1.25, cold: 0.8, maxHours: 120 });
+    expect(pulse.backtest).toEqual([{ horizonHours: 120, label: '5 days', hotAbove: 0.784, coldBelow: 0.781, nHot: null, nCold: null, runAt: '2026-09-28T00:00:00+00:00', population: '10,065 BaT lots', lotsSold: 10065, source: 'scripts/market/live-bands.sql' }]);
+  });
+  it('reads no verdict from a null slot, an older row, or a malformed one', async () => {
+    fixture.rpc.mockResolvedValue({ data: { v: 3, auctions: [[...row.slice(0, 17), null], row.slice(0, 17), [...row.slice(0, 17), { state: 'warm' }]] }, error: null });
+    const pulse = await fetchPulse();
+    expect(pulse.auctions.map((a) => a.serverHeat)).toEqual([null, null, null]);
+    expect(pulse.thresholds).toBeNull(); expect(pulse.backtest).toBeNull();
+  });
+});

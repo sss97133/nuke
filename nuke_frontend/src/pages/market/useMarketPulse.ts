@@ -20,6 +20,17 @@ export interface LiveAuction {
   // Expected-price band from comparable BaT sales on the lot's model page (hammer_predictions, model 30;
   // scripts/market/live-bands.mjs). Null when the lot isn't priced (no confident model page or < 5 comps).
   band: { p10: number; p50: number; p90: number; tier: string; comps: number } | null;
+  // The verdict the read computed (market_pulse_live v3, slot 17, heat_of() with the server's clock); null when the
+  // read made none. Absent on older payloads, where the page computes it with heatOf.
+  serverHeat?: ServerHeat | null;
+}
+
+export interface ServerHeat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
+
+/** One horizon of the hot/cold track record (heat_tag_backtest, latest run), as the read sends it. */
+export interface BacktestRow {
+  horizonHours: number; label: string; hotAbove: number; coldBelow: number;
+  nHot: number | null; nCold: number | null; runAt: string | null; population: string | null; lotsSold: number | null; source: string | null;
 }
 
 // Median share of the final price that sold BaT cars had been bid at each hours-left mark, per price tier.
@@ -51,6 +62,9 @@ export interface MarketPulse {
   weekAgo: BoardReading | null;
   sameHour: SameHourRange | null;
   curve: BidCurve | null;
+  /** v3 payloads: the three numbers the verdict uses and the track record behind its sentence; null before v3. */
+  thresholds: { hot: number; cold: number; maxHours: number } | null;
+  backtest: BacktestRow[] | null;
 }
 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
@@ -97,6 +111,17 @@ type Row = [
   string | null, (string | null)?, (number | null)?, (number | null)?, (number | null)?, (string | null)?, (number | null)?,
 ];
 
+/** Slot 17 of a v3 row: the read's verdict, or null. Anything that is not that shape reads as no verdict. */
+function serverHeatOf(v: unknown): ServerHeat | null {
+  if (!v || typeof v !== 'object') return null;
+  const h = v as Record<string, unknown>;
+  const state = h.state;
+  if (state !== 'hot' && state !== 'cold' && state !== 'in line') return null;
+  const ratio = Number(h.ratio), typicalNow = Number(h.typical_now), share = Number(h.share), hoursLeft = Number(h.hours_left);
+  if (![ratio, typicalNow, share, hoursLeft].every(Number.isFinite)) return null;
+  return { ratio, state, typicalNow, share, hoursLeft };
+}
+
 export async function fetchPulse(): Promise<MarketPulse> {
   const { data, error } = await supabase.rpc('market_pulse_live');
   if (error) throw error;
@@ -131,8 +156,19 @@ export async function fetchPulse(): Promise<MarketPulse> {
       band: r[13] != null && r[12] != null && r[14] != null
         ? { p10: Number(r[12]), p50: Number(r[13]), p90: Number(r[14]), tier: String(r[15] ?? ''), comps: Number(r[16] ?? 0) }
         : null,
+      serverHeat: serverHeatOf(r[17]),
     })),
     curve: (data?.curve as BidCurve | undefined) ?? null,
+    thresholds: data?.thresholds && data.thresholds.hot != null
+      ? { hot: Number(data.thresholds.hot), cold: Number(data.thresholds.cold), maxHours: Number(data.thresholds.max_hours) }
+      : null,
+    backtest: Array.isArray(data?.backtest)
+      ? (data.backtest as any[]).map((b) => ({
+          horizonHours: Number(b.horizon_hours), label: String(b.label ?? ''), hotAbove: Number(b.hot_above), coldBelow: Number(b.cold_below),
+          nHot: b.n_hot == null ? null : Number(b.n_hot), nCold: b.n_cold == null ? null : Number(b.n_cold),
+          runAt: b.run_at ?? null, population: b.population ?? null, lotsSold: b.lots_sold == null ? null : Number(b.lots_sold), source: b.source ?? null,
+        })).filter((b) => Number.isFinite(b.horizonHours) && Number.isFinite(b.hotAbove) && Number.isFinite(b.coldBelow))
+      : null,
   };
 }
 

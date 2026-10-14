@@ -362,6 +362,19 @@ describe('market answer -> supporting lots', () => {
     await click('Running hot');
     expect(container.querySelector('[data-vehicle-id="first"] .market-heat')).toBeNull();
   });
+  it('takes the verdict and track record the read sends when the payload carries them', async () => {
+    fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
+    const a = fixture.pulse.data.auctions[0];
+    a.band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' }; // the page alone would read this bid as hot
+    a.serverHeat = { ratio: 0.5, state: 'cold', typicalNow: 2 * (a.currentBid as number), share: 0.5, hoursLeft: 40 };
+    fixture.pulse.data.backtest = [{ horizonHours: 48, label: '2 days', hotAbove: 0.5, coldBelow: 0.99, nHot: 10, nCold: 10, runAt: '2026-10-14T00:00:00Z', population: 'fixture', lotsSold: 20, source: 'fixture' }];
+    await render('make=PORSCHE');
+    const tag = container.querySelector('[data-vehicle-id="later"] .market-heat__tag')!;
+    expect(tag.textContent).toBe('Running cold · 0.5×');
+    await act(async () => (tag as HTMLButtonElement).click());
+    expect(document.body.textContent).toContain('Of sold cars running this cold 2 days out, 99% finished below the middle of their comparable sales.');
+    delete a.serverHeat; fixture.pulse.data.backtest = null;
+  });
 });
 
 

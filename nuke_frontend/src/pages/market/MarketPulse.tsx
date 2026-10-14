@@ -262,7 +262,10 @@ export function heatOf(a: LiveAuction, curve: BidCurve | null, now: number): Hea
 // Backtest, 10,065 cars sold 2026-06-27..09-26, each priced only from sales before it: of the cars tagged hot at
 // this much time left, the share that finished above the middle of their comparable sales; of those tagged cold,
 // the share that finished below it. (In line: 46-49% above, i.e. no signal.)
-const BACKTEST: [number, string, number, number][] = [
+// The read sends this as 'backtest' from heat_tag_backtest (market_pulse_live v3); until it does, the page carries the
+// 2026-09-28 run here. Same rows either way; the table is the source once it is live.
+type Backtest = [number, string, number, number][];
+const BACKTEST: Backtest = [
   [120, '5 days', 0.784, 0.781], [96, '4 days', 0.808, 0.797], [72, '3 days', 0.833, 0.809],
   [48, '2 days', 0.855, 0.829], [24, 'a day', 0.884, 0.85], [12, '12 hours', 0.915, 0.876],
 ];
@@ -279,10 +282,10 @@ function multiple(ratio: number): string {
   return ratio >= 3 ? '3×+' : ratio < 0.1 ? '<0.1×' : `${ratio.toFixed(1)}×`;
 }
 
-function heatParts(a: LiveAuction, heat: Heat) {
+function heatParts(a: LiveAuction, heat: Heat, backtest: Backtest) {
   const band = a.band as NonNullable<LiveAuction['band']>;
   // Quote the checkpoint at or before this point in the auction (17 h left reads the 24 h record, not the 12 h one).
-  const [, when, hotAbove, coldBelow] = [...BACKTEST].reverse().find((row) => row[0] >= heat.hoursLeft) ?? BACKTEST[BACKTEST.length - 1];
+  const [, when, hotAbove, coldBelow] = [...backtest].reverse().find((row) => row[0] >= heat.hoursLeft) ?? backtest[backtest.length - 1];
   return {
     bid: bidNumber(a.currentBid),
     left: left(heat.hoursLeft * HOUR),
@@ -305,11 +308,11 @@ function heatParts(a: LiveAuction, heat: Heat) {
 
 // The tag on a row, and the reasoning behind it one tap away: the bid, the comps, their middle, the typical bid
 // at this point in the auction, the multiple, and how lots tagged this way finished before.
-function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat }) {
+function HeatTag({ a, heat, backtest }: { a: LiveAuction; heat: Heat; backtest: Backtest }) {
   const [open, setOpen] = useState(false);
   const boundary = useRef<HTMLSpanElement>(null);
   if (heat.state === 'in line') return null;
-  const x = heatParts(a, heat);
+  const x = heatParts(a, heat, backtest);
   const hot = heat.state === 'hot';
   return (
     <span ref={boundary} className="market-heat">
@@ -369,8 +372,8 @@ function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] 
   return [ref, seen];
 }
 
-function BoardRow({ a, risen, stale, detail, expanded, heat, onInspect }: {
-  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; heat: Heat | null;
+function BoardRow({ a, risen, stale, detail, expanded, heat, backtest, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; heat: Heat | null; backtest: Backtest;
   onInspect: (a: LiveAuction, view: LotInspection) => void;
 }) {
   const [rowRef, seen] = useSeen<HTMLDivElement>();
@@ -384,7 +387,7 @@ function BoardRow({ a, risen, stale, detail, expanded, heat, onInspect }: {
       <div className="market-lot-close">
         <Text role="label">Closes in</Text>
         <Countdown endsAt={a.endsAt} />
-        {heat && <HeatTag a={a} heat={heat} />}
+        {heat && <HeatTag a={a} heat={heat} backtest={backtest} />}
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
@@ -420,8 +423,8 @@ function BoardRow({ a, risen, stale, detail, expanded, heat, onInspect }: {
 // document never grows past one page. A shared link to a lot opens the page that holds it.
 export const PAGE = 24;
 
-function Board({ rows, risenIds, stale, activityId, heats, inspection, onInspect, onInspectionChange, onClose }: {
-  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null; heats: Map<string, Heat | null>;
+function Board({ rows, risenIds, stale, activityId, heats, backtest, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null; heats: Map<string, Heat | null>; backtest: Backtest;
   inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
 }) {
@@ -440,7 +443,7 @@ function Board({ rows, risenIds, stale, activityId, heats, inspection, onInspect
         const expanded = a.id === activityId;
         return (
           <div key={a.id}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} heat={heats.get(a.id) ?? null} onInspect={onInspect} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} heat={heats.get(a.id) ?? null} backtest={backtest} onInspect={onInspect} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -609,7 +612,12 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
     return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
   }, [live]);
-  const heats = useMemo(() => new Map<string, Heat | null>(live.map((a) => [a.id, heatOf(a, data?.curve ?? null, now)])), [live, data?.curve, now]);
+  // The read's own verdict when it sent one (v3: heat_of with the server's clock, the same the phone shows); the page
+  // computes it only for older payloads. Both are graded against one fixture (heat-fixture.contract.test.ts).
+  const heats = useMemo(() => new Map<string, Heat | null>(live.map((a) => [a.id, a.serverHeat ?? heatOf(a, data?.curve ?? null, now)])), [live, data?.curve, now]);
+  const backtest = useMemo<Backtest>(() => data?.backtest && data.backtest.length
+    ? data.backtest.map((b) => [b.horizonHours, b.label, b.hotAbove, b.coldBelow] as Backtest[number]).sort((x, y) => y[0] - x[0])
+    : BACKTEST, [data?.backtest]);
 
   const figures = useMemo(() => {
     const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
@@ -777,7 +785,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}><Text role="label">Clear market filters</Text></button></div>}
-        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} heats={heats}
+        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} heats={heats} backtest={backtest}
           activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
           <nav className="market-board-pager" aria-label="Board pages">
