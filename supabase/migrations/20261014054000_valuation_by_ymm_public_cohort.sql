@@ -37,6 +37,7 @@
 -- change. Requires cohort_members_public(uuid) from migration 20261014052500 (the guard stops this one if it is missing, so
 -- merge that first). Source guard: replaced only from the 2026-10-14 definition (md5 below); a re-run is a no-op.
 -- Contract: supabase/sql/test_valuation_by_ymm_public_cohort.sql (CI job valuation-public-cohort-contract).
+-- definer-grants: default reviewed valuation_by_ymm: a public reader of the Valuation page; CREATE OR REPLACE keeps its existing grants (anon, authenticated, service_role) and none are changed here
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
