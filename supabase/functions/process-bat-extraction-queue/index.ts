@@ -7,6 +7,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     const { batchSize = 15, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 15, maxAttempts: 3 }));
@@ -92,8 +93,7 @@ async function processOneItem(
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   // extract-bat-core and extract-auction-comments refuse anonymous callers (writeGuard), so
   // the call must carry the service key. INTERNAL_INVOKE_JWT is the anon key — no longer enough.
-  const invokeJwt = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-                   Deno.env.get('SERVICE_ROLE_KEY') ??
+  const invokeJwt = projectSecretKey() ??
                    Deno.env.get('INTERNAL_INVOKE_JWT') ?? '';
 
   try {

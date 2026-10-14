@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '0 7 * * *' # daily
 
+concurrency:
+  # A newer push to a pull request supersedes its older run; pushes to main, the schedule and manual runs never cancel.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   published-buyer-profile-contract:
     runs-on: ubuntu-latest
@@ -34,6 +39,30 @@ jobs:
       - name: Verify source presentation and known outcome profile contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_published_buyer_ci -f supabase/sql/test_published_buyer_profile_record.sql
 
+  job-health-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable job health readers database
+        run: createdb dm_refinement_job_health_ci
+      - name: Verify the run digest, stored assay readings and live-definition equivalence of v_job_health
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_job_health_ci -f supabase/sql/test_job_health_readers.sql
+
   vehicle-profile-read-contract:
     runs-on: ubuntu-latest
     services:
@@ -57,6 +86,30 @@ jobs:
         run: createdb dm_refinement_profile_read_ci
       - name: Verify the viewer-scoped profile document contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_read_ci -f supabase/sql/test_vehicle_profile_read.sql
+
+  valuation-public-cohort-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_valuation_cohort_ci
+      - name: Verify the valuation reader answers what it answered, reading its cohort set-wise
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_valuation_cohort_ci -f supabase/sql/test_valuation_by_ymm_public_cohort.sql
 
   market-pulse-live-columns-contract:
     runs-on: ubuntu-latest
@@ -82,6 +135,78 @@ jobs:
       - name: Verify market_pulse_live names its 17 row slots in order
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_columns_ci -f supabase/sql/test_market_pulse_live_columns.sql
 
+  treemap-refresh-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable treemap database
+        run: createdb dm_refinement_treemap_ci
+      - name: Verify the map refresh is concurrent only where a unique index allows it
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_treemap_ci -f supabase/sql/test_treemap_refresh_all.sql
+
+  market-pulse-live-heat-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable board-verdict database
+        run: createdb dm_refinement_pulse_heat_ci
+      - name: Verify the verdict in the read reproduces the clients' fixture
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pulse_heat_ci -f supabase/sql/test_market_pulse_live_heat.sql
+
+  journal-density-counts-only-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable journal database
+        run: createdb dm_refinement_journal_ci
+      - name: Verify the public journal index counts every approved photo and carries no money
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_journal_ci -f supabase/sql/test_journal_density_counts_only.sql
+
   investment-readers-money-mask-contract:
     runs-on: ubuntu-latest
     services:
@@ -105,6 +230,78 @@ jobs:
         run: createdb dm_refinement_investment_ci
       - name: Verify the investment proof and timeline carry money only to owners
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_investment_ci -f supabase/sql/test_investment_readers_money_mask.sql
+
+  build-manifest-money-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable build-manifest database
+        run: createdb dm_refinement_manifest_money_ci
+      - name: Verify the build manifest carries money and contacts only to owners
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_manifest_money_ci -f supabase/sql/test_build_manifest_money_owner_only.sql
+
+  k5-harness-reshape-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable reshape database
+        run: createdb dm_refinement_k5_reshape_ci
+      - name: Verify wires reshape into signals, nets and segments with parity
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_reshape_ci -f supabase/sql/test_k5_harness_reshape_v1.sql
+
+  harness-connectivity-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable harness database
+        run: createdb dm_refinement_harness_levels_ci
+      - name: Verify the harness carries signal, net, segment and routing rows
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_harness_levels_ci -f supabase/sql/test_harness_connectivity_levels.sql
 
   day-receipt-money-mask-contract:
     runs-on: ubuntu-latest
@@ -154,6 +351,30 @@ jobs:
       - name: Verify the user contribution calendar carries work cost only to its user
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_user_calendar_ci -f supabase/sql/test_user_calendar_money_mask.sql
 
+  get-vehicle-day-depth-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable day-depth contract database
+        run: createdb dm_refinement_day_depth_ci
+      - name: Verify the day-depth rewrite answers what the live function answers
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_day_depth_ci -f supabase/sql/test_get_vehicle_day_depth_perf.sql
+
   get-user-garage-viewer-contract:
     runs-on: ubuntu-latest
     services:
@@ -177,6 +398,54 @@ jobs:
         run: createdb dm_refinement_get_user_garage_ci
       - name: Verify get_user_garage answers strangers with the public projection only
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_get_user_garage_ci -f supabase/sql/test_get_user_garage_viewer.sql
+
+  private-money-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable private-money readers database
+        run: createdb dm_refinement_private_money_ci
+      - name: Verify the owner's money reaches its owners only through the readers
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_private_money_ci -f supabase/sql/test_private_money_readers.sql
+
+  private-money-columns-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable private-money columns database
+        run: createdb dm_refinement_private_columns_ci
+      - name: Verify strangers cannot select the owner money columns and owners read them through the readers
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_private_columns_ci -f supabase/sql/test_private_money_columns_owner_only.sql
 
   metric-fold-health-contract:
     runs-on: ubuntu-latest
@@ -473,6 +742,37 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # The merge commit and its base, so the replay scope below can diff a pull request.
+          fetch-depth: 2
+      - name: Scope the retained-listing replay to what it reads
+        id: retained
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # The four replay steps below take about 20 minutes and read only the files their script names, and the
+          # files those name. A pull request that changes none of them cannot change their result, so it skips them;
+          # pushes to main, the daily schedule and manual runs always replay.
+          if [ "$EVENT" != pull_request ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          seen=' '; queue='scripts/test-retained-listing-intake.py'
+          while [ -n "$queue" ]; do
+            set -- $queue; f=$1; shift; queue="$*"
+            case "$seen" in (*" $f "*) continue ;; esac
+            seen="$seen$f "
+            [ -f "$f" ] || continue
+            queue="$queue $(grep -ohE '(supabase|scripts)/[A-Za-z0-9_./-]+[.](py|mjs|js|ts|sql)' "$f" | sort -u | tr '\n' ' ')"
+          done
+          hits=$(git diff --name-only HEAD^1 HEAD | while read -r c; do case "$seen" in (*" $c "*) echo "$c" ;; esac; done)
+          # This workflow file reaches the replay only through its header (everything above jobs:) and this job's own
+          # block; a pull request that adds or edits another job cannot change the replay's result.
+          replay_def() { git show "$1:.github/workflows/frontend-tests.yml" | awk '/^jobs:/{j=1} !j{print;next} /^  image-projection:/{p=1;print;next} p&&/^  [A-Za-z0-9_-]+:/{p=0} p{print}'; }
+          if [ "$(replay_def HEAD^1)" != "$(replay_def HEAD)" ]; then hits="$hits .github/workflows/frontend-tests.yml (header or image-projection)"; fi
+          echo "replay reads $(echo $seen | wc -w | tr -d ' ') files"
+          if [ -n "$hits" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this pull request changes: $hits"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "::notice::Retained-listing replay skipped: this pull request changes none of the files it reads. It runs on main and daily."
+          fi
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -491,18 +791,22 @@ jobs:
           RETAINED_PROPERTY_TEST_EXTERIOR=1 node scripts/discovery/retained-listing-property-test.mjs
           RETAINED_PROPERTY_TEST_POWERTRAIN=1 node scripts/discovery/retained-listing-property-test.mjs
       - name: Verify retained listing scheduled intake and canonical completion
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_intake_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_intake_ci
       - name: Verify retained listing replay reaches recent claims and exhausts both fronts
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_two_front_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_two_front_ci --two-front
       - name: Verify retained listing120 staging, leases and canonical source custody
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_bulk_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_bulk_ci --two-front --bulk120
       - name: Verify full retained replay, exact assay equality and 500k aggregation plans
+        if: steps.retained.outputs.run == 'true'
         run: |
           createdb dm_refinement_listing_powertrain_ci
           python3 scripts/test-retained-listing-intake.py dm_refinement_listing_powertrain_ci --two-front --bulk120 --powertrain --description --odometer --identity --vin-label --craigslist-odometer --craigslist-year --native-year --native-identity --public-identity-evidence
@@ -518,6 +822,102 @@ jobs:
         run: createdb dm_refinement_fresh_image_admission
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
+
+  vehicle-image-gallery-eligible-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable gallery eligibility database
+        run: createdb dm_refinement_gallery_eligible_ci
+      - name: Verify the inlinable gallery predicate answers as the live one did, row for row
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gallery_eligible_ci -f supabase/sql/test_vehicle_image_gallery_eligible_inline.sql
+
+  county-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable county readers database
+        run: createdb dm_refinement_county_readers_ci
+      - name: Verify the county readers answer with public vehicles only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_readers_ci -f supabase/sql/test_county_readers_public_only.sql
+
+  vehicle-events-org-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable vehicle events database
+        run: createdb dm_refinement_vehicle_events_org_ci
+      - name: Verify the organization events read joins one vehicle per returned event
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicle_events_org_ci -f supabase/sql/test_vehicle_events_org_index.sql
+
+  observations-comment-bid-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable comment index contract database
+        run: createdb dm_refinement_comment_bid_index_ci
+      - name: Verify the comments view reads only comment and bid rows once the partial index is valid
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_comment_bid_index_ci -f supabase/sql/test_observations_comment_bid_index.sql
 
   market-lot-activity-contract:
     runs-on: ubuntu-latest
@@ -543,6 +943,30 @@ jobs:
       - name: Verify actual market migration and public current-lot contract
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_activity -f supabase/sql/test_market_lot_activity.sql
 
+  pipeline-pulse-memo-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable pipeline pulse database
+        run: createdb dm_refinement_pipeline_pulse_memo_ci
+      - name: Verify the pulse answers as before and reads counted days from memory
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pipeline_pulse_memo_ci -f supabase/sql/test_pipeline_pulse_memo.sql
+
   discovery-contract:
     runs-on: ubuntu-latest
     steps:
@@ -550,6 +974,78 @@ jobs:
         uses: actions/checkout@v4
       - name: Verify discovery failure and evidence contracts
         run: python3 scripts/discovery/inclusion_pass_test.py
+
+  writer-functions-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable writer functions database
+        run: createdb dm_refinement_writer_functions_ci
+      - name: Verify owner-run writers are closed to anon and authenticated, open to the service role
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_writer_functions_ci -f supabase/sql/test_revoke_anon_writer_functions.sql
+
+  vehicles-vin-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable VIN index contract database
+        run: createdb dm_refinement_vehicles_vin_ci
+      - name: Verify a VIN equality lookup reads an index, for the owner and for anon, with the same rows
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vehicles_vin_ci -f supabase/sql/test_vehicles_vin_equality_index.sql
+
+  transfer-seed-cron-key-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable transfer seed database
+        run: createdb dm_refinement_transfer_seed_ci
+      - name: Verify the auction-close transfer seeders send the cron key reader's key
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_transfer_seed_ci -f supabase/sql/test_transfer_seed_cron_key.sql
 
   poller-ledger-contract:
     runs-on: ubuntu-latest
@@ -572,6 +1068,30 @@ jobs:
           deno test --no-check --allow-env supabase/functions/ingest/ingest.slugstub.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
+
+  my-unorganized-photo-count-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable inbox count database
+        run: createdb dm_refinement_unorganized_count_ci
+      - name: Verify the inbox badge count is capped, own-rows-only and invoker-run
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_unorganized_count_ci -f supabase/sql/test_my_unorganized_photo_count.sql
 
   profile-fold-contract:
     runs-on: ubuntu-latest
@@ -629,6 +1149,30 @@ jobs:
       - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
         run: deno test supabase/functions/_shared/batChassis.test.ts
 
+  county-readers-index-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable county readers database
+        run: createdb dm_refinement_county_index_ci
+      - name: Verify the county readers keep their answers and read from the covering indexes
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_index_ci -f supabase/sql/test_county_readers_index_backed.sql
+
   sold-context-contract:
     runs-on: ubuntu-latest
     services:
@@ -668,6 +1212,78 @@ jobs:
         run: createdb dm_refinement_market_delta_ci
       - name: Verify unknown estimates, genuine zero and existing reader access
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_delta_ci -f supabase/sql/test_market_value_delta_unknown.sql
+
+  popup-public-cohort-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_popup_cohort_ci
+      - name: Verify the popup reads its cohort through public readers and answers what it answered
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_popup_cohort_ci -f supabase/sql/test_popup_vehicle_intel_public_cohort.sql
+
+  vehicle-images-policy-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable image policy contract database
+        run: createdb dm_refinement_image_gate_ci
+      - name: Verify strangers no longer read rejected or held frames, owners keep theirs
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_gate_ci -f supabase/sql/test_vehicle_images_public_policy_gate.sql
+
+  vehicle-observations-keyed-indexes-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable observation index contract database
+        run: createdb dm_refinement_vo_keyed_indexes_ci
+      - name: Verify keyed observation reads probe only the keyed rows under row security
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_vo_keyed_indexes_ci -f supabase/sql/test_vehicle_observations_keyed_indexes.sql
 
   valuation-source-sale-contract:
     runs-on: ubuntu-latest
@@ -725,6 +1341,54 @@ jobs:
           node-version: '22'
       - name: Verify nullable episode ancestry, source custody and two-session races
         run: node scripts/discovery/sale-episode-source-integrity-test.mjs
+
+  vehicle-image-findings-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable image findings database
+        run: createdb dm_refinement_image_findings_ci
+      - name: Verify the findings reader returns the old projection rows under the image row policies
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_findings_ci -f supabase/sql/test_vehicle_image_findings.sql
+
+  storage-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable storage policy contract database
+        run: createdb dm_refinement_storage_policies_ci
+      - name: Verify no identity lists, uploads, overwrites or deletes in the two buckets
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_storage_policies_ci -f supabase/sql/test_storage_objects_close_open_policies.sql
 
   vitest:
     runs-on: ubuntu-latest
@@ -784,6 +1448,30 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+
+  pending-assignments-sweep-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable pending assignments database
+        run: createdb dm_refinement_pending_assignments_ci
+      - name: Verify the pending assignments reader returns the same rows for every caller
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pending_assignments_ci -f supabase/sql/test_pending_assignments_sweep.sql
 
   listing-state-contract:
     runs-on: ubuntu-latest
@@ -848,3 +1536,27 @@ jobs:
         run: createdb dm_refinement_device_attribution_ci
       - name: Verify a phone frame is refused before the fix and lands after it
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_device_attribution_ci -f supabase/sql/test_device_attribution_as_owner.sql
+
+  cron-key-reader-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable cron key database
+        run: createdb dm_refinement_cron_key_ci
+      - name: Verify cron sends the Vault secret key first, the old fallbacks after, to service_role only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cron_key_ci -f supabase/sql/test_get_service_role_key_for_cron.sql

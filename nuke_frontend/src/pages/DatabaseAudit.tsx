@@ -48,8 +48,9 @@ const DatabaseAudit: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('*')
+          .select('id, make, model, year, created_at, primary_image_url')
           .order('created_at', { ascending: false });
+
 
         if (!error && data) {
           dbVehicles = data.map(v => ({
@@ -59,7 +60,8 @@ const DatabaseAudit: React.FC = () => {
             year: v.year,
             created_at: v.created_at,
             isAnonymous: false,
-            hasImage: !!v.primaryImageUrl
+            hasImage: !!v.primary_image_url
+
           }));
         }
       } catch (error) {

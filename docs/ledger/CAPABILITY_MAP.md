@@ -79,13 +79,15 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | API keys | `api-keys-manage` + `api_keys` table | — |
 | Caller check for a writing edge function | `_shared/writeGuard.ts` (`requireWriteAuth`: service key, signed-in user, optional nk_live_ key; refuses the anon key) — coverage enforced by `scripts/guardrails/check-write-guard.mjs` in supabase-deploy.yml | per-function `getUser`/service-key compares in ~30 functions: keep as a second layer, never as the only one; `apiKeyAuth.authenticateRequest` stays the api-v1-* front door |
 | Payment facts | `payment_events` table | vehicle_transactions / vehicle_financial_transactions / user_wallets (DROPPED) |
+| Owner's purchase facts (vehicles.purchase_price, purchase_date, purchase_location) | `vehicle_owner_books(uuid[])` for owners and contributors with access; one row as the caller may see it: `vehicle_row_read(uuid)` | direct reads of those columns or `select('*')` on vehicles from the browser |
+
 | Deal jackets / doc forensics | `deal-jacket-pipeline` (dormant; reactivate cron if needed) | forensic-deal-jacket, decompose-deal-jacket, deal-brief, ds-* suite (deleted) |
 | Bidding / auto-buy / exchange / trading | CAPABILITY RETIRED 2026-03 | place-bid-with-deposit (auctionPaymentService still calls it — broken), execute-auto-buy, place-market-order, trading, paper-trade-autopilot, api-v1-exchange, update-exchange-prices (map's cron claim FALSE) |
 | Vehicle shipping | CAPABILITY RETIRED | create-shipping-listing, send-shipping-notification, shippingService.ts, ShippingNotificationManager.tsx |
 | **ORGS & IDENTITY** | | |
 | Create/enrich org from URL | `create-org-from-url` | update-org-from-website (no live path), ingest-org-complete, scrape-organization-site, classify-organization-type, extract-organization-from-seller ⚠ |
 | Org read model | `organizations` table directly | org_profiles / organizations_compat views (0 refs), organization_profiles (DROPPED) |
-| Org↔vehicle links | `organization_vehicles` | — |
+| Org↔vehicle links | `organization_vehicles`; the links' books (asking_price, cost_basis, sale_price, internal_notes) only through `organization_vehicle_books(org)`, for the org's active owners, managers and board members (`caller_manages_organization`) | direct reads of the book columns from the browser |
 | Identity graph (who-is-who cross-platform) | `external_identities` table (573k, written daily) | identity_nodes/edges (DROPPED), build-identity-graph, discover-entity-graph (deleted) — NEVER re-mint a graph layer |
 | Identity search & claim | `search-identities` + /claim-identity page | — |
 | Seller statistics | `compute-org-seller-stats` (reactivate its cron if needed) | seller_intel_rollup cron (inactive), organization_seller_stats (0 rows), api-v1-seller-stats / enrich-seller (orphan deploys) |

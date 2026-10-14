@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +99,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim()
-    const serviceRoleKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '').trim()
+    const serviceRoleKey = (projectSecretKey() ?? '').trim()
 
     if (!supabaseUrl) throw new Error('Missing SUPABASE_URL')
     if (!serviceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
@@ -886,7 +887,7 @@ Deno.serve(async (req) => {
 
     // Trigger AI analysis on comments (async, don't wait)
     if (comments.length > 0 && vehicleId) {
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      const serviceKey = projectSecretKey() ?? ''
       fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/discover-from-observations`, {
         method: 'POST',
         headers: {

@@ -29,6 +29,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 export const MECUM_SOURCE_RESULT_PARSER_VERSION = "extract-mecum:2.0.0:source_result_candidate_v2";
@@ -686,7 +687,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
   // Query for the largest direct snapshot (most likely to have __NEXT_DATA__ with post data)
   const supabaseInner = (() => {
     const u = Deno.env.get("SUPABASE_URL") ?? "";
-    const k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+    const k = projectSecretKey() ?? "";
     return createClient(u, k, { auth: { persistSession: false } });
   })();
   const { data: bestSnapshot } = await supabaseInner
@@ -1031,7 +1032,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};

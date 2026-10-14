@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { callTool } from "../../lib/mcp";
+import { readVehicleNames } from "./vehicleNames";
 
 interface Atom {
   attribute: string;
@@ -27,8 +28,6 @@ interface WorkOrderRef {
 }
 interface Receipt {
   id: string;
-  vendor: string | null;
-  total: number | null;
   date: string | null;
   vehicle_id: string | null;
   scope_type: string | null;
@@ -41,7 +40,6 @@ interface Summary {
   parts_lines: number;
   payment_count: number | null;
   receipt_count?: number;
-  receipt_total?: number;
 }
 interface WorkLog {
   date: string;
@@ -70,10 +68,6 @@ function isUnscoped(r: Receipt): boolean {
   return !r.scope_id;
 }
 
-function formatCurrency(n: number | null | undefined): string {
-  const v = Number(n) || 0;
-  return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 interface Response {
   projection_event_id?: string;
   recorded_at?: string;
@@ -111,6 +105,7 @@ export default function JournalPage() {
   const [data, setData] = useState<Response | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [names, setNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!date) return;
@@ -119,7 +114,14 @@ export default function JournalPage() {
     setLoading(true);
     setError(null);
     callTool<Response>("project_work_log", { date })
-      .then((result) => { if (!cancelled) setData(result); })
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        const log = result?.work_log;
+        const ids = [...new Set([...(log?.photos ?? []), ...(log?.work_orders ?? []), ...(log?.receipts ?? [])]
+          .map((x) => x.vehicle_id).filter((x): x is string => !!x))];
+        readVehicleNames(ids).then((n) => { if (!cancelled) setNames(n); }, () => undefined);
+      })
       .catch((e) => { if (!cancelled) setError(String(e?.message || e)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -141,8 +143,7 @@ export default function JournalPage() {
         {data && data.confidence != null && (
           <span>
             CONFIDENCE {(data.confidence * 100).toFixed(0)}% ·{" "}
-            {data.observation_count} ATOMS ·{" "}
-            EVENT {data.projection_event_id?.slice(0, 8)}
+            {data.observation_count} ATOMS
           </span>
         )}
       </div>
@@ -169,10 +170,12 @@ export default function JournalPage() {
                     )}
                     <div style={styles.photoCaption}>
                       {p.angle ?? "—"} ·{" "}
-                      {p.vehicle_id ? (
+                      {p.vehicle_id && names[p.vehicle_id] ? (
                         <Link to={`/vehicle/${p.vehicle_id}`} style={styles.link}>
-                          {p.vehicle_id.slice(0, 8)}
+                          {names[p.vehicle_id]}
                         </Link>
+                      ) : p.vehicle_id ? (
+                        "PRIVATE VEHICLE"
                       ) : (
                         "UNATTRIBUTED"
                       )}
@@ -212,7 +215,7 @@ export default function JournalPage() {
           {data.work_log.receipts && data.work_log.receipts.length > 0 && (
             <div style={styles.section}>
               <div style={styles.sectionLabel}>
-                EXPENSES · {data.work_log.summary.receipt_count ?? data.work_log.receipts.length} · ${formatCurrency(data.work_log.summary.receipt_total ?? data.work_log.receipts.reduce((s, r) => s + Number(r.total ?? 0), 0))}
+                EXPENSES · {data.work_log.summary.receipt_count ?? data.work_log.receipts.length}
               </div>
               {data.work_log.receipts.map((r) => {
                 const unscoped = isUnscoped(r);
@@ -227,9 +230,8 @@ export default function JournalPage() {
                 };
                 return (
                   <div key={r.id} style={styles.woRow}>
-                    <span style={{ flex: 1 }}>{(r.vendor ?? "(NO VENDOR)").toUpperCase()}</span>
+                    <span style={{ flex: 1 }}>RECEIPT · {r.date ?? "undated"}</span>
                     <span style={badgeStyle}>{scopeLabel(r)}</span>
-                    <span style={{ width: 100, textAlign: "right" }}>${formatCurrency(r.total)}</span>
                   </div>
                 );
               })}

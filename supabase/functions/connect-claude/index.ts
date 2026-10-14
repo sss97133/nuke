@@ -34,6 +34,7 @@ import {
 } from "../_shared/claudeSubscriptionAuth.ts";
 import { decryptSecret } from "../_shared/secretBox.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -45,7 +46,7 @@ function json(body: unknown, status = 200): Response {
 function svc() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    projectSecretKey()!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }

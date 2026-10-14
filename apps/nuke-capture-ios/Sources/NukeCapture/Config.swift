@@ -29,10 +29,9 @@ enum Config {
         #endif
         return URL(string: "https://qkgaybvrernstplzjaam.supabase.co")!
     }()
-    static let supabaseAnonKey =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
-        "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0." +
-        "lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk"
+    // The project's publishable key, public by design: it ships in every client. The legacy anon JWT that stood
+    // here stopped working when the legacy API keys were disabled (key switch, 2026-10-14 05:28Z).
+    static let supabaseAnonKey = "sb_publishable_jJ4IIdHqsgd7Gd5c55t-5g_SceqkkXU"
 
     // Same bucket + path convention as the Mac relay. The path is shared on
     // purpose: if the SAME photo reaches both devices (iCloud), the second

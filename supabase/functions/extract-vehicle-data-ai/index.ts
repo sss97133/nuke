@@ -12,6 +12,7 @@ import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicle } from './vehicleWrite.ts'
 import { normalizeExtractedData } from './normalize.ts'
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,7 +129,7 @@ Deno.serve(async (req) => {
       console.log(`[extract-vehicle-data-ai] Routing to dedicated extractor: ${dedicatedExtractor}`)
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const serviceKey = projectSecretKey()!
         const proxyRes = await fetch(`${supabaseUrl}/functions/v1/${dedicatedExtractor}`, {
           method: 'POST',
           headers: {
@@ -246,7 +247,7 @@ Deno.serve(async (req) => {
     // Initialize Supabase for LLM config
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      projectSecretKey()!
     )
 
     // Get LLM config with automatic fallback chain
@@ -627,7 +628,7 @@ Deno.serve(async (req) => {
     if (vehicleId) {
       try {
         const enrichUrl = Deno.env.get('SUPABASE_URL')!
-        const enrichKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const enrichKey = projectSecretKey()!
         fetch(`${enrichUrl}/functions/v1/enrich-msrp`, {
           method: 'POST',
           headers: {

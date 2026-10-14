@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { cloudVisionJSON, cloudVisionMultiJSON } from "../_shared/visionFallback.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -268,7 +269,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = projectSecretKey()!;
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const body: CheckRequest = await req.json();

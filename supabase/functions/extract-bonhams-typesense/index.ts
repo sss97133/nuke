@@ -34,6 +34,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // ─── Typesense API config ─────────────────────────────────────────────────────
 
@@ -385,7 +386,7 @@ Deno.serve(async (req) => {
     if (mode === "stats") {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        projectSecretKey() ?? "",
       );
 
       // Get Typesense totals
@@ -459,7 +460,7 @@ Deno.serve(async (req) => {
     if (mode === "ingest") {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        projectSecretKey() ?? "",
       );
 
       const stats = {
@@ -580,7 +581,7 @@ Deno.serve(async (req) => {
     if (mode === "archive") {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        projectSecretKey() ?? "",
       );
 
       const stats = {

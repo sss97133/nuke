@@ -151,8 +151,9 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
           linked_by_user_id: userId,
           auto_tagged: false
         })
-        .select()
+        .select('id')
         .single();
+
 
       if (insertError) {
         if (insertError.code === '23505') {

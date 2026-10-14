@@ -10,10 +10,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!
 );
 
 // Compute SHA-256 hash of image bytes — used for exact duplicate detection
@@ -267,7 +268,7 @@ Deno.serve(async (req) => {
       const { createClient: createAuthClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const authSupabase = createAuthClient(
         Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("ANON_KEY") || "",
+        projectPublishableKey() || "",
         { global: { headers: { Authorization: authHeader } } }
       );
       const { data: { user } } = await authSupabase.auth.getUser();
@@ -275,7 +276,7 @@ Deno.serve(async (req) => {
     }
 
     // Require auth - either JWT or service role key
-    const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "NONE";
+    const serviceKey = projectSecretKey() || "NONE";
     const isServiceRole = authHeader?.includes(serviceKey);
     if (!authenticatedUserId && !isServiceRole) {
       return new Response(JSON.stringify({ error: "Authentication required" }), {

@@ -55,7 +55,8 @@ const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
 
 const BuildManifestPanel: React.FC<Props> = ({ vehicleId }) => {
   const { manifest, manifestStats, snapshots, loading } = useBuildProfile(vehicleId);
-  // The build record is public; its costs are owner-only (owner rule 2026-09-28). Anonymous readers see a masked price.
+  // The build record is public; its costs are owner-only (owner rule 2026-09-28). Since migration 20261014050000 the
+  // database sends prices to the owner only, so other viewers' rows carry price = null and show nothing.
   const { isRowOwner, isVerifiedOwner, hasContributorAccess } = useVehicleProfile();
   const canSeeMoney = isRowOwner || isVerifiedOwner || hasContributorAccess;
   const queryClient = useQueryClient();
