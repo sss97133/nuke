@@ -157,12 +157,14 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
   const checkExistingCommentsForBATUrls = async (comments: Comment[]) => {
     try {
       // Check if vehicle already has images (avoid redundant scraping)
-      const { count: imageCount } = await supabase
+      // One row answers "has any image"; an exact count would run the image row policy over every photo of the vehicle.
+      const { data: anyImage } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicleId);
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .limit(1);
 
-      if (imageCount && imageCount > 0) return;
+      if (anyImage && anyImage.length > 0) return;
 
       // Find most recent comment with BAT URL from trusted user
       for (const comment of comments) {
