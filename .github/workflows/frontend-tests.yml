@@ -10,9 +10,10 @@ on:
     - cron: '0 7 * * *' # daily
 
 concurrency:
-  # A newer push to a pull request supersedes its older run; pushes to main, the schedule and manual runs never cancel.
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push to a pull request, or to main, supersedes the older run of the same ref; the newest commit holds
+  # every older change. The daily schedule and manual runs are their own groups and never cancel.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('push-{0}', github.ref) || format('{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
   published-buyer-profile-contract:
@@ -653,11 +654,14 @@ jobs:
         id: retained
         env:
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
           # The four replay steps below take about 20 minutes and read only the files their script names, and the
-          # files those name. A pull request that changes none of them cannot change their result, so it skips them;
-          # pushes to main, the daily schedule and manual runs always replay.
-          if [ "$EVENT" != pull_request ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          # files those name. A pull request or a push to main that changes none of them cannot change their result,
+          # so it skips them; the daily schedule and manual runs always replay, which also catches environment drift.
+          if [ "$EVENT" != pull_request ] && [ "$EVENT" != push ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          # A push carrying several commits is diffed only against its last parent here, so it replays in full.
+          if [ "$EVENT" = push ] && [ "$BEFORE" != "$(git rev-parse HEAD^1)" ]; then echo run=true >> "$GITHUB_OUTPUT"; echo "replay runs: a multi-commit push"; exit 0; fi
           seen=' '; queue='scripts/test-retained-listing-intake.py'
           while [ -n "$queue" ]; do
             set -- $queue; f=$1; shift; queue="$*"
@@ -673,9 +677,9 @@ jobs:
           if [ "$(replay_def HEAD^1)" != "$(replay_def HEAD)" ]; then hits="$hits .github/workflows/frontend-tests.yml (header or image-projection)"; fi
           echo "replay reads $(echo $seen | wc -w | tr -d ' ') files"
           if [ -n "$hits" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this pull request changes: $hits"
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this change touches: $hits"
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"; echo "::notice::Retained-listing replay skipped: this pull request changes none of the files it reads. It runs on main and daily."
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "::notice::Retained-listing replay skipped: this change touches none of the files it reads. It runs daily and on any change to them."
           fi
       - name: Setup Node.js
         uses: actions/setup-node@v4
