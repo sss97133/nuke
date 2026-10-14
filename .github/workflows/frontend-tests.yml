@@ -1659,6 +1659,30 @@ jobs:
       - name: Verify writes through owner-run views are denied to anon and authenticated, reads unchanged
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_owner_views_ci -f supabase/sql/test_owner_view_writes_revoked.sql
 
+  service-role-catalog-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable service-role catalog policies database
+        run: createdb dm_refinement_service_role_catalog_ci
+      - name: Verify the 105 catalog tables take writes from the service role only
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_service_role_catalog_ci -f supabase/sql/test_service_role_catalog_policies.sql
+
   vehicle-observations-keyed-indexes-contract:
     runs-on: ubuntu-latest
     services:
