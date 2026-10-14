@@ -16,6 +16,14 @@ export const VEHICLE_PRIVATE_COLUMNS = ['purchase_price', 'purchase_date', 'purc
 // Kept apart from the money so each list reads true, and scanned by privateMoney.test.ts the same way.
 export const VEHICLE_OWNER_PII_COLUMNS = ['owner_name', 'owner_contact'] as const;
 
+// A transfer's party access tokens are the party credential, and inbox_email and the parties' emails and phones are
+// personal contact. None are granted to anon or authenticated (migration
+// 20261014190000_transfer_party_credentials_owner_only): a read that names one, or selects '*' on the table, fails
+// for every visitor. The /t/ page learns its role through transfer_party_role, and the admin dashboard reads the
+// link fields through transfer_admin_links. Scanned by privateMoney.test.ts the same way.
+export const OWNERSHIP_TRANSFER_PRIVATE_COLUMNS = ['buyer_access_token', 'seller_access_token', 'inbox_email',
+  'buyer_email', 'seller_email', 'buyer_phone', 'seller_phone'] as const;
+
 export interface OrganizationVehicleBook {
   id: string;
   vehicle_id: string;

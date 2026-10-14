@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, VEHICLE_OWNER_PII_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
+import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, OWNERSHIP_TRANSFER_PRIVATE_COLUMNS, VEHICLE_OWNER_PII_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
 import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
 import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns';
 
@@ -13,6 +13,7 @@ import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns'
 const PRIVATE: Record<string, readonly string[]> = {
   vehicles: [...VEHICLE_PRIVATE_COLUMNS, ...VEHICLE_OWNER_PII_COLUMNS],
   organization_vehicles: ORGANIZATION_VEHICLE_PRIVATE_COLUMNS,
+  ownership_transfers: OWNERSHIP_TRANSFER_PRIVATE_COLUMNS,
 };
 const FILTERS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'containedBy',
   'not', 'order', 'filter', 'textSearch', 'match', 'rangeGt', 'rangeLt', 'overlaps']);
@@ -54,7 +55,7 @@ function forbidden(columns: string[], table: string): string[] {
 // Embedded reads of the two tables inside any select list: vehicles(...), vehicle:vehicles(...), vehicles!fk(...).
 function embedViolations(list: string): string[] {
   const out: string[] = [];
-  const re = /(?:^|[\s,(:])(vehicles|organization_vehicles)(?:!\w+)?\s*\(/g;
+  const re = /(?:^|[\s,(:])(vehicles|organization_vehicles|ownership_transfers)(?:!\w+)?\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(list))) {
     let depth = 1;
