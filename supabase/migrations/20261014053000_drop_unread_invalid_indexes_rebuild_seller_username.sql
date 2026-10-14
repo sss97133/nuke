@@ -21,7 +21,8 @@
 --  4 idx_ac_unclassified_questions (auction_comments, ready, 86 MB): the queue index of the question classifier
 --    (analyze-comments-fast mode question_classify; scripts/question-classify-bulk.mjs). Its cron job 468 was retired inactive
 --    by 20260929001000, no statement reads question_classified_at IS NULL in pg_stat_statements since 2026-09-29, and the
---    last classification was 2026-03-31 (pg_stats). To re-arm the classifier build it again, reading the 11 GB heap twice:
+--    classification times in the 2026-10-07 ANALYZE sample (pg_stats histogram) span only 2026-03-27 to 2026-04-14. To re-arm
+--    the classifier build it again, reading the 11 GB heap twice:
 --    CREATE INDEX CONCURRENTLY idx_ac_unclassified_questions ON public.auction_comments (id)
 --      WHERE (has_question = true AND question_classified_at IS NULL);
 --  5 idx_auction_comments_platform_author (auction_comments, ready, 266 MB): platform = 'bat' AND author_username = x already
