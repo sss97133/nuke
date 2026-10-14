@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only, from the repo root:
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_reshape -f supabase/sql/test_k5_harness_reshape_v1.sql
--- Proves 20261014093000_k5_harness_reshape_v1.sql on a fixture with every wire shape the K5 has: a firewall crossing
+-- Proves 20261014101500_k5_harness_reshape_v1_reissue.sql on a fixture with every wire shape the K5 has: a firewall crossing
 -- from each side, wires joined at a splice, a door pass-through, a grommet, a wire with one end, a wire with none, and
 -- a concept wire that must stay out.
 \set ON_ERROR_STOP on
@@ -84,7 +84,11 @@ INSERT INTO public.vehicle_custom_circuits (id, overlay_id, circuit_code, circui
   ('00000000-0000-0000-0000-000000000a09', '00000000-0000-0000-0000-0000000000f0', 'O1', 'one end recorded', 22, 'M22759/16', 'white', 2.0,
    '00000000-0000-0000-0000-0000000000e1', NULL, 'k5_registry v5', '2026-09-26', 'T3', 'decided', 'uncut'),
   ('00000000-0000-0000-0000-000000000a0a', '00000000-0000-0000-0000-0000000000f0', 'C1', 'April concept', 20, 'TXL', 'red', NULL,
-   NULL, NULL, 'April 2026 plan', '2026-04-01', 'T3', 'concept', 'uncut');
+   NULL, NULL, 'April 2026 plan', '2026-04-01', 'T3', 'concept', 'uncut'),
+  ('00000000-0000-0000-0000-000000000a0c', '00000000-0000-0000-0000-0000000000f0', 'ETH_TX+', 'ethernet TX+', 24, 'Cat5 pair', 'white/orange', 3.0,
+   '00000000-0000-0000-0000-0000000000e1', NULL, 'k5_registry v5', '2026-09-26', 'T3', 'decided', 'uncut'),
+  ('00000000-0000-0000-0000-000000000a0d', '00000000-0000-0000-0000-0000000000f0', 'ETH_TX-', 'ethernet TX-', 24, 'Cat5 pair', 'orange', 3.0,
+   '00000000-0000-0000-0000-0000000000e1', NULL, 'k5_registry v5', '2026-09-26', 'T3', 'decided', 'uncut');
 
 INSERT INTO public.wire_termination_specs (id, vehicle_id, circuit_id, endpoint_id) VALUES
   -- 110: M130-B -> 61-pin cab half -> engine half -> CLT
@@ -115,27 +119,27 @@ INSERT INTO public.wire_termination_specs (id, vehicle_id, circuit_id, endpoint_
   -- O1: one end only
   ('00000000-0000-0000-0000-0000000b0901', 'e08bf694-970f-4cbe-8a74-8715158a0f2e', '00000000-0000-0000-0000-000000000a09', '00000000-0000-0000-0000-0000000000e1');
 
-\i supabase/migrations/20261014093000_k5_harness_reshape_v1.sql
+\i supabase/migrations/20261014101500_k5_harness_reshape_v1_reissue.sql
 
 DO $$
 DECLARE n int; got text; want text; r record;
 BEGIN
   -- per-wire segment counts: 110 2, S1 2, L0 1, L1 1, L2 1, D1 2, B1 1, N1 1, O1 1; the concept wire none
-  SELECT string_agg(c.circuit_code || '=' || coalesce(s.n, 0), ' ' ORDER BY c.circuit_code) INTO got
+  SELECT string_agg(c.circuit_code || '=' || coalesce(s.n, 0), ' ' ORDER BY c.circuit_code COLLATE "C") INTO got
   FROM public.vehicle_custom_circuits c
   LEFT JOIN (SELECT vehicle_custom_circuit_id, count(*) n FROM public.harness_segments GROUP BY 1) s ON s.vehicle_custom_circuit_id = c.id;
-  want := '110=2 B1=1 C1=0 D1=2 L0=1 L1=1 L2=1 N1=1 O1=1 S1=2';
+  want := '110=2 B1=1 C1=0 D1=2 ETH_TX+=1 ETH_TX-=1 L0=1 L1=1 L2=1 N1=1 O1=1 S1=2';
   IF got IS DISTINCT FROM want THEN RAISE EXCEPTION 'segments per wire: got %, want %', got, want; END IF;
 
   -- nets: L0, L1, L2 share the splice net; every other decided wire is its own net
   SELECT count(*) INTO n FROM public.harness_nets;
-  IF n <> 7 THEN RAISE EXCEPTION 'nets: got %, want 7', n; END IF;
+  IF n <> 9 THEN RAISE EXCEPTION 'nets: got %, want 9', n; END IF;
   SELECT count(DISTINCT s.net_id) INTO n FROM public.harness_segments s
    WHERE s.vehicle_custom_circuit_id IN ('00000000-0000-0000-0000-000000000a03', '00000000-0000-0000-0000-000000000a04', '00000000-0000-0000-0000-000000000a05');
   IF n <> 1 THEN RAISE EXCEPTION 'L0, L1, L2 should share one net, found %', n; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.harness_nets WHERE net_code = 'SPL-X') THEN RAISE EXCEPTION 'splice net not coded SPL-X'; END IF;
   SELECT count(*) INTO n FROM public.harness_signals;
-  IF n <> 7 THEN RAISE EXCEPTION 'signals: got %, want 7', n; END IF;
+  IF n <> 9 THEN RAISE EXCEPTION 'signals: got %, want 9 (ETH_TX+ and ETH_TX- keep separate keys)', n; END IF;
 
   -- 110 from the cab: M130-B -> cab half, then engine half -> CLT; S1 from the engine: starter -> engine half, then cab half -> PDM
   FOR r IN SELECT c.circuit_code, ef.code f, et.code t FROM public.harness_segments s
