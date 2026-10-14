@@ -6,6 +6,8 @@ name: Update Stats
 # for the About page (scripts/data/readme-stats.mjs).
 # Read-only queries; at most one commit a day,
 # marked [skip ci] so it triggers no build or deploy.
+# The README block also names every INVALID index in public. When one appears that the previous block did not list,
+# the measuring step writes the block and then exits 1, so the run turns red and the commit step below still publishes it.
 
 on:
   schedule:
@@ -38,6 +40,9 @@ jobs:
         run: node scripts/data/readme-stats.mjs
 
       - name: Commit if the block changed, rebase onto a moving main, push
+        # Not skipped when the measuring step failed after writing: a new invalid index fails the run on purpose and the
+        # block that names it must still reach main. When nothing was written there is no diff and this exits 0.
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
