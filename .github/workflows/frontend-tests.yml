@@ -448,6 +448,30 @@ jobs:
       - name: Verify the catalog load (no price, stock or maker claims) and the key fold
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_parts_ci -f supabase/sql/test_k5_harness_parts_catalog.sql
 
+  k5-harness-geometry-check-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable geometry check database
+        run: createdb dm_refinement_k5_geom_ci
+      - name: Verify straight-line distances and the plan-shorter-than-geometry check
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_geom_ci -f supabase/sql/test_k5_harness_geometry_check.sql
+
   k5-harness-reshape-contract:
     runs-on: ubuntu-latest
     services:

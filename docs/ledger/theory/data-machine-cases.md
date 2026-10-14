@@ -2211,3 +2211,44 @@ for housings (molded numbers) with the ECU's A/B labels mapped at the instance. 
 parts, each with its supplier page as source and no price. (d) #110 itself: signal, net, two segments mated at cavity
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
+
+#### 13.12.3 RSI passes 1 to 7: the model measures itself and fills its gaps (lead, 2026-10-14)
+
+Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
+1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
+2. Take the largest gap that existing evidence can close.
+3. Close it with a migration and a PG17 contract test.
+4. Re-measure live as a logged-out reader.
+
+Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
+
+| Pass | Migration | Gap (before) | Evidence used | After (live) |
+|---|---|---|---|---|
+| 1 | 20261014113000 | no field-level evidence, no design state, options at plug grain only, no protection, no self-measurement | 783 k5-wiring observations; device_pin_maps; endpoint couplings | 450 decided / 138 candidate / 50 contradicted segments; 1,066 option links; 57 protected nets; 798 evidence links; stack SH + scoreboard |
+| 2 | 20261014123000 | cavity keys 0 / 884 | MILNEC 25-61 transcription (rings checked 1/6/12/19/23); MoTeC 65044 / 65045 | 295 / 884; 121 cited cavity rows |
+| 3 | 20261014133000 | baseline and residual missing | 65 factory-circuit facts landed through ingest-observation | factory rows keyed 27 / 62; carried 5, unassessed 13, baseline gap 23 |
+| 4 | 20261014143000 | 4 of 28 build-cited GM numbers unnamed; cavity and PDM keys unreadable to the public | ST 352 78 Circuit Tabulation pp. 8-11 (generated rows) | 129 circuits added (348 in all); 139 agree, 6 conflict; build-cited GM circuits named 28 / 28; cavity library and PDM tables readable to a logged-out reader |
+| 5 | 20261014153000 | one net joined battery + and a PDM output to ground | the fold's own node rule, stated as data | net GND-BANK-CAB superseded, 16 nets added (400 live); supply joined to ground 0 / 400; design loads on 12 nets (battery + 180 A, peak 200 A); protection unchanged at 57. The cab ground bank's return to the engine star now waits with the DC primary (its engine end is a PS-STUDS row) |
+| 6 | 20261014163000 | terminal keys 27, tool keys 211 / 884 | the build catalog (parts.yaml, tools.yaml) | 102 catalog rows added (27 already present); terminal keys 494 / 884, tool keys 403 / 884; key_harness_wire_ends() |
+| 7 | 20261014173000 | planned lengths never checked against geometry | twin positions on 98 plugs | 132 / 638 segments with both plugs positioned; 4 of the 15 with a plan are planned shorter than the straight line (PDM30 to Dakota VHX); harness views revoked of public write grants |
+
+**What the loop found that no one asked about:**
+- **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
+  MARKER-LF (a lamp typed ground) as single nodes. The scoreboard now carries the physics check "nets that join a
+  supply to ground (must be 0)".
+- **Factory baseline gaps.** The build cites 23 GM circuits that the factory baseline has no keyed row for. The
+  baseline itself is thin.
+- **Six colour conflicts** between the 1973 manual and the 1978 chart: circuits 22, 67, 225, 231, 232 and 234. They are
+  recorded and not resolved.
+- **Unreadable keys.** Row security was on with no policy on the cavity library and the PDM tables.
+- **Impossible lengths.** Four wires from the PDM30 to the Dakota VHX are planned shorter than the straight line between
+  their plugs. Either the PDM30 position (twin assumption A2) or the plan is wrong; it is an owner placement call.
+
+**Owed, as the scoreboard names it:**
+- Topology and routing (0 segments routed). The landmark file is length proxies, not a graph.
+- The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
+- Loads on PDM-fed nets. The design sets each output's current from the device's measured draw.
+- The factory baseline's own completeness: 35 rows unkeyed and 23 cited circuits absent. The 1978 diagram pages are
+  images.
+- The other 589 wire ends' cavities: GM blade, DT, rings and kit terminals each need a cited layout.
+- Measured lengths (the outcome).
