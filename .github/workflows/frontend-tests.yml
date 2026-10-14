@@ -1635,6 +1635,30 @@ jobs:
       - name: Verify strangers no longer read rejected or held frames, owners keep theirs
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_image_gate_ci -f supabase/sql/test_vehicle_images_public_policy_gate.sql
 
+  open-update-delete-policies-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable open write policies database
+        run: createdb dm_refinement_open_update_delete_ci
+      - name: Verify anon and signed-in callers no longer update or delete service-only rows
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_open_update_delete_ci -f supabase/sql/test_open_update_delete_policies.sql
+
   owner-view-writes-contract:
     runs-on: ubuntu-latest
     services:
