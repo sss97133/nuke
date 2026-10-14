@@ -18,6 +18,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { callOpenAiChatCompletions } from "../_shared/openaiChat.ts";
 import { rlmSummarize } from "../_shared/rlm.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 function okJson(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return okJson({ success: false, error: "Method not allowed" }, 405);
 
   try {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
     const body = await req.json().catch(() => ({}));
 
     const action = String(body?.action || "brief");

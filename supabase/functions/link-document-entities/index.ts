@@ -16,6 +16,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!
 );
 
 // ─── VEHICLE RESOLUTION ────────────────────────────────────────────────────
@@ -346,7 +347,7 @@ async function generateObservations(
       const resp = await fetch(`${baseUrl}/functions/v1/ingest-observation`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          Authorization: `Bearer ${projectSecretKey()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -411,7 +412,7 @@ async function generateObservations(
         await fetch(`${baseUrl}/functions/v1/mcp-connector`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            Authorization: `Bearer ${projectSecretKey()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

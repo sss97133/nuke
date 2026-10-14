@@ -29,10 +29,11 @@ import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttrib
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  projectSecretKey()!,
   { global: { headers: { "X-Nuke-Writer": "ingest" } } },
 );
 
@@ -988,7 +989,7 @@ type EnrichResult =
 
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceKey = projectSecretKey()!;
 
   // BaT delegates to extract-bat-core, a self-contained writer (it creates or
   // conservatively updates the vehicle row itself, resolving by
