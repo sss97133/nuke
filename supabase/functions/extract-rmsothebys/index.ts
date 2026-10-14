@@ -32,6 +32,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { classifyLot, partitionLots, type LotPartition } from './lotKind.ts';
 import { collectLots, type CollectedLots } from './lotPaging.ts';
 import { parseTitle } from './lotTitle.ts';
+import { forEachConcurrent, readConcurrency } from './concurrency.ts';
 import { saveVehicle as saveVehicleWith, type ExtractedVehicle, type SaveDeps } from './saveVehicle.ts';
 
 const corsHeaders = {
@@ -226,6 +227,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { action = 'auctions', auction, url, save_to_db = false, limit, offset = 0 } = body;
+    // Lots written at once by `process`. A first pass over a large auction took 127 s one lot at a time (see concurrency.ts).
+    const concurrency = readConcurrency(body.concurrency, 4);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -314,13 +317,13 @@ Deno.serve(async (req) => {
         errors: [] as string[],
       };
 
-      for (const vehicle of applied) {
+      await forEachConcurrent(applied, concurrency, async (vehicle) => {
         try {
           const saved = await saveVehicle(supabase, vehicle);
           if ('skipped' in saved) {
             // Not reachable for a lot the partition let through; if it happens the two rules disagree, so say so.
             results.errors.push(`${vehicle.title}: refused at write (${saved.skipped})`);
-            continue;
+            return;
           }
           const { vehicleId, isNew } = saved;
           if (isNew) {
@@ -333,12 +336,13 @@ Deno.serve(async (req) => {
           results.errors.push(`${vehicle.title}: ${err.message}`);
           console.error(`[RMS] Error processing ${vehicle.title}:`, err);
         }
-      }
+      });
 
       return okJson({
         success: true,
         auction,
         ...report,
+        concurrency,
         processed: applied.length,
         created: results.created,
         updated: results.updated,
