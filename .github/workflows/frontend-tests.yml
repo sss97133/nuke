@@ -1206,6 +1206,30 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
 
+  pending-assignments-sweep-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable pending assignments database
+        run: createdb dm_refinement_pending_assignments_ci
+      - name: Verify the pending assignments reader returns the same rows for every caller
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_pending_assignments_ci -f supabase/sql/test_pending_assignments_sweep.sql
+
   listing-state-contract:
     runs-on: ubuntu-latest
     services:
