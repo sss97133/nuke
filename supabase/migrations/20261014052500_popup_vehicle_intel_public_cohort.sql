@@ -117,10 +117,13 @@ AS $fn$
      AND v.is_public AND v.deleted_at IS NULL
 $fn$;
 
-REVOKE ALL ON FUNCTION public.cohort_scope_rule(uuid), public.cohort_members_public(uuid),
-  public.public_vehicles_by_model_year(text, integer, text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.cohort_scope_rule(uuid), public.cohort_members_public(uuid),
-  public.public_vehicles_by_model_year(text, integer, text[]) TO anon, authenticated, service_role;
+-- Stated function by function: not PUBLIC, but the three API roles (these return ids of public vehicles, which anon can read).
+REVOKE ALL ON FUNCTION public.cohort_scope_rule(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cohort_scope_rule(uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.cohort_members_public(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cohort_members_public(uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.public_vehicles_by_model_year(text, integer, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.public_vehicles_by_model_year(text, integer, text[]) TO anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.cohort_members_public(uuid) IS
   'cohort_members() restricted to public, undeleted, non-part vehicles; SECURITY DEFINER so its make/model/year quals can use the partial indexes on public vehicles (under anon row policies a lower() qual cannot be an index condition; measured 2026-10-14). Used by popup_vehicle_intel.';
