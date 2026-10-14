@@ -86,7 +86,7 @@ Standing rules the code carries:
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
-  ledger map, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
+  ledger map, `NUKE_DEBUG_ACTOR_ORG=<uuid>` roots on an organization's actor document, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
   (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).

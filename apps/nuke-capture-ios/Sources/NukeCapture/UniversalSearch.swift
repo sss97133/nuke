@@ -38,6 +38,12 @@ struct UniversalSearchHit: Decodable, Identifiable {
     let relevance_score: Double?
     let metadata: Metadata?
 
+    /// An organization hit as a door to its actor document.
+    var actorRoute: ActorRoute? {
+        guard type == "organization", UUID(uuidString: id) != nil else { return nil }
+        return ActorRoute(kind: "organization", id: id.lowercased(), name: title)
+    }
+
     /// The grid's row, from the door's vehicle hit. Trim is not in the hit; the detail page reads it.
     var headerRow: VehicleHeaderRow? {
         guard type == "vehicle", let uuid = UUID(uuidString: id) else { return nil }
@@ -72,10 +78,13 @@ enum UniversalSearch {
 
     /// One page of vehicle hits for a query, through the door the web uses. Pages after the
     /// first carry the door's `next_offset` and the `vehicle_source` it chose on page one.
-    static func vehicles(query: String, limit: Int = pageSize, offset: Int = 0, source: String? = nil) async throws -> UniversalSearchResponse {
+    static func vehicles(query: String, limit: Int = pageSize, offset: Int = 0, source: String? = nil,
+                         types: [String] = ["vehicle"]) async throws -> UniversalSearchResponse {
         try await SupabaseService.client.functions.invoke(
             "universal-search",
-            options: FunctionInvokeOptions(body: UniversalSearchRequest(query: query, limit: limit, offset: offset, types: ["vehicle"], vehicle_source: source))
+            options: FunctionInvokeOptions(body: UniversalSearchRequest(query: query, limit: limit, offset: offset, types: types, vehicle_source: source))
         )
     }
+    /// Page one also asks for the actors the door matches by name (organizations and people, first page only).
+    static let firstPageTypes = ["vehicle", "organization", "user"]
 }
