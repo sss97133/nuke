@@ -171,4 +171,4 @@ open them by path:
 - `wiring-receipt.md` and `wiring-wire-closure-protocol.md` for `docs/wiring/`.
 - `apps/nuke-capture-ios/README.md`, section "The room", for the iOS app (sub-folder `CLAUDE.md` files are
   gitignored, so the README is the tracked home).
-- `production-engineering.md`, which applies everywhere.
+- `production-engineering.md` and `liveness-and-intent.md`, which apply everywhere.
