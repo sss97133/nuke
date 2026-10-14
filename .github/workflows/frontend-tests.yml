@@ -376,6 +376,30 @@ jobs:
       - name: Verify the factory baseline key, the evidence fold and the residual
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi3_ci -f supabase/sql/test_k5_harness_rsi_pass3.sql
 
+  gm-circuit-dictionary-1978-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable GM circuit dictionary database
+        run: createdb dm_refinement_gm78_ci
+      - name: Verify the 1978 chart load, the second-source notes and the named residual
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gm78_ci -f supabase/sql/test_gm_circuit_dictionary_1978_chart.sql
+
   k5-harness-reshape-contract:
     runs-on: ubuntu-latest
     services:
