@@ -55,7 +55,7 @@ const applyPredicates = (values, q) => {
 
 function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], vin = [], deep = [], fuzzy = [], parents = [], missingIds = [], tags = [], owned = [],
   rankedError = () => false, enrichmentError = () => false, directError = false, ilikeError = false,
-  verifiedUser = null, authThrows = false, eligibilityError = () => false } = {}) {
+  verifiedUser = null, authThrows = false, eligibilityError = () => false, expand = {}, expandError = false } = {}) {
   const calls = [], allVehicles = new Map([...ranked, ...direct, ...ilike, ...year, ...vin, ...owned,
     ...deep.map(v => ({ ...v, id: v.vehicle_id })), ...fuzzy.map(v => ({ ...v, id: v.vehicle_id })), ...parents].map(v => [v.id, v]));
   for (const id of missingIds) allVehicles.delete(id);
@@ -97,6 +97,11 @@ function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], v
         : { data: ranked.slice(args.offset_count || 0, (args.offset_count || 0) + args.limit_count) };
       if (name === 'search_vehicles_deep') return { data: deep };
       if (name === 'search_vehicles_fuzzy') return { data: fuzzy };
+      if (name === 'expand_search_query') {
+        if (expandError) return { data: null, error: { message: 'expand failed' } };
+        const word = String(args.raw_query).trim().toLowerCase();
+        return { data: expand[word] ?? word };
+      }
       return { data: [] };
     },
   };
@@ -359,4 +364,42 @@ test('verified private-owned result survives but cannot receive a stale public d
   assert.equal(r.status, 200); assert.deepEqual(r.results.map(v => v.id), [owned.id]);
   assert.equal(r.results[0].relevance_score, 1.5);
   assert(!JSON.stringify(r).includes('unvalidated_private_snippet'));
+});
+
+test('a known typo is corrected before the ranked search, so it takes the indexed path', async () => {
+  const synonyms = { chevorlet: 'chevrolet', gt: 'gran turismo', chevy: 'chevrolet' };
+  const typo = edgeFixture({ expand: synonyms });
+  const r = await typo.search({ query: 'chevorlet' });
+  assert.equal(r.status, 200);
+  const fts = typo.calls.filter(c => c.rpc === 'search_vehicles_fts');
+  assert.equal(fts.length, 1);
+  assert.equal(fts[0].args.query_text, 'chevrolet');
+  assert.equal(typo.calls.filter(c => c.rpc === 'search_vehicles_deep' || c.rpc === 'search_vehicles_fuzzy').length, 0);
+
+  // A multi-word expansion is not adopted: "gt" stays one required term.
+  const multi = edgeFixture({ expand: synonyms });
+  await multi.search({ query: 'porsche gt' });
+  assert.equal(multi.calls.find(c => c.rpc === 'search_vehicles_fts').args.query_text, 'porsche & gt');
+
+  // A nickname becomes the make; words with no entry keep their spelling.
+  const nick = edgeFixture({ expand: synonyms });
+  await nick.search({ query: 'chevy k5' });
+  assert.equal(nick.calls.find(c => c.rpc === 'search_vehicles_fts').args.query_text, 'chevrolet & k5');
+
+  // A failed lookup keeps the query as typed.
+  const failed = edgeFixture({ expand: synonyms, expandError: true });
+  await failed.search({ query: 'chevorlet' });
+  assert.equal(failed.calls.find(c => c.rpc === 'search_vehicles_fts').args.query_text, 'chevorlet');
+});
+
+test('every page of a corrected query searches the same terms', async () => {
+  const f = edgeFixture({ expand: { porche: 'porsche' } });
+  let offset = 0, source; const terms = new Set();
+  do {
+    const r = await f.search({ query: 'porche', offset, vehicle_source: source });
+    assert.equal(r.status, 200);
+    source = r.meta.vehicle_source; offset = r.meta.next_offset;
+  } while (offset !== null);
+  for (const c of f.calls.filter(c => c.rpc === 'search_vehicles_fts')) terms.add(c.args.query_text);
+  assert.deepEqual([...terms], ['porsche']);
 });
