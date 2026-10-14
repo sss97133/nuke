@@ -22,6 +22,7 @@ import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { ExtractionLogger, validateVin, parsePrice, parseMileage } from '../_shared/extractionHealth.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // ============================================================================
 // TYPES
@@ -809,7 +810,7 @@ Deno.serve(async (req) => {
     if (save_to_db) {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        projectSecretKey()!
       );
 
       // Initialize health logger

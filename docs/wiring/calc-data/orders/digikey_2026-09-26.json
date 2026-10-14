@@ -1,6 +1,6 @@
 {
  "vendor": "digikey",
- "account_cart": "guest cart (owner's Chrome profile)",
+ "account_cart": null,
  "captured": "2026-09-26",
  "status": "NOT ordered \u2014 ordering paused 2026-09-26; reference only",
  "lines": [
@@ -78,7 +78,6 @@
  "fuse_lines_ext_sum": 38.57,
  "fuse_lines_note": "per-line prices for the 4 fuse lines were not captured; their sum is derived = 8-line read-back $253.28 \u2212 the four priced lines $214.71",
  "line_count": 10,
- "total": 313.37,
  "sources": [
   "receipts/2026-09-25_orders-staged-prowire-ksv-ict.md addenda 2026-09-26 PM + night"
  ]

@@ -19,10 +19,11 @@ import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 import { handleDirect as landDirect, type DirectInput } from "./direct.ts";
 import { handleBrowserCapture } from "./capture.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  projectSecretKey()!,
 );
 
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");

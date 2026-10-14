@@ -29,6 +29,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runWithChain } from "../_shared/claudeSubscriptionAuth.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
     // Run every DB action AS THE CALLER (their JWT → RLS + relink p_actor_user_id).
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      projectPublishableKey()!,
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: userData } = await supabase.auth.getUser();
@@ -165,7 +166,7 @@ Deno.serve(async (req) => {
     // client — userId above came from the verified JWT and is passed explicitly.
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
 
     const body = await req.json();
@@ -301,7 +302,7 @@ async function runTool(supabase: any, userId: string, name: string, input: any, 
     if (name === "request_derivation") {
       // The app receiving a message and acting on it: the owner's sentence becomes
       // work items. derive-dispatch drains them on a schedule, on their compute.
-      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!);
 
       if (input.evidence_type !== "secure_document") return { error: "no reader registered for that evidence yet" };
 
@@ -427,7 +428,7 @@ async function runTool(supabase: any, userId: string, name: string, input: any, 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          Authorization: `Bearer ${projectSecretKey()}`,
         },
         body: JSON.stringify({
           source_slug: "owner-input",

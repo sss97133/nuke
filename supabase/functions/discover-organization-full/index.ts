@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /**
  * DISCOVER ORGANIZATION FULL
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     console.log(`\n🔍 DISCOVER ORGANIZATION FULL`);
@@ -701,7 +702,7 @@ async function extractAllData(
   other_data: any;
 }> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const serviceKey = projectSecretKey() || '';
 
   // Find inventory URL
   const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');

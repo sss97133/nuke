@@ -18,6 +18,7 @@ import { fetchBatPage, type FetchOptions as BatFetchOptions, type FetchResult as
 import { fetchPage, type FetchOptions as DirectFetchOptions } from "./hybridFetcher.ts";
 import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 import { parseQualifiedBaTSale } from "./batParser.ts";
+import { projectSecretKey } from "./supabaseKeys.ts";
 
 export interface ArchiveFetchResult {
   html: string | null;
@@ -59,7 +60,7 @@ export interface ArchiveFetchOptions {
 
 function getSupabase() {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+  const key = projectSecretKey() ?? "";
   if (!url || !key) throw new Error("SUPABASE_URL or SERVICE_ROLE_KEY not set");
   return createClient(url, key, { auth: { persistSession: false } });
 }

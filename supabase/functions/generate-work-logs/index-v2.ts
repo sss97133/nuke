@@ -5,6 +5,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 interface WorkLogRequest {
   vehicleId: string;
@@ -57,7 +58,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { vehicleId, organizationId, imageIds, eventDate }: WorkLogRequest = await req.json();

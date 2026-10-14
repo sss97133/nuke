@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { VehiclePopup } from './VehiclePopup';
 import type { FeedVehicle } from '../../feed/types/feed';
@@ -125,7 +126,7 @@ export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model,
   const handleCompClick = (comp: Comparable) => {
     supabase
       .from('vehicles')
-      .select('*')
+      .select(VEHICLE_POPUP_COLUMNS)
       .eq('id', comp.id)
       .single()
       .then(({ data }) => {

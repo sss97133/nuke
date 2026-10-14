@@ -24,9 +24,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticateWriter, writeAuthResponse } from '../_shared/writeGuard.ts';
 import { sendEmail } from '../_shared/email.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SERVICE_ROLE_KEY = projectSecretKey()!;
 const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://nuke.ag';
 
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
