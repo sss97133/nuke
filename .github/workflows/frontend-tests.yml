@@ -255,6 +255,30 @@ jobs:
       - name: Verify the build manifest carries money and contacts only to owners
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_manifest_money_ci -f supabase/sql/test_build_manifest_money_owner_only.sql
 
+  k5-harness-rsi-pass1-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable RSI pass 1 database
+        run: createdb dm_refinement_k5_rsi1_ci
+      - name: Verify design state, options, protection, keys, evidence and self-measurement
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi1_ci -f supabase/sql/test_k5_harness_rsi_pass1.sql
+
   k5-harness-reshape-contract:
     runs-on: ubuntu-latest
     services:
