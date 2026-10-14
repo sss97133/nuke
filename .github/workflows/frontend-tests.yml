@@ -1935,6 +1935,30 @@ jobs:
       - name: Verify full native listing prose and qualified public reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_description -f supabase/sql/test_vehicle_listing_description_reader.sql
 
+  api-keys-writes-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable api keys database
+        run: createdb dm_refinement_api_keys_ci
+      - name: Verify signed-in callers can no longer mint or widen API keys, and own reads and deletes stay
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_api_keys_ci -f supabase/sql/test_api_keys_writes_service_only.sql
+
   timeline-view-invoker-contract:
     runs-on: ubuntu-latest
     services:
