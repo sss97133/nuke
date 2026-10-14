@@ -16,14 +16,18 @@
 --   l4_get_review_needed(uuid, integer)         frames held for review, with URLs, for any vehicle id, private
 --                                               ones included, past #1107's row policy
 --   get_county_vehicles(text)                   no caller anywhere; after #1109 it times out for anon
+--   get_clip_embed_batch(integer)               frame URLs and storage paths, gated frames included; its one caller,
+--                                               scripts/clip-embed-image-observations.py, uses the service role
 -- Two views run as their owner (no security_invoker) and were selectable by any signed-in account, anonymous
 -- sign-ins included. Neither has a caller; all privileges are revoked from PUBLIC, anon and authenticated:
 --   user_organized_photos   every gated frame, and sensitive frames with GPS and EXIF
 --   user_photo_inbox        unorganized camera-roll frames of every user (74,917 rows, 18,015 with GPS, 2026-10-14)
--- This revokes EXECUTE from PUBLIC, anon and authenticated on 33 functions and grants it to service_role explicitly.
+-- and the materialized view feed_items_view, readable logged out, holds 2,455 image rows of which 228 are gated; no
+-- reader (scripts/bat-url-parse-bulk-insert.mjs only refreshes it, as the owner).
+-- This revokes EXECUTE from PUBLIC, anon and authenticated on 34 functions and grants it to service_role explicitly.
 -- Their callers keep working: edge functions analysis-engine-coordinator, process-bat-extraction-queue,
 -- sync-live-auctions and photo-pipeline-orchestrator use the service role; cron job photo-pipeline-reset-stuck runs as
--- postgres, the owner. No web or phone code calls any of the 33 or the view (main, 2026-10-14; the web's find_vehicles_near_gps is
+-- postgres, the owner. No web or phone code calls any of the 34 or the three views (main, 2026-10-14; the web's find_vehicles_near_gps is
 -- a different function and is already closed to anon).
 -- Kept, reviewed: register_make_model_subject (the phone, the web and universal-search call it),
 -- validate_data_room_access_code (a public form), confirm_photo_intent (checks the caller),
@@ -69,7 +73,8 @@ DECLARE
     'public.get_fleet_documented_investment()',
     'public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text)',
     'public.l4_get_review_needed(uuid,integer)',
-    'public.get_county_vehicles(text)'
+    'public.get_county_vehicles(text)',
+    'public.get_clip_embed_batch(integer)'
   ];
   s text;
   done int := 0;
@@ -94,7 +99,7 @@ BEGIN
   RAISE NOTICE 'revoked anon and authenticated EXECUTE on % owner-run functions', done;
 
   -- The owner-run views: no signed-in or anonymous access.
-  FOREACH s IN ARRAY ARRAY['public.user_organized_photos', 'public.user_photo_inbox'] LOOP
+  FOREACH s IN ARRAY ARRAY['public.user_organized_photos', 'public.user_photo_inbox', 'public.feed_items_view'] LOOP
     IF to_regclass(s) IS NULL THEN
       RAISE NOTICE 'skipped, no longer exists: %', s;
       CONTINUE;
