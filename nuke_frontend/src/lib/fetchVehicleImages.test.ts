@@ -85,6 +85,45 @@ describe('gallery database admission', () => {
     expect(coverage.at(-1)).toEqual({ loaded: 501, total: 501 });
   });
 
+  it('asks for the REST cap per page and fetches the rest at its offsets', async () => {
+    const page = (from: number, n: number) => Array.from({ length: n }, (_, index) => photo(from + index));
+    transport.fetch.mockResolvedValueOnce(response(page(0, 1000), 2400));
+    transport.fetch.mockResolvedValueOnce(response(page(1000, 1000), 2400));
+    transport.fetch.mockResolvedValueOnce(response(page(2000, 400), 2400));
+
+    const rows = await fetchVehicleImages(vehicleId, 'id,image_url', { includeMismatchFilter: true });
+
+    expect(rows).toHaveLength(2400);
+    expect(requests()).toHaveLength(3);
+    expect(requests()[0].searchParams.get('limit')).toBe('1000');
+    expect(requests()[0].searchParams.get('offset')).toBe('0');
+    expect(requests().slice(1).map(url => url.searchParams.get('offset')).sort()).toEqual(['1000', '2000']);
+    for (const url of requests()) expectCanonicalAdmission(url);
+  });
+
+  it('pages by what the server returns when its row cap is below the page size', async () => {
+    const page = (from: number, n: number) => Array.from({ length: n }, (_, index) => photo(from + index));
+    transport.fetch.mockResolvedValueOnce(response(page(0, 500), 1445));
+    transport.fetch.mockResolvedValueOnce(response(page(500, 500), 1445));
+    transport.fetch.mockResolvedValueOnce(response(page(1000, 445), 1445));
+
+    const rows = await fetchVehicleImages(vehicleId, 'id,image_url');
+
+    expect(rows).toHaveLength(1445);
+    expect(requests().slice(1).map(url => url.searchParams.get('offset')).sort()).toEqual(['1000', '500']);
+    expect(requests().slice(1).every(url => url.searchParams.get('limit') === '500')).toBe(true);
+  });
+
+  it('asks a caller that wants only the first rows for no more than that', async () => {
+    transport.fetch.mockResolvedValueOnce(response(Array.from({ length: 500 }, (_, index) => photo(index)), 3716));
+
+    const rows = await fetchVehicleImages(vehicleId, 'id,image_url', { includeMismatchFilter: true, maxRows: 500 });
+
+    expect(rows).toHaveLength(500);
+    expect(requests()).toHaveLength(1);
+    expect(requests()[0].searchParams.get('limit')).toBe('500');
+  });
+
   it('does not retry without admission when the computed database field fails', async () => {
     transport.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ code: '42703', message: 'computed field unavailable' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
