@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
+import { findPublicVehicleByVin, type VinMatch } from '../../lib/vehicleByVin';
 import { useAuth } from '../../hooks/useAuth';
 import { ingestVehicle } from '../../services/aiDataIngestion';
 import { uploadQueue } from '../../services/globalUploadQueue';
@@ -138,7 +139,7 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<{current: number, total: number} | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [vinMatchedVehicle, setVinMatchedVehicle] = useState<{ id: string; year: number; make: string; model: string } | null>(null);
+  const [vinMatchedVehicle, setVinMatchedVehicle] = useState<VinMatch | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync user state when global auth resolves (handles returning users + sign-in)
@@ -935,12 +936,9 @@ Redirecting to vehicle profile...`);
       return;
     }
     const timeoutId = setTimeout(async () => {
-      const { data } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model')
-        .ilike('vin', vin)
-        .maybeSingle();
-      setVinMatchedVehicle(data ?? null);
+      // Public vehicles only, found through an index; `vin ilike` is a sequential scan under the row policies. The
+      // unique VIN index still refuses a duplicate of the person's own private vehicle at insert.
+      setVinMatchedVehicle(await findPublicVehicleByVin(vin));
     }, 500);
     return () => clearTimeout(timeoutId);
   }, [formData.vin]);
@@ -967,7 +965,7 @@ Redirecting to vehicle profile...`);
 
     // Final VIN dedup guard before creating
     if (vinMatchedVehicle) {
-      if (window.confirm(`This VIN already exists in the database as ${vinMatchedVehicle.year} ${vinMatchedVehicle.make} ${vinMatchedVehicle.model}.\n\nGo to existing vehicle instead?`)) {
+      if (window.confirm(`This VIN already exists in the database as ${[vinMatchedVehicle.year, vinMatchedVehicle.make, vinMatchedVehicle.model].filter(Boolean).join(' ')}.\n\nGo to existing vehicle instead?`)) {
         navigate(`/vehicle/${vinMatchedVehicle.id}`);
       }
       return;

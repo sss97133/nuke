@@ -57,11 +57,13 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
         case 'year':
           query = query.eq('year', contextValue);
           break;
+        // contextValue is the stored spelling the person clicked, so equality finds its peers through the make and
+        // model indexes; `ilike` cannot be an index qual under the row policies and scans the whole heap.
         case 'make':
-          query = query.ilike('make', `${contextValue}`);
+          query = query.eq('make', `${contextValue}`);
           break;
         case 'model':
-          query = query.ilike('model', `${contextValue}`);
+          query = query.eq('model', `${contextValue}`);
           break;
       }
 

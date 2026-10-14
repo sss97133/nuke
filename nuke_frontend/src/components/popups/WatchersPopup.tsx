@@ -41,11 +41,14 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
         return;
       }
       try {
+        // make and model are this vehicle's own stored spellings, so equality finds its peers through
+        // idx_vehicles_make_model; `ilike` is not leakproof, cannot be an index qual under the row policies, and
+        // timed out at 10 s as anon (Ford Mustang, 2026-10-14) where equality answers in 70 ms warm.
         const { data } = await supabase
           .from('vehicles')
           .select('bat_watchers')
-          .ilike('make', make)
-          .ilike('model', model)
+          .eq('make', make)
+          .eq('model', model)
           .not('bat_watchers', 'is', null)
           .gt('bat_watchers', 0)
           .limit(500);
