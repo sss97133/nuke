@@ -12,9 +12,20 @@
 --   {"action":"process","auction":"LF26","save_to_db":false}  ->  total_lots 65, api_reported_total 65, duplicates_dropped 0,
 --   vehicle_lots 61, skipped 4. A response without those keys is the old function: do not merge this.
 --
+-- VAULT. The command authenticates with get_service_role_key_for_cron(), which reads the key from public._app_secrets. The leaked
+-- service-role key is being turned off and the vault given the new one. Until the vault holds a key the functions accept,
+-- every run of this job is refused with 401 by requireWriteAuth and lands nothing. Check before merging, read-only (Logs
+-- Explorer, last 2 hours): job 419 poll-listing-feeds runs every 15 minutes through the same function and must show only 200s.
+--   select log_attributes['response.status_code'] as status, count(*) from logs where source = 'function_edge_logs'
+--     and log_attributes['request.pathname'] = '/functions/v1/poll-listing-feeds' group by 1;     -- 200 only, no 401
+--
 -- BOUND. 4 runs a day, 00:45 / 06:45 / 12:45 / 18:45 UTC = MO26 / MC26 / LF26 / MO26 (the hour picks the code). A run reads
 -- one auction (one lot-API call to rmsothebys.com, one page of at most 200) and writes at most `limit` 200 vehicle lots; the
 -- largest, MO26, has 192. No Firecrawl, no AI, no other host. The existing schedule '45 */6 * * *' is kept.
+-- DURATION. extract-rmsothebys writes 4 lots at once since #1124 (request field concurrency). Replayed through the real handler
+-- against prod's mean statement times (vehicle insert 150 ms, vehicle_images insert 450 ms, resolver ILIKE miss 120 ms): the
+-- first MO26 pass takes 33 s (127 s one lot at a time, too close to an edge function limit of 150 s), the first MC26 and LF26
+-- passes 13 s each, and the re-run of MO26 6 s. Without #1124 the first MO26 run is the one that would be cut off.
 --
 -- BEFORE (2026-10-14, scripts/data/q.sh): vehicles under each code's listing_url prefix
 --   select substring(listing_url from 'auctions/([a-z0-9]+)/') as code, count(*) from vehicles
