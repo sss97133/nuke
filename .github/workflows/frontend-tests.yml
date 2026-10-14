@@ -327,6 +327,30 @@ jobs:
       - name: Verify get_user_garage answers strangers with the public projection only
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_get_user_garage_ci -f supabase/sql/test_get_user_garage_viewer.sql
 
+  private-money-readers-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable private-money readers database
+        run: createdb dm_refinement_private_money_ci
+      - name: Verify the owner's money reaches its owners only through the readers
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_private_money_ci -f supabase/sql/test_private_money_readers.sql
+
   metric-fold-health-contract:
     runs-on: ubuntu-latest
     services:
