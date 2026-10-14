@@ -54,13 +54,15 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   let reconnectAt = 0;
   let admissionTask: Promise<void> | null = null;
   let heartbeatTask: Promise<void> | null = null;
+  // A lot the intake keeps rejecting waits 1, 2, 4 ... 30 seconds between attempts. Retrying it every second sent the
+  // same failing batch about 115 times per worker (36,411 rejected calls on 2026-10-13 from four lots).
   const buffer = new BatLiveBuffer(async frames => {
     await io.admit(frames, []);
     for (const f of frames) {
       const target = targets.find(t => t.id === f.monitored_auction_id)!;
       if (f.event === "comment-added") target.last_comment_id = Math.max(target.last_comment_id, Number(f.data.comment?.id || 0));
     }
-  });
+  }, undefined, { baseMs: 1000, maxMs: 30000 });
   const enqueue = (target: BatLiveTarget, event: string, data: Record<string, any>, received: string, transport: BatLiveFrame["transport"]) => {
     buffer.push({ monitored_auction_id: target.id, event, data, received_at: received, transport });
   };
@@ -171,7 +173,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     await Promise.allSettled([...tasks]);
     if (heartbeatTask) await heartbeatTask;
     if (admissionTask) await admissionTask;
-    try { await buffer.flush(); }
+    try { await buffer.flush({ force: true }); }
     finally {
       // Leave the other overlapping worker's session intact, even when this
       // worker ends with a rejected lot still waiting for admission.
