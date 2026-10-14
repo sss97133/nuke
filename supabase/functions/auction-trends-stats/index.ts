@@ -12,6 +12,7 @@
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      projectSecretKey() ?? ""
     );
 
     const { data, error } = await supabase.rpc("get_auction_trends_v2", {

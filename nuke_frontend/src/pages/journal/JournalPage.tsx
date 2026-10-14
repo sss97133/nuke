@@ -27,8 +27,6 @@ interface WorkOrderRef {
 }
 interface Receipt {
   id: string;
-  vendor: string | null;
-  total: number | null;
   date: string | null;
   vehicle_id: string | null;
   scope_type: string | null;
@@ -41,7 +39,6 @@ interface Summary {
   parts_lines: number;
   payment_count: number | null;
   receipt_count?: number;
-  receipt_total?: number;
 }
 interface WorkLog {
   date: string;
@@ -70,10 +67,6 @@ function isUnscoped(r: Receipt): boolean {
   return !r.scope_id;
 }
 
-function formatCurrency(n: number | null | undefined): string {
-  const v = Number(n) || 0;
-  return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 interface Response {
   projection_event_id?: string;
   recorded_at?: string;
@@ -212,7 +205,7 @@ export default function JournalPage() {
           {data.work_log.receipts && data.work_log.receipts.length > 0 && (
             <div style={styles.section}>
               <div style={styles.sectionLabel}>
-                EXPENSES · {data.work_log.summary.receipt_count ?? data.work_log.receipts.length} · ${formatCurrency(data.work_log.summary.receipt_total ?? data.work_log.receipts.reduce((s, r) => s + Number(r.total ?? 0), 0))}
+                EXPENSES · {data.work_log.summary.receipt_count ?? data.work_log.receipts.length}
               </div>
               {data.work_log.receipts.map((r) => {
                 const unscoped = isUnscoped(r);
@@ -227,9 +220,8 @@ export default function JournalPage() {
                 };
                 return (
                   <div key={r.id} style={styles.woRow}>
-                    <span style={{ flex: 1 }}>{(r.vendor ?? "(NO VENDOR)").toUpperCase()}</span>
+                    <span style={{ flex: 1 }}>RECEIPT · {r.date ?? "undated"}</span>
                     <span style={badgeStyle}>{scopeLabel(r)}</span>
-                    <span style={{ width: 100, textAlign: "right" }}>${formatCurrency(r.total)}</span>
                   </div>
                 );
               })}

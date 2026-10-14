@@ -47,6 +47,7 @@ import {
   type IngestOutcome,
   type LedgerKnown,
 } from "./ledger.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -422,7 +423,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
   const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, MAX_ARTICLE_HOPS_PER_POLL);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceKey = projectSecretKey()!;
 
   for (const articleUrl of fresh) {
     const grant = budget.reserve(feed.source_slug);
@@ -758,7 +759,7 @@ async function pollFirecrawlHtmlFeed(
   const toIngest = plan.toIngest;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceKey = projectSecretKey()!;
 
   // Ledger the settled outcome so future polls skip this share URL (vehicles
   // stores the canonical form, which never matches the share form — see the
@@ -940,7 +941,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      projectSecretKey()!
     );
 
     // Parse options

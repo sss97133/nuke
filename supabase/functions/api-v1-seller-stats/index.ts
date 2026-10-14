@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const headers = {
   ...corsHeaders,
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fire-and-forget auth for rate-limiting; don't block the data query.

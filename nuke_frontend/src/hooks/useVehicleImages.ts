@@ -4,6 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
+
 
 export interface VehicleImage {
   id: string;
@@ -153,8 +155,9 @@ export const useVehiclesWithImages = () => {
       // Include both `user_id` and `uploaded_by` as legacy/new ownership fields.
       const { data: allVehiclesData, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_CARD_COLUMNS)
         .or(`user_id.eq.${userId},uploaded_by.eq.${userId}`)
+
         .order('created_at', { ascending: false })
         .limit(250);
 

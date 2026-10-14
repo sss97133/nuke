@@ -314,7 +314,10 @@ function TechPacketTables({ vehicleId }: { vehicleId: string }) {
             <div style={{ ...MONO_SMALL, padding: '8px 12px', border: '2px solid #2a3142', marginBottom: 8 }}>
               <div style={SUBLABEL}>MANIFEST SUMMARY</div>
               <div style={{ marginTop: 4 }}>
-                {tp.manifest.devices_total} devices · {tp.manifest.devices_purchased} purchased · ${tp.manifest.spent_usd.toLocaleString()} spent · ${tp.manifest.pending_usd.toLocaleString()} pending · ${tp.manifest.total_spec_usd.toLocaleString()} total spec
+                {tp.manifest.devices_total} devices · {tp.manifest.devices_purchased} purchased
+                {tp.manifest.spent_usd != null && tp.manifest.pending_usd != null && tp.manifest.total_spec_usd != null && (
+                  <> · ${tp.manifest.spent_usd.toLocaleString()} spent · ${tp.manifest.pending_usd.toLocaleString()} pending · ${tp.manifest.total_spec_usd.toLocaleString()} total spec</>
+                )}
               </div>
             </div>
           )}

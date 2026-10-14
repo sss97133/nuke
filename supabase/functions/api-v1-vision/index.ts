@@ -39,6 +39,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
 import { cloudAnalyze } from "../_shared/visionFallback.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,8 +53,7 @@ const SIDECAR_URL =
 const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-  Deno.env.get("SERVICE_ROLE_KEY") ??
+  projectSecretKey() ??
   "";
 
 // Sidecar timeout: Modal cold start can take 10-15s, plus image download + inference
