@@ -47,222 +47,28 @@ const CORS = {
   "Access-Control-Expose-Headers": "mcp-session-id",
 };
 
-// ── JWT Helpers (Stateless OAuth) ────────────────────────────────────────────
+// ── OAuth discovery ─────────────────────────────────────────────────────────
+// This function issues no tokens. Its authorization server is https://nuke.ag (the oauth-server function:
+// /.well-known/* and /oauth/* on nuke.ag route there), which is where the 401s below send a client. Until
+// 2026-10-14 this function also served its own /authorize, /token and /register: /authorize approved every
+// request without a login, /token skipped PKCE when no verifier was sent, and the result was a 90-day token with
+// write:canonical, signed with the service key. Those routes are gone, and the tokens they issued are refused.
 
-const BASE_URL = `${SUPABASE_URL}/functions/v1/mcp-connector`;
-
-let _jwtKey: CryptoKey | null = null;
-async function getJwtKey(): Promise<CryptoKey> {
-  if (!_jwtKey) {
-    _jwtKey = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(SERVICE_ROLE_KEY),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign", "verify"],
-    );
-  }
-  return _jwtKey;
-}
-
-function b64UrlEncode(data: Uint8Array): string {
-  return btoa(String.fromCharCode(...data))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function b64UrlDecode(str: string): Uint8Array {
-  str = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (str.length % 4) str += "=";
-  return new Uint8Array([...atob(str)].map((c) => c.charCodeAt(0)));
-}
-
-async function signJwt(payload: Record<string, unknown>, expiresInSec: number): Promise<string> {
-  const key = await getJwtKey();
-  const enc = new TextEncoder();
-  const now = Math.floor(Date.now() / 1000);
-  const hdr = b64UrlEncode(enc.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
-  const pay = b64UrlEncode(enc.encode(JSON.stringify({ ...payload, iat: now, exp: now + expiresInSec })));
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${hdr}.${pay}`));
-  return `${hdr}.${pay}.${b64UrlEncode(new Uint8Array(sig))}`;
-}
-
-async function verifyJwt(token: string): Promise<Record<string, unknown> | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const key = await getJwtKey();
-    const enc = new TextEncoder();
-    const valid = await crypto.subtle.verify("HMAC", key, b64UrlDecode(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
-    if (!valid) return null;
-    const payload = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[1])));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-// ── OAuth Endpoints ─────────────────────────────────────────────────────────
+const AUTHORIZATION_SERVER = "https://nuke.ag";
 
 function oauthResourceMetadata(): Response {
   return new Response(JSON.stringify({
-    resource: BASE_URL,
-    authorization_servers: [BASE_URL],
+    resource: `${AUTHORIZATION_SERVER}/mcp`,
+    authorization_servers: [AUTHORIZATION_SERVER],
     bearer_methods_supported: ["header"],
   }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
-function oauthServerMetadata(): Response {
+function oauthNotHere(): Response {
   return new Response(JSON.stringify({
-    issuer: BASE_URL,
-    authorization_endpoint: `${BASE_URL}/authorize`,
-    token_endpoint: `${BASE_URL}/token`,
-    registration_endpoint: `${BASE_URL}/register`,
-    response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code"],
-    token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"],
-    code_challenge_methods_supported: ["S256"],
-  }), { headers: { ...CORS, "Content-Type": "application/json" } });
-}
-
-// Allowed scope universe for OAuth-issued tokens. read is implicit (read tools are public),
-// but we carry it for transparency. write:observations = autonomous governed claims.
-// write:canonical = direct canonical mutation, owner-login only.
-const ALLOWED_SCOPES = ["read", "write:observations", "write:canonical"];
-
-/**
- * Compute the scope string to grant. Requested scopes are intersected with the allowed universe;
- * a non-owner (external/walk-in) leg is clamped to strip write:canonical so it can never escalate.
- * With nothing requested, owner login defaults to full power, external defaults to read + observations.
- */
-function grantedScope(requested: string | null | undefined, ownerLogin: boolean): string {
-  const universe = ownerLogin ? ALLOWED_SCOPES : ALLOWED_SCOPES.filter((s) => s !== "write:canonical");
-  let grants: string[];
-  if (requested && requested.trim()) {
-    const want = requested.trim().split(/\s+/);
-    grants = universe.filter((s) => want.includes(s));
-    if (grants.length === 0) grants = ["read"]; // requested only unknown scopes → minimal
-  } else {
-    grants = ownerLogin ? universe.slice() : ["read", "write:observations"];
-  }
-  if (!grants.includes("read")) grants.unshift("read");
-  return grants.join(" ");
-}
-
-async function oauthAuthorize(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const redirectUri = url.searchParams.get("redirect_uri");
-  const state = url.searchParams.get("state");
-  const codeChallenge = url.searchParams.get("code_challenge");
-  const clientId = url.searchParams.get("client_id");
-  const requestedScope = url.searchParams.get("scope");
-
-  if (!redirectUri) {
-    return new Response("Missing redirect_uri", { status: 400, headers: CORS });
-  }
-
-  // This /authorize is the owner-login (single-owner, auto-approved) leg. Completing it IS the
-  // human gate, so the owner may be granted write:canonical. An external agent that wants an
-  // autonomous token requests a narrower scope (e.g. "read write:observations") and is clamped to
-  // it by grantedScope() below — it can never escalate to canonical.
-  const code = await signJwt({
-    type: "auth_code",
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    code_challenge: codeChallenge,
-    scope: grantedScope(requestedScope, /* ownerLogin */ true),
-  }, 300);
-
-  // Auto-approve (single-owner system) — redirect back with code
-  const redirect = new URL(redirectUri);
-  redirect.searchParams.set("code", code);
-  if (state) redirect.searchParams.set("state", state);
-
-  return new Response(null, {
-    status: 302,
-    headers: { ...CORS, Location: redirect.toString() },
-  });
-}
-
-async function oauthToken(req: Request): Promise<Response> {
-  let params: URLSearchParams;
-  const ct = req.headers.get("content-type") || "";
-  if (ct.includes("application/x-www-form-urlencoded")) {
-    params = new URLSearchParams(await req.text());
-  } else if (ct.includes("application/json")) {
-    const json = await req.json();
-    params = new URLSearchParams(Object.entries(json).map(([k, v]) => [k, String(v)]));
-  } else {
-    params = new URLSearchParams(await req.text());
-  }
-
-  const grantType = params.get("grant_type");
-  const code = params.get("code");
-  const codeVerifier = params.get("code_verifier");
-
-  if (grantType === "authorization_code" && code) {
-    const payload = await verifyJwt(code);
-    if (!payload || payload.type !== "auth_code") {
-      return new Response(JSON.stringify({ error: "invalid_grant" }), {
-        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
-
-    // PKCE verification
-    if (payload.code_challenge && codeVerifier) {
-      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(codeVerifier)));
-      const computed = b64UrlEncode(new Uint8Array(hash));
-      if (computed !== payload.code_challenge) {
-        return new Response(JSON.stringify({ error: "invalid_grant", error_description: "PKCE failed" }), {
-          status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Issue access token (90-day JWT). Carry the scope minted at /authorize so the write-tier
-    // gate can enforce it. Fall back to read+observations for legacy auth codes lacking a scope.
-    const tokenScope = typeof payload.scope === "string" && payload.scope.trim()
-      ? payload.scope
-      : "read write:observations";
-    const accessToken = await signJwt({
-      type: "access_token",
-      sub: payload.client_id || "claude-ai",
-      scope: tokenScope,
-    }, 90 * 24 * 3600);
-
-    return new Response(JSON.stringify({
-      access_token: accessToken,
-      token_type: "Bearer",
-      expires_in: 90 * 24 * 3600,
-      scope: tokenScope,
-    }), { headers: { ...CORS, "Content-Type": "application/json" } });
-  }
-
-  return new Response(JSON.stringify({ error: "unsupported_grant_type" }), {
-    status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-  });
-}
-
-async function oauthRegister(req: Request): Promise<Response> {
-  // Dynamic Client Registration (RFC 7591) — auto-register any client
-  const body = await req.json().catch(() => ({}));
-  const clientId = `nuke-${crypto.randomUUID().slice(0, 8)}`;
-  // Client secret = signed JWT so we can verify it statelessly later
-  const clientSecret = await signJwt({ type: "client_secret", client_id: clientId }, 365 * 24 * 3600);
-
-  return new Response(JSON.stringify({
-    client_id: clientId,
-    client_secret: clientSecret,
-    client_id_issued_at: Math.floor(Date.now() / 1000),
-    client_secret_expires_at: 0,
-    redirect_uris: body.redirect_uris || [],
-    token_endpoint_auth_method: "client_secret_post",
-    grant_types: ["authorization_code"],
-    response_types: ["code"],
-    client_name: body.client_name || "Nuke MCP Client",
-  }), { status: 201, headers: { ...CORS, "Content-Type": "application/json" } });
+    error: "not_found",
+    error_description: `This server issues no tokens; its authorization server is ${AUTHORIZATION_SERVER}.`,
+  }), { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -297,18 +103,8 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-
-    // 1b. OAuth JWT access token — carry its minted scope through to the write-tier gate.
-    const jwt = await verifyJwt(token);
-    if (jwt && jwt.type === "access_token") {
-      const scope = typeof jwt.scope === "string" ? jwt.scope : "";
-      // Legacy "mcp:tools" tokens predate the tier grammar; treat as read + observations
-      // (NOT canonical — tightening is intentional; canonical now needs an explicit grant).
-      const scopes = scope && scope !== "mcp:tools"
-        ? scope.split(/\s+/).filter(Boolean)
-        : ["read", "write:observations"];
-      return { ok: true, userId: String(jwt.sub || "oauth-user"), scopes };
-    }
+    // No other bearer token is accepted, including the ones this function used to mint without a login.
+    if (!apiKey) return { ok: false, error: "Invalid or expired token", status: 401 };
   }
 
   // 2. API key (nk_live_...)
@@ -6361,11 +6157,8 @@ Deno.serve(async (req: Request) => {
     if (path.endsWith("/.well-known/oauth-protected-resource")) {
       return oauthResourceMetadata();
     }
-    if (path.endsWith("/.well-known/oauth-authorization-server")) {
-      return oauthServerMetadata();
-    }
-    if (path.endsWith("/authorize")) {
-      return await oauthAuthorize(req);
+    if (path.endsWith("/.well-known/oauth-authorization-server") || path.endsWith("/authorize")) {
+      return oauthNotHere();
     }
     // GET on root = SSE stream (required by MCP Streamable HTTP spec)
     // Return an open SSE connection that sends a keepalive then closes
@@ -6377,11 +6170,8 @@ Deno.serve(async (req: Request) => {
 
   // OAuth token + registration endpoints (POST)
   if (req.method === "POST") {
-    if (path.endsWith("/token")) {
-      return await oauthToken(req);
-    }
-    if (path.endsWith("/register")) {
-      return await oauthRegister(req);
+    if (path.endsWith("/token") || path.endsWith("/register")) {
+      return oauthNotHere();
     }
   }
 
@@ -6414,12 +6204,11 @@ Deno.serve(async (req: Request) => {
 
   // Auth — required for write tools, optional for read tools.
   // When a write tool is called without valid auth, return 401 + WWW-Authenticate
-  // pointing at the OAuth resource metadata. Claude.ai sees this and triggers the
-  // OAuth flow at https://nuke.ag/oauth/authorize. After the user logs in via
-  // magic link, Claude.ai gets a Bearer token that it includes on every retry.
+  // pointing at the OAuth resource metadata, which names https://nuke.ag (magic-link login)
+  // as the authorization server. Accepted here: the service key, and API keys on X-API-Key.
   // Write tools are tiered. Governed append-only claims need write:observations (autonomous for
-  // external agents). Canonical-record mutations (identity) need write:canonical, which is only
-  // grantable via owner login — an autonomous walk-in token can never reach them.
+  // external agents). Canonical-record mutations (identity) need write:canonical, which only the
+  // service key and an API key granted it carry.
   const WRITE_TIERS: Record<string, WriteTier> = {
     submit_observation: "observations",
     submit_attribute_value: "observations",
