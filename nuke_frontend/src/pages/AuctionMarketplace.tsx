@@ -297,7 +297,9 @@ export default function AuctionMarketplace() {
           .in('source_platform', [...AUCTION_PLATFORMS])
           .in('event_status', ['sold', 'ended', 'no_sale', 'reserve_not_met'])
           .gte('ended_at', thirtyDaysAgo)
-          .order('ended_at', { ascending: false })
+          // NULLS LAST matches idx_vehicle_events_ended (ended_at DESC NULLS LAST), so the read stops at 50 rows;
+          // plain DESC sorts nulls first, matched no index and read every event of the month (9 s cold, 5 ms after)
+          .order('ended_at', { ascending: false, nullsFirst: false })
           .limit(50);
 
         if (recentEvents) {
