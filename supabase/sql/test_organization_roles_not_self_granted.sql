@@ -103,10 +103,15 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_ownership ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_contributors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_ownership_verifications ENABLE ROW LEVEL SECURITY;
-GRANT ALL ON public.organizations, public.business_ownership, public.organization_contributors,
-  public.organization_ownership_verifications TO anon, authenticated, service_role;
+-- The live ACLs, privilege for privilege (pg_class.relacl and pg_proc.proacl read 2026-10-14; section 0 checks them):
+-- each table grants anon, authenticated and service_role arwdDxt (no MAINTAIN, which GRANT ALL would add on PG17) and
+-- nothing to PUBLIC; caller_manages_organization has no PUBLIC EXECUTE; create_initial_business_ownership keeps it.
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.organizations, public.business_ownership,
+  public.organization_contributors, public.organization_ownership_verifications TO anon, authenticated, service_role;
 \ir helpers/org_role_policies_live_20261014.sql
+REVOKE EXECUTE ON FUNCTION public.caller_manages_organization(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.caller_manages_organization(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.create_initial_business_ownership() TO anon, authenticated, service_role;
 RESET ROLE;
 
 CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE plpgsql AS $$
@@ -132,7 +137,23 @@ CREATE FUNCTION public.t_policy_hash(p_table regclass) RETURNS text LANGUAGE sql
            E'\n' ORDER BY p.polname), 'UTF8')), 'base64')
   FROM pg_policy p WHERE p.polrelid = p_table $$;
 
--- 0. The fixture is the live state: its policy sets hash to the values read from production.
+-- A table's or function's ACL as grantee:privileges, owner left out and grantor ignored, so the fixture (owned by
+-- org_table_owner) and production (owned by postgres) compare. PUBLIC is grantee 0.
+CREATE FUNCTION public.t_acl(p_relacl aclitem[], p_owner oid) RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT string_agg(g || ':' || privs, ';' ORDER BY g) FROM (
+    SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS g,
+           string_agg(a.privilege_type, ',' ORDER BY a.privilege_type) AS privs
+    FROM aclexplode(p_relacl) a WHERE a.grantee <> p_owner GROUP BY 1) x $$;
+
+-- 0. The fixture is the live state: its ACLs and policy sets match the values read from production on 2026-10-14.
+SELECT public.t_assert(public.t_acl(c.relacl, c.relowner) = 'anon:DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE;authenticated:DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE;service_role:DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE',
+  format('fixture: %s ACL as live', c.relname))
+FROM pg_class c WHERE c.oid IN ('public.organizations'::regclass, 'public.business_ownership'::regclass,
+  'public.organization_contributors'::regclass, 'public.organization_ownership_verifications'::regclass);
+SELECT public.t_assert(public.t_acl(p.proacl, p.proowner) = 'anon:EXECUTE;authenticated:EXECUTE;service_role:EXECUTE', 'fixture: caller_manages_organization ACL as live')
+FROM pg_proc p WHERE p.oid = 'public.caller_manages_organization(uuid)'::regprocedure;
+SELECT public.t_assert(public.t_acl(p.proacl, p.proowner) = 'PUBLIC:EXECUTE;anon:EXECUTE;authenticated:EXECUTE;service_role:EXECUTE', 'fixture: create_initial_business_ownership ACL as live')
+FROM pg_proc p WHERE p.oid = 'public.create_initial_business_ownership()'::regprocedure;
 SELECT public.t_assert(public.t_policy_hash('public.business_ownership') = '9fhZL8e9nL6s6VBtEHM+P25zAvyRbFQeOAO4YsmO1m4=', 'fixture: business_ownership policies as live');
 SELECT public.t_assert(public.t_policy_hash('public.organization_contributors') = 'R4c0+Y0LvKtNABRvnhYLUgxKuxfHPyVTIj2uZJuUAm0=', 'fixture: organization_contributors policies as live');
 SELECT public.t_assert(public.t_policy_hash('public.organization_ownership_verifications') = '+2+rWomj4YzHGuV0jNZNPef850xilx80m8RISvGnbBo=', 'fixture: organization_ownership_verifications policies as live');
