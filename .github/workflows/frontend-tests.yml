@@ -623,6 +623,30 @@ jobs:
       - name: Verify discovery failure and evidence contracts
         run: python3 scripts/discovery/inclusion_pass_test.py
 
+  writer-functions-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable writer functions database
+        run: createdb dm_refinement_writer_functions_ci
+      - name: Verify owner-run writers are closed to anon and authenticated, open to the service role
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_writer_functions_ci -f supabase/sql/test_revoke_anon_writer_functions.sql
+
   poller-ledger-contract:
     runs-on: ubuntu-latest
     steps:
