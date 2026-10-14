@@ -113,16 +113,33 @@ export default function JournalPage() {
     setData(null);
     setLoading(true);
     setError(null);
+    const name = (result: Response | null) => {
+      const log = result?.work_log;
+      const ids = [...new Set([...(log?.photos ?? []), ...(log?.work_orders ?? []), ...(log?.receipts ?? [])]
+        .map((x) => x.vehicle_id).filter((x): x is string => !!x))];
+      readVehicleNames(ids).then((n) => { if (!cancelled) setNames((prev) => ({ ...prev, ...n })); }, () => undefined);
+    };
+    // The day's public record from /api/journal/:date (well under a second) renders first; the projection
+    // from the MCP tool (seconds) replaces it when it arrives, adding the atoms and the confidence.
+    let shown = false;
+    let projected = false;
+    fetch(`/api/journal/${encodeURIComponent(date)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((fast: Response | null) => {
+        if (cancelled || projected || !fast?.work_log) return;
+        shown = true;
+        setData(fast);
+        setLoading(false);
+        name(fast);
+      }, () => undefined);
     callTool<Response>("project_work_log", { date })
       .then((result) => {
         if (cancelled) return;
+        projected = true;
         setData(result);
-        const log = result?.work_log;
-        const ids = [...new Set([...(log?.photos ?? []), ...(log?.work_orders ?? []), ...(log?.receipts ?? [])]
-          .map((x) => x.vehicle_id).filter((x): x is string => !!x))];
-        readVehicleNames(ids).then((n) => { if (!cancelled) setNames(n); }, () => undefined);
+        name(result);
       })
-      .catch((e) => { if (!cancelled) setError(String(e?.message || e)); })
+      .catch((e) => { if (!cancelled && !shown) setError(String(e?.message || e)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [date]);
