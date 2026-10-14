@@ -20,13 +20,14 @@ END $$;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role, health_owner;
 GRANT CREATE ON SCHEMA public TO health_owner;
 
--- The function as production grants it (SECURITY DEFINER, EXECUTE to anon, authenticated, service_role), owned by a
--- non-superuser, plus the owner-run view v_job_health that reads it (not security_invoker, so it runs as its owner).
+-- The function as production grants it, owned by a non-superuser: SECURITY DEFINER, and EXECUTE held by PUBLIC (the
+-- default a new function gets), anon, authenticated and service_role; live proacl on 2026-10-14 was
+-- {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}. Plus the
+-- owner-run view v_job_health that reads it. A function's EXECUTE is checked against whoever queries the view.
 SET ROLE health_owner;
 CREATE FUNCTION public.get_live_auction_health() RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path TO 'pg_catalog', 'public'
   AS $fn$ SELECT jsonb_build_object('status', 'passed', 'total_monitored', 0) $fn$;
-REVOKE EXECUTE ON FUNCTION public.get_live_auction_health() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_live_auction_health() TO anon, authenticated, service_role;
 CREATE VIEW public.v_job_health AS SELECT (public.get_live_auction_health() -> 'status') AS auction_status;
 REVOKE ALL ON public.v_job_health FROM PUBLIC;
@@ -43,6 +44,7 @@ END $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text), public.t_refused(text) TO anon, authenticated, service_role;
 
 -- 1. Before: anon and authenticated can execute it.
+SELECT public.t_assert(has_function_privilege('public', 'public.get_live_auction_health()', 'EXECUTE'), 'before: PUBLIC executes, as in production');
 SELECT public.t_assert(has_function_privilege('anon', 'public.get_live_auction_health()', 'EXECUTE'), 'before: anon executes');
 SELECT public.t_assert(has_function_privilege('authenticated', 'public.get_live_auction_health()', 'EXECUTE'), 'before: authenticated executes');
 SET ROLE anon;
@@ -56,6 +58,7 @@ SET ROLE health_owner;
 RESET ROLE;
 
 -- 3. After: anon and authenticated are refused; the service role still executes.
+SELECT public.t_assert(NOT has_function_privilege('public', 'public.get_live_auction_health()', 'EXECUTE'), 'after: PUBLIC cannot execute');
 SELECT public.t_assert(NOT has_function_privilege('anon', 'public.get_live_auction_health()', 'EXECUTE'), 'after: anon cannot execute');
 SELECT public.t_assert(NOT has_function_privilege('authenticated', 'public.get_live_auction_health()', 'EXECUTE'), 'after: authenticated cannot execute');
 SELECT public.t_assert(has_function_privilege('service_role', 'public.get_live_auction_health()', 'EXECUTE'), 'after: service role still executes');
