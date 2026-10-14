@@ -2,9 +2,9 @@
 --
 -- App accounts cannot be ranked yet (one account holds public vehicles); the people who exist in volume are the
 -- market's participants, 692,838 Bring a Trailer identities in external_identities. An identity reads as:
---   Selling  public, undeleted vehicles whose listing names the handle as seller (vehicle grain, latest outcome),
---            sell-through on recorded outcomes; no peer rank until a per-seller fold exists (ranking every
---            seller at read time measured over 10 s on 2026-10-14).
+--   Selling  auction listings recorded with the identity as seller (vehicle_events; one per listing page, a relist
+--            its own listing), sold if any event recorded a sale; sell-through on recorded outcomes; no peer rank
+--            until a per-seller fold exists (ranking every seller at read time measured over 10 s on 2026-10-14).
 --   Bidding  the bidder profile snapshot (mv_bidder_profiles, a table, newest activity 2026-02-09), each measure
 --            ranked among bidders with five or more auctions entered and dated by the snapshot's clock.
 --   Talking  attributed auction comments, and seller responses per listed vehicle (responsiveness).
@@ -34,7 +34,7 @@ DECLARE
   b record;
   bk record;
   snap timestamptz;
-  i_listed int; i_sold int; i_rnm int; i_comments int; i_lots int; i_responses int; i_entered int := 0;
+  i_listed int; i_sold int; i_rnm int; i_vehicles int; i_comments int; i_lots int; i_responses int; i_entered int := 0;
 BEGIN
   IF p_kind = 'identity' THEN
     -- A market participant (external_identities): what it sells, how it bids, how it talks.
@@ -43,28 +43,41 @@ BEGIN
       RETURN NULL;
     END IF;
 
-    -- Selling: public, undeleted vehicles listed under the handle on Bring a Trailer (vehicle grain: a relisted
-    -- vehicle counts once, with its latest recorded outcome). No peer rank until a per-seller fold exists.
-    SELECT count(*), count(*) FILTER (WHERE auction_outcome = 'sold'), count(*) FILTER (WHERE auction_outcome = 'reserve_not_met')
-      INTO i_listed, i_sold, i_rnm
-      FROM public.vehicles
-     WHERE e.platform = 'bat' AND bat_seller = e.handle AND is_public = true AND deleted_at IS NULL;
+    -- Selling: the auction listings attributed to this identity as seller (vehicle_events, one listing per
+    -- normalized listing URL; a relist is its own listing, as Bring a Trailer counts it). Each listing reads as
+    -- sold if any of its events recorded a sale, unsold if it ended without one, open otherwise. Keyed on the
+    -- seller recorded per listing, not on vehicles.bat_seller, which holds only a vehicle's latest seller (on
+    -- 2026-10-14 that field missed 2 of VivaLasVegasAutos' listings resold later by others). No peer rank until a
+    -- per-seller fold exists.
+    SELECT count(*), count(*) FILTER (WHERE sold), count(*) FILTER (WHERE NOT sold AND ended), count(DISTINCT vehicle_id)
+      INTO i_listed, i_sold, i_rnm, i_vehicles
+      FROM (SELECT lower(regexp_replace(regexp_replace(ve.source_url, '[?#].*$', ''), '/+$', '')) AS u,
+                   bool_or(ve.event_status = 'sold') AS sold,
+                   bool_or(ve.event_status IN ('ended', 'unsold', 'reserve_not_met')) AS ended,
+                   min(ve.vehicle_id::text)::uuid AS vehicle_id
+              FROM public.vehicle_events ve
+             WHERE ve.seller_external_identity_id = e.id AND ve.event_type = 'auction' AND ve.source_url IS NOT NULL
+             GROUP BY 1) l;
     items := '[]'::jsonb;
     IF i_listed > 0 THEN
       items := items || jsonb_build_object(
-        'label', 'Vehicles listed', 'unit', 'vehicles', 'value', i_listed,
-        'method', 'public vehicles whose Bring a Trailer listing names this seller handle',
-        'coverage', jsonb_build_object('n', i_listed, 'of', i_listed, 'grain', 'public vehicles listed', 'as_of', v_now), 'rank', NULL);
+        'label', 'Listings', 'unit', 'listings', 'value', i_listed,
+        'method', 'auction listings recorded with this identity as seller, one per listing page; a relist counts as its own listing',
+        'coverage', jsonb_build_object('n', i_listed, 'of', i_listed, 'grain', 'listings', 'as_of', v_now), 'rank', NULL);
+      items := items || jsonb_build_object(
+        'label', 'Vehicles', 'unit', 'vehicles', 'value', i_vehicles,
+        'method', 'distinct vehicle records behind those listings',
+        'coverage', jsonb_build_object('n', i_vehicles, 'of', i_listed, 'grain', 'listings', 'as_of', v_now), 'rank', NULL);
     END IF;
     IF i_sold + i_rnm > 0 THEN
       items := items || jsonb_build_object(
         'label', 'Sell-through', 'unit', '%', 'value', round(100.0 * i_sold / (i_sold + i_rnm), 1),
-        'method', 'sold ÷ (sold + reserve not met) on listed vehicles with a recorded outcome, latest outcome per vehicle; no peer rank until a per-seller fold exists',
-        'coverage', jsonb_build_object('n', i_sold + i_rnm, 'of', i_listed, 'grain', 'vehicles with a recorded outcome', 'as_of', v_now), 'rank', NULL);
+        'method', 'sold ÷ (sold + ended unsold) on listings with a recorded outcome; no peer rank until a per-seller fold exists',
+        'coverage', jsonb_build_object('n', i_sold + i_rnm, 'of', i_listed, 'grain', 'listings with a recorded outcome', 'as_of', v_now), 'rank', NULL);
     END IF;
     sections := sections || jsonb_build_object(
       'kind', 'measures', 'stack', 'performance', 'title', 'Selling',
-      'coverage', jsonb_build_object('n', i_sold + i_rnm, 'of', i_listed, 'grain', 'vehicles with a recorded outcome', 'as_of', v_now),
+      'coverage', jsonb_build_object('n', i_sold + i_rnm, 'of', i_listed, 'grain', 'listings with a recorded outcome', 'as_of', v_now),
       'items', items);
 
     -- Bidding: the bidder profile snapshot (mv_bidder_profiles, a table last built from activity through its newest
@@ -121,8 +134,8 @@ BEGIN
         'coverage', jsonb_build_object('n', i_lots, 'of', i_lots, 'grain', 'lots commented on', 'as_of', v_now), 'rank', NULL);
       IF i_listed > 0 THEN
         items := items || jsonb_build_object(
-          'label', 'Answers to bidders per listed vehicle', 'unit', 'answers', 'value', round(i_responses::numeric / i_listed, 1),
-          'method', 'seller responses ÷ vehicles listed under the handle',
+          'label', 'Answers to bidders per listing', 'unit', 'answers', 'value', round(i_responses::numeric / i_listed, 1),
+          'method', 'seller responses ÷ listings with this identity as seller',
           'coverage', jsonb_build_object('n', i_responses, 'of', i_comments, 'grain', 'comments that are seller responses', 'as_of', v_now), 'rank', NULL);
       END IF;
     END IF;

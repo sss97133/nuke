@@ -28,6 +28,8 @@ CREATE TABLE public.organization_seller_stats (organization_id uuid PRIMARY KEY,
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, year integer, make text, is_public boolean DEFAULT true, deleted_at timestamptz,
   sale_price numeric, sold_price numeric, bat_sold_price numeric, purchase_price numeric, bat_seller text, auction_outcome text);
 CREATE TABLE public.external_identities (id uuid PRIMARY KEY, platform text, handle text, display_name text);
+CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_url text, event_type text,
+  event_status text, seller_external_identity_id uuid, created_at timestamptz DEFAULT now());
 CREATE TABLE public.auction_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, author_external_identity_id uuid, comment_type text);
 CREATE TABLE public.mv_bidder_profiles (bat_username text PRIMARY KEY, total_bids bigint, auctions_entered bigint, wins bigint,
   win_rate numeric, avg_bid numeric, max_bid numeric, first_seen timestamp, last_seen timestamp);
@@ -150,21 +152,27 @@ SELECT public.t_assert(public.t_measure(public.actor_profile_read('organization'
   'fewer than five known outcomes: a value, no rank');
 RESET ROLE;
 
--- The identity kind. S1 is a seller handle with four listed public vehicles (3 sold, 1 reserve not met), one
--- private and one deleted listing (excluded) and a listing under a handle that differs only by case (excluded);
--- 5 comments on 2 lots, 4 of them seller responses; it also bid. B1..B4 fill the bidder cohort (five or more
--- auctions entered); B9 entered three and is not ranked.
+-- The identity kind. S1's listings, as vehicle_events records them (the seller per listing, not the vehicle's
+-- latest seller): A sold; B ended, then sold (one sold listing); C sold, also recorded under a URL variant with a
+-- trailing slash and a query (still one listing); D ended unsold; D2 is D's vehicle relisted and sold (its own
+-- listing); E only pending. Six listings over five vehicles; 4 sold, 1 unsold. Another identity's listing and a
+-- non-auction event are excluded. 5 comments on 2 lots, 4 of them seller responses; it also bid. B1..B4 fill the
+-- bidder cohort (five or more auctions entered); B9 entered three and is not ranked.
 INSERT INTO public.external_identities VALUES
  ('00000000-0000-0000-0000-0000000000e1', 'bat', 'DesertSeller', 'DesertSeller'),
- ('00000000-0000-0000-0000-0000000000e2', 'bat', 'quietlurker', NULL);
-INSERT INTO public.vehicles (id, year, make, is_public, deleted_at, bat_seller, auction_outcome) VALUES
- ('00000000-0000-0000-0000-000000000101', 1970, 'Ford', true, NULL, 'DesertSeller', 'sold'),
- ('00000000-0000-0000-0000-000000000102', 1971, 'Ford', true, NULL, 'DesertSeller', 'sold'),
- ('00000000-0000-0000-0000-000000000103', 1972, 'Ford', true, NULL, 'DesertSeller', 'sold'),
- ('00000000-0000-0000-0000-000000000104', 1973, 'Ford', true, NULL, 'DesertSeller', 'reserve_not_met'),
- ('00000000-0000-0000-0000-000000000105', 1974, 'Ford', false, NULL, 'DesertSeller', 'sold'),
- ('00000000-0000-0000-0000-000000000106', 1975, 'Ford', true, '2026-01-01', 'DesertSeller', 'sold'),
- ('00000000-0000-0000-0000-000000000107', 1976, 'Ford', true, NULL, 'desertseller', 'sold');
+ ('00000000-0000-0000-0000-0000000000e2', 'bat', 'quietlurker', NULL),
+ ('00000000-0000-0000-0000-0000000000e3', 'bat', 'someoneelse', NULL);
+INSERT INTO public.vehicle_events (vehicle_id, source_url, event_type, event_status, seller_external_identity_id) VALUES
+ ('00000000-0000-0000-0000-000000000101', 'https://bringatrailer.com/listing/a', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000102', 'https://bringatrailer.com/listing/b', 'auction', 'ended', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000102', 'https://bringatrailer.com/listing/b', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000103', 'https://bringatrailer.com/listing/c', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000103', 'https://BringATrailer.com/listing/c/?utm=x', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000104', 'https://bringatrailer.com/listing/d', 'auction', 'ended', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000104', 'https://bringatrailer.com/listing/d-2', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000105', 'https://bringatrailer.com/listing/e', 'auction', 'pending', '00000000-0000-0000-0000-0000000000e1'),
+ ('00000000-0000-0000-0000-000000000106', 'https://bringatrailer.com/listing/f', 'auction', 'sold', '00000000-0000-0000-0000-0000000000e3'),
+ ('00000000-0000-0000-0000-000000000101', 'https://bringatrailer.com/listing/a', 'service', 'sold', '00000000-0000-0000-0000-0000000000e1');
 INSERT INTO public.auction_comments (vehicle_id, author_external_identity_id, comment_type) VALUES
  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000e1', 'seller_response'),
@@ -184,10 +192,12 @@ DECLARE d jsonb; m jsonb; sec jsonb;
 BEGIN
   d := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e1');
   PERFORM public.t_assert(d->'subject'->>'kind' = 'identity' AND d->'subject'->>'name' = 'DesertSeller' AND d->'subject'->>'type' = 'bat', format('identity subject; got %s', d->'subject'));
-  -- Selling: four public, undeleted listings under the exact handle; 3 sold, 1 reserve not met: 75.0, no rank.
-  PERFORM public.t_assert((public.t_measure(d, 'performance', 'Vehicles listed')->>'value')::int = 4, 'four public listings under the exact handle');
+  -- Selling: six listings (A, B, C with its URL variant folded in, D, D2, E) over five vehicles; sold A, B, C, D2;
+  -- unsold D; E has no outcome. Sell-through 4 / 5 = 80.0 on five listings with an outcome, no rank.
+  PERFORM public.t_assert((public.t_measure(d, 'performance', 'Listings')->>'value')::int = 6, format('six listings; got %s', public.t_measure(d, 'performance', 'Listings')));
+  PERFORM public.t_assert((public.t_measure(d, 'performance', 'Vehicles')->>'value')::int = 5, 'five vehicles behind them (a relist is one vehicle)');
   m := public.t_measure(d, 'performance', 'Sell-through');
-  PERFORM public.t_assert((m->>'value')::numeric = 75.0 AND m->'rank' = 'null'::jsonb AND (m->'coverage'->>'n')::int = 4, format('sell-through 75.0, no rank; got %s', m));
+  PERFORM public.t_assert((m->>'value')::numeric = 80.0 AND m->'rank' = 'null'::jsonb AND (m->'coverage'->>'n')::int = 5 AND (m->'coverage'->>'of')::int = 6, format('sell-through 80.0 on 5 of 6, no rank; got %s', m));
   -- Bidding: the cohort is DesertSeller, B1, B2, B3, B4. Auctions entered 20 against 10, 20, 30, 5: two below, so
   -- 2 / 4 = 50.0. Win rate 0.25 against 0.10, 0.10, 0.30, 0.00: three below, so 75.0. Dated 2026-02-09.
   m := public.t_measure(d, 'bidding', 'Auctions entered');
@@ -195,10 +205,10 @@ BEGIN
   m := public.t_measure(d, 'bidding', 'Win rate');
   PERFORM public.t_assert((m->>'value')::numeric = 25.0 AND (m->'rank'->>'p')::numeric = 75.0, format('win rate 25.0 at P75; got %s', m));
   PERFORM public.t_assert(m->'coverage'->>'as_of' LIKE '2026-02-09%', format('dated by the snapshot; got %s', m->'coverage'));
-  -- Talking: 5 comments on 2 lots; 4 seller responses over 4 listed vehicles: 1.0.
+  -- Talking: 5 comments on 2 lots; 4 seller responses over 6 listings: 0.7.
   m := public.t_measure(d, 'talking', 'Comments');
   PERFORM public.t_assert((m->>'value')::int = 5 AND (m->'coverage'->>'n')::int = 2, format('5 comments on 2 lots; got %s', m));
-  PERFORM public.t_assert((public.t_measure(d, 'talking', 'Answers to bidders per listed vehicle')->>'value')::numeric = 1.0, 'one answer per listed vehicle');
+  PERFORM public.t_assert((public.t_measure(d, 'talking', 'Answers to bidders per listing')->>'value')::numeric = 0.7, 'answers per listing');
 
   -- An identity that never sold, bid or commented reads with empty sections, never an error.
   d := public.actor_profile_read('identity', '00000000-0000-0000-0000-0000000000e2');
