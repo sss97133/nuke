@@ -1220,6 +1220,8 @@ jobs:
         run: deno test --no-config --no-remote --no-npm --no-lock --allow-read --allow-env supabase/functions/extract-facebook-marketplace/capture.test.ts
       - name: Verify the shared BaT Chassis/VIN reader (short chassis, I/O/Q and separators land; the check digit still refuses)
         run: deno test supabase/functions/_shared/batChassis.test.ts
+      - name: Verify batch-extract-snapshots never calls the model under no_ai, names regex-empty rows, and ends queue rows with no vehicle
+        run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts
 
   county-readers-index-contract:
     runs-on: ubuntu-latest

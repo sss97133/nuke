@@ -11,8 +11,19 @@
  *   "dry_run": boolean,
  *   "offset": number,           // for pagination (default 0)
  *   "mode": string,             // "skeleton" | "sparse" | "deep" | "force" (re-extract everything)
- *   "force": boolean            // re-extract even if already processed by this version
+ *   "force": boolean,           // re-extract even if already processed by this version
+ *   "use_queue": boolean,       // claim from snapshot_extraction_queue instead of scanning vehicles
+ *   "no_ai": boolean            // never call the model (see aiGate.ts); default false
  * }
+ *
+ * The regex parser runs first. Without no_ai, a row it reads as empty on content over 500 characters goes to
+ * claude-haiku, and mode "ai" and platforms with no regex parser use the model as the parser. With no_ai: true none of
+ * that runs: the response counts regex_empty rows and ai_blocked calls, and a regex-empty queue row ends with status
+ * 'regex_empty' rather than 'completed'. no_ai with mode "ai" or a platform that has no regex parser is a 400.
+ *
+ * Queue mode: a claimed row whose vehicle no longer exists ends with status 'no_vehicle'. It used to stay 'processing',
+ * come back to 'pending' after 5 minutes and be claimed first again (the claim orders by vehicle_id): measured
+ * 2026-10-14, 43% of the first 2,000 pending Barrett-Jackson rows and all 127 Bonhams rows have no vehicle.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -21,6 +32,8 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
+import { orphanVehicleIds } from "./queueRows.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,12 +75,23 @@ Deno.serve(async (req) => {
 
     const mode = body.mode || "sparse";
     const useQueue = body.use_queue === true;
-    console.log(`[batch-extract] v2 batch=${batchSize} platform=${platform} mode=${mode} dry=${dryRun} offset=${offset} force=${force} queue=${useQueue}`);
+    const noAi = readNoAi(body);
+    const conflict = noAiConflict(noAi, mode, platform);
+    if (conflict) {
+      return new Response(JSON.stringify({ error: conflict }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Every call to the model goes through this gate (aiGate.ts); with no_ai it never makes one.
+    const gate = makeAiGate(noAi, parseWithAI);
+    console.log(`[batch-extract] v2 batch=${batchSize} platform=${platform} mode=${mode} dry=${dryRun} offset=${offset} force=${force} queue=${useQueue} no_ai=${noAi}`);
 
     const selectFields = `id, year, make, model, trim, vin, mileage, horsepower, torque, engine_type, engine_displacement, transmission, drivetrain, body_style, color, color_primary, interior_color, description, sale_price, bat_auction_url, discovery_url, listing_url, extractor_version`;
 
     let vehicles: any[] = [];
     let queueItems: { vehicle_id: string; snapshot_url: string }[] = [];
+    let orphansMarked = 0;
 
     if (useQueue) {
       // ============================================================
@@ -99,6 +123,19 @@ Deno.serve(async (req) => {
         .in("id", vehicleIds);
       if (vErr) throw new Error(`Vehicle fetch failed: ${vErr.message}`);
       vehicles = vData || [];
+
+      // A claimed row whose vehicle no longer exists is never visited by the loop below. It would stay 'processing', go back
+      // to 'pending' after 5 minutes and be claimed first again, because the claim takes the lowest vehicle_ids. End it.
+      const orphanIds = orphanVehicleIds(claimed, vehicles);
+      if (orphanIds.length > 0 && !dryRun) {
+        const { error: orphanErr } = await supabase.from("snapshot_extraction_queue")
+          .update({ status: "no_vehicle", completed_at: new Date().toISOString() })
+          .in("vehicle_id", orphanIds)
+          .eq("platform", platform)
+          .eq("status", "processing");
+        if (orphanErr) console.warn(`[batch-extract] could not end ${orphanIds.length} rows with no vehicle: ${orphanErr.message}`);
+        else orphansMarked = orphanIds.length;
+      }
     } else {
       // ============================================================
       // LEGACY MODE: OFFSET-based scanning (slower for large datasets)
@@ -155,8 +192,11 @@ Deno.serve(async (req) => {
     if (vehicles.length === 0) {
       return okJson({
         success: true,
-        message: "No vehicles need extraction",
+        message: orphansMarked > 0 ? "Claimed rows had no vehicle; ended as no_vehicle" : "No vehicles need extraction",
         processed: 0,
+        claimed: queueItems.length,
+        orphans_marked: orphansMarked,
+        no_ai: noAi,
         duration_ms: Date.now() - startTime,
       });
     }
@@ -289,6 +329,7 @@ Deno.serve(async (req) => {
 
         // Parse based on platform — try regex first, fall back to AI
         let parsed: Record<string, any>;
+        let regexEmpty = false;
         const useAI = mode === "ai";
 
         if (useAI) {
@@ -296,7 +337,7 @@ Deno.serve(async (req) => {
           // Prefer markdown over raw HTML (cleaner for LLM)
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          parsed = await parseWithAI(content, vehicleUrl, platform);
+          parsed = await gate.primary(content, vehicleUrl, platform);
         } else if (platform === "bat") {
           parsed = parseBatHtml(snapshotHtml);
         } else if (platform === "bonhams") {
@@ -311,18 +352,19 @@ Deno.serve(async (req) => {
           // Unknown platform: try AI extraction
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          parsed = await parseWithAI(content, vehicleUrl, platform);
+          parsed = await gate.primary(content, vehicleUrl, platform);
         }
 
-        // AI FALLBACK: If regex parser returned 0 useful fields, try AI
-        if (!useAI && Object.keys(parsed).filter(k => parsed[k] != null).length === 0) {
+        // AI FALLBACK: If regex parser returned 0 useful fields, try AI (never with no_ai: the row is counted regex-empty)
+        if (!useAI) {
           const snapshotMarkdown = snapshot?.markdown || null;
           const content = snapshotMarkdown || snapshotHtml;
-          if (content && content.length > 500) {
-            console.log(`[AI-fallback] Regex returned 0 fields for ${vehicle.id}, trying AI...`);
-            parsed = await parseWithAI(content, vehicleUrl, platform);
-          }
+          const fb = await gate.fallback(parsed, content, vehicleUrl, platform, vehicle.id);
+          parsed = fb.parsed;
+          regexEmpty = fb.regexEmpty;
         }
+        // 'completed', or under no_ai 'regex_empty' for a row the regex could not read
+        const terminal = terminalQueueStatus(noAi, regexEmpty);
 
         // Extract primary image URL from HTML (works for all platforms)
         if (!parsed.primary_image_url && snapshotHtml) {
@@ -398,7 +440,7 @@ Deno.serve(async (req) => {
             }).eq("id", vehicle.id);
             if (useQueue) {
               await supabase.from("snapshot_extraction_queue")
-                .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: 0 })
+                .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
                 .eq("vehicle_id", vehicle.id);
             }
           }
@@ -428,7 +470,7 @@ Deno.serve(async (req) => {
               skipped++;
               if (useQueue) {
                 await supabase.from("snapshot_extraction_queue")
-                  .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: 0 })
+                  .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
                   .eq("vehicle_id", vehicle.id);
               }
               continue;
@@ -478,7 +520,7 @@ Deno.serve(async (req) => {
 
         if (useQueue && !dryRun) {
           await supabase.from("snapshot_extraction_queue")
-            .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
+            .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
             .eq("vehicle_id", vehicle.id);
         }
         if (sampleResults.length < 10) {
@@ -513,6 +555,10 @@ Deno.serve(async (req) => {
       batch_size: batchSize,
       offset,
       vehicles_found: vehicles.length,
+      claimed: queueItems.length,
+      orphans_marked: orphansMarked,
+      no_ai: noAi,
+      ...gate.counters(),
       extracted,
       skipped,
       no_snapshot: noSnapshot,
