@@ -1217,6 +1217,30 @@ jobs:
       - name: Verify map-vehicles reads the fold only for unfiltered requests, inside timed transactions
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
 
+  market-position-browse-facets-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable market position database
+        run: createdb dm_refinement_market_position_browse_ci
+      - name: Verify browse_stats answers from the market fold and the fold keeps its columns
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_position_browse_ci -f supabase/sql/test_market_position_browse_facets.sql
+
   county-readers-contract:
     runs-on: ubuntu-latest
     services:
