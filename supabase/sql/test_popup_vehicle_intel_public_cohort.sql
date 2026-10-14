@@ -236,6 +236,19 @@ SELECT public.t_assert((SELECT left(pattern, 3) = '\y(' AND right(pattern, 3) = 
     FROM public.cohort_scope_rule('f5586ac1-dc51-4d4b-bd26-abb1b207f872'))
   AND (SELECT canonical_make || year_start || year_end FROM public.cohort_scope_rule('f5586ac1-dc51-4d4b-bd26-abb1b207f872')) = 'CHEVROLET19761980',
   'cohort_scope_rule: the K5 rule, word-bounded, hyphen escaped');
+-- The names reach the statement through format(%L): quotes, commas, braces and backslashes in a model name must survive, and a
+-- NULL argument must match nothing.
+INSERT INTO public.vehicles (id, year, make, model, is_public) VALUES
+ ('e0000000-0000-0000-0000-000000000001', 1999, 'Quote', 'O''Neil Coupe', true),
+ ('e0000000-0000-0000-0000-000000000002', 1999, 'Quote', 'Coupe, "Deluxe" {GT} \ edition', true);
+SELECT public.t_assert((SELECT array_agg(id ORDER BY id) FROM public.public_vehicles_by_model_year('QUOTE', 1999,
+    ARRAY['o''neil coupe', 'coupe, "deluxe" {gt} \ edition', 'no such model']))
+  = ARRAY['e0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002']::uuid[],
+  'model names with quotes, commas, braces, double quotes and a backslash are matched');
+SELECT public.t_assert((SELECT count(*) FROM public.public_vehicles_by_model_year(NULL, 1999, ARRAY['x'])) = 0
+  AND (SELECT count(*) FROM public.public_vehicles_by_model_year('Quote', NULL, ARRAY['x'])) = 0
+  AND (SELECT count(*) FROM public.public_vehicles_by_model_year('Quote', 1999, NULL)) = 0,
+  'a NULL make, year or name list matches nothing');
 SET ROLE anon;
 SELECT public.t_assert((SELECT count(*) FROM public.cohort_members_public('f5586ac1-dc51-4d4b-bd26-abb1b207f872')) = 10
   AND NOT EXISTS (SELECT 1 FROM public.cohort_members_public('f5586ac1-dc51-4d4b-bd26-abb1b207f872') WHERE vehicle_id = '30000000-0000-0000-0000-000000000004'),
@@ -253,6 +266,9 @@ SELECT public.t_assert(NOT has_function_privilege('public', 'public.cohort_membe
   AND has_function_privilege('anon', 'public.cohort_members_public(uuid)', 'execute')
   AND has_function_privilege('authenticated', 'public.public_vehicles_by_model_year(text,integer,text[])', 'execute'),
   'EXECUTE: not PUBLIC, but anon, authenticated and service_role');
+SELECT public.t_assert((SELECT prosrc LIKE '%EXECUTE format%' FROM pg_proc WHERE oid = 'public.cohort_members_public(uuid)'::regprocedure)
+  AND (SELECT prosrc LIKE '%EXECUTE format%' FROM pg_proc WHERE oid = 'public.public_vehicles_by_model_year(text,integer,text[])'::regprocedure),
+  'both readers send their query with the values written in, so each call is planned for its own make, years and names');
 SELECT public.t_assert(pg_get_functiondef('public.popup_vehicle_intel(uuid)'::regprocedure) NOT LIKE '%public.cohort_members(%'
   AND pg_get_functiondef('public.popup_vehicle_intel(uuid)'::regprocedure) LIKE '%cohort_members_public%', 'the popup reads the cohort through the public reader');
 

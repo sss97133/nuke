@@ -15,6 +15,19 @@
 -- 4,620 heap blocks instead of 44,390, 2.0 s cold instead of 7.8-14 s.
 -- Everything else in the function (comments, observations, events, scores, the six sale facts) was under 100 ms in all
 -- three plans.
+-- The statements the new readers send, EXPLAIN (ANALYZE, BUFFERS) on production as the deploy role (the definer's role),
+-- 2026-10-14, each run cold then warm:
+--   K5 scope, Chevrolet 1976-1980, word regex       5,232 buffers touched, 3,468 read, 60 ms warm
+--   Ford 1966 and 28 Mustang names (BitmapAnd)      2,636 touched, 219 read, 144 ms cold, 23 ms warm
+--   Chevrolet 1969 Camaro                           1,625 touched, 1,090 read, 164 ms cold, 14 ms warm
+--   Porsche 2023 911 Sport Classic                  46 touched, 36 read, 1.8 ms cold
+-- The whole popup with those two lookups bound to the same values, against the live body, deploy role, warm: K5 94 ms and
+-- 7,761 buffers against 346 ms and 21,918; Mustang 1966 110-140 ms and 12.9k against 279-282 ms and 20.6k; 911 Sport Classic
+-- 10-11 ms against 31; Mustang SVT Cobra R 9-27 ms against 50.
+-- Why EXECUTE: written as a SQL function, the model-year lookup runs a generic plan that does not know the year, and reads
+-- every year of the model through (lower(make), lower(model)): Ford 1966 touched 18,729 buffers, 14,413 read, 6.6 s cold
+-- (Camaro 1969: 5,895 touched, 4,824 read, 3.2 s cold). Both readers therefore send their query with the values written in,
+-- as cohort_members() does, so each call is planned for its own make, years and names.
 --
 -- Why a definer reader is the same answer: the cohort only ever feeds `eligible`, which keeps public, undeleted,
 -- non-part vehicles other than the one viewed, whoever asks. The one place the caller's own visibility mattered was
@@ -90,31 +103,43 @@ BEGIN
   SELECT * INTO r FROM public.cohort_scope_rule(p_subject_id);
   IF NOT FOUND OR r.pattern IS NULL THEN RETURN; END IF;
   -- definer: the visitor's view of a cohort is public, undeleted, non-part vehicles, stated here so the make, model and
-  -- year quals can use the partial indexes on public vehicles instead of waiting behind the row policies
+  -- year quals can use the partial indexes on public vehicles instead of waiting behind the row policies.
+  -- EXECUTE with the values written in, like cohort_members(): every call is planned for its own make and years, and
+  -- never settles on a cached generic plan.
   IF r.grain = 'year' THEN
-    RETURN QUERY
-      SELECT v.id FROM public.vehicles v
-       WHERE lower(v.make) = lower(r.canonical_make) AND v.year = r.year AND lower(v.model) ~ r.pattern
-         AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item' AND v.is_public AND v.deleted_at IS NULL;
+    RETURN QUERY EXECUTE format(
+      'SELECT v.id FROM public.vehicles v
+        WHERE lower(v.make) = lower(%L) AND v.year = %L::integer AND lower(v.model) ~ %L
+          AND v.listing_kind IS DISTINCT FROM ''non_vehicle_item'' AND v.is_public AND v.deleted_at IS NULL',
+      r.canonical_make, r.year, r.pattern);
   ELSE
-    RETURN QUERY
-      SELECT v.id FROM public.vehicles v
-       WHERE lower(v.make) = lower(r.canonical_make) AND v.year BETWEEN r.year_start AND r.year_end AND lower(v.model) ~ r.pattern
-         AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item' AND v.is_public AND v.deleted_at IS NULL;
+    RETURN QUERY EXECUTE format(
+      'SELECT v.id FROM public.vehicles v
+        WHERE lower(v.make) = lower(%L) AND v.year BETWEEN %L::integer AND %L::integer AND lower(v.model) ~ %L
+          AND v.listing_kind IS DISTINCT FROM ''non_vehicle_item'' AND v.is_public AND v.deleted_at IS NULL',
+      r.canonical_make, r.year_start, r.year_end, r.pattern);
   END IF;
 END
 $fn$;
 
 CREATE OR REPLACE FUNCTION public.public_vehicles_by_model_year(p_make text, p_year integer, p_models text[])
  RETURNS TABLE(id uuid)
- LANGUAGE sql
+ LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-  -- p_models are lower-cased model names; a vehicle matches when lower(model) is one of them
-  SELECT v.id FROM public.vehicles v
-   WHERE lower(v.make) = lower(p_make) AND v.year = p_year AND lower(v.model) = ANY (p_models)
-     AND v.is_public AND v.deleted_at IS NULL
+BEGIN
+  -- p_models are lower-cased model names; a vehicle matches when lower(model) is one of them.
+  -- EXECUTE with the values written in, on purpose: a SQL function (and a plpgsql statement after its fifth call) runs a
+  -- generic plan, and the generic plan for this lookup does not know the year, so it read every year of the model through
+  -- (lower(make), lower(model)). Ford Mustang 1966 on production: 18,729 buffers touched, 14,413 read, 6.6 s cold with the
+  -- generic plan; 2,636 touched, 219 read, 144 ms cold with the values in the statement.
+  RETURN QUERY EXECUTE format(
+    'SELECT v.id FROM public.vehicles v
+      WHERE lower(v.make) = lower(%L) AND v.year = %L::integer AND lower(v.model) = ANY (%L::text[])
+        AND v.is_public AND v.deleted_at IS NULL',
+    p_make, p_year, p_models);
+END
 $fn$;
 
 -- Stated function by function: not PUBLIC, but the three API roles (these return ids of public vehicles, which anon can read).
