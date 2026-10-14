@@ -71,7 +71,7 @@ function readTreemapBrands(): Promise<TreemapNode[] | null> {
 // (job 175, daily 09:10 UTC), with the map's population receipt (treemap_populations()) since 20261014063000.
 // Absent or unreadable, the legend says what it always said, without a time or a population.
 export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number }
-interface MapRefresh { refreshedAt: string | null; populations: MapPopulations | null }
+export interface MapRefresh { refreshedAt: string | null; populations: MapPopulations | null }
 const NO_REFRESH: MapRefresh = { refreshedAt: null, populations: null };
 let refreshRead: Promise<MapRefresh> | null = null;
 function readTreemapRefresh(): Promise<MapRefresh> {
@@ -93,11 +93,18 @@ export function ledgerViewsClock(refreshedAt: string | null): string {
   return ` · as of ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
-/** The caption's population clause: of how many public records, when the receipt is for the confirmed-sale measure. */
-export function mapPopulationClause(populations: MapPopulations | null): string {
-  const n = populations?.public_records;
-  if (populations?.measure !== 'confirmed_sale_v1' || typeof n !== 'number' || !Number.isFinite(n)) return '';
-  return ` of ${n.toLocaleString('en-US')} public records`;
+/** The count beside the map, with its population and date. At the top level both numbers come from the refresh
+ *  receipt (treemap_refreshes.populations), so they share one snapshot: the mapped sales of all public records. Below
+ *  it the count is the level's own; the leaf shows at most 200 sales, the largest. */
+export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', levelCount: number, refresh: MapRefresh): string {
+  const fmt = (n: number) => n.toLocaleString('en-US');
+  const p = refresh.populations;
+  const receipt = level === 'brands' && p?.measure === 'confirmed_sale_v1'
+    && Number.isFinite(p.mapped_sales) && Number.isFinite(p.public_records);
+  const count = level === 'vehicles'
+    ? `${levelCount >= 200 ? 'largest 200' : fmt(levelCount)} confirmed sales`
+    : `${fmt(receipt ? p!.mapped_sales! : levelCount)} vehicles with a confirmed sale`;
+  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${ledgerViewsClock(refresh.refreshedAt)}`;
 }
 
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
@@ -107,14 +114,14 @@ export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles'): st
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
-function useTreemapRefresh(enabled: boolean): MapRefresh {
+function useTreemapRefresh(): MapRefresh {
   const [refresh, setRefresh] = useState<MapRefresh>(NO_REFRESH);
   useEffect(() => {
-    if (!enabled || typeof (supabase as any)?.from !== 'function') return;
+    if (typeof (supabase as any)?.from !== 'function') return;
     let live = true;
     readTreemapRefresh().then((v) => { if (live) setRefresh(v); });
     return () => { live = false; };
-  }, [enabled]);
+  }, []);
   return refresh;
 }
 
@@ -651,7 +658,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
-  const { refreshedAt, populations } = useTreemapRefresh(embedded);
+  const refresh = useTreemapRefresh();
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
     currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
@@ -1052,7 +1059,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <Text role="caption">
-              {fmtNum(totalCount)} {levelType === 'vehicles' ? 'confirmed sales' : 'vehicles with a confirmed sale'}{levelType === 'brands' ? mapPopulationClause(populations) : ''}
+              {mapCaption(levelType, totalCount, refresh)}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1234,7 +1241,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {mapLegend(levelType)}{embedded ? ledgerViewsClock(refreshedAt) : ''}
+          {mapLegend(levelType)}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
