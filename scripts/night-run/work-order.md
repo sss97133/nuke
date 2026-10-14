@@ -79,15 +79,18 @@ is a proposed checkpoint, not permission to stop pursuing the objective. Return 
 - `objective` and `acceptance`: freeze their exact wording in the first checkpoint and preserve it later.
 - `status`: `active` when another authorized step exists; `waiting_review` only for an open PR gate;
   `blocked` only for an actual external/authorization dependency; `complete` only when every acceptance
-  criterion has evidence and no linked PR remains unmerged. A time/usage limit is not completion.
+  criterion has evidence and linked PRs are merged (or closed as superseded by a recorded merged
+  replacement). A time/usage limit is not completion.
 - `next_action`: the concrete next step, not "continue work". The controller passes this back to you.
 - `progress`: what changed since the last checkpoint, with evidence and limits.
 - `blocker` and `unblock_condition`: exact dependency and what would resolve it; empty when none.
 - `prs`: retain all PR numbers associated with this objective across checkpoints.
+- `superseded_prs`: original `pr` and `replacement` number pairs, only for superseded work. Retain
+  both in `prs`; a closed original counts as resolved only when its recorded replacement is merged.
 - `evidence`: criterion and receipt-file path pairs. For completion, every criterion needs an existing
   receipt with the actual check, date, result and limitations. `.night/` receipts are kept locally.
 
-The controller checks structure, receipt existence, clean working tree and linked PR merge state. Those
+The controller checks structure, receipt existence, clean working tree and linked PR merge/supersession state. Those
 checks DO NOT independently prove your claims. You remain responsible for honest acceptance evidence.
 Do not mistake `claude -p` returning successfully for finishing the objective. If a tool is unavailable,
 name the precise blocked step; complete independent authorized work before returning a blocker.

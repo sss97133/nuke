@@ -20,7 +20,7 @@ spec.loader.exec_module(c)
 
 HANDOFF = {"objective": "Make an existing source failure diagnosable", "acceptance": ["receipt demonstrates the source failure"],
            "status": "active", "next_action": "Inspect the retained capture and its writer", "progress": "Located the writer",
-           "blocker": "", "unblock_condition": "", "prs": [], "evidence": []}
+           "blocker": "", "unblock_condition": "", "prs": [], "superseded_prs": [], "evidence": []}
 
 
 class ContinuationTests(unittest.TestCase):
@@ -152,6 +152,18 @@ class ContinuationTests(unittest.TestCase):
                 self.controller.accept({**HANDOFF, "status": "complete", "prs": [123]}, self.wt)
         self.assertEqual(self.controller.state["handoff"]["objective"], HANDOFF["objective"])
         self.assertEqual(self.controller.state["status"], "active")
+
+    def test_closed_superseded_pr_requires_a_recorded_merged_replacement(self):
+        (self.wt / "receipt.md").write_text("Accepted evidence")
+        complete = {**HANDOFF, "status": "complete", "prs": [123, 124],
+                    "evidence": [{"criterion": HANDOFF["acceptance"][0], "receipt": "receipt.md"}]}
+        prs = [{"number": 123, "state": "CLOSED"}, {"number": 124, "state": "MERGED"}]
+        with patch.object(self.controller, "pr_state", return_value=prs), patch.object(c, "command", return_value=""):
+            with self.assertRaisesRegex(ValueError, "unmerged"):
+                self.controller.accept(complete, self.wt)
+            self.controller.accept({**complete, "superseded_prs": [{"pr": 123, "replacement": 124}]}, self.wt)
+        self.assertEqual(self.controller.state["status"], "complete")
+        self.assertEqual(self.controller.state["handoff"]["prs"], [123, 124])
 
     def test_missing_receipt_dirty_work_or_redefined_goal_cannot_complete(self):
         self.invoke()

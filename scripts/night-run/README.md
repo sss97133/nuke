@@ -16,7 +16,8 @@ The work order tells the agent to inspect those PRs before choosing duplicate wo
   or merge state resumes the same objective. The explicit unattended no-merge hold remains.
 - `blocked`: an external/authorization dependency, three controller failures, or three identical
   active handoffs. The saved reason explains what must change. After resolving it, use `--resume`.
-- `complete`: the agent supplied acceptance receipts, linked PRs are merged, and the worktree is clean.
+- `complete`: the agent supplied acceptance receipts, linked PRs are merged (or closed with
+  recorded merged replacements), and the worktree is clean.
   Receipt existence is mechanically checked; semantic correctness and public readiness remain agent
   claims supported by those receipts, not independently certified by the controller.
 

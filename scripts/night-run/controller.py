@@ -30,6 +30,9 @@ FIELDS = {
     "blocker": {"type": "string"},
     "unblock_condition": {"type": "string"},
     "prs": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+    "superseded_prs": {"type": "array", "items": {"type": "object", "properties": {
+        "pr": {"type": "integer", "minimum": 1}, "replacement": {"type": "integer", "minimum": 1}},
+        "required": ["pr", "replacement"], "additionalProperties": False}},
     "evidence": {"type": "array", "items": {"type": "object", "properties": {
         "criterion": {"type": "string"}, "receipt": {"type": "string"}},
         "required": ["criterion", "receipt"], "additionalProperties": False}},
@@ -146,6 +149,10 @@ class Controller:
             raise ValueError("unknown handoff status")
         if not isinstance(handoff["prs"], list) or any(type(p) is not int or p < 1 for p in handoff["prs"]):
             raise ValueError("invalid PR numbers")
+        if not isinstance(handoff["superseded_prs"], list) or any(not isinstance(e, dict)
+                or set(e) != {"pr", "replacement"} or any(type(v) is not int or v not in handoff["prs"] for v in e.values())
+                or e["pr"] == e["replacement"] for e in handoff["superseded_prs"]):
+            raise ValueError("superseded PRs must name distinct recorded original/replacement PRs")
         if not isinstance(handoff["evidence"], list) or any(not isinstance(e, dict) or set(e) != {"criterion", "receipt"}
                 or any(not isinstance(v, str) for v in e.values()) for e in handoff["evidence"]):
             raise ValueError("invalid evidence")
@@ -167,8 +174,10 @@ class Controller:
             raise ValueError("waiting_review requires an open PR")
         if handoff["status"] == "complete":
             # Mechanical minimum, NOT an independent proof of the model's semantic claims.
-            if any(p["state"] != "MERGED" for p in prs):
-                raise ValueError("unmerged PRs cannot be reported as complete; wait for review")
+            merged = {p["number"] for p in prs if p["state"] == "MERGED"}
+            replaced = {e["pr"] for e in handoff["superseded_prs"] if e["replacement"] in merged}
+            if any(p["state"] != "MERGED" and not (p["state"] == "CLOSED" and p["number"] in replaced) for p in prs):
+                raise ValueError("unmerged PRs need review or a closed supersession with a merged replacement")
             evidenced = {e["criterion"] for e in handoff["evidence"] if e["receipt"] and (wt / e["receipt"]).is_file()}
             if not set(handoff["acceptance"]).issubset(evidenced):
                 raise ValueError("completion needs an existing receipt for every acceptance criterion")
@@ -180,7 +189,7 @@ class Controller:
         if stagnant >= 2 and handoff["status"] == "active":
             self.state.update(status="blocked", reason="Three identical handoffs without progress; inspect then --resume.")
         if self.state["status"] == "complete":
-            self.state["completion_basis"] = "agent-reported acceptance receipts; clean worktree; linked PRs merged"
+            self.state["completion_basis"] = "agent-reported acceptance receipts; clean worktree; linked PRs merged or closed with recorded merged replacements"
             self.state["completed_day"] = self.state["budget_day"]
             atomic_json(self.logs / f"task-{self.state['task_id']}.json", self.state)
         self.save()
