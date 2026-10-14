@@ -15,9 +15,21 @@
 -- no_ai, would call claude-haiku on a regex-empty row, and fails a row whenever the database refuses a price or a VIN. Check
 -- the deploy first: the deployed source (Supabase get_edge_function batch-extract-snapshots) must contain aiGate.ts.
 --
+-- VAULT. The command authenticates with get_service_role_key_for_cron(), which reads the key from public._app_secrets. The leaked
+-- service-role key is being turned off and the vault given the new one. Until the vault holds a key the functions accept,
+-- every run of this job is refused with 401 by requireWriteAuth and lands nothing. Check before merging, read-only (Logs
+-- Explorer, last 2 hours): job 419 poll-listing-feeds runs every 15 minutes through the same function and must show only 200s.
+--   select log_attributes['response.status_code'] as status, count(*) from logs where source = 'function_edge_logs'
+--     and log_attributes['request.pathname'] = '/functions/v1/poll-listing-feeds' group by 1;     -- 200 only, no 401
+--
 -- BOUND. 12 runs an hour, 25 rows each: at most 300 queue rows an hour, 7,200 a day, 63,144 rows (63,001 pending + 143 stuck
 -- in processing since 2026-06-23, which the first claim returns to pending) in about 8.8 days. A run reads 25 snapshots from the
 -- private bucket (about 350 to 440 KB each) and writes at most 25 vehicles. No Firecrawl, no AI, no other host.
+-- MEASURED ON PROD (2026-10-14, EXPLAIN ANALYZE, read-only; the orphan update as a plan only, not executed): the claim select
+-- for 25 pending rows 357 ms cold and 2.4 ms warm at the start, 55 to 680 ms deeper in the drain as the planner moves to the
+-- status index; the vehicle fetch for 25 ids 4.9 ms; the snapshot lookup 2.7 ms a row; a vehicle update 67 to 111 ms mean
+-- (pg_stat_statements, 24,677 calls); a snapshot download and parse about 0.55 s a row. A run is about 15 live rows: about 15 s,
+-- against a 5-minute cadence.
 --
 -- BEFORE (2026-10-14, scripts/data/q.sh): snapshot_extraction_queue, platform 'barrett-jackson'
 --   select status, count(*), coalesce(sum(fields_filled),0) from snapshot_extraction_queue
