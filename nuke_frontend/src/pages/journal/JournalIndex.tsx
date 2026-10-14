@@ -9,8 +9,7 @@ interface DensityRow {
   date: string;
   photo_count: number;
   receipt_count: number;
-  receipt_total: number | string;
-  payment_total: number | string;
+  payment_count: number;
   top_vehicle_id: string | null;
 }
 
@@ -29,12 +28,6 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-function fmtUsd(n: number | string): string {
-  const v = Number(n) || 0;
-  if (v === 0) return "$0";
-  return "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
-}
 
 export default function JournalIndex() {
   const [rows, setRows] = useState<DensityRow[]>([]);
@@ -67,15 +60,15 @@ export default function JournalIndex() {
       {loading && <div style={styles.meta}>LOADING…</div>}
       {error && <div style={styles.meta}>ERROR · {error}</div>}
 
-      {!loading && !error && rows.every((r) => r.photo_count === 0 && r.receipt_count === 0 && Number(r.payment_total) === 0 && Number(r.receipt_total) === 0) && (
+      {!loading && !error && rows.every((r) => r.photo_count === 0 && r.receipt_count === 0 && r.payment_count === 0) && (
         <div style={styles.meta}>NO PUBLIC WORK-LOG ENTRIES IN THE LAST 90 DAYS.</div>
       )}
-      {!loading && !error && rows.some((r) => r.photo_count > 0 || r.receipt_count > 0 || Number(r.payment_total) > 0 || Number(r.receipt_total) > 0) && (
+      {!loading && !error && rows.some((r) => r.photo_count > 0 || r.receipt_count > 0 || r.payment_count > 0) && (
         <div style={styles.table}>
           {rows.map((r) => {
             const dt = new Date(r.date + "T12:00:00Z");
             const wkday = WEEKDAYS[dt.getUTCDay()];
-            const empty = r.photo_count === 0 && r.receipt_count === 0 && Number(r.payment_total) === 0;
+            const empty = r.photo_count === 0 && r.receipt_count === 0 && r.payment_count === 0;
             const rowStyle = empty ? { ...styles.row, ...styles.rowEmpty } : styles.row;
             return (
               <Link key={r.date} to={`/journal/${r.date}`} style={rowStyle}>
@@ -83,8 +76,7 @@ export default function JournalIndex() {
                 <span>{wkday}</span>
                 <span style={styles.num}>{r.photo_count > 0 ? `${r.photo_count} P` : "·"}</span>
                 <span style={styles.num}>{r.receipt_count > 0 ? `${r.receipt_count} R` : "·"}</span>
-                <span style={styles.num}>{Number(r.receipt_total) > 0 ? `${fmtUsd(r.receipt_total)} OUT` : "·"}</span>
-                <span style={styles.num}>{Number(r.payment_total) > 0 ? `${fmtUsd(r.payment_total)} IN` : "·"}</span>
+                <span style={styles.num}>{r.payment_count > 0 ? `${r.payment_count} PAY` : "·"}</span>
                 <span>
                   {r.top_vehicle_id ? (
                     <span style={styles.vehicleLink}>{r.top_vehicle_id.slice(0, 8)}</span>

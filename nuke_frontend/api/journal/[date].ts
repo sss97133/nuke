@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `&payment_date=gte.${dayStart}&payment_date=lte.${dayEnd}&status=eq.completed`,
       ),
       rest(
-        `receipts?select=id,vehicle_id,vendor_name,total_amount,transaction_date,scope_type,scope_id` +
+        `receipts?select=id,vehicle_id,transaction_date,scope_type,scope_id` +
           `&or=(transaction_date.eq.${date},purchase_date.eq.${date},receipt_date.eq.${date})&limit=200`,
       ),
     ]);
@@ -85,11 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         )
       : [];
 
-    const receiptTotal = receipts.reduce(
-      (s: number, r: any) => s + (Number(r.total_amount) || 0),
-      0,
-    );
-
+    // Public view: counts and attribution only. Vendors and amounts are the owner's, read through the
+    // authenticated day receipt with its money mask, never through this unauthenticated route.
     const work_log = {
       date,
       vehicle_id: null,
@@ -109,8 +106,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })),
       receipts: receipts.map((r: any) => ({
         id: r.id,
-        vendor: r.vendor_name ?? null,
-        total: r.total_amount ?? null,
         date: r.transaction_date ?? null,
         vehicle_id: r.vehicle_id ?? null,
         scope_type: r.scope_type ?? null,
@@ -123,7 +118,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         parts_lines: parts.length,
         payment_count: payments.length,
         receipt_count: receipts.length,
-        receipt_total: receiptTotal,
       },
     };
 

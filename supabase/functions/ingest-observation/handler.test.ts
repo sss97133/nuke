@@ -105,18 +105,19 @@ Deno.test("invalid defer flag fails before database mutation", async () => {
   assert(r.status === 400 && r.calls.length === 0);
 });
 Deno.test("signed-in user cannot select the service-only deferred mode", async () => {
-  const old = Deno.env.get("JWT_SIGNING_SECRET");
-  Deno.env.set("JWT_SIGNING_SECRET", "test-secret");
+  // A user session as Auth signs it since 2026-10-14: ES256, verified against the project JWKS.
+  const old = Deno.env.get("SUPABASE_JWKS");
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  Deno.env.set("SUPABASE_JWKS", JSON.stringify({ keys: [{ ...(await crypto.subtle.exportKey("jwk", pair.publicKey)), kid: "t", alg: "ES256" }] }));
   const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const unsigned = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ role: "authenticated", sub: UUID, exp: Math.floor(Date.now() / 1000) + 60 })}`;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("test-secret"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(unsigned)));
+  const unsigned = `${encode({ alg: "ES256", typ: "JWT", kid: "t" })}.${encode({ role: "authenticated", sub: UUID, exp: Math.floor(Date.now() / 1000) + 60 })}`;
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(unsigned)));
   const token = `${unsigned}.${btoa(String.fromCharCode(...signature)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")}`;
   try {
     const r = await run(input, "success", token);
     assert(r.status === 403 && r.calls.length === 0);
   } finally {
-    if (old === undefined) Deno.env.delete("JWT_SIGNING_SECRET"); else Deno.env.set("JWT_SIGNING_SECRET", old);
+    if (old === undefined) Deno.env.delete("SUPABASE_JWKS"); else Deno.env.set("SUPABASE_JWKS", old);
   }
 });
 
