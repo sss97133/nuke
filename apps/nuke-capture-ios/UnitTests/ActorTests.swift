@@ -69,4 +69,22 @@ final class ActorTests: XCTestCase {
         XCTAssertEqual(VehicleActorLinks.line(roles: ["owner"], type: "dealer"), "Owned by")
         XCTAssertEqual(VehicleActorLinks.line(roles: ["service_provider"], type: "shop"), "Serviced by")
     }
+
+    func testTheRoleDrillDownCountsAgainstTheRead() {
+        XCTAssertEqual(RoleTableCard.count("2,407"), 2407)
+        XCTAssertEqual(RoleTableCard.count("—"), 0)
+        // A dealer with 2,407 sold vehicles: the drill-down shows 300 and says of how many.
+        XCTAssertEqual(ActorVehiclesView.header(shown: 300, total: 2407, linked: 500),
+                       "300 shown of \(2407.formatted()) public vehicles · the most recently linked first")
+        XCTAssertEqual(ActorVehiclesView.header(shown: 12, total: 12, linked: 12), "All 12 public vehicles · most recently linked first")
+        // Links to private vehicles fill the cap, but the read counted 300 public: all of them are shown.
+        XCTAssertEqual(ActorVehiclesView.header(shown: 300, total: 300, linked: 500), "All 300 public vehicles · most recently linked first")
+        // The read is older than the links: the denominator never falls below what is shown.
+        XCTAssertEqual(ActorVehiclesView.header(shown: 5, total: 3, linked: 5), "All 5 public vehicles · most recently linked first")
+        XCTAssertEqual(ActorVehiclesView.header(shown: 0, total: 40, linked: 500), "0 shown of 40 public vehicles · the most recently linked first")
+        XCTAssertEqual(ActorVehiclesView.header(shown: 0, total: 0, linked: 0), "No public vehicles in this role")
+        // No count from the read and a capped read: never "all".
+        XCTAssertEqual(ActorVehiclesView.header(shown: 300, total: nil, linked: 500),
+                       "300 shown · the most recently linked first; this role has more links than one read takes")
+    }
 }

@@ -230,14 +230,18 @@ struct RoleTableCard: View {
         }
     }
 
+    /// A count cell as the read prints it ("2,407"), as a number; anything else counts as zero.
+    static func count(_ text: String) -> Int { Int(text.filter(\.isNumber)) ?? 0 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(table.title.uppercased()).font(.caption2.monospaced()).foregroundStyle(.secondary)
             ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
                 if row.count >= 3 {
                     let role = row[0].value.text
+                    let total = Self.count(row[1].value.text) + Self.count(row[2].value.text)
                     NavigationLink {
-                        ActorVehiclesView(orgId: orgId, role: role, title: Self.label(role))
+                        ActorVehiclesView(orgId: orgId, role: role, title: Self.label(role), total: total)
                     } label: {
                         HStack {
                             Text(Self.label(role)).font(.subheadline)
@@ -264,15 +268,31 @@ struct ActorVehiclesView: View {
     let orgId: String
     let role: String
     let title: String
+    /// Public vehicles in this role, as the actor read counted them; the denominator for what is shown.
+    var total: Int? = nil
     @State private var rows: [VehicleHeaderRow] = []
     @State private var linked = 0
     @State private var loaded = false
+
+    /// How many links one drill-down reads, and how many of their vehicles it shows.
+    static let linkCap = 500
+    static let shownCap = 300
+
+    /// What is shown of how many: the read's count is the denominator; with no count and a capped read, say so.
+    static func header(shown: Int, total: Int?, linked: Int) -> String {
+        if let total, total > shown {
+            return "\(shown.formatted()) shown of \(total.formatted()) public vehicles · the most recently linked first"
+        }
+        if shown == 0 { return "No public vehicles in this role" }
+        if total != nil || linked < linkCap { return "All \(shown.formatted()) public vehicles · most recently linked first" }
+        return "\(shown.formatted()) shown · the most recently linked first; this role has more links than one read takes"
+    }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
     var body: some View {
         ScrollView {
-            Text(loaded ? "\(rows.count.formatted()) public vehicles of \(linked.formatted()) links · newest year first" : "Reading…")
+            Text(loaded ? Self.header(shown: rows.count, total: total, linked: linked) : "Reading…")
                 .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 6)
             LazyVGrid(columns: columns, spacing: 2) {
@@ -308,14 +328,17 @@ struct ActorVehiclesView: View {
         do {
             let links: [Link] = try await SupabaseService.client.from("organization_vehicles")
                 .select("vehicle_id").eq("organization_id", value: orgId).eq("relationship_type", value: role)
-                .limit(500).execute().value
+                .order("created_at", ascending: false).limit(Self.linkCap).execute().value
             linked = links.count
-            let ids = Array(Set(links.map(\.vehicle_id))).prefix(300)
+            var seen = Set<String>()
+            let ids = links.map { $0.vehicle_id.lowercased() }.filter { seen.insert($0).inserted }.prefix(Self.shownCap)
             if !ids.isEmpty {
-                rows = try await SupabaseService.client.from("vehicles")
+                let found: [VehicleHeaderRow] = try await SupabaseService.client.from("vehicles")
                     .select("id,year,make,model,trim,primary_image_url,city,state")
                     .in("id", values: Array(ids)).eq("is_public", value: true).is("deleted_at", value: nil)
-                    .order("year", ascending: false, nullsFirst: false).execute().value
+                    .execute().value
+                let order = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
+                rows = found.sorted { (order[$0.id.uuidString.lowercased()] ?? .max) < (order[$1.id.uuidString.lowercased()] ?? .max) }
             }
         } catch {
             NSLog("NukeCapture actor vehicles read failed: %@", String(describing: error))
@@ -396,11 +419,14 @@ struct VehicleActorLinks: View {
         // The Bring a Trailer seller handle, as an identity whose measures open from here.
         var sellerLink: Link?
         if let seller: [Seller] = try? await SupabaseService.client.from("vehicles").select("bat_seller").eq("id", value: vehicleId).limit(1).execute().value,
-           let handle = seller.first?.bat_seller, !handle.isEmpty,
-           let ids: [Identity] = try? await SupabaseService.client.from("external_identities").select("id,handle")
-               .eq("platform", value: "bat").eq("handle", value: handle).limit(1).execute().value,
-           let identity = ids.first {
-            sellerLink = Link(route: ActorRoute(kind: "identity", id: identity.id, name: "@" + identity.handle), line: "Listed on Bring a Trailer by")
+           let handle = seller.first?.bat_seller, !handle.isEmpty {
+            // The identity read counts every case variant, so any one variant's row opens the same measures.
+            let spellings = handle == handle.lowercased() ? [handle] : [handle, handle.lowercased()]
+            if let ids: [Identity] = try? await SupabaseService.client.from("external_identities").select("id,handle")
+                   .eq("platform", value: "bat").in("handle", values: spellings).limit(2).execute().value,
+               let identity = ids.first(where: { $0.handle == handle }) ?? ids.first {
+                sellerLink = Link(route: ActorRoute(kind: "identity", id: identity.id, name: "@" + handle), line: "Listed on Bring a Trailer by")
+            }
         }
         defer { if let sellerLink, !links.contains(sellerLink) { links.insert(sellerLink, at: 0) } }
         do {
