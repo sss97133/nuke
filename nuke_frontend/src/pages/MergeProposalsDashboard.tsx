@@ -77,10 +77,12 @@ export default function MergeProposalsDashboard() {
         if (proposalsData) {
           const enriched = await Promise.all(
             proposalsData.map(async (p) => {
+              // Rows as the caller may see them (a select('*') on vehicles is not granted).
               const [primary, duplicate] = await Promise.all([
-                supabase.from('vehicles').select('*').eq('id', p.primary_vehicle_id).single(),
-                supabase.from('vehicles').select('*').eq('id', p.duplicate_vehicle_id).single()
+                supabase.rpc('vehicle_row_read', { p_vehicle_id: p.primary_vehicle_id }),
+                supabase.rpc('vehicle_row_read', { p_vehicle_id: p.duplicate_vehicle_id })
               ]);
+
 
               const [primaryImages, primaryEvents, dupImages, dupEvents] = await Promise.all([
                 supabase.from('vehicle_images').select('id', { count: 'exact', head: true }).eq('vehicle_id', p.primary_vehicle_id),

@@ -1021,7 +1021,7 @@ def write_report(reg, parts, tools):
             P(f"| {d['kind']} | {d['item']} {('— ' + d['name']) if d['name'] else ''} | {d['need']} | {d['cart']} | {d['status']} |")
     P("")
     cc = reg["cart_changes"]
-    P("## Cart change list (ProWire Q27156 → the design; a view, not applied)")
+    P("## Cart change list (the ProWire cart → the design; a view, not applied)")
     P("")
     P(f"Remove {len(cc['remove'])} · add {len(cc['add'])} · change qty {len(cc['set_qty'])} · "
       f"trim {len(cc['trim'])} · part lines {len(cc['parts'])}.")

@@ -26,6 +26,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const EXTRACTOR_VERSION = '2.1.0';
 
@@ -951,7 +952,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    projectSecretKey()!,
     { global: { headers: { 'X-Nuke-Writer': 'extract-gooding' } } },
   );
 

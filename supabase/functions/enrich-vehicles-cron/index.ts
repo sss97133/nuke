@@ -22,6 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabaseKey = projectSecretKey() ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body =

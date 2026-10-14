@@ -285,6 +285,7 @@ function queueHandler({ controls = {}, items = [], result = {}, landed = [] } = 
       if (name.includes('supabase-js')) return { createClient: () => db };
       if (name.endsWith('/listingUrl.ts')) return { normalizeListingUrlKey: url => url };
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
+      if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'configured' };
       if (name.endsWith('/ledger.ts')) return intakeLedger;
       throw new Error(`Unexpected queue import: ${name}`);
     },

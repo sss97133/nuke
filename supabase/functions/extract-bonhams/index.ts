@@ -26,6 +26,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -1108,7 +1109,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
 
     // ── Re-enrich action ─────────────────────────────────────────────────

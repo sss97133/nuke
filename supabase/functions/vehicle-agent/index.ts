@@ -25,6 +25,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
 
     const authHeader = req.headers.get("Authorization");
@@ -177,7 +178,7 @@ Deno.serve(async (req) => {
     if (allowWrites && Array.isArray(proposed) && proposed.length) {
       const now = new Date().toISOString();
       const ingestUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`;
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+      const serviceKey = projectSecretKey() ?? "";
       const toWrite = proposed.filter((o) => o && ALLOWED_KINDS.has(o.kind)).slice(0, 5);
       for (let i = 0; i < toWrite.length; i++) {
         const o = toWrite[i];

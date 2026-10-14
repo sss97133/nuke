@@ -13,7 +13,8 @@ END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
 END $$;
-CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, taken_at timestamptz, source text, vision_gate_status text);
+CREATE TABLE public.profiles (id uuid PRIMARY KEY);
+CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid DEFAULT 'cccccccc-0000-0000-0000-000000000001', taken_at timestamptz, source text, vision_gate_status text);
 CREATE TABLE public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_date date, total numeric, total_amount numeric, vendor_name text);
 CREATE TABLE public.work_order_payments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), payment_date timestamptz, amount numeric, status text);
 
@@ -29,7 +30,15 @@ INSERT INTO public.vehicle_images (vehicle_id, taken_at, source, vision_gate_sta
 INSERT INTO public.receipts (receipt_date, total, total_amount, vendor_name) VALUES (current_date - 3, 120.50, 120.50, 'Vendor A'), (current_date - 1, 9.99, 9.99, 'Vendor B');
 INSERT INTO public.work_order_payments (payment_date, amount, status) VALUES (current_date - 1 + time '09:00', 500, 'completed'), (current_date - 1 + time '10:00', 700, 'pending');
 
+-- ALLOW_RAW_TESTIMONY_WRITE (stub rows in a disposable database)
+INSERT INTO public.profiles VALUES ('cccccccc-0000-0000-0000-000000000001'), ('cccccccc-0000-0000-0000-000000000002');
+-- A second user's photo counts; a photo documented by nobody does not.
+INSERT INTO public.vehicle_images (vehicle_id, user_id, taken_at, source, vision_gate_status) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'cccccccc-0000-0000-0000-000000000002', current_date - 5 + time '09:00', 'capture_relay_ios', 'approved'),
+  ('aaaaaaaa-0000-0000-0000-000000000002', NULL, current_date - 5 + time '10:00', 'iphoto', 'approved');
+
 \ir ../migrations/20261014013500_journal_density_counts_only.sql
+\ir ../migrations/20261014040500_journal_density_per_user_probe.sql
 
 DO $$
 DECLARE r record; cols text;
@@ -43,6 +52,8 @@ BEGIN
   IF r.top_vehicle_id <> 'aaaaaaaa-0000-0000-0000-000000000001' THEN RAISE EXCEPTION 'top vehicle: %', r.top_vehicle_id; END IF;
   SELECT * INTO r FROM public.vw_journal_density WHERE date = current_date - 1;
   IF r.photo_count <> 0 OR r.receipt_count <> 1 OR r.payment_count <> 1 OR r.top_vehicle_id IS NOT NULL THEN RAISE EXCEPTION 'yesterday: %', r; END IF;
+  SELECT * INTO r FROM public.vw_journal_density WHERE date = current_date - 5;
+  IF r.photo_count <> 1 OR r.top_vehicle_id <> 'aaaaaaaa-0000-0000-0000-000000000002' THEN RAISE EXCEPTION 'five days ago (another user counts, nobody does not): %', r; END IF;
   IF (SELECT count(*) FROM public.vw_journal_density) <> 91 THEN RAISE EXCEPTION 'days: %', (SELECT count(*) FROM public.vw_journal_density); END IF;
   RAISE NOTICE 'vw_journal_density: counts only, every approved owner photo by the day it was taken';
 END $$;

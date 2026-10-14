@@ -17,6 +17,7 @@
 
 import { checkRateLimit, getClientIp, rateLimitResponse, rateLimitHeaders } from './rateLimit.ts';
 import { parseScope, scopeMatches, vinFromScope, type ScopeRequest } from './scopeGrammar.ts';
+import { projectSecretKey } from "./supabaseKeys.ts";
 
 // Re-export scope grammar primitives so callers can `import { ... } from '_shared/apiKeyAuth.ts'`
 // without needing to know about the parser file.
@@ -86,8 +87,8 @@ export async function authenticateRequest(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace('Bearer ', '');
 
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
+    const serviceRoleKey = projectSecretKey();
+    const altServiceRoleKey = projectSecretKey();
     if (
       (serviceRoleKey && token === serviceRoleKey) ||
       (altServiceRoleKey && token === altServiceRoleKey)

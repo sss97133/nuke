@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchVehicleOwnerBooks } from '../../lib/privateMoney';
+
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminNotificationService } from '../../services/adminNotificationService';
 import '../../styles/unified-design-system.css';
@@ -95,7 +97,7 @@ const BulkPriceEditor: React.FC = () => {
           .from('vehicles')
           .select(`
             id, year, make, model, vin, created_at,
-            msrp, current_value, purchase_price, asking_price, sale_price, is_for_sale
+            msrp, current_value, asking_price, sale_price, is_for_sale
           `)
           .order('created_at', { ascending: false })
           .range(page * pageSize, page * pageSize + pageSize - 1);
@@ -112,7 +114,10 @@ const BulkPriceEditor: React.FC = () => {
 
         const { data, error } = await base;
         if (error) throw error;
-        setRows((data as any) || []);
+        // The purchase price is the owner's: the caller's own vehicles only, through the owner books reader.
+        const ownerBooks = await fetchVehicleOwnerBooks(((data as any[]) || []).map((r) => r.id));
+        setRows(((data as any[]) || []).map((r) => ({ ...r, purchase_price: ownerBooks.get(r.id)?.purchase_price ?? null })));
+
       } catch (e) {
         console.error('Load vehicles failed:', e);
       } finally {

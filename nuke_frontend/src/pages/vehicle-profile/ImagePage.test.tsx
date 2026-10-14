@@ -6,18 +6,27 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Offline contracts only; no synthetic testimony is written to production.
 const fixture = vi.hoisted(() => ({ route: { vehicleId: 'offline-vehicle', imageId: 'offline-image' }, read: vi.fn(), calls: [] as any[] }));
 vi.mock('react-router-dom', async original => ({ ...await original<typeof import('react-router-dom')>(), useParams: () => fixture.route }));
-vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
-  const call = { table, filters: [] as any[], selected: '', single: false, limit: 0, signal: undefined as AbortSignal | undefined };
-  const query: any = {
-    select: (s: string) => { call.selected = s; return query; },
-    eq: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
-    in: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
-    limit: (n: number) => { call.limit = n; return query; },
-    abortSignal: (s: AbortSignal) => { call.signal = s; return query; },
-    maybeSingle: () => { call.single = true; return query; },
-    then: (resolve: any, reject: any) => { fixture.calls.push(call); return Promise.resolve().then(() => fixture.read(call)).then(resolve, reject); },
-  }; return query;
-} } }));
+vi.mock('../../lib/supabase', () => {
+  const from = (table: string) => {
+    const call = { table, filters: [] as any[], selected: '', single: false, limit: 0, signal: undefined as AbortSignal | undefined };
+    const query: any = {
+      select: (s: string) => { call.selected = s; return query; },
+      eq: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
+      in: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
+      limit: (n: number) => { call.limit = n; return query; },
+      abortSignal: (s: AbortSignal) => { call.signal = s; return query; },
+      maybeSingle: () => { call.single = true; return query; },
+      then: (resolve: any, reject: any) => { fixture.calls.push(call); return Promise.resolve().then(() => fixture.read(call)).then(resolve, reject); },
+    }; return query;
+  };
+  // vehicle_row_read answers the one-row raw vehicles read (the owner's purchase facts masked server-side).
+  const rpc = (name: string, args: any) => {
+    const query = from(name === 'vehicle_row_read' ? 'vehicles' : name);
+    return query.select('*').eq('id', args?.p_vehicle_id).maybeSingle();
+  };
+  return { supabase: { from, rpc } };
+});
+
 import ImagePage from './ImagePage';
 const VEHICLE = 'offline-vehicle', IMAGE = 'offline-image', SOURCE = 'https://example.invalid/offline.jpg';
 function id(c: any, key = 'id') { return c.filters.find((f: any) => f[0] === key)?.[1]; }

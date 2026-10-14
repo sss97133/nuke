@@ -1,5 +1,15 @@
 import { supabase } from '../../lib/supabase';
 import type { Vehicle } from '../../types';
+import { VEHICLE_CARD_COLUMNS } from '../../components/vehicles/vehicleCardColumns';
+
+// One vehicles row as the caller may see it: hidden rows read as null, the owner's purchase facts as
+// null unless the caller is the owner. A select('*') or returning '*' on vehicles is not granted.
+const readRow = async (id: string) => {
+  const { data, error } = await supabase.rpc('vehicle_row_read', { p_vehicle_id: id });
+  if (error) throw error;
+  if (!data) throw new Error('Vehicle not found');
+  return data as Record<string, any>;
+};
 
 export const vehicleService = {
   /**
@@ -7,14 +17,8 @@ export const vehicleService = {
    */
   getById: async (id: string) => {
     // Fetch vehicle and images separately to avoid PostgREST ambiguity (vehicle_id + suggested_vehicle_id)
-    const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const vehicle = await readRow(id);
 
-    if (vehicleError) throw vehicleError;
-    
     // Fetch images separately
     const { data: images, error: imagesError } = await supabase
       .from('vehicle_images')
@@ -42,26 +46,26 @@ export const vehicleService = {
     const { data, error } = await supabase
       .from('vehicles')
       .insert([vehicleData])
-      .select()
+      .select('id')
       .single();
 
     if (error) throw error;
-    return data as Vehicle;
+    return (await readRow(data.id)) as Vehicle;
   },
 
   /**
    * Update an existing vehicle
    */
   update: async (id: string, updates: Partial<Vehicle>) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('vehicles')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('id')
       .single();
 
     if (error) throw error;
-    return data as Vehicle;
+    return (await readRow(id)) as Vehicle;
   },
 
   /**
@@ -84,8 +88,9 @@ export const vehicleService = {
     // Fetch vehicles and images separately to avoid PostgREST ambiguity
     let vehicleQuery = supabase
       .from('vehicles')
-      .select('*')
+      .select(VEHICLE_CARD_COLUMNS)
       .order('created_at', { ascending: false });
+
       
     if (userId) {
       vehicleQuery = vehicleQuery.eq('user_id', userId);
@@ -121,7 +126,8 @@ export const vehicleService = {
     return vehicles.map(vehicle => ({
       ...vehicle,
       images: imagesByVehicle.get(vehicle.id) || []
-    })) as Vehicle[];
+    })) as unknown as Vehicle[];
+
   }
 };
 

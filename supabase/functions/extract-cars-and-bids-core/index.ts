@@ -26,6 +26,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -488,7 +489,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+    const serviceRoleKey = (projectSecretKey() ?? "").trim();
     const firecrawlApiKey = (Deno.env.get("FIRECRAWL_API_KEY") ?? "").trim();
 
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
@@ -952,7 +953,7 @@ Deno.serve(async (req) => {
         // Fire-and-forget: async image-vehicle match validation
         fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-image-vehicle-match`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+          headers: { 'Authorization': `Bearer ${projectSecretKey()}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ vehicle_id: vehicleId, batch_size: 10 }),
         }).catch(() => {});
       }
@@ -1094,7 +1095,7 @@ Deno.serve(async (req) => {
     // Try to log error to scraping_health
     try {
       const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-      const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+      const serviceRoleKey = (projectSecretKey() ?? "").trim();
       if (supabaseUrl && serviceRoleKey) {
         const supabase = createClient(supabaseUrl, serviceRoleKey, {
           global: { headers: { "X-Nuke-Writer": "extract-cars-and-bids-core" } },

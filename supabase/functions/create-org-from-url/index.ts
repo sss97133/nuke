@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -308,7 +309,7 @@ async function safeInvokeInternal(
   body: Record<string, unknown>,
 ): Promise<{ ok: boolean; status: number; data: any; errorText?: string }> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
   const internalJwt = Deno.env.get("INTERNAL_INVOKE_JWT") ?? "";
 
   const url = `${supabaseUrl}/functions/v1/${functionName}`;
@@ -386,7 +387,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
       { auth: { persistSession: false } }
     );
 
