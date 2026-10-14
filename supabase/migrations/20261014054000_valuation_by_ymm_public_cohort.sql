@@ -28,6 +28,17 @@
 -- Chevelle 1969 vs 1970, Bronco 1974 vs 1977, Charger 1969 vs Challenger 1970). Warm is unchanged (Mustang 1967 1.72 s before,
 -- 1.62-1.72 s after): after the reads the time is the evidence work itself. A cohort of 1,700 members still takes several
 -- seconds cold; that evidence work (re-reading each member's stored page and parsing it) is by design and is not touched.
+-- The shipped statement itself, EXPLAIN (ANALYZE, BUFFERS) on production as the deploy role, 2026-10-14, with the member array
+-- bound as a literal the way the plpgsql custom plan sees it, against the live statement on the same ids and members:
+--                               warm old / new            first run after eviction, old / new (time, buffers read)
+--   Mustang 1966, 1,758 members   1,156 ms / 1,136 ms      10.3 s, 21,105  /  7.6 s, 11,338
+--   Chevrolet C10 1972, 767       464 ms / 459 ms          5.0 s, 12,782   /  2.4 s, 3,691
+--   K5 Blazer 1977, 63            48 ms / 47 ms            499 ms          /  242 ms, 329
+--   Porsche 1998 911 Carrera S, 18  18 ms / 18 ms          215 ms          /  84 ms, 130
+-- The four array reads run as an Index Scan on idx_vehicle_events_vehicle (1,243 rows, 10.6 ms) and a Bitmap Heap Scan on
+-- bat_listings (554 rows, 9.9 ms) for the Mustang, no sequential scan anywhere. With a forced generic plan, which a plpgsql
+-- statement can settle on after its fifth call in a session, Mustang 1966: old 7.1 s then 0.93 s, new 1.22 s then 1.01 s,
+-- again no sequential scan.
 -- Same answers: the old and the new statement compared in one SQL statement (one snapshot) for 14 cohorts on 2026-10-14, 11
 -- registered (Mustang 1965/1966/1969, C10 1972, K5 Blazer 1977 and K5-Blazer 1977, Camaro 1969, Corvette 1963, Porsche 911
 -- 1987 and 2023, Bronco 1971) and 3 without a scope (Porsche 1998, Corvette Coupe 1967, Ford 1932 by make and year only, 1,023
