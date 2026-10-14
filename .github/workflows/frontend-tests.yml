@@ -642,8 +642,11 @@ jobs:
             [ -f "$f" ] || continue
             queue="$queue $(grep -ohE '(supabase|scripts)/[A-Za-z0-9_./-]+[.](py|mjs|js|ts|sql)' "$f" | sort -u | tr '\n' ' ')"
           done
-          seen="$seen.github/workflows/frontend-tests.yml "
           hits=$(git diff --name-only HEAD^1 HEAD | while read -r c; do case "$seen" in (*" $c "*) echo "$c" ;; esac; done)
+          # This workflow file reaches the replay only through its header (everything above jobs:) and this job's own
+          # block; a pull request that adds or edits another job cannot change the replay's result.
+          replay_def() { git show "$1:.github/workflows/frontend-tests.yml" | awk '/^jobs:/{j=1} !j{print;next} /^  image-projection:/{p=1;print;next} p&&/^  [A-Za-z0-9_-]+:/{p=0} p{print}'; }
+          if [ "$(replay_def HEAD^1)" != "$(replay_def HEAD)" ]; then hits="$hits .github/workflows/frontend-tests.yml (header or image-projection)"; fi
           echo "replay reads $(echo $seen | wc -w | tr -d ' ') files"
           if [ -n "$hits" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"; echo "replay runs; this pull request changes: $hits"
