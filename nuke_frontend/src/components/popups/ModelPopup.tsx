@@ -7,6 +7,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { VehiclePopup } from './VehiclePopup';
 import type { FeedVehicle } from '../../feed/types/feed';
@@ -98,7 +99,7 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     : data.live_now;
 
   const handleVehicleClick = (sale: SaleVehicle) => {
-    supabase.from('vehicles').select('*').eq('id', sale.id).single().then(({ data: fullVehicle }) => {
+    supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', sale.id).single().then(({ data: fullVehicle }) => {
       if (fullVehicle) {
         openPopup(
           <VehiclePopup vehicle={fullVehicle as unknown as FeedVehicle} />,
