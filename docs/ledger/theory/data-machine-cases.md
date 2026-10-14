@@ -1995,3 +1995,92 @@ coverage and peer rank, a table of the actor's vehicles by role), a public proje
 test on a disposable PG17. (2) The phone renders measures and tables through the kit twin and reaches an actor from
 search, from a vehicle's seller or owner link and from the map. (3) The same read for a person (garage, work,
 disclosure), then the per-ZIP aggregate for the map.
+
+### 13.12 The wiring harness as a stack (owner, 2026-10-14 05:40Z)
+
+**Owner direction, in substance.** Each vehicle has its own extensive data model with its unique data, queried with
+SQL in Postgres: "a series of tables and descriptions, that's how we're supposed to be storing an entire wiring
+harness, not raw data, heavily structured data ... options are different from hard coding ... using the data model as
+our method of delivering the facts of a wiring harness." After seeing the K5 harness rendered from its rows: it
+"preceded our whole data model movement"; "completely ingest this into the proper data model with all the data
+machine concepts and rules, making sure everything's deeply connected ... ruminate, hypothesize, develop criteria of
+what is a stack for wiring harnesses, what is the structured data of this system."
+
+**What the rows are today (read-only, 2026-10-14, vehicle e08bf694).** 37 wiring tables exist. The K5 holds 528 live
+wires (`vehicle_custom_circuits`), 227 plugs (`harness_endpoints`) and 891 wire ends (`wire_termination_specs`),
+loaded one way from `k5_registry.json`, which is the source of truth. 136 of the 528 wire rows store a Python
+dictionary as text in `from_component`/`to_component`, and 27 store prose in a cavity column. 0 of 891 wire ends and 0
+of 227 plugs key into `catalog_parts` (10,853 rows), although the wire-end table carries nine foreign keys for it.
+1,100 of the 1,156 rows in the shared pin library (`device_pin_maps`) also carry one vehicle's connections.
+`factory_harness_circuits` holds 71 squarebody 1973-87 circuits beside 60 `nuke_build` rows (a build mixed into the
+factory baseline). `connector_cavity_layouts` holds 467 cavities across 46 connector models, with the D38999 25-61
+listed twice under two names. 9 of 132 columns in the three core tables are described. 42 of 528 wires carry stored
+check results; the checks run in Python with the truck's layout typed in. The owner's verdict stands: tables holding an
+export, not a model.
+
+**The nouns already exist outside.** VDA 4968, the Vehicle Electric Container (VEC), is the automotive industry's
+information model for harnesses: components such as connectors and wires, connectivity and wiring, topology and
+geometry, and variants and modules, with the older harness list KBL (VDA 4964) beside it (prostep ivip fact sheet).
+Take its concept set as the dimension vocabulary rather than inventing one. What Nuke adds is what VEC does not
+carry: testimony behind every value, clocks and replay, cohort baselines, and outcomes.
+
+**The harness through the nine layers (lead's hypothesis).**
+
+| Layer | What it means for a harness | Exists today as |
+|---|---|---|
+| Log | Every statement about the harness, attributed: a maker's datasheet line, a service-manual page, a vendor drawing, an owner call, a builder's practice, a receipt, a photo, a tape measurement, an agent interpretation with its method and version, a check result with its inputs and rule version. Event clock (said or measured) and ingest clock. | Receipts in git; some `vehicle_observations`; most harness facts are registry fields with a source string |
+| Key | Part numbers to `catalog_parts`; pins to the device pin library; cavities to the connector model's cavity layout; plugs to device instances; speakers to identities and organizations | The foreign-key columns exist and are empty |
+| Dimension (shared, versioned, no vehicle in it) | Parts (housing, terminal, seal, wedge, backshell, wire spec, fuse, crimp tool and die); connector models with cavity layouts and compatibility (terminal × seal × wire outside diameter); device models with pins (function, electrical type, limits); wire specs (gauge, diameter, ampacity by temperature, resistance per foot); signal types; body-generation routing landmarks; the factory circuit catalog per generation | `catalog_parts`, `connector_cavity_layouts`, `wire_catalog`, `component_library`; `device_pin_maps` and `factory_harness_circuits` mixed with one build |
+| Instance graph (per vehicle: the harness itself) | Device instance (placed, with its position source) → connector instance (one mated half) → cavity occupancy (a terminal instance) ← segment (one physical wire between two terminations: spec, colour, planned and measured length) ; segments compose a net (the logical circuit: source pin to load pins, function, protection); splices, studs and ground banks are nodes; bundles and branches carry coverings and routes; every row carries its variant membership (the "150 % harness") | `harness_endpoints`; `vehicle_custom_circuits` conflates net and segment (a wire through the firewall is one row with four end rows); `wiring_decision_links` |
+| Fold | State per instance as of any date: design (concept → decided), procurement (carted → bought with proof → in hand), build (cut → terminated → installed → tested) | Status columns rewritten by each load |
+| Baseline | (a) The factory harness of the body generation, what the truck was born with; (b) the cohort of comparable builds (standalone ECU and PDM restomods, other M130 looms: Dave's Bronco sheet belongs here as a comparable, never as K5 fact); (c) maker rule limits (ampacity, drop ≤ 3 %, seal range) | 71 factory circuits with typical lengths and 26 known failure modes; no build cohort |
+| Residual | This harness against its baselines: each factory circuit kept, replaced, deleted or new; wire per function against the cohort; margins against the rules (drop, ampacity, PDM output current); spare cavities, outputs and inputs against the cohort | The manifest's KEEP / REPLACE / NEW / SPLICE flag; margins only in `CABLE_SIZING.md` |
+| Feature | Per harness as of t: readiness by layer (plugs, ends, crossing, terminals, material), cited-field share, minimum margins, spare capacity, open unknowns with the cost to close each, key-off draw | `options_v5.py` readiness levels, outside the database |
+| Prediction (six blanks) | At design freeze t, for standalone-ECU harness builds P, predict cut length per segment, material cost, build hours and first-start defects as a median and 80 % range; grade by absolute error against the as-built outcome; baseline the factory typical length plus pad, or the cohort median. Per segment: the chance of rework | None |
+| Outcome | The as-built truth joined back by key and clock: measured cut lengths, receipts, work sessions, continuity and insulation tests, voltage drop under load, first start, later faults | None (nothing cut) |
+
+**Criteria: the harness is a stack when each of these holds, and each is a test.**
+1. Every physical thing has a grain and a key: part, connector model, cavity, device model, pin, device instance,
+   connector instance, terminal instance, segment, net, node (splice, stud, ground bank), bundle, route node. A wire
+   through a bulkhead is one net and two segments.
+2. The library and the instance are separate: no library row names a vehicle, and no instance row restates a library
+   fact as text.
+3. Every reference is a key. An unresolved reference is held as a candidate with its original text and a status, never
+   as prose or a serialized object in a typed column.
+4. Every value carries testimony: its source observation, the speaker's relation (maker, service manual, owner intent,
+   builder practice, another vehicle, agent with method and version), both clocks and trust. Another vehicle's
+   document can inform a baseline; it cannot become this vehicle's fact.
+5. Replay: the harness as it stood on any date is a query, and state changes are events.
+6. Variants are data: an option is a decision row, instance rows carry variant membership, a configuration is a query,
+   and deciding an option changes rows, not code. An option with no rows reports itself as unexpanded.
+7. Checks are computed conclusions in SQL, with a rule version and stored inputs. A decided owner call is a constraint
+   the instance cannot violate. Generators never decide.
+8. Every output reads the rows: build book, diagrams, cut list, formboard, carts and the stack page. Nothing generated
+   is a source.
+9. Coverage comes first, across every harness instance in the database (the K5, a factory generation, any other
+   build), each layer with its denominator.
+10. Every column is described in the database (meaning, unit, source, grain, clock).
+11. A second vehicle's harness, or a factory generation, lands in the same tables without a new table.
+
+**Hypotheses, each falsifiable.**
+- *H1, net and segment.* Wire #110 (coolant temp) as one net and two segments through 61-pin cavity w reproduces
+  today's kit output and gives each segment its own length and cut state. It fails if a segment needs a field the net
+  owns.
+- *H2, checks as joins.* Terminal wire range, cavity validity and seal fit recomputed in SQL over library and instance
+  rows agree with `check_plug_ends.py` on all 939 ends; every disagreement names a model gap.
+- *H3, contamination is a key error.* The 65 fields resting on the Bronco sheet and the 28 purchase flags citing
+  another customer's invoice become other-vehicle or baseline testimony once every observation is keyed to the
+  vehicle it observes; none can then be a decided K5 fact.
+- *H4, variants.* Rev A as a query (492 of 528 wires on 2026-10-14) equals `options_v5.py`'s configuration for the
+  same option set. 50 of the 55 candidate options have no rows today.
+- *H5, factory baseline.* The 71 factory circuits give the K5 a residual (kept, replaced, new per factory function)
+  that accounts for its 528 wires; the 60 `nuke_build` rows leave the factory table.
+
+**Build order (a proposal; tables only through SCHEMA_LAW and `schema_proposals`, nothing minted here).**
+(1) Map each VEC concept to an existing table or a proposal, and name each conflation (net and segment; library and
+instance in `device_pin_maps` and `factory_harness_circuits`). (2) Re-ingest the K5 from its sources rather than
+from the registry: each fact an observation with its datasheet page, manual page, owner call, receipt, photo or
+measurement, then keyed and folded into the instance graph. The registry becomes a generated view, and its row-by-row
+diff against today's file is the audit. (3) Port the checks to SQL (H2) and the configuration to a query (H4).
+(4) Load the factory generation as the first baseline (H5) and one more build as the first cohort member. (5) The
+harness stack page, rendered from rows, coverage first, every number a door.
