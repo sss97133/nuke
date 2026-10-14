@@ -71,9 +71,10 @@
 --   Pause when pending reaches 0.
 --
 -- NOT DECIDED HERE. The yield is low because most of this queue is duplicate vehicles (see the VIN conflicts above);
--- merging them is the larger gain. And ingest-observation, which the fire-and-forget observation writes call, returned a
--- non-200 for 39% of 95,544 calls in the 24 hours to 2026-10-14 04:00 UTC: some of this job's observations will be lost
--- silently while the vehicle update lands.
+-- merging them is the larger gain. The observation writes are fire and forget: writeObservation inserts vehicle_observations,
+-- field_evidence and a vehicles gap-fill directly; it does not call the ingest-observation function, whose 39% non-200 rate in
+-- the 24 hours to 2026-10-14 05:35 UTC is mostly BaT live-frame admission (1,077 of 1,155 error lines in one hour). A failed
+-- write here is logged and not counted, and its success rate for this job is unmeasured.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
