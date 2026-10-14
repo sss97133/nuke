@@ -90,10 +90,10 @@ export async function readCapturedListings(source = 'classifieds', cursor?: Curs
   };
 }
 
-export function useCapturedListings(source: string) {
+export function useCapturedListings(source: string, enabled = true) {
   return useInfiniteQuery({
     queryKey: ['market-captured-listings', source], queryFn: ({ pageParam, signal }) => readCapturedListings(source, pageParam, signal),
     initialPageParam: undefined as Cursor | undefined, getNextPageParam: page => page.next,
-    staleTime: 60_000, retry: 1,
+    staleTime: 60_000, retry: 1, enabled,
   });
 }

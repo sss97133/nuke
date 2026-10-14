@@ -105,6 +105,14 @@ enum Config {
     static let siteMinRadiusMeters: Double = 150
     /// Backfill upload batch size (UPLOAD N runs in caps of this).
     static let backfillBatchSize = 50
+    /// How many queued photos a FOREGROUND pass may push before handing the rest to the
+    /// power + Wi-Fi background job. Each one loads original bytes, runs on-device triage
+    /// and uploads; an unbounded foreground drain made the phone hot on every open
+    /// (owner, 2026-10-13). The background drain (drainUntilEmpty) is not budgeted.
+    static let foregroundBackfillBudget = 40
+    /// The pause between queued photos in a foreground pass, so the drain shares the
+    /// device with the screen the owner is looking at.
+    static let foregroundBackfillPaceMs = 400
 
     // ─── iOS-only ────────────────────────────────────────────────────────────
     /// BGAppRefreshTask identifier — must match
