@@ -352,6 +352,30 @@ jobs:
       - name: Verify the cited cavity models and the cavity and housing keys
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi2_ci -f supabase/sql/test_k5_harness_rsi_pass2.sql
 
+  k5-harness-rsi-pass3-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable RSI pass 3 database
+        run: createdb dm_refinement_k5_rsi3_ci
+      - name: Verify the factory baseline key, the evidence fold and the residual
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_rsi3_ci -f supabase/sql/test_k5_harness_rsi_pass3.sql
+
   k5-harness-reshape-contract:
     runs-on: ubuntu-latest
     services:
