@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { readInventoryTaxonomy, useMarketPulse } from './useMarketPulse';
+import { fetchPulse, readInventoryTaxonomy, useMarketPulse } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
