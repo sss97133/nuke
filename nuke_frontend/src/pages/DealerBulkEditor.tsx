@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import vinDecoderService from '../services/vinDecoder';
+import { fetchOrganizationVehicleBooks, fetchVehicleOwnerBooks } from '../lib/privateMoney';
 // import * as XLSX from 'xlsx'; // Optional dependency - install with: npm install xlsx
 
 interface BulkVehicle {
@@ -56,10 +57,12 @@ const DealerBulkEditor: React.FC = () => {
   const loadInventory = async () => {
     setLoading(true);
     try {
-      // Load existing inventory
+      // Load existing inventory. The cost basis lives on the organization's link and the purchase price
+      // on the vehicle; both are owner money, read through their books readers (lib/privateMoney).
       const { data } = await supabase
         .from('organization_vehicles')
         .select(`
+          id,
           vehicle_id,
           relationship_type,
           vehicles!inner(
@@ -72,13 +75,15 @@ const DealerBulkEditor: React.FC = () => {
             mileage,
             color_primary,
             asking_price,
-            purchase_price,
-            cost_basis,
             notes
           )
         `)
         .eq('organization_id', orgId)
         .in('relationship_type', ['in_stock', 'consignment', 'owner']);
+      const [books, ownerBooks] = await Promise.all([
+        fetchOrganizationVehicleBooks(orgId || ''),
+        fetchVehicleOwnerBooks((data || []).map((row: any) => row.vehicle_id)),
+      ]);
 
       const mapped = data?.map((row: any) => ({
         id: row.vehicles.id,
@@ -90,8 +95,8 @@ const DealerBulkEditor: React.FC = () => {
         mileage: row.vehicles.mileage,
         color: row.vehicles.color_primary,
         asking_price: row.vehicles.asking_price,
-        purchase_price: row.vehicles.purchase_price,
-        cost_basis: row.vehicles.cost_basis,
+        purchase_price: ownerBooks.get(row.vehicle_id)?.purchase_price ?? undefined,
+        cost_basis: books.get(row.id)?.cost_basis ?? undefined,
         notes: row.vehicles.notes,
         status: row.relationship_type,
         _isNew: false,
@@ -177,12 +182,11 @@ const DealerBulkEditor: React.FC = () => {
               color_primary: vehicle.color,
               asking_price: vehicle.asking_price,
               purchase_price: vehicle.purchase_price,
-              cost_basis: vehicle.cost_basis,
               notes: vehicle.notes,
               uploaded_by: session?.user?.id,
               is_public: true
             })
-            .select()
+            .select('id')
             .single();
 
           if (vError) {
@@ -196,7 +200,8 @@ const DealerBulkEditor: React.FC = () => {
             .insert({
               organization_id: orgId,
               vehicle_id: newVehicle.id,
-              relationship_type: vehicle.status || 'in_stock'
+              relationship_type: vehicle.status || 'in_stock',
+              cost_basis: vehicle.cost_basis
             });
 
           vehicle.id = newVehicle.id;
@@ -215,7 +220,6 @@ const DealerBulkEditor: React.FC = () => {
               color_primary: vehicle.color,
               asking_price: vehicle.asking_price,
               purchase_price: vehicle.purchase_price,
-              cost_basis: vehicle.cost_basis,
               notes: vehicle.notes
             })
             .eq('id', vehicle.id);
@@ -224,6 +228,19 @@ const DealerBulkEditor: React.FC = () => {
             vehicle._errors = [uError.message];
             continue;
           }
+
+          // The cost basis is the organization's, on its link to the vehicle (vehicles has no such column).
+          const { error: cError } = await supabase
+            .from('organization_vehicles')
+            .update({ cost_basis: vehicle.cost_basis ?? null })
+            .eq('organization_id', orgId)
+            .eq('vehicle_id', vehicle.id);
+
+          if (cError) {
+            vehicle._errors = [cError.message];
+            continue;
+          }
+
         }
 
         vehicle._isDirty = false;

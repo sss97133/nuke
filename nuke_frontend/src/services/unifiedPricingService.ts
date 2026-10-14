@@ -116,7 +116,6 @@ export class UnifiedPricingService {
         sale_price,
         asking_price,
         current_value,
-        purchase_price,
         msrp,
         bat_auction_url,
         updated_at
@@ -196,17 +195,7 @@ export class UnifiedPricingService {
       };
     }
 
-    // 5. FOURTH TRUTH: Historical purchase price
-    const purchasePrice = toNumber(vehicle.purchase_price);
-    if (purchasePrice) {
-      return {
-        displayValue: purchasePrice,
-        displayLabel: 'Purchased for',
-        source: 'purchase_price',
-        confidence: 'low',
-        lastUpdated: vehicle.updated_at || new Date().toISOString()
-      };
-    }
+    // 5. The purchase price is the owner's and is not readable here (lib/privateMoney).
 
     // 6. LOWEST TRUTH: MSRP (baseline reference)
     const msrp = toNumber(vehicle.msrp);
@@ -273,8 +262,8 @@ export class UnifiedPricingService {
         sale_price,
         asking_price,
         current_value,
-        purchase_price,
         msrp,
+
         bat_auction_url,
         updated_at
       `)
@@ -333,28 +322,19 @@ export class UnifiedPricingService {
                 lastUpdated: vehicle.updated_at || new Date().toISOString()
               };
             } else {
-              const purchasePrice = toNumber(vehicle.purchase_price);
-              if (purchasePrice) {
+              // The purchase price is the owner's and is not readable here (lib/privateMoney).
+              const msrp = toNumber(vehicle.msrp);
+              if (msrp) {
                 price = {
-                  displayValue: purchasePrice,
-                  displayLabel: 'Purchased for',
-                  source: 'purchase_price',
+                  displayValue: msrp,
+                  displayLabel: 'MSRP',
+                  source: 'msrp',
                   confidence: 'low',
                   lastUpdated: vehicle.updated_at || new Date().toISOString()
                 };
-              } else {
-                const msrp = toNumber(vehicle.msrp);
-                if (msrp) {
-                  price = {
-                    displayValue: msrp,
-                    displayLabel: 'MSRP',
-                    source: 'msrp',
-                    confidence: 'low',
-                    lastUpdated: vehicle.updated_at || new Date().toISOString()
-                  };
-                }
               }
             }
+
           }
         }
 

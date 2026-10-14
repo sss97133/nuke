@@ -29,7 +29,7 @@ Every data point must come from a real source — a service manual, a product da
 - **VIN:** CCL187Z210370
 - **Owner/Client:** the client (contact details live in the DB, not here)
 - **Builder:** NUKE LTD, 676 Wells Rd, Boulder City NV 89005
-- **Wiring Subcontractor:** Desert Performance (desertperformance@cox.net, 702-513-8837), same address
+- **Wiring Subcontractor:** Desert Performance (contact in the DB), same address
 
 ### Build Spec
 - Engine: Delmo Speed LS3 (cosmetic kit on GM LS3 crate engine)

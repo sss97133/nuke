@@ -2,11 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { callLLM, getLLMConfig, type AnalysisTier, type LLMProvider } from "../_shared/llmProvider.ts"
 import { corsHeaders } from "../_shared/cors.ts"
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-  Deno.env.get("SERVICE_ROLE_KEY") ??
+  projectSecretKey() ??
   ""
 
 const DEFAULT_LIMIT = 20

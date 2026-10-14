@@ -1105,12 +1105,10 @@ Redirecting to vehicle profile...`);
         throw new Error('Failed to create vehicle - no vehicle_id returned');
       }
 
-      // Fetch the created vehicle record for downstream use
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('id', vehicleId)
-        .single();
+      // Fetch the created vehicle record for downstream use (as the caller may see it; a
+      // select('*') on vehicles is not granted)
+      const { data: vehicle } = await supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId });
+
 
       if (vehicle) {
         

@@ -119,7 +119,8 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
       fetches.push(
         supabase
           .from('vehicles')
-          .select('id, year, make, model, current_value, location, purchase_location, city, state, country, is_public, vin, purchase_price_cents, image_count, receipt_count, primary_image_url')
+          .select('id, year, make, model, current_value, location, city, state, country, is_public, vin, purchase_price_cents, image_count, receipt_count, primary_image_url')
+
           .in('id', byType.vehicle)
           .then(({ data }) => {
             (data || []).forEach((v: any) => { detailsMap[v.id] = v; });
