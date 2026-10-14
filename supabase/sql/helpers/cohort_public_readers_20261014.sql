@@ -1,0 +1,71 @@
+-- Fixture: the public cohort readers exactly as migration 20261014052500_popup_vehicle_intel_public_cohort.sql (PR #1129)
+-- creates them. The valuation migration requires them to exist, so its contract loads them first, as if that migration had
+-- been applied. If that migration's definitions change, change these to match.
+CREATE OR REPLACE FUNCTION public.cohort_scope_rule(p_subject_id uuid)
+ RETURNS TABLE(canonical_make text, grain text, year integer, year_start integer, year_end integer, pattern text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+  -- The rule cohort_members() applies, as data: make, years and the word-boundary model regex built from the canonical
+  -- model and its aliases. NULL pattern = no usable model words (cohort_members() then returns nothing).
+  WITH p AS (
+    SELECT mp.canonical_make, mp.grain, mp.year, mp.year_start, mp.year_end, mp.canonical_model, mp.canonical_model_id
+      FROM public.make_model_profiles mp
+     WHERE mp.subject_id = p_subject_id
+  ), alts AS (
+    SELECT string_agg(regexp_replace(lower(s.t), '([.^$*+?()\[\]{}|\\-])', '\\\1', 'g'), '|') AS a
+      FROM (
+        SELECT lower(p.canonical_model) AS t FROM p
+        UNION
+        SELECT lower(al) FROM p JOIN public.canonical_models cm ON cm.id = p.canonical_model_id, unnest(cm.aliases) al
+      ) s
+     WHERE s.t IS NOT NULL AND length(trim(s.t)) > 0
+  )
+  SELECT p.canonical_make, p.grain, p.year, p.year_start, p.year_end,
+         CASE WHEN alts.a IS NOT NULL AND alts.a <> '' THEN '\y(' || alts.a || ')\y' END
+    FROM p CROSS JOIN alts
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.cohort_members_public(p_subject_id uuid)
+ RETURNS TABLE(vehicle_id uuid)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+DECLARE r record;
+BEGIN
+  SELECT * INTO r FROM public.cohort_scope_rule(p_subject_id);
+  IF NOT FOUND OR r.pattern IS NULL THEN RETURN; END IF;
+  -- definer: the visitor's view of a cohort is public, undeleted, non-part vehicles, stated here so the make, model and
+  -- year quals can use the partial indexes on public vehicles instead of waiting behind the row policies
+  IF r.grain = 'year' THEN
+    RETURN QUERY
+      SELECT v.id FROM public.vehicles v
+       WHERE lower(v.make) = lower(r.canonical_make) AND v.year = r.year AND lower(v.model) ~ r.pattern
+         AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item' AND v.is_public AND v.deleted_at IS NULL;
+  ELSE
+    RETURN QUERY
+      SELECT v.id FROM public.vehicles v
+       WHERE lower(v.make) = lower(r.canonical_make) AND v.year BETWEEN r.year_start AND r.year_end AND lower(v.model) ~ r.pattern
+         AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item' AND v.is_public AND v.deleted_at IS NULL;
+  END IF;
+END
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.public_vehicles_by_model_year(p_make text, p_year integer, p_models text[])
+ RETURNS TABLE(id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+  -- p_models are lower-cased model names; a vehicle matches when lower(model) is one of them
+  SELECT v.id FROM public.vehicles v
+   WHERE lower(v.make) = lower(p_make) AND v.year = p_year AND lower(v.model) = ANY (p_models)
+     AND v.is_public AND v.deleted_at IS NULL
+$fn$;
+
+REVOKE ALL ON FUNCTION public.cohort_scope_rule(uuid), public.cohort_members_public(uuid),
+  public.public_vehicles_by_model_year(text, integer, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cohort_scope_rule(uuid), public.cohort_members_public(uuid),
+  public.public_vehicles_by_model_year(text, integer, text[]) TO anon, authenticated, service_role;
