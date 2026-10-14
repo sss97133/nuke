@@ -109,6 +109,10 @@ not close the work. The bounded discovery assays are operator tools, not autonom
   - One migration per commit per push: CI applies only the last commit's new files.
   - Set `statement_timeout` and `lock_timeout` in any migration that can wait on a lock (the pooler
     default is 10 s).
+  - Create a simple view in `public` (one table, no aggregate) `WITH (security_invoker = true)`. The
+    `view_write_guard` event trigger fails a statement that leaves a view there running as its owner
+    while anon or authenticated can write through it; its migration,
+    `supabase/migrations/20261014214500_view_write_guard.sql`, lists the cases.
   - Verify it live after the run.
 - **Edge functions.** Same path; CI deploys the function folders the commit changed. A function that
   writes calls `requireWriteAuth` (`supabase/functions/_shared/writeGuard.ts`), and

@@ -17,9 +17,11 @@
  * is 1 and no file changes, so the previous blocks stay in place; each block carries its own measured-at time, so a
  * stale one shows its age. The one exception is a statement timeout on an intake read: that cell prints "timed out".
  *
- * The database block also names every INVALID index in public (scripts/ci/invalid-indexes.mjs). When one appears that
- * the previous block did not list, the files are still written, so the next session reads the name, and the run then
- * exits 1; update-stats.yml commits the block even after that failure.
+ * The database block also names every INVALID index in public (scripts/ci/invalid-indexes.mjs) and every owner-run view
+ * in public that anon or authenticated can write through (scripts/ci/owner-writable-views.mjs). When an index appears
+ * that the previous block did not list, or any such view exists outside the allowed one, the files are still written,
+ * so the next session reads the name, and the run then exits 1; update-stats.yml commits the block even after that
+ * failure.
  *
  *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite the four blocks
  *   dotenvx run -q -- node scripts/data/readme-stats.mjs --dry-run  # print them only
@@ -32,6 +34,7 @@ import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INVALID_INDEXES_SQL, invalidIndexesLine, riseReport } from '../ci/invalid-indexes.mjs';
+import { OWNER_WRITABLE_VIEWS_SQL, ownerWritableViewsLine, ownerWritableViewsReport } from '../ci/owner-writable-views.mjs';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -118,7 +121,7 @@ function splice(text, file, start, end, block) {
 }
 const spliceBlock = (file, start, end, block) => splice(readFileSync(file, 'utf8'), file, start, end, block);
 
-async function databaseBlock(invalid) {
+async function databaseBlock(invalid, writable) {
   // Sequential on purpose: eight light queries, one at a time, against production.
   const [pg] = await q(`select split_part(version(), ' ', 2) as pg`);
   const [atlas] = await q(`
@@ -184,6 +187,8 @@ async function databaseBlock(invalid) {
       `Postgres ${pg.pg}.`,
     '',
     invalidIndexesLine(invalid),
+    '',
+    ownerWritableViewsLine(writable),
     '<!-- stats:end -->',
   ].join('\n');
 }
@@ -518,7 +523,8 @@ async function intakeBlock() {
 
 async function main() {
   const invalid = await q(INVALID_INDEXES_SQL);
-  const db = await databaseBlock(invalid);
+  const writable = await q(OWNER_WRITABLE_VIEWS_SQL);
+  const db = await databaseBlock(invalid, writable);
   const intake = await intakeBlock();
   const lib = libraryBlock();
   const evidence = await evidenceBlock();
@@ -526,8 +532,8 @@ async function main() {
     console.log(db, '\n', intake, '\n', lib, '\n', evidence);
     return;
   }
-  // Compared with what the block about to be replaced listed, so read before it is overwritten.
-  const alarm = riseReport(invalid, readFileSync(README, 'utf8'));
+  // The index check compares with what the block about to be replaced listed, so it reads before the overwrite.
+  const alarms = [riseReport(invalid, readFileSync(README, 'utf8')), ownerWritableViewsReport(writable)].filter(Boolean);
   // Splice all before writing any, so a missing marker in one file leaves every file as it was.
   const readme = spliceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db);
   const writes = [
@@ -539,9 +545,9 @@ async function main() {
   ];
   for (const [file, text] of writes) writeFileSync(file, text);
   console.log(db, '\n', intake, '\n', lib, '\n', evidence);
-  if (alarm) {
-    // After the write on purpose: the README now names the index. Exit 1 turns the daily run red.
-    console.error(`readme-stats: ${alarm}`);
+  if (alarms.length) {
+    // After the write on purpose: the README now names the index or the view. Exit 1 turns the daily run red.
+    for (const alarm of alarms) console.error(`readme-stats: ${alarm}`);
     process.exitCode = 1;
   }
 }
