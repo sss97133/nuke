@@ -567,6 +567,30 @@ jobs:
       - name: Verify the county readers answer with public vehicles only
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_county_readers_ci -f supabase/sql/test_county_readers_public_only.sql
 
+  burst-total-one-pass-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable contract database
+        run: createdb dm_refinement_burst_total_ci
+      - name: Verify the one-pass burst total answers what the per-day loop answered
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_burst_total_ci -f supabase/sql/test_burst_total_one_pass.sql
+
   market-lot-activity-contract:
     runs-on: ubuntu-latest
     services:
@@ -944,27 +968,3 @@ jobs:
         run: createdb dm_refinement_device_attribution_ci
       - name: Verify a phone frame is refused before the fix and lands after it
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_device_attribution_ci -f supabase/sql/test_device_attribution_as_owner.sql
-
-  burst-total-one-pass-contract:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      PGHOST: localhost
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Create disposable contract database
-        run: createdb dm_refinement_burst_total_ci
-      - name: Verify the one-pass burst total answers what the per-day loop answered
-        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_burst_total_ci -f supabase/sql/test_burst_total_one_pass.sql
