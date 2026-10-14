@@ -778,6 +778,30 @@ jobs:
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
 
+  my-unorganized-photo-count-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable inbox count database
+        run: createdb dm_refinement_unorganized_count_ci
+      - name: Verify the inbox badge count is capped, own-rows-only and invoker-run
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_unorganized_count_ci -f supabase/sql/test_my_unorganized_photo_count.sql
+
   profile-fold-contract:
     runs-on: ubuntu-latest
     services:
