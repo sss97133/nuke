@@ -12,6 +12,18 @@ const AUCTION_PLATFORMS = [
   'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum',
 ] as const;
 
+// vehicle_events has no reserve or currency columns; they live in metadata and are read by path, so the photo
+// arrays in metadata stay on the server (1,000 live lots: 29 MB with metadata, 0.7 MB without, 2026-10-14).
+const EVENT_SELECT = `
+  id, vehicle_id, source_platform, source_url, ended_at, current_price, bid_count, event_status,
+  currency:metadata->>currency, currency_code:metadata->>currency_code, price_currency:metadata->>priceCurrency,
+  no_reserve:metadata->no_reserve, reserve_status:metadata->>reserve_status,
+  vehicle:vehicles (
+    id, year, make, model, trim, mileage, primary_image_url,
+    bat_comments
+  )
+`;
+
 const PLATFORM_LABELS: Record<string, string> = {
   bat: 'BAT',
   cars_and_bids: 'C&B',
@@ -106,21 +118,23 @@ export default function AuctionMarketplace() {
     const results: LiveAuction[] = [];
 
     try {
-      // 1. External auctions from vehicle_events — real auction platforms only
-      const { data: events } = await supabase
-        .from('vehicle_events')
-        .select(`
-          id, vehicle_id, source_platform, source_url, ended_at, end_date,
-          current_price, current_bid, bid_count, event_status, listing_status,
-          reserve_status, no_reserve, metadata, created_at, updated_at,
-          currency, currency_code, price_currency,
-          vehicle:vehicles (
-            id, year, make, model, trim, mileage, primary_image_url,
-            bat_comments
-          )
-        `)
-        .in('source_platform', [...AUCTION_PLATFORMS])
-        .or(`event_status.eq.active,ended_at.gt.${nowIso}`);
+      // 1. External auctions from vehicle_events — real auction platforms only. A lot is live while its end time
+      // is ahead: event_status 'active' alone also matched 2,924 BaT lots that ended without a status update
+      // (2026-10-14). PostgREST returns at most 1,000 rows a request, so page by end time.
+      const events: any[] = [];
+      for (let from = 0; from < 3000; from += 1000) {
+        const { data: page } = await supabase
+          .from('vehicle_events')
+          .select(EVENT_SELECT)
+          .in('source_platform', [...AUCTION_PLATFORMS])
+          .gt('ended_at', nowIso)
+          .order('ended_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + 999);
+        if (!page) break;
+        events.push(...page);
+        if (page.length < 1000) break;
+      }
 
       if (events) {
         const nowMs = Date.now();
@@ -190,18 +204,22 @@ export default function AuctionMarketplace() {
         }
       }
 
-      // 2. Native vehicle_listings (the few real ones)
+      // 2. Native vehicle_listings (the few real ones): a seller's listing whose end time is ahead. The 1,154
+      // 'active' rows without a seller are copies of BaT lots (sync-live-auctions, last written 2026-07-12), all
+      // ended. The reserve amount is the seller's, so only the no-reserve flag is read.
       const { data: native } = await supabase
         .from('vehicle_listings')
         .select(`
           id, vehicle_id, sale_type, auction_end_time, current_high_bid_cents,
-          reserve_price_cents, bid_count, status, listing_url, created_at,
+          bid_count, status, created_at, no_reserve:metadata->no_reserve,
           vehicle:vehicles (
             id, year, make, model, trim, mileage, primary_image_url
           )
         `)
         .eq('status', 'active')
-        .in('sale_type', ['auction', 'live_auction']);
+        .in('sale_type', ['auction', 'live_auction'])
+        .not('seller_id', 'is', null)
+        .gt('auction_end_time', nowIso);
 
       if (native) {
         for (const nl of native as any[]) {
@@ -215,13 +233,13 @@ export default function AuctionMarketplace() {
             id: nl.id,
             vehicle_id: nl.vehicle_id,
             platform: 'nuke',
-            source_url: nl.listing_url ?? null,
+            source_url: null,
             end_time: endMs !== null ? endDate!.toISOString() : null,
             current_price_cents: nl.current_high_bid_cents ?? null,
             currency_code: null,
             bid_count: nl.bid_count ?? 0,
             comment_count: null,
-            no_reserve: nl.reserve_price_cents === null,
+            no_reserve: nl.no_reserve === true,
             vehicle: {
               id: v.id,
               year: v.year,
@@ -275,16 +293,7 @@ export default function AuctionMarketplace() {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const { data: recentEvents } = await supabase
           .from('vehicle_events')
-          .select(`
-            id, vehicle_id, source_platform, source_url, ended_at, end_date,
-            current_price, current_bid, bid_count, event_status, listing_status,
-            reserve_status, no_reserve, metadata, created_at, updated_at,
-            currency, currency_code, price_currency,
-            vehicle:vehicles (
-              id, year, make, model, trim, mileage, primary_image_url,
-              bat_comments
-            )
-          `)
+          .select(EVENT_SELECT)
           .in('source_platform', [...AUCTION_PLATFORMS])
           .in('event_status', ['sold', 'ended', 'no_sale', 'reserve_not_met'])
           .gte('ended_at', thirtyDaysAgo)

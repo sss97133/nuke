@@ -1,7 +1,8 @@
 /**
  * Organization Logo Component
- * Auto-fetches logos from websites using Clearbit/Google APIs
- * with type-based fallbacks for organizations without websites.
+ * Draws the organization's recorded logo (logo_url), else its type icon. It does not guess a logo from the
+ * website: Clearbit's logo API no longer resolves (218 failed lookups on /org, 2026-10-14) and Google's favicon
+ * service 404'd for 58 more, and a favicon fetched by domain is not attributed identity artwork.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -87,16 +88,7 @@ const DefaultIcon: React.FC<{ size: number; color: string }> = ({ size, color })
   <Car size={size} color={color} />
 );
 
-function extractDomain(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
 export const OrgLogo: React.FC<OrgLogoProps> = ({
-  website,
   logoUrl,
   businessType,
   businessName = '',
@@ -107,51 +99,20 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
 }) => {
   const [currentSrc, setCurrentSrc] = useState<string | null>(null);
   const [fallbackLevel, setFallbackLevel] = useState(0);
-  // 0 = logoUrl, 1 = clearbit, 2 = google favicon, 3 = icon fallback
+  // 0 = logoUrl, 3 = icon fallback
 
   const colors = typeColors[businessType || ''] || defaultColors;
   const IconComponent = typeIcons[businessType || ''] || DefaultIcon;
 
   useEffect(() => {
-    setFallbackLevel(0);
+    setFallbackLevel(logoUrl ? 0 : 3);
+    setCurrentSrc(logoUrl || null);
+  }, [logoUrl]);
 
-    if (logoUrl) {
-      setCurrentSrc(logoUrl);
-      return;
-    }
-
-    const domain = website ? extractDomain(website) : null;
-    if (domain) {
-      // Start with Clearbit for higher quality
-      setCurrentSrc(`https://logo.clearbit.com/${domain}`);
-      setFallbackLevel(1);
-    } else {
-      setFallbackLevel(3);
-      setCurrentSrc(null);
-    }
-  }, [logoUrl, website]);
-
+  // The recorded logo failed to load: draw the type icon instead of a broken image
   const handleError = () => {
-    const domain = website ? extractDomain(website) : null;
-
-    if (fallbackLevel === 0 && logoUrl) {
-      // logoUrl failed, try clearbit
-      if (domain) {
-        setCurrentSrc(`https://logo.clearbit.com/${domain}`);
-        setFallbackLevel(1);
-      } else {
-        setFallbackLevel(3);
-        setCurrentSrc(null);
-      }
-    } else if (fallbackLevel === 1 && domain) {
-      // Clearbit failed, try Google favicon
-      setCurrentSrc(`https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.max(size, 64)}`);
-      setFallbackLevel(2);
-    } else {
-      // All image sources failed
-      setFallbackLevel(3);
-      setCurrentSrc(null);
-    }
+    setFallbackLevel(3);
+    setCurrentSrc(null);
   };
 
   // Card variant - for the 240px image area
@@ -174,8 +135,8 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
             src={currentSrc}
             alt=""
             style={{
-              maxWidth: fallbackLevel === 2 ? '48px' : '180px',
-              maxHeight: fallbackLevel === 2 ? '48px' : '100px',
+              maxWidth: '180px',
+              maxHeight: '100px',
               objectFit: 'contain',
               filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))',
             }}
