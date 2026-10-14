@@ -727,6 +727,30 @@ jobs:
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
 
+  vehicle-image-gallery-eligible-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create disposable gallery eligibility database
+        run: createdb dm_refinement_gallery_eligible_ci
+      - name: Verify the inlinable gallery predicate answers as the live one did, row for row
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_gallery_eligible_ci -f supabase/sql/test_vehicle_image_gallery_eligible_inline.sql
+
   county-readers-contract:
     runs-on: ubuntu-latest
     services:
