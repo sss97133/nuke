@@ -1812,6 +1812,20 @@ jobs:
       - name: Verify the covering index serves the cohort lookups and changes no answer
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cohort_probe_ci -f supabase/sql/test_vehicles_public_cohort_probe_index.sql
 
+  mcp-connector-login-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify mcp-connector issues no tokens and refuses the retired self-signed ones
+        run: |
+          deno test --allow-read supabase/functions/mcp-connector/oauth_test.ts
+          deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
+
   vitest:
     runs-on: ubuntu-latest
     steps:
