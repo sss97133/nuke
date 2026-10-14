@@ -142,7 +142,6 @@ export default function WiringPlan() {
 
   // ── Supabase queries for detail panel ──
   const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
-  const [partsReception, setPartsReception] = useState<unknown[]>([]);
   const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
 
   // ── DRC (must be after pinMaps declaration) ──
@@ -199,18 +198,12 @@ export default function WiringPlan() {
     loadPinMaps();
   }, []);
 
-  // ── Load procurement data once ──
+  // ── Procurement is the owner's: work-order parts carry prices, so only the row owner reads them. parts_reception
+  // is not read at all: no browser role holds a grant on it (every read was a 401, the owner's too). ──
   useEffect(() => {
-    async function loadProcurement() {
-      const [prRes, woRes] = await Promise.all([
-        supabase.from('parts_reception').select('*'),
-        supabase.from('work_order_parts').select('*'),
-      ]);
-      if (prRes.data) setPartsReception(prRes.data);
-      if (woRes.data) setWorkOrderParts(woRes.data);
-    }
-    loadProcurement();
-  }, []);
+    if (!isRowOwner) return;
+    supabase.from('work_order_parts').select('*').then(({ data }) => { if (data) setWorkOrderParts(data); });
+  }, [isRowOwner]);
 
   // ── Click handlers ──
   const handleDeviceClick = useCallback((deviceId: string, shiftKey?: boolean) => {
@@ -523,7 +516,6 @@ export default function WiringPlan() {
           result={overlay.result}
           devices={overlay.devices}
           pinMaps={pinMaps}
-          partsReception={partsReception}
           workOrderParts={workOrderParts}
           zoneColors={ZONE_COLORS}
           onClose={handleClosePanel}
