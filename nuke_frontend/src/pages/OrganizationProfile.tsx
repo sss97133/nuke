@@ -16,6 +16,7 @@ import { getOrganizationProfileData, getOrganizationCompetitiveContext, type Sel
 import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
+import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
 import '../styles/unified-design-system.css';
 
 // Lazy-loaded — only pulled in when the relevant tab or modal is activated
@@ -1284,11 +1285,14 @@ export default function OrganizationProfile() {
           let orgVehicles: any[] = [];
           let vehiclesError: any = null;
           let hasMore = true;
+          // A link's cost basis, sale and asking price are the organization's books: its managers read
+          // them through the books reader, everyone else gets none (lib/privateMoney).
+          const booksPromise = fetchOrganizationVehicleBooks(organizationId || '');
 
           while (hasMore && orgVehicles.length < maxVehiclesToLoad) {
             const { data, error } = await supabase
               .from('organization_vehicles')
-              .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
+              .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, listing_status, days_on_lot')
               .eq('organization_id', organizationId)
               .or('status.eq.active,status.eq.sold,status.eq.archived')
               .order('created_at', { ascending: false })
@@ -1312,6 +1316,8 @@ export default function OrganizationProfile() {
             setVehicles([]);
             return;
           }
+          const books = await booksPromise;
+          orgVehicles = orgVehicles.map((ov: any) => withOrganizationVehicleBook(ov, books));
 
           const vehicleIds = (orgVehicles || []).map((ov: any) => ov.vehicle_id).filter(Boolean);
           const now = new Date().toISOString();
@@ -1332,7 +1338,8 @@ export default function OrganizationProfile() {
           };
 
           const [allVehiclesData, allImagesData, allNativeAuctionsData, allExternalAuctionsData, allBatAuctionsData, soldExternalListingsData, soldBatListingsData, endedVehicleListingsData, allExternalListingsData] = await Promise.all([
-            runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
+            runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
+
             runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
             // external_listings -> vehicle_events. external_listings is granted to

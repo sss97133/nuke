@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/getUserApiKey.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +23,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       // Support both env var names (some functions use SUPABASE_SERVICE_ROLE_KEY)
-      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      projectSecretKey() ?? '',
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 

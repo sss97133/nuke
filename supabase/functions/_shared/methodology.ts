@@ -21,6 +21,7 @@
  */
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { projectSecretKey } from "./supabaseKeys.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -259,6 +260,6 @@ function buildContextBlock(
 
 export function createMethodologyClient(): SupabaseClient {
   const url = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("VITE_SUPABASE_URL") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const key = projectSecretKey() ?? "";
   return createClient(url, key);
 }

@@ -7,6 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { buildQueueRow, type CraigslistExtracted, extractFromHtml } from './extract.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
 
   const extracted = extractFromHtml(html, url);
   if (fetchResult.snapshotId) {
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
     const { data, error } = await supabase.from('listing_page_snapshots')
       .select('id, fetched_at').eq('id', fetchResult.snapshotId).eq('platform', 'craigslist').eq('success', true).maybeSingle();
     if (!error && data?.fetched_at && Number.isFinite(Date.parse(data.fetched_at))) {
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
     if (save_to_db) {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        projectSecretKey()!
       );
 
       // Insert into import_queue

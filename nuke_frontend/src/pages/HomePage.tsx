@@ -67,6 +67,39 @@ function readTreemapBrands(): Promise<TreemapNode[] | null> {
   return brandsRead;
 }
 
+// The clock of the ledger's views: the latest treemap_refreshes row, written by treemap_refresh_all() since 2026-10-14
+// (job 175, daily 09:10 UTC). Absent or unreadable, the legend says what it always said, without a time.
+let refreshedAtRead: Promise<string | null> | null = null;
+function readTreemapRefreshedAt(): Promise<string | null> {
+  if (!refreshedAtRead) {
+    refreshedAtRead = Promise.resolve(
+      supabase.from('treemap_refreshes').select('refreshed_at').order('refreshed_at', { ascending: false }).limit(1),
+    ).then(({ data, error }: { data: { refreshed_at: string }[] | null; error: unknown }) => {
+      if (error || !data || data.length === 0) { refreshedAtRead = null; return null; }
+      return String(data[0].refreshed_at);
+    }, () => { refreshedAtRead = null; return null; });
+  }
+  return refreshedAtRead;
+}
+
+/** The legend's clock clause: the refresh time when the ledger recorded one, else the old wording. */
+export function ledgerViewsClock(refreshedAt: string | null): string {
+  const t = refreshedAt ? Date.parse(refreshedAt) : NaN;
+  if (!Number.isFinite(t)) return ' · as of the last refresh of the ledger\u2019s views';
+  return ` · as of ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
+
+function useTreemapRefreshedAt(enabled: boolean): string | null {
+  const [at, setAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled || typeof (supabase as any)?.from !== 'function') return;
+    let live = true;
+    readTreemapRefreshedAt().then((v) => { if (live) setAt(v); });
+    return () => { live = false; };
+  }, [enabled]);
+  return at;
+}
+
 function useTreemapBrands() {
   const [data, setData] = useState<TreemapNode[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -605,6 +638,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
+  const refreshedAt = useTreemapRefreshedAt(embedded);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
     currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
@@ -1210,7 +1244,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded sale or asking price · click to go down'}{embedded ? ' · as of the last refresh of the ledger\u2019s views' : ''}
+          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded sale or asking price · click to go down'}{embedded ? ledgerViewsClock(refreshedAt) : ''}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button

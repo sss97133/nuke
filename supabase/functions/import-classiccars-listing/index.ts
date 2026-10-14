@@ -4,7 +4,8 @@
 // See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { writeObservation } from "../_shared/observationWriter.ts"
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,12 +38,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Require service role key authentication
-    const authHeader = req.headers.get('Authorization')
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
-    const token = authHeader?.replace('Bearer ', '') ?? ''
-    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+    // Require the service role, judged as writeGuard judges it (2026-10-14)
+    const serviceRoleKey = projectSecretKey() ?? ''
+    if (!(await isServiceCaller(req))) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
@@ -77,7 +75,7 @@ Deno.serve(async (req) => {
 
     // Step 1: Scrape the listing
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const serviceRoleKey = projectSecretKey() ?? ''
     
     const scrapeResponse = await fetch(`${supabaseUrl}/functions/v1/scrape-vehicle`, {
       method: 'POST',

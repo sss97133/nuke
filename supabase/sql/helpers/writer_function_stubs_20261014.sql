@@ -1,0 +1,48 @@
+-- Stub signatures of the 34 revoked functions and the 4 kept ones, the two owner-run photo views and the feed
+-- materialized view, as of 2026-10-14.
+-- Test fixture only.
+CREATE FUNCTION public.backfill_photo_analysis(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.backfill_sold_vehicles_comprehensive() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.backfill_vehicle_data_from_bat_listings() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.calculate_platform_revenue() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.claim_analysis_queue_batch(integer,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.claim_bat_extraction_queue_batch(integer,integer,text,integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.end_live_auctions_absent(text,text[]) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_body_from_model(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_body_from_model(integer,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_country_from_make(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_country_from_make(integer,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_cross_ref_bat_price(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_mine_mileage(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_mine_mileage(integer,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_mine_transmission(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_mine_transmission(integer,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.enrich_mine_vins(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.fast_backfill_quality_scores(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.normalize_org_vehicle_relationships(uuid) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.promote_businesses_to_service_from_portfolio_evidence(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.quality_backfill_shard(integer,integer,integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.quick_quality_backfill_fast(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.refresh_bat_seller_org_metrics() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.refresh_equipment_hours() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.refresh_org_total_vehicles() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.rescore_vehicles_batch(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.reset_stuck_photo_pipeline_images() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.sync_bat_live_auction_status() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.sync_edge_secrets_to_db() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.register_make_model_subject(text,text,integer,text,integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.validate_data_room_access_code(uuid,text,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.confirm_photo_intent(uuid,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.analyze_organization_data_signals(uuid) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.get_fleet_documented_investment() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.find_vehicles_near(double precision,double precision,integer,integer,integer,integer,text,text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.l4_get_review_needed(uuid,integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE FUNCTION public.get_county_vehicles(text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE TABLE public.photo_rows_stub (id int);
+CREATE VIEW public.user_organized_photos AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.user_photo_inbox AS SELECT id FROM public.photo_rows_stub;
+CREATE FUNCTION public.get_clip_embed_batch(integer) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER AS $$ BEGIN END $$;
+CREATE MATERIALIZED VIEW public.feed_items_view AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_contacts AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_deals AS SELECT id FROM public.photo_rows_stub;
+CREATE VIEW public.vlva_vehicles AS SELECT id FROM public.photo_rows_stub;

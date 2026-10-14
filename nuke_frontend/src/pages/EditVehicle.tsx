@@ -145,16 +145,15 @@ const EditVehicle: React.FC = () => {
     if (!vehicleId) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('id', vehicleId)
-        .single();
+      // The row as the caller may see it; the purchase facts come back only to the owner or a
+      // contributor with access (a select('*') on vehicles is not granted).
+      const { data, error } = await supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId });
 
       if (error || !data) {
         setError('Vehicle not found or access denied');
         return;
       }
+
 
       // Check if user is owner or has edit permissions
       if (!user || (data.user_id !== user?.id && data.uploaded_by !== user?.id && data.owner_id !== user?.id)) {

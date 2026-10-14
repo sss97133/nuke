@@ -43,6 +43,13 @@ interface Findings {
   latestAnalyzedAt: string | null;   // the newest vision_analyzed_at among the rows read: the coverage clock
 }
 
+// The projection this card sent before vehicle_image_findings existed; used only while that function is not deployed.
+const LEGACY_FINDINGS_SELECT =
+  'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence, byok_scene_type:ai_scan_metadata->byok_deep_analysis->scene_type, byok_build_phase_guess:ai_scan_metadata->byok_deep_analysis->build_phase_guess, byok_confidence:ai_scan_metadata->byok_deep_analysis->confidence, vision_analyzed_at';
+
+const isMissingFunction = (error: { code?: string; message?: string } | null | undefined): boolean =>
+  !!error && (error.code === 'PGRST202' || /could not find the function/i.test(error.message ?? ''));
+
 function inc(map: Record<string, number>, key: string | null | undefined) {
   if (!key) return;
   map[key] = (map[key] || 0) + 1;
@@ -57,19 +64,25 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Project only the scalar keys this card reads — whole ai_scan_metadata
-      // rows carry multi-MB deep_analysis blobs (1.57MB -> 0.43MB for a
-      // 3.6k-image vehicle, measured on prod anon 2026-06-11).
-      const { data, error } = await supabase
-        .from('vehicle_images')
-        .select(
-          'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence, byok_scene_type:ai_scan_metadata->byok_deep_analysis->scene_type, byok_build_phase_guess:ai_scan_metadata->byok_deep_analysis->build_phase_guess, byok_confidence:ai_scan_metadata->byok_deep_analysis->confidence, vision_analyzed_at',
-        )
-        .eq('vehicle_id', vehicleId)
-        .limit(5000);
-      if (error) return;
-      const rows = data || [];
-      const total = rows.length;
+      // One pass in the database over the frames this viewer may read (vehicle_image_findings, SECURITY INVOKER, so the
+      // image row policies still decide which). It replaces 26 arrow projections of ai_scan_metadata, each of which
+      // detoasted every frame's blob again (K5, anon, 2026-10-14: 534-624 ms and 239,000 buffer hits, now about 160 ms).
+      // `rows` holds each frame's non-null keys under the same names as before; `total` counts every frame read.
+      let rows: any[] = [];
+      let total = 0;
+      const read = await supabase.rpc('vehicle_image_findings', { p_vehicle_id: vehicleId });
+      if (!read.error && read.data) {
+        rows = Array.isArray((read.data as any).rows) ? (read.data as any).rows : [];
+        total = typeof (read.data as any).total === 'number' ? (read.data as any).total : rows.length;
+      } else if (isMissingFunction(read.error)) {
+        // The reader's migration has not been applied yet: read the frames the way this card always did.
+        const legacy = await supabase.from('vehicle_images').select(LEGACY_FINDINGS_SELECT).eq('vehicle_id', vehicleId).limit(5000);
+        if (legacy.error) return;
+        rows = legacy.data || [];
+        total = rows.length;
+      } else {
+        return;
+      }
       const out: Findings = {
         total,
         classified: 0,

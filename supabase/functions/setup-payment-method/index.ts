@@ -4,6 +4,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 });
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseServiceKey = projectSecretKey()!;
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
