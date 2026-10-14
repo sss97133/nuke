@@ -238,7 +238,9 @@ struct LiveBoard: Decodable {
     private static var cached: (board: LiveBoard, at: Date)?
     static func fetch(maxAge: TimeInterval = 30) async throws -> LiveBoard {
         if let c = cached, Date().timeIntervalSince(c.at) < maxAge { return c.board }
-        let board: LiveBoard = try await SupabaseService.client.rpc("market_pulse_live").execute().value
+        let res = try await SupabaseService.client.rpc("market_pulse_live").execute()
+        try BoardContract.check(res.data)       // a renamed or moved slot stops the read (BoardContract.swift)
+        let board = try JSONDecoder().decode(LiveBoard.self, from: res.data)
         cached = (board, Date())
         return board
     }
@@ -248,6 +250,7 @@ struct LiveBoard: Decodable {
 struct LiveBoardView: View {
     @State private var board: LiveBoard?
     @State private var loadError = false
+    @State private var loadErrorDetail: String?
     // The map's selection narrows the list to one brand, then one decade: one population, one
     // filter, never a second read. The web Market tab's mapFocus/mapChild do the same.
     @State private var filterMake: String? = {
@@ -368,7 +371,7 @@ struct LiveBoardView: View {
                 ContentUnavailableView {
                     Label("Couldn't read the board", systemImage: "wifi.exclamationmark")
                 } description: {
-                    Text("Check your connection.")
+                    Text(loadErrorDetail ?? "Check your connection.")
                 } actions: {
                     Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                 }
@@ -404,7 +407,7 @@ struct LiveBoardView: View {
             }
             #endif
         } catch {
-            if board == nil { loadError = true }
+            if board == nil { loadError = true; loadErrorDetail = (error as? BoardContract.Mismatch)?.errorDescription }
             NSLog("NukeCapture live board read failed: %@", String(describing: error))
         }
     }
