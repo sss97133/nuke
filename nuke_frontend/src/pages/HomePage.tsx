@@ -68,18 +68,22 @@ function readTreemapBrands(): Promise<TreemapNode[] | null> {
 }
 
 // The clock of the ledger's views: the latest treemap_refreshes row, written by treemap_refresh_all() since 2026-10-14
-// (job 175, daily 09:10 UTC). Absent or unreadable, the legend says what it always said, without a time.
-let refreshedAtRead: Promise<string | null> | null = null;
-function readTreemapRefreshedAt(): Promise<string | null> {
-  if (!refreshedAtRead) {
-    refreshedAtRead = Promise.resolve(
-      supabase.from('treemap_refreshes').select('refreshed_at').order('refreshed_at', { ascending: false }).limit(1),
-    ).then(({ data, error }: { data: { refreshed_at: string }[] | null; error: unknown }) => {
-      if (error || !data || data.length === 0) { refreshedAtRead = null; return null; }
-      return String(data[0].refreshed_at);
-    }, () => { refreshedAtRead = null; return null; });
+// (job 175, daily 09:10 UTC), with the map's population receipt (treemap_populations()) since 20261014063000.
+// Absent or unreadable, the legend says what it always said, without a time or a population.
+export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number }
+export interface MapRefresh { refreshedAt: string | null; populations: MapPopulations | null }
+const NO_REFRESH: MapRefresh = { refreshedAt: null, populations: null };
+let refreshRead: Promise<MapRefresh> | null = null;
+function readTreemapRefresh(): Promise<MapRefresh> {
+  if (!refreshRead) {
+    refreshRead = Promise.resolve(
+      supabase.from('treemap_refreshes').select('*').order('refreshed_at', { ascending: false }).limit(1),
+    ).then(({ data, error }: { data: { refreshed_at: string; populations?: MapPopulations | null }[] | null; error: unknown }) => {
+      if (error || !data || data.length === 0) { refreshRead = null; return NO_REFRESH; }
+      return { refreshedAt: String(data[0].refreshed_at), populations: data[0].populations ?? null };
+    }, () => { refreshRead = null; return NO_REFRESH; });
   }
-  return refreshedAtRead;
+  return refreshRead;
 }
 
 /** The legend's clock clause: the refresh time when the ledger recorded one, else the old wording. */
@@ -89,15 +93,36 @@ export function ledgerViewsClock(refreshedAt: string | null): string {
   return ` · as of ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
-function useTreemapRefreshedAt(enabled: boolean): string | null {
-  const [at, setAt] = useState<string | null>(null);
+/** The count beside the map, with its population and date. At the top level both numbers come from the refresh
+ *  receipt (treemap_refreshes.populations), so they share one snapshot: the mapped sales of all public records. Below
+ *  it the count is the level's own; the leaf shows at most 200 sales, the largest. */
+export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', levelCount: number, refresh: MapRefresh): string {
+  const fmt = (n: number) => n.toLocaleString('en-US');
+  const p = refresh.populations;
+  const receipt = level === 'brands' && p?.measure === 'confirmed_sale_v1'
+    && Number.isFinite(p.mapped_sales) && Number.isFinite(p.public_records);
+  const count = level === 'vehicles'
+    ? `${levelCount >= 200 ? 'largest 200' : fmt(levelCount)} confirmed sales`
+    : `${fmt(receipt ? p!.mapped_sales! : levelCount)} vehicles with a confirmed sale`;
+  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${ledgerViewsClock(refresh.refreshedAt)}`;
+}
+
+/** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
+ *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
+export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles'): string {
+  if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
+  return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
+}
+
+function useTreemapRefresh(): MapRefresh {
+  const [refresh, setRefresh] = useState<MapRefresh>(NO_REFRESH);
   useEffect(() => {
-    if (!enabled || typeof (supabase as any)?.from !== 'function') return;
+    if (typeof (supabase as any)?.from !== 'function') return;
     let live = true;
-    readTreemapRefreshedAt().then((v) => { if (live) setAt(v); });
+    readTreemapRefresh().then((v) => { if (live) setRefresh(v); });
     return () => { live = false; };
-  }, [enabled]);
-  return at;
+  }, []);
+  return refresh;
 }
 
 function useTreemapBrands() {
@@ -151,6 +176,24 @@ function useTreemapYears(make: string | null, model: string | null) {
   return { data, loading };
 }
 
+// The leaf: the cell's confirmed sales (treemap_sales), each with the sold amount its parent cell counted.
+function readTreemapSales(make: string, model: string, year?: number | null): Promise<TreemapNode[] | null> {
+  return Promise.resolve(supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
+    ({ data: result, error }: { data: any[] | null; error: unknown }) => (error || !result ? null : result.map((v: any) => ({
+      name: [v.year, v.make, v.model].filter(Boolean).join(' '),
+      count: 1,
+      value: v.sold_amount || 0,
+      median_price: v.sold_amount,
+      imageUrl: v.primary_image_url || undefined,
+      id: v.id,
+      isVehicle: true,
+      listingTitle: v.listing_title || undefined,
+      mileage: v.mileage || undefined,
+    }))),
+    () => null,
+  );
+}
+
 function useTreemapVehicles(make: string | null, model: string | null, year?: number | null) {
   const [data, setData] = useState<TreemapNode[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -158,31 +201,9 @@ function useTreemapVehicles(make: string | null, model: string | null, year?: nu
     if (!make || !model) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    let query = supabase
-      .from('vehicles')
-      .select('id, year, make, model, listing_title, bat_listing_title, sale_price, sold_price, primary_image_url, mileage')
-      .ilike('make', make)
-      .ilike('model', model)
-      .or('sale_price.gt.0,sold_price.gt.0')
-      .is('deleted_at', null)
-      .order('sale_price', { ascending: false })
-      .limit(200);
-    if (year) query = query.eq('year', year);
-    query.then(({ data: result, error }) => {
+    readTreemapSales(make, model, year).then((result) => {
       if (cancelled) return;
-      if (result && !error) {
-        setData(result.map((v: any) => ({
-          name: [v.year, v.make, v.model].filter(Boolean).join(' '),
-          count: 1,
-          value: v.sale_price || v.sold_price || 0,
-          median_price: v.sale_price || v.sold_price,
-          imageUrl: v.primary_image_url || undefined,
-          id: v.id,
-          isVehicle: true,
-          listingTitle: v.listing_title || v.bat_listing_title || undefined,
-          mileage: v.mileage || undefined,
-        })));
-      }
+      if (result) setData(result);
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -258,11 +279,10 @@ interface CellProps {
   onClick: (e?: React.MouseEvent) => void;
   totalCount: number;
   showValue?: boolean;
-  isYear?: boolean;
   repImage?: string;
 }
 
-function TreemapCell({ rect, onClick, totalCount, showValue, isYear, repImage }: CellProps) {
+function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellProps) {
   const { node, x, y, w, h } = rect;
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -402,7 +422,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear, repImage }:
                 lineHeight: 1.3,
               }}
             >
-              {fmtNum(node.count)} {isYear ? '' : 'vehicles'}
+              {fmtNum(node.count)} sold
             </div>
           )}
           {canShowPrice && node.median_price && (
@@ -513,14 +533,14 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
         {node.name}
       </div>
       <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--text)', marginBottom: 6 }}>
-        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-secondary)' }}>{level === 'years' ? 'listings' : 'vehicles'}</span>
+        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-secondary)' }}>with a confirmed sale</span>
       </div>
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Row label="of total" value={pct + '%'} />
-        <Row label="total value" value={fmtMoney(node.value)} />
-        {node.median_price ? <Row label="median" value={fmtMoney(node.median_price)} /> : null}
+        <Row label="sales total" value={fmtMoney(node.value)} />
+        <Row label="median sale" value={node.median_price ? fmtMoney(node.median_price) : 'under 5 sales'} />
         {node.min_price && node.max_price ? <Row label="range" value={`${fmtMoney(node.min_price)} - ${fmtMoney(node.max_price)}`} /> : null}
-        {sellThrough ? <Row label="sell-through" value={sellThrough} /> : null}
+        {sellThrough ? <Row label={`sold of ${fmtNum(node.auction_count!)} known outcomes`} value={sellThrough} /> : null}
         {node.avg_bids ? <Row label="avg bids" value={String(node.avg_bids)} /> : null}
       </div>
     </div>
@@ -606,8 +626,8 @@ function useSearchPreview(query: string) {
 // MAIN TREEMAP HOMEPAGE
 // ────────────────────────────────────────────────────────────
 
-// The ledger as a map: every public vehicle record by make, area = count, color = median sale price, drilling
-// to models, years and vehicles. `embedded` renders it under the app header as the first section of the
+// The ledger as a map: public vehicle records with a confirmed sale by make, area = count, color = their median sale
+// price, drilling to models, years and the sales themselves. `embedded` renders it under the app header as the first section of the
 // market page (no header bar of its own, a fixed height) instead of as a page of its own.
 export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
@@ -638,7 +658,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
-  const refreshedAt = useTreemapRefreshedAt(embedded);
+  const refresh = useTreemapRefresh();
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
     currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
@@ -688,31 +708,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const prefetchVehicles = useCallback((make: string, model: string, year: number) => {
     const key = `${make}/${model}/${year}`;
     if (prefetchCache.current.has(key)) return;
-    supabase
-      .from('vehicles')
-      .select('id, year, make, model, listing_title, bat_listing_title, sale_price, sold_price, primary_image_url, mileage')
-      .ilike('make', make)
-      .ilike('model', model)
-      .eq('year', year)
-      .or('sale_price.gt.0,sold_price.gt.0')
-      .is('deleted_at', null)
-      .order('sale_price', { ascending: false })
-      .limit(200)
-      .then(({ data: result, error }) => {
-        if (result && !error) {
-          prefetchCache.current.set(key, result.map((v: any) => ({
-            name: [v.year, v.make, v.model].filter(Boolean).join(' '),
-            count: 1,
-            value: v.sale_price || v.sold_price || 0,
-            median_price: v.sale_price || v.sold_price,
-            imageUrl: v.primary_image_url || undefined,
-            id: v.id,
-            isVehicle: true,
-            listingTitle: v.listing_title || v.bat_listing_title || undefined,
-            mileage: v.mileage || undefined,
-          })));
-        }
-      });
+    readTreemapSales(make, model, year).then((result) => {
+      if (result) prefetchCache.current.set(key, result);
+    });
   }, []);
 
   const handleCellMouseEnter = useCallback((node: TreemapNode) => {
@@ -1061,7 +1059,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <Text role="caption">
-              {fmtNum(totalCount)} {levelType === 'vehicles' ? 'vehicles' : 'vehicles with a recorded price'}
+              {mapCaption(levelType, totalCount, refresh)}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1193,7 +1191,6 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   rect={rect}
                   onClick={(ev?: any) => drillInto(rect.node, ev)}
                   totalCount={totalCount}
-                  isYear={levelType === 'years'}
                   repImage={repImg}
                 />
               </div>
@@ -1244,7 +1241,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {levelType === 'vehicles' ? 'area = recorded price · click to open the record' : 'area = vehicles with a recorded price · color = median recorded sale or asking price · click to go down'}{embedded ? ledgerViewsClock(refreshedAt) : ''}
+          {mapLegend(levelType)}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
