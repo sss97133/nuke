@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -828,16 +829,36 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
+    // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
+      if (conflict) {
+        await supabase.rpc("record_revision_item", {
+          p_url: listingUrlCanonical, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: "extract-cars-and-bids-core", p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: "different_car", vehicle_id: vehicleId, detail: conflict }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+
     // Upsert vehicle
     let created = false;
     if (vehicleId) {
       // Update existing
       const { error: updateError } = await supabase
         .from("vehicles")
-        .update({
+        .update(fillOnly({
           ...vehicleData,
           updated_at: new Date().toISOString(),
-        })
+        }, vehicleId, existingIdentity))
         .eq("id", vehicleId);
 
       if (updateError) {
@@ -871,7 +892,7 @@ Deno.serve(async (req) => {
             vehicleId = dupVehicle.id;
             await supabase
               .from("vehicles")
-              .update({ ...vehicleData, updated_at: new Date().toISOString() })
+              .update(fillOnly({ ...vehicleData, updated_at: new Date().toISOString() }, vehicleId, await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle().then((r: any) => r.data ?? null)))
               .eq("id", vehicleId);
             console.log(`✅ C&B: Updated existing vehicle via fallback: ${vehicleId}`);
           } else {
