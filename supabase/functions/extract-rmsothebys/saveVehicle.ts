@@ -17,7 +17,7 @@ import { classifyLot, type LotSkipReason } from './lotKind.ts';
 import { lotStatus } from './lotStatus.ts';
 import { parseEstimate, saleCalendar } from './calendarKeys.ts';
 import { rmListingUrlVariants } from './lotUrl.ts';
-import { mustWrite } from '../_shared/writeResult.ts';
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 
 // RM Sotheby's - we'll store metadata in origin_metadata instead of linking to org table
@@ -121,11 +121,11 @@ export async function saveVehicle(
     const conflict = idRow ? identityConflict(idRow, { year: vehicle.year, make: vehicle.make, model: vehicle.model }) : null;
     if (conflict) {
       try {
-        await supabase.rpc('record_revision_item', {
+        softWrite('record_revision_item', await supabase.rpc('record_revision_item', {
           p_url: vehicle.url, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
           p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: 'extract-rmsothebys', p_snapshot_id: null,
           p_detail: { vehicle_id: resolvedId, detail: conflict }, p_vehicle_id: resolvedId,
-        });
+        }));
       } catch (e) {
         console.warn(`[RMS] revision item not recorded for ${vehicle.url}: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -223,7 +223,7 @@ export async function saveVehicle(
 
     // Save image
     if (vehicle.image_url) {
-      await supabase
+      softWrite('vehicle_images insert', await supabase
         .from('vehicle_images')
         .insert({
           vehicle_id: vehicleId,
@@ -231,7 +231,7 @@ export async function saveVehicle(
           position: 0,
           source: 'rmsothebys_import',
           is_external: true,
-        });
+        }));
     }
   }
 
@@ -286,7 +286,7 @@ export async function saveVehicle(
   // Create timeline event, once: when this run creates the vehicle or the episode, never on a re-read of a known sale.
   // And only with a known sale day: the day of extraction is not the day of the sale.
   if ((isNew || episode.action === 'inserted') && vehicle.sold && vehicle.sold_price && knownAuctionDate) {
-    await supabase.from('timeline_events').insert({
+    softWrite('timeline_events insert', await supabase.from('timeline_events').insert({
       vehicle_id: vehicleId,
       event_type: 'auction_sold',
       event_date: knownAuctionDate,
@@ -299,7 +299,7 @@ export async function saveVehicle(
         sold_price: vehicle.sold_price,
         currency: vehicle.currency,
       },
-    });
+    }));
   }
 
   return { vehicleId, isNew };

@@ -29,6 +29,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
 import { recordRevision } from "../_shared/revision.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { type LotPage, parseLotPage } from "./lotPage.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -1430,11 +1431,12 @@ Deno.serve(async (req) => {
             const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map((b) => b.toString(16).padStart(2, "0")).join("");
             const path = `bonhams/lot-pages/${sha}.html`;
             await supabase.storage.from("listing-snapshots").upload(path, bytes, { contentType: "text/html", upsert: true });
-            await supabase.from("listing_page_snapshots").insert({
+            const snapRes = await supabase.from("listing_page_snapshots").insert({
               platform: "bonhams", listing_url: url, fetched_at: new Date().toISOString(), fetch_method: "firecrawl", http_status: status || null,
               success: status === 200, html: null, html_storage_path: path, html_sha256: sha, content_length: bytes.length,
               metadata: { caller: "extract-bonhams-deep", listing_key: ev.source_listing_id, credits: 1 },
             });
+            if (snapRes.error && snapRes.error.code !== "23505") softWrite("listing_page_snapshots insert", snapRes); // 23505: same page already retained
           } catch (_) { /* a duplicate or a storage hiccup must not lose the parse; the page is parsed below */ }
         }
         const observedAt = new Date().toISOString();
@@ -1504,12 +1506,12 @@ Deno.serve(async (req) => {
 
       async function processOne(cand: any) {
         try {
-          await supabase.from("vehicles").update({ last_enrichment_attempt: new Date().toISOString() }).eq("id", cand.id);
+          softWrite("vehicles enrichment attempt", await supabase.from("vehicles").update({ last_enrichment_attempt: new Date().toISOString() }).eq("id", cand.id));
 
           const extracted = await extractBonhamsLot(cand.discovery_url);
 
           if (!extracted.year && !extracted.make && !extracted.title) {
-            await supabase.from("vehicles").update({ enrichment_failures: 3 }).eq("id", cand.id);
+            softWrite("vehicles enrichment_failures", await supabase.from("vehicles").update({ enrichment_failures: 3 }).eq("id", cand.id));
             results.failed++;
             if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: page empty/removed`);
             return;
@@ -1525,7 +1527,7 @@ Deno.serve(async (req) => {
         } catch (err: any) {
           const msg = err instanceof Error ? err.message : String(err);
           try {
-            await supabase.from("vehicles").update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq("id", cand.id);
+            softWrite("vehicles enrichment_failures", await supabase.from("vehicles").update({ enrichment_failures: (cand.enrichment_failures || 0) + 1 }).eq("id", cand.id));
           } catch { /* ignore */ }
           results.failed++;
           if (results.errors.length < 5) results.errors.push(`${cand.discovery_url}: ${msg.slice(0, 100)}`);
@@ -1607,7 +1609,7 @@ Deno.serve(async (req) => {
               .maybeSingle();
 
             if (existing) {
-              await supabase.from("vehicles").update(vehicleData).eq("id", existing.id);
+              mustWrite("vehicles update (catalog lot)", await supabase.from("vehicles").update(vehicleData).eq("id", existing.id));
               updated++;
               lotResults.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: existing.id, action: "updated" });
             } else {
