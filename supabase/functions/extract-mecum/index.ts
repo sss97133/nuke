@@ -955,7 +955,7 @@ async function saveVehicle(
     const { data: byVin } = await supabase
       .from("vehicles")
       .select("id")
-      .eq("vin", vehicle.vin)
+      .eq("vin", realVin(vehicle.vin)!)
       .limit(1)
       .maybeSingle();
     if (byVin?.id) existingId = byVin.id;
