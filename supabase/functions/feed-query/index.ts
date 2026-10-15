@@ -63,6 +63,7 @@ async function getPortfolioStats(supabaseClient: any): Promise<any> {
       sales_volume_today: cacheRow.sales_volume_today ?? 0,
       // When each figure was last computed: counts by refresh_feed_rollups (an estimate), value and for-sale by the old job.
       total_is_estimate: cacheRow.total_is_estimate === true,
+      total_as_of: cacheRow.total_as_of ?? null,
       counts_updated_at: cacheRow.counts_updated_at ?? null,
       value_updated_at: cacheRow.value_updated_at ?? cacheRow.updated_at ?? null,
       for_sale_updated_at: cacheRow.for_sale_updated_at ?? null,

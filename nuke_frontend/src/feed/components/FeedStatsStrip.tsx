@@ -146,7 +146,11 @@ export function FeedStatsStrip({
   const valueIsCurrent = Number.isFinite(valueAge) && valueAge < 3 * 86_400_000;
   const forSaleAge = stats.for_sale_updated_at ? Date.now() - Date.parse(stats.for_sale_updated_at) : Infinity;
   const forSaleIsCurrent = Number.isFinite(forSaleAge) && forSaleAge < 3 * 3_600_000;
-  const totalLabel = stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)} (estimate)` : formatCompact(stats.total_vehicles);
+  const asOf = stats.total_as_of ? new Date(stats.total_as_of) : null;
+  const asOfLabel = asOf && Number.isFinite(asOf.getTime()) ? `${String(asOf.getUTCHours()).padStart(2, '0')}:${String(asOf.getUTCMinutes()).padStart(2, '0')}Z` : null;
+  const totalLabel = stats.total_is_estimate
+    ? `about ${formatCompact(stats.total_vehicles)} (estimate)`
+    : `${stats.total_vehicles.toLocaleString('en-US')}${asOfLabel ? ` as of ${asOfLabel}` : ''}`;
 
   return (
     <div
@@ -165,7 +169,7 @@ export function FeedStatsStrip({
       <Stat
         label={filteredStats ? 'LOADED' : 'ALL RECORDS'}
         value={!filteredStats ? totalLabel : isFiltered
-          ? `${formatCompact(filtered.count)} / ${stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)}` : formatCompact(stats.total_vehicles)}`
+          ? `${formatCompact(filtered.count)} / ${stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)}` : stats.total_vehicles.toLocaleString('en-US')}`
           : formatCompact(filtered.count)}
         onClick={() => onMetricClick?.('vehicles')}
         active={activeMetric === 'vehicles'}
@@ -173,11 +177,11 @@ export function FeedStatsStrip({
       />
 
       {/* The estimated population, always visible beside the loaded count so the two are not read as one number. */}
-      {filteredStats && !isFiltered && stats.total_is_estimate && (
+      {filteredStats && !isFiltered && (
         <Stat
           label="ALL RECORDS"
           value={totalLabel}
-          hoverHint={`Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}. The map's All sales view shows an exact count that is counted differently.`}
+          hoverHint={stats.total_is_estimate ? `Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}.` : `Public records, the same count the map shows, as of ${stats.total_as_of ?? 'time unknown'}. Updates when the map refreshes.`}
         />
       )}
 
