@@ -66,6 +66,41 @@ the vehicles were hard-deleted.
 - 5,128 lots have no vehicle; 4,753 of them carry a price. lane-online-auctions (skylar-f7) is re-landing them and
   sends the lot-to-vehicle map for the relink. The list is at ~/nuke-logs/bj-orphan-lots-no-vehicle-20261015.json.
 
+**BaT-lot hybrids, fleet (15:15–16:00Z).** 38,179 live vehicles hold B-J auctions. Each one with a BaT listing was
+compared with its own lot in the local BaT archive (`lots`: title, year, make, model, chassis).
+- 473 carry a B-J discovery_url and an identity that differs from their own lot. 445 differ clearly (a different year,
+  or a model with no word or prefix in common). 271 of those carry the lot's exact BaT top bid as their sale price,
+  166 have no price, and 8 have a price matching neither (held).
+- The other 437 were repaired with the recipe above:
+  - model, year and make go back to the lot. The model is the full lot title after the make: the archive model
+    field keeps only three words.
+  - discovery_url goes back to the BaT URL. It is NULL for 9 rows whose BaT URL another row already holds (duplicate
+    records, on the merge list).
+  - auction_source becomes bat.
+  - 121 normalized models left from the docket car (e.g. "Thunderbird" on an E-350) are retracted to unknown.
+  - 352 VINs become the lot's chassis number. 72 were held because another row holds that chassis (duplicates);
+    7 were retracted to unknown.
+  - At the 347 docket rows: 2,580 B-J photos were superseded onto identical copies and 416 B-J auctions retired as
+    duplicates.
+- Make changes were dropped on rows with a short VIN, because (vin, make) is unique and the target pair already
+  existed on a duplicate record.
+
+**Mecum-lot hybrids (skylar-b7's list, 241 rows).** 226 already carry their Mecum lot's identity; only the link and
+venue had been overlaid.
+- 240 rows: auction_source becomes mecum, and discovery_url goes to the Mecum lot (175) or NULL (53, duplicates).
+- 56 B-J vehicle_events moved to docket rows that lacked them (correct_vehicle_event_link).
+- 454 B-J auctions retired as duplicates; 2,294 photos superseded onto copies.
+- 15 rows whose identity also differs from their Mecum slug wait for a retained capture: identity is never changed
+  from a slug alone.
+
+B-J lots with no vehicle row are re-landed by lane-online-auctions and relinked from its map, which grows as lots
+land. Lists:
+- ~/nuke-logs/bj-orphan-lots-no-vehicle-20261015.json (5,128 lots, 4,753 priced);
+- ~/nuke-logs/bj-misattached-lots-no-vehicle-20261015.json (1,261);
+- ~/nuke-logs/bj-hybrid-lots-no-vehicle-20261015.json (169).
+
+The merge-review list of same-car pairs is ~/nuke-logs/bj-same-car-merge-review-20261015.json (5,737 pairs).
+
 **Conceptcarz-origin rows are the main collector.** 2,695 of the 5,496 multi-lot vehicles have a listing_url of the
 form `conceptcarz://event/<id>/<title>`; 1,522 are public and 2,535 carry a B-J discovery_url. Their `sale_result`
 observation carries the B-J docket's price and the import date. Example: 0e88264f, titled "1967 Chevrolet Camaro
