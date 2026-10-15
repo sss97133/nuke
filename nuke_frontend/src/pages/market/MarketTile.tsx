@@ -66,16 +66,19 @@ interface TileProps {
   y: number;
   w: number;
   h: number;
-  onClick: (e: React.MouseEvent) => void;
+  onClick: (e: React.MouseEvent | React.KeyboardEvent) => void;
+  title?: string;
 }
 
-export function MarketTile({ node, move, basis, x, y, w, h, onClick }: TileProps) {
+export function MarketTile({ node, move, basis, x, y, w, h, onClick, title }: TileProps) {
   const t = tileLines(node, move, w, h, basis);
   const style = { left: x, top: y, width: w, height: h, backgroundColor: tileFill(move),
     '--name-size': `${t.nameSize ?? 0}px`, '--move-size': `${t.moveSize}px` } as React.CSSProperties;
   return (
-    <div className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name}
-      onClick={(e) => { e.stopPropagation(); onClick(e); }}>
+    <div className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name} title={title}
+      role="button" tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onClick(e); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }}>
       {t.nameSize != null && <div className="market-tile__name">{t.name}</div>}
       {t.move && <div className="market-tile__move">{t.move}</div>}
       {t.stat && <div className={`market-tile__stat${t.cls === 'L' ? ' market-tile__stat--small' : ''}`}>{t.stat}</div>}
@@ -157,7 +160,7 @@ export function MapLegend({ base, clock, basis }: { base: Baseline | null; clock
             <span className="map-legend__value">{label}</span>
           </span>
         ))}
-        <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--few" /><span className="map-legend__value">too few BaT sales</span></span>
+        <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--few" /><span className="map-legend__value">{basis === 'ledger' ? 'too few BaT sales, or mostly other venues' : 'too few BaT sales'}</span></span>
         <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--none" /><span className="map-legend__value">no BaT sales</span></span>
       </div>
       <div className="map-legend__receipt">
