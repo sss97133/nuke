@@ -450,6 +450,21 @@ test('missing quote/clock projections and withdrawn claims stay unmeasured; dupl
   assert.equal(inspectTypedProvenance(id(1),invalid,typedRow().read_at,typedDrill(1,invalid)).failures.typed_confidence_invalid,1);
 });
 
+test('repeated captures of one listing assertion are counted, not mistaken for support or for a mismatch', async () => {
+  // Live 2026-10-15: one displacement claim's provenance listed 16 rows from 16 identical captures of one page.
+  const c=typedClaim(),drill=typedDrill(),repeat=n=>({...drill.observations[0],id:id(700+n),source_observation_id:id(800+n)});
+  drill.observations.push(repeat(1),repeat(2),{...repeat(3),value:'ANOTHER CLAIM'},{...repeat(4),source_url:'https://example.com/other-page'},
+    {...repeat(5),source_value:'SYNTHETIC PRIVATE DIFFERENT QUOTATION'});
+  const result=inspectTypedProvenance(id(1),c,typedRow().read_at,drill);
+  assert.equal(result.repeatedListingAssertions,2,'Only same page, value and quotation');assert.equal(result.projectionMatches,true);
+  assert.deepEqual(result.failures,{});assert.equal(result.gaps.typed_provenance_repeated_listing_assertion,1);
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill()).repeatedListingAssertions,0);
+  const repeated=typedDrill();repeated.observations.push(repeat(1));
+  const r=await runTypedSpecificationLineage(typedClient({drills:[{ok:true,status:200,value:repeated}]}),scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(r.claimsWithRepeatedAssertion,1);assert.equal(r.repeatedAssertionObservations,1);assert.equal(r.gaps.typed_provenance_repeated_listing_assertion,1);
+  assert.equal(r.matchedProjectionPairs,1);
+});
+
 test('typed runner gates denied parents, emits only private hashes/counters and cannot claim source truth', async () => {
   const client=typedClient(),events=[];
   const r=await runTypedSpecificationLineage(client,scope(),typedLineageSubjects(typedManifest([id(1),id(2)])),{emit:x=>events.push(x)});
