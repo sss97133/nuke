@@ -10,7 +10,6 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 export const TARGETS_TAG = "pcarmarket-targets:1";
 const SITE = "https://www.pcarmarket.com";
-const UA = { "User-Agent": "NukeListingCollector/1.0 (+https://nuke.ag)", "Accept": "application/xml,text/xml" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const slugOf = (url: string) => url.replace(/^.*\/(?:auction|results)\//, "").replace(/[/?#].*$/, "");
@@ -21,10 +20,10 @@ export const eventUrlFor = (targetUrl: string) => `https://pcarmarket.com/auctio
 export async function discoverTargets(supabase: any) {
   const slugs = new Set<string>();
   for (const f of ["sitemap-auctions-vehicles.xml", "sitemap-results.xml"]) {
-    const res = await fetch(`${SITE}/${f}`, { headers: UA, signal: AbortSignal.timeout(30_000) });
-    if (res.status === 403 || res.status === 429) return { success: false, stopped: "blocked_by_source", status: res.status };
-    if (!res.ok) throw new Error(`${f} HTTP ${res.status}`);
-    const xml = await res.text();
+    const res = await archiveFetch(`${SITE}/${f}`, { platform: "pcarmarket", useFirecrawl: false, skipCache: true, callerName: "import-pcarmarket-listing", directFetchOptions: { publicOnly: true, timeout: 40_000 } });
+    if (res.statusCode === 403 || res.statusCode === 429) return { success: false, stopped: "blocked_by_source", status: res.statusCode };
+    if (!res.html) throw new Error(`${f} ${res.error ?? `HTTP ${res.statusCode}`}`);
+    const xml = res.html;
     for (const m of xml.matchAll(/<loc>[^<]*\/(?:auction|results)\/([^<\/]+)<\/loc>/g)) slugs.add(m[1]);
     await sleep(2000);
   }
