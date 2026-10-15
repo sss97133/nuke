@@ -18,7 +18,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
-import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts';
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
@@ -578,17 +578,15 @@ async function saveToDatabase(
 ): Promise<{ vehicle_id: string; images_saved: number; is_new: boolean }> {
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
-  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
+  // Never equate Gooding lot slugs solely because one is a prefix of another.
   const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
     url: extracted.url,
     platform: 'gooding',
-    discoveryUrlIlikePattern: extracted.slug
-      ? `%goodingco.com/lot/${extracted.slug}%`
-      : discoveryUrlIlikePattern(extracted.url),
+    requireExactListingUrl: true,
   });
   let vehicleId: string | null = resolvedId;
 
-  // Also check by VIN (ILIKE pattern may timeout on 1M+ row table)
+  // Only a successful unmatched listing lookup may continue to VIN resolution.
   if (!vehicleId && extracted.vin && extracted.vin.length >= 5) {
     const { data: byVin } = await supabase
       .from('vehicles')

@@ -528,6 +528,8 @@ jobs:
         run: deno test supabase/functions/extract-rmsothebys/
       - name: Verify JamesEdition title and detail identity agree before intake
         run: deno test --no-config --no-lock --no-npm --no-remote supabase/functions/extract-jamesedition/
+      - name: Verify Gooding listing aliases never resolve a different slug or an ambiguous parent
+        run: deno test --no-config --no-lock --no-npm --no-remote supabase/functions/_shared/resolveVehicleForListing.test.ts
 
   profile-fold-contract:
     runs-on: ubuntu-latest
