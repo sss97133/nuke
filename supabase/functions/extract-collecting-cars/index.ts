@@ -1,3 +1,4 @@
+// Redeployed for the allowance_deferred wording (PR 1695).
 // Redeployed 2026-10-15 for the archiveFetch login-heuristic and cache fix (PR 1616).
 // Collecting Cars lot extractor - no LLM. The page comes through Firecrawl rawHtml when the site refuses the server;
 // the parsing lives in ./extract.ts (pure, tested against a stored page). Every fetch is archived to listing_page_snapshots by archiveFetch before it is parsed.

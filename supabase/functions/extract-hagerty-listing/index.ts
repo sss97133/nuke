@@ -23,6 +23,7 @@ import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { ALLOWANCE_EXHAUSTED, firecrawlGate } from "../_shared/firecrawlGate.ts";
 
 // ============================================================================
 // TYPES
@@ -677,7 +678,10 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
   // page fetch — so the feed could never reach the clean-end stamp that clears
   // its last_error. Re-polls now read the archive instead of the network.
   // "Fetch once, extract forever" (.claude/rules/extraction.md).
+  // Ask first, record after: no paid scrape without a credit in firecrawl_allowance('hagerty') (0 until an allocation row exists).
+  const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'hagerty');
   const result = await archiveFetch(url, {
+    firecrawlAllowed: () => gate.allow(),
     platform: 'hagerty',
     callerName: 'extract-hagerty-listing',
     // A live auction's bid/price moves; a day-old snapshot would report a stale
@@ -688,15 +692,19 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
     firecrawlOnBlock: true,
   });
 
+  if (result.error === 'firecrawl_allowance_exhausted') throw new Error(ALLOWANCE_EXHAUSTED);
   if (!result.html) {
+    if (result.source === 'firecrawl') await gate.record(1, 0, 'extract-hagerty-listing', `no page ${url}`);
     throw new Error(`Fetch failed: ${result.error || 'No HTML returned'}`);
   }
   // The parser needs __NEXT_DATA__; a page without it is a soft failure worth
   // naming, because it means the shape changed rather than the fetch failing.
   if (!result.html.includes('__NEXT_DATA__')) {
+    if (result.source === 'firecrawl') await gate.record(1, 0, 'extract-hagerty-listing', `no __NEXT_DATA__ ${url}`);
     throw new Error(`Page fetched (${result.source}) but no __NEXT_DATA__ present`);
   }
 
+  if (result.source === 'firecrawl') await gate.record(1, 1, 'extract-hagerty-listing', url);
   console.log(`[hagerty] ${result.source}${result.cached ? ' (cached)' : ''} — ${result.html.length} bytes`);
   return { html: result.html, source: result.source };
 }
