@@ -915,6 +915,15 @@ async function writeMecumEpisode(supabase: any, vehicleId: string, vehicle: Mecu
   }
 }
 
+/** A VIN or serial as the source states it, or null for a placeholder (measured 2026-10-15: "BLLFSALE" is on a Scat Cat and a
+ *  Sayers and Scovill hearse, two different vehicles). */
+function realVin(vin: string | null): string | null {
+  const v = (vin ?? "").trim();
+  if (v.length < 5) return null;
+  if (/^(bll?f?sale|bill\s*of\s*sale|none|n\/?a|no\s*vin|tbd|unknown|not\s*available|see\s*title)$/i.test(v)) return null;
+  return v;
+}
+
 // ─── Save vehicle ───────────────────────────────────────────────────────
 
 async function saveVehicle(
@@ -942,7 +951,7 @@ async function saveVehicle(
   let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
 
   // Also check by VIN if we have one (prevents duplicate key violation)
-  if (!existingId && vehicle.vin && vehicle.vin.length >= 5) {
+  if (!existingId && realVin(vehicle.vin)) {
     const { data: byVin } = await supabase
       .from("vehicles")
       .select("id")
@@ -956,7 +965,7 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
-    vin: vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : null,
+    vin: realVin(vehicle.vin) ? vehicle.vin : null,
     engine_type: vehicle.engine,
     transmission: vehicle.transmission,
     color: vehicle.exterior_color,
