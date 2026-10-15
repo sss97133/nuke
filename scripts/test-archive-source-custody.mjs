@@ -56,6 +56,8 @@ const sources = new Map([
   ['queueRows',compile('../supabase/functions/batch-extract-snapshots/queueRows.ts')],
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
+  ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
@@ -271,6 +273,8 @@ function fixture(options = {}) {
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
+        if(specifier==='./historicalAsks.ts')return load('historicalAsks');
+        if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');

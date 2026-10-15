@@ -42,6 +42,8 @@ import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBa
 import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
 import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentity, retainedIdentityStore, RetainedIdentityConflict } from "./retainedIdentity.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { HISTORICAL_ASK_MODE, HISTORICAL_ASK_PROFILE } from "./historicalAsks.ts";
+import { HISTORICAL_ASK_METHOD, historicalAskStore, ingestHistoricalAsk, HistoricalAskRefusal } from "./historicalAskIntake.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -256,7 +258,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  let retainedListingBudget = false, retainedSaleBudget = false;
+  let retainedListingBudget = false, retainedSaleBudget = false, historicalAskBudget = false;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     projectSecretKey() ?? "",
@@ -266,15 +268,15 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       global: { headers: { "X-Nuke-Writer": "ingest-observation" },
         fetch: (supabaseUrl, init) => {
           const supplied = (init as { signal?: AbortSignal } | undefined)?.signal;
-          if (retainedListingBudget || retainedSaleBudget) {
+          if (retainedListingBudget || retainedSaleBudget || historicalAskBudget) {
             const target = new URL(typeof supabaseUrl === "string" ? supabaseUrl
               : supabaseUrl instanceof URL ? supabaseUrl.href : supabaseUrl.url);
-            const allowed = retainedSaleBudget ? /^\/(rest|auth|storage)\/v1\// : /^\/(rest|auth)\/v1\//;
+            const allowed = retainedSaleBudget || historicalAskBudget ? /^\/(rest|auth|storage)\/v1\// : /^\/(rest|auth)\/v1\//;
             if (target.origin !== new URL(Deno.env.get("SUPABASE_URL") ?? "").origin ||
               !allowed.test(target.pathname)) throw new Error("Unexpected retained source SDK target");
           }
-          return fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget ? {
-            ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(retainedSaleBudget ? 10000 : 5000),
+          return fetch(supabaseUrl, retainedListingBudget || retainedSaleBudget || historicalAskBudget ? {
+            ...init, signal: AbortSignal.any([req.signal, AbortSignal.timeout(retainedSaleBudget || historicalAskBudget ? 10000 : 5000),
               ...(supplied ? [supplied] : [])]),
           } : init);
         },
@@ -284,6 +286,28 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    historicalAskBudget = input.mode === HISTORICAL_ASK_MODE;
+    if (input.mode === HISTORICAL_ASK_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Historical asking intake requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      try {
+        return new Response(JSON.stringify(await ingestHistoricalAsk(historicalAskStore(supabase), input as unknown as Record<string, unknown>)),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        if (!(error instanceof HistoricalAskRefusal)) throw error;
+        return new Response(JSON.stringify({ error: error.message }),
+          { status: error.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+    if (input.extraction_method === HISTORICAL_ASK_METHOD || input.structured_data?.profile === HISTORICAL_ASK_PROFILE) {
+      return new Response(JSON.stringify({ error: "Historical asking testimony requires its protected mode" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, ...RETAINED_PROPERTY_MODES].includes(input.mode ?? "");
     // Direct sale leaves must carry the worker's10s record cancellation through
     // every SDK query/download; creating a Request signal alone does not do so.
