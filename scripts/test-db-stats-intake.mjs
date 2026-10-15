@@ -354,6 +354,7 @@ function queueHandler({ controls = {}, items = [], result = {}, landed = [] } = 
       if (name.endsWith('/listingUrl.ts')) return { normalizeListingUrlKey: url => url };
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'configured' };
+      if (name.endsWith('/writeResult.ts')) return { mustWrite: (_label, result) => result, softWrite: () => null };
       if (name.endsWith('/ledger.ts')) return intakeLedger;
       throw new Error(`Unexpected queue import: ${name}`);
     },

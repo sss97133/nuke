@@ -35,6 +35,8 @@ const WRITE = /\.(insert|upsert|update|delete)\(/g;
 // checked only when its name starts with a write-ish verb.
 const WRITE_RPC = /\.rpc\(\s*['"](?:upsert_|insert_|persist_|register_|record_|write_|enqueue_|claim_|mark_|set_|update_|refresh_|ingest_|apply_|link_|merge_|supersede_)/g;
 
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export function scan(src) {
   const lines = src.split("\n");
   const offs = []; let o = 0;
@@ -88,7 +90,7 @@ export function scan(src) {
       const after = lines.slice(e + 1, e + 9);
       const idx = after.findIndex((l) => l.includes(errName.split(".")[0]) && (resultVar === null || l.includes(resultVar + ".error") || l.includes("error")));
       if (idx < 0) {
-        if (resultVar !== null && new RegExp(`\\b${resultVar.replace(/\$/g, "\\$")}\\b`).test(after.join("\n")) === false) { out.push({ line: s + 1, kind: "dropped", text: lines[ln].trim().slice(0, 100) }); }
+        if (resultVar !== null && new RegExp(`(?<![\\w$])${escapeRe(resultVar)}(?![\\w$])`).test(after.join("\n")) === false) { out.push({ line: s + 1, kind: "dropped", text: lines[ln].trim().slice(0, 100) }); }
         else if (resultVar === null) out.push({ line: s + 1, kind: "dropped", text: lines[ln].trim().slice(0, 100) });
         continue;
       }
