@@ -146,11 +146,11 @@ export function FeedFilterSidebar({
     : [
         ...feedSources.map((src) => {
           const legacy = LEGACY_FLAG[src.source_platform];
-          if (legacy) return flagRow(legacy, src.label.toUpperCase(), src.n_24h);
+          if (legacy) return flagRow(legacy, src.label.toUpperCase(), src.n_1h);
           const hidden = filters.hiddenSources ?? [];
           const isHidden = src.discovery_sources.some((d) => hidden.includes(d));
           return {
-            key: src.source_platform, label: src.label.toUpperCase(), count: src.n_24h, checked: !isHidden,
+            key: src.source_platform, label: src.label.toUpperCase(), count: src.n_1h, checked: !isHidden,
             toggle: () => update({
               hiddenSources: isHidden
                 ? hidden.filter((d) => !src.discovery_sources.includes(d))
@@ -517,7 +517,7 @@ export function FeedFilterSidebar({
         </div>
       </FilterSection>
 
-      {/* SOURCES: every source with rows in the last 24 h (feed_source_rollup); the fixed list only when that is unavailable */}
+      {/* SOURCES: every source seen in the last 24 h (feed_source_rollup); the fixed list only when that is unavailable */}
       <FilterSection title="SOURCES" defaultOpen={false}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {sourceRows.map(({ key, label, checked, count, toggle }) => (
@@ -535,7 +535,7 @@ export function FeedFilterSidebar({
                 onChange={toggle}
                 style={{ accentColor: 'var(--text)' }}
               />
-              {label}{count != null ? ` · ${count} / 24H` : ''}
+              {label}{count != null ? ` · ${count} / HR` : ''}
             </label>
           ))}
         </div>
