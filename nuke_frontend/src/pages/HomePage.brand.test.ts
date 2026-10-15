@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
-import { brandDollarMomentum, brandLines, brandMomentum } from './HomePage';
+import { brandDollarMomentum, brandLines, brandMomentum, lineChars } from './HomePage';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
 const porsche = {
@@ -22,6 +22,23 @@ describe('a brand tile', () => {
     const thin = { ...porsche, offered: 12, sold_prior_12m: 4 };
     expect(brandLines(thin)).toEqual(['$2.6B · 27,510 sold']);
     expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%']);
+  });
+});
+
+describe('a narrow brand tile', () => {
+  // Maserati's size of market (2026-10-15 live: $156.3M, 1,1xx sold) on Porsche's 12-month counts.
+  const maserati = { ...porsche, name: 'Maserati', count: 1108, value: 156_300_000, usd: 156_300_000, sold_any: 1108, offered: 1368 };
+  it('shows the longest form of each line that fits its width', () => {
+    expect(brandLines(maserati, 17)).toEqual(['$156M · 1.1K sold', '81% sold', '12 mo ▲20%']);
+    expect(brandLines(maserati, 10)).toEqual(['$156M', '81% sold']);
+    expect(brandLines(maserati, 4)).toEqual([]);
+  });
+  it('never returns a line wider than the tile, at any width', () => {
+    for (const node of [porsche, maserati, { ...maserati, usd: 40_400, count: 3, offered: 25, sold_any: 3 }]) {
+      for (let width = 0; width <= 40; width++) {
+        for (const line of brandLines(node, width)) expect(lineChars(line)).toBeLessThanOrEqual(width);
+      }
+    }
   });
 });
 
