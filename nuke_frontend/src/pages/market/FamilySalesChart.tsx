@@ -10,13 +10,13 @@ import './FamilySalesChart.css';
 // set would stop at the API's 1,000 rows, and the 911 alone has over 10,000 sales in five years. A dot opens its record.
 export type Sale = { vehicle_id: string; sale_date: string; usd: number; source: string | null; year: number | null; model: string | null };
 
-export const VENUES: { key: string; label: string; color: string; sources: string[] }[] = [
-  { key: 'bat', label: 'BaT', color: '#2A2A2A', sources: ['Bring a Trailer'] },
-  { key: 'mecum', label: 'Mecum', color: '#C8682A', sources: ['Mecum'] },
-  { key: 'bj', label: 'Barrett-Jackson', color: '#7A57C9', sources: ['Barrett-Jackson'] },
-  { key: 'house', label: 'RM · Gooding · Bonhams · Broad Arrow', color: '#2D6DB5', sources: ["RM Sotheby's", 'Gooding & Co', 'Bonhams', 'Broad Arrow'] },
-  { key: 'online', label: 'Cars & Bids · PCarMarket · others online', color: '#2E8B66', sources: ['Cars & Bids', 'PCarMarket', 'Collecting Cars', 'SBX Cars', 'Classic.com'] },
-  { key: 'other', label: 'other', color: '#9A9A9A', sources: [] },
+export const VENUES: { key: string; label: string; short: string; color: string; sources: string[] }[] = [
+  { key: 'bat', label: 'BaT', short: 'BaT', color: '#2A2A2A', sources: ['Bring a Trailer'] },
+  { key: 'mecum', label: 'Mecum', short: 'Mecum', color: '#C8682A', sources: ['Mecum'] },
+  { key: 'bj', label: 'Barrett-Jackson', short: 'B-J', color: '#7A57C9', sources: ['Barrett-Jackson'] },
+  { key: 'house', label: 'RM · Gooding · Bonhams · Broad Arrow', short: 'Houses', color: '#2D6DB5', sources: ["RM Sotheby's", 'Gooding & Co', 'Bonhams', 'Broad Arrow'] },
+  { key: 'online', label: 'Cars & Bids · PCarMarket · others online', short: 'Online', color: '#2E8B66', sources: ['Cars & Bids', 'PCarMarket', 'Collecting Cars', 'SBX Cars', 'Classic.com'] },
+  { key: 'other', label: 'other', short: 'other', color: '#9A9A9A', sources: [] },
 ];
 export function venueOf(source: string | null | undefined) {
   return VENUES.find((v) => source != null && v.sources.includes(source)) ?? VENUES[VENUES.length - 1];
@@ -97,6 +97,9 @@ export function useFamilySales(brand: string | null, familyKey: string | null) {
 }
 
 const M = { left: 60, right: 18, top: 16, bottom: 26 };
+// Under this width the head stacks (title over the BaT move) and the legend takes short venue names (a 390 px phone
+// wrapped the one-line head over the legend and the dots, 2026-10-15).
+const NARROW = 640;
 
 export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen }: {
   brand: string; familyKey: string; family: string; width: number; height: number; onOpen: (vehicleId: string) => void;
@@ -108,7 +111,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     if (!sales?.length || width < 200 || height < 160) return null;
     const pts = sales.map((s) => ({ ...s, t: Date.parse(s.sale_date) })).filter((s) => Number.isFinite(s.t) && s.usd > 0).sort((a, b) => a.t - b.t);
     if (!pts.length) return null;
-    const head = 54;
+    const head = width < NARROW ? 96 : 54;
     const w = width - M.left - M.right, h = height - head - M.top - M.bottom;
     const t0 = Math.min(pts[0].t, Date.now() - 1826 * DAY), t1 = Date.now();
     const usd = pts.map((p) => p.usd);
@@ -139,19 +142,24 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   if (!plot) return <div className="family-sales__empty"><Text role="caption">No dated sales of this family in the last five years.</Text></div>;
   const hd = hover != null ? plot.dots[hover] : null;
   const pct = move ? Math.round((move.last / move.prior - 1) * 100) : null;
-  return <div className="family-sales">
+  const narrow = width < NARROW;
+  const since = plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const count = truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US');
+  return <div className={narrow ? 'family-sales family-sales--narrow' : 'family-sales'}>
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
-        <Text role="caption">{truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US')} sales with a date since {plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} · one dot each · line = rolling median, 60 days either side</Text>
+        <Text role="caption">{narrow ? `${count} sales since ${since} · line = rolling median`
+          : `${count} sales with a date since ${since} · one dot each · line = rolling median, 60 days either side`}</Text>
       </div>
       {move && <div className="family-sales__move">
         <Text role="measure">{money(move.last)}</Text>
-        <Text role="caption">BaT median, last 12 mo ({move.nLast}) · {money(move.prior)} the 12 before ({move.nPrior}) · {pct! >= 0 ? '▲' : '▼'}{Math.abs(pct!)}%</Text>
+        <Text role="caption">{narrow ? `BaT median, 12 mo · ${money(move.prior)} the 12 before · ${pct! >= 0 ? '▲' : '▼'}${Math.abs(pct!)}%`
+          : `BaT median, last 12 mo (${move.nLast}) · ${money(move.prior)} the 12 before (${move.nPrior}) · ${pct! >= 0 ? '▲' : '▼'}${Math.abs(pct!)}%`}</Text>
       </div>}
     </div>
     <div className="family-sales__legend">
-      {plot.counts.map((v) => <span key={v.key} className="family-sales__venue"><svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg><Text role="caption">{v.label} {v.n.toLocaleString('en-US')}</Text></span>)}
+      {plot.counts.map((v) => <span key={v.key} className="family-sales__venue"><svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg><Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></span>)}
     </div>
     <svg ref={svgRef} className="family-sales__plot" width={width} height={height - plot.head} viewBox={`0 ${plot.head} ${width} ${height - plot.head}`}
       role="img" aria-label={`${family}: ${plot.n} sales over five years, price against date`}
@@ -164,7 +172,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         <line x1={t.x} x2={t.x} y1={plot.head + M.top} y2={height - M.bottom} className="family-sales__grid" />
         <text x={t.x + 4} y={height - 8} className="family-sales__axis">{t.label}</text>
       </g>)}
-      {plot.dots.map((d) => <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={plot.n > 2500 ? 2 : 2.8} fill={d.color} fillOpacity={0.55} />)}
+      {plot.dots.map((d) => <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={plot.n > 2500 ? (narrow ? 1.3 : 2) : 2.8} fill={d.color} fillOpacity={narrow && plot.n > 2500 ? 0.4 : 0.55} />)}
       {plot.line && <path d={plot.line} className="family-sales__median-halo" />}
       {plot.line && <path d={plot.line} className="family-sales__median" />}
       {hd && <circle cx={hd.cx} cy={hd.cy} r={6} className="family-sales__hit" />}
