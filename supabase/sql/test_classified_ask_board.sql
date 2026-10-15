@@ -1,5 +1,6 @@
 -- Isolated PostgreSQL 17 contract for 20261013233000_classified_ask_board.sql (new classified asks with the near-me,
--- band and tier lenses). Synthetic rows only; never production. Run from the repo root in an empty disposable
+-- band and tier lenses) and 20261015070000_classified_ask_board_listed_at.sql (newest first by when a listing went up,
+-- and the newest listing time). Synthetic rows only; never production. Run from the repo root in an empty disposable
 -- dm_ask_board_* database:
 --   createdb dm_ask_board_ci
 --   psql -X -v ON_ERROR_STOP=1 -d dm_ask_board_ci -f supabase/sql/test_classified_ask_board.sql
@@ -9,7 +10,9 @@
 -- Covered: the migration applies and applies again; the window, one row per vehicle (newest event), the exclusions
 -- (private, deleted, non-vehicle, auction sources, outside the window); the population block; the tiers; distance and
 -- the nearest sort; radius, tier and band filters; the point's rounding; argument errors; the ACL and a read as anon,
--- where a low-confidence location row stays hidden.
+-- where a low-confidence location row stays hidden; listed_at (the post time, never later than the first sighting, else
+-- the first sighting) and the order by it; newest_at (the newest visible listing: private and auction rows excluded,
+-- lenses ignored, the same for anon) and the hash guard that lets the newer migration apply again.
 -- Not covered: the real taste scorer; the live query's cost (measured on production with the same plan shape:
 -- 54 ms warm, 638 ms cold over 374 asks, 2026-10-13).
 \set ON_ERROR_STOP on
@@ -64,6 +67,8 @@ AS $$ SELECT CASE WHEN lower(p_parsed_make) = 'chevrolet' THEN 70 ELSE 10 END::s
 
 \ir ../migrations/20261013233000_classified_ask_board.sql
 \ir ../migrations/20261013233000_classified_ask_board.sql
+\ir ../migrations/20261015070000_classified_ask_board_listed_at.sql
+\ir ../migrations/20261015070000_classified_ask_board_listed_at.sql
 RESET ROLE;
 
 -- Vehicles: 1 Blazer (Phoenix), 2 H3T (St George), 3 M1010 (Las Vegas), 4 Ford (no price, no place),
@@ -85,7 +90,8 @@ INSERT INTO public.vehicle_events (vehicle_id, source_platform, source_url, curr
      '{"listing_posted_at":"2026-10-13T16:03:45.000Z"}'),
   ('00000000-0000-4000-8000-000000000002', 'craigslist', 'https://www.craigslist.org/view/d/b/2', 12500, now() - interval '3 hours', '{"listing_posted_at":"soon"}'),
   ('00000000-0000-4000-8000-000000000003', 'craigslist', 'https://www.craigslist.org/view/d/c/3', 13500, now() - interval '30 minutes', '{}'),
-  ('00000000-0000-4000-8000-000000000004', 'ksl', 'https://www.ksl.com/listing/4', NULL, now() - interval '5 hours', '{}'),
+  ('00000000-0000-4000-8000-000000000004', 'ksl', 'https://www.ksl.com/listing/4', NULL, now() - interval '5 hours',
+     '{"listing_posted_at":"2099-01-01T00:00:00Z"}'),
   ('00000000-0000-4000-8000-000000000005', 'craigslist', 'https://www.craigslist.org/view/d/e/5', 9000, now() - interval '1 hour', '{}'),
   ('00000000-0000-4000-8000-000000000006', 'craigslist', 'https://www.craigslist.org/view/d/f/6', 9000, now() - interval '1 hour', '{}'),
   ('00000000-0000-4000-8000-000000000007', 'facebook_marketplace', 'https://www.facebook.com/marketplace/item/7/', 22000, now() - interval '30 hours', '{}'),
@@ -99,6 +105,30 @@ INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, sourc
   ('00000000-0000-4000-8000-000000000002', 'listing', 'https://other.example/elsewhere', now(), 'Elsewhere', 'ME', 44.0, -70.0, 0.8),
   ('00000000-0000-4000-8000-000000000003', 'listing', 'https://www.craigslist.org/view/d/c/3', now(), 'Las Vegas', 'NV', 36.1699, -115.1398, 0.8),
   ('00000000-0000-4000-8000-000000000009', 'listing', 'https://www.craigslist.org/view/d/i/9', now(), 'Hidden', 'CA', 34.05, -118.24, 0.3);
+
+-- newest_at: the newest listing the caller can see. A private vehicle and an auction source arrive later and do not
+-- count; the newest visible listing is the M1010's (no post time, so its first sighting). The F250's post time is later
+-- than its first sighting and is not believed.
+INSERT INTO public.vehicle_events (vehicle_id, source_platform, source_url, current_price, created_at, metadata) VALUES
+  ('00000000-0000-4000-8000-000000000005', 'craigslist', 'https://www.craigslist.org/view/d/e/5b', 9100, now() - interval '5 minutes', '{}'),
+  ('00000000-0000-4000-8000-000000000008', 'bat', 'https://bringatrailer.com/listing/y/', 41000, now() - interval '1 minute', '{}');
+SELECT pg_temp.ok('newest_at is the newest visible arrival',
+  (public.classified_ask_board()->>'newest_at')::timestamptz
+    = (SELECT created_at FROM public.vehicle_events WHERE vehicle_id = '00000000-0000-4000-8000-000000000003'));
+SELECT pg_temp.ok('newest_at ignores the lenses',
+  (public.classified_ask_board(p_tier => 'under_5k')->>'newest_at')::timestamptz
+    = (SELECT created_at FROM public.vehicle_events WHERE vehicle_id = '00000000-0000-4000-8000-000000000003')
+  AND (public.classified_ask_board(p_tier => 'under_5k')->>'matching')::int = 1);
+SELECT pg_temp.ok('listed_at is the post time when it precedes the first sighting',
+  (SELECT (r->>'listed_at')::timestamptz = '2026-10-13T16:03:45Z'::timestamptz
+   FROM jsonb_array_elements(public.classified_ask_board()->'rows') r WHERE r->>'model' = 'blazer'));
+SELECT pg_temp.ok('a post time after the first sighting falls back to the first sighting',
+  (SELECT (r->>'listed_at')::timestamptz = (SELECT created_at FROM public.vehicle_events WHERE vehicle_id = '00000000-0000-4000-8000-000000000004')
+     AND (r->>'posted_at')::timestamptz = '2099-01-01T00:00:00Z'::timestamptz
+   FROM jsonb_array_elements(public.classified_ask_board()->'rows') r WHERE r->>'model' = 'f250'));
+SELECT pg_temp.ok('an unknown post time falls back to the first sighting',
+  (SELECT (r->>'listed_at')::timestamptz = (r->>'first_seen_at')::timestamptz
+   FROM jsonb_array_elements(public.classified_ask_board()->'rows') r WHERE r->>'model' = 'h3t'));
 
 -- Las Vegas, as a caller would pass it.
 \set lat 36.1699
@@ -115,8 +145,9 @@ BEGIN
   PERFORM pg_temp.ok('by tier', b->'population'->'by_tier' = '{"under_5k":1,"5k_15k":2,"15k_40k":1,"unpriced":1}'::jsonb);
   PERFORM pg_temp.ok('band cutoff returned', (b->>'band_min_taste')::int = 60);
   PERFORM pg_temp.ok('window returned', (b->>'window_hours')::int = 24);
-  PERFORM pg_temp.ok('newest first', (SELECT array_agg(r->>'model' ORDER BY o) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY x(r, o))
-    = ARRAY['m1010', 'blazer', 'h3t', 'pickup', 'f250']);
+  PERFORM pg_temp.ok('newest listed first (the Blazer went up on 10-13 and was seen again today)',
+    (SELECT array_agg(r->>'model' ORDER BY o) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY x(r, o))
+    = ARRAY['m1010', 'h3t', 'pickup', 'f250', 'blazer']);
   PERFORM pg_temp.ok('one row per vehicle: the newest event and its place',
     (SELECT r->>'asking_price' = '18800' AND r->>'city' = 'Phoenix' AND r->>'posted_at' IS NOT NULL
      FROM jsonb_array_elements(b->'rows') r WHERE r->>'model' = 'blazer'));
@@ -152,7 +183,7 @@ SELECT pg_temp.ok('price sort, cheapest first',
 SELECT pg_temp.ok('band sort', (public.classified_ask_board(p_sort => 'band')->'rows'->0->>'make') = 'Chevrolet');
 SELECT pg_temp.ok('page size and offset',
   jsonb_array_length(public.classified_ask_board(p_limit => 2)->'rows') = 2
-  AND (public.classified_ask_board(p_limit => 2, p_offset => 2)->'rows'->0->>'model') = 'h3t');
+  AND (public.classified_ask_board(p_limit => 2, p_offset => 2)->'rows'->0->>'model') = 'pickup');
 
 DO $$
 DECLARE bad text[] := ARRAY[
@@ -188,6 +219,8 @@ DO $$
 DECLARE b jsonb := public.classified_ask_board();
 BEGIN
   PERFORM pg_temp.ok('anon: same asks', (b->'population'->>'asks')::int = 5);
+  PERFORM pg_temp.ok('anon: the same newest arrival', (b->>'newest_at')::timestamptz
+    = (SELECT created_at FROM public.vehicle_events WHERE vehicle_id = '00000000-0000-4000-8000-000000000003'));
   PERFORM pg_temp.ok('anon: a low-confidence place stays hidden', (b->'population'->>'with_point')::int = 3
     AND (SELECT r->'city' = 'null'::jsonb FROM jsonb_array_elements(b->'rows') r WHERE r->>'model' = 'pickup'));
 END $$;

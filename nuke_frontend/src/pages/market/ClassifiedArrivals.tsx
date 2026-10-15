@@ -1,10 +1,10 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Masthead, Text } from '../../kit';
 import { sourceLink, sourceName } from './useCapturedListings';
-import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskSort, type AskTier, TIER_NAMES, useAskBoard } from './useAskBoard';
+import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -13,9 +13,45 @@ const WINDOW_NAMES: Record<number, string> = { 24: 'last 24 hours', 72: 'last 3 
 const SORT_NAMES: Record<AskSort, string> = { newest: 'Newest first', nearest: 'Nearest first', band: 'Band first', price: 'Cheapest first' };
 type Locating = 'off' | 'asking' | 'on' | 'refused' | 'unavailable';
 
-function clock(value: string | null | undefined) {
-  const date = value ? new Date(value) : null;
-  return date && Number.isFinite(date.getTime()) ? date.toLocaleString() : 'unrecorded';
+// How long ago, the way a feed says it: now, 12 min, 3 h, 2 d. The page reads as live; a full date and time is noise
+// (owner, 2026-10-15). Unknown stays unknown.
+export function ageOf(value: string | null | undefined, now = Date.now()): string | null {
+  const t = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(t)) return null;
+  const s = Math.max(0, (now - t) / 1000);
+  if (s < 60) return 'now';
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h`;
+  return `${Math.floor(s / 86400)} d`;
+}
+// Live means the newest arrival is within one intake cycle: poll-listing-feeds runs every 15 minutes (96 of 96 runs in
+// the 24 h to 2026-10-15 01:30Z), so 20 minutes allows a cycle and its processing. Past that the board says how far
+// behind it is, whether the intake stalled or the page has sat unread.
+const LIVE_MS = 20 * 60_000;
+export function freshness(newestAt: string | null | undefined, now = Date.now()): string {
+  const t = newestAt ? Date.parse(newestAt) : NaN;
+  if (!Number.isFinite(t)) return 'refresh';
+  return now - t < LIVE_MS ? 'live' : `${ageOf(newestAt, now)} behind`;
+}
+// When a listing went up: the reader's listed_at (20261015070000), else the post time when it precedes the first
+// sighting, else the first sighting. Capture trails posting (median 6.5 h on 2026-10-15), so first seen is not age.
+type Timed = { first_seen_at: string; posted_at?: string | null; listed_at?: string | null };
+export function listedAt(row: Timed): string {
+  if (row.listed_at) return row.listed_at;
+  const posted = row.posted_at ? Date.parse(row.posted_at) : NaN;
+  return Number.isFinite(posted) && posted < Date.parse(row.first_seen_at) ? row.posted_at as string : row.first_seen_at;
+}
+// The newest listing a board knows: the reader's newest_at, else its newest row.
+export function newestOf(board: { newest_at?: string | null; rows: Timed[] } | undefined): string | null {
+  if (!board) return null;
+  if (board.newest_at) return board.newest_at;
+  const times = board.rows.map(row => Date.parse(listedAt(row))).filter(Number.isFinite);
+  return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
+// Listings that went up after a moment, counted from a newest-first page.
+export function arrivalsAfter(rows: Timed[], since: string | null): number {
+  const t = since ? Date.parse(since) : NaN;
+  return Number.isFinite(t) ? rows.filter(row => Date.parse(listedAt(row)) > t).length : 0;
 }
 function vehicleImage(value?: string | null) {
   try { const url = new URL(value ?? ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; }
@@ -57,22 +93,62 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
 
   const located = near && point ? point : null;
   const sort: AskSort = requestedSort === 'nearest' && !located ? 'newest' : requestedSort ?? (located ? 'nearest' : 'newest');
-  const query = useAskBoard({ hours, tier, band, sort, point: located, radius: located ? radius : null }, !near || locating !== 'asking');
+  const askQuery = useMemo(() => ({ hours, tier, band, sort, point: located, radius: located ? radius : null }),
+    [hours, tier, band, sort, located, radius]);
+  const query = useAskBoard(askQuery, !near || locating !== 'asking');
   const first = query.data?.pages[0];
   const population = first?.population;
   const rows = query.data?.pages.flatMap(page => page.rows) ?? [];
 
+  // Refresh in place: the control sits top right, shows that it is reading, then says what arrived. The list keeps the
+  // reader's place (the newest arrive above it), unlike a pull that jumps. Every two minutes, while the tab is shown,
+  // a newest-first read of the same lenses counts what landed since this read; the control then offers "N new".
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(id); }, []);
+  const shownNewest = newestOf(first);
+  const [polled, setPolled] = useState<{ newest: string | null; waiting: number } | null>(null);
+  useEffect(() => {
+    setPolled(null);
+    if (!shownNewest) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      readAskBoard({ ...askQuery, sort: 'newest' }, 0)
+        .then(board => setPolled({ newest: newestOf(board), waiting: arrivalsAfter(board.rows, shownNewest) }))
+        .catch(() => { /* the next tick reads again */ });
+    }, 120_000);
+    return () => window.clearInterval(id);
+  }, [askQuery, shownNewest]);
+  const [arrived, setArrived] = useState<number | null>(null);
+  const shownAt = useRef<string | null>(null);
+  const refresh = async () => {
+    shownAt.current = shownNewest;
+    const result = await query.refetch();
+    setArrived(arrivalsAfter(result.data?.pages[0]?.rows ?? [], shownAt.current)); setNow(Date.now());
+    window.setTimeout(() => setArrived(null), 6_000);
+  };
+  const polledNewest = polled?.newest ?? null;
+  const latest = shownNewest && polledNewest && Date.parse(polledNewest) > Date.parse(shownNewest) ? polledNewest : shownNewest ?? polledNewest;
+  const control = query.isFetching ? '↻ reading…'
+    : !first ? '↻ reading…'
+    : polled?.waiting ? `↻ ${count(polled.waiting)}${polled.waiting >= 60 ? '+' : ''} new`
+    : `↻ ${freshness(latest, now)}`;
+
   return <section aria-label="Classified arrivals" className="market-explorer">
     <Masthead result={<>
-      <Text role="measure" as="div">{first ? count(first.matching) : '…'}</Text>
-      <Text role="caption" as="div">{first
-        ? `of ${count(population?.asks)} asks first seen in the ${WINDOW_NAMES[first.window_hours] ?? `last ${first.window_hours} hours`} · as of ${clock(first.as_of)}`
-        : 'reading asks…'}</Text>
+      <button type="button" className="market-control" aria-busy={query.isFetching} onClick={() => void refresh()}
+        title="Read the newest listings">
+        <Text role="label">{control}</Text>
+      </button>
+      {arrived !== null && <Text role="caption" as="div">{arrived > 0 ? `${count(arrived)} new` : 'nothing new yet'}</Text>}
     </>}>
-      <Text role="entity" as="h1">Classified arrivals</Text>
+      <Text role="entity" as="h1">Just listed</Text>
     </Masthead>
-    <div className="k-section k-strip market-scope" role="group" aria-label="Arrivals scope">
+    <div className="k-section k-strip market-scope" role="group" aria-label="Market view">
       <div role="group" aria-label="Market view" className="market-scope__views">{collection}</div>
+    </div>
+    <details className="k-section market-filters">
+      <summary><Text role="label">Filters</Text></summary>
+    <div className="k-section k-strip market-scope" role="group" aria-label="Arrivals scope">
       {sourcePicker}
       <label className="market-scope__cohort"><Text role="label">Window</Text><select className="market-control k-body" value={hours}
         onChange={event => set('window', event.target.value === '24' ? null : event.target.value)}>
@@ -108,18 +184,22 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
         {count(population.priced)} of {count(population.asks)} priced ({count(population.by_tier.unpriced)} without a price) · {count(population.with_point)} with a recorded place · {count(population.in_band)} in the band (taste {first?.band_min_taste ?? 60}+) · {Object.entries(population.by_source).map(([s, n]) => `${sourceName(s)} ${count(n)}`).join(', ') || 'no source'}
       </Text>
     </div>}
+    </details>
     {query.isPending && <p role="status" className="k-body">Reading arrivals…</p>}
     {query.isError && <p role="status" className="k-body">Arrivals could not be read. <button type="button" className="market-control" onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
     {first && !rows.length && <p role="status" className="k-body">{located && population?.with_point === 0
       ? 'No ask in this window has a recorded place yet.' : 'No ask in this window matches these lenses.'}</p>}
     {rows.length > 0 && <div className="market-listings__scroll"><table className="market-listings">
       <thead><tr><th scope="col"><Text role="label">Listing / vehicle</Text></th><th scope="col"><Text role="label">Asking</Text></th>
-        <th scope="col"><Text role="label">Place</Text></th><th scope="col"><Text role="label">Evidence</Text></th></tr></thead>
+        <th scope="col"><Text role="label">Place</Text></th></tr></thead>
       <tbody>{rows.map(row => {
         const href = sourceLink(row.source, row.url);
         const identity = [row.year, row.make, row.model].filter(Boolean).join(' ');
         const image = vehicleImage(row.image);
-        const specs = [row.drivetrain, row.body_style, row.mileage ? `${row.mileage.toLocaleString('en-US')} mi` : null].filter(Boolean).join(' · ');
+        // The photo says the body and drive; the row carries what it cannot: miles, and how old the listing is.
+        const specs = row.mileage ? `${row.mileage.toLocaleString('en-US')} mi` : '';
+        const age = ageOf(listedAt(row), now);
+        const seen = [sourceName(row.source), age && (age === 'now' ? 'just now' : `${age} ago`)].filter(Boolean).join(' · ');
         return <tr key={row.event_id}>
           <td>{image && <img className="market-listing__image" src={image} width="80" height="60" loading="lazy" alt="Vehicle record image" onError={event => { event.currentTarget.hidden = true; }} />}
             <Text role="entity" dense as="div"><PrefetchLink to={`/vehicle/${row.vehicle_id}`} aria-label={identity || 'Vehicle identity unrecorded'}>
@@ -127,16 +207,12 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
                 : row.make ? <>{row.year ?? ''} <MakeIdentity make={row.make} /></> : identity || 'Vehicle identity unrecorded'}
             </PrefetchLink></Text>
             {specs && <Text role="caption" as="div">{specs}</Text>}
-            <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{sourceName(row.source)} · original listing</a> : `${sourceName(row.source)} · source link unavailable here`}</Text></td>
+            <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{seen}</a> : seen}</Text></td>
           <td>{row.asking_price == null ? <Text role="caption">Unpriced</Text>
             : <><Text role="measure" dense>${Number(row.asking_price).toLocaleString('en-US')}</Text> <Text role="caption">· asking</Text></>}
-            {row.tier && <Text role="caption" as="div">{TIER_NAMES[row.tier]}</Text>}</td>
+          </td>
           <td>{row.city || row.region ? <Text role="body" as="div">{[row.city, row.region].filter(Boolean).join(', ')}</Text> : <Text role="caption" as="div">Place unrecorded</Text>}
             {row.distance_mi != null && <Text role="caption" as="div">{row.distance_mi.toLocaleString('en-US')} mi away</Text>}</td>
-          <td><details className="market-notes"><summary><Text role="label">{row.in_band ? `In band · taste ${row.taste}` : `Taste ${row.taste ?? 'unscored'}`}</Text></summary>
-            <Text role="caption" as="div">First seen {clock(row.first_seen_at)}</Text>
-            <Text role="caption" as="div">Posted {clock(row.posted_at)}</Text>
-          </details></td>
         </tr>;
       })}</tbody>
     </table></div>}
