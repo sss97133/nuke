@@ -390,6 +390,7 @@ struct VehicleDetailView: View {
         }
         .task(id: vehicleId) { await load() }
         .task(id: vehicleId) { if mapContext == nil { await loadHero() } }
+        .task(id: vehicle?.primary_image_url) { if mapContext == nil { await loadCover() } }
         .task(id: vehicleId) { if mapContext != nil { await loadMapEvidence() } }
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { if mapContext == nil { await loadProfileRead() } }
@@ -787,6 +788,11 @@ struct VehicleDetailView: View {
         // fetch — the latest one can sit past the gallery's first page). Then a
         // rendering of it (art fallback). Then the paged gallery for vehicles with no
         // exterior set — always excluding documents (a plate never leads).
+        // The web leads with the record's cover (primary_image_url, kept from the rows the public
+        // may read by recompute_vehicle_primary_image). Mirror it when that cover is one of the gated
+        // rows this viewer read: a listing's cover is the seller's chosen photo, where "latest
+        // exterior" picked a paint-gauge close-up on a 911 (2026-10-15).
+        if let coverRow { return coverRow }
         if let realExt = latest(heroCandidates.filter(realPhoto)) { return realExt }
         if let anyExt  = latest(heroCandidates) { return anyExt }                 // art fallback
         let nonDoc = images.filter { $0.image_category != "documentation" }
@@ -798,6 +804,28 @@ struct VehicleDetailView: View {
     /// miscategorized as exterior_body carry newer dates). Fetch the exterior_body set
     /// once, with its vision reasoning, and let `heroImage` choose photo-over-art.
     @State private var heroCandidates: [VehicleGalleryImage] = []
+    /// The record's cover as a gallery row this viewer may read (nil when it is gated, or when
+    /// no row carries that URL). Fetched on its own: it can sit past the gallery's first page.
+    @State private var coverRow: VehicleGalleryImage?
+    private func loadCover() async {
+        guard let cover = vehicle?.primary_image_url?.trimmingCharacters(in: .whitespaces), !cover.isEmpty else {
+            coverRow = nil; return
+        }
+        do {
+            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
+                .from("vehicle_images")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("image_url", value: cover))
+                .limit(1)
+                .execute().value
+            coverRow = rows.first.flatMap { row in
+                row.image_category == "documentation" ? nil : row   // a plate or document never leads
+            }
+        } catch {
+            NSLog("NukeCapture cover row fetch failed: %@", String(describing: error))
+        }
+    }
     private func loadHero() async {
         do {
             heroCandidates = try await VehicleGalleryImage.eligible(SupabaseService.client
