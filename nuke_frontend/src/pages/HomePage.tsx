@@ -918,9 +918,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Without hover (a phone), a tap on a market tile opens its card; the card's Open drills.
   const [coarse] = useState(() => canMatchMedia && window.matchMedia('(hover: none)').matches);
   const [sheet, setSheet] = useState<TreemapNode | null>(null);
-  // What a market tile's area counts: Bring a Trailer's dollars over the last 12 months (the color's own population,
-  // the default), or every venue and year in the ledger.
-  const [basis, setBasis] = useState<MapBasis>('bat12');
+  // What a market tile's area counts: every venue and year in the ledger (the default: the owner, 2026-10-15, "is
+  // supposed to be all the markets not just one"), or Bring a Trailer's dollars over the last 12 months, the color's
+  // own population. The color stays BaT's move, the one venue held in full both years, hatched where BaT holds under
+  // half a tile's sales.
+  const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
   const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(atFamilies ? currentLevel.make ?? null : null);
@@ -1351,7 +1353,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
         {/* Level indicator + feed shortcut; wraps under itself on a phone rather than pushing the caption off screen */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
-          {activeData && marketLevel && basis === 'bat12' && !(levelType === 'brands' && brandView === 'nested') ? (
+          {activeData && marketLevel && basis === 'bat12' ? (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {isNarrow ? `${bat12Totals.sold.toLocaleString('en-US')} BaT sold, 12 mo`
                 : `${bat12Totals.sold.toLocaleString('en-US')} Bring a Trailer sales, last 12 months · ${fmtMoneyMap(bat12Totals.usd)}${ledgerViewsClock(refresh.refreshedAt)}`}
@@ -1414,8 +1416,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ENTER FEED
             </button>
           )}
-          {marketLevel && !(levelType === 'brands' && brandView === 'nested') && <MapViewSwitch label="Map size" value={basis} onChange={setBasis}
-            options={[{ value: 'bat12', label: 'BaT 12 mo' }, { value: 'ledger', label: 'All sales' }]} />}
+          {marketLevel && <MapViewSwitch label="Map size" value={basis} onChange={setBasis}
+            options={[{ value: 'ledger', label: 'All sales' }, { value: 'bat12', label: 'BaT 12 mo' }]} />}
           {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
             options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
           {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
@@ -1476,7 +1478,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           }}
         >
           {levelType === 'brands' && brandView === 'nested' && dims.w > 0 ? (
-            <BrandFamilyMap width={dims.w} height={dims.h}
+            <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
               onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
               onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
@@ -1576,7 +1578,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           gap: 12,
         }}
       >
-        {(levelType === 'brands' && brandView === 'brands' || levelType === 'families')
+        {(levelType === 'brands' || levelType === 'families')
           && !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0)
           ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} />
           : <Text role="caption">
