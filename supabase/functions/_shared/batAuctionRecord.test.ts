@@ -227,14 +227,14 @@ ${widget}
 
 Deno.test("own end: a running lot's own countdown, not the widget's first entry", () => {
   assertEquals(readOwnAuctionEnd(runningPage), {
-    postId: "121897619", endsAt: "2026-10-15T17:00:00.000Z", endsDate: "2026-10-15", endsFrom: "data-ends", closedAt: null,
+    postId: "121897619", endsAt: "2026-10-15T17:00:00.000Z", endsDate: "2026-10-15", endsFrom: "data-ends", closedAt: null, withdrawn: false,
   });
 });
 
 Deno.test("own end: a closed page has no countdown of its own; its result stamp is the close", () => {
   // the first data-auction-ends on this page is another lot's (2026-10-15); the lot sold 2026-05-26
   assertEquals(readOwnAuctionEnd(closedPage), {
-    postId: "113602346", endsAt: null, endsDate: null, endsFrom: null, closedAt: "2026-05-26T20:42:57.000Z",
+    postId: "113602346", endsAt: null, endsDate: null, endsFrom: null, closedAt: "2026-05-26T20:42:57.000Z", withdrawn: false,
   });
 });
 
@@ -243,10 +243,26 @@ Deno.test("own end: the countdown fallback counts only with the page's own id", 
   assertEquals(readOwnAuctionEnd(ownCountdownOnly).endsFrom, "countdown");
   assertEquals(readOwnAuctionEnd(ownCountdownOnly).endsAt, "2026-10-15T17:00:00.000Z");
   // no shortlink and no result line: no post id, so no countdown is anyone's own
-  assertEquals(readOwnAuctionEnd(widget), { postId: null, endsAt: null, endsDate: null, endsFrom: null, closedAt: null });
+  assertEquals(readOwnAuctionEnd(widget), { postId: null, endsAt: null, endsDate: null, endsFrom: null, closedAt: null, withdrawn: false });
   // the closed "-2" relist of #1574: a sidebar countdown with no id is nobody's own
   assertEquals(readOwnAuctionEnd(sidebar).endsDate, null);
   // another lot's data-ends (an id that is not the page's) is not this lot's end
   const foreign = closedPage + `<span data-ends="1792083600" data-ends-id="121897619"></span>`;
   assertEquals(readOwnAuctionEnd(foreign).endsAt, null);
+});
+
+// Shape copied from 1955-volkswagen-beetle-deluxe (post 123323130), withdrawn 10/5/26 and read 2026-10-15: no countdown
+// of its own, the widget's countdowns, and a result line whose stamp span is "info-value noborder-tiny date-localize".
+const withdrawnPage = `<head><link rel='shortlink' href='https://bringatrailer.com/?p=123323130' /></head>
+${widget}
+<div class="listing-available-info">
+  <span data-listing-currently="123323130"></span><span class="info-label">Withdrawn on</span><span class="info-value noborder-tiny date-localize" data-timestamp="1791231660" data-format="L">10/5/26</span><a class="comments-anchor-link" href="#comments-anchor"></a>
+</div>`;
+
+Deno.test("own end: a withdrawn page is closed at its 'Withdrawn on' stamp", () => {
+  assertEquals(readOwnAuctionEnd(withdrawnPage), {
+    postId: "123323130", endsAt: null, endsDate: null, endsFrom: null, closedAt: "2026-10-05T20:21:00.000Z", withdrawn: true,
+  });
+  // a sold page's stamp is not a withdrawal
+  assertEquals(readOwnAuctionEnd(closedPage).withdrawn, false);
 });

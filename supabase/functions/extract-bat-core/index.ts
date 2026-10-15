@@ -1,6 +1,7 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
  * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
  * - A running lot gets no auction_sold / auction_reserve_not_met / auction_ended row and no end-dated mileage reading
  *   (auctionClose.ts): every live read had written "BaT ended • bid to $<current bid>" dated the scheduled end.
@@ -54,7 +55,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.1';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -315,6 +316,7 @@ function extractEssentials(html: string): {
   auction_end_at: string | null; // ISO timestamp (UTC) when available
   auction_end_source: string | null; // data-ends | result_stamp | countdown | auction_record
   auction_closed_at: string | null; // the closed page's own result stamp; null while the lot runs
+  auction_withdrawn: boolean; // the result line says "Withdrawn on <date>": no sale, no reserve result
   bid_count: number;
   comment_count: number;
   view_count: number;
@@ -477,6 +479,7 @@ function extractEssentials(html: string): {
   const auction_end_date: string | null = auction_end_at ? auction_end_at.slice(0, 10) : ownEnd.endsDate;
   const auction_end_source: string | null = ownEnd.endsFrom ?? (ownEnd.closedAt ? "result_stamp" : null);
   const auction_closed_at: string | null = ownEnd.closedAt;
+  const auction_withdrawn = ownEnd.withdrawn;
 
   // Bid/comment/view/watcher counts
   const bidCountMatch = h.match(/"type":"bat-bid"/g);
@@ -735,6 +738,7 @@ function extractEssentials(html: string): {
     auction_end_at,
     auction_end_source,
     auction_closed_at,
+    auction_withdrawn,
     bid_count,
     comment_count,
     view_count,
@@ -2214,9 +2218,10 @@ Deno.serve(async (req) => {
     if (vehicleId && essentials.auction_end_date && endEvent.close.over) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      const withdrawn = essentials.auction_withdrawn && !hasSale;
       const eventType =
         hasSale ? "auction_sold" :
-        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
+        (!withdrawn && essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
 
       const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
       const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
@@ -2225,7 +2230,9 @@ Deno.serve(async (req) => {
           ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
           : eventType === "auction_reserve_not_met"
             ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
-            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
+            : withdrawn
+              ? `BaT withdrawn${amountText ? ` • bid to ${amountText}` : ""}`
+              : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
 
       const descParts: string[] = [];
       if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
@@ -2255,6 +2262,7 @@ Deno.serve(async (req) => {
           occurred_at: essentials.auction_end_at ?? auction.recordAt ?? null,
           occurred_at_source: essentials.auction_end_source ?? (auction.recordAt ? "auction_record" : null),
           close_basis: endEvent.close.basis,
+          ...(withdrawn ? { withdrawn: true } : {}),
         },
         readAt: sourceFetchedAt,
         readBasis: htmlSource === "direct" ? "direct_fetch" : "cached_snapshot",
@@ -2726,8 +2734,12 @@ Deno.serve(async (req) => {
       // Reading one wrote 'bid_to' on 15 running lots on 2026-09-29 (bat-data coverage audit, P0a).
       const endMsForOutcome = essentials.auction_end_at ? Date.parse(essentials.auction_end_at) : NaN;
       const stillRunning = !hasSale && Number.isFinite(endMsForOutcome) && endMsForOutcome > Date.now();
+      // BaT withdrew the lot ("Withdrawn on 10/5/26"): a terminal no-sale, 'cancelled' in auction_events. 'bid_to' kept
+      // six withdrawn lots live in the stream schedule (only sold / reserve_not_met / cancelled retire a monitor).
       const outcome = hasSale
         ? "sold"
+        : essentials.auction_withdrawn
+        ? "cancelled"
         : stillRunning
         ? "live"
         : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : (hasBid ? "bid_to" : "no_sale"));
