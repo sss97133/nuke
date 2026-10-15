@@ -1,5 +1,6 @@
 import React from 'react';
 import { moveFill, moveText, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
+import { venueOf } from './FamilySalesChart';
 import './MarketMap.css';
 
 /**
@@ -186,6 +187,33 @@ export function MapCallouts({ items, onPick }: { items: Callout[]; onPick: (name
           <span className="map-callouts__n">{c.prior.toLocaleString('en-US')} → {c.sold.toLocaleString('en-US')} BaT sales</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+export type HouseRow = { house: string | null; sales: number; amount: number };
+/** Each house's share of the map's confirmed sales (treemap_populations().by_house, written at each refresh): a
+ *  100% bar in the venue colors, the larger houses named with their share, the rest grouped. Absent until the refresh
+ *  writes it. The owner, 2026-10-15: the site "is supposed to be all the markets not just one". */
+export function VenueMix({ rows, clock }: { rows: HouseRow[] | null | undefined; clock: string }) {
+  const clean = (rows ?? []).filter((r) => r && typeof r.sales === 'number' && r.sales > 0);
+  const total = clean.reduce((a, r) => a + r.sales, 0);
+  if (!clean.length || total <= 0) return null;
+  const named = clean.filter((r) => r.house && r.sales / total >= 0.01);
+  const restSales = total - named.reduce((a, r) => a + r.sales, 0);
+  const share = (n: number) => { const p = (100 * n) / total; return p >= 1 ? `${Math.round(p)}%` : '<1%'; };
+  const parts = [...named.map((r) => ({ key: r.house as string, label: r.house as string, sales: r.sales, color: venueOf(r.house).color })),
+    ...(restSales > 0 ? [{ key: 'rest', label: 'other houses and venue unrecorded', sales: restSales, color: 'var(--text-disabled)' }] : [])];
+  return (
+    <div className="venue-mix" aria-label="Confirmed sales by house">
+      <span className="venue-mix__label">Sales by house</span>
+      <div className="venue-mix__bar" title={parts.map((p) => `${p.label}: ${p.sales.toLocaleString('en-US')} (${share(p.sales)})`).join(' · ')}>
+        {parts.map((p) => <span key={p.key} className="venue-mix__seg" style={{ flexGrow: p.sales, background: p.color }} />)}
+      </div>
+      <span className="venue-mix__names">
+        {parts.map((p) => <span key={p.key}>{p.key === 'rest' ? 'rest' : p.label} {share(p.sales)}</span>)}
+        <span className="venue-mix__n">{total.toLocaleString('en-US')} confirmed sales with an amount{clock}</span>
+      </span>
     </div>
   );
 }
