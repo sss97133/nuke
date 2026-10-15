@@ -2349,3 +2349,13 @@ Population boundary: the live atlas at 00:28 UTC estimates 1,014,519 stored vehi
 and engine-family-eligible totals remain unmeasured. Four source controls do not establish fleet
 coverage. Net newly usable production answers from this refresh: zero. The production proposal is
 still open; merge/deployment authorization and curator ratification remain separate held steps.
+
+### Live-market classifieds: what "ended" means (lane-live-market, 2026-10-15)
+
+A classified listing (Craigslist) has no close and no reserve. While the page reads, `vehicle_events.event_status` is
+`unknown`. When a revisit gets HTTP 404 for the post (measured 2026-10-15: posts from 2025 return 404 "Page Not Found"),
+the listing is `ended`, `ended_at` is the fetch time, and `metadata.removal` holds the evidence. That says the listing
+is gone, withdrawn, expired or sold off-site; the outcome is unknown, never a sale. A listing that scrolls off the first
+page of a search is not removed (only the first page is read), so absence from a search page is not evidence. The
+revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
+kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
