@@ -38,6 +38,7 @@ const EXTRACTOR_VERSION = "2.0.0";
 const TARGETS_TAG = "mecum-targets:1";
 const UPCOMING_TAG = "mecum-upcoming:1";
 const REVERIFY_TAG = "mecum-reverify:1";
+const REFOLD_TAG = "mecum-refold:1";
 const ALGOLIA_APP = "U6CFCQ7V52";
 const ALGOLIA_INDEX = "wp_posts_lot";
 // The search-only key Mecum's own site ships (also in scripts/mecum-algolia-discovery.mjs); it can read, not write.
@@ -1249,6 +1250,73 @@ Deno.serve(async (req) => {
         }
       }
       return okJson({ success: true, examined: evs?.length ?? 0, queued, requeued, last_event_id: lastId });
+    }
+
+    // ── Re-fold retained page snapshots into vehicles (zero requests to Mecum) ──────────────────
+    // listing_page_snapshots holds Mecum lot pages from older writers (platform mecum, success). This reads up to `limit`
+    // (max 100) of them in id order from the last folded one, skips a lot that already has an event under any URL spelling
+    // or an import_queue row, parses the stored page with the same parser the live path uses, and saves it through
+    // saveVehicle (vehicle, observation, photos, event). Each snapshot folded gets an import_queue row (REFOLD_TAG,
+    // raw_data.snapshot_id), which is also the cursor. Not scheduled; run by hand or by a cron someone adds.
+    if (action === "refold_snapshots") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 50, 1), 100);
+      const budgetMs = 100_000;
+      const started = Date.now();
+      const { data: last } = await supabase.from("import_queue").select("raw_data").eq("extractor_version", REFOLD_TAG).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const after = String(body.after_id || last?.raw_data?.snapshot_id || "00000000-0000-0000-0000-000000000000");
+      const { data: snaps, error: sErr } = await supabase
+        .from("listing_page_snapshots")
+        .select("id, listing_url, html_storage_path")
+        .eq("platform", "mecum")
+        .eq("success", true)
+        .gt("id", after)
+        .order("id", { ascending: true })
+        .limit(n);
+      if (sErr) throw sErr;
+      const out = { examined: snaps?.length ?? 0, already_landed: 0, folded: 0, created: 0, updated: 0, not_a_vehicle: 0, unreadable: 0, failed: 0, last_snapshot_id: after, stopped: null as string | null, errors: [] as string[] };
+      const urls = (snaps ?? []).map((x: any) => x.listing_url);
+      const landedKeys = new Set<string>();
+      for (let i = 0; i < urls.length; i += 25) {
+        const chunk = urls.slice(i, i + 25);
+        const { data: ev, error: eErr } = await supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings));
+        if (eErr) throw new Error(`landed lookup failed: ${eErr.message}`);
+        for (const r of ev ?? []) landedKeys.add(mecumLotKey(r.source_url));
+      }
+      for (const snap of snaps ?? []) {
+        if (Date.now() - started > budgetMs) { out.stopped = "time_budget"; break; }
+        out.last_snapshot_id = snap.id;
+        if (landedKeys.has(mecumLotKey(snap.listing_url))) { out.already_landed++; continue; }
+        const { data: row, error: claimErr } = await supabase
+          .from("import_queue")
+          .insert({ listing_url: snap.listing_url, status: "processing", extractor_version: REFOLD_TAG, locked_by: "extract-mecum:refold", raw_data: { snapshot_id: snap.id } })
+          .select("id")
+          .single();
+        if (claimErr || !row) continue; // the URL already has a queue row (another path owns it)
+        try {
+          let html: string | null = null;
+          if (snap.html_storage_path) {
+            const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+            if (blob) html = await blob.text();
+          }
+          if (!html) {
+            const { data: inline } = await supabase.from("listing_page_snapshots").select("html").eq("id", snap.id).maybeSingle();
+            html = inline?.html ?? null;
+          }
+          if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
+          const vehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
+          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); continue; }
+          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); continue; }
+          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id);
+          out.folded++;
+          if (isNew) out.created++; else out.updated++;
+        } catch (err: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
+          await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id);
+        }
+      }
+      return okJson({ ...out, success: true });
     }
 
     // ── Enumerate the calendar: upcoming lots from Mecum's public search index ──────────────────
