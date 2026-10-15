@@ -1,5 +1,8 @@
 -- Isolated PostgreSQL 17 regression: synthetic rows and placeholder links only, never production data.
--- Contract for 20261016163000_correct_auction_event_link.sql: the auction_events arm of correct_vehicle_event_link.
+-- Contract for 20261016163000_correct_auction_event_link.sql (the auction_events arm of correct_vehicle_event_link)
+-- and 20261016181500_correct_auction_event_link_dependents.sql (an auction with comments, links or predictions is
+-- held, because they cascade on delete; its guard refuses a drifted body).
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in a disposable database.
 -- A hybrid row (a BaT truck that collected a Barrett-Jackson Corvette auction) gives the auction to the Corvette's
 -- own vehicle; a duplicate of a lot that vehicle already holds (same lot under www. and a trailing slash) is retired
 -- into superseded_rows with its full row; a stale plan, a missing event, a missing citation or reason, an archive
@@ -31,6 +34,14 @@ CREATE TABLE public.superseded_rows(
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_table text NOT NULL, row_id uuid NOT NULL, row_data jsonb NOT NULL,
   superseded_at timestamptz NOT NULL DEFAULT now(), asserted_by text NOT NULL, source jsonb NOT NULL, reason text NOT NULL,
   restored_at timestamptz);
+-- Dependents as live: comments and links cascade on delete, predictions are set null.
+CREATE TABLE public.auction_comments(id uuid PRIMARY KEY, vehicle_id uuid,
+  auction_event_id uuid REFERENCES public.auction_events(id) ON DELETE CASCADE);
+CREATE TABLE public.auction_event_links(id uuid PRIMARY KEY,
+  from_auction_event_id uuid REFERENCES public.auction_events(id) ON DELETE CASCADE,
+  to_auction_event_id uuid REFERENCES public.auction_events(id) ON DELETE CASCADE);
+CREATE TABLE public.hammer_predictions(id uuid PRIMARY KEY,
+  auction_event_id uuid REFERENCES public.auction_events(id) ON DELETE SET NULL);
 CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
  IF condition IS NOT TRUE THEN RAISE EXCEPTION 'Contract failed: %', label; END IF; RAISE NOTICE 'PASS %', label;
 END $$;
@@ -38,6 +49,19 @@ END $$;
 \ir ../migrations/20261016163000_correct_auction_event_link.sql
 -- A second application replaces the function with the same body.
 \ir ../migrations/20261016163000_correct_auction_event_link.sql
+DO $$ BEGIN
+  PERFORM pg_temp.ok('163000 installs the fingerprint 181500 expects',
+    md5(pg_get_functiondef('public.correct_auction_event_link(jsonb,text)'::regprocedure))
+      = '5b9ad1c47adf60eb3770a5b276cc4be1'); -- gitleaks:allow (fingerprint)
+END $$;
+\ir ../migrations/20261016181500_correct_auction_event_link_dependents.sql
+DO $$ BEGIN
+  PERFORM pg_temp.ok('181500 installs the expected body',
+    md5(pg_get_functiondef('public.correct_auction_event_link(jsonb,text)'::regprocedure))
+      = 'b61e84bf6d7e28f698823d52959a794a'); -- gitleaks:allow (fingerprint)
+END $$;
+-- A second application is a no-op that passes its own guard.
+\ir ../migrations/20261016181500_correct_auction_event_link_dependents.sql
 
 -- Truck (the hybrid row), the Corvette's own vehicle, a deleted vehicle.
 INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a1', NULL),
@@ -155,7 +179,51 @@ DO $$ DECLARE n int := (SELECT count(*) FROM public.superseded_rows); r jsonb; B
     AND (SELECT count(*) FROM public.superseded_rows) = n);
 END $$;
 
--- 5. Only service_role executes.
+-- 5. An auction with a comment, a link or a prediction is held: nothing written, nothing cascaded.
+INSERT INTO public.auction_events (id, vehicle_id, source, source_url, lot_number, outcome) VALUES
+  ('00000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-0000000000a1', 'barrett-jackson',
+   'https://example.invalid/bj/docket/300001', '300001', 'sold'),
+  ('00000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-0000000000a1', 'barrett-jackson',
+   'https://example.invalid/bj/docket/300002', '300002', 'sold'),
+  ('00000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-0000000000a1', 'barrett-jackson',
+   'https://example.invalid/bj/docket/300003', '300003', 'sold'),
+  ('00000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-0000000000b1', 'barrett-jackson',
+   'https://example.invalid/bj/docket/300001', '300001', 'sold');
+INSERT INTO public.auction_comments VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1',
+  '00000000-0000-0000-0000-000000000006');
+INSERT INTO public.auction_event_links VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-000000000009',
+  '00000000-0000-0000-0000-000000000007');
+INSERT INTO public.hammer_predictions VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-000000000008');
+DO $$ DECLARE r jsonb; n int := (SELECT count(*) FROM public.superseded_rows); BEGIN
+  r := pg_temp.call(jsonb_build_array(
+    pg_temp.row('00000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1'),
+    pg_temp.row('00000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1'),
+    pg_temp.row('00000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1')));
+  PERFORM pg_temp.ok('a duplicate with a comment, a linked auction and a predicted auction are held',
+    jsonb_array_length(r -> 'held') = 3 AND (r ->> 'moved')::int = 0 AND (r ->> 'retired_duplicates')::int = 0);
+  PERFORM pg_temp.ok('held rows are untouched and nothing cascaded',
+    (SELECT count(*) FROM public.auction_events WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+       AND id IN ('00000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000007',
+                  '00000000-0000-0000-0000-000000000008')) = 3
+    AND EXISTS (SELECT 1 FROM public.auction_comments WHERE auction_event_id = '00000000-0000-0000-0000-000000000006')
+    AND EXISTS (SELECT 1 FROM public.auction_event_links WHERE to_auction_event_id = '00000000-0000-0000-0000-000000000007')
+    AND EXISTS (SELECT 1 FROM public.hammer_predictions WHERE auction_event_id = '00000000-0000-0000-0000-000000000008')
+    AND (SELECT count(*) FROM public.superseded_rows) = n);
+END $$;
+
+-- 6. A drifted live body is refused by the 181500 guard, then the real chain is restored.
+CREATE OR REPLACE FUNCTION public.correct_auction_event_link(p_rows jsonb, p_asserted_by text DEFAULT 'agent'::text)
+  RETURNS jsonb LANGUAGE sql SECURITY DEFINER AS $f$ SELECT '{}'::jsonb $f$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261016181500_correct_auction_event_link_dependents.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.ok('a drifted body is not replaced',
+  (SELECT prosrc FROM pg_proc WHERE proname = 'correct_auction_event_link') LIKE '%SELECT ''{}''::jsonb%');
+DROP FUNCTION public.correct_auction_event_link(jsonb, text);
+\ir ../migrations/20261016163000_correct_auction_event_link.sql
+\ir ../migrations/20261016181500_correct_auction_event_link_dependents.sql
+
+-- 7. Only service_role executes.
 DO $$ BEGIN
   PERFORM pg_temp.ok('anon cannot execute', NOT has_function_privilege('anon', 'public.correct_auction_event_link(jsonb,text)', 'EXECUTE'));
   PERFORM pg_temp.ok('authenticated cannot execute',
