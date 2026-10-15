@@ -1207,8 +1207,14 @@ Deno.serve(async (req) => {
     // resolve the item landed_whole; a capture that will not parse is released for refetch, an ambiguous identity for relink.
     if (action === 'revise_retained') {
       const n = Math.min(Number(body.limit) || 10, 25);
-      const { data: items, error: cErr } = await supabase.rpc('claim_revision_items', { p_source_slug: 'gooding', p_worker: 'extract-gooding', p_limit: n, p_actions: ['reparse_retained'] });
-      if (cErr) throw new Error(`claim failed: ${cErr.message}`);
+      // The queue matches a source by its scrape_sources name; Gooding is registered as 'Gooding Auctions' and 'Gooding & Company'.
+      const items: any[] = [];
+      for (const name of ['Gooding Auctions', 'Gooding & Company']) {
+        if (items.length >= n) break;
+        const { data: got, error: cErr } = await supabase.rpc('claim_revision_items', { p_source_slug: name, p_worker: 'extract-gooding', p_limit: n - items.length, p_actions: ['reparse_retained'] });
+        if (cErr) throw new Error(`claim failed: ${cErr.message}`);
+        items.push(...(got ?? []));
+      }
       const out = { claimed: items?.length ?? 0, resolved: 0, released_refetch: 0, released_relink: 0, errors: [] as string[] };
       for (const it of items ?? []) {
         try {
