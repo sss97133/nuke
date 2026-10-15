@@ -188,6 +188,7 @@ function mapDocument(doc: BonhamsDoc): MappedVehicle {
       bonhams_lot_item_id: doc.lotItemId,
       lot_number: doc.lotNo?.full || doc.lotId,
       chassis: parsed.chassis,
+      title_year_range: parsed.year_range ?? null,
       description,
       image_url: imageUrl,
       currency,
@@ -318,6 +319,7 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
       country_code: doc.country?.code ?? null,
       lot_unique_id: doc.lotUniqueId ?? null,
       has_reserve: !doc.flags?.isWithoutReserve,
+      ...(raw.title_year_range ? { title_year_range: raw.title_year_range } : {}),
       currency: doc.currency?.iso_code ?? null,
       roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
       engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,

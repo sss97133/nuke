@@ -23,6 +23,8 @@ export interface ParsedTitle {
   make: string | null;
   model: string | null;
   chassis: string | null;
+  /** "1965-2016" when the title leads with a year range. */
+  year_range?: string;
 }
 
 export function parseTitle(title: string): ParsedTitle {
@@ -52,8 +54,19 @@ export function parseTitle(title: string): ParsedTitle {
     .replace(/\s*VIN[:\s]+.*/i, "")
     .trim();
 
-  // Year: leading 4-digit year (1886-2030)
-  const yearMatch = clean.match(/^(\d{4})\s+/);
+  // Year: leading 4-digit year (1886-2030), or a leading range ("1965/2016 Shelby Cobra", "1960-2000 Aston Martin"): the first year of
+  // a range names the car, and the range is kept as year_range because the second year is a later build or conversion.
+  const rangeMatch = clean.match(/^(\d{4})\s*[\/\u2013\u2014-]\s*(\d{4})\s+/);
+  if (rangeMatch) {
+    const a = parseInt(rangeMatch[1], 10);
+    const b = parseInt(rangeMatch[2], 10);
+    if (a >= 1886 && b >= a && b <= 2030) {
+      result.year = a;
+      result.year_range = `${a}-${b}`;
+      clean = clean.slice(rangeMatch[0].length).trim();
+    }
+  }
+  const yearMatch = result.year ? null : clean.match(/^(\d{4})\s+/);
   if (yearMatch) {
     const y = parseInt(yearMatch[1], 10);
     if (y >= 1886 && y <= 2030) {
