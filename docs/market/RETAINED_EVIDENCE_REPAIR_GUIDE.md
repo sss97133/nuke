@@ -183,6 +183,41 @@ Reuse the already pinned HTML parser instead of reconstructing script-tag gramma
 Do not repeat the failed `deno check --cached-only` invocation: the installed CLI rejected that
 flag. Inspect installed tooling before adding dependency downloads or model calls.
 
+### Typed specification projection assay, 2026-10-15
+
+The same operator accepts `--family typed-specifications`. Use the existing
+`public_reader_lineage_subjects_v1` manifest (`population` and `vehicleIds`) with
+an explicit `properties: [{key, id}]` list taken from the inspected property registry.
+It reads the existing `get_vehicle_specs(uuid[],boolean)` overload with
+`p_include_typed_claims: true`, then checks each selected claim against
+`get_field_provenance`. The older scalar `specifications` mode remains separate.
+
+```sh
+bash scripts/check-ingestion-health.sh --public-readers \
+  --family typed-specifications --subjects /private/typed-subjects.json \
+  --env /private/public-reader.env --out /private/new-typed-receipt.jsonl --max-pages 1
+```
+
+Each page gates at most 20 explicit public parents before any child read. The
+default deadline is 15 minutes; set `--until` for a shorter run. The assay checks
+declared scope, property/type/unit, selected observation, source pointer and URL,
+values, microsecond clocks, original quotation and shared uncertainty qualifiers.
+Receipts retain hashes, keys and reasons, without quotation payloads. Missing
+claims or qualifiers stay unavailable/unmeasured; empty results cannot pass.
+Exit 0 establishes only agreement of the requested current projections, never
+independent registry ratification, source truth, physical configuration or readiness.
+
+At 04:59:27 UTC the atlas estimated 1,017,178 stored vehicle records; full public
+and eligible denominators remained unknown. A one-record control at 05:04:59–05:05:04
+returned 11 typed claims and found all 11 selected observations in provenance,
+with no mismatches. Missing projections/qualifiers prevented a complete match for
+all 11: this is an incomplete result, not supported-answer coverage. The same
+record's scalar reader returned eight rows, a different scope. No production
+claim or supported-answer gain was created by this measurement. Private receipts
+are under `/Users/skylar/nuke-logs/data-model-expand-20261015/`. Follow the observed
+qualifier gaps into their existing reader owners; retain the separate curator and
+replay holds on [PR1361](https://github.com/sss97133/nuke/pull/1361).
+
 ## How to close the next repair
 
 Start from a fresh isolated worktree. Select one useful source-to-consumer case and its relevant
