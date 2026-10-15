@@ -15,3 +15,26 @@
 @media (max-width: 600px) {
   .showcase-photo-row { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* Stats bar: four across, two across on a phone (four 28px figures overflowed a 390px screen). */
+.showcase-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 2px solid #222; }
+.showcase-stat { padding: 20px 24px; border-right: 2px solid #222; min-width: 0; }
+.showcase-stat__label { font-size: 9px; letter-spacing: 0.15em; color: #888; text-transform: uppercase; }
+.showcase-stat__value { font-size: 28px; font-family: 'Courier New', monospace; color: #fff; margin-top: 6px; line-height: 1; }
+@media (max-width: 640px) {
+  .showcase-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .showcase-stat { padding: 14px 16px; border-bottom: 2px solid #222; }
+  .showcase-stat__value { font-size: 22px; }
+}
+
+/* Sections, photo grid and testimony rows: on a phone, a 16px gutter, three photos across, and the row's text under
+   its date and kind instead of squeezed into a third column. */
+.showcase-section { padding: 32px; border-bottom: 2px solid #222; }
+.showcase-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.showcase-obs-row { padding: 8px 0; border-bottom: 1px solid #151515; display: grid; grid-template-columns: 90px 140px 1fr; gap: 12px; align-items: baseline; }
+@media (max-width: 640px) {
+  .showcase-section { padding: 20px 16px; }
+  .showcase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .showcase-obs-row { grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .showcase-obs-row__text { grid-column: 1 / -1; overflow-wrap: anywhere; }
+}

@@ -14,10 +14,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
-import { evidenceSpan, splitTestimony } from './showcaseTestimony';
+import { evidenceSpan, parseTestimonySummary, splitTestimony } from './showcaseTestimony';
 import './VehicleShowcase.css';
 
-const FEATURED_VEHICLE_ID = 'e04bf9c5-b488-433b-be9a-3d307861d90b';
+// The owner's K5 (VIN CKR187F127263). e04bf9c5 is a different, GAA-listed 2WD 1977 Blazer that once held misfiled
+// archive photos (docs/wiring/receipts/2026-06-11_k5-doppelganger-reattribution.md); it is not this truck.
+const FEATURED_VEHICLE_ID = 'e08bf694-970f-4cbe-8a74-8715158a0f2e';
 
 interface VehicleRow {
   id: string;
@@ -25,7 +27,6 @@ interface VehicleRow {
   make: string | null;
   model: string | null;
   vin: string | null;
-  primary_image_url: string | null;
 }
 
 interface ImageRow {
@@ -76,6 +77,7 @@ export default function VehicleShowcase() {
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
   const [images, setImages] = useState<ImageRow[]>([]);
   const [observations, setObservations] = useState<ObservationRow[]>([]);
+  const [primaryUrl, setPrimaryUrl] = useState<string | null>(null);
   const [visibleImageIds, setVisibleImageIds] = useState<ReadonlySet<string>>(new Set());
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,8 +89,8 @@ export default function VehicleShowcase() {
       setLoading(true);
       setError(null);
       try {
-        const [vehicleRes, imagesRes, obsRes, allObsRes] = await Promise.all([
-          supabase.from('vehicles').select('id, year, make, model, vin, primary_image_url').eq('id', vehicleId).maybeSingle(),
+        const [vehicleRes, imagesRes, obsRes, summaryRes, primaryRes] = await Promise.all([
+          supabase.from('vehicles').select('id, year, make, model, vin').eq('id', vehicleId).maybeSingle(),
           supabase.from('vehicle_images').select('id, image_url, taken_at, created_at')
             .eq('vehicle_id', vehicleId)
             .eq('is_duplicate', false)
@@ -101,10 +103,11 @@ export default function VehicleShowcase() {
             .eq('is_superseded', false)
             .order('observed_at', { ascending: false, nullsFirst: false })
             .limit(40),
-          supabase.from('vehicle_observations').select('kind, observed_at', { count: 'exact' })
-            .eq('vehicle_id', vehicleId)
-            .eq('is_superseded', false)
-            .limit(2000),
+          // Counts by kind and the first/last observed, as this viewer may read them: one value, no row cap.
+          supabase.rpc('vehicle_testimony_summary', { p_vehicle_id: vehicleId }),
+          // The primary photo through the viewer's own read, so the gate decides (never vehicles.primary_image_url,
+          // a storage URL that routes around it).
+          supabase.from('vehicle_images').select('image_url').eq('vehicle_id', vehicleId).eq('is_primary', true).limit(1),
         ]);
 
         if (cancelled) return;
@@ -113,6 +116,7 @@ export default function VehicleShowcase() {
 
         setVehicle(vehicleRes.data as VehicleRow);
         setImages((imagesRes.data || []) as ImageRow[]);
+        setPrimaryUrl(((primaryRes.data || []) as { image_url: string }[])[0]?.image_url ?? null);
         const obsRows = (obsRes.data || []) as ObservationRow[];
         setObservations(obsRows);
         // Which of the media observations' frames this viewer may see: their own read of vehicle_images, gate applied.
@@ -123,19 +127,9 @@ export default function VehicleShowcase() {
         if (cancelled) return;
         setVisibleImageIds(new Set(((readable || []) as { id: string }[]).map(r => r.id)));
 
-        const allObs = (allObsRes.data || []) as { kind: string; observed_at: string | null }[];
-        const byKind: Record<string, number> = {};
-        let first: string | null = null;
-        let last: string | null = null;
-        for (const r of allObs) {
-          byKind[r.kind] = (byKind[r.kind] || 0) + 1;
-          if (r.observed_at) {
-            if (!first || r.observed_at < first) first = r.observed_at;
-            if (!last || r.observed_at > last) last = r.observed_at;
-          }
-        }
+        const summary = summaryRes.error ? null : parseTestimonySummary(summaryRes.data);
 
-        const [{ count: imageCount }, { count: eventCount }, { data: earliestPhoto }] = await Promise.all([
+        const [{ count: imageCount }, { count: eventCount }, { data: earliestPhoto }, { count: obsCount }] = await Promise.all([
           supabase.from('vehicle_images').select('id', { count: 'exact', head: true })
             .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false)
             .not('is_superseded', 'is', true),
@@ -144,16 +138,19 @@ export default function VehicleShowcase() {
           supabase.from('vehicle_images').select('taken_at')
             .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false)
             .not('taken_at', 'is', null).order('taken_at', { ascending: true }).limit(1),
+          // Without the summary, still count the observations (the breakdown is then left out).
+          summary ? Promise.resolve({ count: summary.total }) : supabase.from('vehicle_observations')
+            .select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId).eq('is_superseded', false),
         ]);
         // The record spans its photos' capture times as well as its observation clocks.
         const latestPhoto = ((imagesRes.data || []) as ImageRow[]).find(i => i.taken_at)?.taken_at ?? null;
-        const span = evidenceSpan(first, last, (earliestPhoto as { taken_at: string | null }[] | null)?.[0]?.taken_at, latestPhoto);
+        const span = evidenceSpan(summary?.first ?? null, summary?.last ?? null, (earliestPhoto as { taken_at: string | null }[] | null)?.[0]?.taken_at, latestPhoto);
 
         setStats({
-          total_observations: allObsRes.count ?? allObs.length,
+          total_observations: obsCount ?? 0,
           total_images: imageCount ?? 0,
           total_events: eventCount ?? 0,
-          by_kind: byKind,
+          by_kind: summary?.byKind ?? {},
           first_observed: span.first,
           last_observed: span.last,
         });
@@ -172,7 +169,8 @@ export default function VehicleShowcase() {
     return [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
   }, [vehicle]);
 
-  const heroUrl = images[0]?.image_url || vehicle?.primary_image_url || null;
+  // Resized through the image endpoint: originals run to 3 MB, and HEIC originals do not draw in most browsers.
+  const heroUrl = optimizeImageUrl(primaryUrl || images[0]?.image_url || null, 'large');
 
   const testimony = useMemo(() => splitTestimony(observations, visibleImageIds), [observations, visibleImageIds]);
 
@@ -223,7 +221,7 @@ export default function VehicleShowcase() {
 
       {/* Stats bar */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, borderBottom: '2px solid #222' }}>
+        <div className="showcase-stats">
           <Stat label="Observations" value={stats.total_observations.toLocaleString()} />
           <Stat label="Images" value={stats.total_images.toLocaleString()} />
           <Stat label="Auction Events" value={stats.total_events.toLocaleString()} />
@@ -250,17 +248,18 @@ export default function VehicleShowcase() {
 
       {/* Photo grid */}
       {images.length > 0 && (
-        <div style={{ padding: '32px', borderBottom: '2px solid #222' }}>
+        <div className="showcase-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
             <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#888', textTransform: 'uppercase' }}>
               Photo Record · {stats?.total_images?.toLocaleString()} total · showing latest {images.length}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+          <div className="showcase-grid">
             {images.map(img => (
               <div key={img.id} style={{ aspectRatio: '4/3', background: '#111', border: '2px solid #1a1a1a', overflow: 'hidden', position: 'relative' }}>
-                <img src={img.image_url} alt="" width={400} height={300}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                <img src={optimizeImageUrl(img.image_url, 'medium') ?? img.image_url} alt="" width={400} height={300}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy"
+                  onError={e => { (e.currentTarget.parentElement as HTMLElement).hidden = true; }} />
                 {img.taken_at && (
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 8px',
                     fontSize: 8, fontFamily: MONO_FONT, color: '#bbb', background: 'rgba(0,0,0,0.7)', letterSpacing: '0.05em' }}>
@@ -275,7 +274,7 @@ export default function VehicleShowcase() {
 
       {/* Observation timeline */}
       {observations.length > 0 && (
-        <div style={{ padding: '32px', borderBottom: '2px solid #222' }}>
+        <div className="showcase-section">
           <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#888', textTransform: 'uppercase', marginBottom: 16 }}>
             Recent Testimony · last {observations.length} observations
           </div>
@@ -308,10 +307,10 @@ export default function VehicleShowcase() {
                 {month === '----' ? 'UNDATED' : month}
               </div>
               {rows.map(o => (
-                <div key={o.id} style={{ padding: '8px 0', borderBottom: '1px solid #151515', display: 'grid', gridTemplateColumns: '90px 140px 1fr', gap: 12, alignItems: 'baseline' }}>
+                <div key={o.id} className="showcase-obs-row">
                   <div style={{ fontSize: 10, fontFamily: MONO_FONT, color: '#888' }}>{fmtDate(o.observed_at)}</div>
                   <div style={{ fontSize: 9, letterSpacing: '0.1em', color: '#fa3', textTransform: 'uppercase' }}>{o.kind}</div>
-                  <div style={{ fontSize: 11, color: '#ccc', lineHeight: 1.4 }}>
+                  <div className="showcase-obs-row__text" style={{ fontSize: 11, color: '#ccc', lineHeight: 1.4 }}>
                     {o.content_text ? o.content_text.slice(0, 280) : <span style={{ color: '#555' }}>(structured)</span>}
                     {o.source_url && (
                       <span style={{ marginLeft: 8 }}>
@@ -346,9 +345,9 @@ export default function VehicleShowcase() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: '20px 24px', borderRight: '2px solid #222' }}>
-      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#888', textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontSize: 28, fontFamily: MONO_FONT, color: '#fff', marginTop: 6, lineHeight: 1 }}>{value}</div>
+    <div className="showcase-stat">
+      <div className="showcase-stat__label">{label}</div>
+      <div className="showcase-stat__value">{value}</div>
     </div>
   );
 }
