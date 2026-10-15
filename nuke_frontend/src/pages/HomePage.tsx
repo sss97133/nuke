@@ -11,6 +11,7 @@ import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
 import { MapLegend, MarketCard, MarketSheet, MarketTile, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
 import { batBaseline, relativeMove } from './market/mapScale';
+import { readShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
@@ -903,8 +904,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
-  // The map's color is each tile's BaT move against BaT overall, summed over the brands (one partition of BaT's sales).
-  const baseline = useMemo(() => batBaseline(brandsData), [brandsData]);
+  // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
+  // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
+  const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    readShareMovers().then((v) => {
+      if (live && v && v.bat.sold_prior_12m > 0) setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+    });
+    return () => { live = false; };
+  }, []);
+  const baseline = useMemo(() => venue ?? batBaseline(brandsData), [venue, brandsData]);
   // Without hover (a phone), a tap on a market tile opens its card; the card's Open drills.
   const [coarse] = useState(() => canMatchMedia && window.matchMedia('(hover: none)').matches);
   const [sheet, setSheet] = useState<TreemapNode | null>(null);
