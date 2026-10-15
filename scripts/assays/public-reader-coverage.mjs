@@ -523,6 +523,13 @@ export function inspectTypedProvenance(id, claim, readAt, value) {
       !present(q.source_capture_basis)) gap('typed_family_capture_witness_unmeasured');
   }
   result.projectionMatches = Object.keys(result.failures).length === 0 && Object.keys(result.gaps).length === 0;
+  // Other rows carrying the same listing assertion (page, value and quotation) are
+  // repeated captures shown as separate reports, not corroboration. The selected
+  // projection can still match; the public answer overstates its support.
+  result.repeatedListingAssertions = value.observations.filter(o => object(o) && o.id !== source.id &&
+    present(source.source_url) && o.source_url === source.source_url && o.value === source.value &&
+    isDeepStrictEqual(o.source_value ?? null, source.source_value ?? null)).length;
+  if (result.repeatedListingAssertions) gap('typed_provenance_repeated_listing_assertion');
   // The drill omits these FKs; matching projected custody is not independent
   // registry/source validation, extraction accuracy, or physical truth.
   if (!present(source.property_id) || !present(source.source_id)) gap('typed_provenance_property_and_source_fk_unprojected');
@@ -1043,6 +1050,7 @@ export async function runTypedSpecificationLineage(client, o, subjects, { now = 
     manifestSha256: subjects.sha256, population: subjects.population, properties: subjects.properties,
     gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
     selectedClaims: 0, drilledClaims: 0, matchedProjectionPairs: 0, mismatchedPairs: 0, unavailablePairs: 0,
+    claimsWithRepeatedAssertion: 0, repeatedAssertionObservations: 0,
     failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
     supportedAnswerCoverage: 'unmeasured', sourceQualification: 'unmeasured', physicalTruth: 'unmeasured',
     boundary: 'Explicit record/property manifest, at most20 current public parents per typed bulk read. Manifest property UUIDs are operator-supplied registry expectations, not an independent ratification audit. Current canonical claims only; unavailable does not identify absent evidence, privacy, withdrawal or supersession. Separate public gate/bulk/provenance reads are not a snapshot. Quotation and shared attribution/clock/uncertainty projections are compared without storing their contents. Provenance omits property/source FKs; original-source custody, extraction quality, conflicts outside the selected canonical claim, historical replay, factory/installed truth and fleet readiness remain unmeasured. No inferred metadata bindings count as testimony.' };
@@ -1095,6 +1103,7 @@ export async function runTypedSpecificationLineage(client, o, subjects, { now = 
           const result = inspectTypedProvenance(p.id, claim, p.readAt, drill.value); merge(result);
           if (result.projectionMatches) summary.matchedProjectionPairs++;
           if (Object.keys(result.failures).length) summary.mismatchedPairs++;
+          if (result.repeatedListingAssertions) { summary.claimsWithRepeatedAssertion++; summary.repeatedAssertionObservations += result.repeatedListingAssertions; }
           drills.push({ propertyKey: claim.property_key, observationId: claim.observation_id,
             responseSha256: hash(drill.value), durationMs: drill.durationMs, ...result });
         }
@@ -2182,6 +2191,7 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       measuredCommentHeaders: report.measuredCommentHeaders, identityStates: report.identityStates,
       measured: report.measured, nativeAuthorStates: report.nativeAuthorStates,
       parentsWithReports: report.parentsWithReports, parentsWithoutReports: report.parentsWithoutReports, unmeasuredReports: report.unmeasuredReports,
+      claimsWithRepeatedAssertion: report.claimsWithRepeatedAssertion, repeatedAssertionObservations: report.repeatedAssertionObservations,
       diagnostics: report.diagnostics, gaps: report.gaps, recordRepairs: 0, verifiedRepairs: 0, databaseWrites: 0, modelCalls: 0 }));
     return report.exitCode;
   } catch (e) { print(JSON.stringify({ status: 'failed', error: e instanceof AssayError ? e.code : 'assay_initialization_or_output_failed' })); return 1; }
