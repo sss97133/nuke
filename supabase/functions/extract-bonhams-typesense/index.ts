@@ -451,25 +451,35 @@ Deno.serve(async (req) => {
         pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
       }
 
-      let data: TypesenseResponse;
-      const params = new URLSearchParams({
-        q: "*", query_by: "title", per_page: String(size), page: String(pageNo),
-        filter_by: DEPARTMENT_FILTER, sort_by: SORT,
-      });
-      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${params}`, {
-        headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" },
-      });
+      const fetchPage = (n: number) => {
+        const params = new URLSearchParams({
+          q: "*", query_by: "title", per_page: String(size), page: String(n),
+          filter_by: DEPARTMENT_FILTER, sort_by: SORT,
+        });
+        return fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${params}`, {
+          headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" },
+        });
+      };
+      let res = await fetchPage(pageNo);
       if (res.status === 403 || res.status === 429) {
         // Back off: nothing more is asked of Bonhams this run; the next scheduled run tries again.
         return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
       }
       if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
-      data = await res.json() as TypesenseResponse;
+      let data = await res.json() as TypesenseResponse;
+      if (!data.hits?.length && pageNo > 1) {
+        // Past the last page: wrap to page 1 (a revisit), 2 s after the previous request.
+        await new Promise((r) => setTimeout(r, 2000));
+        pageNo = 1;
+        res = await fetchPage(pageNo);
+        if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+        if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+        data = await res.json() as TypesenseResponse;
+      }
 
       const totalPages = Math.max(1, Math.ceil(data.found / size));
       if (!data.hits?.length) {
-        // Past the end: wrap, so the next run revisits from page 1.
-        return okJson({ success: true, mode: "land", page: pageNo, landed: 0, wrapped: true, found: data.found });
+        return okJson({ success: true, mode: "land", page: pageNo, landed: 0, found: data.found });
       }
 
       const observedAt = new Date().toISOString();

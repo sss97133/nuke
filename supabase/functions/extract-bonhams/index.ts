@@ -1004,12 +1004,14 @@ async function saveVehicle(
 
   // Also check by VIN
   // Fast path: a chassis number is not unique across makes, so only a full 17-character VIN may join two lots.
-  if (!targetId && extracted.vin && (!opts.fast || /^[A-HJ-NPR-Z0-9]{17}$/i.test(extracted.vin))) {
+  const fullVin = [extracted.vin, extracted.chassis_number].find((v) => v && /^[A-HJ-NPR-Z0-9]{17}$/i.test(v)) ?? null;
+  const lookupVin = opts.fast ? fullVin : extracted.vin;
+  if (!targetId && lookupVin) {
     try {
       const { data: byVin } = await supabase
         .from("vehicles")
         .select("id")
-        .eq("vin", extracted.vin.toUpperCase())
+        .eq("vin", lookupVin.toUpperCase())
         .limit(1)
         .maybeSingle();
       if (byVin?.id) targetId = byVin.id;
@@ -1171,7 +1173,7 @@ Deno.serve(async (req) => {
           }
         }
       }
-      await Promise.all([worker(), worker(), worker()]);
+      await Promise.all([worker(), worker()]);
       return new Response(
         JSON.stringify({ success: true, ...results, not_attempted: lots.length - next, elapsed_ms: Date.now() - started }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
