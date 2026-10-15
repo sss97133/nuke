@@ -18,9 +18,11 @@ Deno.test("the rate is smoothed, so one empty poll does not erase a busy history
   assertEquals(after.interval_minutes, 33);
 });
 
-Deno.test("a poll right after the last one is read as at least ten minutes", () => {
+Deno.test("a poll right after the last one is read as at least ten minutes; a first poll as a day of posts", () => {
   assertEquals(nextYield(null, 1, 0).rate, 6);
-  assertEquals(nextYield(null, 1, null).rate, 6);
+  // a never-polled feed shows its whole backlog: 48 posts is 2 an hour, not 288
+  assertEquals(nextYield(null, 48, null).rate, 2);
+  assertEquals(nextYield(null, 48, null).interval_minutes, 60);
 });
 
 Deno.test("tier orders feeds, and a feed with no tier comes last", () => {
