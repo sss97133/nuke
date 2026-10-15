@@ -15,6 +15,7 @@ export const MIN_INTERVAL_MIN = 10;
 export const MAX_INTERVAL_MIN = 360;
 export const TARGET_NEW_PER_POLL = 2;
 const SMOOTHING = 0.4;
+const FIRST_READING_HOURS = 24;
 
 export interface FeedYield {
   /** New posts per hour, smoothed; null before the first reading. */
@@ -24,10 +25,11 @@ export interface FeedYield {
 
 /**
  * The next yield state after a poll that found `fresh` new posts `hoursSince` hours after the previous poll.
- * A first reading, or a gap under 10 minutes, is read as if it had been 10 minutes.
+ * A first reading is read as a day of posts; a gap under 10 minutes is read as 10 minutes.
  */
 export function nextYield(prev: number | null | undefined, fresh: number, hoursSince: number | null): FeedYield {
-  const hours = Math.max(hoursSince && Number.isFinite(hoursSince) ? hoursSince : MIN_INTERVAL_MIN / 60, MIN_INTERVAL_MIN / 60);
+  // A feed never polled before (hoursSince null) shows the whole backlog on its page, not a rate: read it as a day's worth.
+  const hours = Math.max(hoursSince === null ? FIRST_READING_HOURS : Number.isFinite(hoursSince) ? hoursSince : MIN_INTERVAL_MIN / 60, MIN_INTERVAL_MIN / 60);
   const observed = Math.max(0, fresh) / hours;
   const rate = prev === null || prev === undefined || !Number.isFinite(prev) ? observed : (1 - SMOOTHING) * prev + SMOOTHING * observed;
   const wanted = rate > 0 ? Math.round((60 * TARGET_NEW_PER_POLL) / rate) : MAX_INTERVAL_MIN;

@@ -731,35 +731,29 @@ async function pollFirecrawlHtmlFeed(
   // (HTTP/2 stream error), so query in batches of 40.
   const onVehicles = new Set<string>();
   const ledgerRows = new Map<string, LedgerKnown>();
-  for (let i = 0; i < urls.length; i += 40) {
-    const chunk = urls.slice(i, i + 40);
-    // Independent tables, neither query depends on the other's result —
-    // run concurrently instead of paying two sequential round trips per chunk.
-    const [
-      { data: known, error: knownError },
-      { data: ledgered, error: ledgerError },
-    ] = await Promise.all([
-      supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
-      supabase
-        .from("import_queue")
-        .select("listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
-        .in("listing_url", chunk)
-        .in("status", ["complete", "skipped", "failed"]),
-    ]);
-
-    if (knownError) {
-      return await failFeed(
-        `fetch_failed: known-url lookup: ${knownError.message}`
-      );
+  // A Craigslist search page lists ~350 posts: nine chunks of two lookups each, one after another, cost several seconds of a
+  // 110 s run per feed (measured 2026-10-15: 9 feeds finished per run). The chunks are independent, so they go in waves of four.
+  const chunks: string[][] = [];
+  for (let i = 0; i < urls.length; i += 40) chunks.push(urls.slice(i, i + 40));
+  for (let w = 0; w < chunks.length; w += 4) {
+    const wave = await Promise.all(chunks.slice(w, w + 4).map(async (chunk) => {
+      // Independent tables, neither query depends on the other's result: run them together too.
+      const [known, ledgered] = await Promise.all([
+        supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
+        supabase
+          .from("import_queue")
+          .select("listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+          .in("listing_url", chunk)
+          .in("status", ["complete", "skipped", "failed"]),
+      ]);
+      return { known, ledgered };
+    }));
+    for (const { known, ledgered } of wave) {
+      if (known.error) return await failFeed(`fetch_failed: known-url lookup: ${known.error.message}`);
+      if (ledgered.error) return await failFeed(`fetch_failed: ledger lookup: ${ledgered.error.message}`);
+      for (const v of known.data || []) onVehicles.add(v.listing_url);
+      for (const q of ledgered.data || []) ledgerRows.set(q.listing_url, q);
     }
-    for (const v of known || []) onVehicles.add(v.listing_url);
-
-    if (ledgerError) {
-      return await failFeed(
-        `fetch_failed: ledger lookup: ${ledgerError.message}`
-      );
-    }
-    for (const q of ledgered || []) ledgerRows.set(q.listing_url, q);
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
   const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
