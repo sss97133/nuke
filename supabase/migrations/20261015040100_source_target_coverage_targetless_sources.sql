@@ -64,7 +64,7 @@ SELECT b.source_slug,
        l.landed_lots,
        p.universe_total AS population,
        p.census_method AS population_method,
-       p.census_confidence AS population_confidence,
+       p.census_confidence::numeric AS population_confidence,
        p.census_at AS population_at,
        round(100.0 * l.landed_lots / nullif(p.universe_total, 0), 2) AS landed_of_population
 FROM base b
