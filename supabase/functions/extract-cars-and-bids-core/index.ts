@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
 const corsHeaders = {
@@ -992,8 +993,9 @@ Deno.serve(async (req) => {
       console.log(`✅ C&B: Attempting to insert ${imageRows.length} images for vehicle ${vehicleId}`);
       console.log(`✅ C&B: First image row: ${JSON.stringify(imageRows[0])}`);
 
+      // Exact-URL guard on top of the photo-key filter above: one row per URL per vehicle.
       const { data: insertedImages, error: imgError } = imageRows.length
-        ? await supabase.from("vehicle_images").insert(imageRows).select("id")
+        ? await insertMissingVehicleImages(supabase, vehicleId, imageRows, { select: "id" })
         : { data: [] as { id: string }[], error: null };
 
       if (imgError) {
