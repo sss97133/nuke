@@ -436,7 +436,8 @@ Deno.serve(async (req) => {
         projectSecretKey() ?? "",
       );
       const size = Math.min(Number(batch_size) || 100, 100);
-      const SORT = "auctionEndDate.timestamp:asc";
+      // Newest sale first (2026-10-15): the first walk went oldest-first and landed 2003-2014; the calendar and the deep pass want the newest.
+      const SORT = "auctionEndDate.timestamp:desc";
 
       let pageNo = Number(page) > 1 ? Number(page) : 0;
       if (!pageNo) {
@@ -445,6 +446,7 @@ Deno.serve(async (req) => {
           .select("metadata")
           .eq("source_platform", "bonhams")
           .eq("extraction_source", "bonhams-typesense")
+          .eq("metadata->>ts_sort", "desc")
           .not("metadata->>ts_landed_at", "is", null)
           .order("metadata->>ts_landed_at", { ascending: false })
           .limit(1);
@@ -518,6 +520,7 @@ Deno.serve(async (req) => {
           ts_page: pageNo,
           extra_metadata: {
             ts_landed_at: observedAt,
+            ts_sort: "desc",
             sale_key: `bonhams-${doc.auctionId}`,
             auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
               ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],
