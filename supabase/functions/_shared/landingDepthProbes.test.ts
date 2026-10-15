@@ -67,7 +67,7 @@ Deno.test("sale_outcome: read from the source's stated result, held only when th
   equal(readRaw("carsandbids", "", "- Auction EndedSold for $13,350\n- 10/9/26").sale_outcome?.sample, "sold");
   const ctx = (v: Record<string, unknown>, events: Record<string, unknown>[] = []) => ({ v, events, locObs: [], commentCount: 0, imageCount: 0, obsDescLen: 0 });
   const raw = { sample: "sold" };
-  equal(modelHolds("sale_outcome", raw, ctx({ sale_status: "available" }, [{ event_status: "sold" }])), { anywhere: true, profile: false });
+  equal(modelHolds("sale_outcome", raw, ctx({ sale_status: "available" }, [{ event_status: "sold" }])), { profile: false, anywhere: true });
   equal(modelHolds("sale_outcome", raw, ctx({ sale_status: "sold" })).profile, true);
   equal(modelHolds("sale_outcome", raw, ctx({ auction_outcome: "sold" })).profile, true);
 });
