@@ -1282,7 +1282,7 @@ Deno.serve(async (req) => {
           const filters = `taxonomies.auction_tax.name:"${sale.value}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
           const res = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["permalink","lot_number_meta","auction_day_start_meta","taxonomies"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
           if ((res.nbHits ?? 0) > 1000) console.warn(`[MECUM] ${sale.value} ${day}: ${res.nbHits} lots, only 1000 readable`);
-          const infos: { url: string; info: UpcomingSale }[] = [];
+          const infos: { url: string; roadArt: boolean; info: UpcomingSale }[] = [];
           for (const hit of res.hits ?? []) {
             const term = hit.taxonomies?.auction_tax?.[0];
             const parsed = term ? parseSaleFacet(sale.value, term.slug) : null;
@@ -1293,6 +1293,7 @@ Deno.serve(async (req) => {
             stat.read++;
             infos.push({
               url,
+              roadArt: (hit.taxonomies?.division_tax ?? []).some((x: any) => x.name === "Road Art"),
               info: {
                 sale_key: parsed.sale_key,
                 auction_name: parsed.auction_name,
@@ -1313,8 +1314,9 @@ Deno.serve(async (req) => {
             const { data: existing, error: exErr } = await supabase.from("import_queue").select("id, listing_url, status, processed_at, raw_data").in("listing_url", chunk.map((c) => c.url));
             if (exErr) throw new Error(`roster lookup failed: ${exErr.message}`);
             const byUrl = new Map((existing ?? []).map((r: any) => [r.listing_url, r]));
+            // Road Art is Mecum's automobilia division (signs, pumps, clocks): not vehicles, so not landed or fetched.
             const fresh = chunk.filter((c) => !byUrl.has(c.url)).map((c) => ({
-              listing_url: c.url, status: "pending", priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { sale: c.info },
+              listing_url: c.url, status: c.roadArt ? "skipped" : "pending", error_message: c.roadArt ? "NOT_A_VEHICLE" : null, priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { sale: c.info, road_art: c.roadArt },
             }));
             if (fresh.length) {
               const { error } = await supabase.from("import_queue").insert(fresh);
@@ -1327,6 +1329,10 @@ Deno.serve(async (req) => {
               const first = row.raw_data?.sale?.roster_first_seen_at ?? c.info.roster_first_seen_at;
               const daysToRun = c.info.run_day ? (Date.parse(c.info.run_day) - Date.parse(todayUtc())) / 86400000 : 99;
               const ageH = row.processed_at ? (Date.now() - Date.parse(row.processed_at)) / 3600000 : 1e9;
+              if (c.roadArt) {
+                if (row.status === "pending" || row.status === "failed") await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE", locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: c.info, road_art: true } }).eq("id", row.id);
+                continue;
+              }
               const due = !row.raw_data?.sale || (daysToRun <= 7 && ageH >= 24) || (daysToRun <= 30 && ageH >= 168);
               const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
               if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
