@@ -11,6 +11,9 @@ const COLLECTIONS = [
   { key: 'listings', label: 'Just listed' },
 ] as const;
 type Collection = typeof COLLECTIONS[number]['key'];
+// The home page's own params (HomePage reads tab and force_treemap). Every other param belongs to one collection's
+// lenses and does not apply in another: the classifieds' sort=newest re-sorted the BaT board, near=1 rode onto it.
+const PAGE_PARAMS = ['tab', 'force_treemap'];
 
 // Asking/recorded prices never enter the BaT bid board's auction calculations.
 // Keep the existing explorer at the Market entry point. Source-only listing
@@ -21,7 +24,12 @@ export default function MarketInventory({ onUnavailable }: { onUnavailable?: Rea
   const collection: Collection = COLLECTIONS.some(c => c.key === requested) ? requested as Collection : 'auctions';
   // The other retained populations, one link away. Each page places them in its scope strip.
   const others = <>{COLLECTIONS.filter(c => c.key !== collection).map(c => <button key={c.key} type="button" className="market-control" aria-pressed={false}
-    onClick={() => { const next = new URLSearchParams(params); next.set('collection', c.key); next.delete('sale'); setParams(next); }}>
+    onClick={() => {
+      const next = new URLSearchParams();
+      for (const key of PAGE_PARAMS) { const value = params.get(key); if (value != null) next.set(key, value); }
+      next.set('collection', c.key);
+      setParams(next);
+    }}>
     <Text role="label">{c.label}</Text>
   </button>)}</>;
   if (collection === 'calendar') return <Suspense fallback={<p role="status">Reading the auction calendar…</p>}><AuctionCalendar collection={others} /></Suspense>;

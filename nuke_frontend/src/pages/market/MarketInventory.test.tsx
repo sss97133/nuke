@@ -68,6 +68,21 @@ it('opens the auction calendar as a third collection and clears a chosen sale wh
   expect(new URLSearchParams(window.location.search).get('sale')).toBeNull();
   expect(container.textContent).toContain('Existing BaT bid board');
 });
+it('carries no lens from one collection into another: only the page params and the new collection survive a switch', async () => {
+  const kept = () => [...new URLSearchParams(window.location.search).keys()].sort();
+  await render('tab=market&force_treemap=1&collection=listings&source=ksl&near=1&sort=newest&radius=250');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
+  expect(kept()).toEqual(['collection', 'force_treemap', 'tab']);
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('auctions');
+  expect(container.textContent).toContain('Existing BaT bid board');
+  await act(async () => root.unmount()); root = createRoot(container);
+  await render('tab=market&collection=auctions&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
+  expect(kept()).toEqual(['collection', 'tab']);
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
+  expect(kept()).toEqual(['collection', 'tab']);
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
+});
 it('shows the retained source observation separately from admission and update clocks', async () => {
   const row = fixture.query.data.pages[0].items[0];
   row.source_observed_at = '2026-10-12T01:02:03Z';
