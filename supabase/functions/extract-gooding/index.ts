@@ -700,6 +700,15 @@ async function saveToDatabase(
 
     if (updateError) {
       console.error(`[gooding] Failed to update vehicle: ${updateError.message}`);
+      // A VIN another vehicle already holds fails the WHOLE update, so the year, description and status of the lot were never
+      // written (34 Gooding vehicles kept a sale year as their model year, 2026-10-15). Write everything but the VIN, and raise
+      // the clash as a revision item: two vehicles carry one chassis (merge_proposals decides, not this writer).
+      if (vehicleUpdate.vin && /VIN .* already exists|vehicles_vin_unique|duplicate key/i.test(updateError.message)) {
+        const { vin: clashVin, ...withoutVin } = vehicleUpdate;
+        const { error: retryErr } = await supabase.from('vehicles').update(withoutVin).eq('id', vehicleId);
+        if (retryErr) console.error(`[gooding] Retry without VIN failed: ${retryErr.message}`);
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160), retried_without_vin: !retryErr } });
+      }
     }
   } else {
     // Insert new vehicle
