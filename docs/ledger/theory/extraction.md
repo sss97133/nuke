@@ -137,6 +137,18 @@ Seller type is proposed in `docs/proposals/2026-10-15-seller-type-observation.md
   order, only to sources whose rank key is at least `min_rank_leftover` (0.5), up to the same caps: a low-return source does not
   soak up leftover just because it has a gap.
 
+### One rank floor, and a target slice (owner-lead, 2026-10-15)
+
+- **One floor.** `min_rank_leftover` (0.5) applies to every source: a rank key below it receives no credits. An earlier version
+  applied it only to a source whose gap came from a scoped census window, so KSL (rank 0.313) was funded while Cars & Bids
+  (0.336) was not. A source below the floor is paused with the reason in its inputs (KSL) and is released when its rank clears it.
+- **Target slice.** A source can be bought for a slice of model years (`slice_year_from`, `slice_year_to`; Cars & Bids 1964-1991, the
+  tier years, since it blocks direct reads and Firecrawl is its only path). Its prior value is the mean best_v1.1 of its slice lots,
+  its live gap is its supply rate times the slice share of its landed lots, and it pays an overhead (`overhead_credits_per_day`, an
+  index page a day) spread over the slice gap as an effective cost per lot. Where no end-time clock exists, the supply rate is the
+  scoped census window's ids per day. The observed return counts only fetches and lots since `slice_since`, so the old practice
+  does not judge the new one.
+
 **Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
 `firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_best_v1_1`, `firecrawl_backtest`, `record_lot_quality_signals`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`, `20261017030000_firecrawl_best_v1_1_lot_quality.sql`. Read the ranking with
