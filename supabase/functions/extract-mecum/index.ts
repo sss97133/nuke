@@ -972,7 +972,7 @@ async function saveVehicle(
     .select("id")
     .eq("vehicle_id", vehicleId)
     .eq("source_platform", "mecum")
-    .eq("source_url", vehicle.url)
+    .in("source_url", mecumUrlSpellings(vehicle.url))
     .limit(1)
     .maybeSingle();
 
@@ -1022,6 +1022,16 @@ async function saveVehicle(
   }
 
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+}
+
+// Existing mecum events spell one lot several ways (measured 2026-10-15: with and without www, with and without the
+// trailing slash, and a /sitemap.xml suffix), so a target is landed if any spelling has an event.
+function mecumLotKey(url: string): string {
+  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+}
+function mecumUrlSpellings(url: string): string[] {
+  const bare = mecumLotKey(url);
+  return ["https://www." + bare, "https://" + bare, "http://" + bare].flatMap((u) => [u, u + "/", u + "/sitemap.xml"]);
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────
@@ -1138,14 +1148,12 @@ Deno.serve(async (req) => {
         const urls = targets.map((t: { listing_url: string }) => t.listing_url);
         const [{ data: queued }, { data: landed }] = await Promise.all([
           supabase.from("import_queue").select("listing_url").in("listing_url", urls),
-          supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", urls),
+          supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", urls.flatMap(mecumUrlSpellings)),
         ]);
-        const done = new Set([
-          ...(queued ?? []).map((r: { listing_url: string }) => r.listing_url),
-          ...(landed ?? []).map((r: { source_url: string }) => r.source_url),
-        ]);
+        const queuedUrls = new Set((queued ?? []).map((r: { listing_url: string }) => r.listing_url));
+        const landedKeys = new Set((landed ?? []).map((r: { source_url: string }) => mecumLotKey(r.source_url)));
         for (const t of targets) {
-          if (!done.has(t.listing_url) && picked.length < limit) picked.push(t);
+          if (!queuedUrls.has(t.listing_url) && !landedKeys.has(mecumLotKey(t.listing_url)) && picked.length < limit) picked.push(t);
         }
       }
 
