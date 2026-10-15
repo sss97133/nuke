@@ -1400,8 +1400,8 @@ Deno.serve(async (req) => {
         .limit(limit);
       if (todoErr) throw new Error(`deep_lots queue read failed: ${todoErr.message}`);
       const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, credits_used: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
-      // Credit floor: Cars & Bids keeps its 5,000. Stop when what is left would cut into it.
-      const floor = Number(body.credit_floor) || 5000;
+      // Credit floor: Cars & Bids keeps 5,000 and the eBay private backfill needs the rest. Stop when what is left would cut into it.
+      const floor = Number(body.credit_floor) || 6700; // C&B 5,000 + eBay tier-1 private 588 + 68 a day (lead, 2026-10-15); raise only with a larger plan
       let credits = 0;
       {
         const usage = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", { headers: { Authorization: `Bearer ${Deno.env.get("FIRECRAWL_API_KEY") ?? ""}` } }).then((r) => r.json()).catch(() => null); // guardrail-allow: raw-fetch
