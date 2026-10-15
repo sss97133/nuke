@@ -29,6 +29,8 @@ Deno.serve(async (req) => {
       useFirecrawl: false,
       directFetchOptions: { publicOnly: true },
       maxAgeSec: 86400,
+      // cars.ksl.com refuses the server's datacenter address (403 / login wall, 2026-10-15); a residential IP gets 200.
+      firecrawlOnBlock: true,
     });
     if (!fetched.html || fetched.html.length < 5000) {
       throw new Error(`Failed to fetch: ${fetched.error || `HTTP ${fetched.statusCode}, ${fetched.html?.length || 0} bytes`}`);
