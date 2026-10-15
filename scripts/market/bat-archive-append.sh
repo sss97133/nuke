@@ -1,6 +1,6 @@
 #!/bin/bash
 # Daily: append the BaT lots that settled since the last run to the local BaT archive, so the model 31 band and the
-# model 32 finish estimate (scripts/market/live-bands.mjs, live-finish.mjs) price from current sales.
+# model 32 and 33 finish estimates (scripts/market/live-bands.mjs, live-finish.mjs, live-finish-33.py) price from current sales.
 #
 # Local only: BaT is the only network; no production reads or writes (bat-keep-fresh runs --no-db). Run from a
 # checkout of origin/main (the lot-page parser imports the production parsers by relative path) against the data
@@ -31,4 +31,7 @@ rebuild
 stamp "archive last close: $(duckdb -noheader -list "$DATA/bat-archive.duckdb" -c "SELECT max(end_ts)::date FROM sales")"
 python3 "$RUNNER/scripts/market/live-finish.py" --build-cache --archive "$DATA/bat-archive.duckdb" \
   --cache "${LIVE_FINISH_CACHE:-$HOME/Library/Caches/nuke-market-live-finish}" | tail -1
+# Model 33's archive history (its fitted artifacts stay in ~/Library/Caches/nuke-finish-33); a failure is logged, not fatal.
+BAT_ARCHIVE="$DATA/bat-archive.duckdb" python3 "$RUNNER/scripts/market/live-finish-33.py" --build-cache 2>&1 | tail -1 \
+  || echo "model 33 history rebuild failed"
 stamp "done"
