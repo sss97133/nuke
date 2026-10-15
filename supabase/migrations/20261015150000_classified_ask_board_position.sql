@@ -35,6 +35,10 @@ BEGIN
   IF to_regclass('public.mv_family_year_prices') IS NULL OR to_regclass('public.listing_exit_models') IS NULL THEN
     RAISE EXCEPTION 'apply 20261015130000_family_year_prices.sql and 20261015140000_listing_exit_models.sql first';
   END IF;
+  -- The fold is created empty and first built by its 09:40 UTC refresh; reading it before then would fail every call.
+  IF NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass) THEN
+    RAISE EXCEPTION 'mv_family_year_prices has not been built yet (refresh-family-year-prices, 09:40 UTC); not replacing the board';
+  END IF;
 END $guard$;
 
 CREATE OR REPLACE FUNCTION public.classified_ask_board(
