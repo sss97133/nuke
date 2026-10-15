@@ -850,6 +850,7 @@ async function matchOrCreateVehicle(
       is_primary: i === 0,
       source: imageSourceFor(platform),
       is_external: true,
+      ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
     await supabaseAdmin.from("vehicle_images").insert(imageRows);
@@ -964,6 +965,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         is_primary: !hasPrimary && i === 0,
         source: imageSourceFor(platform),
         is_external: true,
+        ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
       await supabaseAdmin.from("vehicle_images").insert(imageRows);
