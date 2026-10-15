@@ -1235,24 +1235,28 @@ Deno.serve(async (req) => {
         if (!first) await new Promise((r) => setTimeout(r, spacing));
         first = false;
         const url = String(ev.source_url).replace(/\/?$/, "/");
+        // Not archiveFetch: it keeps the whole 300 KB page inline in listing_page_snapshots, which at 2,880 lots a day is
+        // ~200 MB a day on a small database. The observation keeps the lot and auction data parsed from the page (raw_data),
+        // which is what the page holds; the page's markup is not retained.
         let res: Response;
         try {
-          res = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "text/html" } });
+          res = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "text/html" } }); // guardrail-allow: raw-fetch
         } catch (e: any) {
           out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: fetch ${String(e?.message ?? e).slice(0, 100)}`);
           continue;
         }
-        if (res.status === 403 || res.status === 429) { out.backoff = `HTTP ${res.status}`; break; }
+        const status = res.status;
+        if (status === 403 || status === 429) { out.backoff = `HTTP ${status}`; break; }
         const observedAt = new Date().toISOString();
-        if (res.status === 404 || res.status === 410) {
+        if (status === 404 || status === 410) {
           await writeVehicleEventByKey(supabase, {
             vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
-            source_url: ev.source_url, metadata: { deep_at: observedAt, deep_status: `http_${res.status}` },
+            source_url: ev.source_url, metadata: { deep_at: observedAt, deep_status: `http_${status}` },
           });
           out.gone++;
           continue;
         }
-        if (!res.ok) { out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: HTTP ${res.status}`); continue; }
+        if (status !== 200) { out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: HTTP ${status}`); continue; }
         const page = parseLotPage(await res.text());
         if (!page) { out.backoff = "not a lot page (challenge or changed shape)"; break; }
 
