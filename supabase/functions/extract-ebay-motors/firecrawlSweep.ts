@@ -25,6 +25,7 @@ export interface DiscoverOptions {
   deepMax?: number;                 // item pages per run (default 15)
   dailyItemCap?: number;            // item pages per UTC day across runs (default 60)
   dryRun?: boolean;                 // read search pages, write nothing, read no item pages
+  backfill?: boolean;               // read every requested page to the end (no stop at known cards); item pages are the caller's to read
   fetchPage?: PageFetcher;          // test seam
 }
 
@@ -64,7 +65,8 @@ export async function landBlip(supabase: any, c: Card, facet: Facet, snapshotId:
 async function itemsReadToday(supabase: any): Promise<number> {
   const since = new Date(); since.setUTCHours(0, 0, 0, 0);
   const r = await supabase.from("listing_page_snapshots").select("id", { count: "exact", head: true })
-    .eq("platform", PLATFORM).eq("fetch_method", "firecrawl").like("listing_url", "%/itm/%").gte("fetched_at", since.toISOString());
+    .eq("platform", PLATFORM).eq("fetch_method", "firecrawl").like("listing_url", "%/itm/%").gte("fetched_at", since.toISOString())
+    .or("metadata->>via.is.null,metadata->>via.neq.deep");   // the cap is discovery's; one-off 'deep' reads (the backfill) are budgeted by their runner
   if (r.error) throw new Error(`daily cap read failed: ${r.error.message}`);
   return r.count ?? 0;
 }
@@ -107,7 +109,7 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
               cands.push({ card: chunk[k], tier: tier.id, facet });
               if (r.duplicate) { rep.blips_duplicate++; dupRun++; } else { rep.blips_new++; t.new++; dupRun = 0; }
             });
-            if (dupRun >= 24) stopped = true;
+            if (dupRun >= 24 && !o.backfill) stopped = true;
           }
           if (stopped) break;
         }
@@ -116,6 +118,7 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
     if (o.dryRun) { rep.stopped = "dry run"; return finish(rep); }
 
     // item pages: not read before, private first, tier 1 before tier 2, newest first (search order)
+    if (o.backfill) { rep.stopped = "backfill: search pages and blips only"; return finish(rep); }
     const read = await heldKeys(supabase, cands.map((c) => c.card.itemId));
     const rank = (c: Cand) => c.tier * 10 + (c.facet === "private" ? 0 : c.facet === "unspecified" ? 1 : 2);
     const todo = cands.filter((c) => !read.has(c.card.itemId)).sort((a, b) => rank(a) - rank(b));

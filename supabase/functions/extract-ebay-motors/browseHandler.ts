@@ -16,7 +16,7 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
   // Firecrawl door: eBay's public pages, no developer account.
   if (body.action === "discover") {
     const rep = await discover(supabase, {
-      tiers: body.tiers, facets: body.facets, jobs: body.jobs, pages: body.pages, deepMax: body.deep_max, dailyItemCap: body.daily_item_cap, dryRun: body.dry_run === true,
+      tiers: body.tiers, facets: body.facets, jobs: body.jobs, pages: body.pages, deepMax: body.deep_max, dailyItemCap: body.daily_item_cap, dryRun: body.dry_run === true, backfill: body.backfill === true,
     });
     return json(rep, rep.ok ? 200 : 500);
   }
