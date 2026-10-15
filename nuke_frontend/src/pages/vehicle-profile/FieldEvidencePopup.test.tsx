@@ -51,6 +51,28 @@ describe('canonical value -> attributed observation', () => {
     fixture.provenance.data.observations[0].source_url = null;
     expect(render()).toContain('Inspect observation local-observation');
   });
+  it('shows repeated captures of one listing claim once, keeping every capture reachable', () => {
+    // Live 2026-10-15: one displacement claim drilled to 16 identical rows from 16 captures of one page.
+    const base = { ...fixture.provenance.data.observations[0], source_value: 'Synthetic quotation.', extraction_method: 'retained_listing_property_projection_v1' };
+    fixture.provenance.data.observations = Array.from({ length: 16 }, (_, n) => ({ ...base, id: `local-capture-${n}`, observed_at: `2026-10-${String(n + 1).padStart(2, '0')}T12:00:00Z` }));
+    fixture.provenance.data.observations.push({ ...base, id: 'local-other-quote', source_value: 'Another synthetic quotation.' },
+      { ...base, id: 'local-other-value', value: 'OTHER-VIN' }, { ...base, id: 'local-other-page', source_url: 'https://example.com/relisting' });
+    const html = render();
+    expect(html.match(/SOURCE REPORT · /g)?.length).toBe(4);
+    expect(html).toContain('Same claim captured 16 times from this page');
+    expect(html).toContain('one source claim, not corroboration');
+    for (let n = 0; n < 16; n++) expect(html).toContain(`Inspect observation local-capture-${n}`);
+    for (const id of ['local-other-quote', 'local-other-value', 'local-other-page']) expect(html).toContain(`Inspect observation ${id}`);
+  });
+  it('lets the resolved report represent its repeated captures', () => {
+    const base = { ...fixture.provenance.data.observations[0], value: '2.5', source_value: 'Synthetic quotation.' };
+    fixture.provenance.data.observations = [{ ...base, id: 'local-first' }, { ...base, id: 'local-resolved' }];
+    fixture.provenance.data.canonical = { status: 'resolved', value: '2.5', observation_id: 'local-resolved' };
+    const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_displacement_l" label="DISPLACEMENT" value="2.5 L" />);
+    expect(html.indexOf('Inspect observation local-resolved')).toBeLessThan(html.indexOf('RESOLVED REPORT'));
+    expect(html.indexOf('RESOLVED REPORT')).toBeLessThan(html.indexOf('Inspect observation local-first'));
+    expect(html).toContain('Same claim captured 2 times from this page');
+  });
   it('preserves optional deployed clocks and method without deriving a resolution', () => {
     Object.assign(fixture.provenance.data.observations[0], { ingested_at: '2026-10-03T13:00:00Z', extraction_method: 'structured_import' });
     const group = { sources: [], hasConflict: true, conflictType: 'genuine' } as unknown as FieldEvidenceGroup;
