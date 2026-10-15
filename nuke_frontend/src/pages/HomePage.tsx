@@ -184,6 +184,15 @@ export function mapLegend(level: MapLevel, measured = level === 'brands' || leve
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
+/** The legend under the map: the sales chart's when a family shows its chart (the tiles' legend described tiles that
+ *  were not on screen, 2026-10-15), the level's otherwise. */
+export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · price on a log scale · '
+  + 'color = venue · line = the median of the sales within 60 days either side, every 14 days · BaT median = Bring a '
+  + 'Trailer\'s last 12 months against the 12 before · nominal · click a dot to open its record';
+export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
+  return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
+}
+
 function useTreemapRefresh(): MapRefresh {
   const [refresh, setRefresh] = useState<MapRefresh>(NO_REFRESH);
   useEffect(() => {
@@ -1513,7 +1522,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       >
         <Text role="caption">
           {/* One area and color basis per level (#1342): market measures only when every tile on the map carries dollars. */}
-          {mapLegend(levelType, !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0))}
+          {legendFor(levelType, levelType === 'models' && !!currentLevel.family && !!currentLevel.make && familyView === 'sales',
+            !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0))}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
