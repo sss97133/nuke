@@ -4,7 +4,7 @@ import { htmlToText } from "../_shared/htmlToText.ts";
 import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
 import { toLanding } from "./browseMap.ts";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { firecrawlFetcher } from "./retain.ts";
 import { discover } from "./firecrawlSweep.ts";
 import { emptyReport, landItem } from "./browseSweep.ts";
 import { pageToItem, parseItemPage } from "./ebayPage.ts";
@@ -16,15 +16,15 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
   // Firecrawl door: eBay's public pages, no developer account.
   if (body.action === "discover") {
     const rep = await discover(supabase, {
-      tiers: body.tiers, facets: body.facets, pages: body.pages, deepMax: body.deep_max, dailyItemCap: body.daily_item_cap, dryRun: body.dry_run === true,
+      tiers: body.tiers, facets: body.facets, jobs: body.jobs, pages: body.pages, deepMax: body.deep_max, dailyItemCap: body.daily_item_cap, dryRun: body.dry_run === true,
     });
     return json(rep, rep.ok ? 200 : 500);
   }
   if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
     const url = String(body.url ?? "");
     if (!/^https:\/\/(www\.)?ebay\.com\/itm\/\d{6,}/.test(url)) return json({ ok: false, error: "url must be an ebay.com/itm/<id> link" }, 400);
-    const res = await archiveFetch(url, { platform: "ebay_motors", useFirecrawl: true, skipCache: true, includeMarkdown: true, callerName: "extract-ebay-motors" });
-    if (!res.html || !res.markdown) return json({ ok: false, error: res.error ?? "empty page", status: res.statusCode }, 502);
+    const res = await firecrawlFetcher(supabase, "ebay_motors")(url, { markdown: true, metadata: { kind: "item", via: "deep" } });
+    if (!res.html || !res.markdown || res.error) return json({ ok: false, error: res.error ?? "empty page", status: res.statusCode }, 502);
     const page = parseItemPage(res.html, res.markdown);
     const item = pageToItem(page);
     if (body.dry_run === true) return json({ ok: true, snapshot_id: res.snapshotId, page: { ...page, description: page.description.slice(0, 1500) }, landing: toLanding(item, htmlToText, "ebay-firecrawl") });

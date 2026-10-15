@@ -2,7 +2,7 @@
  * The eBay Motors intake that needs no eBay developer account: Firecrawl reads eBay's public search and item pages.
  *
  *   discover  per tier (years) and per eBay "For Sale By" facet, newest first:
- *               1 credit: one search page of 240 cards (archiveFetch keeps the Firecrawl response in listing_page_snapshots)
+ *               1 credit: one search page of 240 cards (retain.ts keeps the Firecrawl response in the listing-snapshots bucket, pointed at by a listing_page_snapshots row)
  *               every card not seen before lands as a blip (unresolved listing observation: title, price, format, year, miles,
  *               brand, seller, feedback, listed label), through writeObservation -> ingest-observation
  *               then the item pages of the not-yet-read cards, private sellers first, tier 1 before tier 2, 1 credit each,
@@ -11,7 +11,7 @@
  *   Private/dealer: the facet and the item specific "For Sale By" are eBay's own seller-declared attribute; the class stored
  *   with the listing is a Nuke claim that cites it (browseMap.classifySeller).
  */
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { firecrawlFetcher, type PageFetcher } from "./retain.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { TIERS, tierOfYear } from "./browseMap.ts";
 import { emptyReport, heldKeys, landItem, pool, PLATFORM, type Report } from "./browseSweep.ts";
@@ -20,11 +20,12 @@ import { type Card, type Facet, pageToItem, parseItemPage, parseSearchCards, res
 export interface DiscoverOptions {
   tiers?: number[];                 // default [1, 2]
   facets?: Facet[];                 // default ["private"]; "unspecified" is read only when asked
+  jobs?: { tiers: number[]; facets: Facet[] }[]; // several (tiers x facets) groups in one run; replaces tiers/facets
   pages?: number;                   // search pages per tier and facet per run (default 1)
   deepMax?: number;                 // item pages per run (default 15)
   dailyItemCap?: number;            // item pages per UTC day across runs (default 60)
   dryRun?: boolean;                 // read search pages, write nothing, read no item pages
-  fetchPage?: typeof archiveFetch;  // test seam
+  fetchPage?: PageFetcher;          // test seam
 }
 
 export interface DiscoverReport extends Report {
@@ -69,23 +70,23 @@ async function itemsReadToday(supabase: any): Promise<number> {
 }
 
 export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<DiscoverReport> {
-  const fetchPage = o.fetchPage ?? archiveFetch;
+  const fetchPage = o.fetchPage ?? firecrawlFetcher(supabase, PLATFORM);
   const base = emptyReport(o.dryRun ? "discover_dry_run" : "discover");
   const rep: DiscoverReport = { ...base, search_pages: 0, cards: 0, blips_new: 0, blips_duplicate: 0, deep_read: 0, deep_cap_left: null, facet_totals: {} };
-  const tiers = TIERS.filter((t) => (o.tiers ?? [1, 2]).includes(t.id));
-  const facets = o.facets ?? ["private"];
+  const groups = (o.jobs ?? [{ tiers: o.tiers ?? [1, 2], facets: o.facets ?? ["private"] }])
+    .flatMap((j) => TIERS.filter((t) => j.tiers.includes(t.id)).flatMap((tier) => j.facets.map((facet) => ({ tier, facet }))));
   const now = new Date().toISOString();
   type Cand = { card: Card; tier: number; facet: Facet };
   const cands: Cand[] = [];
 
   try {
-    for (const tier of tiers) {
-      for (const facet of facets) {
+    {
+      for (const { tier, facet } of groups) {
         const t = (rep.per_tier[`${tier.id}:${facet}`] = { seen: 0, held: 0, new: 0, fetched: 0, landed: 0 });
         for (let page = 1; page <= (o.pages ?? 1); page++) {
-          const res = await fetchPage(searchUrl(tier.years, facet, page), { platform: PLATFORM, useFirecrawl: true, skipCache: true, includeMarkdown: false, callerName: "extract-ebay-motors", metadata: { kind: "search", tier: tier.id, facet, page } });
+          const res = await fetchPage(searchUrl(tier.years, facet, page), { markdown: false, metadata: { kind: "search", tier: tier.id, facet, page } });
           rep.search_pages++; rep.calls++;
-          if (!res.html) { rep.errors.push(`search ${tier.id}:${facet} p${page}: ${res.error ?? "empty page"} (HTTP ${res.statusCode ?? "?"})`); break; }
+          if (!res.html || res.error) { rep.errors.push(`search ${tier.id}:${facet} p${page}: ${res.error ?? "empty page"} (HTTP ${res.statusCode ?? "?"})`); break; }
           const cards = parseSearchCards(res.html);
           if (page === 1) rep.facet_totals[`${tier.id}:${facet}`] = resultCount(res.html);
           if (cards.length === 0) { rep.errors.push(`search ${tier.id}:${facet} p${page}: page parsed to 0 cards (snapshot ${res.snapshotId}); layout change or block`); break; }
@@ -118,9 +119,9 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
     rep.deep_cap_left = capLeft - take.length;
     await pool(take, 3, async (c) => {
       const url = c.card.url;
-      const res = await fetchPage(url, { platform: PLATFORM, useFirecrawl: true, skipCache: true, includeMarkdown: true, callerName: "extract-ebay-motors", metadata: { kind: "item", tier: c.tier, facet: c.facet } });
+      const res = await fetchPage(url, { markdown: true, metadata: { kind: "item", tier: c.tier, facet: c.facet } });
       rep.calls++;
-      if (!res.html || !res.markdown) { rep.errors.push(`item ${c.card.itemId}: ${res.error ?? "empty page"} (HTTP ${res.statusCode ?? "?"})`); return; }
+      if (!res.html || !res.markdown || res.error) { rep.errors.push(`item ${c.card.itemId}: ${res.error ?? "empty page"} (HTTP ${res.statusCode ?? "?"})`); return; }
       rep.deep_read++; rep.per_tier[`${c.tier}:${c.facet}`].fetched++;
       const page = parseItemPage(res.html, res.markdown);
       if (!page.title && !Object.keys(page.specifics).length) { rep.errors.push(`item ${c.card.itemId}: page parsed to nothing (snapshot ${res.snapshotId})`); return; }

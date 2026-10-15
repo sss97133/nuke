@@ -68,7 +68,7 @@ async function callIngest(input: Record<string, unknown>): Promise<{ status: str
 
 /** Land one fetched item. Returns what happened; throws only on a write the run must not continue past. */
 export interface LandOpts {
-  /** The capture is already stored (archiveFetch wrote the Firecrawl response): link it instead of inserting a getItem snapshot. */
+  /** The capture is already stored (retain.ts stored the Firecrawl response): link it instead of inserting a getItem snapshot. */
   snapshotId?: string | null;
   /** Provenance label on the listing episode: 'ebay-browse-api' (default) or 'ebay-firecrawl'. */
   source?: string;
