@@ -134,7 +134,9 @@ function normalizeScrapePayload(parsed: any): {
   const success = Boolean(parsed?.success);
  
   // v1 shape
-  const html = typeof parsed?.data?.html === 'string' ? parsed.data.html : null;
+  // rawHtml keeps the page's <script> blocks (__NEXT_DATA__, flight payloads, JSON-LD); html strips them. Used when a caller asks for it.
+  const html = typeof parsed?.data?.rawHtml === 'string' ? parsed.data.rawHtml
+    : typeof parsed?.data?.html === 'string' ? parsed.data.html : null;
   const markdown = typeof parsed?.data?.markdown === 'string' ? parsed.data.markdown : null;
   const extract = parsed?.data?.extract ?? null;
   const metadata = parsed?.data?.metadata ?? null;
