@@ -1163,14 +1163,17 @@ async function saveVehicle(
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
 }
 
-// Existing mecum events spell one lot several ways (measured 2026-10-15: with and without www, with and without the
-// trailing slash, and a /sitemap.xml suffix), so a target is landed if any spelling has an event.
+// Existing mecum rows spell one lot several ways (measured 2026-10-15: with and without www, with and without the trailing
+// slash, a /sitemap.xml suffix, and, on vehicles.discovery_url, a lowercased path because canonicalize_vehicle_url lowercases
+// it: "FL15-204118" is stored as "fl15-204118"), so a lot is landed if any spelling has a row. The key ignores case.
 function mecumLotKey(url: string): string {
-  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "").toLowerCase();
 }
 function mecumUrlSpellings(url: string): string[] {
-  const bare = mecumLotKey(url);
-  return [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
+  const bare = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+  const lower = bare.toLowerCase();
+  const out = [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
+  return lower === bare ? out : [...out, `https://${lower}`, `https://www.${lower}`, `https://${lower}/`];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────
