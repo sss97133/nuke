@@ -344,6 +344,17 @@ intake that captures within minutes; that is intake work, not page work.
 
 Next: the interest order (underpriced against same-car sales first, then sale composition and the viewer's band), and
 the ask placed against measured sales.
+
+What "same car" needs, measured 2026-10-15 02:15Z: sales and asks do not share model strings (Craigslist "tacoma
+sr5", BaT "911 Carrera 4S Coupe 6-Speed"), so a price position needs a model-family key first. canonical_models
+(3,456 rows, 212 makes, every row with aliases) resolves 496 of the day's 635 Craigslist asks (78.1%) by alias; the
+misses are a make written into the model ("Toyota 4runner SR5 V6"), misspelled makes, and models the table lacks (F600,
+B2000, 633). The fold to build: sales and asks keyed to one family (the same key the brand map needs for "what this
+brand trades"), then each ask against its family's confirmed sales at its year, shown only with its sample.
+Also delivered on October 15: what the listing says rides on each row (20261015080000): a disclosed broken odometer
+shows no number (38 of 621 listings that day), a rolled-over one says so (38), and a title other than clean is said
+(32); the rows are cards, photo first.
+
 ## The live auction board — owner direction, October 15
 
 Read on nuke.ag/?tab=market&collection=auctions as a visitor: "a lot of work goes into it ... but I don't even know
