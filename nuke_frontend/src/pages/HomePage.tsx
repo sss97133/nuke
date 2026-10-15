@@ -38,6 +38,8 @@ interface TreemapNode {
   dated?: number | null;
   sold_12m?: number | null;
   sold_prior_12m?: number | null;
+  usd_12m?: number | null;
+  usd_prior_12m?: number | null;
   imageUrl?: string;
   id?: string;
   isVehicle?: boolean;
@@ -78,7 +80,8 @@ function readTreemapBrands(): Promise<TreemapNode[] | null> {
       return (result as TreemapNode[]).map((n) => {
         const m = byName.get(n.name);
         return m ? { ...n, usd: m.usd, sold_any: m.sold_any, offered: m.offered, p10: m.p10, p90: m.p90,
-          year_p50: m.year_p50, dated: m.dated, sold_12m: m.sold_12m, sold_prior_12m: m.sold_prior_12m } : n;
+          year_p50: m.year_p50, dated: m.dated, sold_12m: m.sold_12m, sold_prior_12m: m.sold_prior_12m,
+          usd_12m: m.usd_12m, usd_prior_12m: m.usd_prior_12m } : n;
       });
     }, () => { brandsRead = null; return null; });
   }
@@ -135,7 +138,7 @@ export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', le
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles'): string {
   if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (level === 'brands') return 'area = dollars from confirmed sales · $low–$high = the cheapest tenth to the top tenth of sales · sell = share of cars offered that sold · ’yy = the model year that trades · color = sales in the last 12 months against the 12 before (gray: too few dated sales) · nominal · click to go down';
+  if (level === 'brands') return 'area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before; color follows sales (gray: too few dated sales) · nominal · click to go down';
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
@@ -303,6 +306,14 @@ export function brandMomentum(n: Pick<TreemapNode, 'count' | 'dated' | 'sold_12m
   return n.sold_12m / n.sold_prior_12m - 1;
 }
 
+// The same twelve months in dollars, under the same rule (enough dated sales before).
+export function brandDollarMomentum(n: Pick<TreemapNode, 'count' | 'dated' | 'sold_prior_12m' | 'usd_12m' | 'usd_prior_12m'>): number | null {
+  if (n.usd_12m == null || !n.usd_prior_12m || !n.sold_prior_12m || n.sold_prior_12m < 10) return null;
+  if (!n.dated || n.dated < 0.5 * n.count) return null;
+  return n.usd_12m / n.usd_prior_12m - 1;
+}
+const signedPct = (m: number) => `${m >= 0 ? '▲' : '▼'}${Math.abs(Math.round(m * 100))}%`;
+
 function momentumToColor(m: number | null): string {
   if (m === null) return 'var(--heat-0)';
   if (m >= 0.2) return 'color-mix(in srgb, var(--success) 42%, var(--surface))';
@@ -315,14 +326,15 @@ function momentumToColor(m: number | null): string {
 /** The brand tile's lines, most important first; the cell shows as many as fit. Each is a measured fact of the brand's
  *  confirmed sales, or absent. */
 export function brandLines(n: TreemapNode): string[] {
+  // What a brand's market is, in three lines: its dollars and sales, how often what is offered sells, and how the last
+  // twelve months compare with the twelve before, in sales and in dollars (owner, 2026-10-15: the price band is
+  // irrelevant; sell-through and the 12-month move are the interest, said clearly).
   const lines: string[] = [];
   if (n.usd) lines.push(`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`);
-  if (n.p10 && n.p90) lines.push(`${fmtMoney(n.p10)}–${fmtMoney(n.p90)}`);
-  if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% sell`);
+  if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% of offered sold`);
   const m = brandMomentum(n);
-  const era = n.year_p50 ? `’${String(n.year_p50).slice(-2)}` : '';
-  const move = m === null ? '' : `${m >= 0 ? '▲' : '▼'}${Math.abs(Math.round(m * 100))}% 12 mo`;
-  if (era || move) lines.push([era, move].filter(Boolean).join(' · '));
+  const d = brandDollarMomentum(n);
+  if (m !== null) lines.push(`12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
   return lines;
 }
 
@@ -602,6 +614,25 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
     );
   }
 
+  if (node.usd != null) {
+    const m = brandMomentum(node);
+    const d = brandDollarMomentum(node);
+    return (
+      <div style={containerStyle}>
+        <Text role="label" as="div">{node.name}</Text>
+        <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
+          {node.sold_12m != null ? <Row label="sold, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
+          {node.sold_prior_12m != null ? <Row label="sold, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
+          {m !== null ? <Row label="change, sales" value={signedPct(m)} /> : null}
+          {d !== null ? <Row label="change, dollars" value={signedPct(d)} /> : null}
+          {m === null && node.sold_12m != null ? <Row label="12-month change" value="too few dated sales" /> : null}
+          {node.avg_bids ? <Row label="average bids" value={String(node.avg_bids)} /> : null}
+        </div>
+      </div>
+    );
+  }
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100).toFixed(1) : '0.0';
   const sellThrough = node.auction_count && node.auction_count > 0
     ? Math.round(((node.sold_count || 0) / node.auction_count) * 100) + '%'
