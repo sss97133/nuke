@@ -23,6 +23,7 @@ import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { buildFullDescription, DESCRIPTION_LIMIT, lotProse } from "./goodingText.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
@@ -74,6 +75,8 @@ interface GoodingExtracted {
   description: string | null;
   vehicle_type: string | null;
   saleroom_addendum: string | null;  // SRA note HTML or plain text
+  engine_number: string | null;      // item.engine, the engine's own number
+  description_sections: string[];    // which prose fields the description was built from
 
   // Parsed structured fields
   engine_size: string | null;
@@ -136,6 +139,12 @@ interface GoodingPageData {
           modelYear: number | null;
           model: string | null;
           note: string | null;
+          engine?: string | null;
+          description?: unknown;
+          provenance?: unknown;
+          exhibitionHighlights?: unknown;
+          raceHighlights?: unknown;
+          documentation?: unknown;
           cloudinaryImagesCombined: Array<{
             public_id: string;
             height: number;
@@ -288,42 +297,6 @@ function buildCloudinaryUrl(publicId: string, width: number = 1800): string {
 }
 
 // ============================================================================
-// DESCRIPTION BUILDER
-// ============================================================================
-
-/**
- * Build a rich description from Gooding's two content sources:
- *   - item.note: typically a short collection credit ("From the John Doe Collection")
- *                or a 1-2 sentence provenance note. Sometimes null.
- *   - highlights: array of 3-8 bullet-point facts about the car (the primary content).
- *
- * Strategy:
- *   - Join highlights as the main body (they carry the substantive content).
- *   - Prepend the note if it's a meaningful provenance statement (> 20 chars).
- *   - Return null only if both are empty.
- */
-function buildGoodingDescription(note: string | null, highlights: string[]): string | null {
-  const parts: string[] = [];
-
-  // Add note if it has meaningful content (not just whitespace or single word)
-  const cleanNote = (note || '').replace(/<[^>]+>/g, '').trim();
-  if (cleanNote.length > 20) {
-    parts.push(cleanNote);
-  }
-
-  // Add highlights as the main description body
-  const cleanHighlights = highlights
-    .map(h => h.replace(/<[^>]+>/g, '').trim())
-    .filter(h => h.length > 5);
-  if (cleanHighlights.length > 0) {
-    parts.push(cleanHighlights.join('\n'));
-  }
-
-  if (parts.length === 0) return null;
-  return parts.join('\n\n').slice(0, 5000);
-}
-
-// ============================================================================
 // EXTRACT FROM PAGE DATA
 // ============================================================================
 
@@ -387,6 +360,9 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
   if (auctionEvent?.startDate) {
     auctionDate = auctionEvent.startDate.split('T')[0];
   }
+
+  // The lot's prose: narrative (item.description), provenance, exhibition and race history, documentation
+  const prose = lotProse(item as Record<string, unknown> | null);
 
   // Strip HTML from highlights
   const cleanHighlights = (item?.highlights || []).map(h =>
@@ -470,9 +446,11 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
 
     highlights: cleanHighlights,
     specifications: item?.specifications || [],
-    description: buildGoodingDescription(item?.note || null, cleanHighlights),
+    description: buildFullDescription(prose, item?.note || null, cleanHighlights),
     vehicle_type: item?.type || null,
     saleroom_addendum,
+    engine_number: typeof item?.engine === 'string' && item.engine.trim() ? item.engine.trim() : null,
+    description_sections: (['narrative', 'provenance', 'exhibition', 'racing', 'documentation'] as const).filter((k) => prose[k]),
 
     engine_size: engineSize,
     transmission: transmissionStr,
@@ -595,7 +573,8 @@ async function discoverLotsFromSitemap(): Promise<string[]> {
 
 async function saveToDatabase(
   supabase: any,
-  extracted: GoodingExtracted
+  extracted: GoodingExtracted,
+  opts: { skipImages?: boolean } = {},
 ): Promise<{ vehicle_id: string; images_saved: number; is_new: boolean }> {
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
@@ -622,11 +601,11 @@ async function saveToDatabase(
 
   let isNew = false;
 
-  // Description is already built by buildGoodingDescription() in extractFromPageData
+  // Description is already built by buildFullDescription() in extractFromPageData
   // (note + highlights merged). Strip any residual HTML and truncate.
   let description: string | null = extracted.description;
   if (description) {
-    description = stripHtmlTags(description).trim().slice(0, 5000) || null;
+    description = stripHtmlTags(description).trim().slice(0, DESCRIPTION_LIMIT) || null;
   }
   // Final fallback: if extractFromPageData returned null (pre-2.1 callers), use highlights
   if (!description && extracted.highlights.length > 0) {
@@ -634,7 +613,7 @@ async function saveToDatabase(
       .map(h => h.replace(/<[^>]+>/g, '').trim())
       .filter(h => h.length > 5)
       .join('\n')
-      .slice(0, 5000) || null;
+      .slice(0, DESCRIPTION_LIMIT) || null;
   }
 
   // Normalize fields before quality gate
@@ -768,7 +747,7 @@ async function saveToDatabase(
     }
   }
 
-  // Fire-and-forget observation write
+  // Observation write (awaited: a refold run ends right after its response)
   if (vehicleId) {
     const obsFields: Record<string, any> = {};
     if (extracted.year) obsFields.year = extracted.year;
@@ -779,12 +758,14 @@ async function saveToDatabase(
     if (extracted.mileage) obsFields.mileage = extracted.mileage;
     if (extracted.engine_size) obsFields.engine_size = extracted.engine_size;
     if (extracted.transmission) obsFields.transmission = extracted.transmission;
-    writeObservation(supabase, {
+    await writeObservation(supabase, {
       vehicleId,
       source: { platform: "gooding", url: extracted.url, trustScore: 0.9 },
       fields: obsFields,
       observationKind: extracted.sale_price ? "sale_result" : "listing",
       extractionMethod: "gatsby_json_parse",
+      // The full text rides as content_text; structured_data feeds an index that refuses entries over 2.7 KB.
+      contentText: description || undefined,
     }).catch((e: any) => console.warn(`[GOODING] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
@@ -818,6 +799,8 @@ async function saveToDatabase(
         specifications: extracted.specifications,
         coachwork: extracted.coachwork,
         chassis: extracted.chassis,
+        engine_number: extracted.engine_number,
+        description_sections: extracted.description_sections,
         saleroom_addendum: extracted.saleroom_addendum,
         online_bidding: extracted.online_bidding_available,
         auction_mobility_id: extracted.auction_mobility_id,
@@ -832,7 +815,7 @@ async function saveToDatabase(
 
   // Save images
   let imagesSaved = 0;
-  if (extracted.image_urls.length > 0) {
+  if (extracted.image_urls.length > 0 && !opts.skipImages) {
     // Delete existing gooding images for this vehicle
     const { error: deleteError } = await supabase
       .from('vehicle_images')
@@ -1147,6 +1130,43 @@ Deno.serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Re-fold retained captures: read the stored page-data JSON of Gooding lots (no request to goodingco.com) and run it
+    // through the current extractor, so the full description reaches the vehicle, the episode and the observation.
+    // Keyset by snapshot id; a capture with a newer capture of the same URL is skipped (the newer one is the lot's state).
+    if (action === 'refold_snapshots') {
+      const n = Math.min(Number(body.limit) || 20, 25);
+      const { data: snaps, error: snapErr } = await supabase
+        .from('listing_page_snapshots')
+        .select('id, listing_url, fetched_at, html')
+        .eq('platform', 'gooding')
+        .eq('success', true)
+        .gt('id', body.after_id || '00000000-0000-0000-0000-000000000000')
+        .order('id', { ascending: true })
+        .limit(n);
+      if (snapErr) throw new Error(`snapshot read failed: ${snapErr.message}`);
+      const out = { read: snaps?.length ?? 0, refolded: 0, skipped_newer: 0, skipped_unparsed: 0, skipped_not_vehicle: 0, failed: 0, with_narrative: 0, errors: [] as string[], last_id: null as string | null };
+      for (const snap of snaps ?? []) {
+        out.last_id = snap.id;
+        try {
+          const { data: newer } = await supabase
+            .from('listing_page_snapshots').select('id').eq('listing_url', snap.listing_url).gt('fetched_at', snap.fetched_at).limit(1);
+          if (newer && newer.length > 0) { out.skipped_newer++; continue; }
+          let pageData: GoodingPageData;
+          try { pageData = JSON.parse(snap.html); } catch { out.skipped_unparsed++; continue; }
+          if (!pageData?.result?.data?.contentfulLot) { out.skipped_unparsed++; continue; }
+          const extracted = extractFromPageData(pageData, snap.listing_url);
+          if (!extracted.year && !extracted.make) { out.skipped_not_vehicle++; continue; }
+          await saveToDatabase(supabase, extracted, { skipImages: true });
+          out.refolded++;
+          if (extracted.description_sections.includes('narrative')) out.with_narrative++;
+        } catch (e: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(e?.message ?? e).slice(0, 160)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Stats
