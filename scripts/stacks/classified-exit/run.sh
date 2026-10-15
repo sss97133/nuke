@@ -16,4 +16,5 @@ d = json.load(sys.stdin); print("rows", d["rows"], "exits", d["exits"], "cut", d
 for v in ("price_only", "sold", "asked", "both"):
     x = d.get(v, {}); a = x.get("auc_test")
     gate = (a[0] - 2 * a[1] > 0.55) if a else False
-    print(f"{v:10s} n={x.get(\"n\")} test={x.get(\"test\")} exits={x.get(\"test_exits\")} auc={a} clears_gate={gate}")'
+    n, t, te = x.get("n"), x.get("test"), x.get("test_exits")
+    print(f"{v:10s} n={n} test={t} exits={te} auc={a} clears_gate={gate}")'
