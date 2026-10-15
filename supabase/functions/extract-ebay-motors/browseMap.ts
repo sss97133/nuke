@@ -125,6 +125,9 @@ export function classifySeller(item: EbayItem, descriptionText = ""): { class: S
   if (name && DEALER_NAME.test(name)) { dealer += 2; reasons.push("username reads as a business"); }
   if (DEALER_TEXT.test(text)) { dealer += 2; reasons.push("text uses dealer wording"); }
   if (score != null && score >= 1000) { dealer += 1; reasons.push(`feedback score ${score} (>= 1000)`); }
+  const fsb = aspectsOf(item)["for sale by"]?.toLowerCase();
+  if (fsb === "dealer") { dealer += 3; reasons.push("eBay item specific For Sale By = Dealer (seller-declared)"); }
+  else if (fsb === "private seller" || fsb === "owner") { priv += 3; reasons.push(`eBay item specific For Sale By = ${aspectsOf(item)["for sale by"]} (seller-declared)`); }
   if (PRIVATE_TEXT.test(text)) { priv += 2; reasons.push("text uses private-seller wording"); }
   if (score != null && score < 100) { priv += 1; reasons.push(`feedback score ${score} (< 100)`); }
   if (classified && score != null && score < 500) { priv += 1; reasons.push("classified ad from a low-volume seller"); }
@@ -151,7 +154,7 @@ export interface Landing {
   vin: { vin: string | null; modern: boolean };
 }
 
-export function toLanding(item: EbayItem, htmlToText: (h: string) => string): Landing | null {
+export function toLanding(item: EbayItem, htmlToText: (h: string) => string, source = "ebay-browse-api"): Landing | null {
   const url = canonicalUrl(item);
   const key = listingKey(item);
   if (!url || !key) return null;
@@ -195,7 +198,7 @@ export function toLanding(item: EbayItem, htmlToText: (h: string) => string): La
     listingKey: key, url, year, make, model, ingestInput, obsFields, price,
     postedAt: posted, endsAt: item.itemEndDate ?? null, images, descriptionText: description, seller, vin,
     eventMetadata: {
-      source: "ebay-browse-api", item_id: item.itemId ?? null, listing_posted_at: posted, listing_ends_at: item.itemEndDate ?? null,
+      source, item_id: item.itemId ?? null, listing_posted_at: posted, listing_ends_at: item.itemEndDate ?? null,
       buying_options: item.buyingOptions ?? [], price_kind: price.kind, currency: price.currency, bid_count: item.bidCount ?? null,
       seller_username: item.seller?.username ?? null, seller_feedback_score: item.seller?.feedbackScore ?? null,
       seller_feedback_percentage: item.seller?.feedbackPercentage ?? null,
