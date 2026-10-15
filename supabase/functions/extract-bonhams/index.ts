@@ -26,7 +26,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
-import { parseLotPage } from "./lotPage.ts";
+import { type LotPage, parseLotPage } from "./lotPage.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -953,6 +953,55 @@ function lotIlikePattern(url: string): string | null {
   return m ? `%bonhams.com/auction/${m[1]}/lot/${m[2]}/%` : null;
 }
 
+/** Write what one lot page holds: gallery, observation (full text + raw data), description lengthened, episode metadata. */
+async function landLotPage(
+  supabase: ReturnType<typeof createClient>,
+  ev: { vehicle_id: string; source_url: string; source_listing_id: string },
+  page: LotPage,
+  observedAt: string,
+): Promise<number> {
+  let imagesWritten = 0;
+  if (page.images.length > 0) {
+    const records = page.images.slice(0, 100).map((img, i) => ({
+      vehicle_id: ev.vehicle_id, image_url: img.url, position: i, source: "bonhams_import", is_external: true, is_primary: img.primary,
+    }));
+    const { error: imgErr } = await supabase.from("vehicle_images").upsert(records, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
+    if (imgErr) throw new Error(`images: ${imgErr.message}`);
+    imagesWritten += records.length;
+  }
+  const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
+  await writeObservation(supabase, {
+    vehicleId: ev.vehicle_id,
+    source: { platform: "bonhams", url: ev.source_url, trustScore: 0.9, sourceIdentifier: ev.source_listing_id },
+    fields: page.hammer_price ? { sale_price: page.hammer_price } : { lot_page: "read" },
+    observationKind: page.hammer_price ? "sale_result" : "listing",
+    extractionMethod: "lot_page_next_data",
+    observedAt,
+    contentText: fullText || undefined,
+    rawData: page.raw,
+  }).then((r) => { if (r.errors.length) throw new Error(`observation: ${r.errors.join("; ").slice(0, 160)}`); });
+  // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened.
+  if (fullText) {
+    const { data: cur } = await supabase.from("vehicles").select("description").eq("id", ev.vehicle_id).maybeSingle();
+    if (cur && fullText.length > (cur.description?.length ?? 0)) {
+      const { error: dErr } = await supabase.from("vehicles").update({ description: fullText }).eq("id", ev.vehicle_id);
+      if (dErr) throw new Error(`description: ${dErr.message}`);
+    }
+  }
+  const w = await writeVehicleEventByKey(supabase, {
+    vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
+    source_url: ev.source_url,
+    metadata: {
+      deep_at: observedAt, deep_status: "ok", image_count: page.images.length,
+      auction_name: page.sale_name, sale_venue: page.sale_venue, sale_starts_on: page.sale_starts_on, sale_ends_on: page.sale_ends_on,
+      number_of_lots: page.number_of_lots, footnotes: page.footnotes, condition_report_url: page.condition_report_url,
+      ...(page.engine_number ? { engine_number: page.engine_number } : {}), ...(page.registration ? { registration: page.registration } : {}),
+    },
+  });
+  if (w.action === "error") throw new Error(`event: ${w.error}`);
+  return imagesWritten;
+}
+
 // ─── Save to database ───────────────────────────────────────────────────────
 
 async function saveVehicle(
@@ -1210,6 +1259,51 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Deep pass, fetched elsewhere: Bonhams answers 403 to this function's datacenter address, so a runner on a house
+    // address reads the pages (same parseLotPage) and sends them here to be written. deep_queue lists the next lots;
+    // land_lot_pages writes up to 20 parsed pages through landLotPage.
+    if (action === "deep_queue") {
+      const limit = Math.min(Number(body.limit) || 20, 50);
+      const { data: todo, error: qErr } = await supabase
+        .from("vehicle_events")
+        .select("vehicle_id, source_url, source_listing_id")
+        .eq("source_platform", "bonhams")
+        .eq("extraction_source", "bonhams-typesense")
+        .is("metadata->>deep_at", null)
+        .order("ended_at", { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (qErr) throw new Error(`deep_queue read failed: ${qErr.message}`);
+      return new Response(JSON.stringify({ success: true, lots: todo ?? [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (action === "land_lot_pages") {
+      const items: Array<{ vehicle_id: string; source_url: string; source_listing_id: string; status?: string; page?: LotPage }> =
+        Array.isArray(body.pages) ? body.pages.slice(0, 20) : [];
+      const out = { received: items.length, done: 0, gone: 0, images: 0, failed: 0, errors: [] as string[] };
+      for (const it of items) {
+        const observedAt = new Date().toISOString();
+        try {
+          if (!it.vehicle_id || !it.source_listing_id || !/^https:\/\/(www\.)?bonhams\.com\//.test(String(it.source_url))) throw new Error("bad item");
+          // The event must be a Bonhams index-landed episode of that vehicle; nothing else is written.
+          const { data: ev } = await supabase.from("vehicle_events").select("id").eq("source_platform", "bonhams")
+            .eq("vehicle_id", it.vehicle_id).eq("source_listing_id", it.source_listing_id).limit(1);
+          if (!ev?.length) throw new Error("no such episode");
+          if (it.status && /^http_(404|410)$/.test(it.status)) {
+            await writeVehicleEventByKey(supabase, {
+              vehicle_id: it.vehicle_id, source_platform: "bonhams", source_listing_id: it.source_listing_id, event_type: "auction",
+              source_url: it.source_url, metadata: { deep_at: observedAt, deep_status: it.status },
+            });
+            out.gone++;
+          } else if (it.page && Array.isArray(it.page.images)) {
+            out.images += await landLotPage(supabase, it, it.page, observedAt);
+            out.done++;
+          } else throw new Error("no page");
+        } catch (e: any) {
+          out.failed++; if (out.errors.length < 5) out.errors.push(`${it.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, ...out }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ── Deep pass: the lot page for lots the search index landed (gallery, sale, footnotes, condition report) ──
     // One page request per `spacing_ms` (at least 2000), at most 20 lots, newest sales first. 403/429 or a page that is
     // not a lot page (a challenge) ends the run at once and marks nothing. Each lot's raw page data is kept on the
@@ -1261,44 +1355,7 @@ Deno.serve(async (req) => {
         if (!page) { out.backoff = "not a lot page (challenge or changed shape)"; break; }
 
         try {
-          if (page.images.length > 0) {
-            const records = page.images.slice(0, 100).map((img, i) => ({
-              vehicle_id: ev.vehicle_id, image_url: img.url, position: i, source: "bonhams_import", is_external: true, is_primary: img.primary,
-            }));
-            const { error: imgErr } = await supabase.from("vehicle_images").upsert(records, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
-            if (imgErr) throw new Error(`images: ${imgErr.message}`);
-            out.images += records.length;
-          }
-          const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
-          await writeObservation(supabase, {
-            vehicleId: ev.vehicle_id,
-            source: { platform: "bonhams", url: ev.source_url, trustScore: 0.9, sourceIdentifier: ev.source_listing_id },
-            fields: page.hammer_price ? { sale_price: page.hammer_price } : { lot_page: "read" },
-            observationKind: page.hammer_price ? "sale_result" : "listing",
-            extractionMethod: "lot_page_next_data",
-            observedAt,
-            contentText: fullText || undefined,
-            rawData: page.raw,
-          }).then((r) => { if (r.errors.length) throw new Error(`observation: ${r.errors.join("; ").slice(0, 160)}`); });
-          // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened.
-          if (fullText) {
-            const { data: cur } = await supabase.from("vehicles").select("description").eq("id", ev.vehicle_id).maybeSingle();
-            if (cur && fullText.length > (cur.description?.length ?? 0)) {
-              const { error: dErr } = await supabase.from("vehicles").update({ description: fullText }).eq("id", ev.vehicle_id);
-              if (dErr) throw new Error(`description: ${dErr.message}`);
-            }
-          }
-          const w = await writeVehicleEventByKey(supabase, {
-            vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
-            source_url: ev.source_url,
-            metadata: {
-              deep_at: observedAt, deep_status: "ok", image_count: page.images.length,
-              auction_name: page.sale_name, sale_venue: page.sale_venue, sale_starts_on: page.sale_starts_on, sale_ends_on: page.sale_ends_on,
-              number_of_lots: page.number_of_lots, footnotes: page.footnotes, condition_report_url: page.condition_report_url,
-              ...(page.engine_number ? { engine_number: page.engine_number } : {}), ...(page.registration ? { registration: page.registration } : {}),
-            },
-          });
-          if (w.action === "error") throw new Error(`event: ${w.error}`);
+          out.images += await landLotPage(supabase, ev, page, observedAt);
           out.done++;
         } catch (e: any) {
           out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
@@ -1474,7 +1531,7 @@ Deno.serve(async (req) => {
               // Create vehicle_events (non-fatal)
               if (newId) {
                 try {
-                  await supabase.from("vehicle_events").upsert({
+                  const evWrite = await writeVehicleEventByKey(supabase, {
                     vehicle_id: newId,
                     source_platform: "bonhams",
                     event_type: "auction",
@@ -1490,7 +1547,8 @@ Deno.serve(async (req) => {
                       sale_name: catalog.auctionName,
                       price_currency: lot.priceCurrency,
                     },
-                  }, { onConflict: "source_platform,source_listing_id" });
+                  });
+                  if (evWrite.action === "error") console.warn(`[Bonhams] vehicle_events error (non-fatal): ${evWrite.error}`);
                 } catch (e: any) {
                   console.warn(`[Bonhams] vehicle_events error (non-fatal): ${e.message}`);
                 }
