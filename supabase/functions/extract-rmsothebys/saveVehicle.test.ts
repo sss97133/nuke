@@ -35,6 +35,7 @@ function stubClient(answers: Record<string, { data?: unknown; error?: { message:
       };
       return b;
     },
+    rpc(fn: string, args: unknown) { calls.push({ table: `rpc:${fn}`, op: 'rpc', row: args, filters: [] }); return Promise.resolve({ error: null }); },
   };
   return { client, calls };
 }
@@ -113,7 +114,7 @@ Deno.test('a vehicle the resolver finds by its episode is updated, its episode r
   const { d, events } = deps({ resolved: 'v-known', episode: 'updated' });
   const res = await saveVehicle(client, lot(), d);
   equal(res, { vehicleId: 'v-known', isNew: false });
-  equal(calls.some((c) => c.table === 'vehicles' && c.op === 'select'), false, 'the resolver answered; no second lookup:');
+  equal(calls.some((c) => c.table === 'vehicles' && c.op === 'select' && c.filters.some(([col]) => col === 'listing_url')), false, 'the resolver answered; no second lookup by listing_url:');
   equal(events.length, 1);
   equal(calls.some((c) => c.table === 'timeline_events'), false);
 });
@@ -206,4 +207,25 @@ Deno.test('an upcoming London lot lands the calendar keys and a numeric estimate
   equal([e.metadata.sale_key, e.metadata.sale_starts_on, e.metadata.sale_ends_on, e.metadata.auction_session_days, e.metadata.sale_location],
     ['lf26', '2026-10-31', '2026-10-31', ['2026-10-31'], 'London']);
   equal([e.metadata.estimate_low, e.metadata.estimate_high, e.metadata.estimate_currency, e.metadata.lot_number], [500000, 800000, 'GBP', '7']);
+});
+
+Deno.test('a resolved vehicle that is a different car is refused, raised as a revision item, and not written', async () => {
+  const { client, calls } = stubClient({ 'vehicles.select': { data: { year: 1967, make: 'chevrolet', model: 'custom sport truck', vin: null } } });
+  const { d, observations, events } = deps({ resolved: 'v-bat-truck', episode: 'updated' });
+  const res = await saveVehicle(client, lot({ year: 1963, make: 'chevrolet', model: 'corvette 427/435' }), d);
+  equal((res as any).skipped, 'different_car');
+  equal((res as any).vehicleId, 'v-bat-truck');
+  equal(calls.some((c) => c.op === 'update' || c.op === 'insert'), false, 'no vehicle write');
+  equal(observations.length + events.length, 0, 'no observation or episode');
+  const rev = calls.find((c) => c.table === 'rpc:record_revision_item');
+  equal((rev?.row as any).p_reason, 'different_car');
+  equal((rev?.row as any).p_next_action, 'relink');
+});
+
+Deno.test('the same car on a resolved vehicle still lands', async () => {
+  const { client, calls } = stubClient({ 'vehicles.select': { data: { year: 1954, make: 'buick', model: 'skylark', vin: null } } });
+  const { d } = deps({ resolved: 'v-same', episode: 'updated' });
+  const res = await saveVehicle(client, lot(), d);
+  equal((res as any).vehicleId, 'v-same');
+  equal(calls.some((c) => c.table === 'vehicles' && c.op === 'update'), true);
 });
