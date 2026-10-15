@@ -42,6 +42,15 @@ def lint(boxes, statuses=STATUSES, kind="box"):
         for i, w in enumerate(b.get("why") or []):
             if not (w.get("text") and w.get("source")):
                 errors.append(f"{bid}: reason {i + 1} has no text or no source")
+        pos = b.get("position")
+        if pos is not None:
+            # a placed box lands on the route graph (load_map_rows -> load_harness_topology_points): coordinates in the twin
+            # frame, with the study or record they come from and how sure it is (RSI pass 31)
+            bad = [k for k in ("node", "frame", "x", "y", "z", "source", "confidence") if pos.get(k) in (None, "")]
+            if bad or pos.get("frame") != "twin" or not all(isinstance(pos.get(k), (int, float)) for k in ("x", "y", "z")):
+                errors.append(f"{bid}: position needs node, frame twin, numeric x/y/z, source and confidence (missing {bad})")
+            if b.get("status") not in ("decided", "proposed"):
+                errors.append(f"{bid}: a position belongs to a decided or proposed box, not {b.get('status')!r}")
         if b.get("status") in ("flag", "open") and not (b.get("open") or b.get("instead")):
             errors.append(f"{bid}: {b['status']} {kind} must say what is open or what else it could be")
     return errors
