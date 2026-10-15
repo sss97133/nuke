@@ -853,6 +853,8 @@ def main():
         if branches:
             print(f"route branches: {api._req('POST', 'rpc/load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
         print(f"routing: {api._req('POST', 'rpc/route_harness_segments', {'p_vehicle_id': K5})}")
+        # a routed segment with no plan gets route length x pad (RSI pass 34); the scoreboard checks every plan against its route
+        print(f"route plans: {api._req('POST', 'rpc/plan_harness_segment_lengths', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
         print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
