@@ -25,8 +25,11 @@
 -- count and first/last date, the count in the last 24 months, by_source (count per venue) and as_of.
 -- Readers: classified_ask_board (next migration) reads one row per listing; anon reads the fold (prices are already
 -- public on the listings and sale pages; no seller, buyer or vehicle id is stored).
--- Refreshed daily at 09:40 UTC (after treemap_refresh_all at 09:10 and mv_model_family_names at 04:05), CONCURRENTLY,
--- by refresh_family_year_prices() (service role only).
+-- Created WITH NO DATA: the build reads all of vehicles once, so it runs at the quiet hour, not at deploy (intake
+-- lanes were writing at deploy time, 2026-10-15 04:40Z). The first build, and every one after it, is the daily cron
+-- at 09:40 UTC (after treemap_refresh_all at 09:10 and mv_model_family_names at 04:05) through
+-- refresh_family_year_prices() (service role only): plain the first time, CONCURRENTLY after. Until then a reader
+-- gets "has not been populated": the board migration that reads it waits for the first build.
 -- Contract: supabase/sql/test_family_year_prices.sql (db-contracts).
 BEGIN;
 SET LOCAL statement_timeout = '300s';
@@ -147,7 +150,8 @@ SELECT a.family_id, a.year, a.basis, a.year - a.w AS year_from, a.year + a.w AS 
    FROM (SELECT s, count(*)::integer AS c FROM unnest(a.sources) s GROUP BY s) z) AS by_source,
   now() AS as_of
 FROM agg a
-WHERE a.n > 0;
+WHERE a.n > 0
+WITH NO DATA;
 
 CREATE UNIQUE INDEX IF NOT EXISTS mv_family_year_prices_key ON public.mv_family_year_prices (family_id, year, basis);
 REVOKE ALL ON public.mv_family_year_prices FROM PUBLIC, anon, authenticated;
@@ -167,7 +171,12 @@ CREATE OR REPLACE FUNCTION public.refresh_family_year_prices()
  SET enable_nestloop TO 'off'
 AS $function$
 BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_family_year_prices;
+  -- The first build is plain (CONCURRENTLY needs a populated view); after it, readers keep reading during a refresh.
+  IF (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass) THEN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_family_year_prices;
+  ELSE
+    REFRESH MATERIALIZED VIEW public.mv_family_year_prices;
+  END IF;
 END $function$;
 REVOKE ALL ON FUNCTION public.refresh_family_year_prices() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.refresh_family_year_prices() TO service_role;
@@ -185,8 +194,8 @@ END $job$;
 
 DO $check$
 BEGIN
-  IF NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass) THEN
-    RAISE EXCEPTION 'mv_family_year_prices is not populated';
+  IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-family-year-prices') THEN
+    RAISE EXCEPTION 'refresh-family-year-prices is not scheduled';
   END IF;
 END $check$;
 

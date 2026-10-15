@@ -10,8 +10,8 @@
 --     sale whose own page names its model year but not its family is another car: not pooled, counted in conflicts;
 --   * asks: Facebook listings and classified events in the 365 days before today, one per vehicle (its latest), never a
 --     duplicate or blocked listing, never a private or deleted vehicle, never pooled with sales;
---   * no vehicle or listing id is stored; anon reads it; it refreshes CONCURRENTLY; the migration applies twice and
---     schedules its refresh once.
+--   * it is created empty and the first refresh builds it; no vehicle or listing id is stored; anon reads it; later
+--     refreshes run CONCURRENTLY; the migration applies twice and schedules its refresh once.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -122,6 +122,11 @@ INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_pric
 \ir ../migrations/20261015130000_family_year_prices.sql
 -- A second application changes nothing and passes its own guard and checks.
 \ir ../migrations/20261015130000_family_year_prices.sql
+SELECT pg_temp.ok('created empty: the deploy reads nothing; the first build is the refresh',
+  NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
+SELECT public.refresh_family_year_prices();
+SELECT pg_temp.ok('the first refresh builds it (plain, not concurrently)',
+  (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
 
 CREATE FUNCTION pg_temp.r(f text, y integer, b text) RETURNS public.mv_family_year_prices LANGUAGE sql AS
 $$ SELECT * FROM public.mv_family_year_prices WHERE family_id = ('00000000-0000-4000-c000-00000000000' || f)::uuid AND year = y AND basis = b $$;
