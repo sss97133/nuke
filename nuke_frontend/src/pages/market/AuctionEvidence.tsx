@@ -53,12 +53,16 @@ function closeStamp(value: string) {
 
 /** A row's bid and its pace: how long since the last bid, and how much it raised. The bid number is the board's
  *  (the fallback), so the row agrees with the board's total; the pace comes from Stack A's exact-episode fold. */
-export function AuctionCompetition({ vehicleId, sourceUrl, row = true, enabled = true, fallback }: {
+export function AuctionCompetition({ vehicleId, sourceUrl, row = true, enabled = true, fallback, bid }: {
   vehicleId: string; sourceUrl?: string | null; row?: boolean; enabled?: boolean; fallback?: ReactNode;
+  /** The board's bid. The pace is said only when the bid rows have caught up to it; rows trail by hours. */
+  bid?: number | null;
 }) {
   const query = useBidBook(vehicleId, sourceUrl, enabled);
   const reading = useMemo(() => query.data ? bidBookReading(query.data) : null, [query.data]);
-  const last = reading?.states.length ? reading.states[reading.states.length - 1] : null;
+  const latest = reading?.states.length ? reading.states[reading.states.length - 1] : null;
+  const inStep = bid == null || (reading?.high != null && Math.abs(reading.high - bid) < 1);
+  const last = inStep ? latest : null;
   const pace = last ? <Text role="caption" className="market-lot-last-bid">
     <time dateTime={new Date(last.bid.at).toISOString()} title={stamp(new Date(last.bid.at).toISOString())}>bid {ago(last.bid.at)}</time>
     {reading?.lastRaise != null && <> · +{reading.lastRaise.toFixed(1)}%</>}
