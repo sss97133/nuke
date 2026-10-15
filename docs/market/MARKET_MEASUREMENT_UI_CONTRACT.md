@@ -361,6 +361,37 @@ Also delivered on October 15: what the listing says rides on each row (202610150
 shows no number (38 of 621 listings that day), a rolled-over one says so (38), and a title other than clean is said
 (32); the rows are cards, photo first.
 
+### Classifieds: surface the deals — owner direction, October 15 (04:15Z)
+
+**The name is "Classifieds".** "Just listed" goes. What people care about is finding the deals; the benchmark is the
+deal posts Barn Finds used to write ("this is a good deal, snatch this up"): surface what someone would want, and say
+where each listing lands in our price analysis. That is the goal of the page, to teach people the market.
+
+**His read of the top three, the acceptance case for any position measure.** A 1965 Plymouth Barracuda at $29,500
+(vehicle eee88010-57c2-4290-baae-2d2088040f04): top dollar, maybe a little more, and it still needs investment. A 1999
+Jeep Wrangler at $14,000 with 178,000 miles (ddb3afc1-94be-4083-a0c1-7582a97a9dc3): retail, on the expensive side, it
+would have to prove it is special; it "lands right in the middle, and why is that not expressed". A 1995 GMC K1500 at
+$3,500 with 300,000 miles (e308f6cd-b29b-4bf0-bbd0-22ef9656c517): worn out. A position measure reproduces top, middle and
+low on these three, or says why it cannot. His pick among them weighed what he could do with the car (a build), the
+make's following, and the photos; the three have nothing in common, and that comparison is what the page should help.
+
+**Price follows condition, and condition is in the photos.** Image analysis is not good enough yet. For development,
+analyze the photos, or put an Analyze control on a listing so the analysis is paid for only where someone asks, not
+for every arrival. The detailed data model exists because of that analysis.
+
+**Read each listing the way he does.** Make, model and condition, then the car's character, its history, what is
+already known about it, and the market's measures. Cars in hard-to-reach regions sit longer on classifieds because
+demand there is thinner; time to exit is read by region.
+
+**Every photo.** He chose "based on one photo". Measured 2026-10-15 04:20Z: the intake held every photo the three
+listing pages showed (21 of 21, 7 of 7, 3 of 3) and the card showed one. Delivered: each card carries all of them (one
+read per page of 60 cards: 616 photos, 85 KB, 0.55 s cold, 0.17 s warm, logged out), a swipe on a phone, an arrow under
+a pointer, the count in the corner, and a larger photo on a wide screen. Capture order is not kept (vehicle_images
+position is 0 on every row), so the board's image leads.
+
+Owners: the position and merit fold (each ask against its family's sales at its year, asks against similar asks, exit
+outcomes) is the listing-merit lane; the card renders what it returns.
+
 ## The live auction board — owner direction, October 15
 
 Read on nuke.ag/?tab=market&collection=auctions as a visitor: "a lot of work goes into it ... but I don't even know
