@@ -117,6 +117,7 @@ export interface LedgerKnown {
   max_attempts?: number | null;
   next_attempt_at?: string | null;
   failure_category?: string | null;
+  processed_at?: string | null;
 }
 
 export type LedgerOutcome =
@@ -203,7 +204,26 @@ export function ledgerDecision(
   return "retry";
 }
 
+/**
+ * Revisit rule for a venue whose listings change after they land (a price drop, an edit): a `complete` ledger row whose
+ * last pass is older than `afterMs` and whose URL is still on a feed page is asked again, after every new URL and every
+ * due retry. `max` bounds the revisits one feed page may add. `ingest` finds the vehicle by its listing_url, keeps the
+ * snapshot, and an unchanged page adds no observation.
+ */
+export interface Revisit {
+  afterMs: number;
+  max: number;
+}
+
+export function revisitDue(row: LedgerKnown | null | undefined, now: Date, afterMs: number): boolean {
+  if (!row || row.status !== "complete") return false;
+  const at = row.processed_at ? Date.parse(row.processed_at) : NaN;
+  return Number.isFinite(at) && now.getTime() - at >= afterMs;
+}
+
 export interface IngestPlan {
+  /** Settled `complete` URLs due for a revisit. */
+  revisits?: number;
   /** New URLs first, then due retries, cut at the cap. */
   toIngest: string[];
   fresh: number;
@@ -221,23 +241,28 @@ export function planIngests(
   ledger: Map<string, LedgerKnown>,
   now: Date,
   cap: number,
+  revisit: Revisit | null = null,
 ): IngestPlan {
   const fresh: string[] = [];
   const retries: string[] = [];
+  const revisits: string[] = [];
   let settled = 0;
   let backoff = 0;
   for (const url of urls) {
     const d = ledgerDecision(ledger.get(url), now);
-    if (d === "settled") settled++;
-    else if (d === "backoff") backoff++;
+    if (d === "settled") {
+      if (revisit && revisitDue(ledger.get(url), now, revisit.afterMs) && revisits.length < revisit.max) revisits.push(url);
+      else settled++;
+    } else if (d === "backoff") backoff++;
     else if (d === "retry") retries.push(url);
     else if (onVehicles.has(url)) settled++;
     else fresh.push(url);
   }
   return {
-    toIngest: [...fresh, ...retries].slice(0, cap),
+    toIngest: [...fresh, ...retries, ...revisits].slice(0, cap),
     fresh: fresh.length,
     retries: retries.length,
+    revisits: revisits.length,
     settled,
     backoff,
   };

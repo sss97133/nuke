@@ -225,6 +225,10 @@ function cleanListingUrl(url: string, sourceSlug: string): string {
 
 /** Cost bound: max NEW listings sent to `ingest` per feed per poll. */
 const MAX_NEW_INGESTS_PER_POLL = 20;
+// Craigslist asking prices and edits change after posting; revisit a landed listing daily while it is still listed.
+const CRAIGSLIST_REVISIT = { afterMs: 24 * 3600_000, max: 5 };
+// One request to a site per 2 s (owner rule); other sources keep the 250 ms pause below.
+const SITE_MIN_SPACING_MS = 2000;
 
 /**
  * Ingest outcomes wait for one read-back of their vehicle rows (ledger.ts). A poll that is killed mid-loop would lose
@@ -732,7 +736,7 @@ async function pollFirecrawlHtmlFeed(
       supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
       supabase
         .from("import_queue")
-        .select("listing_url, status, attempts, max_attempts, next_attempt_at, failure_category")
+        .select("listing_url, status, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
         .in("listing_url", chunk)
         .in("status", ["complete", "skipped", "failed"]),
     ]);
@@ -752,7 +756,8 @@ async function pollFirecrawlHtmlFeed(
     for (const q of ledgered || []) ledgerRows.set(q.listing_url, q);
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), MAX_NEW_INGESTS_PER_POLL);
+  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), MAX_NEW_INGESTS_PER_POLL,
+    feed.source_slug === "craigslist" ? CRAIGSLIST_REVISIT : null);
   result.matched_existing = plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
@@ -891,8 +896,9 @@ async function pollFirecrawlHtmlFeed(
 
     if (Date.now() - lastFlushAt >= FLUSH_AFTER_MS) await flushLedger();
 
-    // Small delay between ingests to be polite
-    await new Promise((r) => setTimeout(r, 250));
+    // Small delay between ingests to be polite; a Craigslist ingest is a live page fetch, so keep it to 1 per 2 s.
+    const spacing = feed.source_slug === "craigslist" ? Math.max(250, SITE_MIN_SPACING_MS - (Date.now() - attemptStarted)) : 250;
+    await new Promise((r) => setTimeout(r, spacing));
   }
   await flushLedger();
 

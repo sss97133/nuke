@@ -515,3 +515,15 @@ Deno.test('latest source visit outranks its old metro feeds; billing errors pers
   equal(budget.reserve('mecum'), null);
   assert(!!budget.reserve('other'), 'another source retains a slot');
 });
+
+Deno.test("planIngests: a complete row past the revisit age is asked again after new URLs and retries, bounded by max", () => {
+  const old = { status: "complete", processed_at: iso(-25 * HOUR) };
+  const recent = { status: "complete", processed_at: iso(-HOUR) };
+  const ledger = new Map<string, LedgerKnown>([["old1", old], ["old2", old], ["recent", recent]]);
+  const rule = { afterMs: 24 * HOUR, max: 1 };
+  const plan = planIngests(["old1", "old2", "recent", "n1"], new Set(), ledger, NOW, 20, rule);
+  equal(plan.toIngest, ["n1", "old1"]);
+  equal(plan.revisits, 1);
+  equal(plan.settled, 2);
+  equal(planIngests(["old1"], new Set(), ledger, NOW, 20).toIngest, []);
+});
