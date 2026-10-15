@@ -179,13 +179,26 @@ final class SyncEngine: ObservableObject {
     @Published private(set) var foregroundBudgetReached = false
     private var thermalObserver: NSObjectProtocol?
     private var powerObserver: NSObjectProtocol?
+    private var batteryObserver: NSObjectProtocol?
 
     /// True when the device should not be doing bulk photo work right now.
     /// Warm already (fair or above) or Low Power Mode: a foreground backfill slice waits for the
     /// background job instead of adding heat while the owner holds the phone.
     static var deviceWarm: Bool {
         let p = ProcessInfo.processInfo
-        return p.thermalState.rawValue >= ProcessInfo.ThermalState.fair.rawValue || p.isLowPowerModeEnabled
+        return p.thermalState.rawValue >= ProcessInfo.ThermalState.fair.rawValue || lowPowerHolds
+    }
+    /// Plugged in (charging or full).
+    static var onExternalPower: Bool {
+        let d = UIDevice.current
+        if !d.isBatteryMonitoringEnabled { d.isBatteryMonitoringEnabled = true }
+        return d.batteryState == .charging || d.batteryState == .full
+    }
+    /// Low Power Mode holds photo work only on battery. On a charger the battery it protects is
+    /// filling, so only heat holds uploads. On 2026-10-15 the owner's phone (build 116) kept Low
+    /// Power Mode on all day, and its charging background job at 19:35Z on Wi-Fi uploaded nothing.
+    static var lowPowerHolds: Bool {
+        ProcessInfo.processInfo.isLowPowerModeEnabled && !onExternalPower
     }
     /// Seriously hot: nothing reads originals, not even the newest photos.
     static var deviceTooHot: Bool {
@@ -193,8 +206,7 @@ final class SyncEngine: ObservableObject {
         return t == .serious || t == .critical
     }
     static var deviceTooHotOrLow: Bool {
-        let p = ProcessInfo.processInfo
-        return p.thermalState == .serious || p.thermalState == .critical || p.isLowPowerModeEnabled
+        deviceTooHot || lowPowerHolds
     }
     private func refreshThermalHold() {
         let hold = Self.deviceTooHotOrLow
@@ -208,12 +220,17 @@ final class SyncEngine: ObservableObject {
         powerObserver = center.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in await self?.thermalOrPowerChanged() }
         }
+        // Plugging in lifts a Low Power Mode hold.
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        batteryObserver = center.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.thermalOrPowerChanged() }
+        }
         refreshThermalHold()
     }
     private func thermalOrPowerChanged() async {
         let was = thermalHold
         refreshThermalHold()
-        // Cooled down, or Low Power Mode off: pick the persisted queue back up.
+        // Cooled down, Low Power Mode off, or plugged in: pick the persisted queue back up.
         if was, !thermalHold, started, !isPaused { await resumeBackfillIfNeeded() }
     }
     private var pendingRescan: Task<Void, Never>?
@@ -489,8 +506,8 @@ final class SyncEngine: ObservableObject {
             if Self.deviceTooHot { refreshThermalHold(); failed += 1; stopReason = "hot"; break }
             // Low Power Mode is a battery choice the owner may keep on all day: it used to stop
             // every upload (build 116 sent nothing). Now the last three days still upload, in a
-            // smaller slice; the older window waits until it is off.
-            let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+            // smaller slice; the older window waits until it is off or the phone is plugged in.
+            let lowPower = Self.lowPowerHolds
             if lowPower, !recentIDs.contains(asset.localIdentifier) {
                 failed += 1; stopReason = "low_power_window"; break
             }
@@ -604,6 +621,7 @@ final class SyncEngine: ObservableObject {
         props["foreground"] = .bool(UIApplication.shared.applicationState != .background)
         props["thermal"] = .integer(p.thermalState.rawValue)
         props["low_power"] = .bool(p.isLowPowerModeEnabled)
+        props["charging"] = .bool(Self.onExternalPower)
         props["paused"] = .bool(isPaused)
         props["sites"] = .integer(SiteStore.shared.sites.count)
         props["backfill_queue"] = .integer(backfillRemaining)

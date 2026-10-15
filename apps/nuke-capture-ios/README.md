@@ -83,7 +83,8 @@ Standing rules the code carries:
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
-  when the phone is already warm (`SyncEngine.deviceWarm`); polls pause when the app is not active. A new loop
+  when the phone is already warm (`SyncEngine.deviceWarm`); polls pause when the app is not active. Low Power
+  Mode holds uploads only on battery (`SyncEngine.lowPowerHolds`): on a charger only heat holds them. A new loop
   that reads photos or the network states its bound and its thermal gate. The 2026-10-15 audit of every
   launch-time cost is in the PR that added this rule.
 - **A failed read says why.** `ReadFailure.text(error)` (SupabaseService.swift): no connection, a server timeout,
