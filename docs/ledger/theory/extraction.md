@@ -22,3 +22,46 @@
 **Do NOT:** resurrect the graveyard: smart-extraction-router (ghost — old map wrongly calls it the entry), scrape-vehicle (undeployed; AddVehicle degrades to manual entry — do NOT wire `ingest` into the paste-debounce, it auto-mints before user intent is stated; ingest needs a preview mode first, see .claude/ISSUES.md 2026-07-12), complete-bat-import (undeployed, 404s), sync-bat-listing / unified-scraper-orchestrator / store-auction-listing (zombies), bat-simple-extract, extraction-quality-validator (ghost), import-classic-auction + extract-specialty-builder (routed but UNDEPLOYED — 404 traps). `bat_comments` table DOES NOT EXIST. Never mint a new per-source fn, queue, or sentiment/label column — extend the routed extractor. Never full-scan snapshots without an index (bat-snapshot-parser died scanning 367k rows/59GB). Don't trust inactive cron rows as evidence of life.
 
 **Before you build here:** read `docs/ledger/CAPABILITY_MAP.md` (column 2 is THE entrypoint; column 3 is the graveyard) and `docs/library/technical/extraction-playbook.md` (12 repeated mistakes, method catalog). Check `pipeline_registry` before writing any computed field, and `cron.job WHERE active=true` for what actually runs. If a capability seems missing, it almost certainly exists — search the ledger before minting anything.
+
+## Spending Firecrawl: sources and vehicle groups ranked from the data (owner directive 2026-10-15)
+
+**The rule.** Firecrawl stays at USD 100 a month at most and is spent only on the best targets. The targets are not hand-picked: a
+weekly job ranks sources, then vehicle groups, from the data model, and writes the allocation to
+`firecrawl_target_allocation`. Every Firecrawl spender asks `firecrawl_allowance(source)` before a batch, stops at the number it
+returns, and reports the spend with `firecrawl_record_spend(source, credits, lots, lane)`. In `archiveFetch()` the call belongs in
+the Firecrawl branch. A source we can fetch directly or re-read from retained captures costs no credits and is never allocated any;
+Firecrawl is for the sources that need it. Budget size is the parameter `firecrawl_params.monthly_credits`: 1,000 now, 100,000 if
+the USD 99 Standard plan is taken. Owner tiers: model years 1964-1973 above 1974-1991 above the rest, non-dealer sellers first.
+
+**Source score = value x gap / cost.** Every input is stored, with its date, in the `inputs` jsonb of the source's `'*'` row.
+- *Value* (0 to 1, the weighted mean of the components that are known; the tier share counts double; unknown components are
+  dropped and listed under `unknown_inputs`, never guessed): tier share of the source's landed lots (1964-1973 weighs 1, 1974-1991
+  weighs 0.6, the rest 0.2); outcome observable (share with a realized sale price); completeness per lot (description, VIN, photo);
+  uniqueness (share not also listed on another platform); private-seller share. **Private-seller share is not in the data model**:
+  there is no seller-type field on `vehicles` or `vehicle_events`, so it stays unknown until one is recorded. It is the first gap to
+  close for the owner's non-dealer-first rule.
+- *Gap* (lots): for a historical source the known population minus landed lots (the whole-source `source_census` row and
+  `mv_source_target_landed`; no population, no gap); for a live source the new supply per day (events created in the last 14 days)
+  times `live_horizon_days`.
+- *Cost* (credits per full lot): `firecrawl_source_params.credits_per_lot` with its basis, replaced by the observed credits per lot
+  in `firecrawl_spend_log` once 50 lots are logged. A source with no Firecrawl cost is scored with the floor cost 0.01, so it ranks
+  but receives 0 credits.
+- *Inputs are measured on bounded samples*: a source with at most 4,000 events is read in full; a larger one by a 4% TABLESAMPLE of
+  `vehicle_events` joined to `vehicles`. Under 30 sampled events the sample-derived inputs are unknown.
+
+**Vehicle-group score = tier weight x sqrt(liquidity rank x information rank) x (1 + own).** A group is a model family by year
+band (1964-1973, 1974-1991, other) from `mv_family_sales`. Liquidity = priced sales in the last 12 months. Information value = price
+dispersion, (p75 - p25) / median, over 36 months, for groups with at least 8 sales. Own = the owner's vehicles in the group:
+verified ownership (`vehicle_ownerships` verified_owner/current, or `vehicle_user_permissions` owner/co_owner) counts 1, a vehicle
+merely recorded under the owner's account counts 0.1 (ownership there is unclear). The owner's user id is
+`firecrawl_params.owner_user_id`; unset, the input is unknown.
+
+**Allocation.** Sources that consume Firecrawl credits, by score, each capped at its gap in credits and at `max_source_share` (0.5) of
+the allocatable credits (the monthly credits less `reserve_fraction`, 0.15). Within an allocated source, credits split across the top
+20 groups in proportion to group score. `firecrawl_allowance` spreads a source's period allocation over the days left in the
+billing period (it resets on `period_start_day`, now the 4th) and subtracts today's spend, so an unspent day rolls forward.
+
+**Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`;
+functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
+`firecrawl_record_spend`; migration `20261017010000_firecrawl_target_allocation.sql`. Read the ranking with
+`select * from firecrawl_target_allocation where computed_at = (select max(computed_at) from firecrawl_target_allocation) and vehicle_group = '*'`.

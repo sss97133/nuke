@@ -28,7 +28,7 @@
 3. **Decide what to run:**
    - If BaT pending is high → verified extraction (Playwright) is on-target.
    - If BaT pending is 0 and vehicle_events (bat) &lt; 222k → need discovery + extraction, not just “run for N hours.”
-   - If only C&B/PCarMarket/Collecting Cars pending → those need Firecrawl or Playwright; don’t burn Firecrawl without a clear target.
+   - If only C&B/PCarMarket/Collecting Cars pending → those need Firecrawl or Playwright; don’t burn Firecrawl without a clear target: the target and its monthly credits come from `firecrawl_target_allocation`, and a spender asks `firecrawl_allowance(source)` first (spec: `docs/ledger/theory/extraction.md`, “Spending Firecrawl”).
 
 ## Script: print current vs targets
 
