@@ -1920,6 +1920,35 @@ we have to collect and analyze the data to understand the odds."
    organizations it scores. The registry change is the data-model lane's; the needs above are its list.
 5. **The pitch is secondary.** It stays in `docs/POSITIONING.md` as one application of the function, not the goal.
 
+### 13.9.3 Attributed demand and contextual opportunities (owner, 2026-10-14 local)
+
+The owner broadened the classified-feed question beyond personal interest: model local, state, national and cultural
+value contexts and the ability to act; precompute useful supply/demand connections before a user joins. A public
+wanted post can express attributed demand without becoming a Nuke account or proof of current buying intent. Interest,
+request, available supply, contextual fit and financial opportunity have different evidence and outcomes. The owner
+asked agents to proceed independently, test the model through skeptical review, and repair useful missing relationships.
+
+The existing [opportunity matching specification](../../features/opportunity-matching/SPEC.md) now carries this general
+contract and preserves the funding case as dated history. Inspection found three differently grained owners:
+`demand_signal` measures aggregate search/interest; `taste_intent_signals` records user saves; `demand_briefs` carries
+concierge partner asks. None becomes a new external-request store. Attributed testimony and property vocabulary retain
+their existing observation/identity/curator owners; request episode, criteria, lifecycle, visibility and evaluation
+relationships remain named work.
+
+Independent review corrected two model errors: no known unmet criterion does not establish eligibility when required
+facts are unknown; and a registry of eligible businesses cannot supply the application denominator for funding odds.
+The first implementation extends `scripts/discovery/buying-evidence.mjs` with an explicit structured-request mode,
+using existing anonymous typed-specification and provenance readers. Required/preferred predicates return met, unmet,
+unknown or conflict with source IDs and clocks. Primitive record labels cannot satisfy a requirement. This is a bounded
+private operator consumer over 1–10 declared candidates, not a maintained public market feed or automatic request
+extraction. Availability, geographic/cultural ranking, economic outcomes and whole-market coverage remain unassessed.
+
+The correction assay preserves captured inputs and reevaluates the same request after discriminating evidence, with an
+unaffected candidate and earlier captured receipt retained. Such replay proves the evaluator, not historical canonical
+state reconstruction or fleet improvement. No production schema, request admission, source activation, contact or paid
+model calls are part of this implementation. Implementation/test/publication/runtime stages are recorded in the lane's
+private receipt; neither this contract nor a passing fixture establishes net newly ready public answers.
+
 ### 13.10 Used-vehicle buying evidence: resale reassurance and personal use (owner, 2026-10-08)
 
 **Owner direction, in substance.** A buyer comparing a truck at 94k miles and a higher price with one at
