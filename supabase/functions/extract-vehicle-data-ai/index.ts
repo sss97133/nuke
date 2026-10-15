@@ -255,10 +255,11 @@ Deno.serve(async (req) => {
     let llmConfig;
     let llmResponse;
     const providerModels: [LLMProvider, string][] = [
-      // Google (lite) first — free tier, separate quota from 2.5-flash
-      ['google', 'gemini-2.5-flash-lite'],
-      // Google (full) — may hit 10K/day quota
-      ['google', 'gemini-2.5-flash'],
+      // Google first. gemini-2.5-flash and -flash-lite returned 404 (retired for our key) on 2026-10-15; the key lists
+      // gemini-3.1-flash-lite and the gemini-flash-lite-latest alias. The AI Studio prepay was depleted (402) that day:
+      // a 402 falls through to the next provider like any other error.
+      ['google', 'gemini-3.1-flash-lite'],
+      ['google', 'gemini-flash-lite-latest'],
       // Anthropic fallback — $1/MTok input (may have no credits)
       ['anthropic', 'claude-haiku-4-5-20251001'],
       // OpenAI last resort — quota may be exhausted
