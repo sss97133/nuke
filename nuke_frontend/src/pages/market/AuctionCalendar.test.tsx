@@ -142,6 +142,18 @@ it('opens a roster in place by run day, with earlier records in the source terms
   expect(container.querySelector('.auction-roster')).toBeNull();
 });
 
+it('shows only the house count for a listed sale with no lot landed', async () => {
+  fixture.calendar.data = { ...fixture.calendar.data, sales: [...SALES, { house: 'mecum', sale_key: 'fixture-empty-2027', sale_name: 'Fixture Empty 2027',
+    location: null, starts_on: '2027-01-05', ends_on: '2027-01-17', lots: 0, seen_before: 0, no_reserve: 0, first_seen_at: null,
+    first_seen_7d: 0, updated_at: null, lots_listed: 855, listed_at: new Date(2026, 9, 15, 11, 0).toISOString(), run_days: [] }] };
+  await render();
+  const row = [...container.querySelectorAll('tr.auction-sale')].find(r => r.textContent?.includes('Fixture Empty 2027'))!;
+  expect(row.textContent).toContain('0 of 855 lots');
+  expect(row.textContent).toContain('Mecum lists 855, read 1 h ago');
+  expect(row.textContent).not.toContain('first seen');
+  expect(row.textContent).not.toContain('update time unrecorded');
+  expect(row.textContent).not.toContain('no reserve');
+});
 it('says when a listed sale has no lot landed yet', async () => {
   fixture.roster = { ...fixture.roster, hasNextPage: false, data: { pages: [{ as_of: '2026-10-15T01:00:00Z', roster: { house: 'gooding', sale_key: 'fixture-winter-2027', lots: 0, offset: 0, rows: [] } }] } };
   await render();
