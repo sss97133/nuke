@@ -1355,11 +1355,11 @@ Deno.serve(async (req) => {
         lots.push(r.lot);
       }
 
-      // Landed lookup: events and vehicles under any spelling of each lot URL, 25 lots (125 URLs) per request.
+      // Landed lookup: events and vehicles under any spelling of each lot URL, 10 lots per request (up to 8 spellings each, about 7 KB of URL; 25 lots reached 16.4 KB on LV23 lots and the gateway refused it, batches 365-367).
       const eventKeys = new Set<string>();
       const vehicleByKey = new Map<string, string>();
       const chunks: IndexLot[][] = [];
-      for (let i = 0; i < lots.length; i += 25) chunks.push(lots.slice(i, i + 25));
+      for (let i = 0; i < lots.length; i += 10) chunks.push(lots.slice(i, i + 10));
       await Promise.all(chunks.map(async (chunk) => {
         const spellings = chunk.flatMap((l) => mecumUrlSpellings(l.url));
         const [ev, ve] = await Promise.all([
@@ -1562,8 +1562,8 @@ Deno.serve(async (req) => {
       const out = { examined: snaps?.length ?? 0, already_landed: 0, folded: 0, created: 0, updated: 0, not_a_vehicle: 0, unreadable: 0, failed: 0, last_snapshot_id: after, stopped: null as string | null, errors: [] as string[] };
       const urls = (snaps ?? []).map((x: any) => x.listing_url);
       const landedKeys = new Set<string>();
-      for (let i = 0; i < urls.length; i += 25) {
-        const chunk = urls.slice(i, i + 25);
+      for (let i = 0; i < urls.length; i += 10) {
+        const chunk = urls.slice(i, i + 10);
         const { data: ev, error: eErr } = await supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings));
         if (eErr) throw new Error(`landed lookup failed: ${eErr.message}`);
         for (const r of ev ?? []) landedKeys.add(mecumLotKey(r.source_url));
@@ -1804,12 +1804,12 @@ Deno.serve(async (req) => {
           if (!targets?.length) break;
           cursor = targets[targets.length - 1].id;
           const urls = targets.map((t: { listing_url: string }) => t.listing_url);
-          // 25 targets x 5 spellings keeps each request line near 11 KB; a longer line is refused, and an unread answer must
+          // 10 targets x up to 8 spellings keeps each request line under 8 KB; a longer line is refused, and an unread answer must
           // never count as "nothing landed" (the first scheduled runs added second events that way).
           const queuedUrls = new Set<string>();
           const landedKeys = new Set<string>();
-          for (let i = 0; i < urls.length; i += 25) {
-            const chunk = urls.slice(i, i + 25);
+          for (let i = 0; i < urls.length; i += 10) {
+            const chunk = urls.slice(i, i + 10);
             const [q, e] = await Promise.all([
               supabase.from("import_queue").select("listing_url").in("listing_url", chunk),
               supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings)),
