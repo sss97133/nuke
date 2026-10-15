@@ -138,13 +138,14 @@ export async function measureSource(sb: Sb, body: MeasureOpts) {
       const link = tally("_linked");
       link.raw++;
       if (vid) { link.model++; link.profile++; } else if (link.examples.length < 3) link.examples.push({ snapshot_id: c.id, vehicle_id: null });
-      const ctx = vid ? await modelFor(sb, vid) : null;
+      if (!vid) continue; // an unlinked lot is counted once, under _linked, not again under every field
+      const ctx = await modelFor(sb, vid);
       for (const f of DEPTH_FIELDS) {
         const r = raw[f];
         if (!r) continue;
         const t = tally(f);
         t.raw++;
-        const held = ctx ? modelHolds(f as DepthField, r, ctx) : { anywhere: false, profile: false };
+        const held = modelHolds(f as DepthField, r, ctx);
         if (held.anywhere) t.model++;
         if (held.profile) t.profile++;
         if (held.profileRatio !== undefined) { t.pRatios.push(held.profileRatio); t.mRatios.push(held.modelRatio ?? 0); }
@@ -155,7 +156,7 @@ export async function measureSource(sb: Sb, body: MeasureOpts) {
     // 4. one row per field
     const runId = crypto.randomUUID();
     const rows = [...tallies.entries()].map(([field, t]) => ({
-      run_id: runId, source, field, sample_n: n, raw_present: t.raw, model_present: t.model,
+      run_id: runId, source, field, sample_n: field === "_linked" ? n : (tallies.get("_linked")?.model ?? 0), raw_present: t.raw, model_present: t.model,
       profile_present: t.profile, population_n: population,
       window_start: windowStart.toISOString(), window_end: windowEnd.toISOString(), examples: t.examples,
       detail: t.pRatios.length ? { held_length_over_raw_length: { profile_p50: p50(t.pRatios), model_p50: p50(t.mRatios), teaser_only_lots: t.pRatios.filter((r, i) => r < 0.5 && t.mRatios[i] >= 0.8).length, nothing_beyond_teaser_lots: t.mRatios.filter((r) => r < 0.5).length } } : {},

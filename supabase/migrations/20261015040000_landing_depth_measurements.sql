@@ -7,7 +7,8 @@
 --   model_present    of those, lots where the canonical model holds it anywhere (any canonical table)
 --   profile_present  of those, lots where the vehicles row itself holds it (what the profile reader shows)
 --   dropped          raw_present - model_present: the field was captured and did not land
--- Field "_linked" counts lots whose raw capture resolved to a vehicle at all.
+-- Field "_linked" counts lots whose raw capture resolved to a vehicle at all (sample_n = lots sampled); every other field
+-- is counted over the linked lots only (sample_n = linked lots), so an unlinked lot is counted once.
 -- Nothing here is private data: values are not stored, only counts and up to 3 snapshot ids per field as examples.
 BEGIN;
 SET LOCAL statement_timeout = '10s';
@@ -37,7 +38,7 @@ CREATE INDEX IF NOT EXISTS landing_depth_source_field_time ON public.landing_dep
 
 COMMENT ON TABLE public.landing_depth_measurements IS
   'Nightly raw-vs-model landing depth: per run x source x field, how many sampled lots held the field in the retained raw capture, how many of those the canonical model holds, and how many the vehicles row holds. Written by measure-landing-depth; read through v_landing_depth_latest and v_landing_depth_drops.';
-COMMENT ON COLUMN public.landing_depth_measurements.sample_n IS 'Lots sampled for this source in this run (one snapshot per listing url, fetched between window_start and window_end).';
+COMMENT ON COLUMN public.landing_depth_measurements.sample_n IS 'Lots sampled in this run (one snapshot per listing url, fetched between window_start and window_end); for every field but _linked, the sampled lots that resolved to a vehicle.';
 COMMENT ON COLUMN public.landing_depth_measurements.population_n IS 'Distinct lot urls the sample was drawn from (candidate snapshots in the window, lot pages only), not a platform total.';
 COMMENT ON COLUMN public.landing_depth_measurements.raw_present IS 'Sampled lots whose raw capture held the field (probe in _shared/landingDepthProbes.ts).';
 COMMENT ON COLUMN public.landing_depth_measurements.model_present IS 'Of raw_present, lots where any canonical table holds the field for the resolved vehicle.';
