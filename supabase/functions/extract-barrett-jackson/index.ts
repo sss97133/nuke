@@ -24,7 +24,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
@@ -743,16 +743,25 @@ function isPageRemoved(html: string | null, markdown: string | null): boolean {
 
 let lastCaptureSource = ""; // cache | direct | firecrawl: where the page behind the last parse came from (reported by action extract)
 
-async function fetchAndParse(url: string, opts?: { retainedFirst?: boolean; noFirecrawl?: boolean }): Promise<BJVehicle & { capture_source?: string }> {
+async function fetchAndParse(url: string, opts?: { retainedFirst?: boolean; noFirecrawl?: boolean; noFetch?: boolean }): Promise<BJVehicle & { capture_source?: string }> {
   // Step 1: Try direct HTTP fetch (free, uses archiveFetch with cache)
   // BJ has Cloudflare but archiveFetch handles retries/proxies
   // retainedFirst: use any retained capture however old (re-landing a lot whose vehicle was lost needs the capture, not a new fetch)
-  const directResult = await archiveFetch(url, {
-    platform: "barrett-jackson",
-    useFirecrawl: false,
-    callerName: "extract-barrett-jackson",
-    ...(opts?.retainedFirst ? { maxAgeSec: 10 * 365 * 86400 } : {}),
-  });
+  // noFetch: read the retained capture and nothing else. barrett-jackson.com/robots.txt disallows every crawler but Google's, so a
+  // re-land must never make a request; a lot with no capture is reported (NO_RETAINED_CAPTURE), not fetched.
+  let directResult: Awaited<ReturnType<typeof archiveFetch>>;
+  if (opts?.noFetch) {
+    const kept = await readArchivedPage(url, { platform: "barrett-jackson", maxAgeSec: 10 * 365 * 86400, htmlOnly: true });
+    if (!kept.html) throw new Error("NO_RETAINED_CAPTURE");
+    directResult = { html: kept.html, markdown: kept.markdown, source: "cache", cached: true, snapshotId: kept.snapshotId, url, platform: "barrett-jackson", statusCode: 200, error: null, costCents: 0 };
+  } else {
+    directResult = await archiveFetch(url, {
+      platform: "barrett-jackson",
+      useFirecrawl: false,
+      callerName: "extract-barrett-jackson",
+      ...(opts?.retainedFirst ? { maxAgeSec: 10 * 365 * 86400 } : {}),
+    });
+  }
   lastCaptureSource = directResult.cached ? "cache" : directResult.source;
 
   const isBlocked = directResult.statusCode === 403 || directResult.statusCode === 503 ||
@@ -1197,12 +1206,13 @@ Deno.serve(async (req) => {
 
       let vehicle: BJVehicle;
       try {
-        vehicle = await fetchAndParse(url, { retainedFirst: body.retained_first === true, noFirecrawl: body.no_firecrawl === true });
+        vehicle = await fetchAndParse(url, { retainedFirst: body.retained_first === true, noFirecrawl: body.no_firecrawl === true, noFetch: body.no_fetch === true });
       } catch (e: any) {
         if (e.message === "PAGE_NOT_FOUND") {
           return okJson({ success: false, error: "Page not found (removed by Barrett-Jackson)" }, 410);
         }
         if (e.message === "NO_USABLE_CAPTURE") return okJson({ success: false, error: "no_usable_capture" }, 422);
+        if (e.message === "NO_RETAINED_CAPTURE") return okJson({ success: false, error: "no_retained_capture" }, 422);
         throw e;
       }
 
