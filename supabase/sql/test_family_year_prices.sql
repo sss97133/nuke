@@ -10,6 +10,7 @@
 --     sale whose own page names its model year but not its family is another car: not pooled, counted in conflicts;
 --   * asks: Facebook listings and classified events in the 365 days before today, one per vehicle (its latest), never a
 --     duplicate or blocked listing, never a private or deleted vehicle, never pooled with sales;
+--   * (20261016015000) vehicles is read once (vehicle_rows, one sequential pass on prod), built daily at 10:40;
 --   * (20261015218000) badge twins pool by canonical_models.platform, one row per family naming the platform;
 --   * (20261015215000) venues: each source's count and its median from 5 prices, within the row's window;
 --   * (20261015160000) the odometer: sorted readings, n_miles and the median over the same window and rows, zero and
@@ -44,6 +45,10 @@ CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
 CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
 $$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid $$;
+CREATE FUNCTION cron.alter_job(job_id bigint, schedule text DEFAULT NULL, command text DEFAULT NULL,
+  database text DEFAULT NULL, username text DEFAULT NULL, active boolean DEFAULT NULL) RETURNS void LANGUAGE sql AS
+$$ UPDATE cron.job j SET schedule = coalesce(alter_job.schedule, j.schedule), command = coalesce(alter_job.command, j.command),
+     active = coalesce(alter_job.active, j.active) WHERE j.jobid = job_id $$;
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, make text, model text, year integer, sale_date date, bat_sale_date date,
   listing_url text, discovery_url text, mileage integer,
@@ -174,6 +179,14 @@ INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_pric
 -- 20261015218000 replaces it again, pooling badge twins by canonical_models.platform; applied twice.
 \ir ../migrations/20261015218000_family_year_prices_platforms.sql
 \ir ../migrations/20261015218000_family_year_prices_platforms.sql
+-- 20261016015000 replaces it again so vehicles is read once (vehicle_rows) and moves the build to 10:40; applied twice.
+\ir ../migrations/20261016015000_family_year_prices_one_pass.sql
+\ir ../migrations/20261016015000_family_year_prices_one_pass.sql
+SELECT pg_temp.ok('vehicles is read once, by vehicle_rows; the refresh plans for a heap on disk, without nested loops',
+  (SELECT count(*) FROM regexp_matches(pg_get_viewdef('public.mv_family_year_prices'::regclass), '\mvehicles\M', 'g')) = 1
+  AND pg_get_viewdef('public.mv_family_year_prices'::regclass) LIKE '%vehicle_rows%'
+  AND (SELECT proconfig FROM pg_proc WHERE oid = 'public.refresh_family_year_prices()'::regprocedure)
+      @> ARRAY['enable_nestloop=off', 'random_page_cost=4', 'work_mem=32MB']);
 SELECT pg_temp.ok('created empty: the deploy reads nothing; the first build is the refresh',
   NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
 SELECT public.refresh_family_year_prices();
@@ -246,16 +259,17 @@ END $$;
 RESET ROLE;
 SELECT pg_temp.ok('anon cannot run the refresh', true);
 SELECT public.refresh_family_year_prices();
-SELECT pg_temp.ok('refreshes concurrently through refresh_family_year_prices(), scheduled once at 09:40',
+SELECT pg_temp.ok('refreshes concurrently through refresh_family_year_prices(), scheduled once at 10:40 with a 1,200 s cap',
   (SELECT count(*) FROM cron.job WHERE jobname = 'refresh-family-year-prices') = 1
-  AND (SELECT schedule FROM cron.job WHERE jobname = 'refresh-family-year-prices') = '40 9 * * *'
-  AND (SELECT command FROM cron.job WHERE jobname = 'refresh-family-year-prices') LIKE '%refresh_family_year_prices()%'
+  AND (SELECT schedule FROM cron.job WHERE jobname = 'refresh-family-year-prices') = '40 10 * * *'
+  AND (SELECT command FROM cron.job WHERE jobname = 'refresh-family-year-prices') LIKE '%''1200s''%refresh_family_year_prices()%'
   AND (SELECT n FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
          AND family_id = '00000000-0000-4000-c000-00000000000a') = 12);
 -- After the first build, 20261015160000 and 20261015215000 apply again without dropping or emptying the built view.
 \ir ../migrations/20261015160000_family_year_prices_miles.sql
 \ir ../migrations/20261015215000_family_year_prices_venues.sql
 \ir ../migrations/20261015218000_family_year_prices_platforms.sql
+\ir ../migrations/20261016015000_family_year_prices_one_pass.sql
 SELECT pg_temp.ok('re-applying the odometer migration after the build keeps the built view',
   (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass)
   AND (SELECT n_miles FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
