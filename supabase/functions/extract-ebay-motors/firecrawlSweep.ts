@@ -153,12 +153,12 @@ function finish(rep: DiscoverReport): DiscoverReport {
 }
 
 /** Re-land item pages already retained in the bucket that have no listing episode yet (a parser fix, a failed write): 0 credits. */
-export async function reland(supabase: any, o: { limit?: number } = {}): Promise<Report> {
+export async function reland(supabase: any, o: { limit?: number; offset?: number } = {}): Promise<Report> {
   const rep = emptyReport("reland");
   try {
     const snaps = await supabase.from("listing_page_snapshots").select("id,listing_url,html_storage_path,markdown_storage_path")
       .eq("platform", PLATFORM).eq("success", true).like("listing_url", "%/itm/%").not("markdown_storage_path", "is", null)
-      .order("fetched_at", { ascending: false }).limit(Math.min(o.limit ?? 50, 200));
+      .order("fetched_at", { ascending: false }).range(o.offset ?? 0, (o.offset ?? 0) + Math.min(o.limit ?? 50, 200) - 1);
     if (snaps.error) throw new Error(`snapshots read failed: ${snaps.error.message}`);
     const keys = (snaps.data ?? []).map((s: any) => String(s.listing_url).split("/").pop());
     const ev = await supabase.from("vehicle_events").select("source_listing_id").eq("source_platform", PLATFORM).in("source_listing_id", keys).limit(1000);
