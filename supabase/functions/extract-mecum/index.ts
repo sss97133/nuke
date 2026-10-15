@@ -828,6 +828,15 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
   throw new Error("Could not parse vehicle data from page");
 }
 
+/** auction_events.outcome is checked against a fixed list (sold, reserve_not_met, no_sale, bid_to, cancelled, relisted, pending, live). */
+function auctionOutcome(status: string | null): string {
+  const x = (status ?? "").toLowerCase();
+  if (x === "sold") return "sold";
+  if (x === "not sold" || x === "no sale") return "no_sale";
+  if (x === "bid-goes-on") return "bid_to";
+  return "pending";
+}
+
 // ─── Listing episode ────────────────────────────────────────────────────
 
 /** One lot of a sale on Mecum's calendar, from its Algolia roster (enumerate_upcoming). */
@@ -1106,16 +1115,21 @@ async function saveVehicle(
     .maybeSingle();
 
   if (!existingEvent) {
-    try {
-      await supabase.from("auction_events").insert({
+    {
+      // The insert result is read: a missing column here went unseen for months (this insert named sale_price, which the
+      // table does not have, inside a try that cannot catch a PostgREST error).
+      const { error: aeErr } = await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "mecum",
         source_url: vehicle.url,
-        outcome: vehicle.status || "listed",
+        outcome: auctionOutcome(vehicle.status),
         lot_number: vehicle.lot_number || null,
-        sale_price: vehicle.sale_price || null,
+        source_listing_id: vehicle.lot_number || null,
+        winning_bid: vehicle.status === "sold" ? vehicle.sale_price || null : null,
+        high_bid: vehicle.status !== "sold" ? vehicle.sale_price || null : null,
       });
-    } catch { /* non-fatal */ }
+      if (aeErr) console.warn(`[MECUM] auction_events insert failed for ${vehicle.url}: ${aeErr.message}`);
+    }
   }
 
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
@@ -1387,7 +1401,8 @@ Deno.serve(async (req) => {
           }
         }
         const ae = await supabase.from("auction_events").insert(landed.map((l) => ({
-          vehicle_id: vehicleIdFor.get(l.lot_id)!, source: "mecum", source_url: l.url, outcome: l.result ?? "listed", lot_number: l.lot_number, sale_price: l.result === "sold" ? l.price : null,
+          vehicle_id: vehicleIdFor.get(l.lot_id)!, source: "mecum", source_url: l.url, source_listing_id: l.lot_number ?? l.lot_id, outcome: auctionOutcome(l.result), lot_number: l.lot_number,
+          winning_bid: l.result === "sold" ? l.price : null, high_bid: l.result === "bid-goes-on" ? l.price : null,
         }))).select("id");
         if (!ae.error) out.auction_events_created += ae.data?.length ?? 0;
         else if (out.errors.length < 5) out.errors.push(`auction_events insert: ${ae.error.message}`);
