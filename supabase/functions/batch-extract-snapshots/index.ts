@@ -41,7 +41,7 @@ import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGat
 import { orphanVehicleIds } from "./queueRows.ts";
 import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
-import { judge, urlVariants, type LotPage } from "./snapshotCompare.ts";
+import { judge, pickBjLotPrice, urlVariants, type LotPage } from "./snapshotCompare.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -971,13 +971,11 @@ function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
     }
   }
 
-  // Price from "price":"$$99,000.00" format (RSC data)
+  // Price from "price":"$$99,000.00" format (RSC data): the lot record's price, never the menu's bidder-package promo
+  // ("Bidder packages start at $250", read as the sale price on 19 vehicles before 2026-10-15).
   if (!result.sale_price) {
-    const priceStrMatch = html.match(/"price"\s*:\s*"\$?\$?([\d,]+(?:\.\d{2})?)"/);
-    if (priceStrMatch?.[1]) {
-      const price = parseInt(priceStrMatch[1].replace(/[,\.]\d{2}$/, '').replace(/,/g, ''));
-      if (price > 0) result.sale_price = price;
-    }
+    const price = pickBjLotPrice(html);
+    if (price) result.sale_price = price;
   }
 
   // Description from "full_description" in RSC data
