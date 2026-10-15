@@ -291,7 +291,7 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     timeoutMs: 120_000,
   },
   "gemini-flash": {
-    id: "gemini-2.0-flash-lite",
+    id: "gemini-flash-lite-latest",
     provider: "google",
     displayName: "Gemini Flash Lite",
     costPerInputMTok: 0,

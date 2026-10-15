@@ -181,7 +181,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
   if (googleKey) {
     try {
       const resp = await geminiFetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -195,7 +195,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini output truncated");
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (content) return { content, model: data.modelVersion || "gemini-2.5-flash-lite" };
+        if (content) return { content, model: data.modelVersion || "gemini-flash-lite-latest" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);

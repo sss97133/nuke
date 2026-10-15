@@ -93,7 +93,7 @@ export async function detectSPIDSheet(
     },
     {
       name: 'google',
-      model: 'gemini-1.5-pro',
+      model: 'gemini-pro-latest',
       envVar: 'GOOGLE_AI_API_KEY',
       fn: extractWithGoogleGemini
     }
