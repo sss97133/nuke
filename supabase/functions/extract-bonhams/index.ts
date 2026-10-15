@@ -953,6 +953,41 @@ function lotIlikePattern(url: string): string | null {
   return m ? `%bonhams.com/auction/${m[1]}/lot/${m[2]}/%` : null;
 }
 
+/**
+ * Add a lot's photos to a vehicle. vehicle_images has no unique key on (vehicle_id, image_url), so the old
+ * upsert(onConflict: "vehicle_id,image_url") failed every time and its error was only logged: lots landed with no
+ * photos. This reads what the vehicle has, inserts the rest, and marks a primary only where the vehicle has none
+ * (one primary per vehicle is a unique index).
+ */
+async function addVehicleImages(
+  supabase: ReturnType<typeof createClient>,
+  vehicleId: string,
+  images: Array<{ url: string; primary?: boolean }>,
+  context: { source_url: string; lot_number?: string | null },
+): Promise<number> {
+  if (images.length === 0) return 0;
+  const { data: have, error: readErr } = await supabase
+    .from("vehicle_images").select("image_url, is_primary").eq("vehicle_id", vehicleId).limit(500);
+  if (readErr) throw new Error(`images read: ${readErr.message}`);
+  const urls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+  let hasPrimary = (have ?? []).some((r: { is_primary: boolean | null }) => r.is_primary === true);
+  const fresh = images.slice(0, 100).filter((img) => !urls.has(img.url));
+  if (fresh.length === 0) return 0;
+  const rows = fresh.map((img, i) => {
+    const primary = !hasPrimary && (img.primary || i === 0);
+    if (primary) hasPrimary = true;
+    return {
+      vehicle_id: vehicleId, image_url: img.url, source_url: img.url, position: urls.size + i, display_order: urls.size + i,
+      source: "bonhams_import", is_external: true, is_primary: primary,
+      approval_status: "auto_approved", is_approved: true, redaction_level: "none",
+      exif_data: { source_url: context.source_url, imported_from: "bonhams", lot_number: context.lot_number ?? null },
+    };
+  });
+  const { error } = await supabase.from("vehicle_images").insert(rows);
+  if (error) throw new Error(`images: ${error.message}`);
+  return rows.length;
+}
+
 /** Write what one lot page holds: gallery, observation (full text + raw data), description lengthened, episode metadata. */
 async function landLotPage(
   supabase: ReturnType<typeof createClient>,
@@ -961,14 +996,7 @@ async function landLotPage(
   observedAt: string,
 ): Promise<number> {
   let imagesWritten = 0;
-  if (page.images.length > 0) {
-    const records = page.images.slice(0, 100).map((img, i) => ({
-      vehicle_id: ev.vehicle_id, image_url: img.url, position: i, source: "bonhams_import", is_external: true, is_primary: img.primary,
-    }));
-    const { error: imgErr } = await supabase.from("vehicle_images").upsert(records, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
-    if (imgErr) throw new Error(`images: ${imgErr.message}`);
-    imagesWritten += records.length;
-  }
+  imagesWritten += await addVehicleImages(supabase, ev.vehicle_id, page.images, { source_url: ev.source_url });
   const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
   await writeObservation(supabase, {
     vehicleId: ev.vehicle_id,
@@ -1142,19 +1170,8 @@ async function saveVehicle(
   // Save images (non-fatal)
   try {
     if (extracted.image_urls.length > 0) {
-      const imageRecords = extracted.image_urls.slice(0, 50).map((img_url, i) => ({
-        vehicle_id: targetId,
-        image_url: img_url,
-        position: i,
-        source: "bonhams_import",
-        is_external: true,
-      }));
-
-      const { error: imgErr } = await supabase
-        .from("vehicle_images")
-        .upsert(imageRecords, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
-      if (imgErr) console.warn(`[Bonhams] Image save error (non-fatal): ${imgErr.message}`);
-      else console.log(`[Bonhams] Saved ${imageRecords.length} images`);
+      const n = await addVehicleImages(supabase, targetId, extracted.image_urls.slice(0, 50).map((url) => ({ url })), { source_url: extracted.url, lot_number: extracted.lot_number });
+      console.log(`[Bonhams] Saved ${n} images`);
     }
   } catch (e: any) {
     console.warn(`[Bonhams] Image save failed (non-fatal): ${e.message}`);
