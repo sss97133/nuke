@@ -7,8 +7,11 @@
 // Hard cap: max_total lots landed by this tag (default 5000) so the monthly credit pool is never drained.
 
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { softWrite } from "../_shared/writeResult.ts";
+import { classifyFailure, recordRevision, reviseRetained } from "../_shared/revisionWorker.ts";
 
 export const TARGETS_TAG = "carsandbids-targets:1";
+const CAB_SOURCE_ID = "960d1c7f-f711-4f95-9eb5-8e57833f7e0a"; // scrape_sources "Cars and Bids"; claim_revision_items matches on its name
 const SITEMAP = "https://carsandbids.com/cab-sitemap/auctions.xml";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const auctionId = (url: string) => url.match(/\/auctions\/([^/?#]+)/)?.[1] ?? null;
@@ -102,12 +105,12 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
     if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
     const { data: row, error: claimErr } = await supabase.from("import_queue").insert({
       listing_url: t.listing_url, status: "processing", extractor_version: TARGETS_TAG,
-      raw_data: { target_id: t.id }, locked_at: new Date().toISOString(),
+      raw_data: { target_id: t.id }, locked_at: new Date().toISOString(), source_id: CAB_SOURCE_ID,
     }).select("id").single();
     if (claimErr || !row) continue; // claimed by the other cron job before any credit was spent
     claimed++;
-    const finish = (status: string, error?: string, vehicleId?: string) =>
-      supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id);
+    const finish = async (status: string, error?: string, vehicleId?: string) =>
+      softWrite("import_queue update", await supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id), results.errors);
     try {
       const fc = await firecrawlScrape(
         {
@@ -123,7 +126,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
         { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
       );
       results.credits += Number(fc.raw?.data?.metadata?.creditsUsed ?? 1);
-      if (fc.httpStatus === 404) { await finish("skipped", "PAGE_NOT_FOUND"); streak = 0; await sleep(delayMs); continue; }
+      if (fc.httpStatus === 404) { await finish("skipped", "PAGE_NOT_FOUND"); await supabase.rpc("resolve_revision_item", { p_id: row.id, p_outcome: "dead_page", p_detail: { http: 404 } }); streak = 0; await sleep(delayMs); continue; }
       const html = fc.data?.html ?? "";
       if (!html || html.length < 1000) throw new Error(fc.error || `insufficient html (${html.length}) status ${fc.httpStatus}`);
       const res = await fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-core`, {
@@ -135,11 +138,20 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
       const out = await res.json().catch(() => ({}));
       if (!res.ok || out.success === false) throw new Error(`extract ${res.status}: ${out.error ?? "failed"}`);
       await finish("complete", undefined, out.vehicle_id);
-      if (out.completeness) await supabase.from("import_queue").update({ raw_data: { target_id: t.id, ...out.completeness } }).eq("id", row.id);
+      if (out.completeness) {
+        softWrite("import_queue completeness", await supabase.from("import_queue").update({ raw_data: { target_id: t.id, ...out.completeness } }).eq("id", row.id), results.errors);
+        const c = out.completeness;
+        const gaps = [
+          ...(c.comments_claimed != null && c.comments_landed < c.comments_claimed - 2 ? ["comments"] : []),
+          ...(c.photos_claimed != null && c.photos_landed < c.photos_claimed ? ["photos"] : []),
+        ];
+        if (gaps.length) await recordRevision(supabase, { url: t.listing_url, missing: gaps, reason: "thin_landing", next: "refetch", raisedBy: "extract-cars-and-bids-core", vehicleId: out.vehicle_id, detail: c });
+      }
       results.landed++; streak = 0;
     } catch (err: any) {
       const msg = String(err?.message || err);
       await finish("failed", msg);
+      if (!/^extract 409/.test(msg)) { const k = classifyFailure(msg); await recordRevision(supabase, { url: t.listing_url, missing: ["landing"], reason: k.reason, next: k.next, raisedBy: "extract-cars-and-bids-core", detail: { error: msg.slice(0, 300) } }); } // a 409 identity refusal is recorded by the extractor itself
       results.failed++; streak++;
       if (results.errors.length < 5) results.errors.push(`${t.listing_url}: ${msg.slice(0, 200)}`);
       if (/\b(402|403|429)\b/.test(msg)) { results.stopped = "blocked_or_out_of_credits"; break; }
@@ -148,4 +160,23 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
     await sleep(delayMs);
   }
   return { success: true, cursor, ...results };
+}
+
+/** reparse_retained worker: re-run the current parser on the retained capture. retained_only makes the extractor refuse to fetch. */
+export async function reviseCab(supabase: any, supabaseUrl: string, key: string, body: Record<string, any>) {
+  return await reviseRetained(supabase, {
+    sourceName: "Cars and Bids", worker: "extract-cars-and-bids-core:revise", limit: Math.floor(Number(body.limit)) || 10,
+    reparse: async (it) => {
+      const res = await fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-core`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+        body: JSON.stringify({ url: it.listing_url, retained_only: true }), signal: AbortSignal.timeout(90_000),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.status === 409 && out.error === "no_retained_capture") return { ok: false, noCapture: true };
+      if (!res.ok || out.success === false) return { ok: false, detail: { status: res.status, error: String(out.error ?? "").slice(0, 200) } };
+      const c = out.completeness ?? {};
+      const whole = (c.comments_claimed == null || c.comments_landed >= c.comments_claimed - 2) && (c.photos_claimed == null || c.photos_landed >= c.photos_claimed);
+      return { ok: true, whole, detail: c };
+    },
+  });
 }

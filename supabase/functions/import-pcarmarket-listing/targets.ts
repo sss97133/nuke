@@ -5,10 +5,12 @@
 // A target tried gets an import_queue row (extractor_version TARGETS_TAG, raw_data.target_id): that row is the cursor.
 // Stops at the limit, at the time budget, after 3 failures in a row, and at once on a 403/429.
 
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
+import { classifyFailure, recordRevision, reviseRetained } from "../_shared/revisionWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 export const TARGETS_TAG = "pcarmarket-targets:1";
+const PCM_SOURCE_ID = "d338952e-e559-4a2b-aa84-1aadf6a5bb71"; // scrape_sources "PCARMARKET"; claim_revision_items matches on its name
 const SITE = "https://www.pcarmarket.com";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,7 +104,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
     if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
     const { data: row, error: claimErr } = await supabase.from("import_queue").insert({
       listing_url: t.listing_url, status: "processing", extractor_version: TARGETS_TAG,
-      raw_data: { target_id: t.id, lane: t.lane }, locked_at: new Date().toISOString(),
+      raw_data: { target_id: t.id, lane: t.lane }, locked_at: new Date().toISOString(), source_id: PCM_SOURCE_ID,
     }).select("id").single();
     if (claimErr || !row) continue; // another run holds this target
     const finish = (status: string, error?: string, vehicleId?: string) =>
@@ -115,10 +117,10 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
       let page = await get(`${SITE}/results/${bareSlug(slugOf(t.listing_url))}`);
       if (!page.html || page.statusCode === 404) { await sleep(delayMs); page = await get(`${SITE}/auction/${bareSlug(slugOf(t.listing_url))}`); }
       const status = page.statusCode ?? 0;
-      if (status === 404 || status === 410) { await finish("skipped", "PAGE_NOT_FOUND"); results.not_vehicle++; streak = 0; }
+      if (status === 404 || status === 410) { await finish("skipped", "PAGE_NOT_FOUND"); await supabase.rpc("resolve_revision_item", { p_id: row.id, p_outcome: "dead_page", p_detail: { http: status } }); results.not_vehicle++; streak = 0; }
       else if (status === 403 || status === 429) { await finish("failed", `HTTP ${status}`); results.failed++; results.stopped = "blocked_by_source"; break; }
       else if (!page.html) throw new Error(page.error || `no html (status ${status})`);
-      else if (!page.html.includes("Car Details")) { await finish("skipped", "not_a_vehicle_page"); results.not_vehicle++; streak = 0; }
+      else if (!page.html.includes("Car Details")) { await finish("skipped", "not_a_vehicle_page"); await supabase.rpc("resolve_revision_item", { p_id: row.id, p_outcome: "non_vehicle", p_detail: { page: "no Car Details block" } }); results.not_vehicle++; streak = 0; }
       else {
         const res = await fetch(`${supabaseUrl}/functions/v1/import-pcarmarket-listing`, {
           method: "POST",
@@ -134,6 +136,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
     } catch (err: any) {
       const msg = String(err?.message || err);
       await finish("failed", msg);
+      if (!/^import 409/.test(msg)) { const k = classifyFailure(msg); await recordRevision(supabase, { url: t.listing_url, missing: ["landing"], reason: k.reason, next: k.next, raisedBy: "import-pcarmarket-listing", detail: { error: msg.slice(0, 300) } }); } // a 409 identity refusal is recorded by the importer itself
       results.failed++; streak++;
       if (results.errors.length < 5) results.errors.push(`${t.listing_url}: ${msg.slice(0, 200)}`);
       if (/\b(403|429)\b/.test(msg)) { results.stopped = "blocked_by_source"; break; }
@@ -142,4 +145,29 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
     await sleep(delayMs);
   }
   return { success: true, cursor, ...results };
+}
+
+/** reparse_retained worker: re-run the current parser on the retained capture (no fetch). */
+export async function revisePcm(supabase: any, supabaseUrl: string, body: Record<string, any>) {
+  const key = projectSecretKey()!;
+  return await reviseRetained(supabase, {
+    sourceName: "PCARMARKET", worker: "import-pcarmarket-listing:revise", limit: Math.floor(Number(body.limit)) || 10,
+    reparse: async (it) => {
+      const bare = bareSlug(slugOf(it.listing_url));
+      let html: string | null = null;
+      for (const u of [`${SITE}/results/${bare}`, `${SITE}/auction/${bare}`]) {
+        const page = await readArchivedPage(u, { platform: "pcarmarket", maxAgeSec: 10 * 365 * 86400, htmlOnly: true });
+        if (page.html) { html = page.html; break; }
+      }
+      if (!html) return { ok: false, noCapture: true };
+      if (!html.includes("Car Details")) return { ok: true, nonVehicle: true };
+      const res = await fetch(`${supabaseUrl}/functions/v1/import-pcarmarket-listing`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+        body: JSON.stringify({ url: `${SITE}/auction/${slugOf(it.listing_url)}`, html }), signal: AbortSignal.timeout(60_000),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.success) return { ok: false, detail: { status: res.status, error: String(out.error ?? out.refused ?? "").slice(0, 200) } };
+      return { ok: true, whole: true, detail: { vehicle_id: out.vehicle_id } };
+    },
+  });
 }

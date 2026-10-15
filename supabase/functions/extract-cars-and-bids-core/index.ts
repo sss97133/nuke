@@ -27,7 +27,7 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { batchFromTargets, discoverTargets } from "./targets.ts";
+import { batchFromTargets, discoverTargets, reviseCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
@@ -508,6 +508,9 @@ Deno.serve(async (req) => {
     if (body?.action === "batch_from_targets") {
       return new Response(JSON.stringify(await batchFromTargets(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (body?.action === "revise") {
+      return new Response(JSON.stringify(await reviseCab(supabase, supabaseUrl, serviceRoleKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (body?.action === "discover_targets") {
       return new Response(JSON.stringify(await discoverTargets(supabase, firecrawlApiKey)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -551,6 +554,9 @@ Deno.serve(async (req) => {
       responseTimeMs = 0;
       fromCache = true;
       console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars, markdown: ${markdown.length} chars)`);
+    } else if (body?.retained_only === true) {
+      // reparse_retained: never fetch (a fetch here costs a Firecrawl credit).
+      return new Response(JSON.stringify({ success: false, error: "no_retained_capture" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } else if (typeof body?.html === "string" && body.html.length > 1000) {
       // Page already fetched by this function's batch_from_targets (one Firecrawl credit, no actions): archive and parse it.
       html = body.html;
