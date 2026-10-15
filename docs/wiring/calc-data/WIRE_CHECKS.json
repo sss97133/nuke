@@ -9801,11 +9801,11 @@
    }
   },
   {
-   "wire": "SUB_JMP_P",
+   "wire": "30c",
    "kind": "implied",
-   "label": "Woofer jumper (+): woofer 1 to woofer 2, in parallel",
+   "label": "Subwoofer 2 (+): amp sub harness pair 2 -> woofer 2",
    "from": [
-    "SUB (+)",
+    "AMP (sub output +, pair 2)",
     ""
    ],
    "to": [
@@ -9816,23 +9816,23 @@
     "other",
     "other"
    ],
-   "from_str": "SUB (+)",
+   "from_str": "AMP (sub output +, pair 2)",
    "control": null,
    "subsystem": "AUDIO",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (+): -> SUB-2 (+):+ push terminal"
+     "AMP (sub output +, pair 2): -> SUB-2 (+):+ push terminal"
     ]
    }
   },
   {
-   "wire": "SUB_JMP_N",
+   "wire": "30d",
    "kind": "implied",
-   "label": "Woofer jumper (-): woofer 1 to woofer 2, in parallel",
+   "label": "Subwoofer 2 (-): amp sub harness pair 2 -> woofer 2",
    "from": [
-    "SUB (-)",
+    "AMP (sub output -, pair 2)",
     ""
    ],
    "to": [
@@ -9843,14 +9843,14 @@
     "other",
     "other"
    ],
-   "from_str": "SUB (-)",
+   "from_str": "AMP (sub output -, pair 2)",
    "control": null,
    "subsystem": "AUDIO",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (-): -> SUB-2 (-):- push terminal"
+     "AMP (sub output -, pair 2): -> SUB-2 (-):- push terminal"
     ]
    }
   },

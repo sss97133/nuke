@@ -74,14 +74,14 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 384 | 292 | 381 | 384 | 370 | 1 | 90 | m 0 · e 193 · u 180 |
-| composite (every option) | 417 | 297 | 409 | 417 | 401 | 1 | 90 | m 0 · e 197 · u 209 |
+| buildable (base + decided) | 384 | 292 | 381 | 384 | 370 | 1 | 90 | m 0 · e 195 · u 178 |
+| composite (every option) | 417 | 297 | 409 | 417 | 401 | 1 | 90 | m 0 · e 199 · u 207 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
+| AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 14 · u 7 |
 | BASE | 352 | 272 | 349 | 352 | 338 | 1 | 90 | m 0 · e 178 · u 163 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
@@ -95,7 +95,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| body_convenience | 102 | 59 | 97 | 102 | 102 | 0 | 6 | m 0 · e 35 · u 67 |
+| body_convenience | 102 | 59 | 97 | 102 | 102 | 0 | 6 | m 0 · e 37 · u 65 |
 | dash_cabin | 58 | 40 | 58 | 58 | 56 | 0 | 13 | m 0 · e 15 · u 40 |
 | engine | 133 | 128 | 130 | 133 | 128 | 1 | 52 | m 0 · e 108 · u 23 |
 | lighting_front | 35 | 19 | 35 | 35 | 35 | 0 | 10 | m 0 · e 22 · u 13 |
@@ -152,8 +152,8 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft; also ISO_KILL, PCS_BRK, DAK_CEL (length not measured yet) |
 | M22759/16 22 AWG white/orange | 19.8 | 0 | not recorded | short by 19.8 ft |
 | M22759/16 22 AWG white/blue | 14.6 | 0 | not recorded | short by 14.6 ft |
-| M22759/16 10 AWG black | 21.2 | 30.0 | not recorded | covered |
-| M22759/16 10 AWG red | 21.2 | 30.0 | not recorded | covered |
+| M22759/16 10 AWG black | 42.3 | 30.0 | not recorded | short by 12.3 ft |
+| M22759/16 10 AWG red | 42.3 | 30.0 | not recorded | short by 12.3 ft |
 | M22759/16 8 AWG black | 2.5 | 5.0 | not recorded | covered; also G3 (length not measured yet) |
 | M22759/16 8 AWG red | 2.5 | 30.0 | not recorded | covered |
 | M22759/16 6 AWG red | 5.3 | 0 | not recorded | short by 5.3 ft |
