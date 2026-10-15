@@ -56,12 +56,11 @@ function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 }
 
-// Live while the last board read is within one read cycle (BaT's board is read every 15 minutes; 20 allows a cycle and
-// its write); past that, how far behind it is. Unknown stays unknown.
-export function boardFreshness(syncedAt: number | null | undefined, now: number): string {
-  if (syncedAt == null || !Number.isFinite(syncedAt)) return 'refresh';
-  const m = Math.max(0, Math.floor((now - syncedAt) / 60_000));
-  return m < 20 ? 'live' : m < 60 ? `${m} min behind` : m < 1440 ? `${Math.floor(m / 60)} h behind` : `${Math.floor(m / 1440)} d behind`;
+// This is the successful browser read clock. A vehicle-row write by any process cannot establish source freshness.
+export function boardFreshness(readAt: number | null | undefined, now: number): string {
+  if (readAt == null || !Number.isFinite(readAt) || readAt <= 0 || readAt > now) return 'refresh';
+  const m = Math.floor((now - readAt) / 60_000);
+  return m < 1 ? 'read just now' : `read ${m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h` : `${Math.floor(m / 1440)} d`} ago`;
 }
 
 function title(a: LiveAuction): string {
@@ -520,8 +519,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   };
   const masthead = (
     <Masthead result={view === 'inventory' ? <button type="button" className="market-control market-clock" aria-busy={reading}
-      onClick={() => void readAgain()} title={data?.syncedAt != null ? `Board read ${clock(data.syncedAt)}. Select to read again.` : 'Read the board'}>
-      <Text role="label">{reading ? '↻ reading…' : `↻ ${boardFreshness(data?.syncedAt, now)}`}</Text>
+      onClick={() => void readAgain()} title={dataUpdatedAt > 0 ? `Board fetched ${clock(dataUpdatedAt)}; source capture time is unavailable here. Select to read again.` : 'Read the board'}>
+      <Text role="label">{reading || isLoading ? '↻ reading…' : isError ? '↻ retry' : `↻ ${boardFreshness(dataUpdatedAt, Math.max(now, Date.now()))}`}</Text>
     </button> : undefined}>
       {view === 'inventory' ? <span className="market-venue">
         <img className="market-venue__mark" src="/vendor/bat/favicon.ico" alt="" width={32} height={32} />

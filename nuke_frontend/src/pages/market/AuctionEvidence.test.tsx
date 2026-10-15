@@ -139,7 +139,32 @@ it('opens one panel that adds only what the row cannot say, with the venue link 
   } finally { HTMLElement.prototype.scrollIntoView = previous; }
 });
 
+it.each([false, true])('keeps reported bids when dated bid evidence is missing (truncated: %s)', async truncated => {
+  fixture.query.data.truncated = truncated;
+  fixture.query.data.interactions = truncated ? [row('undated-bid', 'bid', null, { bid_amount: 2000 })] : [];
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}}
+    summary={{ id, bidCount: 23 } as any} />));
+  expect(container.querySelector('.market-inspection-counts')?.textContent).toBe('23 bids');
+  expect(container.textContent).toContain('No dated bids in this retained window.');
+  expect(container.textContent).not.toContain('No bids yet');
+  expect(container.querySelector('svg')).toBeNull();
+  expect(container.textContent?.includes('Earlier interactions omitted by the limit.')).toBe(truncated);
+  expect(container.querySelector('a[href^="https://bringatrailer.com"]')?.getAttribute('href')).toBe(source);
+});
+
+it('identifies a partial bid chart when the complete bid book has no retained bids', async () => {
+  fixture.query.data.truncated = true;
+  fixture.book = { vehicle: { id }, lot: { source_url: source }, bids: [] };
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}}
+    summary={{ id, bidCount: 23 } as any} />));
+  expect(container.querySelector('.market-inspection-counts')?.textContent).toBe('23 bids');
+  expect(container.querySelectorAll('svg [role="button"]')).toHaveLength(2);
+  expect(container.textContent).toContain('Earlier interactions omitted by the limit.');
+  expect(container.textContent).not.toContain('No bids yet');
+});
+
 it('draws every bid the bid book holds, not only the newest interactions', async () => {
+  fixture.query.data.truncated = true;
   fixture.book = {
     vehicle: { id }, lot: { id: 'lot', source_url: source, auction_end_date: '2026-10-05T12:00:00Z', total_bids: 4, updated_at: '2026-10-04T11:30:00Z' },
     readAt: '2026-10-04T11:30:00Z', bids: [
@@ -153,6 +178,7 @@ it('draws every bid the bid book holds, not only the newest interactions', async
   // The episode read holds two dated bids; the book holds four, and the chart draws the four.
   expect(container.querySelectorAll('svg [role="button"]')).toHaveLength(4);
   expect(container.querySelector('.auction-evidence-chart-heading')?.textContent).toContain('4');
+  expect(container.textContent).not.toContain('Earlier interactions omitted by the limit.');
   // The latest bid is the highlighted point by default.
   expect(container.querySelector('svg [aria-pressed="true"]')?.getAttribute('aria-label')).toContain('$2,000');
 });

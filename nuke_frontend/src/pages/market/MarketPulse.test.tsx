@@ -451,7 +451,7 @@ describe('the market document', () => {
     expect(h1.className).toContain('k-entity');
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$25K');
     expect(cohortCount()).toBe('3');
-    expect(container.querySelector('.k-masthead__result')?.textContent).toBe('↻ live');
+    expect(container.querySelector('.k-masthead__result')?.textContent).toBe('↻ read just now');
     expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
     expect(container.textContent?.match(/Market explorer|Market cohort|captured vehicle auctions/)).toBeNull();
     expect(container.querySelectorAll('h1')).toHaveLength(1);
@@ -466,6 +466,18 @@ describe('the market document', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer');
     expect(container.querySelector('[aria-label="Market scope"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
+    expect(container.querySelector('.k-masthead__result')?.textContent).toBe('↻ retry');
+  });
+  it('uses the successful browser read clock, not a recent unrelated vehicle write, and exposes refresh failure', async () => {
+    fixture.pulse.data.syncedAt = Date.now();
+    fixture.pulse.dataUpdatedAt = Date.now() - 30 * 60_000;
+    await render();
+    expect(container.querySelector('.market-clock')?.textContent).toBe('↻ read 30 min ago');
+    expect(container.querySelector('.market-clock')?.getAttribute('title')).toContain('source capture time is unavailable');
+    fixture.pulse.isError = true;
+    await render();
+    expect(container.querySelector('.market-clock')?.textContent).toBe('↻ retry');
+    expect(boardTitles().length).toBeGreaterThan(0);
   });
 });
 

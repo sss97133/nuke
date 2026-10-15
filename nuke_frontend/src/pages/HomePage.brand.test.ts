@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+const rpc = vi.hoisted(() => vi.fn());
+vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
 import { brandLines, brandMomentum } from './HomePage';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
@@ -30,5 +31,31 @@ describe('a brand’s 12-month move', () => {
     expect(brandMomentum({ ...porsche, sold_prior_12m: 9 })).toBeNull();
     expect(brandMomentum({ ...porsche, dated: 13000 })).toBeNull();
     expect(brandMomentum({ ...porsche, sold_12m: null })).toBeNull();
+  });
+});
+
+describe('a partially unavailable brand market', () => {
+  it.each(['failed', 'partial', 'invalid'])('keeps all tiles and the legend on counts and median price when supplemental data is %s', async mode => {
+    vi.resetModules();
+    const base = [{ name: 'A', count: 10, value: 10, median_price: 20_000 }, { name: 'B', count: 20, value: 20, median_price: 30_000 }];
+    rpc.mockImplementation(async name => name === 'treemap_by_brand' ? { data: base, error: null }
+      : mode === 'failed' ? { data: null, error: { message: 'unavailable' } }
+      : { data: [{ name: 'A', usd: 200_000 }, ...(mode === 'invalid' ? [{ name: 'B', usd: 0 }] : [])], error: null });
+    const { readTreemapBrands, mapLegend } = await import('./HomePage');
+    const rows = await readTreemapBrands();
+    expect(rows).toEqual(base);
+    const legend = mapLegend('brands', !!rows?.length && rows.every(n => n.usd != null && n.usd > 0));
+    expect(legend).toContain('area = vehicles with a confirmed sale');
+    expect(legend).toContain('color = their median sale price');
+    expect(legend).not.toContain('last 12 months');
+  });
+  it('uses dollar area and momentum only with a dollar total for every tile', async () => {
+    vi.resetModules();
+    rpc.mockImplementation(async name => ({ data: name === 'treemap_by_brand'
+      ? [{ name: 'A', count: 10, value: 10 }] : [{ name: 'A', usd: 200_000, sold_12m: 8 }], error: null }));
+    const { readTreemapBrands, mapLegend } = await import('./HomePage');
+    const rows = await readTreemapBrands();
+    expect(rows?.[0].usd).toBe(200_000);
+    expect(mapLegend('brands', true)).toContain('area = dollars from confirmed sales');
   });
 });
