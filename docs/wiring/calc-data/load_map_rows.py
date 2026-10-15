@@ -247,6 +247,7 @@ def position(code):
 
 class API:
     def __init__(self):
+        self.failed = []
         self.url = os.environ.get("VITE_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
         self.key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         if not (self.url and self.key):
@@ -264,6 +265,15 @@ class API:
                 return json.loads(raw) if raw else None
         except urllib.error.HTTPError as e:
             sys.exit(f"{method} {path[:80]} -> HTTP {e.code}: {e.read()[:400].decode(errors='ignore')}")
+
+    def rpc(self, name, body):
+        """An end-of-run fold (RSI pass 36): a failure is reported and the run goes on, so the later folds (nets, splices,
+        settings) never stay un-run behind an earlier one; the run exits non-zero at the end."""
+        try:
+            return self._req("POST", f"rpc/{name}", body)
+        except SystemExit as e:
+            self.failed.append(f"{name}: {e}")
+            return f"FAILED ({e})"
 
     def get(self, table, query):
         return self._req("GET", f"{table}?{query}")
@@ -830,20 +840,20 @@ def main():
     if not PLAN:
         # a plug this run added takes the reshape's node rule (bus for a splice, ground bus or stud) before any fold reads it
         # (RSI pass 28)
-        print(f"node kinds: {api._req('POST', 'rpc/classify_harness_endpoint_nodes', {'p_vehicle_id': K5})}")
-        print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"node kinds: {api.rpc('classify_harness_endpoint_nodes', {'p_vehicle_id': K5})}")
+        print(f"harness model: {api.rpc('resync_harness_segments', {'p_vehicle_id': K5})}")
         # every decided wire's segments follow its live ends by the reshape's rule: new wires get segments, a segment whose
         # end changed plug takes the new end (RSI pass 25, which covers pass 19's fill); the new ends are keyed to their
         # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
-        print(f"segments: {api._req('POST', 'rpc/conform_harness_segments', {'p_vehicle_id': K5})}")
-        print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        print(f"segments: {api.rpc('conform_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"wire end keys: {api.rpc('key_harness_wire_ends', {'p_vehicle_id': K5})}")
         # and every segment to its wire's catalog part and its plugs' option couplings (RSI pass 30: the reshape's and pass
         # 1's rules, re-runnable)
-        print(f"segment keys: {api._req('POST', 'rpc/key_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"segment keys: {api.rpc('key_harness_segments', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
-        print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
+        print(f"cavity keys: {api.rpc('key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
         # citations on a wire end this run re-inserted at the same plug and cavity follow it (RSI pass 28)
-        print(f"evidence carried: {api._req('POST', 'rpc/carry_harness_termination_evidence', {'p_vehicle_id': K5})}")
+        print(f"evidence carried: {api.rpc('carry_harness_termination_evidence', {'p_vehicle_id': K5})}")
         # the boxes the design record places land on the route graph first (RSI pass 31), then each plug keys to its point
         points = [{"node_code": a, "kind": "device", "x": pos["x"], "y": pos["y"], "z": pos["z"], "pos_source": placed_source(a),
                    "method": "placement decision record (catalog/mounts.yaml)", "trust": b["status"]} for a, (b, pos) in PLACED.items()]
@@ -859,8 +869,8 @@ def main():
             points.append({"node_code": pos["point"], "kind": kind, "x": pos["x"], "y": pos["y"], "z": pos["z"],
                            "pos_source": f"{pos['point']}: {e['where']} (confidence {pos['confidence']}; {pos['method']}; {pos['source']})",
                            "method": "placement decision record (catalog/mounts.yaml ends)", "trust": e["status"]})
-        print(f"route points: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
-        print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        print(f"route points: {api.rpc('load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
+        print(f"route graph: {api.rpc('key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
         # the route graph's branches and their junctions from the design record, then every segment between standing
         # points routed over them (RSI pass 33)
         rb = yaml.safe_load((CD / "catalog" / "route_branches.yaml").read_text()) if (CD / "catalog" / "route_branches.yaml").exists() else {}
@@ -869,7 +879,7 @@ def main():
                       "method": "route study (catalog/route_branches.yaml)", "trust": j.get("trust") or "proposed"}
                      for j in (rb.get("junctions") or [])]
         if junctions:
-            print(f"route junctions: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': junctions, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+            print(f"route junctions: {api.rpc('load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': junctions, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
         branches = [{"code": b_["code"], "from": b_["from"], "to": b_["to"], "polyline_m": b_["polyline_m"], "length_in": b_["length_in"],
                      "description": b_.get("follows"), "method": rb.get("method") or "route study",
                      "assumptions": "; ".join(x for x in (b_.get("rule_notes"), f"min clearance {b_.get('min_clearance_mm')} mm"
@@ -877,18 +887,20 @@ def main():
                                                           f"confidence {b_.get('confidence')}" if b_.get("confidence") else None) if x)}
                     for b_ in (rb.get("branches") or [])]
         if branches:
-            print(f"route branches: {api._req('POST', 'rpc/load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
-        print(f"routing: {api._req('POST', 'rpc/route_harness_segments', {'p_vehicle_id': K5})}")
+            print(f"route branches: {api.rpc('load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        print(f"routing: {api.rpc('route_harness_segments', {'p_vehicle_id': K5})}")
         # a routed segment with no plan gets route length x pad (RSI pass 34); the scoreboard checks every plan against its route
-        print(f"route plans: {api._req('POST', 'rpc/plan_harness_segment_lengths', {'p_vehicle_id': K5})}")
+        print(f"route plans: {api.rpc('plan_harness_segment_lengths', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
-        print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
+        print(f"nets: {api.rpc('refold_harness_nets', {'p_vehicle_id': K5})}")
         # the design's splices and their conductors; the nets re-fold through them, and a splice that would join a
         # supply to ground refuses the whole load (RSI pass 16)
-        print(f"splices: {api._req('POST', 'rpc/load_harness_splices', {'p_vehicle_id': K5, 'p_rows': reg.get('splices') or [], 'p_source': f'k5_registry.json splices @ {SHA}'})}")
+        print(f"splices: {api.rpc('load_harness_splices', {'p_vehicle_id': K5, 'p_rows': reg.get('splices') or [], 'p_source': f'k5_registry.json splices @ {SHA}'})}")
         # each PDM output's programmed limit and cited load onto its channel, then onto the nets it protects (RSI pass 15)
-        print(f"pdm settings: {api._req('POST', 'rpc/load_pdm_settings', {'p_vehicle_id': K5, 'p_rows': reg.get('pdm_settings') or [], 'p_source': f'k5_registry.json pdm_settings @ {SHA}'})}")
+        print(f"pdm settings: {api.rpc('load_pdm_settings', {'p_vehicle_id': K5, 'p_rows': reg.get('pdm_settings') or [], 'p_source': f'k5_registry.json pdm_settings @ {SHA}'})}")
+        if api.failed:
+            sys.exit("end-of-run folds failed (the later ones still ran): " + " | ".join(api.failed))
 
 
 if __name__ == "__main__":
