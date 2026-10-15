@@ -13,8 +13,16 @@ describe('the ledger map legend clock', () => {
 });
 
 describe('the ledger map legend measure', () => {
-  it('says the area counts confirmed sales and the color is their median, nothing else', () => {
-    for (const level of ['brands', 'models', 'years'] as const) {
+  it('says what a brand tile measures: dollars, the band, sell-through, the year that trades, the 12-month move', () => {
+    const legend = mapLegend('brands');
+    expect(legend).toContain('area = dollars from confirmed sales');
+    expect(legend).toContain('$low–$high = the cheapest tenth to the top tenth of sales');
+    expect(legend).toContain('sell = share of cars offered that sold');
+    expect(legend).toContain('color = sales in the last 12 months against the 12 before (gray: too few dated sales)');
+    expect(legend).not.toMatch(/median/);
+  });
+  it('says the area counts confirmed sales and the color is their median below the brand level', () => {
+    for (const level of ['models', 'years'] as const) {
       const legend = mapLegend(level);
       expect(legend).toContain('area = vehicles with a confirmed sale');
       expect(legend).toContain('color = their median sale price (gray: under 5 sales)');
