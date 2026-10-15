@@ -1,7 +1,7 @@
 -- Isolated PostgreSQL 17 contract for 20261016140000_privacy_mask_email_handle.sql. Stand-in tables with the live column names;
 -- synthetic rows and a synthetic address only; never production. Run in an empty disposable dm_refinement_* database:
 --   createdb dm_refinement_privacy && psql -X -v ON_ERROR_STOP=1 -d dm_refinement_privacy -f supabase/sql/test_privacy_mask_email_handle.sql
--- Covered: the handle is found by sha256 only; every copy of it (comments incl. content_hash, auction_events winner and bid_history,
+-- Covered (also the widened pattern of 20261016150000): the handle is found by sha256 only; every copy of it (comments incl. content_hash, auction_events winner and bid_history,
 -- vehicle_events buyer, vehicles.origin_metadata, identity handle and profile url) is replaced by bidder-<8 hex>; each original goes to
 -- private.privacy_masked_values; other members' handles are untouched; a second call is a no-op; a non-email handle never matches;
 -- the ACL (no anon or authenticated access to the private table or the function).
@@ -29,7 +29,8 @@ CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE 
 INSERT INTO public.external_identities (id, platform, handle, profile_url) VALUES
  ('00000000-0000-0000-0000-0000000000e1', 'pcarmarket', 'person@example.test', 'https://example.test/member/person@example.test/'),
  ('00000000-0000-0000-0000-0000000000e2', 'pcarmarket', 'plainmember', 'https://example.test/member/plainmember/'),
- ('00000000-0000-0000-0000-0000000000e3', 'pcarmarket', '@insta_style', 'https://example.test/member/@insta_style/');
+ ('00000000-0000-0000-0000-0000000000e3', 'pcarmarket', '@insta_style', 'https://example.test/member/@insta_style/'),
+ ('00000000-0000-0000-0000-0000000000e4', 'pcarmarket', 'trunc9@example.', 'https://example.test/member/trunc9@example./');
 INSERT INTO public.vehicles (id, origin_metadata) VALUES ('00000000-0000-0000-0000-0000000000a1', '{"pcarmarket_buyer_username": "person@example.test", "x": 1}');
 INSERT INTO public.auction_comments (vehicle_id, author_username, author_external_identity_id, content_hash) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'person@example.test', '00000000-0000-0000-0000-0000000000e1', 'pcm_v_2026-01-01_person@example.test_100_bid'),
@@ -40,6 +41,7 @@ INSERT INTO public.auction_events (vehicle_id, winning_bidder, high_bidder, bid_
 INSERT INTO public.vehicle_events (vehicle_id, buyer_identifier) VALUES ('00000000-0000-0000-0000-0000000000a1', 'person@example.test');
 
 \ir ../migrations/20261016140000_privacy_mask_email_handle.sql
+\ir ../migrations/20261016150000_privacy_mask_truncated_email.sql
 
 SET statement_timeout = '30s';
 SELECT pg_temp.ok('a non-matching hash masks nothing',
@@ -89,3 +91,10 @@ SELECT pg_temp.ok('anon and authenticated cannot touch the private table or the 
   AND NOT has_function_privilege('anon', 'public.privacy_mask_email_handle(text,text)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.privacy_mask_email_handle(text,text)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.privacy_mask_email_handle(text,text)', 'EXECUTE'));
+
+CREATE TEMP TABLE r2 AS SELECT public.privacy_mask_email_handle(encode(sha256(convert_to('trunc9@example.', 'UTF8')), 'hex')) AS j;
+SELECT pg_temp.ok('a truncated address (name@domain.) is masked, profile url included',
+  (SELECT (j ->> 'masked')::boolean FROM r2)
+  AND NOT EXISTS (SELECT 1 FROM public.external_identities WHERE handle LIKE '%trunc9@%' OR profile_url LIKE '%trunc9@%'));
+SELECT pg_temp.ok('the Instagram-style handle still never matches',
+  (public.privacy_mask_email_handle(encode(sha256(convert_to('@insta_style', 'UTF8')), 'hex')) ->> 'masked')::boolean IS FALSE);
