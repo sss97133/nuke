@@ -162,6 +162,6 @@ test('targeting gate: cars and trucks 1964-1991 pass with tier; boats, trailers,
   assert.deepEqual(classify(c('1958 Chevrolet Apache', 9000, 1958)).reasons, ['year_before_1964']);
   assert.deepEqual(classify(c('Vintage truck', 9000, null)).reasons, ['year_unknown']);
   assert.equal(classify(c('1975 Honda CB550', 2500, 1975)).reasons[0], 'motorcycle');
-  assert.match(fs.readFileSync(new URL('./extension/content.js', import.meta.url), 'utf8'), new RegExp(core.TARGET.replace(/[?.]/g, '\\$&')));
+  assert(fs.readFileSync(new URL('./extension/content.js', import.meta.url), 'utf8').includes(core.TARGET));
   dom.window.close();
 });
