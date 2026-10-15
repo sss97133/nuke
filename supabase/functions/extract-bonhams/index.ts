@@ -552,6 +552,8 @@ interface ExtractionResult {
   raw_document?: unknown;
   /** Typesense page this lot came from; the lander's cursor reads it back from vehicle_events.metadata.ts_page. */
   ts_page?: number;
+  /** Calendar and depth keys merged into the event metadata (session days, sale key, engine/registration numbers). */
+  extra_metadata?: Record<string, unknown>;
 }
 
 interface SaveOptions {
@@ -559,6 +561,7 @@ interface SaveOptions {
   fast?: boolean;
   observedAt?: string;
   method?: string;
+  onObservationIssue?: (msg: string) => void;
 }
 
 async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
@@ -1054,14 +1057,22 @@ async function saveVehicle(
     }
     const obsPromise = writeObservation(supabase, {
       vehicleId: targetId,
-      source: { platform: "bonhams", url: extracted.url, trustScore: 0.9 },
+      source: { platform: "bonhams", url: extracted.url, trustScore: 0.9, sourceIdentifier: extracted.event_key },
       fields: obsFields,
       observationKind: extracted.sale_price ? "sale_result" : "listing",
       extractionMethod: opts.method ?? "json_ld_parse",
       observedAt: opts.observedAt,
       rawData: extracted.raw_document,
-    }).catch((e: any) => console.warn(`[BONHAMS] observationWriter error for ${targetId}: ${e?.message}`));
-    if (opts.fast) await obsPromise;
+    }).catch((e: any) => {
+      console.warn(`[BONHAMS] observationWriter error for ${targetId}: ${e?.message}`);
+      return null;
+    });
+    if (opts.fast) {
+      const r = await obsPromise;
+      if (!r?.observationId || r.errors.length) {
+        opts.onObservationIssue?.(`${extracted.event_key}: ${(r?.errors ?? ["no result"]).join("; ").slice(0, 200)}`);
+      }
+    }
   }
 
   // Save images (non-fatal)
@@ -1115,6 +1126,7 @@ async function saveVehicle(
         hammer_price: extracted.hammer_price ?? null,
         hammer_premium: extracted.hammer_premium ?? null,
         ...(extracted.ts_page ? { ts_page: extracted.ts_page } : {}),
+        ...(extracted.extra_metadata ?? {}),
         chassis_number: extracted.chassis_number,
         quality_score: gateResult.score,
       },
@@ -1154,7 +1166,7 @@ Deno.serve(async (req) => {
     if (action === "land_lots") {
       const lots: ExtractionResult[] = Array.isArray(body.lots) ? body.lots.slice(0, 100) : [];
       const observedAt: string | undefined = body.observed_at;
-      const results = { received: lots.length, created: 0, updated: 0, rejected: 0, failed: 0, errors: [] as string[] };
+      const results = { received: lots.length, created: 0, updated: 0, rejected: 0, failed: 0, obs_issues: 0, errors: [] as string[] };
       const started = Date.now();
       const BUDGET_MS = 100_000;
       let next = 0;
@@ -1162,7 +1174,10 @@ Deno.serve(async (req) => {
         while (next < lots.length && Date.now() - started < BUDGET_MS) {
           const lot = lots[next++];
           try {
-            const r = await saveVehicle(supabase, lot, undefined, { fast: true, observedAt, method: "typesense_api" });
+            const r = await saveVehicle(supabase, lot, undefined, {
+              fast: true, observedAt, method: "typesense_api",
+              onObservationIssue: (m) => { results.obs_issues++; if (results.errors.length < 8) results.errors.push(`obs ${m}`); },
+            });
             if (r.action === "created") results.created++;
             else if (r.action === "updated") results.updated++;
             else if (r.action === "rejected") results.rejected++;

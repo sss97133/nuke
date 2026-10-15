@@ -102,14 +102,14 @@ function parseTitle(title: string): ParsedTitle {
   // Extract chassis/VIN from title
   // Patterns: "Chassis no. XXXXX", "Chassis no XXXXX", "VIN XXXXX"
   const chassisPatterns = [
-    /Chassis\s+no\.?\s+([A-Z0-9*-]+(?:\s+[A-Z0-9*-]+)?)/i,
+    /Chassis\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
     /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-    /Frame\s+no\.?\s+([A-Z0-9*-]+)/i,
+    /Frame\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
   ];
   for (const pat of chassisPatterns) {
     const m = title.match(pat);
     if (m) {
-      result.chassis = m[1].trim().toUpperCase();
+      result.chassis = m[1].trim().replace(/[./-]+$/, "").toUpperCase();
       break;
     }
   }
@@ -515,6 +515,20 @@ Deno.serve(async (req) => {
           cost_cents: 0,
           event_key: doc.id,
           ts_page: pageNo,
+          extra_metadata: {
+            sale_key: `bonhams-${doc.auctionId}`,
+            auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
+              ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],
+            sale_starts_on: (doc as unknown as { biddableFrom?: { datetime?: string } }).biddableFrom?.datetime?.slice(0, 10) ?? null,
+            sale_ends_on: doc.auctionEndDate?.datetime?.slice(0, 10) ?? null,
+            sale_location: doc.region?.name || doc.country?.name || null,
+            country_code: doc.country?.code ?? null,
+            lot_unique_id: doc.lotUniqueId ?? null,
+            engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
+            registration: (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null,
+            without_reserve: !!doc.flags?.isWithoutReserve,
+            bonhams_status: doc.status ?? null,
+          },
           hammer_price: hammer,
           hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
           // The source document is retained on the observation (raw_data); the page is stamped for the cursor.
