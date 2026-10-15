@@ -195,7 +195,15 @@ _TC = Path(__file__).with_name("twin_centers.json")
 TWIN_POS = json.load(open(_TC)) if _TC.exists() else {}
 
 
+PIN_SPLICE = {}     # RSI pass 26: pin splice node -> its plug and cavity (set by main from the registry)
+
+
 def position(code):
+    ps = PIN_SPLICE.get(code)
+    if ps:
+        at = position(ps["plug"])
+        return dict(at, pos_source=f"beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the plug on its lead; "
+                                   + at["pos_source"]) if at else {}
     a = NODE_ANCHOR.get(code)
     if not a and TWIN_OBJ.get(code) in TWIN_POS:
         x, y, z = TWIN_POS[TWIN_OBJ[code]]
@@ -256,6 +264,7 @@ def main():
     wires = {str(w["id"]): w for w in reg["wires"] if not w.get("retired")}
     wires.update({str(w["id"]): w for w in reg["implied"]})
     eps, terms, cands = reg["endpoints"], reg["terminations"], reg["candidates"]
+    PIN_SPLICE.update({e: ep["pin_splice"] for e, ep in eps.items() if ep.get("pin_splice")})
 
     # ------------------------------------------------ nodes: v5 endpoints + April candidate devices
     nodes = {}
@@ -312,7 +321,9 @@ def main():
         # the start is the plug the record names, else the ECU/PDM pin; a wire whose start plug has no write-up still
         # starts there (2026-09-27: dual-pin PDM outputs had both pins taken as the two ends)
         src_end = (next((t for t in tl if fc and t["endpoint"] == fc), None)
-                   or next((t for t in tl if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15"))), None))
+                   or next((t for t in tl if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15"))), None)
+                   # RSI pass 26: a wire that ends at the splice beside a pin starts there
+                   or next((t for t in tl if t["endpoint"] in PIN_SPLICE), None))
         if src_end is None and not fc:
             src_end = next((t for t in tl if t["endpoint"] != tc), None) if tc else (tl[0] if tl else None)
         # the far end is the device, not an inline connector the wire passes through, nor another pin of the start
@@ -397,7 +408,9 @@ def main():
     # April concept rows the v5 design now carries (a v5 wire on the same two plugs) or a locked decision rules out
     # (R13 in WIRE_CHECKS.json) leave the map; the rest stay as concept for section-by-section review (2026-09-27)
     def _unit(code):
-        # the ECU/PDM connectors and studs count as one box; April pseudo-nodes (M130_HB_spare, PDM30_OUT_*) stay themselves
+        # the ECU/PDM connectors and studs count as one box; April pseudo-nodes (M130_HB_spare, PDM30_OUT_*) stay themselves;
+        # a pin splice node counts as its plug (RSI pass 26)
+        code = (PIN_SPLICE.get(code) or {}).get("plug", code)
         if not code or code not in eps:
             return code or None
         return ("PDM30" if code.startswith("PDM30") else "PDM15" if code.startswith("PDM15")
