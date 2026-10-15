@@ -44,6 +44,8 @@ export interface ArchiveFetchOptions {
   skipCache?: boolean;
   /** Use Firecrawl (for JS-rendered sites like C&B) */
   useFirecrawl?: boolean;
+  /** Direct fetch first; when the site blocks it (403/429/challenge, "Blocked by site"), fetch the page with Firecrawl. */
+  firecrawlOnBlock?: boolean;
   /** Firecrawl waitFor in ms */
   waitForJs?: number;
   /** Request markdown from Firecrawl in addition to HTML */
@@ -326,6 +328,30 @@ export async function archiveFetch(
     result.source = directResult.source as "direct" | "proxy";
     result.statusCode = directResult.statusCode ?? null;
     result.error = directResult.error ?? null;
+
+    // The site refused our server's address: one Firecrawl scrape, only for callers that opted in.
+    const refused = !result.html && (/blocked|forbidden|captcha|challenge|auth_required|login page/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
+    if (options?.firecrawlOnBlock && refused) {
+      const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
+        url,
+        formats: ["html"],
+        onlyMainContent: false,
+        waitFor: options?.waitForJs ?? 3000,
+      });
+      result.html = fcResult.data.html;
+      result.markdown = fcResult.data.markdown;
+      result.source = "firecrawl";
+      result.statusCode = fcResult.httpStatus;
+      result.error = fcResult.error;
+      result.costCents = 1;
+      await logFetchCost(supabase, options?.callerName ?? "archiveFetch", url, {
+        html: result.html,
+        source: "firecrawl",
+        costCents: 1,
+        error: result.error ?? undefined,
+        statusCode: result.statusCode ?? undefined,
+      }).catch(() => {});
+    }
   }
 
   // Step 3: Archive to listing_page_snapshots (non-blocking, never fail the main operation)
