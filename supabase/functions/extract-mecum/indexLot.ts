@@ -48,7 +48,7 @@ export function termName(t: any, key: string, field: "name" | "slug" = "name"): 
 }
 
 /** An index record as an IndexLot, or the reason it is not one. Pure: no request, no write. */
-export function indexLot(hit: any): { lot: IndexLot } | { skip: string } {
+export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: string; title?: string } {
   const t = hit?.taxonomies;
   if (!t || typeof t !== "object") return { skip: "no_taxonomies" };
   const lotType = termName(t, "lot_type");
@@ -58,7 +58,7 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string } {
   if (!lotId) return { skip: "no_lot_id" };
   const year = Number(termName(t, "lot_year"));
   const make = termName(t, "make");
-  if (!Number.isInteger(year) || year < 1885 || year > 2100 || !make) return { skip: "no_year_make" };
+  if (!Number.isInteger(year) || year < 1885 || year > 2100 || !make) return { skip: "no_year_make", url: `https://www.mecum.com${permalink}`, title: typeof hit.post_title === "string" ? hit.post_title : undefined };
   const resultName = termName(t, "sale_result", "slug");
   const result = hit.sold === 1 || resultName === "sold" ? "sold" : (hit.bid_goes_on === 1 || resultName === "bid-goes-on" ? "bid-goes-on" : null);
   const rawPrice = Number(hit.highest_bid_or_price);
