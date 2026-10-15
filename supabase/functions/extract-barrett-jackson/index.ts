@@ -741,14 +741,19 @@ function isPageRemoved(html: string | null, markdown: string | null): boolean {
 
 // ─── Fetch + parse (tries direct first, falls back to Firecrawl) ────────────
 
-async function fetchAndParse(url: string): Promise<BJVehicle> {
+let lastCaptureSource = ""; // cache | direct | firecrawl: where the page behind the last parse came from (reported by action extract)
+
+async function fetchAndParse(url: string, opts?: { retainedFirst?: boolean; noFirecrawl?: boolean }): Promise<BJVehicle & { capture_source?: string }> {
   // Step 1: Try direct HTTP fetch (free, uses archiveFetch with cache)
   // BJ has Cloudflare but archiveFetch handles retries/proxies
+  // retainedFirst: use any retained capture however old (re-landing a lot whose vehicle was lost needs the capture, not a new fetch)
   const directResult = await archiveFetch(url, {
     platform: "barrett-jackson",
     useFirecrawl: false,
     callerName: "extract-barrett-jackson",
+    ...(opts?.retainedFirst ? { maxAgeSec: 10 * 365 * 86400 } : {}),
   });
+  lastCaptureSource = directResult.cached ? "cache" : directResult.source;
 
   const isBlocked = directResult.statusCode === 403 || directResult.statusCode === 503 ||
     (directResult.html && directResult.html.length < 50000 &&
@@ -796,6 +801,7 @@ async function fetchAndParse(url: string): Promise<BJVehicle> {
     }
   }
 
+  if (opts?.noFirecrawl) throw new Error("NO_USABLE_CAPTURE");
   // Step 2: Fallback to Firecrawl (BJ usually requires JS rendering)
   console.log(`[BJ] Direct fetch insufficient, falling back to Firecrawl for ${url}`);
   const fcResult = await archiveFetch(url, {
@@ -1191,11 +1197,12 @@ Deno.serve(async (req) => {
 
       let vehicle: BJVehicle;
       try {
-        vehicle = await fetchAndParse(url);
+        vehicle = await fetchAndParse(url, { retainedFirst: body.retained_first === true, noFirecrawl: body.no_firecrawl === true });
       } catch (e: any) {
         if (e.message === "PAGE_NOT_FOUND") {
           return okJson({ success: false, error: "Page not found (removed by Barrett-Jackson)" }, 410);
         }
+        if (e.message === "NO_USABLE_CAPTURE") return okJson({ success: false, error: "no_usable_capture" }, 422);
         throw e;
       }
 
@@ -1232,6 +1239,7 @@ Deno.serve(async (req) => {
         success: true,
         vehicle_id: vehicleId,
         is_new: isNew,
+        capture_source: lastCaptureSource,
         quality_score: qualityScore,
         extraction_method: vehicle.extraction_method,
         fields_updated: fieldsUpdated,
