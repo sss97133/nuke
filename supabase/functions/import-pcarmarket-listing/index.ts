@@ -4,6 +4,8 @@ import { normalizeMake, normalizeVehicleFields } from '../_shared/normalizeVehic
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseSsrPage } from "./ssrPage.ts";
+import { batchFromTargets, discoverTargets } from "./targets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -352,6 +354,36 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           html = '';
         }
       }
+    }
+
+    // Current pages are server-rendered (Car Details block in the HTML): read them without JS rendering.
+    const ssr = parseSsrPage(html);
+    if (ssr) {
+      const slug = url.match(/\/auction\/([^\/\?]+)/)?.[1];
+      return {
+        url: normalizeUrl(url),
+        title: ssr.title,
+        year: ssr.year,
+        make: ssr.make,
+        model: ssr.model,
+        vin: ssr.vin,
+        mileage: ssr.mileage,
+        salePrice: ssr.salePrice,
+        auctionEndDate: ssr.auctionEndDate,
+        saleDate: ssr.auctionOutcome === 'sold' ? ssr.auctionEndDate : undefined,
+        auctionOutcome: ssr.auctionOutcome === 'sold' ? 'sold' : ssr.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : null,
+        description: ssr.description,
+        images: ssr.images,
+        slug,
+        auctionId: slug?.split('-').pop() || undefined,
+        bidCount: ssr.bidCount,
+        viewCount: ssr.viewCount,
+        location: ssr.location,
+        reserveStatus: ssr.auctionType,
+        color: ssr.color,
+        interiorColor: ssr.interiorColor,
+        transmission: ssr.transmission,
+      };
     }
 
     // Initialize listing
@@ -753,6 +785,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
+    if (body.action === 'batch_from_targets' || body.action === 'discover_targets') {
+      const sb = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!, {
+        global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
+      });
+      const out = body.action === 'discover_targets'
+        ? await discoverTargets(sb)
+        : await batchFromTargets(sb, Deno.env.get('SUPABASE_URL')!, body);
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const listing_url = body.listing_url || body.url;
     const providedHtml = body.html;
 
@@ -1011,6 +1052,8 @@ Deno.serve(async (req: Request) => {
         source_url: listing.url,
         source_listing_id: listing.auctionId || listing.slug || null,
         event_status: eventStatus,
+        extraction_method: 'ssr_parse',
+        extractor_version: 'import-pcarmarket-listing:2',
         current_price: listing.salePrice || null,
         bid_count: listing.bidCount || null,
         view_count: listing.viewCount || null,
