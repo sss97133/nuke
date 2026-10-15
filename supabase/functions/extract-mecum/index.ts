@@ -32,6 +32,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { indexLot, parseSaleFacet, type IndexLot } from "./indexLot.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
@@ -214,7 +215,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
+let writeErrors: string[] = [];
+
 function okJson(data: unknown, status = 200) {
+  if (writeErrors.length && data && typeof data === "object" && !Array.isArray(data)) {
+    data = { ...(data as Record<string, unknown>), write_error_count: writeErrors.length, write_errors: writeErrors.slice(0, 10) };
+  }
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1039,7 +1046,8 @@ async function saveVehicle(
     // Strip identity/source fields that should only be set on insert
     const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
 
-    const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    const updateErr = updateRes.error;
     if (updateErr) {
       // VIN unique constraint violation: another vehicle already has this VIN.
       // Retry without VIN to still update other fields.
@@ -1095,8 +1103,7 @@ async function saveVehicle(
       .map((imgUrl, idx) => ({ vehicle_id: vehicleId, image_url: imgUrl, source: "external_import", source_url: imgUrl, is_external: true, position: idx }))
       .filter((row) => !haveUrls.has(row.image_url));
     if (fresh.length) {
-      const { error: imgErr } = await supabase.from("vehicle_images").insert(fresh);
-      if (imgErr) console.warn(`[MECUM] image insert failed for ${vehicleId}: ${imgErr.message}`);
+      softWrite("vehicle_images insert", await supabase.from("vehicle_images").insert(fresh), writeErrors);
     }
   }
 
@@ -1148,6 +1155,7 @@ function mecumUrlSpellings(url: string): string[] {
 // ─── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  writeErrors = [];
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -1197,10 +1205,10 @@ Deno.serve(async (req) => {
       const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
 
       // Update queue entry if exists
-      await supabase
+      softWrite("import_queue complete", await supabase
         .from("import_queue")
         .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-        .eq("listing_url", url);
+        .eq("listing_url", url), writeErrors);
 
       return okJson({
         success: true,
@@ -1250,7 +1258,7 @@ Deno.serve(async (req) => {
         const { data: row } = await supabase.from("import_queue").select("id, status").eq("listing_url", url).maybeSingle();
         if (row) {
           if (row.status === "processing") continue;
-          await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id);
+          softWrite("import_queue requeue", await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id), writeErrors);
           requeued++;
         } else {
           const { error } = await supabase.from("import_queue").insert({ listing_url: url, status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw });
@@ -1486,13 +1494,13 @@ Deno.serve(async (req) => {
           if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); continue; }
           if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); continue; }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
-          await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id);
+          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
           if (isNew) out.created++; else out.updated++;
         } catch (err: any) {
           out.failed++;
           if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
-          await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id);
+          softWrite("import_queue failed", await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id), writeErrors);
         }
       }
       return okJson({ ...out, success: true });
@@ -1590,7 +1598,7 @@ Deno.serve(async (req) => {
               if (same && !due) continue; // nothing to write; one update per lot made the roster read outrun the function limit
               const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
               if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
-              await supabase.from("import_queue").update(patch).eq("id", row.id);
+              softWrite("import_queue roster update", await supabase.from("import_queue").update(patch).eq("id", row.id), writeErrors);
             }
           }
         }
@@ -1608,7 +1616,7 @@ Deno.serve(async (req) => {
           if (!sale.run_day || sale.run_day < todayUtc()) continue;
           const { data: ev } = await supabase.from("vehicle_events").select("id, metadata").eq("vehicle_id", r.vehicle_id).eq("source_platform", "mecum").in("source_url", mecumUrlSpellings(r.listing_url)).limit(1);
           if (ev?.[0] && !ev[0].metadata?.withdrawn_at) {
-            await supabase.from("vehicle_events").update({ metadata: { ...ev[0].metadata, withdrawn_at: startedAt.toISOString() } }).eq("id", ev[0].id);
+            mustWrite("vehicle_events withdrawn_at", await supabase.from("vehicle_events").update({ metadata: { ...ev[0].metadata, withdrawn_at: startedAt.toISOString() } }).eq("id", ev[0].id));
             withdrawn++;
           }
         }
@@ -1620,7 +1628,7 @@ Deno.serve(async (req) => {
       for (const r of pastRows ?? []) {
         const sale = r.raw_data?.sale;
         if (sale?.run_day && sale.run_day < todayUtc() && !r.raw_data?.result_read) {
-          await supabase.from("import_queue").update({ status: "pending" }).eq("id", r.id);
+          softWrite("import_queue result re-read", await supabase.from("import_queue").update({ status: "pending" }).eq("id", r.id), writeErrors);
           resultsDue++;
         }
       }
@@ -1724,8 +1732,9 @@ Deno.serve(async (req) => {
         if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
         let rowId = w.rowId;
         if (rowId) {
-          const { data: won } = await supabase.from("import_queue").update({ status: "processing", locked_at: new Date().toISOString() }).eq("id", rowId).eq("status", "pending").select("id");
-          if (!won?.length) continue; // another run holds this lot
+          const claim = await supabase.from("import_queue").update({ status: "processing", locked_at: new Date().toISOString() }).eq("id", rowId).eq("status", "pending").select("id");
+          if (claim.error) { softWrite("import_queue claim", claim, writeErrors); continue; }
+          if (!claim.data?.length) continue; // another run holds this lot
         } else {
           const { data: row, error: claimErr } = await supabase
             .from("import_queue")
@@ -1742,16 +1751,16 @@ Deno.serve(async (req) => {
             // Keep the backfill's claim on the event before the page's result replaces its state.
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
             if (ev && !ev.metadata?.orphan_claim) {
-              await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id);
+              mustWrite("vehicle_events orphan_claim", await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id));
             }
           }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle, undefined, w.sale);
           if (w.reverify?.event_id) {
             const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
-            await supabase.from("vehicle_events").update({
+            mustWrite("vehicle_events sale_reverified", await supabase.from("vehicle_events").update({
               metadata: { ...(ev?.metadata ?? {}), sale_reverified: confirmed ? "confirmed" : "refused", reverified_at: new Date().toISOString(), reverified_result: vehicle.status ?? null },
-            }).eq("id", w.reverify.event_id);
+            }).eq("id", w.reverify.event_id));
             results.reverified++;
             if (confirmed) results.confirmed++;
           }
@@ -1761,14 +1770,14 @@ Deno.serve(async (req) => {
             done.raw_data = { sale: w.sale, ...(resultRead ? { result_read: true } : {}) };
             results.upcoming++;
           }
-          await supabase.from("import_queue").update(done).eq("id", rowId);
+          softWrite("import_queue complete", await supabase.from("import_queue").update(done).eq("id", rowId), writeErrors);
           results.landed++;
           if (isNew) results.created++; else results.updated++;
           consecutiveFailures = 0;
         } catch (err: any) {
           const msg = String(err?.message || err);
           const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
-          await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId);
+          softWrite("import_queue outcome", await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId), writeErrors);
           if (gone) { results.gone++; consecutiveFailures = 0; }
           else {
             results.failed++;
@@ -1805,10 +1814,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite("import_queue claim", await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1826,20 +1835,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            softWrite("import_queue failed", await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id), writeErrors);
             results.failed++;
             continue;
           }
 
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          softWrite("import_queue complete", await supabase
             .from("import_queue")
             .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .eq("id", item.id), writeErrors);
 
           results.success++;
           if (isNew) results.created++;
@@ -1853,10 +1862,10 @@ Deno.serve(async (req) => {
           const msg = err.message === "PAGE_NOT_FOUND" ? "Page removed/404" : (err.message || String(err));
           results.failed++;
           if (results.errors.length < 5) results.errors.push(`${item.listing_url}: ${msg}`);
-          await supabase
+          softWrite("import_queue failed", await supabase
             .from("import_queue")
             .update({ status: "failed", error_message: msg.slice(0, 500) })
-            .eq("id", item.id);
+            .eq("id", item.id), writeErrors);
         }
       }
 
@@ -1928,7 +1937,7 @@ Deno.serve(async (req) => {
           const msg = err.message || String(err);
           // SKIP_NO_NEXT_DATA means this page needs Firecrawl — bump updated_at so it rotates out
           if (msg === "SKIP_NO_NEXT_DATA" || msg === "PAGE_NOT_FOUND") {
-            await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id);
+            softWrite("vehicles rotation bump", await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id), writeErrors);
             results.failed++;
             return;
           }
