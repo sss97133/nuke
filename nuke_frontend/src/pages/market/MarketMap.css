@@ -1,0 +1,60 @@
+/* The market map's tiles, card, phone sheet and legend (MarketTile.tsx). Seven diverging stops computed in OKLCH;
+   #111 text reads at 4.8:1 or better on every light stop. Dark stops are finviz's. */
+:root, :root[data-theme="light"] {
+  --map-1: #d9544b; --map-2: #e88f85; --map-3: #f0c5bf; --map-4: #e8e8e5; --map-5: #bbdbc0; --map-6: #7fc08c; --map-7: #3ca059;
+  --map-none: #fbfbf9; --map-ink: #111111; --map-ink-2: #3b3b3b;
+  --map-hatch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7'%3E%3Cpath d='M-2 2L2-2M0 7L7 0M5 9L9 5' stroke='%23111' stroke-opacity='0.3' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] {
+  --map-1: #f63538; --map-2: #bf4045; --map-3: #8b444e; --map-4: #414554; --map-5: #35764e; --map-6: #2f9e4f; --map-7: #30cc5a;
+  --map-none: #1d1f26; --map-ink: #f5f5f5; --map-ink-2: #d9d9d9;
+  --map-hatch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7'%3E%3Cpath d='M-2 2L2-2M0 7L7 0M5 9L9 5' stroke='%23fff' stroke-opacity='0.3' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.market-tile {
+  position: absolute; box-sizing: border-box; border: 2px solid var(--border); overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 6px;
+  text-align: center; color: var(--map-ink); font-family: Arial, sans-serif; user-select: none;
+  transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.market-tile:hover { border-color: var(--border-focus); }
+.market-tile--few { background-image: var(--map-hatch); }
+.market-tile__name { font-size: var(--name-size); font-weight: 700; line-height: 1.1; white-space: nowrap; text-transform: uppercase; letter-spacing: -0.01em; }
+.market-tile__move { font-size: var(--move-size); font-weight: 700; line-height: 1.15; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.market-tile__stat { font-size: 12px; font-family: 'Courier New', monospace; line-height: 1.3; white-space: nowrap; color: var(--map-ink-2); }
+.market-tile__stat--small { font-size: 11px; }
+
+.market-card, .market-sheet { background: var(--surface-elevated, #fff); color: var(--text); font-family: Arial, sans-serif; }
+.market-card { position: fixed; z-index: 10000; width: 300px; box-sizing: border-box; padding: 12px 14px; border: 2px solid var(--text); pointer-events: none; }
+.market-card__head { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.market-card__window { font-size: 10px; color: var(--text-secondary); margin: 2px 0 8px; }
+.market-card__move { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-secondary); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.market-card__big { font-size: 18px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.market-card__rows { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 0; font-size: 11px; }
+.market-card__rows dt { color: var(--text-secondary); }
+.market-card__rows dd { margin: 0; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+.market-card__note, .market-card__foot { font-size: 10px; color: var(--text-secondary); margin-top: 8px; }
+
+.market-sheet__scrim { position: fixed; inset: 0; z-index: 10001; background: color-mix(in srgb, var(--text) 18%, transparent); display: flex; align-items: flex-end; }
+.market-sheet { width: 100%; box-sizing: border-box; max-height: 70vh; overflow: auto; padding: 16px; border-top: 2px solid var(--text); }
+.market-sheet__actions { display: flex; gap: 8px; margin-top: 12px; }
+.market-sheet__open, .market-sheet__close { font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; padding: 10px 14px; border: 2px solid var(--text); cursor: pointer; }
+.market-sheet__open { flex: 1; background: var(--text); color: var(--bg); }
+.market-sheet__close { background: transparent; color: var(--text); }
+
+.map-legend { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.map-legend__scale { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.map-legend__stop { display: inline-flex; align-items: center; gap: 4px; }
+.map-legend__swatch { display: inline-block; width: 28px; height: 12px; border: 1px solid var(--border); box-sizing: border-box; }
+.map-legend__swatch--1 { background: var(--map-1); } .map-legend__swatch--2 { background: var(--map-2); }
+.map-legend__swatch--3 { background: var(--map-3); } .map-legend__swatch--4 { background: var(--map-4); }
+.map-legend__swatch--5 { background: var(--map-5); } .map-legend__swatch--6 { background: var(--map-6); }
+.map-legend__swatch--7 { background: var(--map-7); }
+.map-legend__swatch--few { background: var(--map-4) var(--map-hatch); }
+.map-legend__swatch--none { background: var(--map-none); }
+.map-legend__value { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.map-legend__receipt { font-size: 12px; line-height: 1.4; color: var(--text-secondary); }
+@media (max-width: 640px) {
+  .map-legend__swatch { width: 20px; }
+  .map-legend__receipt { font-size: 11px; }
+}
