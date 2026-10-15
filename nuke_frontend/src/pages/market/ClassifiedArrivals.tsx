@@ -31,9 +31,12 @@ export function ageOf(value: string | null | undefined, now = Date.now()): strin
   return `${Math.floor(s / 86400)} d`;
 }
 // A listing's name as a reader expects to see it: a word typed in lower case gets its capital, a word with digits is a
-// code (SR5, F-150, K1500); a word already capitalised stays as the seller wrote it.
+// code (SR5, F-150, K1500), and so is a short word with no vowel (XLT, GT, SS); a word already capitalised stays as the
+// seller wrote it.
 export function tidyName(value: string | null | undefined): string {
   return (value ?? '').split(/(\s+)/).map((w) => /\d/.test(w) ? w.toUpperCase()
+    // a short word with no vowel is a trim code (xlt, gt, ss, ltz), not a word
+    : /^[b-df-hj-np-tv-xz]{2,4}$/.test(w) ? w.toUpperCase()
     : /^[a-z][a-z'.-]*$/.test(w) && w.length > 1 ? w[0].toUpperCase() + w.slice(1) : w).join('');
 }
 // The source as a small mark, not a word: the platform's own icon, kept in the repo, with its name for screen readers.

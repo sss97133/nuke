@@ -290,7 +290,10 @@ describe('how a listing is named', () => {
     const { tidyName } = await import('./ClassifiedArrivals');
     expect(tidyName('wrangler')).toBe('Wrangler');
     expect(tidyName('tacoma sr5')).toBe('Tacoma SR5');
-    expect(tidyName('f-150 xlt')).toBe('F-150 Xlt');
+    expect(tidyName('f-150 xlt')).toBe('F-150 XLT');
+    expect(tidyName('camaro ss')).toBe('Camaro SS');
+    expect(tidyName('ranger xlt 4x4')).toBe('Ranger XLT 4X4');
+    expect(tidyName('sky')).toBe('Sky');
     expect(tidyName('k1500')).toBe('K1500');
     expect(tidyName('Sonoma')).toBe('Sonoma');
     expect(tidyName('DeVille')).toBe('DeVille');
