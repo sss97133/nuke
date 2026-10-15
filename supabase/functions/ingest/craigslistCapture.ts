@@ -32,7 +32,7 @@
  */
 
 import { normalizeDrivetrain, normalizeTransmission } from "../_shared/normalizeVehicle.ts";
-import { type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
+import { pickCapture, type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
 import type { ObservationInput, WriteResult } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
 
@@ -264,6 +264,8 @@ export async function landCraigslistCapture(
     vehicleId: string;
     listingUrl: string;
     capture: CraigslistCapture;
+    /** Prose parsed from this same source capture; admitted only with its validated snapshot and source clock. */
+    sourceDescription?: string | null;
     written: WrittenColumns;
     /** True when ingest created the vehicle from this page a moment ago. Then the columns it wrote are not re-confirmed. */
     isNewVehicle?: boolean;
@@ -287,7 +289,10 @@ export async function landCraigslistCapture(
     }
 
     const fields = captureObservationFields(capture, written, vinWritable);
-    if (Object.keys(fields).length === 0) return landing;
+    // A cached page without its receipt must not acquire a current source clock from the writer's default.
+    const sourceDescription = pickCapture(capture)?.source_capture && typeof args.sourceDescription === "string" && args.sourceDescription.trim()
+      ? args.sourceDescription : null;
+    if (Object.keys(fields).length === 0 && !sourceDescription) return landing;
 
     const result = await withTimeout(
       deps.writeObservation(deps.supabase, {
@@ -299,6 +304,7 @@ export async function landCraigslistCapture(
         ...(args.isNewVehicle ? { testimonyOnly: COLUMNS_WRITTEN_AT_CREATION } : {}),
         observationKind: "listing",
         extractionMethod: "html_parse",
+        ...(sourceDescription ? { contentText: sourceDescription } : {}),
         ...(capture.source_capture ? { observedAt: capture.source_capture.observed_at } : {}),
         // The verbatim block, so the observation stands on its own if the page is gone.
         rawData: { ...ledgerFields(capture), ...(args.modelCitation ? { model_from_text: args.modelCitation } : {}), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
