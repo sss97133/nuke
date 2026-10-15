@@ -825,32 +825,15 @@ Deno.serve(async (req: Request) => {
       global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
     });
 
-    // Get or create scrape source
+    // Source health row: scrape_sources is keyed by url (it has no domain/source_name/base_url columns).
     const { data: source } = await supabase
       .from('scrape_sources')
       .select('id')
-      .eq('domain', 'pcarmarket.com')
+      .ilike('url', '%pcarmarket.com%')
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle();
-
-    let sourceId = source?.id;
-
-    if (!sourceId) {
-      const { data: newSource } = await supabase
-        .from('scrape_sources')
-        .insert({
-          domain: 'pcarmarket.com',
-          source_name: 'PCarMarket',
-          source_type: 'auction_house',
-          base_url: 'https://www.pcarmarket.com',
-          is_active: true,
-        })
-        .select('id')
-        .maybeSingle();
-
-      if (newSource) {
-        sourceId = newSource.id;
-      }
-    }
+    const sourceId = source?.id;
 
     console.log(`Importing PCarMarket listing: ${listing_url}`);
 
