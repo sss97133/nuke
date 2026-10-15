@@ -578,6 +578,8 @@ jobs:
         run: deno check --node-modules-dir=none supabase/functions/batch-vin-decode/index.ts
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
+      - name: Verify extract-bat-core writes an end event only after the close, and its page read clock
+        run: deno test supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts
       - name: Verify native BaT frames, per-lot admission isolation and coverage
         run: deno test --node-modules-dir=none supabase/functions/_shared/batLiveEvents.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
