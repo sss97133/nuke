@@ -5,7 +5,8 @@
  */
 type Rpc = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data?: unknown; error?: { message: string } | null }> };
 
-export const ALLOWANCE_EXHAUSTED = "rate_limited: firecrawl allowance exhausted for today";
+/** The poller reads "allowance_deferred" as a deferral (poll-listing-feeds/ledger.ts): no ledger row, no attempt counted. */
+export const ALLOWANCE_EXHAUSTED = "allowance_deferred: firecrawl allowance exhausted for today";
 
 export function firecrawlGate(supabase: Rpc, source: string) {
   return {

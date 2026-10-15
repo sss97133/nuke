@@ -162,6 +162,8 @@ function statusCodes(message: string): number[] {
  */
 export function failureCategoryFor(message: string): string {
   const m = message.toLowerCase();
+  // A paid fetch the source's Firecrawl allowance does not cover today (_shared/firecrawlGate.ts) is a deferral, not a failure.
+  if (/allowance[_ ]deferred/.test(m)) return "deferred";
   const codes = statusCodes(message);
   if (
     /no credits remaining|insufficient[_ ]credits?|insufficient[_ ]quota|exceeded your current quota|payment required/.test(m) ||
@@ -398,6 +400,8 @@ export function ledgerWriteFor(input: {
 }): LedgerWrite | null {
   const { url, feedId, ingest, batch, prev, now } = input;
   if (!shouldLedger(ingest)) return null;
+  // Deferred by the Firecrawl allowance: no ledger row and no attempt, so the URL is read again in the next window.
+  if (failureCategoryFor([ingest.error, ingest.reason, ingest.enrichment_error].filter(Boolean).join(" ")) === "deferred") return null;
 
   // A rejected/failed request need not return a vehicle. Its landing remains unknown even if an earlier row exists.
   let outcome: LedgerOutcome | null;
@@ -562,7 +566,7 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
       s.estimate_ms = Math.max(1_000, elapsedMs);
       const error = [outcome.error, outcome.reason, outcome.enrichment_error].filter(Boolean).join(" ");
       const category = failureCategoryFor(error);
-      if (error && ["billing", "rate_limited", "blocked", "timeout"].includes(category)) s.hold = category;
+      if (error && ["billing", "rate_limited", "blocked", "timeout", "deferred"].includes(category)) s.hold = category;
     },
     refusal,
     remainingMs,
