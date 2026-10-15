@@ -12,13 +12,16 @@
  *       dry run (the default): plans each event_date day with plan_bat_live_end_supersessions, logs every planned row,
  *       prints the counts by class. Nothing is written.
  *   ... --inline       plans with the migration file's own plan query (read only), for before the migration is deployed
- *   ... --apply        calls supersede_timeline_events for the planned rows, --batch rows per call (default 50)
+ *   ... --apply        calls supersede_timeline_events for the planned rows, --batch rows per call (default 50),
+ *                      --pace-ms between calls (default 3000; twice the call's time after a call over 10 s)
  *   ... --log-dir DIR  JSONL logs (default ~/nuke-logs/bat-ended-20261015)
  *
  * Run --apply only after extract-bat-core 4.5.0 is deployed: the older extractor inserts the row again on its next
  * read of a running lot. Re-running is safe: a retired row is no longer planned, and the writer answers 'already'.
  * Reads run inside `begin read only` through the Supabase Management API (as readme-stats.mjs does); each write call
- * sets statement_timeout 30 s; after each call it checks for lock waiters and pauses while there are more than two.
+ * sets statement_timeout 30 s; a call that hits a statement or lock timeout (rolled back whole) is split in halves down
+ * to one row, and a row that still times out is logged as skipped_timeout. After each call it checks for lock waiters and pauses while there
+ * are more than two.
  * Needs SUPABASE_ACCESS_TOKEN.
  */
 import { readFileSync, mkdirSync, appendFileSync } from 'node:fs';
@@ -38,6 +41,7 @@ const INLINE = args.includes('--inline');
 const FROM = opt('--from', '2025-01-01');
 const TO = opt('--to', new Date(Date.now() + 30 * 86400e3).toISOString().slice(0, 10));
 const BATCH = Math.min(Math.max(Number(opt('--batch', '50')) || 50, 1), 500);
+const PACE_MS = Math.max(Number(opt('--pace-ms', '3000')) || 3000, 1000);
 const LOG_DIR = opt('--log-dir', resolve(homedir(), 'nuke-logs', 'bat-ended-20261015'));
 const isDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 if (!isDay(FROM) || !isDay(TO) || FROM >= TO) { console.error('usage: --from YYYY-MM-DD --to YYYY-MM-DD (from < to)'); process.exit(2); }
@@ -113,10 +117,40 @@ async function plan(from, to) {
   return all;
 }
 
+// One writer call, paced. A statement or lock timeout rolls the call back whole, so it is split and retried.
+async function writeBatch(day, n, batch) {
+  const payload = JSON.stringify(batch);
+  if (payload.includes('$j$')) throw new Error('payload contains the dollar-quote tag');
+  const t0 = Date.now();
+  let out;
+  try {
+    out = await api(`set statement_timeout = '30s'; select public.supersede_timeline_events($j$${payload}$j$::jsonb, '${ASSERTED_BY}') as r`);
+  } catch (e) {
+    // 57014 statement timeout, 55P03 lock timeout (the writer waits 3 s at most): either way the call rolled back
+    if (!/57014|55P03/.test(String(e?.message))) throw e;
+    const ms = Date.now() - t0;
+    log({ day, batch: n, timeout: { rows: batch.length, ms, code: /55P03/.test(String(e?.message)) ? '55P03' : '57014' } });
+    await sleep(Math.max(PACE_MS, ms * 2));
+    if (batch.length === 1) { result.skipped_timeout += 1; log({ skipped_timeout: batch[0].event_id }); return; }
+    const h = Math.ceil(batch.length / 2);
+    await writeBatch(day, `${n}a`, batch.slice(0, h));
+    await writeBatch(day, `${n}b`, batch.slice(h));
+    return;
+  }
+  const ms = Date.now() - t0;
+  const r = out[0]?.r ?? {};
+  log({ day, batch: n, ms, result: r });
+  result.retired += Number(r.retired ?? 0);
+  for (const k of ['already', 'missing', 'stale', 'refused', 'referenced']) result[k] += (r[k] ?? []).length;
+  console.error(`${day} batch ${n}: retired ${r.retired ?? 0} of ${batch.length} in ${ms} ms` +
+    ['already', 'missing', 'stale', 'refused', 'referenced'].map((k) => (r[k]?.length ? `, ${k} ${r[k].length}` : '')).join(''));
+  await sleep(ms > 10000 ? Math.max(PACE_MS, ms * 2) : PACE_MS);
+}
+
 const nextDay = (d) => new Date(Date.parse(`${d}T00:00:00Z`) + 86400e3).toISOString().slice(0, 10);
 const counts = {};
-const result = { planned: 0, retired: 0, already: 0, missing: 0, stale: 0, refused: 0, referenced: 0, unplanned_days: [] };
-log({ run: { apply: APPLY, inline: INLINE, from: FROM, to: TO, batch: BATCH } });
+const result = { planned: 0, retired: 0, already: 0, missing: 0, stale: 0, refused: 0, referenced: 0, skipped_timeout: 0, unplanned_days: [] };
+log({ run: { apply: APPLY, inline: INLINE, from: FROM, to: TO, batch: BATCH, pace_ms: PACE_MS } });
 
 for (let day = FROM; day < TO; day = nextDay(day)) {
   const rows = await plan(day, nextDay(day));
@@ -130,15 +164,7 @@ for (let day = FROM; day < TO; day = nextDay(day)) {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map(({ event_id, expected_vehicle_id, expected_event_type, replacement_event_id, source, reason }) =>
       ({ event_id, expected_vehicle_id, expected_event_type, replacement_event_id, source, reason }));
-    const payload = JSON.stringify(batch);
-    if (payload.includes('$j$')) throw new Error('payload contains the dollar-quote tag');
-    const out = await api(`set statement_timeout = '30s'; select public.supersede_timeline_events($j$${payload}$j$::jsonb, '${ASSERTED_BY}') as r`);
-    const r = out[0]?.r ?? {};
-    log({ day, batch: i / BATCH, result: r });
-    result.retired += Number(r.retired ?? 0);
-    for (const k of ['already', 'missing', 'stale', 'refused', 'referenced']) result[k] += (r[k] ?? []).length;
-    console.error(`${day} batch ${i / BATCH}: retired ${r.retired ?? 0} of ${batch.length}` +
-      ['already', 'missing', 'stale', 'refused', 'referenced'].map((k) => (r[k]?.length ? `, ${k} ${r[k].length}` : '')).join(''));
+    await writeBatch(day, i / BATCH, batch);
     for (let waits = 0; ; waits++) {
       const lw = Number((await api(`select count(*) as n from pg_stat_activity where wait_event_type = 'Lock'`))[0]?.n ?? 0);
       if (lw <= 2) break;
