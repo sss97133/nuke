@@ -953,8 +953,12 @@ async function extractCatalog(catalogUrl: string): Promise<{
 
 /** The same lot under any host or slug: .../auction/{sale}/lot/{lot}/ (the trigram index on discovery_url serves it). */
 function lotIlikePattern(url: string): string | null {
-  const m = url.match(/\/auction\/(\d+)\/lot\/([^/?#]+)/i);
-  return m ? `%bonhams.com/auction/${m[1]}/lot/${m[2]}/%` : null;
+  const m = url.match(/\/auction\/(\d+)\/lot\/([^/?#]+)(?:\/([^/?#]+))?/i);
+  if (!m) return null;
+  // Lot 0 is the number every unopened lot of a sale carries (preview lots), so the lot number alone names every one of them:
+  // 11 Paris preview lots resolved to two vehicles on 2026-10-16. A lot 0 is identified by its slug too.
+  if (m[2] === "0") return m[3] ? `%bonhams.com/auction/${m[1]}/lot/0/${m[3]}%` : null;
+  return `%bonhams.com/auction/${m[1]}/lot/${m[2]}/%`;
 }
 
 /**
@@ -1118,7 +1122,10 @@ async function saveVehicle(
   // Identity guard: a lot may only update the vehicle it is (same sale and lot), or one whose identity does not contradict
   // it. A different car is refused before anything is written and raised as a revision item; on another lot's vehicle the
   // identity fields are fill-only.
-  const lotKey = (u: string | null | undefined) => (u ?? "").match(/\/auction\/(\d+)\/lot\/([^/?#]+)/i)?.slice(1, 3).join("/") ?? null;
+  const lotKey = (u: string | null | undefined) => {
+    const m = (u ?? "").match(/\/auction\/(\d+)\/lot\/([^/?#]+)(?:\/([^/?#]+))?/i);
+    return m ? (m[2] === "0" ? `${m[1]}/0/${m[3] ?? ""}` : `${m[1]}/${m[2]}`) : null; // lot 0 is the preview number: the slug names the lot
+  };
   const guardTarget = async (id: string): Promise<{ refused: string | null; update: Record<string, any> }> => {
     const { data: row } = await supabase.from("vehicles").select("year,make,model,vin,discovery_url").eq("id", id).maybeSingle();
     if (!row) return { refused: null, update: vehicleData };
