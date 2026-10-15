@@ -13,6 +13,7 @@ import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
+import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -896,10 +897,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const vehicleYear = currentLevel.year ?? null;
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
-  // Determine active data and level type
   // The top level as brands, or as brands with their families inside (finviz's map of the market).
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
+  // A family opens on its sales chart; its model names as tiles are one switch away.
+  const [familyView, setFamilyView] = useState<'sales' | 'names'>('sales');
+  useEffect(() => { setFamilyView('sales'); }, [currentLevel.make, currentLevel.family]);
 
+  // Determine active data and level type
   const levelType: MapLevel =
     currentLevel.year ? 'vehicles' :
     currentLevel.model ? 'years' :
@@ -1355,6 +1359,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           )}
           {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
             options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
+          {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
@@ -1414,6 +1419,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             <BrandFamilyMap width={dims.w} height={dims.h}
               onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
               onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
+          ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
+            <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
+              width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)} />
           ) : rects.map((rect, i) => {
             const repImg = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
