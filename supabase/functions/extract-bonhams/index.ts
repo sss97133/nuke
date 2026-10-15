@@ -27,6 +27,8 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
+import { recordRevision } from "../_shared/revision.ts";
 import { type LotPage, parseLotPage } from "./lotPage.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -1112,12 +1114,34 @@ async function saveVehicle(
     return opts.fast && m ? m[1] : null;
   };
   action = "updated";
+  // Identity guard: a lot may only update the vehicle it is (same sale and lot), or one whose identity does not contradict
+  // it. A different car is refused before anything is written and raised as a revision item; on another lot's vehicle the
+  // identity fields are fill-only.
+  const lotKey = (u: string | null | undefined) => (u ?? "").match(/\/auction\/(\d+)\/lot\/([^/?#]+)/i)?.slice(1, 3).join("/") ?? null;
+  const guardTarget = async (id: string): Promise<{ refused: string | null; update: Record<string, any> }> => {
+    const { data: row } = await supabase.from("vehicles").select("year,make,model,vin,discovery_url").eq("id", id).maybeSingle();
+    if (!row) return { refused: null, update: vehicleData };
+    const same = lotKey(row.discovery_url) !== null && lotKey(row.discovery_url) === lotKey(extracted.url);
+    if (same) return { refused: null, update: vehicleData };
+    const conflict = identityConflict(row, { year: vehicleData.year, make: vehicleData.make, model: vehicleData.model, vin: vehicleData.vin });
+    if (conflict) return { refused: conflict, update: vehicleData };
+    return { refused: null, update: fillOnlyIdentity(vehicleData, row) };
+  };
+  const refuse = async (id: string, why: string) => {
+    await recordRevision(supabase, { url: extracted.url, missing: ["identity_match"], reason: "bad_data", next_action: "relink", raised_by: "extract-bonhams", vehicle_id: id, detail: { reason: "different_car", detail: why } });
+    return { vehicleId: null, action: "refused", qualityScore: gateResult.score, issues: [`different_car: ${why}`] };
+  };
   if (targetId) {
-    let { error } = await supabase.from("vehicles").update(vehicleData).eq("id", targetId);
+    const g0 = await guardTarget(targetId);
+    if (g0.refused) return await refuse(targetId, g0.refused);
+    let { error } = await supabase.from("vehicles").update(g0.update).eq("id", targetId);
     const other = error ? vinClash(error.message) : null;
     if (error && other) {
-      if (fullVin) { targetId = other; action = "linked_by_vin"; error = null; }
-      else { ({ error } = await supabase.from("vehicles").update({ ...vehicleData, vin: null }).eq("id", targetId)); }
+      if (fullVin) {
+        const g1 = await guardTarget(other);
+        if (g1.refused) return await refuse(other, g1.refused);
+        targetId = other; action = "linked_by_vin"; error = null;
+      } else { ({ error } = await supabase.from("vehicles").update({ ...g0.update, vin: null }).eq("id", targetId)); }
     }
     if (error) throw new Error(`Vehicle update failed: ${error.message}`);
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
@@ -1125,7 +1149,11 @@ async function saveVehicle(
     let ins = await supabase.from("vehicles").insert(vehicleData).select("id").maybeSingle();
     const other = ins.error ? vinClash(ins.error.message) : null;
     if (ins.error && other) {
-      if (fullVin) { ins = { data: { id: other }, error: null } as typeof ins; action = "linked_by_vin"; }
+      if (fullVin) {
+        const g2 = await guardTarget(other);
+        if (g2.refused) return await refuse(other, g2.refused);
+        ins = { data: { id: other }, error: null } as typeof ins; action = "linked_by_vin";
+      }
       else ins = await supabase.from("vehicles").insert({ ...vehicleData, vin: null }).select("id").maybeSingle();
     }
     if (ins.error) throw new Error(`Vehicle insert failed: ${ins.error.message}`);
@@ -1281,12 +1309,17 @@ Deno.serve(async (req) => {
               onObservationIssue: (m) => { results.obs_issues++; if (results.errors.length < 8) results.errors.push(`obs ${m}`); },
             });
             if (count(r)) continue;
-            if (r.action === "rejected") { results.rejected++; note(String(lot.event_key), "quality_gate", r.issues.join(", ")); }
+            if (r.action === "rejected") { results.rejected++; note(String(lot.event_key), "quality_gate", r.issues.join(", ")); await recordRevision(supabase, { url: lot.url, missing: ["vehicle_link", "landing"], reason: "quality_gate", next_action: "reparse_retained", raised_by: "extract-bonhams", detail: { issues: r.issues.slice(0, 5) } }); }
+            else if (r.action === "refused") { results.rejected++; note(String(lot.event_key), "identity", r.issues.join(", ")); }
             else { results.failed++; note(String(lot.event_key), "other", r.action); }
           } catch (e: any) {
             const msg = String(e?.message ?? e);
             if (reasonOf(msg) === "lock_timeout") retry.push(lot);
-            else { results.failed++; note(String(lot.event_key), reasonOf(msg), msg); }
+            else {
+              results.failed++; note(String(lot.event_key), reasonOf(msg), msg);
+              const why = reasonOf(msg);
+              await recordRevision(supabase, { url: lot.url, missing: ["vehicle_link", "landing"], reason: why === "duplicate_key" ? "duplicate_key" : "other", next_action: why === "duplicate_key" ? "relink" : "retry", raised_by: "extract-bonhams", detail: { message: msg.slice(0, 200) } });
+            }
           }
         }
       }
@@ -1300,57 +1333,13 @@ Deno.serve(async (req) => {
           else { results.failed++; note(String(lot.event_key), "other", r.action); }
         } catch (e: any) {
           results.failed++; note(String(lot.event_key), reasonOf(String(e?.message ?? e)), String(e?.message ?? e));
+          await recordRevision(supabase, { url: lot.url, missing: ["vehicle_link", "landing"], reason: "lock_timeout", next_action: "retry", raised_by: "extract-bonhams", detail: { message: String(e?.message ?? e).slice(0, 200) } });
         }
       }
       return new Response(
         JSON.stringify({ success: true, ...results, not_attempted: lots.length - next, elapsed_ms: Date.now() - started }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
-    }
-
-    // ── Deep pass, fetched elsewhere: Bonhams answers 403 to this function's datacenter address, so a runner on a house
-    // address reads the pages (same parseLotPage) and sends them here to be written. deep_queue lists the next lots;
-    // land_lot_pages writes up to 20 parsed pages through landLotPage.
-    if (action === "deep_queue") {
-      const limit = Math.min(Number(body.limit) || 20, 50);
-      const { data: todo, error: qErr } = await supabase
-        .from("vehicle_events")
-        .select("vehicle_id, source_url, source_listing_id")
-        .eq("source_platform", "bonhams")
-        .eq("extraction_source", "bonhams-typesense")
-        .is("metadata->>deep_at", null)
-        .order("ended_at", { ascending: false, nullsFirst: false })
-        .limit(limit);
-      if (qErr) throw new Error(`deep_queue read failed: ${qErr.message}`);
-      return new Response(JSON.stringify({ success: true, lots: todo ?? [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (action === "land_lot_pages") {
-      const items: Array<{ vehicle_id: string; source_url: string; source_listing_id: string; status?: string; page?: LotPage }> =
-        Array.isArray(body.pages) ? body.pages.slice(0, 20) : [];
-      const out = { received: items.length, done: 0, gone: 0, images: 0, failed: 0, errors: [] as string[] };
-      for (const it of items) {
-        const observedAt = new Date().toISOString();
-        try {
-          if (!it.vehicle_id || !it.source_listing_id || !/^https:\/\/(www\.)?bonhams\.com\//.test(String(it.source_url))) throw new Error("bad item");
-          // The event must be a Bonhams index-landed episode of that vehicle; nothing else is written.
-          const { data: ev } = await supabase.from("vehicle_events").select("id").eq("source_platform", "bonhams")
-            .eq("vehicle_id", it.vehicle_id).eq("source_listing_id", it.source_listing_id).limit(1);
-          if (!ev?.length) throw new Error("no such episode");
-          if (it.status && /^http_(404|410)$/.test(it.status)) {
-            await writeVehicleEventByKey(supabase, {
-              vehicle_id: it.vehicle_id, source_platform: "bonhams", source_listing_id: it.source_listing_id, event_type: "auction",
-              source_url: it.source_url, metadata: { deep_at: observedAt, deep_status: it.status },
-            });
-            out.gone++;
-          } else if (it.page && Array.isArray(it.page.images)) {
-            out.images += await landLotPage(supabase, it, it.page, observedAt);
-            out.done++;
-          } else throw new Error("no page");
-        } catch (e: any) {
-          out.failed++; if (out.errors.length < 5) out.errors.push(`${it.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
-        }
-      }
-      return new Response(JSON.stringify({ success: true, ...out }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── Deep pass: the lot page for lots the search index landed (gallery, sale, footnotes, condition report) ──
@@ -1411,10 +1400,12 @@ Deno.serve(async (req) => {
         }
         const observedAt = new Date().toISOString();
         if (status === 404 || status === 410) {
+          // Not terminal: a preview lot (lot 0) of an unopened sale opens later. The revision queue owns the retry.
           await writeVehicleEventByKey(supabase, {
             vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
-            source_url: ev.source_url, metadata: { deep_at: observedAt, deep_status: `http_${status}` },
+            source_url: ev.source_url, metadata: { deep_at: observedAt, deep_status: "revision_not_found", http_status: status },
           });
+          await recordRevision(supabase, { url: ev.source_url, missing: ["photos", "description"], reason: "not_found", next_action: "refetch", raised_by: "extract-bonhams", vehicle_id: ev.vehicle_id, detail: { http_status: status, preview_lot: /\/lot\/0\//.test(ev.source_url) } });
           out.gone++;
           continue;
         }

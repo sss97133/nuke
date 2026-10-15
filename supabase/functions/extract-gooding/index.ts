@@ -24,6 +24,8 @@ import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
+import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
+import { recordRevision } from "../_shared/revision.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
@@ -636,6 +638,24 @@ async function saveToDatabase(
     console.warn(`[gooding] Quality gate FLAGGED ${extracted.url} (score=${gate.score}): ${gate.issues.join(', ')}`);
   }
 
+  // Identity guard: the lot may update the vehicle it is (same slug) or one that does not contradict it; a different car is
+  // refused before anything is written (revision item: identity_match / relink), and identity fields stay fill-only on
+  // another lot's vehicle.
+  let identityKeep: Record<string, unknown> | null = null;
+  if (vehicleId) {
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url').eq('id', vehicleId).maybeSingle();
+    const slugOf = (u: unknown) => String(u ?? '').split('/lot/')[1]?.split(/[/?#]/)[0] || null;
+    const same = idRow && slugOf(idRow.discovery_url) !== null && slugOf(idRow.discovery_url) === slugOf(extracted.url);
+    if (idRow && !same) {
+      const conflict = identityConflict(idRow, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin });
+      if (conflict) {
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'bad_data', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'different_car', detail: conflict } });
+        throw new Error(`identity refused: different_car (${conflict})`);
+      }
+      identityKeep = idRow as Record<string, unknown>;
+    }
+  }
+
   if (vehicleId) {
     // Update existing vehicle (vehicleId from listing, discovery_url, or slug match)
 
@@ -651,6 +671,10 @@ async function saveToDatabase(
       updated_at: new Date().toISOString(),
       extractor_version: EXTRACTOR_VERSION,
     };
+    if (identityKeep) {
+      const kept = fillOnlyIdentity(vehicleUpdate, identityKeep);
+      for (const f of ['year', 'make', 'model', 'vin']) if (!(f in kept)) delete vehicleUpdate[f];
+    }
     // Only fill engine/transmission/mileage if extracted and currently empty
     if (extracted.engine_size) vehicleUpdate.engine_size = extracted.engine_size;
     if (extracted.transmission) vehicleUpdate.transmission = extracted.transmission;
@@ -1169,6 +1193,11 @@ Deno.serve(async (req) => {
         } catch (e: any) {
           out.failed++;
           if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(e?.message ?? e).slice(0, 160)}`);
+          // A lot whose identity cannot be resolved (two vehicle records for it, or a different car) is a revision item.
+          const msg = String(e?.message ?? e);
+          if (/multiple \(or no\) rows|Ambiguous listing URL|identity unresolved/i.test(msg)) {
+            await recordRevision(supabase, { url: snap.listing_url, missing: ['vehicle_link'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', snapshot_id: snap.id, detail: { message: msg.slice(0, 200) } });
+          }
         }
       }
       return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
