@@ -39,6 +39,9 @@ export type AskPricePopulation = {
 };
 export type AskPosition = {
   family: string; family_id: string;
+  // share of the family's prices at or below this ask: other asks when there are 10 (basis 'asked'), else recorded
+  // sales ('sold'); null when neither places it. p_sort 'position' orders by it, lowest first.
+  share: number | null; basis: 'asked' | 'sold' | null;
   // offered = every recorded outcome (sold or not); conflicts = sales refused because their own page is another car.
   sold: (AskPricePopulation & { offered: number | null; conflicts: number | null; first_on: string | null; last_on: string | null }) | null;
   asked: AskPricePopulation | null; // other classified asks in the 365 days before the fold's refresh, this one excluded

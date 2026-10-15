@@ -8,6 +8,8 @@
 --              offered, conflicts (sales refused because their own page is another car), first/last sale, by_source;
 --       asked  other classified asks in the 365 days before the fold's refresh: the same, without this listing.
 --     thin (fewer than 10) carries no percentiles and no at_or_below.
+--     share: the share of the family's prices at or below this ask (other asks when there are 10, else sales; basis
+--     says which). One measured quantity, no weights: p_sort => 'position' puts the lowest against its own family first.
 --   merit: the active listing_exit_models row's chance that a listing like this is gone within its horizon, computed
 --     from the position (every feature the model names must be present; nothing is imputed). Null until a model is
 --     active; p_sort => 'merit' orders by it, nulls last.
@@ -27,7 +29,7 @@ DECLARE v text;
 BEGIN
   SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'base64') INTO v
   FROM pg_proc WHERE oid = 'public.classified_ask_board(integer,double precision,double precision,integer,integer,text,text,integer,integer)'::regprocedure;
-  IF v IS DISTINCT FROM '2wRKul4/2BnP7TJze1jUL3TZ5QrIfTDWMtWQKyMTdV8=' AND v IS DISTINCT FROM 'pHRpEW1AbLhotvpAhsBtS5AaJMl89Y1+QowPySC8Czo=' THEN
+  IF v IS DISTINCT FROM '2wRKul4/2BnP7TJze1jUL3TZ5QrIfTDWMtWQKyMTdV8=' AND v IS DISTINCT FROM 'n6jfuWA/lRnelNZLUTa0ihtGRmfk440kizRpfjXFe2A=' THEN
     RAISE EXCEPTION 'classified_ask_board is not the 20261015080000 body (sha256 %); not replacing it', v;
   END IF;
   IF to_regclass('public.mv_family_year_prices') IS NULL OR to_regclass('public.listing_exit_models') IS NULL THEN
@@ -68,8 +70,8 @@ BEGIN
   IF p_tier IS NOT NULL AND p_tier NOT IN ('under_5k', '5k_15k', '15k_40k', '40k_100k', '100k_plus') THEN
     RAISE EXCEPTION 'unknown tier %', p_tier USING ERRCODE = '22023';
   END IF;
-  IF coalesce(p_sort, 'newest') NOT IN ('newest', 'nearest', 'band', 'price', 'merit') OR (p_sort = 'nearest' AND p_lat IS NULL) THEN
-    RAISE EXCEPTION 'p_sort is newest, nearest (with a point), band, price or merit' USING ERRCODE = '22023';
+  IF coalesce(p_sort, 'newest') NOT IN ('newest', 'nearest', 'band', 'price', 'position', 'merit') OR (p_sort = 'nearest' AND p_lat IS NULL) THEN
+    RAISE EXCEPTION 'p_sort is newest, nearest (with a point), band, price, position or merit' USING ERRCODE = '22023';
   END IF;
 
   WITH ev AS (
@@ -141,11 +143,17 @@ BEGIN
       SELECT CASE WHEN fa.as_of IS NOT NULL AND s.current_price > 0 AND s.created_at < fa.as_of::date
                    AND s.created_at >= fa.as_of::date - 365 THEN 1 ELSE 0 END AS self
     ) ai
+  ), placed AS (
+    -- position_share: the share of the family's prices at or below this ask: other asks when there are 10, else recorded
+    -- sales. One measured quantity, no weights; p_sort => 'position' puts the lowest against its own family first.
+    SELECT k.*, coalesce(k.asked_below::float8 / nullif(k.asked_n, 0), k.sold_below::float8 / nullif(k.sold_n, 0)) AS position_share,
+      CASE WHEN k.asked_below IS NOT NULL THEN 'asked' WHEN k.sold_below IS NOT NULL THEN 'sold' END AS position_basis
+    FROM known k
   ), scored AS (
     -- merit: the active model's chance that a listing like this is gone within its horizon, from the position above.
     -- Every feature the model names must be present for this listing; otherwise merit is null (nothing is imputed).
     SELECT k.*, mm.exit7
-    FROM known k
+    FROM placed k
     LEFT JOIN LATERAL (
       SELECT CASE WHEN count(*) > 0 AND count(*) FILTER (WHERE fv.v IS NULL) = 0 THEN
                1 / (1 + exp(-(max(md.intercept)
@@ -175,6 +183,7 @@ BEGIN
     SELECT * FROM picked p
     ORDER BY
       CASE WHEN p_sort = 'merit' THEN p.exit7 END DESC NULLS LAST,
+      CASE WHEN p_sort = 'position' THEN p.position_share END ASC NULLS LAST,
       CASE WHEN p_sort = 'nearest' THEN p.distance_mi END ASC NULLS LAST,
       CASE WHEN p_sort = 'band' THEN p.taste END DESC NULLS LAST,
       CASE WHEN p_sort = 'price' THEN p.current_price END ASC NULLS LAST,
@@ -230,6 +239,7 @@ BEGIN
         'taste', taste, 'in_band', taste >= v_band,
         'position', CASE WHEN family_id IS NOT NULL THEN jsonb_build_object(
           'family', family, 'family_id', family_id,
+          'share', round(position_share::numeric, 3), 'basis', position_basis,
           'sold', CASE WHEN sold_n IS NOT NULL THEN jsonb_build_object(
             'n', sold_n, 'year_from', sold_from, 'year_to', sold_to, 'thin', sold_thin,
             'p25', sold_p25, 'p50', sold_p50, 'p75', sold_p75, 'at_or_below', sold_below,
@@ -244,6 +254,7 @@ BEGIN
           'exit7', round(exit7::numeric, 3), 'model_version', (SELECT version FROM model)) END)
       ORDER BY
         CASE WHEN p_sort = 'merit' THEN exit7 END DESC NULLS LAST,
+        CASE WHEN p_sort = 'position' THEN position_share END ASC NULLS LAST,
         CASE WHEN p_sort = 'nearest' THEN distance_mi END ASC NULLS LAST,
         CASE WHEN p_sort = 'band' THEN taste END DESC NULLS LAST,
         CASE WHEN p_sort = 'price' THEN current_price END ASC NULLS LAST,
@@ -263,7 +274,7 @@ COMMENT ON FUNCTION public.classified_ask_board(integer, double precision, doubl
   'the listing says (listing_mileage, odometer, title_status, condition, observation_id) and position: the family '
   '(mv_model_family_names) and where the ask sits among its recorded sales and other classified asks around its model '
   'year (mv_family_year_prices); merit = the active listing_exit_models chance of being gone within its horizon. '
-  'p_sort: newest, nearest, band, price or merit. SECURITY INVOKER: callers see only what RLS already lets them read.';
+  'p_sort: newest, nearest, band, price, position (lowest share of the family''s prices at or below the ask first) or merit. SECURITY INVOKER: callers see only what RLS already lets them read.';
 
 REVOKE ALL ON FUNCTION public.classified_ask_board(integer, double precision, double precision, integer, integer, text, text, integer, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.classified_ask_board(integer, double precision, double precision, integer, integer, text, text, integer, integer) TO anon, authenticated, service_role;

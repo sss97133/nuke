@@ -313,6 +313,14 @@ BEGIN
   PERFORM pg_temp.ok('newest_seen_at is the newest first sighting (capture time)',
     (b->>'newest_seen_at')::timestamptz = (SELECT created_at FROM public.vehicle_events
                                            WHERE vehicle_id = '00000000-0000-4000-8000-000000000003'));
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer';
+  PERFORM pg_temp.ok('share: asks when there are 10 (Blazer 5 of 11), else sales (pickup 4 of 10)',
+    (r->'position'->>'share')::numeric = 0.455 AND r->'position'->>'basis' = 'asked'
+    AND (SELECT (x->'position'->>'share')::numeric = 0.4 AND x->'position'->>'basis' = 'sold'
+         FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'pickup'));
+  PERFORM pg_temp.ok('position sort: lowest share first, unplaced rows after, newest first among them',
+    (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(public.classified_ask_board(p_sort => 'position')->'rows')
+       WITH ORDINALITY y(x, o)) = ARRAY['pickup', 'blazer', 'm1010', 'h3t', 'f250']);
   PERFORM pg_temp.ok('merit sort with no model keeps newest first',
     (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(public.classified_ask_board(p_sort => 'merit')->'rows')
        WITH ORDINALITY y(x, o))
