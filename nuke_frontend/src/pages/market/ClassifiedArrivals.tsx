@@ -50,6 +50,16 @@ export function freshness(readAt: string | null | undefined, now = Date.now()): 
   const age = ageOf(readAt, now);
   return age === 'now' ? 'read just now' : `read ${age} ago`;
 }
+// Live means our intake captured a listing within one cycle (poll-listing-feeds runs every 15 minutes): the reader's
+// newest_seen_at, the newest first sighting it can show (20261015150000), which is capture time, not posting time.
+// Owner, 2026-10-15: the board reads live, or how far behind it is, not a clock. Null when the reader has no capture
+// time; the control then states the read age.
+const LIVE_MS = 20 * 60_000;
+export function captureFreshness(seenAt: string | null | undefined, now = Date.now()): string | null {
+  const t = seenAt ? Date.parse(seenAt) : NaN;
+  if (!Number.isFinite(t) || t > now + 60_000) return null;
+  return now - t < LIVE_MS ? 'live' : `${ageOf(seenAt, now)} behind`;
+}
 // When a listing went up: the reader's listed_at (20261015070000), else the post time when it precedes the first
 // sighting, else the first sighting. Capture trails posting (median 6.5 h on 2026-10-15), so first seen is not age.
 type Timed = { first_seen_at: string; posted_at?: string | null; listed_at?: string | null };
@@ -235,16 +245,19 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
     setArrived(arrivalsAfter(result.data?.pages[0]?.rows ?? [], shownAt.current)); setNow(Date.now());
     window.setTimeout(() => setArrived(null), 6_000);
   };
+  const capturedAt = (first as (typeof first & { newest_seen_at?: string | null }) | undefined)?.newest_seen_at ?? null;
   const control = query.isFetching ? '↻ reading…'
     : query.isError || pollFailed ? '↻ retry'
     : !first ? '↻ reading…'
     : polled?.waiting ? `↻ ${count(polled.waiting)}${polled.waiting >= 60 ? '+' : ''} new`
-    : `↻ ${freshness(first.as_of, Math.max(now, Date.now()))}`;
+    : `↻ ${captureFreshness(capturedAt, Math.max(now, Date.now())) ?? freshness(first.as_of, Math.max(now, Date.now()))}`;
 
   return <section aria-label="Classified arrivals" className="market-explorer">
     <Masthead result={<>
       <button type="button" className="market-control" aria-busy={query.isFetching} onClick={() => void refresh()}
-        title={pollFailed ? 'Latest check failed. Showing the last fetched listings; select to retry.' : 'Read the newest listings; the read clock does not establish source capture freshness.'}>
+        title={pollFailed ? 'Latest check failed. Showing the last fetched listings; select to retry.'
+          : capturedAt ? 'Live when our intake captured a listing in the last 20 minutes; otherwise how long since it last did. Select to read the newest.'
+          : 'Read the newest listings; the read clock does not establish source capture freshness.'}>
         <Text role="label">{control}</Text>
       </button>
       {arrived !== null && <Text role="caption" as="div">{arrived > 0 ? `${count(arrived)} new` : 'nothing new yet'}</Text>}

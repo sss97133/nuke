@@ -315,6 +315,15 @@ describe('how a feed says time', () => {
     expect(freshness(null, now)).toBe('refresh');
   });
 
+  it('says live when the intake captured a listing within a cycle, else how far behind, from capture time', async () => {
+    const { captureFreshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(captureFreshness('2026-10-15T01:50:00Z', now)).toBe('live');
+    expect(captureFreshness('2026-10-15T01:35:00Z', now)).toBe('25 min behind');
+    expect(captureFreshness('2026-10-14T23:00:00Z', now)).toBe('3 h behind');
+    expect(captureFreshness(null, now)).toBeNull();
+    expect(captureFreshness('2026-10-15T03:00:00Z', now)).toBeNull();
+  });
   it('states the read age without treating it as proof of source freshness', async () => {
     const { freshness } = await import('./ClassifiedArrivals');
     const now = Date.parse('2026-10-15T02:00:00Z');
