@@ -361,6 +361,27 @@ Deno.serve(async (req) => {
     const perPage = Math.min(Number(batch_size) || 50, MAX_PER_PAGE);
     const startPage = Math.max(Number(page) || 1, 1);
 
+    // ─── MODE: departments ──────────────────────────────────────────────
+    // Which departments the search index holds, with lot counts (one request, read only), and, for named lots, each lot's own department.
+    //   POST { "mode": "departments" }                       -> facet counts of department.code (+ name) over the whole lots collection
+    //   POST { "mode": "departments", "ids": ["31858-214"] } -> [{ id, department: {code, name} | null }] for up to 250 lot ids
+    if (mode === "departments") {
+      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
+      const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+-[0-9]+$/.test(x)).slice(0, 250);
+      const params: Record<string, string> = ids.length
+        ? { q: "*", query_by: "title", per_page: "250", filter_by: `id:=[${ids.join(",")}]`, include_fields: "id,department" }
+        : { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "60" };
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`, { headers });
+      if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}` }, 502);
+      const j = await res.json() as { found: number; hits?: Array<{ document: { id: string; department?: { code: string; name: string } } }>; facet_counts?: Array<{ field_name: string; counts: Array<{ value: string; count: number }> }> };
+      if (ids.length) {
+        const byId = new Map((j.hits ?? []).map((h) => [h.document.id, h.document.department ?? null]));
+        return okJson({ success: true, mode: "departments", asked: ids.length, found: j.hits?.length ?? 0, lots: ids.map((id) => ({ id, department: byId.get(id) ?? null })) });
+      }
+      return okJson({ success: true, mode: "departments", total: j.found, facets: Object.fromEntries((j.facet_counts ?? []).map((f) => [f.field_name, f.counts])) });
+    }
+
     // ─── MODE: stats ────────────────────────────────────────────────────
     if (mode === "stats") {
       const supabase = createClient(
