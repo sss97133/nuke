@@ -48,6 +48,25 @@ Selector run (read-only, `scripts/bat-corrections/select_hybrid_candidates.sh`, 
 
 So the conflicts are mostly this one writer's overlays, and a candidate is not a verdict.
 
+Where the 36 hybrids' own records come from:
+
+| Own record | Rows | Example |
+|---|---|---|
+| Conceptcarz auction-results records (`listing_url` of the form `conceptcarz://event/<id>/<title>`) | 30 | `conceptcarz://event/1205/1967 Chevrolet Camaro SS`, now labeled "Corvette 2 Door Coupe" with a B-J Scottsdale 2013 docket |
+| BaT lots | 4 | The local archive (`scripts/data/bat-archive.duckdb`, `lots`) holds each lot's own title, year, make, model and VIN |
+| RM Sotheby's lot | 1 | |
+| No own link | 1 | |
+
+For a BaT lot, the archive is the citation for its identity. Its VIN is not trusted blindly: one archive VIN is free
+text, so the check digit decides between the archive VIN and NULL.
+
+For a Conceptcarz row, the own record is that result's title. The B-J writer also overwrites `sale_price`. So
+whether the row's price is the Conceptcarz car's result or the docket car's must be settled per row:
+- compare the Conceptcarz event's result with the docket's;
+- only then correct the identity and, if needed, the price.
+
+This makes the Conceptcarz rows the larger and harder half of the batch.
+
 1. The fleet count: `sum(conflicts)` over the fold's `sold` rows, by family. This is available after the first build.
    It counts sales whose own page names their model year but no phrase of their family. That's a lower bound,
    because pages without a descriptive slug are not tested.
