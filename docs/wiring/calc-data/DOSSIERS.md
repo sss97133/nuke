@@ -71,7 +71,7 @@ Kit: LS-CRANK-CONN-KIT ×1 [1]
 |---|---|---|---|---|
 | #99 Crank Position Sensor · v4.2 L37 | 22 AWG M27500 2C cable | M130 B01 · SSC-N · AFM8 + K1S sel 6 [8] | cavity x: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 1 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
 | #99g CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) · v4.2 L229 | 22 AWG M27500 2C cable | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [12] | cavity JJ: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 2 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
-| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [13] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [12] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 3 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
+| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [13] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [12] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 3 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
 
 **Tools:** Metri-Pack 150/280 sealed crimp tool (12155975) — to buy [2] · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [4]
 
@@ -101,7 +101,7 @@ Kit: LS-CAM-CONN-KIT ×1 [1]
 
 | Wire | Spec | ECU / PDM end | Firewall | Device end |
 |---|---|---|---|---|
-| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [8] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [9] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 1 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
+| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [8] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 1 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
 | #101g CMP Sensor Ground (conductor 2 of #101 shielded 2C) · v4.2 L232 | 22 AWG M27500 2C cable [13] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity HH: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 2 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
 | #101 Cam Position Sensor · v4.2 L38 | 22 AWG M27500 2C cable | M130 B02 · SSC-N · AFM8 + K1S sel 6 [14] | cavity v: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 3 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
 
@@ -232,8 +232,8 @@ Kit: D38999/26WJ61PN ×1 [1] · M85049/69-25N ×1 [2] · 202K163-25-0 ×1 [3] ·
 | #103s Knock B1 Shield Drain · v4.2 L240 | 22 AWG M22759/16 brown [33] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity PP: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | PP · M39029/58-363 [20] |
 | #104g Knock B2 Sensor Ground (conductor 2) · v4.2 L241 | 22 AWG M27500 2C cable | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity MM: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | MM · M39029/58-363 [20] |
 | #104s Knock B2 Shield Drain · v4.2 L242 | 22 AWG M22759/16 brown/black [21] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity p: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | p · M39029/58-363 [20] |
-| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [34] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [27] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | NN · M39029/58-363 [20] |
-| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [35] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [27] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | Z · M39029/58-363 [20] |
+| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [34] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | NN · M39029/58-363 [20] |
+| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [35] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | Z · M39029/58-363 [20] |
 | #108g MAP Sensor Ground · v4.2 L221 | 22 AWG M22759/16 brown [36] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity q: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | q · M39029/58-363 [20] |
 | #108r MAP 5V Reference · v4.2 L222 | 22 AWG M22759/16 orange [37] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity r: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | r · M39029/58-363 [20] |
 | #109g IAT Sensor Ground · v4.2 L212 | 22 AWG M22759/16 brown [38] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [27] | cavity s: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | s · M39029/58-363 [20] |
@@ -453,7 +453,7 @@ Kit: WPAPP30 ×1 (on the cart change) [1]
 | Wire | Spec | ECU / PDM end | Device end |
 |---|---|---|---|
 | #APS_T1_5V APS Track 1 5V Reference · v4.2 L396 | 22 AWG M22759/16 orange [9] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | G · D-609-03 [11] |
-| #APS_T1_SIG APS Track 1 Signal · v4.2 L395 | 22 AWG M22759/16 green/violet [9] | M130 B21 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [10] | F · D-609-03 [11] |
+| #APS_T1_SIG APS Track 1 Signal · v4.2 L395 | 22 AWG M22759/16 green/violet [9] | M130 B21 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | F · D-609-03 [11] |
 | #APS_T1_GND APS Track 1 Ground · v4.2 L397 | 22 AWG M22759/16 brown [12] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | E · D-609-03 [11] |
 | #APS_T2_GND APS Track 2 Ground · v4.2 L400 | 22 AWG M22759/16 white/blue [13] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | D · D-609-03 [11] |
 | #APS_T2_SIG APS Track 2 Signal · v4.2 L398 | 22 AWG M22759/16 green/gray [9] | M130 B22 · SSC-N · AFM8 + K1S sel 6 [14] | C · D-609-03 [11] |

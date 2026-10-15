@@ -5,6 +5,11 @@
  * That is the only evidence taken. A post that merely scrolled off the first page of a search is NOT removed: only the
  * first page is read. So the sweep asks the post itself, one request per 2 s, a few per invocation, oldest check first.
  *
+ *   notice page  Craigslist also serves a removed post as a page with a notice and no posting body, at status 200 or 404:
+ *                "This posting has been deleted by its author" (deleted), "This posting has expired" (expired),
+ *                "This posting has been flagged for removal" (flagged: taken down by readers or staff, a different reason
+ *                from the seller's own). The notice is recorded in metadata.removal.notice. A live post always has a
+ *                posting body, so a notice phrase inside a seller's own text never counts.
  *   404 or 410   the listing is `ended`: event_status 'ended', ended_at = the fetch time, metadata.removal = the evidence.
  *                Outcome unknown (withdrawn, expired or sold elsewhere); never a sale. The listing observations stay.
  *   200          still live: metadata.last_checked_at is stamped so the post goes to the back of the line.
@@ -12,11 +17,23 @@
  */
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
-export type Probe = { status: number | null; observed_at: string; snapshot_id: string | null };
+export type Notice = "deleted" | "expired" | "flagged";
+export type Probe = { status: number | null; observed_at: string; snapshot_id: string | null; notice?: Notice | null };
+
+/** Which removal notice a page carries, or null. Only a page with no posting body can carry one. */
+export function noticeFrom(html: string | null | undefined): Notice | null {
+  if (!html || /id\s*=\s*["']postingbody["']/i.test(html)) return null;
+  const text = html.replace(/<script[\s\S]*?<\/script\b[^>]*>|<style[\s\S]*?<\/style\b[^>]*>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  if (/flagged for removal/i.test(text)) return "flagged";
+  if (/deleted by (its|the) author/i.test(text)) return "deleted";
+  if (/(posting|post|ad) has expired|this posting has expired/i.test(text)) return "expired";
+  return null;
+}
 export type SweepOutcome = "ended" | "live" | "stopped" | "error";
 
-export function classifyProbe(status: number | null): "ended" | "live" | "blocked" {
+export function classifyProbe(status: number | null, notice: Notice | null = null): "ended" | "live" | "blocked" {
   if (status === 404 || status === 410) return "ended";
+  if (notice && status !== null && status >= 200 && status < 300) return "ended";
   if (status !== null && status >= 200 && status < 300) return "live";
   return "blocked";
 }
@@ -35,7 +52,7 @@ export function endedRow(live: { vehicle_id: string; source_listing_id: string; 
     metadata: {
       source_observed_at: probe.observed_at,
       last_checked_at: probe.observed_at,
-      removal: { http_status: probe.status, observed_at: probe.observed_at, basis: "revisit", ...(probe.snapshot_id ? { snapshot_id: probe.snapshot_id } : {}) },
+      removal: { http_status: probe.status, observed_at: probe.observed_at, basis: "revisit", ...(probe.notice ? { notice: probe.notice } : {}), ...(probe.snapshot_id ? { snapshot_id: probe.snapshot_id } : {}) },
     },
   };
 }
@@ -64,7 +81,7 @@ export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs
       if (deps.remainingMs() < 20_000) { out.stopped = "worker_deadline"; break; }
       const probe = await deps.probe(row.source_url);
       out.checked++;
-      const verdict = classifyProbe(probe.status);
+      const verdict = classifyProbe(probe.status, probe.notice ?? null);
       if (verdict === "blocked") { out.stopped = `http_${probe.status ?? "none"}`; break; }
       const base = { vehicle_id: row.vehicle_id, source_listing_id: row.source_listing_id, source_url: row.source_url };
       const result = verdict === "ended"

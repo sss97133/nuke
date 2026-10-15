@@ -23,7 +23,7 @@ import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { buildFullDescription, DESCRIPTION_LIMIT, lotProse } from "./goodingText.ts";
+import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
@@ -193,7 +193,7 @@ function parseEngineFromSpecs(specs: string[]): string | null {
     if (!trimmed) continue;
     if (excludeKeywords.some(p => p.test(trimmed))) continue;
     if (engineKeywords.some(p => p.test(trimmed))) {
-      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      return htmlToText(trimmed).replace(/\s+/g, ' ').trim().slice(0, 100);
     }
   }
   return null;
@@ -208,7 +208,7 @@ function parseTransmissionFromSpecs(specs: string[]): string | null {
     const trimmed = spec.trim();
     if (!trimmed) continue;
     if (/\b(Transmission|Gearbox|Transaxle)\b/i.test(trimmed)) {
-      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      return htmlToText(trimmed).replace(/\s+/g, ' ').trim().slice(0, 100);
     }
   }
   return null;
@@ -366,7 +366,7 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
 
   // Strip HTML from highlights
   const cleanHighlights = (item?.highlights || []).map(h =>
-    h.replace(/<[^>]+>/g, '').trim()
+    htmlToText(h)
   ).filter(Boolean);
 
   // Chassis (classic car ID) and coachwork from Contentful
@@ -401,7 +401,7 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
   let saleroom_addendum: string | null = null;
   const sraHtml = lot.sraNote?.childMarkdownRemark?.html;
   if (sraHtml && sraHtml.trim()) {
-    saleroom_addendum = sraHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    saleroom_addendum = htmlToText(sraHtml.replace(/>/g, '> ')).replace(/\s+/g, ' ').trim();
   }
 
   // Auction calendar position: "2025 Pebble Beach Auctions (Lot 38)"
@@ -610,7 +610,7 @@ async function saveToDatabase(
   // Final fallback: if extractFromPageData returned null (pre-2.1 callers), use highlights
   if (!description && extracted.highlights.length > 0) {
     description = extracted.highlights
-      .map(h => h.replace(/<[^>]+>/g, '').trim())
+      .map(h => htmlToText(h))
       .filter(h => h.length > 5)
       .join('\n')
       .slice(0, DESCRIPTION_LIMIT) || null;

@@ -48,7 +48,7 @@ import {
   type LedgerKnown,
 } from "./ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { sweepCraigslistRemovals } from "./removal.ts";
+import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1282,7 +1282,7 @@ Deno.serve(async (req) => {
             platform: "craigslist", skipCache: true, useFirecrawl: false, includeMarkdown: false,
             directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds",
           } as any);
-          return { status: r.statusCode, observed_at: new Date().toISOString(), snapshot_id: r.snapshotId };
+          return { status: r.statusCode, observed_at: new Date().toISOString(), snapshot_id: r.snapshotId, notice: noticeFrom(r.html) };
         },
       }, 5);
     }

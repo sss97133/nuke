@@ -41139,10 +41139,11 @@
     "102r",
     "108r",
     "112r",
-    "APS_T1_5V"
+    "APS_T1_5V",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B15",
@@ -41151,10 +41152,11 @@
     "99s",
     "101g",
     "101s",
-    "APS_T2_GND"
+    "APS_T2_GND",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B16",
@@ -41166,8 +41168,7 @@
     "102g",
     "108g",
     "112g",
-    "103g",
-    "20 AWG lead"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
@@ -41175,20 +41176,22 @@
   {
    "at": "M130-B B16",
    "wires": [
+    "103g",
     "103s",
     "104g",
     "104s",
     "APS_T1_GND",
-    "20 AWG lead"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B16",
    "wires": [
-    "2 group leads",
-    "pin lead"
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 14
@@ -41197,19 +41200,21 @@
    "at": "M130-B B19",
    "wires": [
     "99r",
-    "101r"
+    "101r",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "M130-B B21",
    "wires": [
     "APS_T1_SIG",
-    "PCS_TPS"
+    "PCS_TPS",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-A A11",
@@ -41218,10 +41223,11 @@
     "75",
     "81",
     "83",
-    "84"
+    "84",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-A A15",
@@ -41229,10 +41235,11 @@
     "97",
     "76",
     "89",
-    "MIRROR_TRIG"
+    "MIRROR_TRIG",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-A A24",
@@ -41243,11 +41250,30 @@
     "87",
     "88",
     "90",
-    "91",
-    "92"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 12
+   "equiv_awg": 10
+  },
+  {
+   "at": "PDM30-A A24",
+   "wires": [
+    "91",
+    "92",
+    "20 AWG group lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-A A24",
+   "wires": [
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-A A28",
@@ -41255,16 +41281,18 @@
     "IGN_SW_0V",
     "BRK_SW_0V",
     "HL_SW_0V",
-    "TURN_SW_0V"
+    "TURN_SW_0V",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-B B1",
    "wires": [
     "38",
-    "LOCK_FEED_R"
+    "LOCK_FEED_R",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
@@ -41273,46 +41301,51 @@
    "at": "PDM30-B B12",
    "wires": [
     "80",
-    "119"
-   ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
-  },
-  {
-   "at": "PDM30-B B14",
-   "wires": [
-    "82",
-    "120"
-   ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
-  },
-  {
-   "at": "PDM30-B B16",
-   "wires": [
-    "71",
-    "GSS_PWR"
+    "119",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 14
   },
   {
+   "at": "PDM30-B B14",
+   "wires": [
+    "82",
+    "120",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-B B16",
+   "wires": [
+    "71",
+    "GSS_PWR",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
    "at": "PDM30-B B25",
    "wires": [
     "CAN_LO",
-    "CAN_FW_L"
+    "CAN_FW_L",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-B B26",
    "wires": [
     "CAN_HI",
-    "CAN_FW_H"
+    "CAN_FW_H",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-B B8",
@@ -41321,37 +41354,59 @@
     "68",
     "69",
     "73",
-    "74"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
   },
   {
+   "at": "PDM30-B B8",
+   "wires": [
+    "74",
+    "20 AWG group lead"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-B B8",
+   "wires": [
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
    "at": "PDM15-A A28",
    "wires": [
     "AC_LP_0V",
-    "AC_HP_0V"
+    "AC_HP_0V",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM15-B B25",
    "wires": [
     "CAN_FW_L",
-    "CAN_LTCD_L"
+    "CAN_LTCD_L",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM15-B B26",
    "wires": [
     "CAN_FW_H",
-    "CAN_LTCD_H"
+    "CAN_LTCD_H",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "TG-SW-DASH 4 FEED",
@@ -41387,7 +41442,7 @@
     "100"
    ],
    "splice": "D-609-04",
-   "equiv_awg": 16
+   "equiv_awg": 14
   },
   {
    "at": "BLOWER-MOTOR + blade terminal",
@@ -41405,7 +41460,7 @@
     "86"
    ],
    "splice": "D-609-04",
-   "equiv_awg": 16
+   "equiv_awg": 14
   },
   {
    "at": "FLOOR-DIMMER 12 LOW cavity",
@@ -41433,7 +41488,7 @@
     "STEP_DOOR_L"
    ],
    "splice": "D-609-04",
-   "equiv_awg": 16
+   "equiv_awg": 14
   },
   {
    "at": "DOOR-JAMB-R switch terminal",
@@ -41442,7 +41497,7 @@
     "STEP_DOOR_R"
    ],
    "splice": "D-609-04",
-   "equiv_awg": 16
+   "equiv_awg": 14
   },
   {
    "at": "SUB + push terminal",
@@ -41518,8 +41573,8 @@
    ],
    "splice": "D-609-05",
    "type": "stub",
-   "equiv_awg": 14,
-   "cm": 3702
+   "equiv_awg": 12,
+   "cm": 4402
   },
   {
    "at": "SPL-PDM30-OUT3",
@@ -41868,8 +41923,8 @@
    "CPA-100-3/4-BK": 1,
    "CPA-100-3/8-RED": 1,
    "D-609-03": 53,
-   "D-609-04": 23,
-   "D-609-05": 34,
+   "D-609-04": 15,
+   "D-609-05": 46,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -43330,21 +43385,21 @@
    "kind": "splice",
    "item": "D-609-04",
    "name": "MiniSeal stub splice, blue (20–16)",
-   "need": 23,
+   "need": 15,
    "cart": 25,
    "inside": [],
    "vendor": "prowire",
-   "status": "covered (+2 spare)"
+   "status": "covered (+10 spare)"
   },
   {
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 34,
+   "need": 46,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 14"
+   "status": "short by 26"
   },
   {
    "kind": "housing",
@@ -44630,10 +44685,10 @@
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 34,
+    "need": 46,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 14"
+    "status": "short by 26"
    },
    {
     "code": "DL438",
@@ -45721,7 +45776,7 @@
     },
     {
      "field": "#99r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -45829,7 +45884,7 @@
     },
     {
      "field": "#101r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -47935,7 +47990,7 @@
     },
     {
      "field": "#99r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -47977,7 +48032,7 @@
     },
     {
      "field": "#101r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -49531,7 +49586,7 @@
     },
     {
      "field": "#APS_T1_SIG ECU end",
-     "value": "M130:B21: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B21: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
