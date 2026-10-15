@@ -14,9 +14,15 @@ Deno.serve = ((callback: typeof handler) => { handler = callback; }) as typeof D
 let row: Record<string, unknown>, patches = 0, calls: string[] = [], rejectWrite = false;
 let classificationType = "other", intakeSuccess = true, intakeDuplicate = false, rejectEvidence = false;
 let intakeBody: Record<string, unknown> | null = null;
+// Unfiled-photo fixtures: the GPS matcher's answer, the sanctioned writer's answer, and every PATCH body.
+let gpsMatch: { vehicle_id: string; confidence: number } | null = null;
+let attributeResult: Record<string, unknown> = { success: true };
+let attributeBody: Record<string, unknown> | null = null;
+let patchBodies: Record<string, unknown>[] = [], uploadClockReads = 0;
 function reset() {
   patches = 0; calls = []; rejectWrite = false;
   classificationType = "other"; intakeSuccess = true; intakeDuplicate = false; rejectEvidence = false; intakeBody = null;
+  gpsMatch = null; attributeResult = { success: true }; attributeBody = null; patchBodies = []; uploadClockReads = 0;
   Deno.env.delete("GEMINI_API_KEY");
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle",
     updated_at: "2026-01-01T00:00:00.000Z", ai_scan_metadata: { byok_deep_analysis: { original: true }, on_device_vision: { version: "local-v1" } },
@@ -43,17 +49,33 @@ globalThis.fetch = (async (input, init) => {
     if (url.origin === project && url.pathname === "/rest/v1/vehicle_field_evidence") {
       return rejectEvidence ? Response.json({ message: "synthetic evidence rejection" }, { status: 400 }) : Response.json([]);
     }
+    if (url.origin === project && url.pathname === "/rest/v1/rpc/auto_match_image_to_vehicles") {
+      return Response.json(gpsMatch ? [gpsMatch] : []);
+    }
+    if (url.origin === project && url.pathname === "/rest/v1/rpc/attribute_testimony") {
+      // The live writer files only an unfiled row, and its UPDATE moves the updated_at token.
+      attributeBody = JSON.parse(String(options?.body));
+      if (attributeResult.success === true) {
+        row = { ...row, vehicle_id: attributeBody?.p_target_vehicle_id,
+          updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
+      }
+      return Response.json(attributeResult);
+    }
   }
   if (url.origin !== project || url.pathname !== "/rest/v1/vehicle_images") throw new Error("unexpected image/model/observation request");
   if (options?.method === "PATCH") {
+    const body = JSON.parse(String(options.body)); patchBodies.push(body);
     if (rejectWrite) return Response.json({ message: "synthetic write rejection", code: "42501" }, { status: 400 });
     if (url.searchParams.get("updated_at") !== `eq.${row.updated_at}`) return Response.json([]);
-    patches++; row = { ...row, ...JSON.parse(String(options.body)), updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
+    patches++; row = { ...row, ...body, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
     return Response.json([{ id: row.id }]);
   }
+  // An upload-clock read ("this user's most recently created filed photo") finds a different, recently filed vehicle.
+  if (url.searchParams.has("created_at")) { uploadClockReads++; return Response.json([{ vehicle_id: "recent-upload-vehicle" }]); }
   return Response.json(structuredClone(row));
 }) as typeof fetch;
 await import("./index.ts");
+const { CLASSIFIER_MODEL } = await import("./classifier.ts");
 Deno.serve = originalServe;
 
 function assert(value: unknown): asserts value { if (!value) throw new Error("assertion failed"); }
@@ -126,7 +148,7 @@ Deno.test("field evidence rejection fails completion and composite model remains
   assert(response.status === 500 && result.success === false && row.ai_processing_status === "failed");
   assert(intakeBody?.agent_model === null);
   const extraction = intakeBody?.extraction_metadata as Record<string, unknown>;
-  assert(extraction.classifier_model_configured === "gemini-2.5-flash" && extraction.downstream_model === null);
+  assert(extraction.classifier_model_configured === CLASSIFIER_MODEL && extraction.downstream_model === null);
   assert(calls.includes("POST /rest/v1/vehicle_field_evidence"));
 });
 
@@ -135,6 +157,56 @@ Deno.test("classifier assay dispatches before processing and refuses ordinary pi
   const result = await response.json();
   assert(response.status === 400 && result.error === "classifier_assay_input_invalid");
   assert(patches === 0 && calls.length === 0 && row.ai_processing_status === "pending");
+});
+
+function unfiledPhoto() {
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key");
+  row.vehicle_id = null; row.user_id = "owner"; row.is_external = false;
+  row.latitude = 35.9727; row.longitude = -114.856; row.taken_at = "2021-05-01T17:00:00.000Z";
+}
+function pipelineMetadata() {
+  return row.ai_scan_metadata as Record<string, Record<string, unknown>>;
+}
+
+Deno.test("unfiled photo with no evidence stays unfiled and gets no upload-clock suggestion", async () => {
+  unfiledPhoto();
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  assert(result.success === true && result.vehicle_resolved === false && row.vehicle_id === null);
+  assert(calls.includes("POST /rest/v1/rpc/auto_match_image_to_vehicles"));
+  assert(!calls.includes("POST /rest/v1/rpc/attribute_testimony") && uploadClockReads === 0);
+  assert(patchBodies.every(b => !("suggested_vehicle_id" in b) && !("image_vehicle_match_status" in b) && !("vehicle_id" in b)));
+  assert(pipelineMetadata().attribution === undefined && intakeBody === null);
+});
+
+Deno.test("GPS match at or under the 0.7 bar files nothing", async () => {
+  unfiledPhoto(); gpsMatch = { vehicle_id: "nearby-vehicle", confidence: 0.5 };
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  assert(result.success === true && result.vehicle_resolved === false && row.vehicle_id === null);
+  assert(attributeBody === null && patchBodies.every(b => !("vehicle_id" in b) && !("suggested_vehicle_id" in b)));
+});
+
+Deno.test("GPS match above the bar is filed by attribute_testimony, never by a raw vehicle_id patch", async () => {
+  unfiledPhoto(); gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.82 };
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  assert(result.success === true && result.vehicle_resolved === true && result.vehicle_id === "held-vehicle");
+  assert(attributeBody?.p_observation_type === "image" && attributeBody?.p_observation_id === "image");
+  assert(attributeBody?.p_target_vehicle_id === "held-vehicle" && attributeBody?.p_signal === "gps_proximity");
+  assert(attributeBody?.p_confidence === 0.82 && attributeBody?.p_actor_user_id === null);
+  assert(row.vehicle_id === "held-vehicle" && row.ai_processing_status === "completed");
+  assert(patchBodies.every(b => !("vehicle_id" in b) && !("suggested_vehicle_id" in b)));
+  const attribution = pipelineMetadata().attribution;
+  assert(attribution.filed === true && attribution.refusal === null && attribution.signal === "gps_proximity");
+  assert(intakeBody !== null); // the observation is created on the vehicle the writer filed
+});
+
+Deno.test("attribution the writer refuses leaves the photo unfiled and the handlers vehicle-less", async () => {
+  unfiledPhoto(); gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.9 };
+  attributeResult = { success: false, error: "file_hash_exists_on_target" };
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  assert(result.success === true && result.vehicle_resolved === false && row.vehicle_id === null);
+  assert(attributeBody !== null && intakeBody === null);
+  const attribution = pipelineMetadata().attribution;
+  assert(attribution.filed === false && attribution.refusal === "file_hash_exists_on_target");
 });
 
 Deno.test("restore handler-test fetch fixture", () => { globalThis.fetch = originalFetch; });
