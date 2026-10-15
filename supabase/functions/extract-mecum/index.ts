@@ -216,15 +216,16 @@ const corsHeaders = {
 };
 
 /**
- * A lot that did not land whole goes to the revision queue (record_revision_item) with what is missing and the next action,
- * instead of staying a counter. next_action is one of reparse_retained, refetch, relink, classify_non_vehicle, retry.
+ * A lot that did not land whole goes to the revision queue (record_revision_item) with what is missing, a reason and the next
+ * action, instead of staying a counter. Reason and next_action are the closed vocabularies of import_queue_revision_vocab
+ * (migration 20261015120000_revision_queue.sql); a free-text reason is refused by the table's check.
  */
 async function raiseRevision(
   supabase: any,
   url: string,
   missing: string[],
-  reason: string,
-  nextAction: "reparse_retained" | "refetch" | "relink" | "classify_non_vehicle" | "retry",
+  reason: "parser_gap" | "blocked" | "rate_limited" | "billing" | "timeout" | "lock_timeout" | "duplicate_key" | "quality_gate" | "bad_data" | "not_found" | "thin_landing" | "unlinked_capture" | "other",
+  nextAction: "reparse_retained" | "refetch" | "relink" | "classify_non_vehicle" | "retry" | "wait" | "none",
   detail: Record<string, unknown> = {},
   snapshotId?: string,
 ) {
@@ -1312,7 +1313,7 @@ Deno.serve(async (req) => {
         if ("skip" in r) {
           bump(r.skip);
           if (r.skip === "no_year_make" && r.url && !dryRun) {
-            await raiseRevision(supabase, r.url, ["year", "make"], "the public lot index states no year or make", "refetch", { title: r.title ?? null, index_pulled_at: pulledIso });
+            await raiseRevision(supabase, r.url, ["year", "make"], "bad_data", "reparse_retained", { title: r.title ?? null, index_pulled_at: pulledIso });
             out.revisions_raised++;
           }
           continue;
@@ -1489,7 +1490,8 @@ Deno.serve(async (req) => {
           }
           const vehicle = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
           if (!vehicle || !(vehicle.year && vehicle.make)) {
-            mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
+            // reparse_retained, then refetch, then classify_non_vehicle: a page that parses with no year and make is next classified.
+            mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: vehicle ? "classify_non_vehicle" : "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
             out.released++;
             continue;
           }
@@ -1556,8 +1558,8 @@ Deno.serve(async (req) => {
           }
           if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
           const vehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
-          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "the retained page has no lot object", "refetch", {}, snap.id); continue; }
-          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "the retained page states no year or make", "classify_non_vehicle", {}, snap.id); continue; }
+          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
+          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
           softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
@@ -1842,8 +1844,8 @@ Deno.serve(async (req) => {
         } catch (err: any) {
           const msg = String(err?.message || err);
           const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
-          if (msg === "NOT_A_VEHICLE") await raiseRevision(supabase, w.url, ["year", "make"], "the lot page states no year or make", "classify_non_vehicle");
-          else if (msg === "SKIP_NO_NEXT_DATA") await raiseRevision(supabase, w.url, ["lot_object"], "the free parse found no lot object on the page", "refetch");
+          if (msg === "NOT_A_VEHICLE") await raiseRevision(supabase, w.url, ["year", "make"], "quality_gate", "classify_non_vehicle");
+          else if (msg === "SKIP_NO_NEXT_DATA") await raiseRevision(supabase, w.url, ["lot_object"], "parser_gap", "refetch");
           softWrite("import_queue outcome", await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId), writeErrors);
           if (gone) { results.gone++; consecutiveFailures = 0; }
           else {
