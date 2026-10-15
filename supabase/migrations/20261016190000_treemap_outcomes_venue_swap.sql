@@ -8,7 +8,8 @@
 -- The fill job (market-venue-v2-fill) is unscheduled. The _v1 views stay one day for a reverse rename, then a later
 -- migration drops them.
 -- Refuses unless: all seven copies are filled; each copied dependent's live definition is still the one it was copied
--- from (pg_get_viewdef of the live view, parents repointed, equals the copy's); the views reading the live fold are still
+-- from (the live view's definition, parents repointed and re-parsed, equals the copy's; mv_family_year_prices_v2 may
+-- differ only by skylar-08's short-alias fix, 20261017053000); the views reading the live fold are still
 -- exactly the six. Applied twice, the second run finds the swap done and changes nothing.
 -- Contract: supabase/sql/test_treemap_outcomes_venue_swap.sql (db-contracts).
 BEGIN;
@@ -23,6 +24,7 @@ DECLARE
   ix record;
   v_unfilled text;
   v_drift text;
+  v_expected text;
   v_chain text[];
 BEGIN
   IF to_regclass('public.mv_treemap_outcomes_v1') IS NOT NULL
@@ -39,11 +41,23 @@ BEGIN
     RAISE EXCEPTION 'not every copy is filled: %', v_unfilled;
   END IF;
 
-  SELECT string_agg(v1, ', ') INTO v_drift
-  FROM unnest(c_chain[2:]) v1
-  WHERE regexp_replace(regexp_replace(pg_get_viewdef(format('public.%I', v1)::regclass),
-          '\mmv_treemap_outcomes\M', 'mv_treemap_outcomes_v2', 'g'), '\mmv_family_market\M', 'mv_family_market_v2', 'g')
-        IS DISTINCT FROM pg_get_viewdef(format('public.%I', v1 || '_v2')::regclass);
+  -- Each copy must still be its live view's definition, parents repointed. Compared after one re-parse: a view made
+  -- from deparsed text does not deparse to the same text (array literals come back with element casts; skylar-08,
+  -- 2026-10-15 19:00Z), so the expected text goes through a temporary view first. mv_family_year_prices_v2 carries one
+  -- intended difference, skylar-08's short-alias fix (20261017053000), applied to the expected text before comparing.
+  FOREACH v IN ARRAY c_chain[2:] LOOP
+    v_expected := regexp_replace(regexp_replace(pg_get_viewdef(format('public.%I', v)::regclass),
+      '\mmv_treemap_outcomes\M', 'mv_treemap_outcomes_v2', 'g'), '\mmv_family_market\M', 'mv_family_market_v2', 'g');
+    IF v = 'mv_family_year_prices' THEN
+      v_expected := replace(v_expected, '(length(n.w) >= 3)',
+        '((length(n.w) >= 3) OR ((length(n.w) = 2) AND (n.w ~ ''[0-9]''::text)))');
+    END IF;
+    EXECUTE format('CREATE TEMP VIEW swap_expected AS %s', regexp_replace(v_expected, ';\s*$', ''));
+    IF pg_get_viewdef('pg_temp.swap_expected'::regclass) IS DISTINCT FROM pg_get_viewdef(format('public.%I', v || '_v2')::regclass) THEN
+      v_drift := concat_ws(', ', v_drift, v);
+    END IF;
+    DROP VIEW pg_temp.swap_expected;
+  END LOOP;
   IF v_drift IS NOT NULL THEN
     RAISE EXCEPTION 'redefined since its copy was made: % (recopy before swapping)', v_drift;
   END IF;
