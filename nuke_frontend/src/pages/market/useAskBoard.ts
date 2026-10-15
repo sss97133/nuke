@@ -21,10 +21,10 @@ export type AskRow = {
   mileage: number | null; image: string | null;
   // What the listing itself says (20261015080000): its stated miles, a disclosed odometer state, its title status.
   listing_mileage?: number | null; odometer?: 'broken' | 'rolled_over' | null; title_status?: string | null; observation_id?: string | null;
-  condition?: string | null; // the seller's declared condition, as stated (20261016020000): a claim, not an inspection
+  condition?: string | null; // the seller's declared condition, as stated (20261016042000): a claim, not an inspection
   city: string | null; region: string | null; lat: number | null; lng: number | null; distance_mi: number | null;
   taste: number | null; in_band: boolean | null;
-  // What the listing is and where its ask sits (20261016020000): its model family and, for its model year, the
+  // What the listing is and where its ask sits (20261016042000): its model family and, for its model year, the
   // family's recorded sales and other classified asks (mv_family_year_prices). merit: the active exit model's chance
   // that a listing like this is gone within the model's horizon; null until a model is active.
   position?: AskPosition | null;
@@ -54,13 +54,13 @@ export type AskPosition = {
 };
 export type AskPopulation = {
   asks: number; priced: number; with_point: number; in_band: number;
-  keyed?: number; positioned_sold?: number; positioned_asked?: number; with_merit?: number; // 20261016020000
+  keyed?: number; positioned_sold?: number; positioned_asked?: number; with_merit?: number; // 20261016042000
   by_source: Record<string, number>; by_tier: Partial<Record<AskTier | 'unpriced', number>>;
 };
 export type AskBoard = {
   as_of: string; since: string; window_hours: number; band_min_taste: number;
   newest_at?: string | null; // the newest listed_at the caller can see in the window (20261015070000)
-  newest_seen_at?: string | null; // the newest first sighting: capture time (20261016020000)
+  newest_seen_at?: string | null; // the newest first sighting: capture time (20261016042000)
   merit_model?: { version: string; horizon_days: number; base_rate: number } | null; // the active exit model
   population: AskPopulation; matching: number; rows: AskRow[];
 };
