@@ -166,8 +166,10 @@ export interface BatOwnAuctionEnd {
   endsDate: string | null;
   /** which own countdown gave the end: the stats table's data-ends, or the data-auction-ends countdown */
   endsFrom: "data-ends" | "countdown" | null;
-  /** a closed page's result stamp ("Sold for … on 5/26/26"), ISO UTC; null while the lot runs */
+  /** a closed page's result stamp ("Sold for … on 5/26/26", "Withdrawn on 10/5/26"), ISO UTC; null while the lot runs */
   closedAt: string | null;
+  /** the result line says "Withdrawn on <date>": BaT pulled the lot, so there is no sale and no reserve result */
+  withdrawn: boolean;
 }
 
 const attrOf = (tag: string, name: string): string | null =>
@@ -205,10 +207,13 @@ export function readOwnAuctionEnd(html: string): BatOwnAuctionEnd {
   if (endsAt) endsDate = endsAt.slice(0, 10);
 
   const infoId = info.match(/data-listing-currently="(\d+)"/i)?.[1] ?? null;
+  // the stamp's span: "date date-localize" after "Sold for" / "Bid to", "info-value noborder-tiny date-localize" after
+  // "Withdrawn on" (six lots withdrawn 10-05..08 read as running until 2026-10-15: the old pattern wanted class="date…")
   const closedAt = info && !/\sdata-until=/i.test(info) && own(infoId)
-    ? isoOf(info.match(/<span[^>]*\sclass="date[^"]*"[^>]*\sdata-timestamp="(\d+)"/i)?.[1])
+    ? isoOf(info.match(/<span[^>]*\sclass="[^"]*\bdate-localize\b[^"]*"[^>]*\sdata-timestamp="(\d+)"/i)?.[1])
     : null;
-  return { postId, endsAt, endsDate, endsFrom, closedAt };
+  const withdrawn = closedAt !== null && /<span class="info-label">\s*Withdrawn on\s*<\/span>/i.test(info);
+  return { postId, endsAt, endsDate, endsFrom, closedAt, withdrawn };
 }
 
 /** ISO 3779 check digit for a 17-character VIN (pre-1981 VINs have none and are not judged here). */
