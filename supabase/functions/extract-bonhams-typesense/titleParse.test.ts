@@ -34,3 +34,20 @@ Deno.test('a leading year range names the car by its first year and keeps the ra
 Deno.test('a year that is not first, or a reversed range, is not read as a range', () => {
   equal(parseTitle('2016/1965 Shelby Cobra').year_range, undefined);
 });
+
+Deno.test('a claim ahead of the car is kept as a blurb, not read as the make', () => {
+  const a = parseTitle('58,000 kms from new,1976 Ferrari 308GTB Vetroresina Coup\u00e9 Chassis no. 18889');
+  equal([a.year, a.make, a.blurb, a.chassis], [1976, 'Ferrari', '58,000 kms from new', '18889']);
+  const b = parseTitle('1 of only 70 built,1963 Aston Martin DB4 Convertible Chassis no. DB4C/1091/R Engine no. 370/1085');
+  equal([b.year, b.make, b.blurb], [1963, 'Aston Martin', '1 of only 70 built']);
+});
+
+Deno.test('a two-digit range end is read in the first year\'s century', () => {
+  const a = parseTitle("1954-55 Ferrari Tipo 555 'Super Squalo' 2.5-litre Formula 1 Racing Single-Seater Chassis no. 555/1");
+  equal([a.year, a.make, a.year_range], [1954, 'Ferrari', '1954-1955']);
+});
+
+Deno.test('a title with no year anywhere stays without one', () => {
+  equal(parseTitle('1840s Tilley Horsedrawn Manual Fire Pump').year, null);
+  equal(parseTitle('The Ferrari factory team, Mille Miglia, Le Mans').year, null);
+});
