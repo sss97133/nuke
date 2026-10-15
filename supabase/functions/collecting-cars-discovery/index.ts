@@ -75,34 +75,32 @@ function okJson(body: unknown, status = 200): Response {
   });
 }
 
+async function typesenseSearch(search: Record<string, unknown>): Promise<any> {
+  const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ searches: [search] }),
+  });
+  if (!response.ok) {
+    throw new Error(`Typesense API returned ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()).results?.[0];
+}
+
 async function fetchTypesenseListings(
   stage: string = "live",
   perPage: number = 250
 ): Promise<TypesenseDocument[]> {
-  const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      searches: [{
-        collection: TYPESENSE_COLLECTION,
-        q: "*",
-        filter_by: `listingStage:${stage}`,
-        sort_by: "tsPublishedUTC:desc",
-        per_page: perPage,
-        page: 1,
-        query_by: "title,productMake,vehicleMake,productYear",
-      }],
-    }),
+  const result = await typesenseSearch({
+    collection: TYPESENSE_COLLECTION,
+    q: "*",
+    filter_by: `listingStage:${stage}`,
+    sort_by: "tsPublishedUTC:desc",
+    per_page: perPage,
+    page: 1,
+    query_by: "title,productMake,vehicleMake,productYear",
   });
-
-  if (!response.ok) {
-    throw new Error(`Typesense API returned ${response.status}: ${await response.text()}`);
-  }
-
-  const data: TypesenseResponse = await response.json();
-  return data.results[0]?.hits?.map(hit => hit.document) || [];
+  return result?.hits?.map((hit: { document: TypesenseDocument }) => hit.document) || [];
 }
 
 async function getExistingUrls(supabase: any): Promise<Set<string>> {
@@ -244,16 +242,10 @@ Deno.serve(async (req) => {
       for (let i = 0; i < days; i++) {
         const start = new Date(today.getTime() - i * 86_400_000);
         const end = new Date(start.getTime() + 86_400_000);
-        const res = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ searches: [{
-            collection: TYPESENSE_COLLECTION, q: "*", query_by: "title", per_page: 1,
-            filter_by: `lotType:=car && tsPublishedUTC:>=${start.getTime() / 1000} && tsPublishedUTC:<${end.getTime() / 1000}`,
-          }] }),
-        });
-        if (!res.ok) throw new Error(`Typesense API returned ${res.status}`);
-        const found = (await res.json()).results?.[0]?.found;
+        const found = (await typesenseSearch({
+          collection: TYPESENSE_COLLECTION, q: "*", query_by: "title", per_page: 1,
+          filter_by: `lotType:=car && tsPublishedUTC:>=${start.getTime() / 1000} && tsPublishedUTC:<${end.getTime() / 1000}`,
+        }))?.found;
         if (typeof found !== "number") throw new Error("Typesense returned no count");
         out.push({ day: start.toISOString().slice(0, 10), listed: found });
         await new Promise((r) => setTimeout(r, 2000));
