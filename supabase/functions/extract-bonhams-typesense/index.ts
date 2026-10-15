@@ -445,7 +445,8 @@ Deno.serve(async (req) => {
           .select("metadata")
           .eq("source_platform", "bonhams")
           .eq("extraction_source", "bonhams-typesense")
-          .order("updated_at", { ascending: false })
+          .not("metadata->>ts_landed_at", "is", null)
+          .order("metadata->>ts_landed_at", { ascending: false })
           .limit(1);
         const lastPage = Number((last?.[0]?.metadata as Record<string, unknown> | undefined)?.ts_page);
         pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
@@ -516,6 +517,7 @@ Deno.serve(async (req) => {
           event_key: doc.id,
           ts_page: pageNo,
           extra_metadata: {
+            ts_landed_at: observedAt,
             sale_key: `bonhams-${doc.auctionId}`,
             auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
               ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],

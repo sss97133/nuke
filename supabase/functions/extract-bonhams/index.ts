@@ -1025,23 +1025,34 @@ async function saveVehicle(
 
   let action: string;
 
+  // Fast path (Typesense lander): a VIN/chassis that another vehicle already holds is resolved, not thrown.
+  // A full 17-character VIN names the same car, so the lot links to that vehicle; a short chassis number is not
+  // unique across makes, so the lot keeps its own vehicle without the vin column (the chassis stays in origin_metadata).
+  const vinClash = (msg: string): string | null => {
+    const m = msg.match(/VIN .* already exists on vehicle ([0-9a-f-]{36})/i);
+    return opts.fast && m ? m[1] : null;
+  };
+  action = "updated";
   if (targetId) {
-    // Update existing vehicle
-    const { error } = await supabase.from("vehicles").update(vehicleData).eq("id", targetId);
+    let { error } = await supabase.from("vehicles").update(vehicleData).eq("id", targetId);
+    const other = error ? vinClash(error.message) : null;
+    if (error && other) {
+      if (fullVin) { targetId = other; action = "linked_by_vin"; error = null; }
+      else { ({ error } = await supabase.from("vehicles").update({ ...vehicleData, vin: null }).eq("id", targetId)); }
+    }
     if (error) throw new Error(`Vehicle update failed: ${error.message}`);
-    action = "updated";
-    console.log(`[Bonhams] Updated vehicle: ${targetId}`);
+    console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   } else {
-    // Insert new vehicle
-    const { data: newVehicle, error } = await supabase
-      .from("vehicles")
-      .insert(vehicleData)
-      .select("id")
-      .maybeSingle();
-    if (error) throw new Error(`Vehicle insert failed: ${error.message}`);
-    targetId = newVehicle?.id || null;
-    action = "created";
-    console.log(`[Bonhams] Created vehicle: ${targetId}`);
+    let ins = await supabase.from("vehicles").insert(vehicleData).select("id").maybeSingle();
+    const other = ins.error ? vinClash(ins.error.message) : null;
+    if (ins.error && other) {
+      if (fullVin) { ins = { data: { id: other }, error: null } as typeof ins; action = "linked_by_vin"; }
+      else ins = await supabase.from("vehicles").insert({ ...vehicleData, vin: null }).select("id").maybeSingle();
+    }
+    if (ins.error) throw new Error(`Vehicle insert failed: ${ins.error.message}`);
+    targetId = ins.data?.id || null;
+    if (action !== "linked_by_vin") action = "created";
+    console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   }
 
   if (!targetId) {
@@ -1182,7 +1193,7 @@ Deno.serve(async (req) => {
               onObservationIssue: (m) => { results.obs_issues++; if (results.errors.length < 8) results.errors.push(`obs ${m}`); },
             });
             if (r.action === "created") results.created++;
-            else if (r.action === "updated") results.updated++;
+            else if (r.action === "updated" || r.action === "linked_by_vin") results.updated++;
             else if (r.action === "rejected") results.rejected++;
             else results.failed++;
           } catch (e: any) {
