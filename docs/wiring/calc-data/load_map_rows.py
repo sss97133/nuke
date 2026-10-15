@@ -355,7 +355,11 @@ def main():
         tl = ends_of.get(wid, [])
         def _code(x):
             b = re.split(r"\s\(|:|\s->|\s\+", str(x or ""))[0].strip()
-            return ALIAS_N.get(re.sub(r"[^a-z0-9]", "", b.lower())) or (b if b in eps else None)
+            # RSI pass 40: "AMP CH1+" names the AMP plug by its first word; without it the start fell to the first end
+            # listed (the door pass-through), and the segment fold chained 26a/26b/27a/27b AMP -> SPK and door -> AMP
+            first = b.split()[0] if b.split() else ""
+            return (ALIAS_N.get(re.sub(r"[^a-z0-9]", "", b.lower())) or (b if b in eps else None)
+                    or ALIAS_N.get(re.sub(r"[^a-z0-9]", "", first.lower())) or (first if first in eps else None))
         fc = _code(w.get("frm"))
         tc = _code(w["to"].get("device") if isinstance(w.get("to"), dict) else w.get("to"))
         fc, tc = (None if fc in STUD_SET else fc), (None if tc in STUD_SET else tc)   # the stud nodes carry those ends
