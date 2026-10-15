@@ -1614,7 +1614,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               cursor: 'pointer',
             }}
           >
-            {embedded ? 'BAT LIVE BOARD ↓' : 'BROWSE ALL'}
+            {embedded ? 'SOURCES ↓' : 'BROWSE ALL'}
           </button>
           {!embedded && <a
             href="https://nuke.ag"
@@ -1642,6 +1642,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
 const FeedPage = lazy(() => import('../feed/components/FeedPage'));
 const MarketPulse = lazy(() => import('./market/MarketInventory'));
+const SourcesBoard = lazy(() => import('./market/SourcesBoard'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 
 type TabId = 'market' | 'garage' | 'feed';
@@ -1716,7 +1717,10 @@ export default function HomePage() {
 
       <Suspense fallback={<TabSkeleton />}>
         {activeTab === 'market' && <>
-          <TreemapHomePage embedded onBrowse={() => document.querySelector('.market-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
+          <SourcesBoard />
           <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
         </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
