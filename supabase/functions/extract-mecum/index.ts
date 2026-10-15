@@ -1031,7 +1031,7 @@ function mecumLotKey(url: string): string {
 }
 function mecumUrlSpellings(url: string): string[] {
   const bare = mecumLotKey(url);
-  return ["https://www." + bare, "https://" + bare, "http://" + bare].flatMap((u) => [u, u + "/", u + "/sitemap.xml"]);
+  return [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────
@@ -1146,12 +1146,20 @@ Deno.serve(async (req) => {
         if (!targets?.length) break;
         cursor = targets[targets.length - 1].id;
         const urls = targets.map((t: { listing_url: string }) => t.listing_url);
-        const [{ data: queued }, { data: landed }] = await Promise.all([
-          supabase.from("import_queue").select("listing_url").in("listing_url", urls),
-          supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", urls.flatMap(mecumUrlSpellings)),
-        ]);
-        const queuedUrls = new Set((queued ?? []).map((r: { listing_url: string }) => r.listing_url));
-        const landedKeys = new Set((landed ?? []).map((r: { source_url: string }) => mecumLotKey(r.source_url)));
+        // 25 targets x 5 spellings keeps each request line near 11 KB; a longer line is refused, and an unread answer must
+        // never count as "nothing landed" (the first scheduled runs added second events that way).
+        const queuedUrls = new Set<string>();
+        const landedKeys = new Set<string>();
+        for (let i = 0; i < urls.length; i += 25) {
+          const chunk = urls.slice(i, i + 25);
+          const [q, e] = await Promise.all([
+            supabase.from("import_queue").select("listing_url").in("listing_url", chunk),
+            supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings)),
+          ]);
+          if (q.error || e.error) throw new Error(`landed lookup failed: ${(q.error || e.error)?.message}`);
+          for (const r of q.data ?? []) queuedUrls.add(r.listing_url);
+          for (const r of e.data ?? []) landedKeys.add(mecumLotKey(r.source_url));
+        }
         for (const t of targets) {
           if (!queuedUrls.has(t.listing_url) && !landedKeys.has(mecumLotKey(t.listing_url)) && picked.length < limit) picked.push(t);
         }
