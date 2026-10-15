@@ -247,3 +247,60 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   included), except Gooding and Barrett-Jackson, whose published prices `vehicle_sale_basis()` accepts as sales.
 - **Not claimed.** The calendar is the lots Nuke has landed, not the house's full roster, until the stated count is held
   beside it; an estimate is the house's; "no reserve" is the house's flag.
+
+## The feed and the brand map — owner direction, October 15
+
+**The brand map.** The treemap may be the best format there is, and its tiles said little: "Chevrolet 27,885 sold,
+$36K med, 11.5%". A brand is not its median price ("to define an entire brand on a median price is just totally
+horrible"), and the share repeats the tile's area. The job is to present brand context no one has seen, from what the
+data model already holds, and to name and build what it lacks. Delivered first (fold `mv_brand_market`): area =
+dollars from confirmed sales; the tile reads dollars and sales, the p10–p90 band, the share of offered cars that sold,
+the model year that trades, and the last 12 months against the 12 before (color; gray when too few sales are dated).
+Missing and next: model families (model strings are split by trim, so "what this brand trades" cannot be shown yet),
+and repeat-sale returns (the same car sold twice, and what it gained per year held).
+
+**The feed: why is this listing in front of me.** Serving cars newest first over a mixed pile is not an organizing
+method ("what am I doing here, why am I looking at this classified"). A listing earns its place the way social feeds
+measure virality, by a measured reason it is worth a look:
+- it is underpriced against its own market (which needs a defensible estimate of what the car should bring);
+- the composition of the sale (who is selling, for example an original owner's car);
+- the viewer's interests, from their own history and whatever access they grant;
+- the patterns the corpus already shows people go crazy about, so a matching vehicle triggers something when it lands;
+- and some new things introduced to test whether they hold the viewer.
+The design system is the data: the order and what each row says come from these measures, not from layout.
+
+**Live, not clocks.** The page should read as live to the second. No full date and time stamps (22 characters); when
+the board is current it says live, otherwise how old the read is ("5 min ago"). No population sentence as a headline
+("of 573 asks first seen in the last 24 hours" is not what matters), and no section named like a pipeline
+("Classified arrivals").
+
+**Ask less of the viewer.** Source, window, order, near me, band and price tiers are not the first thing on the page;
+defaults do the work and the controls recede. The market-view switch is navigation, not a filter.
+
+**What a row says.** The photo already says it is a rear-drive coupe; do not spend text on drivetrain or body. Say the
+source (Craigslist), and above all how old the listing is: how early the viewer is (the Marketplace habit of refreshing
+the top). "Original listing" as a label goes. Location matters and deserves its own thought.
+
+**Refresh is a control.** Top right, it shows that something is happening and says what arrived. Refreshing never
+loses the reader's place; scrolling up is not a refresh.
+
+**Price must be believable.** An ask of $21,000 over a "$15K–40K" tier is not helpful. The viewer needs what the car
+should sell for, a Zillow-grade estimate, which needs image analysis, condition, and the cost to make it a daily
+driver, and differs per viewer. Until a number can be defended it is not shown (feedback rule: never show a price you
+cannot defend); the honest interim is the ask placed against the same car's measured sales.
+
+**Typography and logos.** Careful use of logos (makes, sources) and type is more fun, and the site under-uses it.
+
+Delivered October 15 on the classifieds board: "Just listed"; a top-right refresh that reads live or how far behind,
+checks quietly every two minutes and offers "N new" without moving the list; filters folded into one closed control;
+rows with mileage, the source and the listing's age; the tier label and the raw taste score removed. The reader
+(20261015070000) orders newest first by when a listing went up (listed_at = the post time, never later than the first
+sighting) and returns the newest listing time, so the control and the top row agree.
+
+Measured that day, and the reason "live" cannot yet be claimed of the market: the intake (poll-listing-feeds, every
+15 minutes) captured 614 Craigslist listings in 24 h, a median 6.5 h after they were posted (p10 82 min, p90 3 days;
+38 within the hour). Facebook Marketplace and KSL sent none (their jobs are paused). Being early on a listing needs an
+intake that captures within minutes; that is intake work, not page work.
+
+Next: the interest order (underpriced against same-car sales first, then sale composition and the viewer's band), and
+the ask placed against measured sales.

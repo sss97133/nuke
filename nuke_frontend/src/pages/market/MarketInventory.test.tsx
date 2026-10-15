@@ -2,7 +2,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), boardQuery: {} as any }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
 vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
@@ -36,7 +36,7 @@ it('opens the existing explorer at Market and keeps unresolved source presentati
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Captured listings')!.click());
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Classified arrivals');
+  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
   expect(fixture.source).not.toHaveBeenCalled();
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=listings&source=craigslist');
@@ -108,14 +108,18 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
 const button = (text: string) => [...container.querySelectorAll('button')].find(b => b.textContent?.startsWith(text))!;
 const lastQuery = () => fixture.board.mock.calls.at(-1)![0];
 
-it('opens classifieds on the arrivals board: the count with its population and clock, tiers with counts, place and band', async () => {
+it('opens classifieds as just listed: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
   await render('collection=listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Classified arrivals');
-  expect(container.textContent).toContain(`of 374 asks first seen in the last 24 hours · as of ${new Date('2026-10-13T23:30:00Z').toLocaleString()}`);
+  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
+  expect(container.textContent).not.toContain('asks first seen');
+  expect(button('↻')).toBeTruthy();
+  expect(container.querySelector('details.market-filters')?.hasAttribute('open')).toBe(false);
   expect(button('$5K–15K').textContent).toBe('$5K–15K · 140');
   expect(container.textContent).toContain('368 of 374 priced (6 without a price) · 3 with a recorded place · 67 in the band (taste 60+) · Craigslist 374');
   expect(container.textContent).toContain('Phoenix, AZ'); expect(container.textContent).toContain('256 mi away');
-  expect(container.textContent).toContain('In band · taste 96'); expect(container.textContent).toContain('4WD · SUV · 88,000 mi');
+  expect(container.textContent).toContain('88,000 mi'); expect(container.textContent).not.toContain('4WD · SUV');
+  expect(container.textContent).not.toContain('original listing'); expect(container.textContent).not.toMatch(/taste 96/);
+  expect(container.textContent).toMatch(/Craigslist · (just now|\d+ (min|h|d) ago)/);
   expect(container.textContent).toContain('$18,800 · asking');
   expect(container.textContent).toContain('Unpriced'); expect(container.textContent).toContain('Place unrecorded');
   expect(container.querySelector('a[href="/vehicle/v1"]')).not.toBeNull();
@@ -154,4 +158,43 @@ it('near me refused: the whole country, said so', async () => {
   await render('collection=listings&near=1');
   expect(container.textContent).toContain('Location not shared; showing the whole country.');
   expect(lastQuery().point).toBeNull();
+});
+
+describe('how a feed says time', () => {
+  it('says how old a listing is in feed terms, and unknown as unknown', async () => {
+    const { ageOf, freshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(ageOf('2026-10-15T01:59:30Z', now)).toBe('now');
+    expect(ageOf('2026-10-15T01:48:00Z', now)).toBe('12 min');
+    expect(ageOf('2026-10-14T23:00:00Z', now)).toBe('3 h');
+    expect(ageOf('2026-10-13T01:00:00Z', now)).toBe('2 d');
+    expect(ageOf(null, now)).toBeNull();
+    expect(freshness(null, now)).toBe('refresh');
+  });
+
+  it('is live while the newest arrival is within one 15-minute intake cycle, and says how far behind past it', async () => {
+    const { freshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(freshness('2026-10-15T01:59:00Z', now)).toBe('live');
+    expect(freshness('2026-10-15T01:45:00Z', now)).toBe('live');
+    expect(freshness('2026-10-15T01:35:00Z', now)).toBe('25 min behind');
+    expect(freshness('2026-10-14T23:00:00Z', now)).toBe('3 h behind');
+  });
+
+  it('knows its newest arrival from the reader, else from its rows, and counts what came after it', async () => {
+    const { newestOf, arrivalsAfter } = await import('./ClassifiedArrivals');
+    const rows = [{ first_seen_at: '2026-10-15T01:30:00+00:00' }, { first_seen_at: '2026-10-15T01:45:00+00:00' }];
+    expect(newestOf({ newest_at: '2026-10-15T01:46:00+00:00', rows: rows as never })).toBe('2026-10-15T01:46:00+00:00');
+    expect(newestOf({ newest_at: undefined, rows: rows as never })).toBe('2026-10-15T01:45:00.000Z');
+    // Before the reader carries listed_at: a post time before the first sighting is the listing's age; a later one is not.
+    const { listedAt } = await import('./ClassifiedArrivals');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: '2026-10-14T19:00:00Z' })).toBe('2026-10-14T19:00:00Z');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: '2099-01-01T00:00:00Z' })).toBe('2026-10-15T01:45:00Z');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: null, listed_at: '2026-10-15T01:00:00Z' })).toBe('2026-10-15T01:00:00Z');
+    expect(newestOf({ newest_at: null, rows: [] })).toBeNull();
+    expect(newestOf(undefined)).toBeNull();
+    expect(arrivalsAfter(rows, '2026-10-15T01:40:00Z')).toBe(1);
+    expect(arrivalsAfter(rows, '2026-10-15T01:45:00Z')).toBe(0);
+    expect(arrivalsAfter(rows, null)).toBe(0);
+  });
 });
