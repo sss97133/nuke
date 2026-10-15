@@ -2211,18 +2211,23 @@ Deno.serve(async (req) => {
       mark("observation_receipts");
       if (cleanedImages.length > 0) {
         try {
-          const { data: existingRows, error: existingErr } = await supabase
-            .from("vehicle_images")
-            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
-            .eq("vehicle_id", vehicleId)
-            // Keep parity with gallery filters
-            .not("is_document", "is", true)
-            .not("is_duplicate", "is", true)
-            .limit(5000);
-
-          if (existingErr) throw existingErr;
-
-          const existing = Array.isArray(existingRows) ? existingRows : [];
+          // Read every held row, a page at a time: one .limit() read is capped by the API, so a vehicle with more rows than
+          // the cap looked empty past it and every run inserted the rest again (9,972 rows for 719 URLs, 2026-02).
+          const existing: any[] = [];
+          for (let from = 0; ; from += 1000) {
+            const { data: page, error: existingErr } = await supabase
+              .from("vehicle_images")
+              .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
+              .eq("vehicle_id", vehicleId)
+              // Keep parity with gallery filters
+              .not("is_document", "is", true)
+              .not("is_duplicate", "is", true)
+              .order("id", { ascending: true })
+              .range(from, from + 999);
+            if (existingErr) throw existingErr;
+            if (Array.isArray(page)) existing.push(...page);
+            if (!Array.isArray(page) || page.length < 1000) break;
+          }
           const hasPrimaryAlready = existing.some((r: any) => Boolean(r?.is_primary));
 
           const keyFromRow = (r: any): string => {
