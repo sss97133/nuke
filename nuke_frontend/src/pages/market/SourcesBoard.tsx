@@ -158,9 +158,10 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
                   : null}
               </span>
               <span className="market-sources__share" title={total}>
-                <span className={`market-sources__track${s.share == null ? ' market-sources__track--unknown' : ''}`}>
-                  {s.share != null ? <span className="market-sources__fill" style={{ width: `${Math.max(1.5, s.share * 100)}%` }} /> : null}
-                </span>
+                <svg className={`market-sources__track${s.share == null ? ' market-sources__track--unknown' : ''}`} viewBox="0 0 100 8"
+                  preserveAspectRatio="none" aria-hidden="true">
+                  {s.share != null ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} /> : null}
+                </svg>
                 <span className="market-sources__sharetext">{s.text}</span>
               </span>
               <span className="market-sources__map n">

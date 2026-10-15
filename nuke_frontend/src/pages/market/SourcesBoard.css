@@ -18,9 +18,9 @@
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
 .market-sources__share { display: grid; grid-template-columns: minmax(60px, 1fr) auto; align-items: center; gap: 8px; min-width: 0; }
-.market-sources__track { position: relative; height: 8px; border: 1px solid var(--border); background: var(--surface); }
+.market-sources__track { display: block; width: 100%; height: 10px; border: 1px solid var(--border); background: var(--surface); box-sizing: border-box; }
 .market-sources__track--unknown { background: repeating-linear-gradient(135deg, var(--surface) 0 4px, var(--border) 4px 5px); }
-.market-sources__fill { position: absolute; inset: 0 auto 0 0; background: var(--text); }
+.market-sources__fill { fill: var(--text); }
 .market-sources__sharetext { font-size: 11px; color: var(--text-secondary); white-space: nowrap; font-family: 'Courier New', monospace; }
 .market-sources__map { font-size: 11px; color: var(--text-secondary); }
 .market-sources__recent { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
