@@ -1700,7 +1700,7 @@ def length_kind(w):
         return None
     b = str(w.get("length_basis") or "").lower()
     return ("tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "route" if b.startswith("route")
-            else "estimate")
+            else "design" if b.startswith("design") else "estimate")
 
 
 
@@ -2051,6 +2051,27 @@ def main():
     assign_subsystems(list(wires) + list(implied))
     pigtails = add_pigtails(list(wires) + list(implied))
     implied += pigtails
+    # RSI pass 42: a PDM pigtail, and the PCS ignition pin lead, runs from a Superseal contact into the in-line splice
+    # beside the plug: the pin leads' pattern (kits_v5.LEAD_IN, RSI pass 26), which had no length here, so 33 segments
+    # had no plan and the pigtails' stock claimed no feet. Each splice's legs are one length (PDM_PIGTAIL_NOTE: "equal
+    # length"); a box's splices alternate 4 and 6 in by output number so they don't stack in the bundle. The cut is still
+    # made at the formboard (kits_meta deferred).
+    import kits_v5
+    _leg = defaultdict(list)
+    for w in list(wires) + list(implied):
+        m = re.match(r"(PDM15|PDM30):", str(w.get("frm") or ""))
+        spl = re.match(r"SPL-(PDM15|PDM30)-OUT(\d+)\b", str(w.get("to") or ""))
+        if m and spl and m.group(1) == spl.group(1) and not w.get("retired") and not isinstance(w.get("length_ft"), (int, float)):
+            _leg[(spl.group(1), int(spl.group(2)))].append(w)
+    for box in {b for b, _ in _leg}:
+        for k, out in enumerate(sorted(o for b, o in _leg if b == box)):
+            inch = kits_v5.LEAD_IN[k % len(kits_v5.LEAD_IN)]
+            for w in _leg[(box, out)]:
+                w["length_ft"] = round(inch / 12, 2)
+                w["length_basis"] = (f"design call, RSI pass 42: {inch} in from the {box} contact to the in-line splice "
+                                     f"SPL-{box}-OUT{out}, every leg of the splice one length; a box's splices alternate "
+                                     f"{kits_v5.LEAD_IN[0]} and {kits_v5.LEAD_IN[1]} in, staggered (the pin leads' rule, RSI "
+                                     f"pass 26); cut at the formboard")
     # 22 AWG signal wire is M22759/16-22, not /32-22 (2026-09-26 PM): MoTeC specifies "22# Tefzel wire (Mil Spec
     # M22759/16-22)" (C125 manual p.20) and tables M22759/16 (PDM manual p.48); /32-22 is 0.043 in = 1.09 mm OD
     # (ProWire AS22759/32 datasheet) — under the 1.20–1.85 mm seal range of GT150 22–20 terminals (12191818 tech
@@ -2062,25 +2083,28 @@ def main():
     # RSI pass 39: a wire's route over the twin graph (inputs/route_lengths.json, export_route_lengths.py from the live
     # model). No length: the complete route. A zone estimate or an older twin path (taken before the route graph and the
     # cab placement of the PDM30): the longer of the two, because a twin route carries no modelled slack or service loop
-    # and so never shortens a cut. Tape and design lengths stand. Only a wire with one segment: the segment fold chains
-    # a wire's ends in an order that can double back (26a runs AMP -> door -> AMP -> speaker in the model, 2026-10-15),
-    # so a multi-hop sum is not the wire's length until the chain is fixed.
+    # and so never shortens a cut. Tape and design lengths stand. A wire with one segment, or a through run (RSI pass
+    # 40): one path whose only interior plugs are crossings (the 61-pin, a body bulkhead, a door pass-through), so its
+    # segments sum to the wire. A bus (CAN, the door-lock buses) is a tree, not a run, and waits.
     _rl = json.load((INPUTS / "route_lengths.json").open()) if (INPUTS / "route_lengths.json").exists() else {}
+    _crossing = re.compile(r"^(FIREWALL-CABIN|FIREWALL-BODY-[A-Z]|DOOR-[LR]-PASS(-P)?)$")
     for w in list(wires) + list(implied):
         r = (_rl.get("wires") or {}).get(str(w["id"]))
-        if (not r or not r.get("complete") or r.get("segments") != 1 or w.get("retired")
+        run = r and (r.get("segments") == 1 or (r.get("chain") and all(_crossing.match(p) for p in r["chain"][1:-1])))
+        if (not r or not r.get("complete") or not run or w.get("retired")
                 or length_kind(w) not in (None, "estimate", "twin")):
             continue
         route_ft = math.ceil(r["route_in"] / 12 * 10) / 10
         old = w.get("length_ft")
         if isinstance(old, (int, float)) and old >= route_ft:
             continue
+        via = f" through {', '.join(r['chain'][1:-1])}" if r.get("segments", 1) > 1 and r.get("chain") else ""
         w.setdefault("conflicts", []).append(
             f"decision: length_ft {old} -> {route_ft} — its route over the twin graph is {r['route_in']} in over {r['branches']} "
-            f"branches ({_rl.get('exported_at')}, inputs/route_lengths.json)"
+            f"branches{via} ({_rl.get('exported_at')}, inputs/route_lengths.json)"
             + (f", longer than the {'twin path' if length_kind(w) == 'twin' else 'zone estimate'}" if old else ""))
         w["length_ft"] = route_ft
-        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches "
+        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches{via} "
                              f"(inputs/route_lengths.json, {_rl.get('exported_at')}); the cut adds the pad")
     for w in list(wires) + list(implied):
         w["length_kind"] = length_kind(w)

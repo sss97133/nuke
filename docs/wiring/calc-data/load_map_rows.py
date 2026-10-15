@@ -22,7 +22,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -180,6 +180,8 @@ ALIASES = {**{f"Fuel_Injector_{i}": f"INJ-{i}" for i in range(1, 9)},
            "amp_fuse_holder": "ACC-BATT", "amp_remote_in": "AMP", "courtesy_underdash": "UNDERDASH-LAMPS"}
 
 
+# the fields of a wire end the registry owns; a change to any of them re-writes the end (RSI pass 41)
+END_FIELDS = ("cavity", "terminal_contact_pn", "pin_seal_pn", "crimp_tool_pn", "connector_family")
 ALIAS_N = {re.sub(r"[^a-z0-9]", "", k.lower()): v for k, v in ALIASES.items()}
 
 
@@ -276,7 +278,20 @@ class API:
             return f"FAILED ({e})"
 
     def get(self, table, query):
-        return self._req("GET", f"{table}?{query}")
+        """Every row. PostgREST answers at most 1,000 rows a request whatever the limit (2026-10-15: limit=5000 on the
+        K5's wire ends gave 1,000 of them, with 999 live), so a read without its own limit of 1,000 or less pages by
+        offset in a stable order (RSI pass 41)."""
+        m = re.search(r"(?:^|&)limit=(\d+)", query)
+        if m and int(m.group(1)) <= 1000:
+            return self._req("GET", f"{table}?{query}")
+        q = re.sub(r"(?:^|&)limit=\d+", "", query).lstrip("&")
+        q += "" if "order=" in q else "&order=id"
+        out = []
+        while True:
+            page = self._req("GET", f"{table}?{q}&limit=1000&offset={len(out)}") or []
+            out += page
+            if len(page) < 1000:
+                return out
 
     def insert(self, table, rows):
         """Bulk insert; PostgREST wants every row in a batch to carry the same keys, so fill the gaps with null."""
@@ -388,6 +403,9 @@ def main():
             "_to": dst_end["endpoint"] if dst_end else (tc if tc and tc != fc else None),
             "to_cavity": dst_end.get("cavity") if dst_end else None,
             "planned_length_ft": w.get("length_ft") if isinstance(w.get("length_ft"), (int, float)) else None,
+            # RSI pass 42: what the length is and where it came from
+            "planned_length_kind": w.get("length_kind") if isinstance(w.get("length_ft"), (int, float)) else None,
+            "planned_length_basis": (str(w.get("length_basis") or "")[:1000] or None) if isinstance(w.get("length_ft"), (int, float)) else None,
             "build_state": "uncut", "derivation_version": "k5_registry_v5", "design_status": "decided",
             "notes": "; ".join(x for x in (w.get("notes"), f"switched by: {w['control']}" if w.get("control") else None) if x)[:1000] or None,
             "harness_section": sec, "source": SRC_V5, "method": "registry loader", "observed_at": NOW, "trust": "T3",
@@ -572,7 +590,8 @@ def main():
     WIRE_KEYS = ("circuit_name", "from_component", "to_component", "wire_gauge_awg", "wire_color", "wire_type", "system_category",
                  "from_cavity", "to_cavity", "planned_length_ft", "notes", "harness_section")
     live = api.get("vehicle_custom_circuits",
-                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id," + ",".join(WIRE_KEYS)
+                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id,planned_length_kind,"
+                   "planned_length_basis," + ",".join(WIRE_KEYS)
                    + f"&overlay_id=eq.{OVERLAY}&is_superseded=eq.false&limit=5000") or []
     have_c = {(r["circuit_code"], r["derivation_version"]): r["id"] for r in live}
     # v5 rows the registry changed (supersede + insert, bench progress carried) or retired (supersede, no successor)
@@ -690,6 +709,19 @@ def main():
             n_ret += 1
     for r in changed_c:
         api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", {"superseded_by": have_c[(r["circuit_code"], "k5_registry_v5")]})
+    # RSI pass 42: a wire's length says what it is (kind + basis); written in place on rows the registry left otherwise
+    # unchanged, like the checks (a changed length re-rows the wire, and the new row carries its own)
+    changed_ids = {r["id"] for r in changed_c}
+    n_basis = 0
+    for r in live:
+        c = reg_v5.get(r["circuit_code"]) if r["derivation_version"] == "k5_registry_v5" else None
+        if not c or r["id"] in changed_ids:
+            continue
+        want = {k: c.get(k) for k in ("planned_length_kind", "planned_length_basis")}
+        if any((r.get(k) or None) != (v or None) for k, v in want.items()):
+            api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", want)
+            n_basis += 1
+    print(f"wire length basis: written on {n_basis} wires")
     n_cov = n_dead = 0
     for code_, (fate, why) in april_fate.items():
         rid = have_c.get((code_, "april_2026_candidate"))
@@ -707,20 +739,24 @@ def main():
     print(f"wires: {len(rows)} inserted ({len(changed_c)} of them replace changed rows) · {len(retired_c)} retired · "
           f"June rows: {n_sup} superseded by their v5 row, {n_ret} retired (not in the master)")
     # wire ends
-    live_t = api.get("wire_termination_specs", f"select=circuit_id,endpoint_id&vehicle_id=eq.{K5}&is_superseded=eq.false&circuit_id=not.is.null") or []
+    live_t = api.get("wire_termination_specs", f"select=id,circuit_id,endpoint_id,{','.join(END_FIELDS)}&vehicle_id=eq.{K5}"
+                                               "&is_superseded=eq.false&circuit_id=not.is.null") or []
     have_t = {(r["circuit_id"], r["endpoint_id"]) for r in live_t}
+    live_by = defaultdict(list)
+    for r in live_t:
+        live_by[(r["circuit_id"], r["endpoint_id"])].append(r)
     fam_tool = {}
     for tid, tdef in (tools or {}).items():
         for p in (tdef.get("for") or []):
             fam_tool.setdefault(str(p), tdef.get("pn") or tid)
-    trows = []
+    trows, reend, seen = [], [], set()
     for t in terms:
         cid, nid = have_c.get((str(t["wire"]), "k5_registry_v5")), have.get(t["endpoint"])
-        if not cid or not nid or (cid, nid) in have_t:
+        if not cid or not nid or (cid, nid) in seen:
             continue
-        have_t.add((cid, nid))
+        seen.add((cid, nid))
         codes = [x for x in str(t.get("part") or "").split(" + ") if x]
-        trows.append({
+        row = {
             "vehicle_id": K5, "circuit_id": cid, "endpoint_id": nid, "wire_code": str(t["wire"]), "cavity": t.get("cavity"),
             "endpoint_side": "source" if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15")) else "device",
             "connector_family": t.get("family"), "terminal_contact_pn": codes[0] if codes else None,
@@ -729,9 +765,23 @@ def main():
             "notes": "doubled over at the terminal (MoTeC C125 p.21)" if t.get("doubled") else None,
             "source": f"k5-wiring:{t['endpoint']}:#{t['wire']} end" if t["endpoint"] in reg["dossiers"] else SRC_V5,
             "method": "registry loader", "observed_at": NOW, "trust": "T3",
-        })
+        }
+        if (cid, nid) in have_t:
+            # RSI pass 41: an end whose cavity, parts or family changed in the registry is written again (the old row
+            # superseded, pointing at the new one); before, the loader wrote an end once and never again
+            old = live_by.get((cid, nid)) or []
+            if len(old) == 1 and any((old[0].get(k) or None) != (row.get(k) or None) for k in END_FIELDS):
+                reend.append((old[0]["id"], row))
+            continue
+        trows.append(row)
     if "--with-ends" in sys.argv:
-        api.insert("wire_termination_specs", trows)
+        for i in range(0, len(reend), 80):
+            api.patch("wire_termination_specs", f"id=in.({','.join(o for o, _ in reend[i:i + 80])})", {"is_superseded": True})
+        new_ids = {(r["circuit_id"], r["endpoint_id"]): r["id"]
+                   for r in api.insert("wire_termination_specs", trows + [r for _, r in reend]) or []}
+        for o, r in reend:
+            if new_ids.get((r["circuit_id"], r["endpoint_id"])):
+                api.patch("wire_termination_specs", f"id=eq.{o}", {"superseded_by": new_ids[(r["circuit_id"], r["endpoint_id"])]})
         # ends the registry no longer has (e.g. a wire the engine PDM now keeps inside the engine bay leaves the 61-pin)
         want = {(have_c.get((str(t["wire"]), "k5_registry_v5")), have.get(t["endpoint"])) for t in terms}
         v5_ids = {cid for (code, dv), cid in have_c.items() if dv == "k5_registry_v5"}
@@ -740,7 +790,8 @@ def main():
                  if r["circuit_id"] in v5_ids and (r["circuit_id"], r["endpoint_id"]) not in want]
         for i in range(0, len(stale), 80):
             api.patch("wire_termination_specs", f"id=in.({','.join(r['id'] for r in stale[i:i + 80])})", {"is_superseded": True})
-        print(f"wire ends: {len(trows)} inserted, {len(stale)} retired (no longer in the registry)")
+        print(f"wire ends: {len(trows)} inserted, {len(reend)} re-written (cavity, parts or family changed), "
+              f"{len(stale)} retired (no longer in the registry)")
     else:
         print(f"wire ends: {len(trows)} ready, held until wire_termination_specs.wire_number is nullable (--with-ends)")
     # rule-check results per wire (check_plug_ends.py --wires -> WIRE_CHECKS.json), replaced in place

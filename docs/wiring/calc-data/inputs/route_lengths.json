@@ -1,5 +1,5 @@
 {
- "exported_at": "2026-10-15T20:19Z",
+ "exported_at": "2026-10-15T20:44Z",
  "source": "live route graph (v_harness_route_length_check over harness_segments), vehicle e08bf694-970f-4cbe-8a74-8715158a0f2e",
  "wires": {
   "10": {
@@ -7,2128 +7,3443 @@
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-4"
+   ]
   },
   "100": {
    "route_in": 74.2,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-BODY-C",
+    "VSS-SENDER"
+   ]
   },
   "101": {
    "route_in": 67.5,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "CMP"
+   ]
   },
   "101g": {
    "route_in": 67.5,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B15",
+    "FIREWALL-CABIN",
+    "CMP"
+   ]
   },
   "101r": {
    "route_in": 67.5,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B19",
+    "FIREWALL-CABIN",
+    "CMP"
+   ]
   },
   "101s": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": null
   },
   "102": {
    "route_in": 92.9,
    "branches": 8,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "OILP-ECU"
+   ]
   },
   "102g": {
    "route_in": 92.9,
    "branches": 8,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "OILP-ECU"
+   ]
   },
   "102r": {
    "route_in": 92.9,
    "branches": 8,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-A-A02",
+    "FIREWALL-CABIN",
+    "OILP-ECU"
+   ]
   },
   "103": {
    "route_in": 64.7,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "KNOCK-1"
+   ]
   },
   "103g": {
    "route_in": 64.7,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G2",
+    "FIREWALL-CABIN",
+    "KNOCK-1"
+   ]
   },
   "103s": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": null
   },
   "104": {
    "route_in": 104.1,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "KNOCK-2"
+   ]
   },
   "104g": {
    "route_in": 104.1,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G2",
+    "FIREWALL-CABIN",
+    "KNOCK-2"
+   ]
   },
   "104s": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": null
   },
   "105": {
    "route_in": 11.0,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "AC-LP-SW"
+   ]
   },
   "108": {
    "route_in": 80.5,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "MAP"
+   ]
   },
   "108g": {
    "route_in": 80.5,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "MAP"
+   ]
   },
   "108r": {
    "route_in": 80.5,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-A-A02",
+    "FIREWALL-CABIN",
+    "MAP"
+   ]
   },
   "109": {
    "route_in": 58.7,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "IAT"
+   ]
   },
   "109g": {
    "route_in": 58.7,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "IAT"
+   ]
   },
   "11": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-6"
+   ]
   },
   "110": {
    "route_in": 59.9,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "CLT-ECU"
+   ]
   },
   "110g": {
    "route_in": 59.9,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "CLT-ECU"
+   ]
   },
   "111": {
    "route_in": 43.6,
    "branches": 9,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "AC-HP-SW"
+   ]
   },
   "112": {
    "route_in": 45.0,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "FUELP"
+   ]
   },
   "112g": {
    "route_in": 45.0,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "FUELP"
+   ]
   },
   "112r": {
    "route_in": 45.0,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-A-A02",
+    "FIREWALL-CABIN",
+    "FUELP"
+   ]
   },
   "113": {
    "route_in": 89.2,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "OILT"
+   ]
   },
   "113g": {
    "route_in": 89.2,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "OILT"
+   ]
   },
   "114": {
    "route_in": 14.7,
    "branches": 3,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "DAK-CTS",
+    "FIREWALL-CABIN",
+    "DAKOTA-VHX"
+   ]
   },
   "115": {
    "route_in": 14.7,
    "branches": 3,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "DAK-OILP",
+    "FIREWALL-CABIN",
+    "DAKOTA-VHX"
+   ]
   },
   "116": {
    "route_in": 3.8,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "DAKOTA-VHX"
+   ]
   },
   "117": {
    "route_in": 150.2,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-FUEL-SND",
+    "DAKOTA-VHX"
+   ]
   },
   "119": {
    "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B12",
+    "DAKOTA-VHX"
+   ]
   },
   "12": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-8"
+   ]
   },
   "120": {
    "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B14",
+    "DAKOTA-VHX"
+   ]
   },
   "121": {
    "route_in": 24.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FLOOR-DIMMER",
+    "DAKOTA-VHX"
+   ]
   },
   "123": {
    "route_in": 28.2,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DAKOTA-VHX",
+    "GND-BANK-CAB"
+   ]
   },
   "13": {
    "route_in": 55.9,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-1"
+   ]
   },
   "14": {
    "route_in": 68.9,
    "branches": 8,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-2"
+   ]
   },
   "15": {
    "route_in": 49.1,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-3"
+   ]
   },
   "16": {
    "route_in": 62.1,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-4"
+   ]
   },
   "17": {
    "route_in": 55.9,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-5"
+   ]
   },
   "18": {
    "route_in": 68.9,
    "branches": 8,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-6"
+   ]
   },
   "19": {
    "route_in": 62.6,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-7"
+   ]
   },
   "20": {
    "route_in": 75.6,
    "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "INJ-8"
+   ]
   },
   "21": {
    "route_in": 52.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FAN-JUNCTION",
+    "FAN"
+   ]
   },
   "23": {
    "route_in": 54.7,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT8",
+    "AC-CLUTCH"
+   ]
   },
   "24": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-1"
+   ]
   },
   "26a": {
-   "route_in": 338.2,
-   "branches": 13,
+   "route_in": 183.0,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "DOOR-L-PASS",
+    "SPK-FL"
+   ]
   },
   "26b": {
-   "route_in": 338.2,
-   "branches": 13,
+   "route_in": 183.0,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "DOOR-L-PASS",
+    "SPK-FL"
+   ]
   },
   "27a": {
-   "route_in": 315.6,
-   "branches": 13,
+   "route_in": 171.5,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "DOOR-R-PASS",
+    "SPK-FR"
+   ]
   },
   "27b": {
-   "route_in": 315.6,
-   "branches": 13,
+   "route_in": 171.5,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "DOOR-R-PASS",
+    "SPK-FR"
+   ]
   },
   "28a": {
    "route_in": 68.5,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SPK-RL"
+   ]
   },
   "28b": {
    "route_in": 68.5,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SPK-RL"
+   ]
   },
   "29a": {
    "route_in": 16.6,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SPK-RR"
+   ]
   },
   "29b": {
    "route_in": 16.6,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SPK-RR"
+   ]
   },
   "3": {
    "route_in": 111.6,
    "branches": 10,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DIST-STUD",
+    "AMP-STEP-CTRL"
+   ]
   },
   "30a": {
    "route_in": 54.5,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SUB"
+   ]
   },
   "30b": {
    "route_in": 54.5,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SUB"
+   ]
   },
   "30c": {
    "route_in": 54.6,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SUB-2"
+   ]
   },
   "30d": {
    "route_in": 54.6,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "SUB-2"
+   ]
   },
   "31": {
    "route_in": 33.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "RADIO"
+   ]
   },
   "32": {
    "route_in": 175.2,
    "branches": 9,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ACC-BATT",
+    "AMP-BLOCK"
+   ]
   },
   "33": {
    "route_in": 19.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "TURN-SW"
+   ]
   },
   "34": {
    "route_in": 64.8,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT3",
+    "DOOR-L-PASS-P",
+    "WIN-SW-L"
+   ]
   },
   "35": {
    "route_in": 92.4,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT4",
+    "DOOR-R-PASS-P",
+    "WIN-SW-R"
+   ]
   },
   "38": {
    "route_in": 64.8,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B1",
+    "DOOR-L-PASS",
+    "LOCK-SW-L"
+   ]
   },
   "39": {
    "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A11",
+    "DAKOTA-VHX"
+   ]
   },
   "42": {
    "route_in": 36.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "DOOR-JAMB-L"
+   ]
   },
   "43": {
    "route_in": 64.3,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "DOOR-JAMB-R"
+   ]
   },
   "45": {
    "route_in": 30.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "BLOWER-SW"
+   ]
   },
   "46": {
    "route_in": 22.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "WIPER-SW"
+   ]
   },
   "48": {
    "route_in": 67.9,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "FIREWALL-BODY-B",
+    "HORN"
+   ]
   },
   "49": {
    "route_in": 50.1,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "FIREWALL-BODY-B",
+    "WIPER-MOTOR"
+   ]
   },
   "4a": {
    "route_in": 64.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "TB"
+   ]
   },
   "4b": {
    "route_in": 64.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "TB"
+   ]
   },
   "4c": {
    "route_in": 64.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "TB"
+   ]
   },
   "4e": {
    "route_in": 64.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-A-A02",
+    "FIREWALL-CABIN",
+    "TB"
+   ]
   },
   "4f": {
    "route_in": 64.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G1",
+    "FIREWALL-CABIN",
+    "TB"
+   ]
   },
   "5": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-3"
+   ]
   },
   "50": {
    "route_in": 49.7,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "FIREWALL-BODY-A",
+    "WASHER-PUMP"
+   ]
   },
   "51": {
    "route_in": 30.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT6",
+    "BLOWER-SW"
+   ]
   },
   "52": {
    "route_in": 65.4,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DIST-STUD",
+    "IBOOSTER"
+   ]
   },
   "53": {
    "route_in": 22.1,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "BRAKE-SW"
+   ]
   },
   "54": {
    "route_in": 118.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT7",
+    "E-STOPP"
+   ]
   },
   "55": {
    "route_in": 67.2,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TCASE-4WD-SW",
+    "DAKOTA-VHX"
+   ]
   },
   "66": {
    "route_in": 191.1,
    "branches": 11,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT5",
+    "FUEL-PUMP"
+   ]
   },
   "67": {
    "route_in": 135.5,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B8-G1",
+    "DOME-LAMP"
+   ]
   },
   "68": {
    "route_in": 12.9,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B8-G1",
+    "UNDERDASH-LAMPS"
+   ]
   },
   "69": {
    "route_in": 16.6,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B8-G1",
+    "FOOTWELL-LAMPS"
+   ]
   },
   "7": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-5"
+   ]
   },
   "70": {
    "route_in": 16.9,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "USB-PORT"
+   ]
   },
   "71": {
    "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B16",
+    "DAKOTA-VHX"
+   ]
   },
   "72": {
    "route_in": 20.9,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT8",
+    "OUTLET-12V"
+   ]
   },
   "73": {
    "route_in": 17.3,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "SPL-PDM30-B-B8-G1",
+    "FIREWALL-BODY-A",
+    "UNDERHOOD-LAMP"
+   ]
   },
   "74": {
    "route_in": 175.0,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B8-G2",
+    "CARGO-LAMP"
+   ]
   },
   "75": {
    "route_in": 198.0,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A11",
+    "Tail_Light_Right"
+   ]
   },
   "76": {
    "route_in": 200.4,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A15",
+    "Backup_Light_Right"
+   ]
   },
   "77": {
    "route_in": 198.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "MARKER-LR"
+   ]
   },
   "78": {
    "route_in": 200.3,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "MARKER-RR"
+   ]
   },
   "79": {
    "route_in": 83.9,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "CLEARANCE-L"
+   ]
   },
   "8": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-7"
+   ]
   },
   "80": {
    "route_in": 72.0,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B12",
+    "FIREWALL-BODY-A",
+    "PARK-TURN-LF"
+   ]
   },
   "81": {
    "route_in": 195.7,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A11",
+    "Tail_Light_Left"
+   ]
   },
   "82": {
    "route_in": 126.0,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B14",
+    "FIREWALL-BODY-A",
+    "PARK-TURN-RF"
+   ]
   },
   "83": {
    "route_in": 72.0,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A11",
+    "FIREWALL-BODY-A",
+    "PARK-TURN-LF"
+   ]
   },
   "84": {
    "route_in": 126.0,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A11",
+    "FIREWALL-BODY-A",
+    "PARK-TURN-RF"
+   ]
   },
   "85": {
    "route_in": 24.4,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "FLOOR-DIMMER"
+   ]
   },
   "85a": {
    "route_in": 70.1,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FLOOR-DIMMER",
+    "FIREWALL-BODY-A",
+    "HEADLIGHT-L"
+   ]
   },
   "85b": {
    "route_in": 70.1,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FLOOR-DIMMER",
+    "FIREWALL-BODY-A",
+    "HEADLIGHT-L"
+   ]
   },
   "86": {
    "route_in": 24.4,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "FLOOR-DIMMER"
+   ]
   },
   "86a": {
    "route_in": 124.1,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FLOOR-DIMMER",
+    "FIREWALL-BODY-A",
+    "HEADLIGHT-R"
+   ]
   },
   "86b": {
    "route_in": 124.1,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FLOOR-DIMMER",
+    "FIREWALL-BODY-A",
+    "HEADLIGHT-R"
+   ]
   },
   "87": {
    "route_in": 75.7,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "FIREWALL-BODY-A",
+    "MARKER-LF"
+   ]
   },
   "88": {
    "route_in": 129.7,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "FIREWALL-BODY-A",
+    "MARKER-RF"
+   ]
   },
   "89": {
    "route_in": 198.1,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A15",
+    "Backup_Light_Left"
+   ]
   },
   "9": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "COIL-2"
+   ]
   },
   "90": {
    "route_in": 92.8,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G1",
+    "CLEARANCE-C"
+   ]
   },
   "91": {
    "route_in": 101.7,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G2",
+    "CLEARANCE-R"
+   ]
   },
   "92": {
    "route_in": 173.4,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A24-G2",
+    "LICENSE-LAMP"
+   ]
   },
   "93": {
    "route_in": 195.6,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT5",
+    "CHMSL"
+   ]
   },
   "97": {
    "route_in": 173.9,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A15",
+    "Backup_Camera"
+   ]
   },
   "98": {
    "route_in": 146.4,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "SPL-FUEL-SND"
+   ]
   },
   "99": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "M130-B",
+    "FIREWALL-CABIN",
+    "CKP"
+   ]
   },
   "99g": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "SPL-M130-B-B15",
+    "FIREWALL-CABIN",
+    "CKP"
+   ]
   },
   "99r": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "SPL-M130-B-B19",
+    "FIREWALL-CABIN",
+    "CKP"
+   ]
   },
   "99s": {
    "route_in": 10.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": null
   },
   "ACC_NEG": {
    "route_in": 7.5,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ACC-BATT",
+    "GND-BANK-ENG"
+   ]
   },
   "AC_HP_0V": {
    "route_in": 43.6,
    "branches": 9,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-A-A28",
+    "AC-HP-SW"
+   ]
   },
   "AC_LP_0V": {
    "route_in": 11.0,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-A-A28",
+    "AC-LP-SW"
+   ]
   },
   "AMP_GND": {
    "route_in": 167.7,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP-BLOCK",
+    "GND-BANK-ENG"
+   ]
   },
   "AMP_GND_TAIL": {
    "route_in": 10.6,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP",
+    "AMP-BLOCK"
+   ]
   },
   "AMP_PWR_TAIL": {
    "route_in": 10.6,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP-BLOCK",
+    "AMP"
+   ]
   },
   "APS_T1_5V": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-A-A02",
+    "APS"
+   ]
   },
   "APS_T1_GND": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B16-G2",
+    "APS"
+   ]
   },
   "APS_T1_SIG": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B21",
+    "APS"
+   ]
   },
   "APS_T2_5V": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "APS"
+   ]
   },
   "APS_T2_GND": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B15",
+    "APS"
+   ]
   },
   "APS_T2_SIG": {
    "route_in": 18.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "APS"
+   ]
   },
   "BFL_0V": {
    "route_in": 51.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-B",
+    "BRAKE-FLUID-LVL"
+   ]
   },
   "BFL_SIG": {
    "route_in": 51.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "BRAKE-FLUID-LVL"
+   ]
   },
   "BLOWER_BAT": {
    "route_in": 116.7,
    "branches": 11,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "BLOWER-SW",
+    "FIREWALL-BODY-B",
+    "BLOWER-RES"
+   ]
   },
   "BLOWER_GND": {
    "route_in": 35.7,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "BLOWER-MOTOR",
+    "GND-BANK-ENG"
+   ]
   },
   "BLOWER_HI": {
    "route_in": 95.2,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT2",
+    "FIREWALL-BODY-P",
+    "BLOWER-MOTOR"
+   ]
   },
   "BLOWER_M2": {
    "route_in": 116.7,
    "branches": 11,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "BLOWER-SW",
+    "FIREWALL-BODY-B",
+    "BLOWER-RES"
+   ]
   },
   "BLOWER_MED": {
    "route_in": 116.7,
    "branches": 11,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "BLOWER-SW",
+    "FIREWALL-BODY-B",
+    "BLOWER-RES"
+   ]
   },
   "BLOWER_MOT": {
    "route_in": 17.4,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "BLOWER-RES",
+    "BLOWER-MOTOR"
+   ]
   },
   "BRK_SW_0V": {
    "route_in": 22.1,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A28",
+    "BRAKE-SW"
+   ]
   },
   "BU_L_GND": {
    "route_in": 89.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Backup_Light_Left",
+    "GND-SPLICE-REAR"
+   ]
   },
   "BU_R_GND": {
    "route_in": 89.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Backup_Light_Right",
+    "GND-SPLICE-REAR"
+   ]
   },
   "BWS_SIG": {
    "route_in": 82.1,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "BRAKE-WARN-SW"
+   ]
   },
   "CAM_GND": {
    "route_in": 62.9,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Backup_Camera",
+    "GND-SPLICE-REAR"
+   ]
   },
   "CAM_VIDEO": {
    "route_in": 220.1,
    "branches": 9,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Backup_Camera",
+    "MIRROR-MON"
+   ]
   },
   "CAN_FW_H": {
    "route_in": 88.2,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B26",
+    "FIREWALL-CABIN",
+    "SPL-PDM15-B-B26"
+   ]
   },
   "CAN_FW_L": {
    "route_in": 88.2,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B25",
+    "FIREWALL-CABIN",
+    "SPL-PDM15-B-B25"
+   ]
   },
   "CAN_HI": {
    "route_in": 37.0,
    "branches": 4,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "SPL-PDM30-B-B26",
+    "CAN-BUS"
+   ]
   },
   "CAN_LO": {
    "route_in": 37.0,
    "branches": 4,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-B",
+    "SPL-PDM30-B-B25",
+    "CAN-BUS"
+   ]
   },
   "CARGO_GND": {
    "route_in": 163.9,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "CARGO-LAMP",
+    "GND-SPLICE-REAR"
+   ]
   },
   "CHMSL_GND": {
    "route_in": 145.5,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "CHMSL",
+    "GND-SPLICE-REAR"
+   ]
   },
   "CL_C_GND": {
    "route_in": 98.7,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "CLEARANCE-C",
+    "GND-BANK-CAB"
+   ]
   },
   "CL_L_GND": {
    "route_in": 89.8,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "CLEARANCE-L",
+    "GND-BANK-CAB"
+   ]
   },
   "CL_R_GND": {
    "route_in": 107.6,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "CLEARANCE-R",
+    "GND-BANK-CAB"
+   ]
   },
   "COIL_PWR": {
    "route_in": 61.6,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT3",
+    "RAIL-COIL_PWR"
+   ]
   },
   "DAK_BRAKE": {
    "route_in": 117.8,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "E-STOPP",
+    "DAKOTA-VHX"
+   ]
   },
   "DAK_CEL": {
    "route_in": 3.8,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "DAKOTA-VHX"
+   ]
   },
   "DAK_CONST": {
    "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUSE-DAK_CONST",
+    "DAKOTA-VHX"
+   ]
   },
   "DAK_CTS_RET": {
    "route_in": 14.7,
    "branches": 3,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "DAKOTA-VHX",
+    "FIREWALL-CABIN",
+    "DAK-CTS"
+   ]
   },
   "DAK_GEAR": {
    "route_in": 32.9,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GSS-3000",
+    "DAKOTA-VHX"
+   ]
   },
   "DAK_OILP_5V": {
    "route_in": 14.7,
    "branches": 3,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "DAKOTA-VHX",
+    "FIREWALL-CABIN",
+    "DAK-OILP"
+   ]
   },
   "DAK_OILP_GND": {
    "route_in": 14.7,
    "branches": 3,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "DAKOTA-VHX",
+    "FIREWALL-CABIN",
+    "DAK-OILP"
+   ]
   },
   "DCDC_GND": {
    "route_in": 13.8,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DCDC",
+    "GND-BANK-ENG"
+   ]
   },
   "DCDC_IN": {
    "route_in": 19.9,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DIST-STUD",
+    "DCDC"
+   ]
   },
   "DCDC_OUT": {
    "route_in": 6.3,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DCDC",
+    "ACC-BATT"
+   ]
   },
   "DOME_GND": {
    "route_in": 141.4,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DOME-LAMP",
+    "GND-BANK-CAB"
+   ]
   },
   "ECU_PWR": {
    "route_in": 18.5,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "PDM30-B"
+   ]
   },
   "ESTOPP_GND": {
    "route_in": 7.1,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "E-STOPP",
+    "GND-SPLICE-REAR"
+   ]
   },
   "ESTOPP_IGN": {
    "route_in": 118.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "E-STOPP"
+   ]
   },
   "FAN_GND": {
    "route_in": 70.2,
    "branches": 9,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FAN",
+    "GND-BANK-ENG"
+   ]
   },
   "FAN_LEG1": {
    "route_in": 3.1,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT1",
+    "FAN-JUNCTION"
+   ]
   },
   "FAN_LEG2": {
    "route_in": 3.1,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT6",
+    "FAN-JUNCTION"
+   ]
   },
   "FAN_PWM": {
    "route_in": 66.2,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "FIREWALL-CABIN",
+    "FAN"
+   ]
   },
   "FUEL_SND_GND": {
    "route_in": 138.3,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DAKOTA-VHX",
+    "FUEL-LEVEL"
+   ]
   },
   "FUEL_SND_LEAD": {
    "route_in": 11.9,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-FUEL-SND",
+    "FUEL-LEVEL"
+   ]
   },
   "FW_GND": {
    "route_in": 10.7,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FOOTWELL-LAMPS",
+    "GND-BANK-CAB"
+   ]
   },
   "GND_RET_REAR": {
    "route_in": 117.1,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GND-SPLICE-REAR",
+    "GND-BANK-CAB"
+   ]
   },
   "GSS_GND": {
    "route_in": 4.7,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GSS-3000",
+    "GND-BANK-CAB"
+   ]
   },
   "GSS_PWR": {
    "route_in": 10.6,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B16",
+    "GSS-3000"
+   ]
   },
   "GSS_SENS_B": {
    "route_in": 65.5,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GSS-SENSOR",
+    "GSS-3000"
+   ]
   },
   "GSS_SENS_G": {
    "route_in": 65.5,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GSS-SENSOR",
+    "GSS-3000"
+   ]
   },
   "GSS_SENS_R": {
    "route_in": 65.5,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "GSS-SENSOR",
+    "GSS-3000"
+   ]
   },
   "HL_L_GND": {
    "route_in": 80.3,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "HEADLIGHT-L",
+    "GND-BANK-ENG"
+   ]
   },
   "HL_R_GND": {
    "route_in": 26.3,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "HEADLIGHT-R",
+    "GND-BANK-ENG"
+   ]
   },
   "HL_SW_0V": {
    "route_in": 22.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A28",
+    "HL-SW"
+   ]
   },
   "HL_SW_HEAD": {
    "route_in": 22.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "HL-SW"
+   ]
   },
   "HL_SW_PARK": {
    "route_in": 22.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "HL-SW"
+   ]
   },
   "HORN_GND": {
    "route_in": 79.5,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "HORN",
+    "GND-BANK-ENG"
+   ]
   },
   "HORN_SW": {
    "route_in": 19.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "HORN-SW"
+   ]
   },
   "IBOOST_GND": {
    "route_in": 71.5,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "IBOOSTER",
+    "GND-BANK-ENG"
+   ]
   },
   "IBOOST_PERM": {
    "route_in": 60.4,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUSE-IBOOST_PERM",
+    "IBOOSTER"
+   ]
   },
   "IBOOST_PERM_FH": {
    "route_in": 5.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DIST-STUD",
+    "FUSE-IBOOST_PERM"
+   ]
   },
   "IBOOST_WAKE": {
    "route_in": 52.0,
    "branches": 5,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "FIREWALL-BODY-B",
+    "IBOOSTER"
+   ]
   },
   "IGN_RUN_B": {
    "route_in": 18.9,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "IGN-SWITCH"
+   ]
   },
   "IGN_START": {
    "route_in": 18.9,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "IGN-SWITCH"
+   ]
   },
   "IGN_SW_0V": {
    "route_in": 18.9,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A28",
+    "IGN-SWITCH"
+   ]
   },
   "INJ1_PWR": {
    "route_in": 13.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-1"
+   ]
   },
   "INJ2_PWR": {
    "route_in": 13.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-2"
+   ]
   },
   "INJ3_PWR": {
    "route_in": 6.5,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-3"
+   ]
   },
   "INJ4_PWR": {
    "route_in": 6.5,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-4"
+   ]
   },
   "INJ5_PWR": {
    "route_in": 13.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-5"
+   ]
   },
   "INJ6_PWR": {
    "route_in": 13.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-6"
+   ]
   },
   "INJ7_PWR": {
    "route_in": 20.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-7"
+   ]
   },
   "INJ8_PWR": {
    "route_in": 20.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RAIL-INJ_PWR",
+    "INJ-8"
+   ]
   },
   "INJ_PWR": {
    "route_in": 28.5,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT2",
+    "RAIL-INJ_PWR"
+   ]
   },
   "ISO_CLOSE": {
    "route_in": 104.5,
    "branches": 13,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ISOLATOR",
+    "FIREWALL-BODY-B",
+    "ISO-SWITCH"
+   ]
   },
   "ISO_GND": {
    "route_in": 6.1,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ISOLATOR",
+    "GND-BANK-ENG"
+   ]
   },
   "ISO_KILL": {
    "route_in": 22.6,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-ISO-YEL",
+    "M130-B"
+   ]
   },
   "ISO_LED": {
    "route_in": 104.5,
    "branches": 13,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ISOLATOR",
+    "FIREWALL-BODY-B",
+    "ISO-SWITCH"
+   ]
   },
   "ISO_OPEN": {
    "route_in": 104.5,
    "branches": 13,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "ISOLATOR",
+    "FIREWALL-BODY-B",
+    "ISO-SWITCH"
+   ]
   },
   "ISO_PWR": {
    "route_in": 3.8,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUSE-ISO_PWR",
+    "ISOLATOR"
+   ]
   },
   "ISO_SW_PWR": {
    "route_in": 102.3,
    "branches": 11,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUSE-ISO_SW_PWR",
+    "FIREWALL-BODY-B",
+    "ISO-SWITCH"
+   ]
   },
   "LIC_GND": {
    "route_in": 62.4,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "LICENSE-LAMP",
+    "GND-SPLICE-REAR"
+   ]
   },
   "LOCK_BUS_A": {
    "route_in": 345.3,
    "branches": 30,
    "segments": 5,
    "routed": 5,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "LOCK-SW-L",
+    "DOOR-L-PASS",
+    "DOOR-R-PASS",
+    "lock_actuator_PS",
+    "LOCK-SW-R",
+    "lock_actuator_DS"
+   ]
   },
   "LOCK_BUS_B": {
    "route_in": 345.3,
    "branches": 30,
    "segments": 5,
    "routed": 5,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "LOCK-SW-L",
+    "DOOR-L-PASS",
+    "DOOR-R-PASS",
+    "lock_actuator_PS",
+    "LOCK-SW-R",
+    "lock_actuator_DS"
+   ]
   },
   "LOCK_FEED_R": {
    "route_in": 92.4,
    "branches": 10,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-B-B1",
+    "DOOR-R-PASS",
+    "LOCK-SW-R"
+   ]
   },
   "LOCK_GND_L": {
    "route_in": 70.7,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "LOCK-SW-L",
+    "DOOR-L-PASS",
+    "GND-BANK-CAB"
+   ]
   },
   "LOCK_GND_R": {
    "route_in": 86.5,
    "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "LOCK-SW-R",
+    "DOOR-R-PASS",
+    "GND-BANK-CAB"
+   ]
   },
   "MIRROR_GND": {
    "route_in": 107.4,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "MIRROR-MON",
+    "GND-BANK-CAB"
+   ]
   },
   "MIRROR_PWR": {
    "route_in": 101.5,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "MIRROR-MON"
+   ]
   },
   "MIRROR_TRIG": {
    "route_in": 101.5,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A15",
+    "MIRROR-MON"
+   ]
   },
   "MK_LF_GND": {
    "route_in": 87.7,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "MARKER-LF",
+    "GND-BANK-ENG"
+   ]
   },
   "MK_LR_GND": {
    "route_in": 89.3,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "MARKER-LR",
+    "GND-SPLICE-REAR"
+   ]
   },
   "MK_RF_GND": {
    "route_in": 33.7,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "MARKER-RF",
+    "GND-BANK-ENG"
+   ]
   },
   "MK_RR_GND": {
    "route_in": 89.3,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "MARKER-RR",
+    "GND-SPLICE-REAR"
+   ]
   },
   "OUT12V_GND": {
    "route_in": 15.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "OUTLET-12V",
+    "GND-BANK-CAB"
+   ]
   },
   "PCS_BATT": {
    "route_in": 15.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUSE-PCS_BATT",
+    "PCS-HARNESS-4610"
+   ]
   },
   "PCS_BRK": {
    "route_in": 15.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-OUT5",
+    "PCS-HARNESS-4610"
+   ]
   },
   "PCS_GND": {
    "route_in": 9.8,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PCS-HARNESS-4610",
+    "GND-BANK-CAB"
+   ]
   },
   "PCS_IGN": {
    "route_in": 109.2,
    "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT13",
+    "FIREWALL-BODY-P",
+    "PCS-HARNESS-4610"
+   ]
   },
   "PCS_NS": {
    "route_in": 15.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PCS-HARNESS-4610",
+    "PDM30-B"
+   ]
   },
   "PCS_REV": {
    "route_in": 15.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PCS-HARNESS-4610",
+    "PDM30-B"
+   ]
   },
   "PCS_RPM": {
    "route_in": 34.2,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "PCS-HARNESS-4610"
+   ]
   },
   "PCS_TPS": {
    "route_in": 34.2,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-M130-B-B21",
+    "PCS-HARNESS-4610"
+   ]
   },
   "PDM15_BPOS": {
    "route_in": 8.9,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-STUD",
+    "DIST-STUD"
+   ]
   },
   "PDM15_GND1": {
    "route_in": 15.0,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "GND-BANK-ENG"
+   ]
   },
   "PDM15_GND2": {
    "route_in": 15.0,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM15-B",
+    "GND-BANK-ENG"
+   ]
   },
   "PDM_BPOS": {
    "route_in": 64.8,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-STUD",
+    "DIST-STUD"
+   ]
   },
   "PDM_GND1": {
    "route_in": 70.9,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "GND-BANK-ENG"
+   ]
   },
   "PDM_GND2": {
    "route_in": 70.9,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "GND-BANK-ENG"
+   ]
   },
   "PT_LF_GND": {
    "route_in": 84.0,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PARK-TURN-LF",
+    "GND-BANK-ENG"
+   ]
   },
   "PT_RF_GND": {
    "route_in": 30.0,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PARK-TURN-RF",
+    "GND-BANK-ENG"
+   ]
   },
   "PUMP_GND": {
    "route_in": 188.3,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "FUEL-PUMP",
+    "GND-BANK-ENG"
+   ]
   },
   "RADIO_CONST": {
    "route_in": 33.1,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "RADIO"
+   ]
   },
   "RADIO_GND": {
    "route_in": 27.2,
    "branches": 4,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RADIO",
+    "GND-BANK-CAB"
+   ]
   },
   "RADIO_REM": {
    "route_in": 147.1,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RADIO",
+    "AMP"
+   ]
   },
   "RCA_FRONT": {
    "route_in": 147.1,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RADIO",
+    "AMP"
+   ]
   },
   "RCA_REAR": {
    "route_in": 147.1,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RADIO",
+    "AMP"
+   ]
   },
   "RCA_SUB": {
    "route_in": 147.1,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "RADIO",
+    "AMP"
+   ]
   },
   "REAR_ST_L": {
    "route_in": 195.7,
    "branches": 7,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "Tail_Light_Left"
+   ]
   },
   "REAR_ST_R": {
    "route_in": 198.0,
    "branches": 6,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "Tail_Light_Right"
+   ]
   },
   "START_TRIG": {
    "route_in": 32.4,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM15-OUT4",
+    "STARTER-S"
+   ]
   },
   "STEP_DOOR_L": {
    "route_in": 37.4,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DOOR-JAMB-L",
+    "AMP-STEP-CTRL"
+   ]
   },
   "STEP_DOOR_R": {
    "route_in": 111.1,
    "branches": 10,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DOOR-JAMB-R",
+    "AMP-STEP-CTRL"
+   ]
   },
   "STEP_GND": {
    "route_in": 117.7,
    "branches": 11,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "AMP-STEP-CTRL",
+    "GND-BANK-ENG"
+   ]
   },
   "TCASE_SW_GND": {
    "route_in": 73.4,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TCASE-4WD-SW",
+    "GND-BANK-CAB"
+   ]
   },
   "TGR_CUT_IN": {
    "route_in": 34.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-KEY-REV",
+    "TG-CUTOUT"
+   ]
   },
   "TGR_DN": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-MASTER",
+    "TG-SW-KEY-REV"
+   ]
   },
   "TGR_KEY_FEED": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-MASTER",
+    "TG-SW-KEY-REV"
+   ]
   },
   "TGR_KEY_GND": {
    "route_in": 52.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-KEY-REV",
+    "GND-SPLICE-REAR"
+   ]
   },
   "TGR_MOT_A": {
    "route_in": 48.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-CUTOUT",
+    "TG-MOTOR-ACI"
+   ]
   },
   "TGR_MOT_B": {
    "route_in": 17.1,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-KEY-REV",
+    "TG-MOTOR-ACI"
+   ]
   },
   "TGR_M_GND": {
    "route_in": 8.0,
    "branches": 1,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-MASTER",
+    "GND-BANK-CAB"
+   ]
   },
   "TGR_UP": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-MASTER",
+    "TG-SW-KEY-REV"
+   ]
   },
   "TG_BUS_DN": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-DASH",
+    "TG-SW-KEY"
+   ]
   },
   "TG_BUS_UP": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-DASH",
+    "TG-SW-KEY"
+   ]
   },
   "TG_CUT_IN": {
    "route_in": 34.3,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-KEY",
+    "TG-CUTOUT"
+   ]
   },
   "TG_FEED": {
    "route_in": 13.9,
    "branches": 2,
    "segments": 2,
    "routed": 1,
-   "complete": false
+   "complete": false,
+   "chain": [
+    "SPL-PDM30-OUT1",
+    "TG-SW-MASTER",
+    "TG-SW-DASH"
+   ]
   },
   "TG_KEY_FEED": {
    "route_in": 177.0,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-DASH",
+    "TG-SW-KEY"
+   ]
   },
   "TG_MOT_A": {
    "route_in": 48.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-CUTOUT",
+    "rear_window_motor"
+   ]
   },
   "TG_MOT_B": {
    "route_in": 17.1,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "TG-SW-KEY",
+    "rear_window_motor"
+   ]
   },
   "TL_L_GND": {
    "route_in": 87.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Tail_Light_Left",
+    "GND-SPLICE-REAR"
+   ]
   },
   "TL_R_GND": {
    "route_in": 87.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "Tail_Light_Right",
+    "GND-SPLICE-REAR"
+   ]
   },
   "TURN_SW_0V": {
    "route_in": 19.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "SPL-PDM30-A-A28",
+    "TURN-SW"
+   ]
   },
   "TURN_SW_R": {
    "route_in": 19.0,
    "branches": 3,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-A",
+    "TURN-SW"
+   ]
   },
   "UD_GND": {
    "route_in": 7.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "UNDERDASH-LAMPS",
+    "GND-BANK-CAB"
+   ]
   },
   "USB_GND": {
    "route_in": 11.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "USB-PORT",
+    "GND-BANK-CAB"
+   ]
   },
   "UTC_0V": {
    "route_in": 18.5,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "PDM30-B",
+    "CAN-BUS"
+   ]
   },
   "VSS_DAK": {
    "route_in": 78.0,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "VSS-SENDER",
+    "FIREWALL-BODY-C",
+    "DAKOTA-VHX"
+   ]
   },
   "VSS_GND": {
    "route_in": 78.0,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "VSS-SENDER",
+    "FIREWALL-BODY-C",
+    "DAKOTA-VHX"
+   ]
   },
   "VSS_PWR": {
    "route_in": 78.0,
    "branches": 6,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "DAKOTA-VHX",
+    "FIREWALL-BODY-C",
+    "VSS-SENDER"
+   ]
   },
   "WASH_GND": {
    "route_in": 69.6,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WASHER-PUMP",
+    "GND-BANK-ENG"
+   ]
   },
   "WIN_GND_L": {
    "route_in": 70.7,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-L",
+    "DOOR-L-PASS-P",
+    "GND-BANK-CAB"
+   ]
   },
   "WIN_GND_R": {
    "route_in": 86.5,
    "branches": 9,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-R",
+    "DOOR-R-PASS-P",
+    "GND-BANK-CAB"
+   ]
   },
   "WIN_MOT_L_A": {
    "route_in": 19.7,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-L",
+    "window_motor_DS"
+   ]
   },
   "WIN_MOT_L_B": {
    "route_in": 19.7,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-L",
+    "window_motor_DS"
+   ]
   },
   "WIN_MOT_R_A": {
    "route_in": 18.6,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-R",
+    "window_motor_PS"
+   ]
   },
   "WIN_MOT_R_B": {
    "route_in": 18.6,
    "branches": 2,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-R",
+    "window_motor_PS"
+   ]
   },
   "WIN_R_DN": {
    "route_in": 157.2,
    "branches": 16,
    "segments": 3,
    "routed": 3,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-L",
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P",
+    "WIN-SW-R"
+   ]
   },
   "WIN_R_UP": {
    "route_in": 157.2,
    "branches": 16,
    "segments": 3,
    "routed": 3,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIN-SW-L",
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P",
+    "WIN-SW-R"
+   ]
   },
   "WIPER_GND": {
    "route_in": 69.6,
    "branches": 8,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIPER-MOTOR",
+    "GND-BANK-ENG"
+   ]
   },
   "WIPER_SW_GND": {
    "route_in": 28.3,
    "branches": 5,
    "segments": 1,
    "routed": 1,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIPER-SW",
+    "GND-BANK-CAB"
+   ]
   },
   "WIPER_T1": {
    "route_in": 49.9,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIPER-SW",
+    "FIREWALL-BODY-B",
+    "WIPER-MOTOR"
+   ]
   },
   "WIPER_T3": {
    "route_in": 49.9,
    "branches": 7,
    "segments": 2,
    "routed": 2,
-   "complete": true
+   "complete": true,
+   "chain": [
+    "WIPER-SW",
+    "FIREWALL-BODY-B",
+    "WIPER-MOTOR"
+   ]
   }
  }
 }

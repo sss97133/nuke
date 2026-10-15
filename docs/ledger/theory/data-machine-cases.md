@@ -2241,7 +2241,7 @@ parts, each with its supplier page as source and no price. (d) #110 itself: sign
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
 
-#### 13.12.3 RSI passes 1 to 34: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
+#### 13.12.3 RSI passes 1 to 40: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
 
 Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
 1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
@@ -2288,6 +2288,12 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 | 32 | 20261015210000 | the node-kind and citation folds matched a plug by row id, so a re-inserted plug lost its citations (88 to 85) and would take the generic kind (PS-STUDS or MARKER-LF as a bus would join supply to ground) | net fold v2's evidence-set kinds | both folds follow a plug by code, evidence-set kinds first; cited ends back to 88 / 985 |
 | 33 | 20261015220000 | routing 0 / 670: the June branches fell with the overtaken points and nothing could write a branch or a routing | a twin route study (research/2026-10-15_route-branches.md): 39 branches, 9 junctions, 536.5 in, the 61-pin the only crossing, 88 mm or more from exhaust | load_harness_branches and route_harness_segments (shortest chain), called by the loader; routed segments 0 to 121 / 670 |
 | 34 | 20261015230000 | 106 of the 121 routed segments had no planned length, and no check compared a plan with its route | the routes; K5_WIRING_STATE row 33 pads (1.20 engine, 1.15 body) | plan_harness_segment_lengths and the check "routed segments planned shorter than their route (must be 0)"; planned segments 268 to 374 / 670; the check 0 / 121 |
+| 35 | (generator, #1671) | 368 of 670 segments could not route: 124 plugs had no position | a headless-Blender study of the twin (research/2026-10-15_device-positions.md): bounding boxes, split lamp meshes, ray casts | 119 end positions in mounts.yaml, loaded as route-graph points. The load stopped half-way at a branch-key clash (pass 36); its tail folds ran by hand |
+| 36 | 20261015240000 | the point writer re-rowed a point on new words alone, so a branch kept the old id and the history-wide key refused it; the loader stopped before routing | the pass 35 failure | points re-row only when they move; branches re-link in place; the loader's end folds all run and it exits non-zero after |
+| 37 | (generator, #1689) | PS-STUDS was one node for nine studs, so every DC primary cable shared one point | the power-spine records (chapters/17, the DC primary sheet) | nine stud nodes; each cable end on its stud; endpoints 203 to 212, wire ends 993 to 999; supply-to-ground 0 / 328 |
+| 38 | (generator, #1690) | 196 placed plug pairs had no branch chain | a second twin route study (research/2026-10-15_route-branches-2.md): 116 branches, 16 junctions | routed segments 125 to 397 / 669; planned 375 to 587 |
+| 39 | 20261015250000 | 14 of 397 routed segments were planned shorter than their route, all cut-list estimates copied unpadded; 207 of 417 registry wires had no length | the live routes, exported to inputs/route_lengths.json | the planner pads estimates and gives way to a longer route; the registry takes one-segment routes: 120 wires gain a length, 14 short ones rise; the check 14 to 0 / 397, plans shorter than the straight line 9 to 0 / 424 |
+| 40 | (loader + generator, #1698, this pass) | "AMP CH1+" matched no plug, so 26a/26b/27a/27b started at the door and chained back through the amp (26a summed 28.2 ft) | the registry's start text | the start resolves by its first word and the 4 wires re-chain AMP, door, speaker; through runs (one path whose interior plugs are crossings) take their summed route: 72 more wires, 81 of 85 multi-hop wires eligible; the 4 buses wait |
 
 **What the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
@@ -2336,13 +2342,19 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   iBooster also sits 20 mm above the 61-pin point: on the truck the two share the driver firewall, which needs a look.
 - **The cut list's zone estimates run 4x the twin routes** (15 routed segments that carry one: average 4.0x, minimum
   1.88x). The estimates may be generous, or the twin may miss slack and service loops. Measured lengths settle it.
+- **The cut list's zone estimates were not cut lengths.** 186 segments carried a wire's whole-length estimate as
+  their plan, without the pad the column promises; 14 were shorter than their own route (#67 dome lamp 3.5 ft over
+  11.29 ft). Pass 34's "4x" ran the other way: those 15 were the long ones.
+- **A start in words chose the wrong end.** The loader parsed "AMP CH1+" as no plug and started four speaker leads at
+  the door, so their segments doubled back through the amp.
 - **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
   passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
 
 **Owed, as the scoreboard names it:**
-- Routing beyond the placed points: 121 / 670 segments are routed; 368 have a plug with no position (124 plugs:
-  lamps, switches, rail splices, grounds, fuses, body connectors), and DEL_STRIBUTOR, CKP, BAT, ALT and the O2 sensors
-  stand unplaced. A placement study of the 124 plugs is running.
+- Routing beyond the placed points: 397 / 669 segments are routed (20:45Z); 56 have a plug with no position, 62 join
+  two plugs at one point, 2 join points no branch chain reaches. The engine-front branches wait on a twin engine fix.
+- Buses as trees: CAN_HI/CAN_LO and the door-lock buses are chained like runs; their length and the order of their
+  drops is a design question the segment fold cannot answer.
 - The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
 - PDM limits still waiting on a cited load current: 12 of 40 outputs, most with no published figure; each status names
   the bench measurement that closes it (coil packs, starter solenoid, PCS ignition, blower, E-Stopp sense, iBooster
