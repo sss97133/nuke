@@ -8,8 +8,22 @@ const rows = (n: number) => Array.from({ length: n }, (_, i) => ({
 const request = (signal?: AbortSignal) => new Request("https://db.test/functions/v1/ingest-observation", {
   method: "POST", headers: { Authorization: "Bearer test-key" }, signal,
 });
-async function run(input: Record<string, unknown>, claimed: unknown, scenario = "new", signal?: AbortSignal) {
+const familyProposal = "6b9de10b-1666-4bdf-bb69-7e82d62f8b32";
+// Synthetic ratification output, never a production property identifier.
+const familyId = "33333333-3333-4333-8333-333333333333";
+const familyMode = "retained_listing_engine_family_label_v1";
+const familyRows = (n: number, id = familyId) => rows(n).map(row => ({ ...row, property_id: id, mode: familyMode }));
+const registry = (id = familyId) => ({
+  proposal: { id: familyProposal, status: "approved", promoted_to_id: id },
+  property: { id, property_key: "engine_family_label", label: "Publisher engine-family label", namespace: "core",
+    data_type: "string", unit: null, parent_property_id: null, discriminator_key: null, cardinality: "single",
+    verification_scope: "class", ratified_at: "2026-10-15T00:00:00Z", deprecated_at: null,
+    applies_to_kinds: ["specification"], proposed_by_proposal_id: familyProposal },
+});
+type FamilyFixture = { proposal: any; property: any; readError?: string; readThrow?: string };
+async function run(input: Record<string, unknown>, claimed: unknown, scenario = "new", signal?: AbortSignal, family?: FamilyFixture) {
   const calls: { name: string; args: any }[] = [], selectors: any[] = [];
+  const registryReads: { table: string; fields: string; id: string; signal: AbortSignal }[] = [];
   const db = { rpc(name: string, args: any) {
     calls.push({ name, args });
     return { abortSignal() {
@@ -18,6 +32,17 @@ async function run(input: Record<string, unknown>, claimed: unknown, scenario = 
       ? { data: claimed, error: scenario === "claim_error" ? {} : null }
       : { data: !(["bad_custody","retry_refused"].includes(scenario) && args.p_status === "done") && scenario !== "retry_refused",
         error: scenario === "completion_error" && args.p_status === "done" ? { message: "private RPC error" } : null }); } };
+  }, from(table: string) {
+    assert(family && ["schema_proposals", "observation_properties"].includes(table));
+    return { select(fields: string) { return { eq(column: string, id: string) {
+      assert(column === "id");
+      return { maybeSingle() { return { abortSignal(readSignal: AbortSignal) {
+        registryReads.push({ table, fields, id, signal: readSignal });
+        if (readSignal.aborted || family?.readThrow === table) throw Error("private registry failure");
+        return Promise.resolve({ data: table === "schema_proposals" ? family?.proposal : family?.property,
+          error: family?.readError === table ? { message: "private registry error" } : null });
+      } }; } };
+    } }; } };
   } };
   const response = await drainRetainedListingProperties(request(signal), input, db, async req => {
     assert(req.headers.get("authorization") === "Bearer test-key");
@@ -30,7 +55,7 @@ async function run(input: Record<string, unknown>, claimed: unknown, scenario = 
       observation_id: source, duplicate: scenario === "duplicate" } :
       { error: scenario === "refused" ? "Retained source ineligible" : "private source error" }), { status });
   });
-  return { response, body: await response.json(), calls, selectors };
+  return { response, body: await response.json(), calls, selectors, registryReads };
 }
 const input = { mode: RETAINED_LISTING_DRAIN_MODE, batch_size: 60 };
 Deno.test("powertrain replay drains all four exact existing property selectors", async () => {
@@ -65,6 +90,7 @@ Deno.test("sixty claims use exact existing selectors and require verified comple
   const r = await run(input, rows(60));assert(r.body.writes === 60 && r.body.stored === 60 && r.body.retries === 0);
   assert(r.calls.length === 61 && r.selectors.length === 60);
   assert(r.body.model_calls === 0 && r.body.provider_calls === 0);
+  assert(r.registryReads.length === 0);
   r.selectors.forEach((s, i) => assert(JSON.stringify(s) === JSON.stringify({
     mode: rows(60)[i].mode, source_observation_id: rows(60)[i].source_observation_id })));
 });
@@ -76,8 +102,78 @@ Deno.test("120 claims retain exact selectors, verified custody and zero inferenc
   assert(r.body.claimed === 120 && r.body.stored === 120 && r.body.writes === 120);
   assert(r.calls.length === 121 && r.selectors.length === 120 && r.body.completion_failures === 0);
   assert(r.body.model_calls === 0 && r.body.provider_calls === 0);
+  assert(r.registryReads.length === 0);
   r.selectors.forEach((s, i) => assert(JSON.stringify(s) === JSON.stringify({
     mode: rows(120)[i].mode, source_observation_id: rows(120)[i].source_observation_id })));
+});
+Deno.test("120 family claims resolve the approved registry ID once and keep the existing bounded selector/custody path", async () => {
+  const work = familyRows(120);
+  const r = await run({ ...input, batch_size: 120 }, work, "new", undefined, registry());
+  assert(r.response.status === 200 && r.body.stored === 120 && r.body.writes === 120);
+  assert(r.registryReads.length === 2 && r.calls.length === 121 && r.body.completion_failures === 0);
+  assert(r.registryReads[0].table === "schema_proposals" && r.registryReads[0].id === familyProposal);
+  assert(r.registryReads[1].table === "observation_properties" && r.registryReads[1].id === familyId);
+  assert(r.registryReads.every(read => read.signal instanceof AbortSignal));
+  assert(r.body.model_calls === 0 && r.body.provider_calls === 0);
+  r.selectors.forEach((selector, i) => assert(JSON.stringify(selector) === JSON.stringify({
+    mode: familyMode, source_observation_id: work[i].source_observation_id })));
+  assert(r.calls.slice(1).every(call => call.name === "finish_retained_listing_property" &&
+    call.args.p_property === familyId && call.args.p_status === "done"));
+});
+Deno.test("family registry IDs are resolved independently per drain and coexist with existing properties", async () => {
+  for (const id of [familyId, "44444444-4444-4444-8444-444444444444"]) {
+    const work = [...rows(1), ...familyRows(2, id)];
+    const r = await run(input, work, "duplicate", undefined, registry(id));
+    assert(r.body.stored === 3 && r.body.duplicates === 3 && r.body.writes === 0 && r.registryReads.length === 2);
+    assert(r.registryReads[1].id === id && r.calls.slice(1).filter(call => call.args.p_property === id).length === 2);
+  }
+});
+Deno.test("unapproved, withdrawn, absent and mismatched family proposals fail before registry or admission", async () => {
+  for (const proposal of [null, { ...registry().proposal, id: source },
+    ...["open", "under_review", "withdrawn", "rejected"].map(status => ({ ...registry().proposal, status })),
+    ...[null, "invalid", interior, source].map(promoted_to_id => ({ ...registry().proposal, promoted_to_id }))]) {
+    const r = await run(input, [...rows(1), ...familyRows(1)], "new", undefined, { ...registry(), proposal });
+    assert(r.response.status === 503 && r.body.error === "invalid_claimed_listing_work" && r.body.writes === 0);
+    assert(r.registryReads.length === 1 && r.calls.length === 1 && r.selectors.length === 0);
+  }
+});
+Deno.test("family registry semantics and proposal linkage must exactly retain the reviewed contract", async () => {
+  const changes = [
+    { id: source }, { property_key: "engine_code" }, { label: "Engine family" }, { namespace: "pending" },
+    { data_type: "integer" }, { unit: "liters" }, { parent_property_id: source }, { discriminator_key: "engine" },
+    { cardinality: "multiple" }, { verification_scope: "instance" }, { ratified_at: null }, { ratified_at: "" },
+    { deprecated_at: "2026-10-15T01:00:00Z" }, { applies_to_kinds: ["listing"] }, { applies_to_kinds: null },
+    { proposed_by_proposal_id: source },
+  ];
+  for (const property of [null, ...changes.map(change => ({ ...registry().property, ...change }))]) {
+    const r = await run(input, familyRows(1), "new", undefined, { ...registry(), property });
+    assert(r.response.status === 503 && r.body.error === "invalid_claimed_listing_work");
+    assert(r.registryReads.length === 2 && r.calls.length === 1 && r.selectors.length === 0 && r.body.writes === 0);
+  }
+});
+Deno.test("family lookup failures and cancellation fail closed without source details or admission", async () => {
+  for (const table of ["schema_proposals", "observation_properties"]) {
+    for (const failure of [{ readError: table }, { readThrow: table }]) {
+      const r = await run(input, familyRows(1), "new", undefined, { ...registry(), ...failure });
+      assert(r.response.status === 503 && r.body.error === "listing_property_registry_unavailable");
+      assert(r.calls.length === 1 && r.selectors.length === 0 && !JSON.stringify(r.body).includes("private"));
+      assert(r.registryReads.length === (table === "schema_proposals" ? 1 : 2));
+    }
+  }
+  const controller = new AbortController();controller.abort();
+  const cancelled = await run(input, familyRows(1), "new", controller.signal, registry());
+  assert(cancelled.response.status === 503 && cancelled.registryReads[0].signal.aborted && cancelled.selectors.length === 0);
+});
+Deno.test("malformed, duplicate, overclaimed or mismatched family selectors cannot trigger admission", async () => {
+  for (const work of [familyRows(61), [familyRows(1)[0], familyRows(1)[0]],
+    [{ ...familyRows(1)[0], source_observation_id: "invalid" }],
+    [{ ...familyRows(1)[0], property_id: "invalid" }], [{ ...familyRows(1)[0], property_id: interior }],
+    [{ ...familyRows(1)[0], mode: "retained_listing_interior_color_v1" }]]) {
+    const r = await run(input, work, "new", undefined, registry());
+    assert(r.response.status === 503 && r.selectors.length === 0 && r.calls.length === 1 && r.registryReads.length === 0);
+  }
+  const mismatch = await run(input, [familyRows(1)[0], familyRows(1, source)[0]], "new", undefined, registry());
+  assert(mismatch.response.status === 503 && mismatch.selectors.length === 0 && mismatch.registryReads.length === 1);
 });
 Deno.test("admissions overlap by at most two and completion stays source-bound", async () => {
   let active = 0, peak = 0;
