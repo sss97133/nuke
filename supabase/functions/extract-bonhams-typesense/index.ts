@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
       const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
       const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+-[0-9]+[A-Za-z]{0,2}$/.test(x)).slice(0, 250); // lot numbers can carry a letter ("908A")
       const params: Record<string, string> = ids.length
-        ? { q: "*", query_by: "title", per_page: "250", filter_by: `id:=[${ids.map((x) => "`" + x + "`").join(",")}]`, include_fields: "id,department" }
+        ? { q: "*", query_by: "title", per_page: "250", filter_by: `id:=[${ids.map((x) => (/^[0-9]+-[0-9]+$/.test(x) ? x : "`" + x + "`")).join(",")}]`, include_fields: "id,department" }
         : { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "60" };
       const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`, { headers });
       if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
