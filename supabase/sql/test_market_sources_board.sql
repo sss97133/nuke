@@ -1,11 +1,13 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_sources_board -f this-file.sql
--- Contract for 20261018030000_market_sources_board.sql. Synthetic rows only; never production.
+-- Contract for 20261018030000_market_sources_board.sql and 20261018031000_market_sources_live_window.sql (the reader in
+-- force). Synthetic rows only; never production.
 --   * the migration applies twice and schedules its job once;
 --   * record_market_source_day() writes one row per declared source holding data: held lots and when measured, the latest
 --     whole-source census, map sales under the source's house, sales by sale date (12 months, the 12 before, 24 months);
 --     a source with no data gets no row; a second call the same day replaces the day's rows;
 --   * market_sources_read() ranks by held lots, counts only live lots with a future end read in the last two hours, and
---     carries each source's held lots a week earlier; with no rows it returns an empty list;
+--     carries each source's held lots a week earlier; with no rows it returns an empty list; a live lot counts when its
+--     monitor was read within 24 hours;
 --   * anon reads the board only through the reader; only service_role runs the writer;
 --   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched.
 \set ON_ERROR_STOP on
@@ -96,6 +98,8 @@ INSERT INTO public.monitored_auctions (source_id, auction_end_time, is_live, upd
 SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
   ('bat', now() + interval '1 day', true, now() - interval '5 minutes'),
   ('bat', now() + interval '2 days', true, now() - interval '30 minutes'),
+  ('bat', now() + interval '5 days', true, now() - interval '10 hours'),      -- far from its close, read daily: live
+  ('bat', now() + interval '3 days', true, now() - interval '30 hours'),      -- not read in a day: not counted
   ('bat', now() - interval '1 day', true, now() - interval '5 minutes'),       -- ended: not live
   ('bat', now() + interval '1 day', false, now()),                             -- not live
   ('cars-and-bids', now() + interval '1 day', true, now() - interval '200 days') -- stale since February: not live
@@ -103,6 +107,8 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 
 \ir ../migrations/20261018030000_market_sources_board.sql
 \ir ../migrations/20261018030000_market_sources_board.sql
+\ir ../migrations/20261018031000_market_sources_live_window.sql
+\ir ../migrations/20261018031000_market_sources_live_window.sql
 
 SELECT pg_temp.ok('the writer job is scheduled once, at 10:47Z',
   (SELECT count(*) FROM cron.job WHERE jobname = 'market-source-days') = 1
@@ -165,7 +171,7 @@ BEGIN
     (b->>'day')::date = current_date AND (SELECT array_agg(x->>0 ORDER BY ord) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY e(x, ord))
       = ARRAY['bat', 'mecum', 'cars-and-bids', 'craigslist']);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'bat';
-  PERFORM pg_temp.ok('live lots: live, a future end, read in the last two hours', (r->>17)::int = 2 AND r->>18 IS NOT NULL);
+  PERFORM pg_temp.ok('live lots: live, a future end, read in the last 24 hours', (r->>17)::int = 3 AND r->>18 IS NOT NULL);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'cars-and-bids';
   PERFORM pg_temp.ok('a live row stale since February is not live', (r->>17)::int = 0);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'mecum';
