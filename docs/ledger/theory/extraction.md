@@ -28,7 +28,7 @@
 **The rule.** Firecrawl stays at USD 100 a month at most and is spent only on the best targets. The targets are not hand-picked: a
 weekly job ranks sources, then vehicle groups, from the data model, and writes the allocation to
 `firecrawl_target_allocation`. Every Firecrawl spender asks `firecrawl_allowance(source)` before a batch, stops at the number it
-returns, and reports the spend with `firecrawl_record_spend(source, credits, lots, lane)`. In `archiveFetch()` the call belongs in
+returns, and reports the spend with `firecrawl_record_spend(source, credits, lots, lane, note, historical)` (`historical` for spend made before the rule or an allocation: it counts toward the observed return, not against the period allowance). In `archiveFetch()` the call belongs in
 the Firecrawl branch. A source we can fetch directly or re-read from retained captures costs no credits and is never allocated any;
 Firecrawl is for the sources that need it. Budget size is the parameter `firecrawl_params.monthly_credits`: 1,000 now, 100,000 if
 the USD 99 Standard plan is taken. Owner tiers: model years 1964-1973 above 1974-1991 above the rest, non-dealer sellers first.
