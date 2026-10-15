@@ -70,6 +70,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/ledger.ts')) return ledger;
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };

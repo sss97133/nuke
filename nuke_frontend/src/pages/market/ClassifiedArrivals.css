@@ -17,3 +17,6 @@
   .market-ask__identity { grid-area: identity; }
   .market-ask__deal { grid-area: deal; grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: baseline; text-align: left; }
 }
+/* The source as a quiet mark beside the listing's age. */
+.market-ask__seen { display: inline-flex; align-items: center; gap: 6px; }
+.market-ask__mark { width: 14px; height: 14px; opacity: 0.7; flex-shrink: 0; }

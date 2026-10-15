@@ -789,6 +789,10 @@ def main():
     # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
     if not PLAN:
         print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
+        # a wire whose segment was made before its ends existed takes them, by the reshape's rule (RSI pass 19); the new
+        # ends are keyed to their terminal and tool parts (key_harness_wire_ends, RSI pass 6)
+        print(f"segment ends: {api._req('POST', 'rpc/fill_harness_segment_ends', {'p_vehicle_id': K5})}")
+        print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)

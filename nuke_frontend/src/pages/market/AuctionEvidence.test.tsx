@@ -242,6 +242,11 @@ it('adds the pace of bidding to the board bid in the row, from Stack A, and noth
     expect(container.textContent).toBe('Recorded bid 800bid 1 h ago · +11.1%');
     expect(container.textContent).not.toMatch(/Retained high|bidders|within 10%|reported bids held|Bid depth/);
     expect(container.querySelector('a')).toBeNull();
+    // The board's bid has moved past the bid rows: the pace is not said, since it would describe an older bid.
+    await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row bid={1500} fallback={<span>Recorded bid 1,500</span>} />));
+    expect(container.textContent).toBe('Recorded bid 1,500');
+    await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row bid={1000} fallback={<span>Recorded bid 1,000</span>} />));
+    expect(container.textContent).toBe('Recorded bid 1,000bid 1 h ago · +11.1%');
     fixture.book = null;
     await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
     expect(container.textContent).toBe('Recorded bid 800');

@@ -13,17 +13,29 @@ const WINDOW_NAMES: Record<number, string> = { 24: 'last 24 hours', 72: 'last 3 
 const SORT_NAMES: Record<AskSort, string> = { newest: 'Newest first', nearest: 'Nearest first', band: 'Band first', price: 'Cheapest first' };
 type Locating = 'off' | 'asking' | 'on' | 'refused' | 'unavailable';
 
-// How long ago, the way a feed says it: now, 12 min, 3 h, 2 d. The page reads as live; a full date and time is noise
-// (owner, 2026-10-15). Unknown stays unknown.
+// How long ago, the way a feed says it: now, 12 min, 1 h 12 min, 5 h, 2 d. Minutes count while a listing is fresh,
+// the first three hours (owner, 2026-10-15: "if listing is less than an hour put the minutes"); a full date and time is
+// noise. Unknown stays unknown.
 export function ageOf(value: string | null | undefined, now = Date.now()): string | null {
   const t = value ? Date.parse(value) : NaN;
   if (!Number.isFinite(t)) return null;
   const s = Math.max(0, (now - t) / 1000);
   if (s < 60) return 'now';
   if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 3 * 3600) { const m = Math.floor((s % 3600) / 60); return `${Math.floor(s / 3600)} h${m ? ` ${m} min` : ''}`; }
   if (s < 86400) return `${Math.floor(s / 3600)} h`;
   return `${Math.floor(s / 86400)} d`;
 }
+// A listing's name as a reader expects to see it: a word typed in lower case gets its capital, a word with digits is a
+// code (SR5, F-150, K1500); a word already capitalised stays as the seller wrote it.
+export function tidyName(value: string | null | undefined): string {
+  return (value ?? '').split(/(\s+)/).map((w) => /\d/.test(w) ? w.toUpperCase()
+    : /^[a-z][a-z'.-]*$/.test(w) && w.length > 1 ? w[0].toUpperCase() + w.slice(1) : w).join('');
+}
+// The source as a small mark, not a word: the platform's own icon, kept in the repo, with its name for screen readers.
+const SOURCE_MARKS: Record<string, string> = {
+  craigslist: '/vendor/craigslist/favicon.ico', facebook_marketplace: '/vendor/facebook/favicon.ico', ksl: '/vendor/ksl/favicon.ico',
+};
 // The reader's as_of is when it read this snapshot. Posting age does not establish successful source capture.
 export function freshness(readAt: string | null | undefined, now = Date.now()): string {
   const t = readAt ? Date.parse(readAt) : NaN;
@@ -203,13 +215,14 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
       ? 'No ask in this window has a recorded place yet.' : 'No ask in this window matches these lenses.'}</p>}
     {rows.length > 0 && <div className="market-asks" role="list" aria-label="Just listed">{rows.map(row => {
       const href = sourceLink(row.source, row.url);
-      const identity = [row.year, row.make, row.model].filter(Boolean).join(' ');
+      const identity = [row.year, tidyName(row.make), tidyName(row.model)].filter(Boolean).join(' ');
       const image = vehicleImage(row.image);
       // The photo says the body and drive; the card says what it cannot: what the listing states about its miles and
       // title, where it is, what it asks, and how long it has been up.
       const said = listingFacts(row);
       const age = ageOf(listedAt(row), now);
-      const seen = [sourceName(row.source), age && (age === 'now' ? 'just now' : `${age} ago`)].filter(Boolean).join(' · ');
+      const seen = age ? (age === 'now' ? 'just now' : `${age} ago`) : '';
+      const mark = SOURCE_MARKS[row.source];
       const place = [row.city, row.region].filter(Boolean).join(', ');
       return <article key={row.event_id} role="listitem" className="market-ask">
         <PrefetchLink to={`/vehicle/${row.vehicle_id}`} className="market-ask__image" aria-label={identity || 'Vehicle identity unrecorded'} tabIndex={-1}>
@@ -219,11 +232,15 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
         <div className="market-ask__identity">
           <PrefetchLink to={`/vehicle/${row.vehicle_id}`}><Text role="entity">{identity || 'Vehicle identity unrecorded'}</Text></PrefetchLink>
           {(said.miles || said.title) && <Text role="body" as="div">{said.miles}{said.miles && said.title ? ' · ' : ''}{said.title && <strong>{said.title}</strong>}</Text>}
-          <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{seen}</a> : seen}</Text>
+          <Text role="caption" as="div" className="market-ask__seen">
+            {mark ? <img className="market-ask__mark" src={mark} width={14} height={14} alt={sourceName(row.source)} title={sourceName(row.source)} />
+              : <span>{sourceName(row.source)} · </span>}
+            {href ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`${sourceName(row.source)} listing, ${seen}`}>{seen}</a> : seen}
+          </Text>
         </div>
         <div className="market-ask__deal">
           {row.asking_price == null ? <Text role="caption">Unpriced</Text>
-            : <span><Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text> <Text role="caption">· asking</Text></span>}
+            : <Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text>}
           <Text role="body" as="div">{place || 'Place unrecorded'}{row.distance_mi != null ? ` · ${row.distance_mi.toLocaleString('en-US')} mi away` : ''}</Text>
         </div>
       </article>;

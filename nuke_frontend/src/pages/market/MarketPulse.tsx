@@ -231,8 +231,10 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, onInspect }: {
   const reached = (seen || expanded) && !!detail;
   const specs = useMarketRowSpecs(a.id, reached);
   const facts = selectRowFacts(specs.data ?? [], title(a));
-  const bidReading = detail?.currentBid != null ? { ...a, currentBid: detail.currentBid,
-    updatedAt: detail.recordedAt ? Date.parse(detail.recordedAt) : a.updatedAt } : a;
+  // One bid per lot: the board's (vehicles.high_bid, synced every 15 min), the same number the figures and the finish
+  // estimate use. The listing event's recorded price and the bid rows can trail it by hours (2026-10-15: a GT2 RS read
+  // $582,000 on the board at 03:15Z while its event said $467,000 from 23:02Z).
+  const bidReading = a;
   // A row says what the photo cannot: the time left, the bid and its pace, and no reserve. The venue is the page's.
   return (
     <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
@@ -254,7 +256,7 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, onInspect }: {
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
-        <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
+        <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached} bid={a.currentBid}
           fallback={<BidCell auction={bidReading} risen={risen} stale={stale} />} />
         {finish && <FinishLine e={finish} />}
       </button>

@@ -152,8 +152,11 @@ it('opens classifieds as just listed: a refresh control instead of a clock, filt
   expect(container.textContent).toContain('Phoenix, AZ'); expect(container.textContent).toContain('256 mi away');
   expect(container.textContent).toContain('88,000 mi'); expect(container.textContent).not.toContain('4WD · SUV');
   expect(container.textContent).not.toContain('original listing'); expect(container.textContent).not.toMatch(/taste 96/);
-  expect(container.textContent).toMatch(/Craigslist · (just now|\d+ (min|h|d) ago)/);
-  expect(container.textContent).toContain('$18,800 · asking');
+  // The source is a quiet mark with its name for screen readers; the age reads in feed terms; the price stands alone.
+  expect(container.querySelector('.market-ask__mark')?.getAttribute('alt')).toBe('Craigslist');
+  expect(container.querySelector('.market-ask__seen')?.textContent).toMatch(/^(just now|\d+ (min|h|d)( \d+ min)? ago)$/);
+  expect(container.querySelector('.market-ask__deal')?.textContent).toContain('$18,800');
+  expect(container.querySelector('.market-asks')?.textContent).not.toContain('asking');
   expect(container.textContent).toContain('Unpriced'); expect(container.textContent).toContain('Place unrecorded');
   expect(container.querySelector('a[href="/vehicle/v1"]')).not.toBeNull();
   expect(lastQuery()).toEqual({ hours: 24, tier: null, band: false, sort: 'newest', point: null, radius: null });
@@ -203,12 +206,27 @@ describe('what a listing says about its miles and title', () => {
   });
 });
 
+describe('how a listing is named', () => {
+  it('capitalises words typed in lower case, writes codes in capitals, and keeps what the seller capitalised', async () => {
+    const { tidyName } = await import('./ClassifiedArrivals');
+    expect(tidyName('wrangler')).toBe('Wrangler');
+    expect(tidyName('tacoma sr5')).toBe('Tacoma SR5');
+    expect(tidyName('f-150 xlt')).toBe('F-150 Xlt');
+    expect(tidyName('k1500')).toBe('K1500');
+    expect(tidyName('Sonoma')).toBe('Sonoma');
+    expect(tidyName('DeVille')).toBe('DeVille');
+    expect(tidyName(null)).toBe('');
+  });
+});
+
 describe('how a feed says time', () => {
   it('says how old a listing is in feed terms, and unknown as unknown', async () => {
     const { ageOf, freshness } = await import('./ClassifiedArrivals');
     const now = Date.parse('2026-10-15T02:00:00Z');
     expect(ageOf('2026-10-15T01:59:30Z', now)).toBe('now');
     expect(ageOf('2026-10-15T01:48:00Z', now)).toBe('12 min');
+    expect(ageOf('2026-10-15T00:48:00Z', now)).toBe('1 h 12 min');
+    expect(ageOf('2026-10-15T01:00:00Z', now)).toBe('1 h');
     expect(ageOf('2026-10-14T23:00:00Z', now)).toBe('3 h');
     expect(ageOf('2026-10-13T01:00:00Z', now)).toBe('2 d');
     expect(ageOf(null, now)).toBeNull();
