@@ -57,9 +57,16 @@ interface WorkOrderPartRow {
   image_url: string;
 }
 
+// ── A plug of the live harness model (harness_endpoints + its live wire ends) ──
+export interface LivePin { cavity: string | null; wire: string; awg: number | null; color: string | null; other: string | null }
+export interface LivePlug { code: string; pins: LivePin[] }
+
 // ── Props ─────────────────────────────────────────────────────────────
 interface Props {
   device: ManifestDevice | null;
+  /** The device's plugs in the live harness model, matched on its part number. When present they are its pins and wires:
+   *  the manifest's April pin map and overlay wires describe a design the model has since replaced. */
+  livePlugs?: LivePlug[];
   wire: WireSpec | null;
   result: OverlayResult;
   devices: ManifestDevice[];
@@ -71,7 +78,7 @@ interface Props {
 }
 
 export function DeviceDetailPanel({
-  device, wire, result, devices, pinMaps, workOrderParts,
+  device, livePlugs = [], wire, result, devices, pinMaps, workOrderParts,
   zoneColors, onClose, onShowOnFormboard,
 }: Props) {
   // ── Device wires from overlay ──
@@ -229,8 +236,8 @@ export function DeviceDetailPanel({
               <Row label="CONNECTOR" value={device.connector_type?.replace(/_/g, ' ').toUpperCase() || '—'} />
               <Row label="WIRE GAUGE" value={device.wire_gauge_recommended ? `${device.wire_gauge_recommended} AWG` : '—'} />
               {device.requires_shielding && <Row label="SHIELDING" value="REQUIRED" color={C.warn} />}
-              {device.pdm_controlled && <Row label="PDM CONTROLLED" value="YES" color={C.active} />}
-              {pdmChannel && (
+              {livePlugs.length === 0 && device.pdm_controlled && <Row label="PDM CONTROLLED" value="YES" color={C.active} />}
+              {livePlugs.length === 0 && pdmChannel && (
                 <>
                   <Row label="PDM CHANNEL" value={`OUT${pdmChannel.channel}`} color={C.active} />
                   <Row label="PDM MAX" value={`${pdmChannel.maxAmps}A`} />
@@ -243,8 +250,39 @@ export function DeviceDetailPanel({
               )}
             </Section>
 
+            {/* ── Pins in the live harness model ── */}
+            {livePlugs.map(plug => (
+              <Section key={plug.code} title={`PINS · HARNESS MODEL · ${plug.code} (${plug.pins.length} WIRES)`}>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['CAV', 'WIRE', 'AWG', 'COLOR', 'OTHER ENDS'].map(h => (
+                          <th key={h} style={{ ...lblStyle, textAlign: 'left', padding: '2px 4px', borderBottom: `1px solid ${C.border}` }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plug.pins.map((p, i) => (
+                        <tr key={`${p.wire}-${i}`}>
+                          <td style={cellStyle}>{p.cavity ?? '—'}</td>
+                          <td style={cellStyle}>{p.wire}</td>
+                          <td style={cellStyle}>{p.awg ?? '—'}</td>
+                          <td style={cellStyle}>{p.color ?? '—'}</td>
+                          {/* a cavity label can carry its open note ("TB 5 — pin order OPEN until ..."): the code shows, the note hovers */}
+                          <td style={cellStyle} title={p.other ?? undefined}>{p.other ? p.other.split(' · ').map(x => x.split(' — ')[0]).join(' · ') : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            ))}
+
             {/* ── Wiring ── */}
-            {deviceWires.length > 0 && (
+            {livePlugs.length === 0 && deviceWires.length > 0 && (
               <Section title={`WIRING (${deviceWires.length} WIRES)`}>
                 {deviceWires.map(w => (
                   <div key={w.wireNumber} style={{
@@ -277,7 +315,7 @@ export function DeviceDetailPanel({
             )}
 
             {/* ── Pin Map ── */}
-            {devicePins.length > 0 && (
+            {livePlugs.length === 0 && devicePins.length > 0 && (
               <Section title={`PIN MAP (${devicePins.length} PINS)`}>
                 <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
