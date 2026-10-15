@@ -6,6 +6,7 @@ import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseSsrPage } from "./ssrPage.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { recordSellerTypes, sellerTypeRow } from '../_shared/sellerType.ts';
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { batchFromTargets, discoverTargets, readEnded, revisePcm } from "./targets.ts";
 
@@ -47,6 +48,7 @@ interface PCarMarketListing {
   interiorColor?: string;
   engine?: string;
   transmission?: string;
+  sellerTypeLabel?: string | null;
   bids?: { user: string; at: string | null; amount: number; kind: 'bid' | 'sold' | 'offer' }[];
   reserveMet?: boolean;
   photosClaimed?: number;
@@ -1109,6 +1111,7 @@ Deno.serve(async (req: Request) => {
         .eq('source_platform', 'pcarmarket')
         .maybeSingle();
 
+      let sellerEventId: string | null = existingListing?.id ?? null;
       if (existingListing) {
         await supabase
           .from('vehicle_events')
@@ -1125,7 +1128,18 @@ Deno.serve(async (req: Request) => {
 
         if (!listingError && newListing) {
           console.log(`Created vehicle_event: ${newListing.id}`);
+          sellerEventId = newListing.id;
         }
+      }
+      // Seller type: the page's own "Seller Type" label (declared 0.9); no label on the page = unknown.
+      try {
+        if (sellerEventId && listing.url) {
+          const label = listing.sellerTypeLabel ?? '';
+          const value = /dealer/i.test(label) ? 'dealer' : /private/i.test(label) ? 'private' : 'unknown';
+          await recordSellerTypes(supabase, [sellerTypeRow({ eventId: sellerEventId, value, basis: 'declared', field: 'Seller Type', text: label || null, method: 'pcarmarket_seller_type_label' })], 'import-pcarmarket-listing');
+        }
+      } catch (e) {
+        console.warn(`[pcarmarket] seller type not written: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
