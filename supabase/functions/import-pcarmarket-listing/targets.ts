@@ -60,11 +60,29 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
   const started = Date.now();
 
   const { data: last } = await supabase
-    .from("import_queue").select("raw_data").eq("extractor_version", TARGETS_TAG)
+    .from("import_queue").select("raw_data").eq("extractor_version", TARGETS_TAG).contains("raw_data", { lane: "backlog" })
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   let cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
 
-  const picked: { id: number; listing_url: string }[] = [];
+  const picked: { id: number; listing_url: string; lane: string }[] = [];
+  const isDone = async (targets: { listing_url: string }[]) => {
+    const [{ data: queued }, { data: landed }] = await Promise.all([
+      supabase.from("import_queue").select("listing_url").in("listing_url", targets.map((t) => t.listing_url)),
+      supabase.from("vehicle_events").select("source_url").eq("source_platform", "pcarmarket").in("source_url", targets.map((t) => eventUrlFor(t.listing_url))),
+    ]);
+    return new Set([...(queued ?? []).map((r: any) => r.listing_url), ...(landed ?? []).map((r: any) => r.source_url)]);
+  };
+  // Newly discovered auctions first (up to half the batch), so they land while fresh; the cursor walk takes the backlog.
+  const { data: fresh } = await supabase
+    .from("source_targets").select("id, listing_url").eq("source_slug", "pcarmarket")
+    .gte("first_discovered_at", new Date(Date.now() - 3 * 86_400_000).toISOString())
+    .order("id", { ascending: false }).limit(100);
+  if (fresh?.length) {
+    const done = await isDone(fresh);
+    for (const t of fresh) {
+      if (picked.length < Math.ceil(limit / 2) && !done.has(t.listing_url) && !done.has(eventUrlFor(t.listing_url))) picked.push({ ...t, lane: "fresh" });
+    }
+  }
   for (let page = 0; page < 20 && picked.length < limit; page++) {
     const { data: targets, error } = await supabase
       .from("source_targets").select("id, listing_url").eq("source_slug", "pcarmarket")
@@ -72,14 +90,9 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
     if (error) throw error;
     if (!targets?.length) break;
     cursor = targets[targets.length - 1].id;
-    const urls = targets.map((t: any) => t.listing_url);
-    const [{ data: queued }, { data: landed }] = await Promise.all([
-      supabase.from("import_queue").select("listing_url").in("listing_url", urls),
-      supabase.from("vehicle_events").select("source_url").eq("source_platform", "pcarmarket").in("source_url", targets.map((t: any) => eventUrlFor(t.listing_url))),
-    ]);
-    const done = new Set([...(queued ?? []).map((r: any) => r.listing_url), ...(landed ?? []).map((r: any) => r.source_url)]);
+    const done = await isDone(targets);
     for (const t of targets) {
-      if (picked.length < limit && !done.has(t.listing_url) && !done.has(eventUrlFor(t.listing_url))) picked.push(t);
+      if (picked.length < limit && !picked.some((p) => p.id === t.id) && !done.has(t.listing_url) && !done.has(eventUrlFor(t.listing_url))) picked.push({ ...t, lane: "backlog" });
     }
   }
 
@@ -90,7 +103,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
     if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
     const { data: row, error: claimErr } = await supabase.from("import_queue").insert({
       listing_url: t.listing_url, status: "processing", extractor_version: TARGETS_TAG,
-      raw_data: { target_id: t.id }, locked_at: new Date().toISOString(),
+      raw_data: { target_id: t.id, lane: t.lane }, locked_at: new Date().toISOString(),
     }).select("id").single();
     if (claimErr || !row) continue; // another run holds this target
     const finish = (status: string, error?: string, vehicleId?: string) =>
