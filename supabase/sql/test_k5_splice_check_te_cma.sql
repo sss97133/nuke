@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only, from the repo root:
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_k5_tecma -f supabase/sql/test_k5_splice_check_te_cma.sql
--- Proves 20261015103000_k5_splice_check_te_cma.sql on top of RSI pass 16 (re-issued writer): the D-609 stub splices carry
+-- Proves 20261015104500_k5_splice_check_te_cma_reissue.sql (re-issue of 20261015103000) on top of RSI pass 16 (re-issued writer): the D-609 stub splices carry
 -- TE's CMA range and CMA per gauge; the fill check uses them, so two 22 AWG wires and a 20 AWG pin lead in a D-609-04
 -- (2,306 CM by the AWG formula, inside 20-16 AWG) read 2,724 CMA, over TE's 2,680; a butt splice with no maker table keeps
 -- the AWG basis and says so.
@@ -14,7 +14,16 @@ BEGIN
   IF got IS DISTINCT FROM 'fits 2306' THEN RAISE EXCEPTION 'before: %', got; END IF;
 END $$;
 
-\i supabase/migrations/20261015103000_k5_splice_check_te_cma.sql
+-- Production's form rule for stack_needs objects (20261007014500_stack_registry.sql), which 20261015103000 broke.
+ALTER TABLE public.stack_needs ADD CONSTRAINT stack_needs_object_form CHECK (CASE kind
+    WHEN 'table'    THEN object ~ '^[a-z_][a-z0-9_]*$'
+    WHEN 'function' THEN object ~ '^[a-z_][a-z0-9_]*$'
+    WHEN 'column'   THEN object ~ '^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$'
+    WHEN 'intake'   THEN object ~ '^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$'
+    WHEN 'stack'    THEN object ~ '^S[0-9A-Z]+$' AND object <> stack_id
+    ELSE btrim(object) <> '' AND object = btrim(object) END);
+
+\i supabase/migrations/20261015104500_k5_splice_check_te_cma_reissue.sql
 
 DO $$
 DECLARE got text; n int;
