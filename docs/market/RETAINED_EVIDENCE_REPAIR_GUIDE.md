@@ -218,6 +218,41 @@ are under `/Users/skylar/nuke-logs/data-model-expand-20261015/`. Follow the obse
 qualifier gaps into their existing reader owners; retain the separate curator and
 replay holds on [PR1361](https://github.com/sss97133/nuke/pull/1361).
 
+### Publisher-reported work assay, 2026-10-15
+
+`--family reported-work` takes the same `public_reader_lineage_subjects_v1`
+manifest. Per gated public parent it calls only the opt-in
+`vehicle_build_log_public(p_vehicle_id, p_include_reported: true)` overload, then
+drills each report to its parent listing on the anonymous `vehicle_observations`
+route, constrained by source observation and vehicle. It never reads the private
+activity child.
+
+```sh
+bash scripts/check-ingestion-health.sh --public-readers \
+  --family reported-work --subjects /private/subjects.json \
+  --env /private/public-reader.env --out /private/new-reported-work.jsonl
+```
+
+Per report it checks the fixed uncertainty (unverified occurrence, unknown
+performer and intent, not independent), month precision and label, that the
+performed clause is a prefix of the full sentence and carries no recommendation,
+that four clocks keep their bases at microsecond precision, and that the parent is
+a current native listing whose source, URL, capture witness and clocks agree and
+whose text contains the exact sentence. One sentence on one listing page counts
+once: a repeat is reported as `reported_work_repeated_listing_sentence`, never
+corroboration. An absent overload stops as `reported_work_reader_absent`
+(incomplete); zero reports is missing support; a withheld, missing or oversized
+parent stays a gap. Source capability and protected admission are asserted by the
+reader, not established by this route; capture authenticity, publisher truth and
+physical occurrence remain unmeasured.
+
+At 06:25:04–06:25:05 UTC on 2026-10-15 an anonymous control over the two first-admission
+vehicles made two requests and stopped as `reported_work_reader_absent`: the held
+overload is not deployed, so nothing agrees yet. Against a local PostgreSQL
+fixture the assay accepted all four real reader rows and matched each to its
+parent's sentence; against the earlier capture-grain reader state it flagged the
+repeated listing sentence.
+
 ## How to close the next repair
 
 Start from a fresh isolated worktree. Select one useful source-to-consumer case and its relevant
