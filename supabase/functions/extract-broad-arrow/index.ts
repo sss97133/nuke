@@ -39,6 +39,10 @@ import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
+import { archiveFetch } from '../_shared/archiveFetch.ts';
+import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
+import { recordRevision } from '../_shared/revision.ts';
+import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
 
 // ============================================================================
 // TYPES
@@ -83,6 +87,8 @@ interface BroadArrowExtracted {
   // Meta
   vehicle_id?: string;
   scrape_ms: number;
+  /** Calendar keys merged into the episode's metadata (the roster action). */
+  extra_metadata?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -774,10 +780,25 @@ async function saveToDatabase(
     },
   };
 
+  let identityRow: { year: number | null; make: string | null; model: string | null; vin: string | null; discovery_url: string | null } | null = null;
+  if (vehicleId) {
+    // A lot may update the vehicle it is (same listing key); on any other vehicle a different car is refused before anything is
+    // written (revision item identity_match / relink) and the identity fields stay fill-only.
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url').eq('id', vehicleId).maybeSingle();
+    if (idRow && normalizeListingUrlKey(idRow.discovery_url) !== listingUrlKey) {
+      const conflict = identityConflict(idRow, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin });
+      if (conflict) {
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'bad_data', next_action: 'relink', raised_by: 'extract-broad-arrow', vehicle_id: vehicleId, detail: { reason: 'different_car', detail: conflict } });
+        throw new Error(`identity refused: different_car (${conflict})`);
+      }
+      identityRow = idRow;
+    }
+  }
+
   if (vehicleId) {
     // Update existing: only overwrite non-null fields, preserve existing data
     const updates: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(vehicleData)) {
+    for (const [key, val] of Object.entries(identityRow ? fillOnlyIdentity(vehicleData, identityRow) : vehicleData)) {
       if (val !== null && val !== undefined) {
         updates[key] = val;
       }
@@ -832,6 +853,13 @@ async function saveToDatabase(
     }).catch((e: any) => console.warn(`[BROAD-ARROW] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
+  // roster_first_seen_at is the first read of the lot on the house's roster: keep the earlier one.
+  if (extracted.extra_metadata?.roster_first_seen_at && listingUrlKey) {
+    const { data: prior } = await supabase.from('vehicle_events').select('metadata').eq('source_platform', 'broad_arrow').eq('source_listing_id', listingUrlKey).limit(1);
+    const first = prior?.[0]?.metadata?.roster_first_seen_at;
+    if (first) extracted.extra_metadata = { ...extracted.extra_metadata, roster_first_seen_at: first };
+  }
+
   // Upsert vehicle_events record
   const eventWrite = await writeVehicleEventByKey(supabase, {
       vehicle_id: vehicleId,
@@ -840,7 +868,7 @@ async function saveToDatabase(
       source_url: extracted.url,
       source_listing_id: listingUrlKey || extracted.lot_number,
       event_status: extracted.auction_status === 'sold' ? 'sold' :
-                      extracted.auction_status === 'upcoming' ? 'active' :
+                      extracted.auction_status === 'upcoming' ? (extracted.extra_metadata ? 'upcoming' : 'active') :
                       extracted.auction_status === 'not_sold' ? 'unsold' : 'ended',
       ended_at: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
       final_price: extracted.sale_price,
@@ -853,6 +881,7 @@ async function saveToDatabase(
         estimate_low: extracted.estimate_low,
         estimate_high: extracted.estimate_high,
         chassis_number: extracted.chassis_number,
+        ...(extracted.extra_metadata ?? {}),
       },
     });
 
@@ -864,14 +893,11 @@ async function saveToDatabase(
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && vehicleId) {
     // Delete existing broad_arrow images for this vehicle to avoid duplicates
-    const { error: deleteError } = await supabase
+    softWrite('vehicle_images replace', await supabase
       .from('vehicle_images')
       .delete()
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'broad_arrow');
-    if (deleteError) {
-      console.error(`[broad-arrow] Image delete error: ${deleteError.message}`);
-    }
+      .eq('source', 'broad_arrow'));
 
     const imageRecords = extracted.image_urls.slice(0, 80).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -1169,6 +1195,92 @@ Deno.serve(async (req) => {
       }
 
       return okJson({ success: true, ...results });
+    }
+
+    // --- Roster: upcoming sales for the auction calendar (0 credits: plain fetches of the site's own public pages) ---
+    // /vehicles (all pages, 2 s apart) gives the lot cards; /events/event/<sale> the run day and place. Up to 40 lots not yet landed as
+    // upcoming are landed per run through saveToDatabase (event_status upcoming, ended_at the run day, calendar metadata), and a
+    // source_census row (house_roster_facet) states the lots listed per sale. A 403/429 or a page without cards ends the run.
+    if (action === 'roster') {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const observedAt = new Date().toISOString();
+      const cards: RosterCard[] = [];
+      const seenUrls = new Set<string>();
+      let stoppedBy: string | null = null;
+      for (let pg = 1; pg <= 8; pg++) {
+        if (pg > 1) await sleep(2000);
+        const r = await archiveFetch(`https://www.broadarrowauctions.com/vehicles${pg > 1 ? `?page=${pg}` : ''}`, {
+          platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', page: pg },
+        });
+        if (r.statusCode === 403 || r.statusCode === 429) { stoppedBy = `HTTP ${r.statusCode}`; break; }
+        if (!r.html) { stoppedBy = `no page ${pg} (${r.statusCode ?? r.error ?? 'unknown'})`; break; }
+        const got = parseListingCards(r.html).filter((c) => !seenUrls.has(c.url));
+        if (got.length === 0) break;
+        for (const c of got) { seenUrls.add(c.url); cards.push(c); }
+      }
+      const bySale = new Map<string, RosterCard[]>();
+      for (const c of cards) bySale.set(c.code, [...(bySale.get(c.code) ?? []), c]);
+      const salesMeta: Record<string, { name: string; starts_on: string | null; ends_on: string | null }> = {};
+      const events = new Map<string, ReturnType<typeof parseEventPage>>();
+      for (const [code, lots] of bySale) {
+        const name = lots[0].sale_name ?? code;
+        await sleep(2000);
+        const ev = await archiveFetch(`https://www.broadarrowauctions.com/events/event/${encodeURIComponent(name.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}`, {
+          platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', sale: code },
+        });
+        const parsed = ev.html ? parseEventPage(ev.html, name) : { starts_on: null, ends_on: null, days: [], location: null };
+        events.set(code, parsed);
+        salesMeta[`broad-arrow-${code}`] = { name, starts_on: parsed.starts_on, ends_on: parsed.ends_on };
+      }
+      const landedUrls = new Set<string>();
+      const keyOf = (u: string) => normalizeListingUrlKey(u) ?? u;
+      for (let i = 0; i < cards.length; i += 100) {
+        const keys = cards.slice(i, i + 100).map((c) => keyOf(c.url));
+        const { data: have } = await supabase.from('vehicle_events').select('source_listing_id').eq('source_platform', 'broad_arrow').eq('event_status', 'upcoming').in('source_listing_id', keys);
+        for (const h of have ?? []) landedUrls.add(String(h.source_listing_id));
+      }
+      const todo = cards.filter((c) => !landedUrls.has(keyOf(c.url)) && events.get(c.code)?.starts_on).slice(0, 40);
+      const out = { landed: 0, created: 0, failed: 0, errors: [] as string[] };
+      for (const c of todo) {
+        const e = events.get(c.code)!;
+        const extracted: BroadArrowExtracted = {
+          url: c.url, title: [c.year, c.make, c.model].filter(Boolean).join(' ') || null, year: c.year, make: c.make, model: c.model, vin: null, chassis_number: null,
+          estimate_low: c.estimate_low, estimate_high: c.estimate_high, sale_price: null, sold_price_text: null,
+          lot_number: c.lot_number, auction_name: c.sale_name, auction_date: e.starts_on, auction_status: 'upcoming',
+          mileage: null, engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
+          description: null, image_urls: c.image_urls, scrape_ms: 0,
+          extra_metadata: {
+            sale_key: `broad-arrow-${c.code}`, auction_name: c.sale_name, auction_session_days: e.days, sale_starts_on: e.starts_on, sale_ends_on: e.ends_on,
+            sale_location: e.location, currency: c.currency, roster_first_seen_at: observedAt,
+          },
+        };
+        try {
+          const r = await saveToDatabase(supabase, extracted);
+          out.landed++;
+          if (r.is_new) out.created++;
+        } catch (err) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${c.url}: ${err instanceof Error ? err.message : String(err)}`.slice(0, 200));
+        }
+      }
+      const census: Record<string, number> = {};
+      for (const [code, lots] of bySale) census[`broad-arrow-${code}`] = lots.length;
+      let censusWritten = false;
+      if (Object.keys(census).length && !stoppedBy) {
+        const { data: src } = await supabase.from('observation_sources').select('id').eq('slug', 'broad-arrow').maybeSingle();
+        if (src?.id) {
+          const total = Object.values(census).reduce((a, b) => a + b, 0);
+          const cen = await supabase.from('source_census').insert({
+            source_id: src.id, universe_total: total, universe_active: total, census_method: 'house_roster_facet', census_confidence: 0.9,
+            census_at: observedAt, census_url: 'https://www.broadarrowauctions.com/vehicles',
+            census_notes: 'Broad Arrow /vehicles listing (all pages): vehicle cards per sale; by_category keys are the events\' metadata.sale_key (broad-arrow-<sale code>).',
+            by_category: census, raw_response: { sales: salesMeta },
+          });
+          censusWritten = !cen.error;
+          softWrite('source_census insert', cen);
+        }
+      }
+      return okJson({ success: !stoppedBy, action: 'roster', stopped_by: stoppedBy, cards: cards.length, sales: salesMeta, already_upcoming: landedUrls.size, ...out, census_written: censusWritten });
     }
 
     // --- Stats ---
