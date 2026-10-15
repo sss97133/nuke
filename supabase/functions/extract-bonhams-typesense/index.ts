@@ -363,6 +363,77 @@ async function searchTypesense(
   return await res.json() as TypesenseResponse;
 }
 
+
+// ─── One search-index lot document as an ExtractionResult for extract-bonhams (land_lots) ──────────────────────────────
+
+interface LandContext {
+  observedAt: string;
+  pageNo?: number;
+  pass?: number;
+  SORT?: string;
+  sortTag?: string;
+  /** The sale (auctions collection) when the lot is read for the calendar: its title, days and place. */
+  sale?: { title: string; starts_on: string | null; ends_on: string | null; days: string[]; location: string | null };
+}
+
+function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unknown> {
+  const { observedAt, pageNo, pass, SORT, sortTag, sale } = ctx;
+  const m = mapDocument(doc);
+  const raw = m.raw_data as Record<string, unknown>;
+  const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
+  const ended = !!doc.flags?.isAuctionEnded;
+  const runDay = String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || "").slice(0, 10);
+  return {
+    url: m.listing_url,
+    title: m.listing_title,
+    year: m.listing_year,
+    make: m.listing_make,
+    model: m.listing_model,
+    vin: null,
+    chassis_number: (raw.chassis as string | null) ?? null,
+    mileage: null, engine: null, transmission: null, exterior_color: null, interior_color: null, body_style: null,
+    description: (raw.description as string | null) ?? null,
+    sale_price: hammer,
+    price_currency: doc.currency?.iso_code ?? null,
+    auction_status: hammer ? "sold" : (ended ? "unsold" : "upcoming"),
+    lot_number: doc.lotNo?.full || doc.lotId || null,
+    sale_id: doc.auctionId || null,
+    sale_name: sale?.title ?? null,
+    sale_date: doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || null,
+    sale_location: sale?.location ?? (doc.region?.name || doc.country?.name || null),
+    estimate_low: doc.price?.estimateLow > 0 ? doc.price.estimateLow : null,
+    estimate_high: doc.price?.estimateHigh > 0 ? doc.price.estimateHigh : null,
+    estimate_currency: doc.currency?.iso_code ?? null,
+    image_urls: doc.image?.url ? [doc.image.url] : [],
+    fetch_source: "bonhams-typesense",
+    cost_cents: 0,
+    event_key: doc.id,
+    ...(pageNo ? { ts_page: pageNo } : {}),
+    extra_metadata: {
+      ...(pageNo ? { ts_landed_at: observedAt, ts_sort: sortTag ?? "desc", ts_pass: pass ?? 0 } : {}),
+      sale_key: `bonhams-${doc.auctionId}`,
+      auction_name: sale?.title ?? null,
+      auction_session_days: sale?.days?.length ? sale.days : (runDay ? [runDay] : []),
+      sale_starts_on: sale?.starts_on ?? (doc as unknown as { biddableFrom?: { datetime?: string } }).biddableFrom?.datetime?.slice(0, 10) ?? null,
+      sale_ends_on: sale?.ends_on ?? doc.auctionEndDate?.datetime?.slice(0, 10) ?? null,
+      sale_location: sale?.location ?? (doc.region?.name || doc.country?.name || null),
+      country_code: doc.country?.code ?? null,
+      lot_unique_id: doc.lotUniqueId ?? null,
+      has_reserve: !doc.flags?.isWithoutReserve,
+      currency: doc.currency?.iso_code ?? null,
+      roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
+      engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
+      registration: (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null,
+      without_reserve: !!doc.flags?.isWithoutReserve,
+      bonhams_status: doc.status ?? null,
+    },
+    hammer_price: hammer,
+    hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
+    // The source document is retained on the observation (raw_data); a walk page is stamped for the cursor.
+    raw_document: { ...doc, styledDescription: undefined, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo ?? null, sort: SORT ?? null } },
+  };
+}
+
 // ─── HTTP handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -495,61 +566,8 @@ Deno.serve(async (req) => {
       }
 
       const observedAt = new Date().toISOString();
-      const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) => {
-        const doc = h.document;
-        const m = mapDocument(doc);
-        const raw = m.raw_data as Record<string, unknown>;
-        const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
-        const ended = !!doc.flags?.isAuctionEnded;
-        return {
-          url: m.listing_url,
-          title: m.listing_title,
-          year: m.listing_year,
-          make: m.listing_make,
-          model: m.listing_model,
-          vin: null,
-          chassis_number: (raw.chassis as string | null) ?? null,
-          mileage: null, engine: null, transmission: null, exterior_color: null, interior_color: null, body_style: null,
-          description: (raw.description as string | null) ?? null,
-          sale_price: hammer,
-          price_currency: doc.currency?.iso_code ?? null,
-          auction_status: hammer ? "sold" : (ended ? "unsold" : "upcoming"),
-          lot_number: doc.lotNo?.full || doc.lotId || null,
-          sale_id: doc.auctionId || null,
-          sale_name: null,
-          sale_date: doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || null,
-          sale_location: doc.region?.name || doc.country?.name || null,
-          estimate_low: doc.price?.estimateLow > 0 ? doc.price.estimateLow : null,
-          estimate_high: doc.price?.estimateHigh > 0 ? doc.price.estimateHigh : null,
-          estimate_currency: doc.currency?.iso_code ?? null,
-          image_urls: doc.image?.url ? [doc.image.url] : [],
-          fetch_source: "bonhams-typesense",
-          cost_cents: 0,
-          event_key: doc.id,
-          ts_page: pageNo,
-          extra_metadata: {
-            ts_landed_at: observedAt,
-            ts_sort: "desc",
-            ts_pass: pass,
-            sale_key: `bonhams-${doc.auctionId}`,
-            auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
-              ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],
-            sale_starts_on: (doc as unknown as { biddableFrom?: { datetime?: string } }).biddableFrom?.datetime?.slice(0, 10) ?? null,
-            sale_ends_on: doc.auctionEndDate?.datetime?.slice(0, 10) ?? null,
-            sale_location: doc.region?.name || doc.country?.name || null,
-            country_code: doc.country?.code ?? null,
-            lot_unique_id: doc.lotUniqueId ?? null,
-            engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
-            registration: (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null,
-            without_reserve: !!doc.flags?.isWithoutReserve,
-            bonhams_status: doc.status ?? null,
-          },
-          hammer_price: hammer,
-          hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
-          // The source document is retained on the observation (raw_data); the page is stamped for the cursor.
-          raw_document: { ...doc, styledDescription: undefined, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo, sort: SORT } },
-        };
-      });
+      const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) =>
+        lotToExtraction(h.document, { observedAt, pageNo, pass, SORT, sortTag: "desc" }));
 
       // Two calls of 50: one 100-lot call hit WORKER_RESOURCE_LIMIT (2026-10-15 01:41Z).
       const landed: Record<string, unknown>[] = [];
@@ -569,6 +587,97 @@ Deno.serve(async (req) => {
         success: landOk, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
         next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
       });
+    }
+
+    // ─── MODE: upcoming ─────────────────────────────────────────────────
+    // The calendar grain: the lots of Bonhams' car sales that have not ended, read from the search index (0 credits, no lot page).
+    // One request to the auctions collection, then one request per page of 250 lots per sale, 2 s apart. New or not-yet-upcoming
+    // lots are landed (up to 100 a run, two land_lots calls of 50) with event_status upcoming, ended_at the run day and the keys the
+    // calendar contract names; a source_census row (house_roster_facet) states the lots the house lists per sale.
+    if (mode === "upcoming") {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const todayUtc = new Date().toISOString().slice(0, 10);
+      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
+      const get = async (collection: string, params: Record<string, string>) => {
+        const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${collection}/documents/search?${new URLSearchParams(params)}`, { headers });
+        if (res.status === 403 || res.status === 429) throw Object.assign(new Error(`backoff ${res.status}`), { backoff: res.status });
+        if (!res.ok) throw new Error(`Typesense ${collection} HTTP ${res.status}`);
+        return await res.json();
+      };
+      let sales: Array<Record<string, any>> = [];
+      try {
+        const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+        sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= todayUtc);
+      } catch (e: any) {
+        if (e.backoff) return okJson({ success: false, backoff: true, upstream_status: e.backoff });
+        throw e;
+      }
+      const observedAt = new Date().toISOString();
+      const rosterBySale: Record<string, number> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string | null; ends_on: string | null }> = {};
+      const docs: Array<{ doc: BonhamsDoc; sale: LandContext["sale"] }> = [];
+      for (const sale of sales) {
+        await sleep(2000);
+        const saleKey = `bonhams-${sale.id}`;
+        const endsOn = String(sale.dates?.end?.datetime ?? "").slice(0, 10) || null;
+        const startsOn = (sale.dates?.start?.[0]?.date?.datetime ?? sale.dates?.start?.datetime ?? sale.hammerTime?.datetime ?? "")?.slice(0, 10) || endsOn;
+        const days: string[] = [];
+        for (let t = Date.parse(`${startsOn}T00:00:00Z`); startsOn && endsOn && t <= Date.parse(`${endsOn}T00:00:00Z`) && days.length < 14; t += 86400000) days.push(new Date(t).toISOString().slice(0, 10));
+        const ctx = { title: String(sale.auctionTitle ?? sale.auctionHeading ?? saleKey), starts_on: startsOn, ends_on: endsOn, days, location: sale.country?.name ?? sale.region?.name ?? null };
+        salesMeta[saleKey] = { name: ctx.title, starts_on: startsOn, ends_on: endsOn };
+        let n = 0;
+        for (let pg = 1; pg <= 6; pg++) {
+          if (pg > 1) await sleep(2000);
+          let r: any;
+          try {
+            r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(pg), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+          } catch (e: any) {
+            if (e.backoff) return okJson({ success: false, backoff: true, upstream_status: e.backoff });
+            throw e;
+          }
+          for (const h of r.hits ?? []) { docs.push({ doc: h.document, sale: ctx }); n++; }
+          if ((r.hits ?? []).length < 250) break;
+        }
+        rosterBySale[saleKey] = n;
+      }
+
+      // Lots not yet landed as upcoming (new, or landed earlier by the walk as something else).
+      const landed = new Set<string>();
+      for (let i = 0; i < docs.length; i += 100) {
+        const ids = docs.slice(i, i + 100).map((d) => d.doc.id);
+        const { data: have } = await supabase.from("vehicle_events").select("source_listing_id").eq("source_platform", "bonhams").eq("event_status", "upcoming").in("source_listing_id", ids);
+        for (const r of have ?? []) landed.add(String(r.source_listing_id));
+      }
+      const todo = docs.filter((d) => !landed.has(d.doc.id) && d.doc.title && d.doc.title.length >= 3).slice(0, 100);
+      const lots = todo.map((d) => lotToExtraction(d.doc, { observedAt, sale: d.sale }));
+      const reports: Record<string, unknown>[] = [];
+      for (let i = 0; i < lots.length; i += 50) {
+        const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ action: "land_lots", lots: lots.slice(i, i + 50), observed_at: observedAt }),
+        });
+        reports.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
+      }
+
+      // The roster the house lists per sale: lots found in the index for the car department, per sale_key.
+      let censusWritten = false;
+      if (Object.keys(rosterBySale).length) {
+        const { data: src } = await supabase.from("observation_sources").select("id").eq("slug", "bonhams").maybeSingle();
+        if (src?.id) {
+          const total = Object.values(rosterBySale).reduce((a, b) => a + b, 0);
+          const cen = await supabase.from("source_census").insert({
+            source_id: src.id, universe_total: total, universe_active: total, census_method: "house_roster_facet", census_confidence: 0.9,
+            census_at: observedAt, census_url: `${TYPESENSE_HOST}/search-proxy/collections/lots/documents/search`,
+            census_notes: "Bonhams search index: car-department lots (department.code MOT-CAR) of sales not yet ended, per sale; by_category keys are the events' metadata.sale_key (bonhams-<auctionId>).",
+            by_category: rosterBySale, raw_response: { sales: salesMeta },
+          });
+          censusWritten = !cen.error;
+          if (cen.error) console.warn(`[bonhams-typesense] census not written: ${cen.error.message}`);
+        }
+      }
+      return okJson({ success: true, mode: "upcoming", sales: Object.keys(rosterBySale).length, roster: rosterBySale, read: docs.length, already_upcoming: landed.size, landing: lots.length, lander: reports, census_written: censusWritten });
     }
 
     // ─── MODE: search ───────────────────────────────────────────────────
