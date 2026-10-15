@@ -64,6 +64,11 @@ Standing rules the code carries:
   camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
   `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
   stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **The phone suggests; the owner files.** Nothing in the app writes `vehicle_images.vehicle_id`. A VIN read and a
+  session inheritance are suggestions (`auto_suggested_vehicle_id`, confidence, reasons); the owner files a session
+  in the confirm sheet through `attribute_image_session` → `attribute_testimony` (audited). The VIN matcher
+  (`VisionEngine.matchSerial`, `UnitTests/SerialMatchTests.swift`) reads every era's serial (17-character VINs and the
+  8–16-character chassis numbers before 1981) against vehicles the account holds by `user_id` or `owner_id`.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
