@@ -933,9 +933,9 @@ async function saveVehicle(
 
   // Identity guard: the lot must be the same car as the vehicle it resolved to (a VIN or URL match is not enough: the
   // docket car overwrote a BaT sport truck's year, make, model, VIN, URL and photos, 2026-10-15). Fill-only below.
-  let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+  let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null; sale_price?: number | null } | null = null;
   if (existingId) {
-    const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", existingId).maybeSingle();
+    const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,sale_price").eq("id", existingId).maybeSingle();
     existingIdentity = (idRow as typeof existingIdentity) ?? null;
     const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
     if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
@@ -1021,7 +1021,9 @@ async function saveVehicle(
     // Strip identity/source fields that should only be set on insert
     const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateAll } = cleanData;
     // Identity fields are fill-only on a vehicle that already has them.
+    // sale_price is fill-only too: a docket price must not replace the price a vehicle already carries.
     const updateData = existingIdentity ? fillOnlyIdentity(updateAll, existingIdentity) : updateAll;
+    if (existingIdentity?.sale_price != null) delete (updateData as Record<string, unknown>).sale_price;
 
     const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     if (updateErr) {
