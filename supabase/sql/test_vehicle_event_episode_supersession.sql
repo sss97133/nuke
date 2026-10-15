@@ -693,4 +693,48 @@ SELECT pg_temp.ok('source_url: a second call is already, not a second write',
      '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
      'Lowercased id restored from the capture') ->> 'status') = 'already');
 
+
+-- ====================================================================================================================
+-- source_platform: 20261015075000 adds the field. The value must be an observation_sources slug whose base_url host is
+-- the host of the episode's own source_url.
+\ir ../migrations/20261015075000_supersede_vehicle_event_episode_source_platform.sql
+CREATE TABLE public.observation_sources (slug text PRIMARY KEY, base_url text);
+INSERT INTO public.observation_sources(slug, base_url) VALUES
+ ('bat', 'https://bringatrailer.com'), ('hemmings', 'https://www.hemmings.com'), ('nohost', NULL), ('carsandbids', 'https://carsandbids.com');
+INSERT INTO public.vehicles(id, year, make, model) VALUES (pg_temp.u('a001', 14), 1987, 'Chevrolet', 'Suburban');
+INSERT INTO public.vehicle_events(id, vehicle_id, source_platform, source_url, source_listing_id, event_type, event_status,
+  final_price, metadata, extracted_at, extraction_method, created_at, updated_at) VALUES
+ (pg_temp.u('e001', 13), pg_temp.u('a001', 14), 'hemmings', 'https://bringatrailer.com/listing/1987-chevrolet-suburban-3/', NULL,
+  'auction', 'sold', 9000, '{}', '2025-12-02 10:00:00+00', 'orphan-backfill-v1',
+  '2025-12-02 10:00:00+00', '2025-12-02 10:00:00+00');
+SELECT pg_temp.refuses('source_platform: no basis',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000d'::uuid, '{"source_platform": {"value": "bat", "expected": "hemmings"}}',
+     '{"type": "vehicle_events", "ref": "vehicle_events/00000000-0000-0000-e001-00000000000d"}', 'Platform label contradicted by the URL host')$c$,
+  'must name its basis');
+SELECT pg_temp.refuses('source_platform: a source whose host is not the URL host',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000d'::uuid,
+     '{"source_platform": {"value": "carsandbids", "expected": "hemmings"}}', '{"type": "vehicle_events", "ref": "vehicle_events/00000000-0000-0000-e001-00000000000d", "basis": "url_host"}', 'Platform label contradicted by the URL host')$c$,
+  'is not that source');
+SELECT pg_temp.refuses('source_platform: a slug that is not a source',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000d'::uuid,
+     '{"source_platform": {"value": "nohost", "expected": "hemmings"}}', '{"type": "vehicle_events", "ref": "vehicle_events/00000000-0000-0000-e001-00000000000d", "basis": "url_host"}', 'Platform label contradicted by the URL host')$c$,
+  'no observation_sources row');
+SELECT pg_temp.ok('source_platform: a stale expected platform writes nothing',
+  (public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000d'::uuid,
+     '{"source_platform": {"value": "bat", "expected": "craigslist"}}', '{"type": "vehicle_events", "ref": "vehicle_events/00000000-0000-0000-e001-00000000000d", "basis": "url_host"}', 'Platform label contradicted by the URL host')
+     ->> 'status') = 'stale');
+SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000d'::uuid, '{"source_platform": {"value": "bat", "expected": "hemmings"}}', '{"type": "vehicle_events", "ref": "vehicle_events/00000000-0000-0000-e001-00000000000d", "basis": "url_host"}',
+     'Platform label contradicted by the URL host') AS res2 \gset
+SELECT pg_temp.ok('source_platform: superseded, prior platform kept whole, new row locked',
+  :'res2'::jsonb ->> 'status' = 'superseded'
+  AND (SELECT row_data ->> 'source_platform' FROM public.superseded_rows WHERE row_id = pg_temp.u('e001', 13)) = 'hemmings'
+  AND (SELECT count(*) FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 14) AND source_platform = 'bat'
+        AND source_url = 'https://bringatrailer.com/listing/1987-chevrolet-suburban-3/' AND created_at = '2025-12-02 10:00:00+00'
+        AND metadata -> 'clock_locked_by_supersession' -> 'fields' = '["source_platform"]'::jsonb
+        AND metadata -> 'episode_supersessions' -> 0 -> 'citation_match' -> 'url_host' ->> 'host' = 'bringatrailer.com') = 1);
+UPDATE public.vehicle_events SET source_platform = 'hemmings' WHERE vehicle_id = pg_temp.u('a001', 14);
+SELECT pg_temp.ok('source_platform: writing the old label back is blocked and recorded',
+  (SELECT source_platform FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 14)) = 'bat'
+  AND (SELECT metadata -> 'clock_lock_hits' -> 0 -> 'fields' FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 14)) = '["source_platform"]'::jsonb);
+
 SELECT 'vehicle-event episode supersession contract: all passed' AS result;
