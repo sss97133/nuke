@@ -1,9 +1,11 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_bid_tape -f this-file.sql
--- Contract for 20261017062000_live_bid_tape.sql. Synthetic rows only; never production.
+-- Contract for 20261017062000_live_bid_tape.sql and 20261017063000_live_bid_tape_window_index.sql. Synthetic rows only;
+-- never production.
 -- Requires: an anonymous reader gets each bid of the window once (the same BaT comment over two transports is one bid),
 -- newest first, with its amount, time and scheduled end; bids outside the window, backfilled history, non-stream rows,
--- superseded rows, other kinds and bids on private vehicles are left out; no bidder name leaves the read; the window
--- is clamped to 1-30 minutes; the read runs as its caller.
+-- superseded rows, other kinds, garage owner corrections, rows the public test refuses and bids on private vehicles are
+-- left out; no bidder name leaves the read; the window is clamped to 1-30 minutes; the read is SECURITY DEFINER with
+-- the anonymous policy's public path applied in it, and anon may execute it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -30,7 +32,13 @@ CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean NOT NULL DE
 CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id), kind public.observation_kind,
   observed_at timestamptz, ingested_at timestamptz DEFAULT now(), source_identifier text, structured_data jsonb,
-  is_superseded boolean DEFAULT false);
+  is_superseded boolean DEFAULT false, extraction_method text);
+-- observation_is_public's production shape: public kinds, and no private money or person keys in the payload.
+CREATE FUNCTION public.observation_is_public(p_kind public.observation_kind, p_data jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT p_kind IN ('listing', 'sale_result', 'comment', 'bid')
+     AND coalesce(p_data::text, '') !~* '"(invoice_number|payment|client_name|customer_name)"'
+$$;
 -- The production read policy's shape for an anonymous reader: rows on public vehicles only.
 ALTER TABLE public.vehicle_observations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY anon_public_read ON public.vehicle_observations FOR SELECT TO anon
@@ -70,10 +78,18 @@ INSERT INTO public.vehicle_observations (vehicle_id, kind, observed_at, ingested
    'public-live:9:comment-added:comment:107:a', pg_temp.frame('107', 51500, NULL, 'bidder_seven'), true),
   -- H: a comment, not a bid
   ('00000000-0000-4000-c000-000000000001', 'comment', now() - interval '1 minute', now(),
-   'public-live:9:comment-added:comment:108:a', pg_temp.frame('108', 1, NULL, 'bidder_eight'), false);
+   'public-live:9:comment-added:comment:108:a', pg_temp.frame('108', 1, NULL, 'bidder_eight'), false),
+  -- J: a row the public test refuses (a private key in its payload)
+  ('00000000-0000-4000-c000-000000000001', 'bid', now() - interval '1 minute', now(),
+   'public-live:9:comment-added:comment:110:a', pg_temp.frame('110', 53000, NULL, 'bidder_ten') || '{"payment": {"x": 1}}'::jsonb, false);
+INSERT INTO public.vehicle_observations (vehicle_id, kind, observed_at, ingested_at, source_identifier, structured_data, extraction_method) VALUES
+  -- I: a garage owner correction
+  ('00000000-0000-4000-c000-000000000001', 'bid', now() - interval '1 minute', now(),
+   'public-live:9:comment-added:comment:109:a', pg_temp.frame('109', 52500, NULL, 'bidder_nine'), 'garage_owner_correction_v1');
 
 \ir ../migrations/20261017062000_live_bid_tape.sql
-\ir ../migrations/20261017062000_live_bid_tape.sql
+\ir ../migrations/20261017063000_live_bid_tape_window_index.sql
+\ir ../migrations/20261017063000_live_bid_tape_window_index.sql
 
 SET ROLE anon;
 CREATE TEMP TABLE r5 AS SELECT public.live_bid_tape() AS j;
@@ -88,12 +104,12 @@ SELECT pg_temp.ok('each bid carries its amount, its time and the scheduled end a
   (SELECT (j->'bids'->0->>'amount')::numeric FROM r5) = 52000
   AND (SELECT (j->'bids'->0->>'end_at') IS NOT NULL AND (j->'bids'->1->>'end_at') IS NULL FROM r5)
   AND (SELECT (j->'bids'->0->>'vehicle_id')::uuid FROM r5) = '00000000-0000-4000-c000-000000000001');
-SELECT pg_temp.ok('a wider window reaches the older bid; backfill, other sources, superseded rows, comments and private cars stay out',
+SELECT pg_temp.ok('a wider window reaches the older bid; backfill, other sources, superseded rows, comments, owner corrections, refused rows and private cars stay out',
   (SELECT jsonb_path_query_array(j, '$.bids[*].id') FROM r30) = '["101", "102", "103"]'::jsonb);
 SELECT pg_temp.ok('the window is clamped to at least a minute',
   (SELECT (j->>'minutes')::int FROM r1) = 1 AND (SELECT jsonb_path_query_array(j, '$.bids[*].id') FROM r1) = '["101"]'::jsonb);
 SELECT pg_temp.ok('no bidder name leaves the read',
   NOT EXISTS (SELECT 1 FROM r30 WHERE j::text ~ 'bidder_|authorName|placed by'));
-SELECT pg_temp.ok('the read runs as its caller and is executable by anon',
-  (SELECT NOT prosecdef FROM pg_proc WHERE oid = 'public.live_bid_tape(integer)'::regprocedure)
+SELECT pg_temp.ok('the read is SECURITY DEFINER with a fixed search_path, and anon may execute it',
+  (SELECT prosecdef AND proconfig @> ARRAY['search_path=public, pg_temp'] FROM pg_proc WHERE oid = 'public.live_bid_tape(integer)'::regprocedure)
   AND has_function_privilege('anon', 'public.live_bid_tape(integer)', 'EXECUTE'));
