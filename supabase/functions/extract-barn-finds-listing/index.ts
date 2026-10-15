@@ -1,18 +1,16 @@
 /**
  * Barn Finds listing extractor
  *
- * WordPress site – direct fetch first (no Firecrawl). Fallback to Firecrawl if blocked.
- * Parses: title, Asking/High Bid, Chassis # (VIN), Mileage, Location, Seller, description.
+ * WordPress site, direct fetch only (no Firecrawl). A post is an editorial write-up of a car listed elsewhere; parseArticle.ts
+ * reads the headline identity, the article text, the quoted price and place, photos and comments.
  *
  * POST { url: "https://barnfinds.com/bf-exclusive-1990-ford-f-150-lariat-4x4/" }
- * POST { url, use_firecrawl: true }  – force Firecrawl
  * POST { action: "batch", limit?: number }  – land unlanded barnfinds source_targets under a polite throttle
  *   (>= 2 s between fetches, stops on 403/429, time-boxed); run by the barnfinds-intake-batch pg_cron job.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
@@ -21,71 +19,9 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { parseBarnFindsPost } from "./parseArticle.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
-
-function parseFromMarkdown(md: string, url: string): Record<string, unknown> {
-  const data: Record<string, unknown> = { url, title: null, year: null, make: null, model: null, vin: null, mileage: null, sale_price: null, asking_price: null, high_bid: null, location: null, seller: null, description: null };
-  const lines = md.split("\n").map((l) => l.trim()).filter(Boolean);
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.startsWith("# ")) {
-      data.title = line.replace(/^#\s+/, "").trim();
-      // Match year-make-model from title, handling prefixes like "Original Paint Survivor: 1955 Jeep CJ5"
-      const titleMatch = String(data.title ?? "").match(/(?:^|:\s*)(\d{4})\s+(.+?)(?:\s+[×x]\s*\d+)?$/i);
-      if (titleMatch) {
-        data.year = parseInt(titleMatch[1], 10);
-        const rest = titleMatch[2];
-        const parts = rest.split(/\s+/);
-        if (parts.length >= 1) data.make = parts[0];
-        if (parts.length >= 2) data.model = parts.slice(1).join(" ");
-      }
-      continue;
-    }
-    if (/^Asking:\s*\$?([\d,]+)/i.test(line)) {
-      const m = line.match(/^Asking:\s*\$?([\d,]+)/i);
-      if (m) data.asking_price = parseInt(m[1].replace(/,/g, ""), 10);
-      continue;
-    }
-    if (/^High Bid:\s*\$?([\d,]+)/i.test(line)) {
-      const m = line.match(/^High Bid:\s*\$?([\d,]+)/i);
-      if (m) data.high_bid = parseInt(m[1].replace(/,/g, ""), 10);
-      continue;
-    }
-    if (/Chassis\s*#?:\s*([A-HJ-NPR-Z0-9]{17})/i.test(line)) {
-      const m = line.match(/Chassis\s*#?:\s*([A-HJ-NPR-Z0-9]{17})/i);
-      if (m) data.vin = m[1].toUpperCase();
-      continue;
-    }
-    if (/Mileage:\s*([\d,]+)/i.test(line)) {
-      const m = line.match(/Mileage:\s*([\d,]+)/i);
-      if (m) data.mileage = parseInt(m[1].replace(/,/g, ""), 10);
-      continue;
-    }
-    if (/^Location:\s*\[?([^\]]+)\]?/i.test(line)) {
-      const m = line.match(/^Location:\s*\[?([^\]]+)\]?/i);
-      if (m) data.location = m[1].trim();
-      continue;
-    }
-    if (/^Seller:\s*(.+)/i.test(line)) {
-      const m = line.match(/^Seller:\s*(.+)/i);
-      if (m) data.seller = m[1].trim();
-      continue;
-    }
-  }
-
-  const price = Number(data.sale_price) || Number(data.asking_price) || Number(data.high_bid) || null;
-  if (price) data.sale_price = price;
-  if (!data.vin && md) {
-    const vinMatch = md.match(/\b([A-HJ-NPR-Z0-9]{17})\b/g);
-    if (vinMatch && vinMatch.length >= 1) data.vin = vinMatch[0].toUpperCase();
-  }
-  const descStart = md.indexOf("If you've been looking");
-  if (descStart === -1) data.description = md.slice(0, 2000).trim();
-  else data.description = md.slice(descStart, descStart + 3000).trim();
-  return data;
-}
 
 type Supabase = any;
 type Outcome = { status: number; body: Record<string, unknown>; blocked?: boolean };
@@ -93,40 +29,6 @@ type Outcome = { status: number; body: Record<string, unknown>; blocked?: boolea
 const MIN_GAP_MS = 2000; // <= 1 request per 2 s to barnfinds.com
 const BATCH_BUDGET_MS = 110_000;
 const BATCH_MAX = 50;
-
-/** Remove tags until none remain, so a nested fragment cannot reassemble one. */
-function stripTags(input: string): string {
-  let out = input;
-  for (let prev = ""; prev !== out; ) {
-    prev = out;
-    out = out.replace(/<[^>]*>/g, " ");
-  }
-  return out;
-}
-
-function htmlToMarkdown(html: string): string {
-  // Extract h1 title separately (it's outside entry-content on Barn Finds)
-  const h1Match = html.match(/<h1[^>]*class="entry-title"[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const h1Title = h1Match ? stripTags(h1Match[1]).replace(/[<>]/g, "").trim() : "";
-  // Match entry-content first (Barn Finds WordPress structure), then fallback
-  const mainMatch = html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+?)<\/div>\s*(?:<div class="(?:author|post-tags|sharing)|<\/article)/i)
-    || html.match(/<main[^>]*>([\s\S]+?)<\/main>/i)
-    || html.match(/<article[^>]*>([\s\S]+?)<\/article>/i)
-    || html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+)/i);
-  const content = mainMatch ? mainMatch[1] : html;
-  // The output is parsed as text and never rendered; tags are stripped until none remain.
-  let strip = content;
-  for (let prev = ""; prev !== strip; ) {
-    prev = strip;
-    strip = strip.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
-  }
-  strip = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n");
-  strip = stripTags(strip);
-  let text = strip.replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-  // Prepend h1 as markdown heading if not already present
-  if (h1Title && !text.startsWith("# ")) text = `# ${h1Title}\n${text}`;
-  return text;
-}
 
 /** Keep the raw page (the testimony) before it is parsed. A duplicate hash (23505) means the same page is already kept. */
 async function archiveSnapshot(supabase: Supabase, url: string, html: string, status: number) {
@@ -151,36 +53,20 @@ async function archiveSnapshot(supabase: Supabase, url: string, html: string, st
   }
 }
 
-async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean): Promise<Outcome> {
-  let markdown: string | null = null;
-  if (!useFirecrawl) {
-    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15000) });
-    if (res.status === 403 || res.status === 429) {
-      return { status: 429, blocked: true, body: { success: false, error: `barnfinds.com answered ${res.status}` } };
-    }
-    if (res.ok) {
-      const html = await res.text();
-      await archiveSnapshot(supabase, url, html, res.status);
-      markdown = htmlToMarkdown(html);
-    }
+async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15000) });
+  if (res.status === 403 || res.status === 429) {
+    return { status: 429, blocked: true, body: { success: false, error: `barnfinds.com answered ${res.status}` } };
   }
+  if (res.status === 404 || res.status === 410) return { status: 422, body: { success: false, error: `page gone (${res.status})` } };
+  if (!res.ok) return { status: 502, body: { success: false, error: `barnfinds.com answered ${res.status}` } };
+  const html = await res.text();
+  await archiveSnapshot(supabase, url, html, res.status);
 
-  if (!markdown) {
-    const key = Deno.env.get("FIRECRAWL_API_KEY");
-    if (key) {
-      const result = await firecrawlScrape({ url, formats: ["markdown"], onlyMainContent: true }, { timeoutMs: 25000 });
-      markdown = result?.data?.markdown ?? null;
-    }
-  }
-  if (!markdown) return { status: 422, body: { success: false, error: "Could not fetch or parse page" } };
-
-  const parsed = parseFromMarkdown(markdown, url);
-  const year = parsed.year as number | null;
-  const make = (parsed.make as string) || null;
-  const model = (parsed.model as string) || null;
-  const vin = (parsed.vin as string) || null;
-  const title = (parsed.title as string) || null;
-  if (!year && !vin && !title) return { status: 422, body: { success: false, error: "No vehicle data extracted" } };
+  const post = parseBarnFindsPost(html);
+  const { year, make, model, vin, title } = post;
+  // A post with no year in its headline is an article about cars (round-ups, news), not one car.
+  if (!year || !make) return { status: 422, body: { success: false, error: "No single vehicle in the headline" } };
 
   const platform = "barnfinds";
   const slug = url.replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");
@@ -190,10 +76,10 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
 
   const listingUrlKey = normalizeListingUrlKey(url);
   const norm = normalizeVehicleFields({ make, model, year });
-  const vehicleRow = {
+  const vehicleRow: Record<string, unknown> = {
     discovery_url: url,
     discovery_source: platform,
-    year: norm.year ?? year ?? undefined,
+    year: norm.year ?? year,
     make: norm.make ?? make,
     model: norm.model ?? model,
     vin: vin || undefined,
@@ -203,6 +89,14 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
     is_public: true,
     status: "active",
   };
+  // The article is a description of the car, written by Barn Finds: set it on a new vehicle or one without a description, never over another description.
+  if (post.articleText) {
+    if (!vehicleId) vehicleRow.description = post.articleText;
+    else {
+      const { data: cur } = await supabase.from("vehicles").select("description").eq("id", vehicleId).maybeSingle();
+      if (cur && !cur.description) vehicleRow.description = post.articleText;
+    }
+  }
 
   // Quality gate: validate before writing to vehicles
   const gateResult = qualityGate(vehicleRow, { source: "barnfinds", sourceType: "marketplace" });
@@ -223,44 +117,109 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
     finalVehicleId = inserted.id;
   }
 
-  const obsFields: Record<string, any> = {};
-  if (year) obsFields.year = year;
-  if (make) obsFields.make = make;
-  if (model) obsFields.model = model;
+  // Testimony: the whole article is the observation's text; the identity fields are what the headline states.
+  // An asking price is not a sale: it goes on the event (current_price), never as sale_price.
+  const obsFields: Record<string, any> = { year, make, model };
   if (vin) obsFields.vin = vin;
-  // An asking price or high bid is not a sale: it goes on the event (current_price), never as sale_price.
   const observedAt = new Date().toISOString();
   const obs = await writeObservation(supabase, {
     vehicleId: finalVehicleId,
     source: { platform: "barnfinds", url, trustScore: 0.55 },
     fields: obsFields,
     observationKind: "listing",
-    extractionMethod: "markdown_parse",
+    extractionMethod: "html_parse",
     observedAt,
+    contentText: post.articleText,
+    rawData: {
+      title, asking_price: post.askingPrice, price_text: post.priceText, location: post.location, listing_platform: post.listingPlatform,
+      tipster: post.tipster, published_at: post.publishedAt, modified_at: post.modifiedAt, image_count: post.imageUrls.length, comment_count: post.comments.length,
+    },
   }).catch((e: any) => {
     console.warn(`[BARNFINDS] observationWriter error for ${finalVehicleId}: ${e?.message}`);
     return null;
   });
 
   // The listing key is partial-unique, so upsert/onConflict cannot reach it: write by key (_shared/vehicleEventWrite.ts).
-  const askingPrice = parsed.asking_price != null ? Number(parsed.asking_price) : null;
-  const highBid = parsed.high_bid != null ? Number(parsed.high_bid) : null;
   const event = await writeVehicleEventByKey(supabase, {
     vehicle_id: finalVehicleId,
     source_platform: platform,
     event_type: "listing",
     source_url: url,
     source_listing_id: listingUrlKey || slug,
-    event_status: "active",
-    current_price: highBid ?? askingPrice ?? undefined,
+    // The post is an article about a listing elsewhere; whether that listing is still open is not stated.
+    event_status: "unknown",
+    started_at: post.publishedAt ?? undefined,
+    current_price: post.askingPrice ?? undefined,
+    comment_count: post.comments.length,
     extracted_at: observedAt,
-    extraction_method: "markdown_parse",
+    extraction_method: "html_parse",
     extraction_source: "extract-barn-finds-listing",
-    metadata: { seller: parsed.seller, location: parsed.location, asking_price: askingPrice, high_bid: highBid, mileage: parsed.mileage, source: "extract-barn-finds-listing" },
+    metadata: {
+      source: "extract-barn-finds-listing",
+      kind: "editorial_post_about_listing",
+      started_at_basis: "barnfinds post published",
+      published_at: post.publishedAt,
+      modified_at: post.modifiedAt,
+      price_text: post.priceText,
+      price_is_seller_asking_quoted_in_prose: post.askingPrice != null,
+      obo: post.obo,
+      seller_listing_platform: post.listingPlatform,
+      seller_location_claim: post.location,
+      tipster: post.tipster,
+      photo_count: post.imageUrls.length,
+    },
   });
   if (event.action === "error") throw new Error(`vehicle_events write failed: ${event.error}`);
 
-  return { status: 200, body: { success: true, vehicle_id: finalVehicleId, event: event.action, observation_id: obs?.observationId ?? null } };
+  // Photos: external references to the post's own images.
+  let imagesSaved = 0;
+  if (post.imageUrls.length > 0) {
+    await supabase.from("vehicle_images").delete().eq("vehicle_id", finalVehicleId).eq("source", platform);
+    const rows = post.imageUrls.slice(0, 100).map((imgUrl, i) => ({
+      vehicle_id: finalVehicleId,
+      image_url: imgUrl,
+      source: platform,
+      source_url: imgUrl,
+      is_external: true,
+      approval_status: "auto_approved",
+      is_approved: true,
+      redaction_level: "none",
+      position: i,
+      display_order: i,
+      is_primary: i === 0,
+      exif_data: { source_url: url, discovery_url: url, imported_from: platform },
+    }));
+    const { data: ins, error: imgErr } = await supabase.from("vehicle_images").insert(rows).select("id");
+    if (imgErr) console.warn(`[barnfinds] image save ${url}: ${imgErr.message}`);
+    else imagesSaved = ins?.length ?? 0;
+  }
+
+  // Comments: the readers' thread, one row per comment, deduped by (vehicle_id, content_hash).
+  let commentsSaved = 0;
+  if (post.comments.length > 0) {
+    const rows = [];
+    for (const c of post.comments) {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`barnfinds:${c.id}:${c.text}`));
+      rows.push({
+        vehicle_id: finalVehicleId,
+        platform,
+        comment_type: c.depth > 1 ? "reply" : "comment",
+        sequence_number: rows.length,
+        author_username: c.author,
+        comment_text: c.text,
+        word_count: c.text.split(/\s+/).length,
+        comment_likes: c.likes,
+        source_url: `${url}#comment-${c.id}`,
+        content_hash: Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join(""),
+        raw_html: c.html,
+      });
+    }
+    const { data: ins, error: cErr } = await supabase.from("auction_comments").upsert(rows, { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true }).select("id");
+    if (cErr) console.warn(`[barnfinds] comment save ${url}: ${cErr.message}`);
+    else commentsSaved = ins?.length ?? 0;
+  }
+
+  return { status: 200, body: { success: true, vehicle_id: finalVehicleId, event: event.action, observation_id: obs?.observationId ?? null, images_saved: imagesSaved, comments_saved: commentsSaved } };
 }
 
 const json = (body: unknown, status = 200) =>
@@ -335,7 +294,7 @@ async function runBatch(supabase: Supabase, limit: number) {
     const now = new Date().toISOString();
     let out: Outcome;
     try {
-      out = await extractOne(supabase, t.listing_url.replace(/\/+$/, ""), false);
+      out = await extractOne(supabase, t.listing_url.replace(/\/+$/, ""));
     } catch (e: any) {
       out = { status: 500, body: { success: false, error: e?.message ?? String(e) } };
     }
@@ -384,7 +343,7 @@ Deno.serve(async (req) => {
     let host = "";
     try { host = new URL(url).hostname.toLowerCase(); } catch { /* not a URL */ }
     if (host !== "barnfinds.com" && host !== "www.barnfinds.com") return json({ success: false, error: "url required (barnfinds.com)" }, 400);
-    const out = await extractOne(supabase, url, body.use_firecrawl === true);
+    const out = await extractOne(supabase, url);
     return json(out.body, out.status);
   } catch (e: any) {
     console.error("[extract-barn-finds-listing]", e);
