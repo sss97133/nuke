@@ -96,3 +96,23 @@ it('counts a sale under the $500 floor in the caption and does not draw it below
   expect(container.querySelector('.family-sales__title')?.textContent).toContain('7 sales with a date since');
   expect(container.querySelector('.family-sales__title')?.textContent).toContain('1 under $500 not drawn');
 });
+
+it('hides a venue from the legend: its dots go, the median follows the rest, the axis stays', async () => {
+  const sales = [...[1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer')),
+    sale(7, 40, 250000, 'Mecum'), sale(8, 60, 240000, 'Mecum')];
+  fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="fvenue" family="911" width={900} height={500} onOpen={() => {}} />));
+  const dots = () => container.querySelectorAll('svg.family-sales__plot circle').length;
+  const ticks = () => [...container.querySelectorAll('.family-sales__axis')].map((n) => n.textContent).join(',');
+  expect(dots()).toBe(8);
+  const before = ticks();
+  const mecum = [...container.querySelectorAll('button.family-sales__venue')].find((b) => b.textContent?.startsWith('Mecum'))!;
+  expect(mecum.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => (mecum as HTMLButtonElement).click());
+  expect(dots()).toBe(6);
+  expect(mecum.getAttribute('aria-pressed')).toBe('false');
+  expect(container.querySelector('.family-sales__title')?.textContent).toContain('· 6 shown');
+  expect(ticks()).toBe(before);
+  await act(async () => (mecum as HTMLButtonElement).click());
+  expect(dots()).toBe(8);
+});
