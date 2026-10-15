@@ -3,6 +3,7 @@ import { assertEquals } from "jsr:@std/assert@1";
 import { aspectFilterFor, yearAspect } from "./browseApi.ts";
 import { classifySeller, fullSizeImage, imagesOf, tierOfYear, toLanding, vinOf } from "./browseMap.ts";
 import { sweep } from "./browseSweep.ts";
+import { htmlToText } from "../_shared/htmlToText.ts";
 
 const item = {
   itemId: "v1|123456789012|0", legacyItemId: "123456789012", title: "1969 Chevrolet C10 Pickup", itemWebUrl: "https://www.ebay.com/itm/123456789012?hash=x",
@@ -21,7 +22,7 @@ Deno.test("full-size photos, deduplicated", () => {
 });
 
 Deno.test("an item maps to the writers' shapes, VIN kept even when pre-1981", () => {
-  const l = toLanding(item as any, (h) => h.replace(/<[^>]+>/g, ""))!;
+  const l = toLanding(item as any, htmlToText)!;
   assertEquals([l.url, l.year, l.make, l.model], ["https://www.ebay.com/itm/123456789012", 1969, "Chevrolet", "C10"]);
   assertEquals(l.price.amount, 18500);
   assertEquals(l.ingestInput?.mileage, 81250);
