@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { identityFromTitle, isWidgetText, shownTimeAsUtc, listingFromText, parseBarnFindsPost, priceFromText } from "./parseArticle.ts";
+import { identityFromTitle, priceMentions, isWidgetText, shownTimeAsUtc, listingFromText, parseBarnFindsPost, priceFromText } from "./parseArticle.ts";
 
 Deno.test("identity from headlines with and without a prefix", () => {
   assertEquals(identityFromTitle("Mild Build 350 V8: 1989 Chevrolet C1500"), { year: 1989, make: "Chevrolet", model: "C1500" });
@@ -40,4 +40,10 @@ Deno.test("widget teasers are not article text or a price", () => {
   assertEquals(priceFromText("Current high bid $100 on the widget").price, null);
   assertEquals(shownTimeAsUtc("Feb 1, 2026 9:49pm"), "2026-02-01T21:49:00.000Z");
   assertEquals(shownTimeAsUtc("Jan 8, 2026 12:05am"), "2026-01-08T00:05:00.000Z");
+});
+
+Deno.test("price kinds: asking, bid, msrp, unknown", () => {
+  const m = priceMentions("The seller set their price at $107,000 OBO. It sold new for $3,995 when new. The current high bid is $52,000. The cash value of $16,504 was stated. Asking $12k firm.");
+  assertEquals(m.map((x) => [x.amount, x.kind]), [[107000, "asking"], [3995, "original_msrp"], [52000, "bid"], [16504, "unknown"], [12000, "asking"]]);
+  assertEquals(priceFromText("Original MSRP was $4,200 and the high bid is $9,000.").price, null);
 });

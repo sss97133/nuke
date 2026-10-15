@@ -138,8 +138,13 @@ export async function measureSource(sb: Sb, body: MeasureOpts) {
       const link = tally("_linked");
       link.raw++;
       if (vid) { link.model++; link.profile++; } else if (link.examples.length < 3) link.examples.push({ snapshot_id: c.id, vehicle_id: null });
-      if (!vid) continue; // an unlinked lot is counted once, under _linked, not again under every field
+      if (!vid) {
+        // an unlinked lot is counted once, under _linked, not again under every field; it is a revision item
+        if (!body.dry_run) await sb.rpc("record_lot_depth", { p_url: c.listing_url, p_missing: ["vehicle_link"], p_snapshot_id: c.id, p_vehicle_id: null });
+        continue;
+      }
       const ctx = await modelFor(sb, vid);
+      const missing: string[] = [];
       for (const f of DEPTH_FIELDS) {
         const r = raw[f];
         if (!r) continue;
@@ -150,7 +155,10 @@ export async function measureSource(sb: Sb, body: MeasureOpts) {
         if (held.profile) t.profile++;
         if (held.profileRatio !== undefined) { t.pRatios.push(held.profileRatio); t.mRatios.push(held.modelRatio ?? 0); }
         if (!held.anywhere && t.examples.length < 3) t.examples.push({ snapshot_id: c.id, vehicle_id: vid });
+        if (!held.anywhere) missing.push(f);
       }
+      // landed but thin is a revision item too; a lot found whole closes the item the test raised before
+      if (!body.dry_run) await sb.rpc("record_lot_depth", { p_url: c.listing_url, p_missing: missing, p_snapshot_id: c.id, p_vehicle_id: vid });
     }
 
     // 4. one row per field
