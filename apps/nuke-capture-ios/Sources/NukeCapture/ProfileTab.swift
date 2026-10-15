@@ -311,6 +311,8 @@ struct ProfileView: View {
     @State private var latestError = false
     // Producer signals — the proof-of-work read that replaces vanity counts.
     @State private var producer: ProducerSignals?
+    @State private var affiliations: [OrgAffiliationsSection.Row] = []
+    @State private var affiliationsFailure: String?
 
     var body: some View {
         List {
@@ -353,6 +355,10 @@ struct ProfileView: View {
                     .padding(.vertical, 4)
                 }
             }
+
+            // ORGANIZATIONS — the web profile's affiliations table (OrganizationAffiliations.tsx),
+            // same read, same columns: the businesses this person works with and as what.
+            OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure)
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
@@ -418,6 +424,10 @@ struct ProfileView: View {
         .task(id: userId) { await loadGarage() }
         .task(id: userId) { await loadLatest() }
         .task(id: userId) { await loadProducer() }
+        .task(id: userId) {
+            do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
+            catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
+        }
         .task(id: userId) {
             guard isOwn else { return }
             await loadPhotoEvidence()
@@ -1628,5 +1638,89 @@ private struct PhotoFullScreenView: View {
                 NSLog("NukeCapture add_photo_comment failed: %@", String(describing: error))
             }
         }
+    }
+}
+
+// ─── Organizations: the web profile's affiliations, mirrored ───────────────────
+//
+// Read exactly as nuke_frontend/src/components/profile/OrganizationAffiliations.tsx reads it
+// (organization_contributors with the businesses relation, newest start first) and shown with its
+// four columns: organization and type, role, status, start date. Each row opens the organization's
+// page on nuke.ag; the phone has no organization view yet. Renders nothing for a person with none.
+struct OrgAffiliationsSection: View {
+    let rows: [Row]
+    let failureText: String?
+
+    struct Row: Decodable, Identifiable {
+        struct Business: Decodable {
+            let business_name: String?
+            let business_type: String?
+        }
+        let id: String
+        let organization_id: String
+        let role: String?
+        let status: String?
+        let start_date: String?
+        let businesses: Business?
+    }
+
+    var body: some View {
+        if !rows.isEmpty {
+                Section {
+                    ForEach(rows) { r in
+                        Link(destination: URL(string: "https://nuke.ag/org/\(r.organization_id)")!) { row(r) }
+                            .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("Organizations · \(rows.count)")
+                } footer: {
+                    Text("Roles as each membership records them. Opens the organization on nuke.ag.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            } else if let failureText {
+                Section("Organizations") {
+                    Text("Couldn't load. \(failureText)").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+    }
+
+    @ViewBuilder private func row(_ r: Row) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.businesses?.business_name ?? "Organization").font(.subheadline.weight(.medium))
+                if let t = r.businesses?.business_type, !t.isEmpty {
+                    Text(t.replacingOccurrences(of: "_", with: " ")).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Self.words(r.role ?? "member")).font(.caption.weight(.semibold))
+                Text([Self.status(r.status), r.start_date.map { "since \($0.prefix(10))" }]
+                        .compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private static func words(_ s: String) -> String {
+        s.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+    /// The web's badge words: active → ACTIVE, inactive → PAST, pending → PENDING.
+    private static func status(_ s: String?) -> String? {
+        switch s {
+        case "active": return "ACTIVE"
+        case "inactive": return "PAST"
+        case nil: return nil
+        default: return s!.uppercased()
+        }
+    }
+
+    static func load(userId: String) async throws -> [Row] {
+        try await SupabaseService.client.from("organization_contributors")
+            .select("id,organization_id,role,status,start_date,businesses!inner(business_name,business_type)")
+            .eq("user_id", value: userId)
+            .order("start_date", ascending: false)
+            .execute().value
     }
 }
