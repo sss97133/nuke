@@ -1641,40 +1641,39 @@ private struct PhotoFullScreenView: View {
     }
 }
 
-// ─── Organizations: the web profile's affiliations, mirrored ───────────────────
+// ─── Organizations: memberships with each relation's weight ────────────────────
 //
-// Read exactly as nuke_frontend/src/components/profile/OrganizationAffiliations.tsx reads it
-// (organization_contributors with the businesses relation, newest start first) and shown with its
-// four columns: organization and type, role, status, start date. Each row opens the organization's
-// page on nuke.ag; the phone has no organization view yet. Renders nothing for a person with none.
+// One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
+// now, computed by the server from passive contributions (photos at the organization's locations, its images, timeline
+// events, contractor work) and halving every 6 h. A membership is not a status: "active" was hard-coded on every row
+// (owner, 2026-10-15). Each row opens the organization inside the app. Renders nothing for a person with none.
 struct OrgAffiliationsSection: View {
     let rows: [Row]
     let failureText: String?
 
     struct Row: Decodable, Identifiable {
-        struct Business: Decodable {
-            let business_name: String?
-            let business_type: String?
-        }
-        let id: String
         let organization_id: String
+        let name: String?
+        let type: String?
         let role: String?
-        let status: String?
         let start_date: String?
-        let businesses: Business?
+        let relation: OrgPage.Relation
+        var id: String { organization_id + (role ?? "") }
     }
+    private struct Payload: Decodable { let relations: [Row] }
 
     var body: some View {
         if !rows.isEmpty {
                 Section {
                     ForEach(rows) { r in
-                        Link(destination: URL(string: "https://nuke.ag/org/\(r.organization_id)")!) { row(r) }
-                            .buttonStyle(.plain)
+                        NavigationLink {
+                            OrganizationView(orgId: r.organization_id, fallbackName: r.name)
+                        } label: { row(r) }
                     }
                 } header: {
                     Text("Organizations · \(rows.count)")
                 } footer: {
-                    Text("Roles as each membership records them. Opens the organization on nuke.ag.")
+                    Text("Each relation is kept warm only by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             } else if let failureText {
@@ -1687,16 +1686,18 @@ struct OrgAffiliationsSection: View {
     @ViewBuilder private func row(_ r: Row) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(r.businesses?.business_name ?? "Organization").font(.subheadline.weight(.medium))
-                if let t = r.businesses?.business_type, !t.isEmpty {
-                    Text(t.replacingOccurrences(of: "_", with: " ")).font(.caption).foregroundStyle(.secondary)
-                }
+                Text(r.name ?? "Organization").font(.subheadline.weight(.medium))
+                Text([r.role.map(Self.words), r.type?.replacingOccurrences(of: "_", with: " ")]
+                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(Self.words(r.role ?? "member")).font(.caption.weight(.semibold))
-                Text([Self.status(r.status), r.start_date.map { "since \($0.prefix(10))" }]
-                        .compactMap { $0 }.joined(separator: " · "))
+                HStack(spacing: 4) {
+                    Circle().fill(RelationWeight.color(r.relation)).frame(width: 6, height: 6)
+                    Text(RelationWeight.word(r.relation)).font(.caption.weight(.semibold))
+                }
+                Text(RelationWeight.ago(r.relation.last_contribution_at) ?? "nothing in 2 days")
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             }
         }
@@ -1706,21 +1707,11 @@ struct OrgAffiliationsSection: View {
     private static func words(_ s: String) -> String {
         s.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
-    /// The web's badge words: active → ACTIVE, inactive → PAST, pending → PENDING.
-    private static func status(_ s: String?) -> String? {
-        switch s {
-        case "active": return "ACTIVE"
-        case "inactive": return "PAST"
-        case nil: return nil
-        default: return s!.uppercased()
-        }
-    }
 
     static func load(userId: String) async throws -> [Row] {
-        try await SupabaseService.client.from("organization_contributors")
-            .select("id,organization_id,role,status,start_date,businesses!inner(business_name,business_type)")
-            .eq("user_id", value: userId)
-            .order("start_date", ascending: false)
+        let payload: Payload = try await SupabaseService.client
+            .rpc("user_org_relations", params: ["p_user_id": userId])
             .execute().value
+        return payload.relations
     }
 }
