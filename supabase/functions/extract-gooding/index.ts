@@ -25,6 +25,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { recordRevision } from "../_shared/revision.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
@@ -509,7 +510,7 @@ async function fetchGoodingPageData(url: string, supabase?: any): Promise<Goodin
       const hashBuffer = await crypto.subtle.digest('SHA-256', hashData);
       const sha256 = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-      await supabase.from('listing_page_snapshots').insert({
+      const snapRes = await supabase.from('listing_page_snapshots').insert({
         platform: 'gooding',
         listing_url: url,
         fetched_at: new Date().toISOString(),
@@ -521,6 +522,7 @@ async function fetchGoodingPageData(url: string, supabase?: any): Promise<Goodin
         content_length: text.length,
         metadata: { caller: 'extract-gooding', format: 'json', page_data_url: pageDataUrl },
       });
+      if (snapRes.error && snapRes.error.code !== '23505') softWrite('listing_page_snapshots insert', snapRes); // 23505: same content already archived
       console.log(`[gooding] Archived JSON snapshot (${text.length} bytes)`);
     } catch (e: any) {
       // 23505 = duplicate content hash — fine
@@ -693,10 +695,11 @@ async function saveToDatabase(
         gooding_auction_calendar: extracted.auction_calendar_position,
       };
     }
-    const { error: updateError } = await supabase
+    const updateRes = await supabase
       .from('vehicles')
       .update(vehicleUpdate)
       .eq('id', vehicleId);
+    const updateError = updateRes.error;
 
     if (updateError) {
       console.error(`[gooding] Failed to update vehicle: ${updateError.message}`);
@@ -705,9 +708,11 @@ async function saveToDatabase(
       // the clash as a revision item: two vehicles carry one chassis (merge_proposals decides, not this writer).
       if (vehicleUpdate.vin && /VIN .* already exists|vehicles_vin_unique|duplicate key/i.test(updateError.message)) {
         const { vin: clashVin, ...withoutVin } = vehicleUpdate;
-        const { error: retryErr } = await supabase.from('vehicles').update(withoutVin).eq('id', vehicleId);
-        if (retryErr) console.error(`[gooding] Retry without VIN failed: ${retryErr.message}`);
-        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160), retried_without_vin: !retryErr } });
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160) } });
+        mustWrite('vehicles update without the clashing vin', await supabase.from('vehicles').update(withoutVin).eq('id', vehicleId));
+      } else {
+        // Any other failed update means the lot did not land: the run fails (a counted failure), it is not swallowed.
+        mustWrite('vehicles update', updateRes);
       }
     }
   } else {
@@ -746,11 +751,13 @@ async function saveToDatabase(
         gooding_auction_calendar: extracted.auction_calendar_position,
       };
     }
-    const { data: newVehicle, error: insertError } = await supabase
+    const insertRes = await supabase
       .from('vehicles')
       .insert(insertPayload)
       .select('id')
       .maybeSingle();
+    const newVehicle = insertRes.data;
+    const insertError = insertRes.error;
 
     if (insertError) {
       // Handle unique constraint violation (e.g. www vs non-www URL)
@@ -766,12 +773,12 @@ async function saveToDatabase(
           vehicleId = byUrl.id;
           isNew = false;
           // Update instead
-          await supabase.from('vehicles').update(insertPayload).eq('id', vehicleId);
+          mustWrite('vehicles update (duplicate-url fallback)', await supabase.from('vehicles').update(insertPayload).eq('id', vehicleId));
         } else {
           throw new Error(`Failed to insert vehicle: ${insertError.message}`);
         }
       } else {
-        throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
+        mustWrite('vehicles insert', insertRes);
       }
     } else {
       vehicleId = newVehicle?.id;
@@ -848,12 +855,11 @@ async function saveToDatabase(
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && !opts.skipImages) {
     // Delete existing gooding images for this vehicle
-    const { error: deleteError } = await supabase
+    softWrite('vehicle_images replace', await supabase
       .from('vehicle_images')
       .delete()
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'gooding');
-    if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
+      .eq('source', 'gooding'));
 
     const imageRecords = extracted.image_urls.slice(0, 100).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -876,16 +882,12 @@ async function saveToDatabase(
       },
     }));
 
-    const { data: insertedImages, error: imgError } = await supabase
+    const imgRes = await supabase
       .from('vehicle_images')
       .insert(imageRecords)
       .select('id');
-
-    if (imgError) {
-      console.error(`[gooding] Image save error: ${imgError.message}`);
-    } else {
-      imagesSaved = insertedImages?.length || 0;
-    }
+    softWrite('vehicle_images insert', imgRes);
+    if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
   }
 
   return { vehicle_id: vehicleId, images_saved: imagesSaved, is_new: isNew };
@@ -1059,14 +1061,12 @@ Deno.serve(async (req) => {
           priority: 0,
         }));
 
-        const { data, error } = await supabase
+        const enq = await supabase
           .from('import_queue')
           .upsert(batch, { onConflict: 'listing_url', ignoreDuplicates: true })
           .select('id');
-
-        if (error) {
-          console.error(`[gooding] Enqueue error: ${error.message}`);
-        }
+        const data = enq.data;
+        softWrite('import_queue enqueue', enq);
         enqueued += data?.length || 0;
       }
 
@@ -1110,11 +1110,11 @@ Deno.serve(async (req) => {
         !item.listing_url?.includes('goodingco.com')
       );
       if (otherItems.length > 0) {
-        await supabase.from('import_queue').update({
+        softWrite('import_queue release', await supabase.from('import_queue').update({
           status: 'pending',
           locked_at: null,
           locked_by: null,
-        }).in('id', otherItems.map((i: any) => i.id));
+        }).in('id', otherItems.map((i: any) => i.id)));
       }
 
       const urls = goodingItems.map((item: any) => item.listing_url);
@@ -1123,13 +1123,13 @@ Deno.serve(async (req) => {
       // Mark queue items
       for (const item of goodingItems) {
         const succeeded = !results.errors.find(e => e.url === item.listing_url);
-        await supabase.from('import_queue').update({
+        softWrite('import_queue mark', await supabase.from('import_queue').update({
           status: succeeded ? 'complete' : 'failed',
           processed_at: new Date().toISOString(),
           locked_at: null,
           locked_by: null,
           error_message: results.errors.find(e => e.url === item.listing_url)?.error || null,
-        }).eq('id', item.id);
+        }).eq('id', item.id));
       }
 
       return new Response(
