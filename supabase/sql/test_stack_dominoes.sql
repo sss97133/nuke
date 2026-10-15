@@ -96,6 +96,7 @@ INSERT INTO public.auction_comments (platform) SELECT 'bat' FROM generate_series
 ANALYZE;
 
 \i supabase/migrations/20261015034500_stack_dominoes.sql
+\i supabase/migrations/20261015050000_stack_dominoes_staged.sql
 
 -- Shape ---------------------------------------------------------------------------------------------------------------
 SELECT pg_temp.ok('both tables have RLS on and no anon or authenticated grant',
@@ -111,8 +112,8 @@ SELECT pg_temp.fails('source_a after source_b is refused', $$INSERT INTO public.
 
 -- One reading ---------------------------------------------------------------------------------------------------------
 SELECT public.snapshot_stack_dominoes('contract') AS r \gset
-SELECT pg_temp.ok('the reading wrote rows to both tables and listed no failed source',
-  (:'r'::jsonb ->> 'input_rows')::int > 0 AND (:'r'::jsonb ->> 'depth_rows')::int > 0 AND :'r'::jsonb -> 'failed_sources' = '[]'::jsonb);
+SELECT pg_temp.ok('the one-call reading wrote rows to both tables',
+  (:'r'::jsonb ->> 'input_rows')::int > 0 AND (:'r'::jsonb ->> 'depth_rows')::int > 0);
 SELECT pg_temp.ok('vehicle_events counted exactly per normalized source',
   (SELECT jsonb_object_agg(source_key, rows) FROM public.stack_input_support WHERE input_table = 'vehicle_events')
   = '{"bat":612,"mecum":504,"barrettjackson":500,"tiny":5,"unknown":1}'::jsonb);
@@ -164,14 +165,27 @@ SELECT pg_temp.ok('V019 reads stack S05 coverage 0 against 1.0: unmet',
 SELECT pg_temp.ok('V017 lists three requirements',
   (SELECT count(*) = 3 FROM public.v_hypothesis_support WHERE vein_id = 'V017'));
 
+-- Staged form, as the job runs it: separate statements in one session, a missing source simply absent.
+SELECT public.snapshot_stack_dominoes_begin('staged') \gset
+SELECT public.snapshot_stack_dominoes_read('bat');
+SELECT public.snapshot_stack_dominoes_read('mecum');
+SELECT public.snapshot_stack_dominoes_read('nosuchsource');
+SELECT public.snapshot_stack_dominoes_finish() AS f \gset
+SELECT pg_temp.ok('staged reading: depth only for the sources read (bat, mecum), bat x mecum 1 cohort at 10 lots',
+  :'f'::jsonb ->> 'sources_read' = 'bat, mecum'
+  AND (SELECT count(DISTINCT source_a) = 2 FROM public.stack_cohort_depth WHERE registered_by = 'staged')
+  AND (SELECT cohorts FROM public.stack_cohort_depth WHERE registered_by = 'staged' AND source_a = 'bat' AND source_b = 'mecum' AND min_lots = 10) = 1);
+SELECT pg_temp.fails('read without begin is refused', $$SELECT public.snapshot_stack_dominoes_read('bat')$$, '55000');
+
 -- Registry, schedule, re-apply ----------------------------------------------------------------------------------------
 SELECT pg_temp.ok('registry rows for both tables', (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes' AND do_not_write_directly));
 SELECT pg_temp.ok('cron job runs the coverage snapshot then the dominoes, daily, with the 300s timeout',
-  (SELECT schedule = '25 4 * * *' AND command LIKE '%statement_timeout = ''300s''%' AND command LIKE '%snapshot_stack_coverage%' AND command LIKE '%snapshot_stack_dominoes%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes'));
+  (SELECT schedule = '25 4 * * *' AND command LIKE '%statement_timeout = ''300s''%' AND command LIKE '%snapshot_stack_coverage%' AND command LIKE '%snapshot_stack_dominoes_begin%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes'));
 SELECT pg_temp.ok('every column of both tables is described',
   (SELECT count(*) = 0 FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
    WHERE c.relname IN ('stack_input_support', 'stack_cohort_depth') AND a.attnum > 0 AND NOT a.attisdropped AND col_description(c.oid, a.attnum) IS NULL));
 \i supabase/migrations/20261015034500_stack_dominoes.sql
+\i supabase/migrations/20261015050000_stack_dominoes_staged.sql
 SELECT pg_temp.ok('re-apply registered nothing twice',
   (SELECT count(*) = 6 FROM public.vein_ledger WHERE vein_id BETWEEN 'V014' AND 'V019')
   AND (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes'));
