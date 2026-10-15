@@ -54,8 +54,8 @@ function halt(reason, detail = {}) {
 }
 
 // Page-side: dom.js + classify.js are classic scripts; this wraps the same pass the extension makes.
-const pageScripts = ['dom.js', 'classify.js'].map(n => fs.readFileSync(path.join(ext, n), 'utf8')).join('\n;');
-const PASS = `(async (cfg) => {
+export const pageScripts = ['dom.js', 'classify.js'].map(n => fs.readFileSync(path.join(ext, n), 'utf8')).join('\n;');
+export const PASS = `(async (cfg) => {
   const dom = globalThis.NukeMarketplaceDOM, cards = new Map(); let last, scans = 0;
   for (let step = 0; step <= cfg.maxScrolls; step++) {
     last = dom.scan(cfg.maxCards - cards.size, new Set(cards.keys())); scans++;

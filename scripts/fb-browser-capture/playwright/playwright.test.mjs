@@ -61,3 +61,27 @@ test('revisit policy: tier 1 first, 3 h minimum age, once a day, 45 day horizon'
   assert.deepEqual(due(rows, {}, now), ['b', 'a', 'd']);
   assert.deepEqual(due(rows, { b: now - 3600_000, a: now - 25 * 3600_000 }, now), ['a', 'd']);
 });
+
+const { pageScripts, PASS } = await import('./runner.mjs');
+const { createRequire } = await import('node:module');
+test('dry run on a saved search page: gate keeps cars/trucks 1964-1991, drops the rest with reasons, packet validates and stages', async () => {
+  const { JSDOM } = createRequire(new URL('../../../nuke_frontend/package.json', import.meta.url))('jsdom');
+  const html = fs.readFileSync(new URL('./fixtures/vehicles-search.html', import.meta.url), 'utf8');
+  const dom = new JSDOM(html, { url: BASE + VARIANTS.years_cartruck, runScripts: 'outside-only' });
+  dom.window.HTMLElement.prototype.getBoundingClientRect = () => ({ width: 200, height: 100, top: 10, bottom: 110, left: 10, right: 210 });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'innerText', { get() { return this.textContent; } }); // jsdom has no layout text
+  dom.window.eval(pageScripts);
+  const pass = JSON.parse(JSON.stringify(await dom.window.eval(`${PASS}({ maxScrolls: 0, maxCards: 200, pauseMs: [1] })`)));
+  dom.window.close();
+  assert.equal(pass.cards.length, 17, 'outside-main recommendation excluded');
+  const { packets, screening, rejected } = buildPackets(pass, BASE + VARIANTS.years_cartruck, classify);
+  const kept = packets[0].batch.map(c => c.facebook_id).sort();
+  assert.deepEqual(kept, ['1001', '1002', '1003', '1004', '1005', '1006', '1017']);
+  assert.deepEqual(screening.tiers, { 1001: 1, 1002: 1, 1003: 1, 1004: 2, 1005: 2, 1006: 2, 1017: 2 });
+  const byReason = {}; for (const r of rejected) for (const x of r.reasons) byReason[x] = (byReason[x] ?? 0) + 1;
+  assert.deepEqual(byReason, { boat: 1, motorcycle: 1, rv_camper_trailer: 2, parts: 1, year_after_1991: 1, year_unknown: 1, price_placeholder: 1, offroad_utility: 1, year_before_1964: 1 });
+  validateCapture(packets[0].capture, packets[0].batch);
+  const out = path.join(process.env.NUKE_FB_HOME, 'dry.json'); fs.writeFileSync(out, JSON.stringify(packets[0]));
+  const staged = (await import('node:child_process')).spawnSync('node', ['--import', 'tsx', new URL('../../fb-import-urls.ts', import.meta.url).pathname, '--capture', out], { encoding: 'utf8' });
+  assert.equal(staged.status, 0, staged.stderr); assert.equal(JSON.parse(staged.stdout.trim().split('\n').at(-1)).cards, 7);
+});
