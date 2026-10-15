@@ -70,6 +70,7 @@ export async function landClassifiedListing(
 
   let for_sale: ClassifiedLanding["for_sale"] = "already";
   try {
+    // write-error-ok: the failure is returned to the caller as for_sale: "error" in the landing, which ingest logs
     const { data, error } = await supabase.from("vehicles").update({ is_for_sale: true })
       .eq("id", a.vehicleId).not("is_for_sale", "is", true).select("id");
     for_sale = error ? "error" : data?.length ? "set" : "already";
@@ -83,7 +84,10 @@ export async function landClassifiedListing(
         method: a.platform === "ksl" ? "extract-ksl" : "extract-classiccars",
       })], "ingest");
       seller_type = "written";
-    } catch { seller_type = "error"; }
+    } catch (e) {
+      seller_type = "error";
+      console.error(`[ingest] seller_type row for event ${event.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
   return { event, for_sale, seller_type };
 }
