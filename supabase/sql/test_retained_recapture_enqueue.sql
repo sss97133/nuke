@@ -1,8 +1,9 @@
--- Arrival enqueue for retained listing projections: a word-for-word BaT description
--- re-capture of one listing page is not projected again; everything else enqueues as before.
--- The live trigger function and trigger definition are reproduced exactly so the
--- migration guard runs against the production owners. enqueue_retained_listing_properties
--- is a one-row stub: this contract decides only whether arrival enqueues.
+-- Arrival enqueue for retained listing projections: a BaT re-capture whose projection
+-- inputs equal the same page's immediately preceding capture is not projected again;
+-- everything else enqueues as before. The live trigger function, trigger definition
+-- and enqueue owner are reproduced exactly so the migration guard runs against the
+-- production owners. enqueue_retained_listing_properties(uuid) is a one-row stub: this
+-- contract decides only whether arrival enqueues.
 -- The shared db-contracts runner discovers this file and gives it a fresh PG17 database.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -16,9 +17,11 @@ CREATE TYPE public.observation_kind AS ENUM ('listing', 'specification');
 CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_id uuid, kind public.observation_kind,
   extraction_method text, source_url text, is_superseded boolean NOT NULL DEFAULT false,
-  content_text text, structured_data jsonb, ingested_at timestamptz NOT NULL DEFAULT clock_timestamp()
+  content_text text, structured_data jsonb, observed_at timestamptz DEFAULT clock_timestamp(),
+  ingested_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 CREATE INDEX ON public.vehicle_observations(vehicle_id, source_id, kind);
+CREATE INDEX idx_observations_vehicle_time ON public.vehicle_observations(vehicle_id, observed_at DESC) WHERE vehicle_id IS NOT NULL;
 CREATE TABLE public.retained_listing_property_work (
   source_observation_id uuid NOT NULL REFERENCES public.vehicle_observations, property_id uuid NOT NULL, vehicle_id uuid,
   status text NOT NULL DEFAULT 'pending', PRIMARY KEY (source_observation_id, property_id)
@@ -30,7 +33,7 @@ CREATE FUNCTION public.enqueue_retained_listing_properties(p_source uuid) RETURN
 $$;
 \ir fixtures/retained_enqueue_owner_20261015.sql
 -- Exact live owner (hash xHctvFszU9qLfSOvsxFsM8FaGRLolR/n34qvRq49k1M=, read 2026-10-15).
-CREATE OR REPLACE FUNCTION public.trg_enqueue_retained_listing_properties()
+CREATE FUNCTION public.trg_enqueue_retained_listing_properties()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -57,10 +60,13 @@ $$;
 CREATE FUNCTION pg_temp.queued(p_key text) RETURNS integer LANGUAGE sql AS $$
   SELECT count(*)::integer FROM public.retained_listing_property_work WHERE source_observation_id = md5(p_key)::uuid;
 $$;
+CREATE FUNCTION pg_temp.same(p_key text) RETURNS uuid LANGUAGE sql AS $$
+  SELECT pg_temp.capture(p_key, 'Synthetic description. The same words every capture.');
+$$;
 
 -- Before: every identical re-capture is queued again.
-SELECT pg_temp.capture('a', 'Synthetic description. The same words every capture.');
-SELECT pg_temp.capture('b', 'Synthetic description. The same words every capture.');
+SELECT pg_temp.same('a');
+SELECT pg_temp.same('b');
 DO $$ BEGIN
   IF pg_temp.queued('a') <> 1 OR pg_temp.queued('b') <> 1 THEN RAISE EXCEPTION 'Fixture did not reproduce the live duplicate enqueue'; END IF;
   RAISE NOTICE 'PASS before the repair, an identical re-capture is queued again (the measured defect)';
@@ -68,21 +74,21 @@ END $$;
 
 \ir ../migrations/20261015193000_retained_recapture_enqueue.sql
 
-SELECT pg_temp.capture('c', 'Synthetic description. The same words every capture.');
+SELECT pg_temp.same('c');
+SELECT pg_temp.same('c2');
 SELECT pg_temp.capture('d', 'Synthetic description. The words changed.');
-SELECT pg_temp.capture('e', 'Synthetic description. The same words every capture.', p_truncated => true);
+SELECT pg_temp.capture('e', 'Synthetic description. The words changed.', p_truncated => true);
 SELECT pg_temp.capture('f', 'Synthetic description. The same words every capture.', p_url => 'https://bringatrailer.com/listing/synthetic-relisting/');
 SELECT pg_temp.capture('g', 'Synthetic description. The same words every capture.', p_vehicle => 'vehicle-two');
-SELECT pg_temp.capture('h', 'Synthetic description. The same words every capture.', p_method => 'html_match');
 DO $$ BEGIN
-  IF pg_temp.queued('c') <> 0 THEN RAISE EXCEPTION 'Identical re-capture was queued again'; END IF;
+  IF pg_temp.queued('c') <> 0 THEN RAISE EXCEPTION 'A repeat of a queued capture was queued again'; END IF;
+  IF pg_temp.queued('c2') <> 0 THEN RAISE EXCEPTION 'A repeat of a skipped repeat was queued again'; END IF;
   IF pg_temp.queued('d') <> 1 THEN RAISE EXCEPTION 'Changed text must enqueue'; END IF;
   IF pg_temp.queued('e') <> 1 THEN RAISE EXCEPTION 'Changed qualification must enqueue'; END IF;
   IF pg_temp.queued('f') <> 1 THEN RAISE EXCEPTION 'Another listing page must enqueue'; END IF;
   IF pg_temp.queued('g') <> 1 THEN RAISE EXCEPTION 'Another vehicle must enqueue'; END IF;
-  IF pg_temp.queued('h') <> 1 THEN RAISE EXCEPTION 'Other extraction methods are unchanged'; END IF;
-  IF (SELECT count(*) FROM public.vehicle_observations WHERE id = md5('c')::uuid) <> 1 THEN RAISE EXCEPTION 'The re-capture must stay testimony'; END IF;
-  RAISE NOTICE 'PASS a word-for-word re-capture is kept but not queued; changed text, qualification, page, vehicle and method enqueue';
+  IF (SELECT count(*) FROM public.vehicle_observations WHERE id IN (md5('c')::uuid, md5('c2')::uuid)) <> 2 THEN RAISE EXCEPTION 'Repeats must stay testimony'; END IF;
+  RAISE NOTICE 'PASS repeats of a queued or skipped predecessor are kept but not queued; changed text, qualification, page and vehicle enqueue';
 END $$;
 
 -- html_match parents carry no description text; their nine projected fields decide.
@@ -102,17 +108,41 @@ DO $$ DECLARE k text; BEGIN
   RAISE NOTICE 'PASS html_match: each of the nine projected fields re-enqueues when changed; other changes and repeats do not';
 END $$;
 
--- A withdrawn or failed earlier capture no longer stands in for the assertion.
-UPDATE public.vehicle_observations SET is_superseded = true WHERE id IN (md5('a')::uuid, md5('b')::uuid);
-SELECT pg_temp.capture('i', 'Synthetic description. The same words every capture.');
-UPDATE public.retained_listing_property_work SET status = 'failed' WHERE source_observation_id = md5('i')::uuid;
-SELECT pg_temp.capture('j', 'Synthetic description. The same words every capture.');
-SELECT pg_temp.capture('k', 'Synthetic description. The same words every capture.');
+-- A superseded or only-failed predecessor no longer stands in for the assertion.
+SELECT pg_temp.capture('s1', 'Synthetic description. Third wording.');
+UPDATE public.vehicle_observations SET is_superseded = true WHERE id = md5('s1')::uuid;
+SELECT pg_temp.capture('s2', 'Synthetic description. Third wording.');
+UPDATE public.retained_listing_property_work SET status = 'failed' WHERE source_observation_id = md5('s2')::uuid;
+SELECT pg_temp.capture('s3', 'Synthetic description. Third wording.');
+SELECT pg_temp.capture('s4', 'Synthetic description. Third wording.');
 DO $$ BEGIN
-  IF pg_temp.queued('i') <> 1 THEN RAISE EXCEPTION 'With every queued capture superseded, the next capture must enqueue'; END IF;
-  IF pg_temp.queued('j') <> 1 THEN RAISE EXCEPTION 'Failed earlier work must not block the assertion'; END IF;
-  IF pg_temp.queued('k') <> 0 THEN RAISE EXCEPTION 'A current queued capture again stands for the assertion'; END IF;
-  RAISE NOTICE 'PASS superseded or failed earlier captures do not block; the next current queued capture does';
+  IF pg_temp.queued('s2') <> 1 THEN RAISE EXCEPTION 'A superseded predecessor must not block'; END IF;
+  IF pg_temp.queued('s3') <> 1 THEN RAISE EXCEPTION 'An only-failed predecessor must not block'; END IF;
+  IF pg_temp.queued('s4') <> 0 THEN RAISE EXCEPTION 'A current queued predecessor again stands for the assertion'; END IF;
+  RAISE NOTICE 'PASS superseded or only-failed predecessors do not block; the next current queued one does';
+END $$;
+
+-- Only the immediately preceding capture of the page decides (documented limit: A,B,A re-queues).
+SELECT pg_temp.capture('alt-a', 'Synthetic description. Alternating A.');
+SELECT pg_temp.capture('alt-b', 'Synthetic description. Alternating B.');
+SELECT pg_temp.capture('alt-a2', 'Synthetic description. Alternating A.');
+DO $$ BEGIN
+  IF pg_temp.queued('alt-a') <> 1 OR pg_temp.queued('alt-b') <> 1 OR pg_temp.queued('alt-a2') <> 1 THEN
+    RAISE EXCEPTION 'Alternating inputs must each enqueue against their immediate predecessor'; END IF;
+  RAISE NOTICE 'PASS only the immediately preceding capture of the page is compared';
+END $$;
+
+-- The walk is bounded: a predecessor beyond the vehicle's latest 200 observations enqueues.
+SELECT pg_temp.capture('far-1', 'Synthetic description. Far wording.', p_vehicle => 'vehicle-busy');
+INSERT INTO public.vehicle_observations(vehicle_id, source_id, kind, extraction_method, source_url, structured_data)
+  SELECT md5('vehicle-busy')::uuid, '4cdc735c-f117-42f2-889f-ba33805639a5', 'listing', 'bat_public_live_v1',
+    'https://bringatrailer.com/listing/synthetic-one/', '{}'::jsonb FROM generate_series(1, 200);
+SELECT pg_temp.capture('far-2', 'Synthetic description. Far wording.', p_vehicle => 'vehicle-busy');
+SELECT pg_temp.capture('far-3', 'Synthetic description. Far wording.', p_vehicle => 'vehicle-busy');
+DO $$ BEGIN
+  IF pg_temp.queued('far-2') <> 1 THEN RAISE EXCEPTION 'A predecessor beyond the bounded walk must not block'; END IF;
+  IF pg_temp.queued('far-3') <> 0 THEN RAISE EXCEPTION 'A near predecessor must still be found past other rows'; END IF;
+  RAISE NOTICE 'PASS the predecessor walk is bounded to 200 observations and skips unrelated rows';
 END $$;
 
 -- Reapplication is idempotent; a drifted owner is refused.
