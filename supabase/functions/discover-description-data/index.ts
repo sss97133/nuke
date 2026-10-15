@@ -15,8 +15,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from "../_shared/geminiGuard.ts";
 import { conditionExtractionArtifact, conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
-import { geminiFetch } from '../_shared/geminiGuard.ts';
   loadDescriptionInput, loadReusableConditionExtraction, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
 
 const corsHeaders = {
