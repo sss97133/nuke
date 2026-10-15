@@ -74,6 +74,13 @@ export function moveText(m: Move): string {
   return '';
 }
 
+/** The same words for a tile too narrow for them: the percentage, or the reason in two words. */
+export function moveTextShort(m: Move): string {
+  if (m.kind === 'move') return pct(m.rel);
+  if (m.kind === 'few') return m.why === 'share' ? 'sold elsewhere' : 'few sales';
+  return '';
+}
+
 /** Short names a tile may print when the full name does not fit (the study's curated column; to move into
  *  canonical_makes). A name with no short form is left out instead. */
 export const SHORT_NAMES: Record<string, string> = {
