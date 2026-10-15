@@ -2241,7 +2241,7 @@ parts, each with its supplier page as source and no price. (d) #110 itself: sign
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
 
-#### 13.12.3 RSI passes 1 to 40: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
+#### 13.12.3 RSI passes 1 to 43: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
 
 Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
 1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
@@ -2293,9 +2293,12 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 | 37 | (generator, #1689) | PS-STUDS was one node for nine studs, so every DC primary cable shared one point | the power-spine records (chapters/17, the DC primary sheet) | nine stud nodes; each cable end on its stud; endpoints 203 to 212, wire ends 993 to 999; supply-to-ground 0 / 328 |
 | 38 | (generator, #1690) | 196 placed plug pairs had no branch chain | a second twin route study (research/2026-10-15_route-branches-2.md): 116 branches, 16 junctions | routed segments 125 to 397 / 669; planned 375 to 587 |
 | 39 | 20261015250000 | 14 of 397 routed segments were planned shorter than their route, all cut-list estimates copied unpadded; 207 of 417 registry wires had no length | the live routes, exported to inputs/route_lengths.json | the planner pads estimates and gives way to a longer route; the registry takes one-segment routes: 120 wires gain a length, 14 short ones rise; the check 14 to 0 / 397, plans shorter than the straight line 9 to 0 / 424 |
-| 40 | (loader + generator, #1698, this pass) | "AMP CH1+" matched no plug, so 26a/26b/27a/27b started at the door and chained back through the amp (26a summed 28.2 ft) | the registry's start text | the start resolves by its first word and the 4 wires re-chain AMP, door, speaker; through runs (one path whose interior plugs are crossings) take their summed route: 72 more wires, 81 of 85 multi-hop wires eligible; the 4 buses wait |
+| 40 | (loader + generator, #1698, #1700) | "AMP CH1+" matched no plug, so 26a/26b/27a/27b started at the door and chained back through the amp (26a summed 28.2 ft) | the registry's start text | the start resolves by its first word and the 4 wires re-chain AMP, door, speaker; through runs (one path whose interior plugs are crossings) take their summed route: 72 more wires, 81 of 85 multi-hop wires eligible; the 4 buses wait |
 
-**What the loop found that no one asked about:**
+**W| 41 | 20261015260000 (#1702) | 106 Deutsch and MIL-splice wire ends had no crimp tool; the loader wrote an end once and read at most 1,000 rows (999 live ends) | ProWire's HDT-48-00 and MiniSeal pages (saved through fetch_sources.py) | tools mapped, two catalog rows, the loader pages and re-writes changed ends; ends keyed to a crimp tool 475 to 581 / 991 |
+| 42 | 20261015270000 (#1705) | 354 wire lengths said nothing about what they were, so the planner called pin leads and twin paths zone estimates; the 32 PDM pigtails had no length | the registry's length kinds; the pin leads' design rule (pass 26) | planned_length_kind and _basis on the wire, the planner names the kind, the pigtails take 4 and 6 in; planned segments 587 to 620 / 669 |
+| 43 | (generator, this pass) | 56 segments sat on an unplaced plug, 7 of the 8 open plugs on the engine; the twin's engine was said to sit 15 cm into the cab | three owner photos triangulated against the true-size engine_ls3 model (research/2026-10-15_engine-position.md) | the engine is where it is (the v2 block box was GM's 710 mm misread); 34 engine ends placed on the corrected engine, 22 branches redrawn, 19 added; a shortest-path walk joins 443 / 443 placed segments |
+hat the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
   MARKER-LF (a lamp typed ground) as single nodes. The scoreboard now carries the physics check "nets that join a
   supply to ground (must be 0)".
@@ -2337,7 +2340,9 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   4 A where a fault sees 8 A, which is exactly the 20 AWG wires' cap.
 - **A rule that runs once decays.** Node kinds (net fold v2) and citations (passes 1 and 3) were written by
   migrations; every row the loader added later missed them. Both now run after every load.
-- **The twin's engine sits about 15 cm into the cab.** Its block rear is at y -1.30 against a firewall at -1.447 (route
+- **The twin's engine sits about 15 cm into the cab** (corrected by pass 43: it does not; its block box was GM's 710 mm
+  outline, which runs from the ring gear to the water-pump inlet, so the box's rear face sat 13 cm behind the real block
+  rear; the cylinders are within 8 mm of the photos). Its block rear is at y -1.30 against a firewall at -1.447 (route
   study), so the twin cannot settle anything near the rear of the engine; those branches are confidence low. Its
   iBooster also sits 20 mm above the 61-pin point: on the truck the two share the driver firewall, which needs a look.
 - **The cut list's zone estimates run 4x the twin routes** (15 routed segments that carry one: average 4.0x, minimum
@@ -2351,8 +2356,10 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
 
 **Owed, as the scoreboard names it:**
-- Routing beyond the placed points: 397 / 669 segments are routed (20:45Z); 56 have a plug with no position, 62 join
-  two plugs at one point, 2 join points no branch chain reaches. The engine-front branches wait on a twin engine fix.
+- Routing beyond the placed points: after pass 43, 12 segments sit on an unplaced point (the battery, the driver O2
+  sensor, the underhood lamp, and the open frame, head and firewall grounds); 62 join two plugs at one point. One tape
+  on the truck (passenger firewall flat face to the passenger head's rear face) settles the engine's fore-aft position
+  to 5 mm.
 - Buses as trees: CAN_HI/CAN_LO and the door-lock buses are chained like runs; their length and the order of their
   drops is a design question the segment fold cannot answer.
 - The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
