@@ -35,6 +35,44 @@ Per row, in order:
 5. `reattribute_observation` (onto-existing-copy branch, #1553): each B-J photo on the hybrid is superseded onto the
    docket row's identical copy. Nothing is duplicated.
 
+### Fleet pass: B-J auctions on the wrong car (2026-10-15 14:30Z on)
+
+All 78,328 Barrett-Jackson auction_events were read by heap block range: 38,652 lots on 47,569 vehicle ids. 5,496
+existing vehicles hold 2+ lots, 23,500 auctions in all. Each auction was compared with its vehicle and with its lot's
+own docket row (`vehicles.discovery_url`):
+
+| Class | Auctions | Action |
+|---|---|---|
+| The vehicle's own lot | 9,202 | kept |
+| Same year and a shared model word (a resale, or the same car under two records) | 6,881 | held for merge review |
+| Another car (different year or model), whose docket row exists | 5,987 | moved by `correct_auction_event_link`; 5,973 were duplicates of a lot the docket row already held |
+| Another car with no docket row | 1,430 | waits for that car's row |
+
+Held out of the move:
+- 12 rows whose docket row is deleted;
+- 3 priced rows whose price disagrees with the docket row's copy ($43,200 vs $20,900, $2,505 vs $71,500, $250,000 vs
+  $102,600).
+
+One row already retired showed the same disagreement ($3,000 vs a kept $4,950). Its full row is in superseded_rows.
+
+Profiling found that `auction_comments` and `auction_event_links` cascade on delete. Since #1561 the writer holds any
+auction with comments, links or predictions. None of the planned rows had any (read 14:44Z).
+
+**Orphans.** 14,246 B-J auctions point at 7,503 vehicle ids that no longer exist. The FK is NOT VALID. In a sample,
+the auctions were created 2026-02-01..27 and their vehicle_events are orphaned too. There are no merge proposals, so
+the vehicles were hard-deleted.
+- 3,603 go to their lot's docket row (almost all duplicates). 62 priced ones are held because the docket copy is
+  unpriced or its price disagrees.
+- 5,128 lots have no vehicle; 4,753 of them carry a price. lane-online-auctions (skylar-f7) is re-landing them and
+  sends the lot-to-vehicle map for the relink. The list is at ~/nuke-logs/bj-orphan-lots-no-vehicle-20261015.json.
+
+**Conceptcarz-origin rows are the main collector.** 2,695 of the 5,496 multi-lot vehicles have a listing_url of the
+form `conceptcarz://event/<id>/<title>`; 1,522 are public and 2,535 carry a B-J discovery_url. Their `sale_result`
+observation carries the B-J docket's price and the import date. Example: 0e88264f, titled "1967 Chevrolet Camaro
+SS", shows $71,500 on 2026-02-26, which is the Scottsdale 2013 Corvette docket's sale. So these look like duplicate
+records of B-J lots, not separate cars. Their identity is a merge-review question. This pass does not rewrite them;
+it only moves the auctions of other cars off them.
+
 ## What is wrong
 
 Some recorded sales sit under the wrong model, so every cohort, comp and treemap reader counts a C10 or a Chevelle
