@@ -55,6 +55,7 @@ const sources = new Map([
   ['aiGate',compile('../supabase/functions/batch-extract-snapshots/aiGate.ts')],
   ['queueRows',compile('../supabase/functions/batch-extract-snapshots/queueRows.ts')],
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
+  ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
   ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
@@ -251,6 +252,7 @@ function fixture(options = {}) {
         if(specifier==='./aiGate.ts')return load('aiGate');
         if(specifier==='./queueRows.ts')return load('queueRows');
         if(specifier==='./writeRules.ts')return load('writeRules');
+        if(specifier==='./snapshotCompare.ts')return load('snapshotCompare');
         if(specifier==='../batch-extract-snapshots/batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
