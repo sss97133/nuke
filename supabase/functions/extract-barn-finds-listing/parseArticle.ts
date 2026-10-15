@@ -28,6 +28,8 @@ export interface BarnFindsPost {
   articleText: string;
   askingPrice: number | null;
   priceText: string | null;
+  priceSentence: string | null;
+  priceMentions: PriceMention[];
   obo: boolean;
   location: string | null;
   listingPlatform: string | null;
@@ -91,13 +93,37 @@ export function identityFromTitle(title: string | null): { year: number | null; 
   return { year, make, model };
 }
 
-/** The seller's price quoted in the prose: "set their price at $107,000 OBO", "asking $12,500". */
-export function priceFromText(text: string): { price: number | null; priceText: string | null; obo: boolean } {
-  const m = text.match(/\b(?:price|asking|asks?|listed (?:for|at))\b[^$.]{0,50}\$\s?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)([^.]{0,12})/i);
-  if (!m) return { price: null, priceText: null, obo: false };
-  const price = Number(m[1].replace(/,/g, ""));
-  if (!Number.isFinite(price) || price < 100) return { price: null, priceText: null, obo: false };
-  return { price, priceText: `$${m[1]}${m[2] ?? ""}`.trim(), obo: /\bOBO\b|or best offer/i.test(m[2] ?? "") };
+export type PriceKind = "asking" | "bid" | "original_msrp" | "unknown";
+export interface PriceMention { amount: number; kind: PriceKind; text: string; sentence: string }
+
+const MSRP_RE = /\b(?:msrp|sticker|original(?:ly)?\s+(?:price|cost|sold|retail)|new (?:it|they|this)|when new|base price|cost \$|window sticker|retail price)\b/i;
+const BID_RE = /\b(?:high(?:est)? bid|current(?:ly)? bid|bid(?:ding)?\s+(?:is|was|at|to|up to|stands?|has|had|reached|currently)|bids? (?:of|to)|reserve|hammer|sold for|sold at|final bid|winning bid)\b/i;
+const ASK_RE = /\b(?:ask(?:ing)?|asks|set (?:their|the|his|her) price|price (?:at|of|is|tag)|priced (?:at|to)|listed (?:for|at)|for sale (?:for|at)|buy it now|BIN|OBO|or best offer|wants?|offered (?:for|at))\b/i;
+
+/**
+ * Every dollar amount in the prose, each with the kind the sentence says it is. Only 'asking' is a price someone is
+ * asking for the car; a bid, a sticker/MSRP figure or a number whose sentence says none of those is kept, with its sentence.
+ */
+export function priceMentions(text: string): PriceMention[] {
+  const out: PriceMention[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    for (const m of sentence.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?([kK])?(?![\d,])/g)) {
+      let amount = Number(m[1].replace(/,/g, ""));
+      if (m[2]) amount *= 1000;
+      if (!Number.isFinite(amount) || amount < 100) continue;
+      const near = sentence.slice(Math.max(0, (m.index ?? 0) - 90), (m.index ?? 0) + m[0].length + 25);
+      const kind: PriceKind = MSRP_RE.test(near) ? "original_msrp" : BID_RE.test(near) ? "bid" : ASK_RE.test(near) ? "asking" : "unknown";
+      out.push({ amount: Math.round(amount), kind, text: m[0].trim(), sentence: sentence.slice(0, 300) });
+    }
+  }
+  return out;
+}
+
+/** The seller's asking price quoted in the prose: the first mention whose sentence says asking. */
+export function priceFromText(text: string): { price: number | null; priceText: string | null; obo: boolean; sentence: string | null } {
+  const hit = priceMentions(text).find((p) => p.kind === "asking");
+  if (!hit) return { price: null, priceText: null, obo: false, sentence: null };
+  return { price: hit.amount, priceText: hit.text, obo: /\bOBO\b|or best offer/i.test(hit.sentence), sentence: hit.sentence };
 }
 
 /** "listed here on eBay in Concord, North Carolina": the platform and the place the seller gave. */
@@ -186,12 +212,12 @@ export function parseBarnFindsPost(htmlRaw: string): BarnFindsPost {
   const paragraphs = [...content.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((p) => clean(p[1])).filter((t) => t && !/^Disclosure:/i.test(t) && !isWidgetText(t));
   const articleText = paragraphs.join("\n\n");
   const id = identityFromTitle(title);
-  const { price, priceText, obo } = priceFromText(articleText);
+  const { price, priceText, obo, sentence: priceSentence } = priceFromText(articleText);
   const { platform, location } = listingFromText(articleText);
   const vin = articleText.match(/\b(?:VIN|chassis|serial)(?:\s*(?:#|number|no\.?))?\s*[:#]?\s*([A-HJ-NPR-Z0-9]{17})\b/i)?.[1]?.toUpperCase() ?? null;
   const tipster = articleText.match(/Barn Finder\s+([A-Z][\w.'-]+)/)?.[1] ?? null;
   return {
-    title, ...id, vin, articleText, askingPrice: price, priceText, obo, location, listingPlatform: platform, tipster,
+    title, ...id, vin, articleText, askingPrice: price, priceText, priceSentence, priceMentions: priceMentions(articleText).slice(0, 8), obo, location, listingPlatform: platform, tipster,
     publishedAt: article.datePublished ?? html.match(/article:published_time" content="([^"]+)"/)?.[1] ?? null,
     modifiedAt: article.dateModified ?? html.match(/article:modified_time" content="([^"]+)"/)?.[1] ?? null,
     imageUrls: imageUrls(content),

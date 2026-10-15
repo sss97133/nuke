@@ -161,7 +161,10 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
       published_at: post.publishedAt,
       modified_at: post.modifiedAt,
       price_text: post.priceText,
-      price_is_seller_asking_quoted_in_prose: post.askingPrice != null,
+      // current_price is set only from a mention the sentence calls asking; every mention is kept with its kind and sentence
+      price_kind: post.askingPrice != null ? "asking" : post.priceMentions.length ? "unknown" : null,
+      price_source_sentence: post.priceSentence,
+      price_mentions: post.priceMentions,
       obo: post.obo,
       seller_listing_platform: post.listingPlatform,
       seller_location_claim: post.location,
