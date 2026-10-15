@@ -253,6 +253,34 @@ fixture the assay accepted all four real reader rows and matched each to its
 parent's sentence; against the earlier capture-grain reader state it flagged the
 repeated listing sentence.
 
+### Repeated captures of one listing page, 2026-10-15
+
+A listing assertion's grain is one page (source, listing URL) and its projection
+inputs, not one capture. BaT live reads re-capture an unchanged page roughly every
+40 minutes, and the arrival trigger queued each capture for retained-property
+projection, so the same claims were written again per capture. Bounded reads on
+2026-10-15: all 101 description parents projected 05:37–06:37 UTC were word-for-word
+repeats of an earlier queued capture (719 of 974 retained claims that hour); all 20
+`html_match` parents in the hour to 06:42 repeated the nine projected fields; a
+0.15% block sample found 38 of 40 current description captures repeating; on the
+20 diagnostic vehicles 4,999 current claims stood for 286 listing assertions (one
+repeated 367 times). The share of the 616,038 completed projection items that came
+from repeats is unmeasured: three bounded samples hit the 10 s statement limit.
+
+Visitors see it: `get_field_provenance` lists each repeat as its own source report.
+The `typed-specifications` drill now counts these rows
+(`typed_provenance_repeated_listing_assertion`, `repeatedAssertionObservations`); an
+anonymous control at 06:47 UTC found 43 repeated rows behind three selected claims
+on two vehicles. A repeat is neither corroboration nor a new claim.
+
+The held repair changes only `trg_enqueue_retained_listing_properties()`: a
+re-capture whose projection inputs equal an earlier current, queued capture of the
+same page stays testimony and is not queued. Its contract is
+`supabase/sql/test_retained_recapture_enqueue.sql`. Existing duplicate claims and a
+provenance reader collapse are separate decisions (`get_field_provenance` is pinned by
+held PR1361). PR1361's 703-entry replay frame is 82 listing assertions on 81 vehicles.
+Private receipts: `/Users/skylar/nuke-logs/data-model-expand-20261015/recapture-load-measurements.json`.
+
 ## How to close the next repair
 
 Start from a fresh isolated worktree. Select one useful source-to-consumer case and its relevant
