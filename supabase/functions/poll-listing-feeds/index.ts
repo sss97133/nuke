@@ -48,6 +48,7 @@ import {
   type LedgerKnown,
 } from "./ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { sweepCraigslistRemovals } from "./removal.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1268,6 +1269,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Removal sweep: ask a few landed Craigslist posts whether they still exist (a 404 ends the listing).
+    // Same site, same pacing, and only with the time and the Craigslist budget this invocation has left.
+    let removals: Awaited<ReturnType<typeof sweepCraigslistRemovals>> | null = null;
+    if ((!source || source === "craigslist") && !budget.refusal("craigslist")?.match(/paused|source_limit|billing|rate_limited|blocked/)) {
+      removals = await sweepCraigslistRemovals({
+        supabase,
+        remainingMs: () => budget.remainingMs(),
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        probe: async (url) => {
+          const r = await archiveFetch(url, {
+            platform: "craigslist", skipCache: true, useFirecrawl: false, includeMarkdown: false,
+            directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds",
+          } as any);
+          return { status: r.statusCode, observed_at: new Date().toISOString(), snapshot_id: r.snapshotId };
+        },
+      }, 5);
+    }
+
     const elapsed = Date.now() - startTime;
     console.log(
       `[poll-feeds] Done. ${dueFeeds.length} feeds polled, ${totalFound} items found, ${totalQueued} new queued, ${totalIngested} new ingested in ${elapsed}ms`
@@ -1282,6 +1301,7 @@ Deno.serve(async (req) => {
         feeds_selected: dueFeeds.length,
         feed_selection_complete: feeds.length <= 2000,
         throttle: budget.snapshot(),
+        removals,
         total_items_found: totalFound,
         total_new_queued: totalQueued,
         total_new_ingested: totalIngested,
