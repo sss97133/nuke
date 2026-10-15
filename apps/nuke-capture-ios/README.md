@@ -81,7 +81,9 @@ Standing rules the code carries:
   Contributions are passive (photos at the organization's locations, its images, timeline events, contractor work),
   because nobody at work spends a minute in the app. Reads: `user_org_relations` (the profile's list) and
   `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. The list shows on the
-  person's own profile only (the owner took organizations off the profile face on 2026-06-13). Membership still
+  person's own profile only (the owner took organizations off the profile face on 2026-06-13), and only live and
+  stalling relations, warmest first: "only show active orgs. its annoying that evening side projects surface to top
+  billing." Membership still
   decides permissions and the contributor gate (`fetchActiveOrgMemberships`).
 - **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
   original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
