@@ -64,3 +64,43 @@ Deno.test('a year at the end of an older catalogue title is the car\'s year', ()
 Deno.test('a trailing number that is not a year is left alone', () => {
   equal(parseTitle('A set of 12 spark plugs 7777').year, null);
 });
+
+Deno.test('a headline ahead of the car line is provenance, not the make; the year glued to it is still read', () => {
+  const a = parseTitle('The ex-Peter Thornton, Ian Dalglish actively and successfully campaigned,1960 Aston Martin DB4 GT Chassis no. 370/0110/GT (original engine offered with it)');
+  equal([a.year, a.make, a.model], [1960, 'Aston Martin', 'DB4 GT']);
+  equal(a.blurb, 'The ex-Peter Thornton, Ian Dalglish actively and successfully campaigned');
+  const b = parseTitle('Formerly the property of Rudolf Lilljeqvist,1915/1919 Mercedes 22/50hp Open Tourer Chassis no. 17-759 Engine no. 25-546');
+  equal([b.year, b.make, b.year_range], [null, 'Mercedes-Benz', '1915-1919']);
+  const c = parseTitle('Unrestored survivor, 31,370 miles from new 1963 Maserati 3500 GTi Superleggera Coupe Coachwork by Touring');
+  equal([c.year, c.make], [1963, 'Maserati']);
+  const d = parseTitle('The Ex-Barry Sheene 1983 Suzuki RG500 XR40 Racing');
+  equal([d.year, d.make, d.blurb], [1983, 'Suzuki', 'The Ex-Barry Sheene']);
+  const e = parseTitle('Ex-Charles Pozzi 1952 FERRARI 212 EUROPA COUPE Chassis no. 0277EU');
+  equal([e.year, e.make], [1952, 'Ferrari']);
+});
+
+Deno.test('an out-of-range year is not a year, and a make the list lacks falls back to the comma split', () => {
+  equal(parseTitle('1790 Ferrari 365GTB/4 Daytona Chassis no. 16035').year, null);
+  const a = parseTitle('Originally the property of Olry Roederer of the champagne house Louis Roderer, Reims,1904 CGV 6¼-Litre Type H1 Four-Cylinder Side-entrance Phaeton');
+  equal([a.year, a.make], [1904, 'CGV']);
+});
+
+Deno.test('a make is matched on a word boundary and longest first', () => {
+  equal(parseTitle('1963 Acura NSX').make, 'Acura');
+  equal(parseTitle('1965 Lotus-Ford Type 30').model, 'Ford Type 30');
+  equal(parseTitle('1931 Rolls-Royce Phantom II').make, 'Rolls-Royce');
+});
+
+Deno.test('an engine size ahead of the make stays with the model', () => {
+  const a = parseTitle("The Ex-Giuseppe Campari,1933 2-litre Maserati 4 Cilindri Monoposto Chassis no. 2000");
+  equal([a.year, a.make, a.model], [1933, 'Maserati', '2-litre 4 Cilindri Monoposto']);
+});
+
+Deno.test('a headline, a year range and a make: the year stays null and the range is kept', () => {
+  const a = parseTitle('The Ex-Dan Hagerty,1969-70 Lola-Chevrolet T70GT Mark IIIB Group 4 Racing Coupe Chassis no. SL73/128');
+  equal([a.year, a.make, a.year_range], [null, 'Lola', '1969-70']);
+  const b = parseTitle('1937/8 Buick Sedan Chassis no. 844198084');
+  equal([b.year, b.make, b.year_range], [1937, 'Buick', '1937-1938']);
+  const c = parseTitle('Property of a deceased estate,Jaguar D-Type 4.5-Litre Replica Chassis no. 12700');
+  equal([c.year, c.make, c.blurb], [null, 'Jaguar', 'Property of a deceased estate']);
+});
