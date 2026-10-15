@@ -34,6 +34,19 @@ struct TodayView: View {
                         .foregroundStyle(.orange)
                     }
                 }
+                if let problem = engine.authProblem {
+                    Section {
+                        Label(problem, systemImage: "person.crop.circle.badge.exclamationmark")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                if engine.gaveUpCount > 0 {
+                    Section {
+                        Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 if let error = engine.backfillError, engine.backfillRemaining > 0 {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.secondary)

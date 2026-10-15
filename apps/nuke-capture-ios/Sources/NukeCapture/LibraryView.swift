@@ -57,6 +57,7 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                AuthProblemBanner()
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns),
                     spacing: spacing
@@ -494,5 +495,21 @@ struct LibraryCell: View {
                 loader.cancel()
                 if let lid = localID { overlay.forget(lid) }
             }
+    }
+}
+
+/// The server refused the sign-in during a sync: nothing uploads until it is fixed. Shown on the
+/// Library because that is where a signed-in owner lands. Its own view, so SyncEngine's frequent
+/// publishes re-render this line and not the grid.
+struct AuthProblemBanner: View {
+    @ObservedObject private var engine = SyncEngine.shared
+    var body: some View {
+        if let problem = engine.authProblem {
+            Label(problem, systemImage: "person.crop.circle.badge.exclamationmark")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+        }
     }
 }
