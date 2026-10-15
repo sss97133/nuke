@@ -12,6 +12,7 @@ import { squarify } from '../lib/squarify';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
+import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -879,6 +880,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
   // Determine active data and level type
+  // The top level as brands, or as brands with their families inside (finviz's map of the market).
+  const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
+
   const levelType: MapLevel =
     currentLevel.year ? 'vehicles' :
     currentLevel.model ? 'years' :
@@ -1330,6 +1334,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ENTER FEED
             </button>
           )}
+          {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
+            options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
@@ -1385,7 +1391,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             position: 'relative',
           }}
         >
-          {rects.map((rect, i) => {
+          {levelType === 'brands' && brandView === 'nested' && dims.w > 0 ? (
+            <BrandFamilyMap width={dims.w} height={dims.h}
+              onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
+              onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
+          ) : rects.map((rect, i) => {
             const repImg = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
               : undefined;
