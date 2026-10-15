@@ -2,6 +2,8 @@
 // estimate, first images) and each sale's /events/event/<name> page (run day and place). The site is server-rendered, so a plain
 // fetch of those pages carries everything the calendar needs. Pure functions, tested in roster.test.ts.
 
+import { htmlToText } from '../_shared/htmlToText.ts';
+
 export interface RosterCard {
   url: string;          // https://www.broadarrowauctions.com/vehicles/lv26_r0006/2003-ferrari-enzo
   code: string;         // lv26
@@ -21,7 +23,7 @@ export interface RosterCard {
 const CURRENCY: Array<[RegExp, string]> = [[/€/, 'EUR'], [/£/, 'GBP'], [/CHF/i, 'CHF'], [/\$/, 'USD']];
 
 function text(s: string): string {
-  return s.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return htmlToText(s).replace(/\s+/g, ' ').trim();
 }
 
 function money(s: string): number | null {
@@ -65,7 +67,7 @@ export function parseEventPage(html: string, saleName: string): RosterEvent {
   // Fold accents to find the sale name ("Zürich" on a card, "Zurich" on its page); the text itself keeps its accents. Folding
   // precomposed letters keeps the length, so an index in the folded text is an index in the original.
   const fold = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const t = text(html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' '));
+  const t = text(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*[^>]*>/gi, ' '));
   const ft = fold(t);
   const name = fold(saleName);
   let starts: string | null = null, ends: string | null = null, at = -1;
