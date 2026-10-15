@@ -171,9 +171,17 @@ whether the row's price is the Conceptcarz car's result or the docket car's must
 
 This makes the Conceptcarz rows the larger and harder half of the batch.
 
-1. The fleet count: `sum(conflicts)` over the fold's `sold` rows, by family. This is available after the first build.
-   It counts sales whose own page names their model year but no phrase of their family. That's a lower bound,
-   because pages without a descriptive slug are not tested.
+1. **The fleet count, from the fold's first build (2026-10-15 18:45Z).** It counts sales whose own page names their
+   model year but no phrase of their family. It is a lower bound, because pages without a descriptive slug are not
+   tested.
+   - Exact on single-year rows (`year_from = year_to`, so no sale is counted twice): 6,317 refused beside 206,146
+     kept, 3.0%, on 1,463 of 4,281 rows. Every sold row together reports 25,917, but windows overlap.
+   - Largest by family: BMW M3 902 (vs 2,667 kept), Corvette 243 (vs 13,498), Firebird 208, BMW Z3 187, Mustang 172,
+     Jaguar XK 138, BMW M5 133, C10 128, Bel Air 112, Sierra and Silverado 107 each.
+   - The BMW counts are a fold bug, not hybrids: the rule kept only aliases of 3+ characters, so "m3", "z3", "m5"
+     and "x5" named nothing. Fixed in `mv_family_year_prices_v2` (20261017053000), which skylar-b7's venue swap
+     installs.
+   - The fold read this morning's outcomes, so today's repairs (above) show at the next treemap refresh.
 2. Row selection for the batch: `scripts/bat-corrections/select_hybrid_candidates.sh <out> <family_id>[:<y0>:<y1>]`.
    Per family, it reads `mv_treemap_outcomes` through its cell index (brand, model, year).
    Join the family names, fetch only the matched rows' pages, and apply the same conflict rule.
