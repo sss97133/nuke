@@ -1017,6 +1017,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  // A drill or a view switch replaces the tiles under the pointer, and the tile a tooltip came from can no longer clear it:
+  // over the sales chart the 911 tile's tooltip stayed on screen (2026-10-15).
+  useEffect(() => { setTooltip(null); }, [drillStack, brandView, familyView]);
 
   // Drill down — continuous zoom: makes → models → years → vehicles → profile
   const [clickOrigin, setClickOrigin] = useState<{ x: number; y: number } | null>(null);
