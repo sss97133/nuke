@@ -1,3 +1,4 @@
+// Redeployed 2026-10-15 for the archiveFetch login-heuristic and cache fix (PR 1616).
 // ClassicCars.com listing extractor - no LLM. The page is server-rendered; the parsing lives in ./extract.ts (pure, tested
 // against a stored page). Every fetch is archived to listing_page_snapshots by archiveFetch before it is parsed.
 // Returns { success, extracted }; `ingest` reads that shape and does the vehicle write.
