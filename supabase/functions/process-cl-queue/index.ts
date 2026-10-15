@@ -82,11 +82,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Listing data needs no user: vehicles.user_id, vehicle_images.user_id and timeline_events.user_id are nullable.
+    // With no profile to attribute to, rows are written with user_id null instead of stopping the queue.
     if (!importUserId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No user_id found. Please provide user_id or ensure users exist.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+      importUserId = null
+      console.warn('No import user found; writing Craigslist rows with user_id null')
     }
 
     console.log('🔄 Processing Craigslist queue...')
