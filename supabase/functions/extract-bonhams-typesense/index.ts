@@ -440,17 +440,25 @@ Deno.serve(async (req) => {
       const SORT = "auctionEndDate.timestamp:desc";
 
       let pageNo = Number(page) > 1 ? Number(page) : 0;
+      let pass = 0;
       if (!pageNo) {
-        const { data: last } = await supabase
+        // The cursor is the furthest page of the newest pass (metadata.ts_pass, absent = pass 0), not the latest row written:
+        // a stray page-1 landing, or a failed read read as "nothing landed", used to send the walk back to page 1 (10:42Z
+        // 2026-10-15: 150 lots per 20 minutes became re-landing pages 1-4). A failed read now stops the run.
+        const { data: last, error: curErr } = await supabase
           .from("vehicle_events")
           .select("metadata")
           .eq("source_platform", "bonhams")
           .eq("extraction_source", "bonhams-typesense")
           .eq("metadata->>ts_sort", "desc")
-          .not("metadata->>ts_landed_at", "is", null)
-          .order("metadata->>ts_landed_at", { ascending: false })
+          .not("metadata->>ts_page", "is", null)
+          .order("metadata->ts_pass", { ascending: false, nullsFirst: false })
+          .order("metadata->ts_page", { ascending: false })
           .limit(1);
-        const lastPage = Number((last?.[0]?.metadata as Record<string, unknown> | undefined)?.ts_page);
+        if (curErr) return okJson({ success: false, error: `cursor read failed: ${curErr.message}` }, 503);
+        const m = (last?.[0]?.metadata ?? {}) as Record<string, unknown>;
+        const lastPage = Number(m.ts_page);
+        pass = Number.isFinite(Number(m.ts_pass)) ? Number(m.ts_pass) : 0;
         pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
       }
 
@@ -474,6 +482,7 @@ Deno.serve(async (req) => {
         // Past the last page: wrap to page 1 (a revisit), 2 s after the previous request.
         await new Promise((r) => setTimeout(r, 2000));
         pageNo = 1;
+        pass += 1; // a new pass over the index: its cursor outranks every page of the last pass
         res = await fetchPage(pageNo);
         if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
         if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
@@ -521,6 +530,7 @@ Deno.serve(async (req) => {
           extra_metadata: {
             ts_landed_at: observedAt,
             ts_sort: "desc",
+            ts_pass: pass,
             sale_key: `bonhams-${doc.auctionId}`,
             auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
               ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],
