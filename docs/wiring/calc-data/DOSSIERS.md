@@ -489,7 +489,7 @@ Kit: WPAPP30 ×1 (on the cart change) [1]
 2. chapters/18-construction-and-segmentation.md §7 (IPC/WHMA-A-620 §19.1 values)
 3. prowire p-2025 page
 4. prowire p-2026 page
-5. prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)"
+5. prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)", fetched 2026-09-26
 6. tools.yaml
 7. chapters/18 §7 (IPC/WHMA-A-620 §19.1)
 8. owner 2026-09-26; chapters/18 §6–8
