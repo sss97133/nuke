@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import FamilySalesChart, { batMove, logTicks, parseFamilySales, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
+import FamilySalesChart, { batMove, eraMoves, eraOf, logTicks, mixFixed, parseFamilySales, quantile, rollingBand, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
 
 const DAY = 86_400_000;
 const now = Date.now();
@@ -62,7 +62,7 @@ it('draws one dot per sale, the venues with their counts, and BaT\'s 12-month me
   expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(12);
   expect([...container.querySelectorAll('.family-sales__venue')].map((n) => n.textContent)).toEqual(['BaT 11', 'Mecum 1']);
   expect(container.querySelector('.family-sales__move')?.textContent).toContain('BaT median, last 12 mo (6)');
-  expect(container.querySelector('.family-sales__plot')?.getAttribute('aria-label')).toBe('911: 12 sales over five years, price against date');
+  expect(container.querySelector('.family-sales__plot')?.getAttribute('aria-label')).toBe('911 1990s: 12 sales over five years, price against date');
 });
 
 it('says so when the family has no dated sales, or the read fails', async () => {
@@ -115,4 +115,60 @@ it('hides a venue from the legend: its dots go, the median follows the rest, the
   expect(ticks()).toBe(before);
   await act(async () => (mecum as HTMLButtonElement).click());
   expect(dots()).toBe(8);
+});
+
+describe('the chart by model-year decade', () => {
+  it('bands a sale by its model year\'s decade, and an unknown year as such', () => {
+    expect(eraOf(1995)).toBe('1990s');
+    expect(eraOf(2004)).toBe('2000s');
+    expect(eraOf(null)).toBe('year unknown');
+    expect(eraOf(0)).toBe('year unknown');
+  });
+  it('interpolates quantiles and draws the middle half only where enough sales stand', () => {
+    expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
+    expect(quantile([10, 20, 30, 40, 50], 0.25)).toBe(20);
+    const pts = Array.from({ length: 10 }, (_, i) => ({ t: i * DAY, usd: 100 + i }));
+    const band = rollingBand(pts, 14, 60, 8);
+    expect(band[0]).toEqual({ t: 0, p25: quantile(pts.map((p) => p.usd), 0.25), p50: quantile(pts.map((p) => p.usd), 0.5), p75: quantile(pts.map((p) => p.usd), 0.75) });
+    expect(rollingBand(pts.slice(0, 5), 14, 60, 8)).toEqual([]);
+  });
+  it('holds last year\'s mix of decades: a shift toward dear decades does not read as a price rise', () => {
+    // 1990s cheap, 2020s dear; both flat in price; the last year sold more of the dear ones.
+    const mk = (i: number, ago: number, usd: number, year: number): Sale =>
+      ({ vehicle_id: `v${i}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: '911' });
+    const sales: Sale[] = [];
+    let i = 0;
+    for (let k = 0; k < 20; k++) sales.push(mk(i++, 400, 50_000, 1995));
+    for (let k = 0; k < 20; k++) sales.push(mk(i++, 400, 200_000, 2021));
+    for (let k = 0; k < 20; k++) sales.push(mk(i++, 30, 50_000, 1996));
+    for (let k = 0; k < 60; k++) sales.push(mk(i++, 30, 200_000, 2022));
+    const moves = eraMoves(sales, now);
+    expect(moves.map((m) => m.era)).toEqual(['1990s', '2020s']);
+    expect(moves.every((m) => m.last === m.prior)).toBe(true);
+    expect(mixFixed(moves)).toEqual({ change: 0, nLast: 80, nPrior: 40, eras: 2 });
+    expect(batMove(sales, now)!.last).toBeGreaterThan(batMove(sales, now)!.prior);
+  });
+  it('says nothing for one decade, or under 15 BaT sales a year in a decade', () => {
+    expect(mixFixed([{ era: '1990s', last: 2, prior: 1, nLast: 20, nPrior: 20 }])).toBeNull();
+    const few: Sale[] = Array.from({ length: 10 }, (_, k) => ({ vehicle_id: `f${k}`, sale_date: day(30 + 400 * (k % 2)), usd: 9000, source: 'Bring a Trailer', year: 1970, model: '911' }));
+    expect(eraMoves(few, now)).toEqual([]);
+  });
+});
+
+it('draws a panel per decade with eight or more sales, counts the rest, and counts sales past the price axis', async () => {
+  const mk = (i: number, ago: number, usd: number, year: number | null): Sale =>
+    ({ vehicle_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: '911' });
+  const sales: Sale[] = [];
+  let i = 1;
+  for (let k = 0; k < 40; k++) sales.push(mk(i++, 10 + k * 20, 60_000 + k * 1000, 1995));
+  for (let k = 0; k < 40; k++) sales.push(mk(i++, 15 + k * 20, 150_000 + k * 1000, 2016));
+  for (let k = 0; k < 3; k++) sales.push(mk(i++, 30 + k, 900_000, 1973));
+  sales.push(mk(i++, 40, 3_400_000, 2019));
+  fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="f911" family="911" width={1200} height={600} onOpen={() => {}} />));
+  const labels = [...container.querySelectorAll('svg.family-sales__plot')].map((p) => p.getAttribute('aria-label'));
+  expect(labels).toEqual(['911 1990s: 40 sales over five years, price against date', '911 2010s: 41 sales over five years, price against date']);
+  expect(container.querySelector('.family-sales__title')?.textContent).toContain('3 with a rare or unknown model year not drawn');
+  expect(container.querySelectorAll('svg.family-sales__plot path.family-sales__edge').length).toBeGreaterThan(0);
+  expect(container.querySelector('.family-sales__title')?.textContent).toMatch(/· \d+ outside \$[\d.]+K–\$[\d.]+[KM] on the edge/);
 });
