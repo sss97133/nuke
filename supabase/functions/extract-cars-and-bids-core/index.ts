@@ -933,8 +933,19 @@ Deno.serve(async (req) => {
       // NOTE: Do NOT include user_id field - omitting it allows the constraint to pass
       // The attribution check requires either user_id OR (source='*_import' with specific fields)
       const photoKey = (u: string) => u.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "").split("?")[0];
-      const { data: heldImgs } = await supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
-      const held = new Set((heldImgs ?? []).map((r: { image_url: string }) => photoKey(r.image_url)));
+      const { data: heldImgs } = await supabase.from("vehicle_images").select("id, image_url, exif_data").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
+      const fullRes = (u: string) => /width=2080[,/]/.test(u);
+      const current = new Set(extracted.images.map(photoKey));
+      const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
+      // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
+      // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
+      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      if (stale.length) {
+        const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
+        if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);
+      }
+      const staleSet = new Set(stale);
+      const held = new Set((heldImgs ?? []).filter((r: { id: string }) => !staleSet.has(r.id)).map((r: { image_url: string }) => photoKey(r.image_url)));
       const imageRows = extracted.images.filter((u) => !held.has(photoKey(u))).slice(0, 200).map((url, idx) => ({
         vehicle_id: vehicleId,
         image_url: url,
