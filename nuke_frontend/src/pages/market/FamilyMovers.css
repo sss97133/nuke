@@ -11,3 +11,8 @@
 .map-movers__item--up { border-left: 3px solid var(--success); }
 .map-movers__item--down { border-left: 3px solid var(--error); }
 @media (max-width: 760px) { .map-movers__row { grid-template-columns: 1fr; gap: 2px; } .map-movers__base { display: none; } }
+/* The two years behind a mover: 24 month-length bars, the year before faint, the last year in the chip's direction. */
+.map-movers__spark { display: block; align-self: center; flex-shrink: 0; }
+.map-movers__bar--prior { fill: var(--text-disabled); }
+.map-movers__spark--up .map-movers__bar--recent { fill: var(--success); }
+.map-movers__spark--down .map-movers__bar--recent { fill: var(--error); }
