@@ -12,9 +12,15 @@
 //     • a session = one day at one GPS cell = one truck. If ANY frame in a
 //       session got a VIN hit, the whole session inherits that vehicle.
 //
-// Trust: a VIN match PROMOTES vehicle_id (definitive). Session inheritance is
-// written as a SUGGESTION (auto_suggested_vehicle_id + confidence) for the
-// owner to confirm — never a raw vehicle_id from an unconfirmed guess.
+// Trust: nothing here writes vehicle_id. A VIN match and a session inheritance are both
+// SUGGESTIONS (auto_suggested_vehicle_id + confidence + reasons); the owner files them in
+// the confirm sheet, which goes through attribute_image_session → attribute_testimony
+// (audited). The VIN match used to write vehicle_id with a raw client UPDATE, outside the
+// sanctioned writers and without an audit row (2026-10-15).
+//
+// The vehicles matched against are every vehicle the account holds by user_id OR owner_id:
+// user_id alone saw 5 VINs of the owner's 211 vehicles and missed the Charger and the
+// Mustang, which he holds by owner_id.
 //
 // Feature-print similarity is deliberately NOT the decider: the live test
 // proved Apple's generic print can't separate same-bodystyle trucks
@@ -31,6 +37,8 @@ final class AttributionEngine: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var lastSummary: String?
     @Published private(set) var progress: (done: Int, total: Int) = (0, 0)
+    /// This run's suggestion per image id, so the confirm sheet can lead with it.
+    @Published private(set) var suggestionByImage: [String: String] = [:]
 
     // ─── DB shapes ───────────────────────────────────────────────────────────
     private struct VehicleRow: Decodable { let id: String; let vin: String? }
@@ -43,12 +51,6 @@ final class AttributionEngine: ObservableObject {
         let exif_data: Exif?
     }
     private struct SuggestUpdate: Encodable {
-        let auto_suggested_vehicle_id: String
-        let auto_suggestion_confidence: Double
-        let auto_suggestion_reasons: [String]
-    }
-    private struct PromoteUpdate: Encodable {
-        let vehicle_id: String
         let auto_suggested_vehicle_id: String
         let auto_suggestion_confidence: Double
         let auto_suggestion_reasons: [String]
@@ -66,7 +68,7 @@ final class AttributionEngine: ObservableObject {
 
         // Known vehicles + VINs (the small set we fuzzy-match against).
         let knownVehicles = await fetchKnownVehicles(userId: userId)
-        let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count == 17 }
+        let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count >= 8 }
         let vinToVehicle = Dictionary(uniqueKeysWithValues:
             knownVehicles.compactMap { v in v.vin.map { ($0.uppercased(), v.id) } })
 
@@ -78,18 +80,24 @@ final class AttributionEngine: ObservableObject {
         struct Signal { let row: OrphanRow; let isVehicle: Bool; let vinVehicleId: String?; let vinDist: Int?; let session: String }
         var signals: [Signal] = []
         var vinHits = 0, skippedNonLocal = 0
+        suggestionByImage = [:]
 
         for row in orphans {
             defer { progress.done += 1 }
             guard let assetID = row.exif_data?.uuid,
                   let cg = await VisionEngine.loadCGImage(assetID: assetID) else { skippedNonLocal += 1; continue }
 
-            let cls = VisionEngine.classify(cg)
+            // Classify and OCR off the main actor (accurate OCR is seconds per frame).
+            let vins = knownVINs
+            let (isVehicle, match) = await Task.detached(priority: .utility) {
+                (VisionEngine.classify(cg)?.isVehicle ?? false,
+                 vins.isEmpty ? nil : VisionEngine.matchVIN(cg, knownVINs: vins))
+            }.value
             var vinVehicleId: String? = nil, vinDist: Int? = nil
-            if !knownVINs.isEmpty, let m = VisionEngine.matchVIN(cg, knownVINs: knownVINs) {
+            if let m = match {
                 vinVehicleId = vinToVehicle[m.vin]; vinDist = m.editDistance; if vinVehicleId != nil { vinHits += 1 }
             }
-            signals.append(Signal(row: row, isVehicle: cls?.isVehicle ?? false,
+            signals.append(Signal(row: row, isVehicle: isVehicle,
                                   vinVehicleId: vinVehicleId, vinDist: vinDist, session: sessionKey(row)))
         }
 
@@ -97,24 +105,26 @@ final class AttributionEngine: ObservableObject {
         var sessionVehicle: [String: String] = [:]
         for s in signals where s.vinVehicleId != nil { sessionVehicle[s.session] = s.vinVehicleId }
 
-        // PASS B — write verdicts.
-        var promoted = 0, suggested = 0, unresolved = 0
+        // PASS B — write suggestions; the owner files them.
+        var vinSuggested = 0, suggested = 0, unresolved = 0
         for s in signals {
             if let vid = s.vinVehicleId {
                 let conf = [0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93
-                await promote(imageId: s.row.id, vehicleId: vid, conf: conf,
+                await suggest(imageId: s.row.id, vehicleId: vid, conf: conf,
                               reasons: ["vin_ocr_match", "edit_distance=\(s.vinDist ?? 0)"])
-                promoted += 1
+                suggestionByImage[s.row.id] = vid
+                vinSuggested += 1
             } else if let vid = sessionVehicle[s.session], s.isVehicle {
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: 0.80,
                               reasons: ["session_inheritance", "vin_anchored_session", "session=\(s.session)"])
+                suggestionByImage[s.row.id] = vid
                 suggested += 1
             } else {
                 unresolved += 1   // no VIN, no anchored session, or not a vehicle frame → owner/server tier
             }
         }
 
-        lastSummary = "\(promoted) routed (VIN) · \(suggested) suggested (session) · \(unresolved) unresolved · \(skippedNonLocal) not local · \(vinHits) VIN reads"
+        lastSummary = "\(vinSuggested) VIN reads to confirm · \(suggested) suggested by session · \(unresolved) unresolved · \(skippedNonLocal) not on this phone"
         NSLog("NukeCapture attribution: %@", lastSummary ?? "")
         return true
     }
@@ -132,7 +142,7 @@ final class AttributionEngine: ObservableObject {
     private func fetchKnownVehicles(userId: String) async -> [VehicleRow] {
         do {
             return try await SupabaseService.client.from("vehicles")
-                .select("id, vin").eq("user_id", value: userId).execute().value
+                .select("id, vin").or("user_id.eq.\(userId),owner_id.eq.\(userId)").execute().value
         } catch { NSLog("attribution fetchKnownVehicles: %@", String(describing: error)); return [] }
     }
 
@@ -147,15 +157,6 @@ final class AttributionEngine: ObservableObject {
                 .limit(limit)
                 .execute().value
         } catch { NSLog("attribution fetchOrphans: %@", String(describing: error)); return [] }
-    }
-
-    private func promote(imageId: String, vehicleId: String, conf: Double, reasons: [String]) async {
-        do {
-            try await SupabaseService.client.from("vehicle_images")
-                .update(PromoteUpdate(vehicle_id: vehicleId, auto_suggested_vehicle_id: vehicleId,
-                                      auto_suggestion_confidence: conf, auto_suggestion_reasons: reasons))
-                .eq("id", value: imageId).execute()
-        } catch { NSLog("attribution promote: %@", String(describing: error)) }
     }
 
     private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String]) async {
@@ -217,7 +218,7 @@ final class AttributionEngine: ObservableObject {
                 .execute().value
             let vehicles: [OwnerVehicle] = try await SupabaseService.client.from("vehicles")
                 .select("id, year, make, model, primary_image_url")
-                .eq("user_id", value: userId)
+                .or("user_id.eq.\(userId),owner_id.eq.\(userId)")
                 .order("updated_at", ascending: false)
                 .execute().value
             orphanSessions = sessions
