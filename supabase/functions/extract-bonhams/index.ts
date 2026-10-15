@@ -20,6 +20,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { cleanVehicleFields, stripHtmlTags, containsHtml } from "../_shared/pollutionDetector.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
@@ -1370,25 +1371,44 @@ Deno.serve(async (req) => {
         .order("ended_at", { ascending: false, nullsFirst: false })
         .limit(limit);
       if (todoErr) throw new Error(`deep_lots queue read failed: ${todoErr.message}`);
-      const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
+      const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, credits_used: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
+      // Credit floor: Cars & Bids keeps its 5,000. Stop when what is left would cut into it.
+      const floor = Number(body.credit_floor) || 5000;
+      let credits = 0;
+      {
+        const usage = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", { headers: { Authorization: `Bearer ${Deno.env.get("FIRECRAWL_API_KEY") ?? ""}` } }).then((r) => r.json()).catch(() => null); // guardrail-allow: raw-fetch
+        const left = Number(usage?.data?.remaining_credits);
+        if (!Number.isFinite(left) || left - (todo?.length ?? 0) < floor) {
+          return new Response(JSON.stringify({ success: true, picked: todo?.length ?? 0, done: 0, stopped: "credit_floor", remaining_credits: Number.isFinite(left) ? left : null, floor }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
       let first = true;
       for (const ev of todo ?? []) {
         if (Date.now() - started > BUDGET_MS) break;
         if (!first) await new Promise((r) => setTimeout(r, spacing));
         first = false;
         const url = String(ev.source_url).replace(/\/?$/, "/");
-        // Not archiveFetch: it keeps the whole 300 KB page inline in listing_page_snapshots, which at 2,880 lots a day is
-        // ~200 MB a day on a small database. The observation keeps the lot and auction data parsed from the page (raw_data),
-        // which is what the page holds; the page's markup is not retained.
-        let res: Response;
-        try {
-          res = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "text/html" } }); // guardrail-allow: raw-fetch
-        } catch (e: any) {
-          out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: fetch ${String(e?.message ?? e).slice(0, 100)}`);
-          continue;
+        // Bonhams answers 403 to this function's address, so the page is read through Firecrawl (rawHtml, 1 credit a page).
+        // Every response is retained first: the body goes to the listing-snapshots bucket and a listing_page_snapshots row
+        // points at it (the table's own convention for large pages), then the page is parsed and landed.
+        const fc = await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 });
+        credits++;
+        const status = Number(fc.raw?.data?.metadata?.statusCode ?? fc.httpStatus ?? 0);
+        const rawHtml: string | null = typeof fc.raw?.data?.rawHtml === "string" ? fc.raw.data.rawHtml : fc.data.html;
+        if (fc.httpStatus === 402 || fc.httpStatus === 429) { out.backoff = `Firecrawl HTTP ${fc.httpStatus}`; break; }
+        if (rawHtml) {
+          try {
+            const bytes = new TextEncoder().encode(rawHtml);
+            const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map((b) => b.toString(16).padStart(2, "0")).join("");
+            const path = `bonhams/lot-pages/${sha}.html`;
+            await supabase.storage.from("listing-snapshots").upload(path, bytes, { contentType: "text/html", upsert: true });
+            await supabase.from("listing_page_snapshots").insert({
+              platform: "bonhams", listing_url: url, fetched_at: new Date().toISOString(), fetch_method: "firecrawl", http_status: status || null,
+              success: status === 200, html: null, html_storage_path: path, html_sha256: sha, content_length: bytes.length,
+              metadata: { caller: "extract-bonhams-deep", listing_key: ev.source_listing_id, credits: 1 },
+            });
+          } catch (_) { /* a duplicate or a storage hiccup must not lose the parse; the page is parsed below */ }
         }
-        const status = res.status;
-        if (status === 403 || status === 429) { out.backoff = `HTTP ${status}`; break; }
         const observedAt = new Date().toISOString();
         if (status === 404 || status === 410) {
           await writeVehicleEventByKey(supabase, {
@@ -1398,8 +1418,8 @@ Deno.serve(async (req) => {
           out.gone++;
           continue;
         }
-        if (status !== 200) { out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: HTTP ${status}`); continue; }
-        const page = parseLotPage(await res.text());
+        if (status !== 200 || !rawHtml) { out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: HTTP ${status} ${fc.error ?? ""}`.trim()); continue; }
+        const page = parseLotPage(rawHtml);
         if (!page) { out.backoff = "not a lot page (challenge or changed shape)"; break; }
 
         try {
@@ -1409,7 +1429,7 @@ Deno.serve(async (req) => {
           out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
         }
       }
-      return new Response(JSON.stringify({ success: true, ...out, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: true, ...out, credits_used: credits, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── Re-enrich action ─────────────────────────────────────────────────
