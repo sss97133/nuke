@@ -8,6 +8,7 @@ else it could be), an end's id is not a registry endpoint, or an end follows a b
 Run: python3 docs/wiring/calc-data/mounts_v5.py
 """
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,11 +47,17 @@ def lint(boxes, statuses=STATUSES, kind="box"):
         if pos is not None:
             # a placed box lands on the route graph (load_map_rows -> load_harness_topology_points): coordinates in the twin
             # frame, with the study or record they come from and how sure it is (RSI pass 31)
-            bad = [k for k in ("node", "frame", "x", "y", "z", "source", "confidence") if pos.get(k) in (None, "")]
+            # a box names its route-graph point `node`; an end names the `point` it sits on (RSI pass 35), which the
+            # route graph keys by [A-Za-z0-9_] (key_harness_endpoints_to_topology)
+            pk = "node" if kind == "box" else "point"
+            bad = [k for k in (pk, "frame", "x", "y", "z", "source", "confidence") if pos.get(k) in (None, "")]
             if bad or pos.get("frame") != "twin" or not all(isinstance(pos.get(k), (int, float)) for k in ("x", "y", "z")):
-                errors.append(f"{bid}: position needs node, frame twin, numeric x/y/z, source and confidence (missing {bad})")
-            if b.get("status") not in ("decided", "proposed"):
-                errors.append(f"{bid}: a position belongs to a decided or proposed box, not {b.get('status')!r}")
+                errors.append(f"{bid}: position needs {pk}, frame twin, numeric x/y/z, source and confidence (missing {bad})")
+            elif not re.fullmatch(r"[A-Za-z0-9_]+", str(pos.get(pk))):
+                errors.append(f"{bid}: position {pk} {pos.get(pk)!r} must be letters, digits and underscores")
+            ok = ("decided", "proposed") if kind == "box" else ("decided", "proposed", "fixed_by_engine", "flag")
+            if b.get("status") not in ok:
+                errors.append(f"{bid}: a position belongs to a {' or '.join(ok)} {kind}, not {b.get('status')!r}")
         if b.get("status") in ("flag", "open") and not (b.get("open") or b.get("instead")):
             errors.append(f"{bid}: {b['status']} {kind} must say what is open or what else it could be")
     return errors
