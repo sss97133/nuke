@@ -15,6 +15,8 @@
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
+import { identityConflict } from "../_shared/identityMatch.ts";
+import { recordRevision } from "../_shared/revision.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { endedRow } from "../poll-listing-feeds/removal.ts";
 import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } from "./browseApi.ts";
@@ -38,7 +40,7 @@ export interface Report {
   action: string; ok: boolean; stopped: string | null; calls: number; remaining_before: number | null; remaining_after: number | null;
   year_aspect: string | null;
   per_tier: Record<string, { seen: number; held: number; new: number; fetched: number; landed: number }>;
-  by_class: Record<string, number>; landed: number; blips: number; rejected: number; ingest_created: number; ingest_matched: number;
+  by_class: Record<string, number>; landed: number; blips: number; rejected: number; ingest_created: number; ingest_matched: number; linked_by_vin?: number; vin_conflicts?: number;
   errors: string[];
 }
 export const emptyReport = (action: string): Report => ({
@@ -97,7 +99,28 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   // 2. the vehicle, through ingest (identity gate, VIN/URL duplicate matching, photos)
   let vehicleId: string | null = null;
   let outcome: "landed" | "blip" | "rejected" = "landed";
-  if (landing.ingestInput) {
+  // 2a. a VIN already held by a vehicle decides first (a car that sold on BaT and is now on eBay is one record):
+  //     same car (identityMatch: VIN, make, year, model words agree) -> link to it, fill-only, no new vehicle;
+  //     a different car under the same VIN, or two holders -> a revision item and an unresolved listing, never a new vehicle.
+  let vinBlocked = false;
+  const heldVin = landing.vin.vin && /^[A-Z0-9]{8,17}$/.test(landing.vin.vin) ? landing.vin.vin : null;
+  if (heldVin) {
+    const held = await supabase.from("vehicles").select("id,year,make,model,vin").eq("vin", heldVin).limit(3);
+    if (held.error) { rep.errors.push(`vin lookup ${landing.listingKey}: ${held.error.message}`); return "skipped"; }
+    const rows = held.data ?? [];
+    const incoming = { year: landing.year, make: landing.make, model: landing.model, vin: heldVin };
+    const conflict = rows.length > 1 ? `${rows.length} vehicles hold vin ${heldVin}` : rows.length === 1 ? identityConflict(rows[0], incoming) : null;
+    if (rows.length === 1 && !conflict) {
+      vehicleId = rows[0].id; rep.linked_by_vin = (rep.linked_by_vin ?? 0) + 1;
+    } else if (conflict) {
+      vinBlocked = true; rep.vin_conflicts = (rep.vin_conflicts ?? 0) + 1;
+      await recordRevision(supabase, { url: landing.url, missing: ["identity_match"], reason: "bad_data", next_action: "relink", raised_by: "extract-ebay-motors",
+        vehicle_id: rows[0]?.id ?? null, snapshot_id: snapshotId, detail: { reason: "different_car", detail: conflict, vin: heldVin, holders: rows.map((r: any) => r.id) } });
+    }
+  }
+  if (vinBlocked) { outcome = "blip"; rep.blips++; }
+  else if (vehicleId) { /* linked above */ }
+  else if (landing.ingestInput) {
     const res = await callIngest(landing.ingestInput);
     if ((res.status === "created" || res.status === "matched" || res.status === "duplicate") && res.vehicle_id) {
       vehicleId = res.vehicle_id;
