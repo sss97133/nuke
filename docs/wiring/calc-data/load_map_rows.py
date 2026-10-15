@@ -811,6 +811,9 @@ def main():
         # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
         print(f"segments: {api._req('POST', 'rpc/conform_harness_segments', {'p_vehicle_id': K5})}")
         print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # and every segment to its wire's catalog part and its plugs' option couplings (RSI pass 30: the reshape's and pass
+        # 1's rules, re-runnable)
+        print(f"segment keys: {api._req('POST', 'rpc/key_harness_segments', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
         print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
         # citations on a wire end this run re-inserted at the same plug and cavity follow it (RSI pass 28)
