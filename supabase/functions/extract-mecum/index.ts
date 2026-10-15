@@ -938,7 +938,7 @@ async function saveVehicle(
   const { data: byUrl } = await supabase
     .from("vehicles")
     .select("id")
-    .eq("discovery_url", vehicle.url)
+    .in("discovery_url", mecumUrlSpellings(vehicle.url)) // existing vehicles store the lot URL in several spellings
     .limit(1)
     .maybeSingle();
 
