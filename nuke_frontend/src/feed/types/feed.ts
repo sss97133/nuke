@@ -219,6 +219,9 @@ export interface FeedStats {
   counts_updated_at?: string | null;
   /** When total_value, for_sale_count and the sales figures were last computed. */
   value_updated_at?: string | null;
+  /** When for_sale_count was last computed from live listings, and what it counts. */
+  for_sale_updated_at?: string | null;
+  for_sale_definition?: string | null;
 }
 
 // ---------------------------------------------------------------------------

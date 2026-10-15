@@ -144,6 +144,8 @@ export function FeedStatsStrip({
   // Value and for-sale are recomputed by an old job. When they are more than three days old they are not shown as current.
   const valueAge = stats.value_updated_at ? Date.now() - Date.parse(stats.value_updated_at) : Infinity;
   const valueIsCurrent = Number.isFinite(valueAge) && valueAge < 3 * 86_400_000;
+  const forSaleAge = stats.for_sale_updated_at ? Date.now() - Date.parse(stats.for_sale_updated_at) : Infinity;
+  const forSaleIsCurrent = Number.isFinite(forSaleAge) && forSaleAge < 3 * 3_600_000;
   const approx = stats.total_is_estimate ? '~' : '';
 
   return (
@@ -192,12 +194,12 @@ export function FeedStatsStrip({
       )}
 
       {/* FOR SALE */}
-      {(isFiltered || valueIsCurrent) && <Stat
+      {(isFiltered || forSaleIsCurrent) && <Stat
         label="FOR SALE"
         value={formatCompact(isFiltered ? filtered.forSaleCount : stats.for_sale_count)}
         onClick={() => onMetricClick?.('for_sale')}
         active={activeMetric === 'for_sale'}
-        hoverHint="Show only for-sale vehicles"
+        hoverHint={stats.for_sale_definition ? `${stats.for_sale_definition} Updated ${stats.for_sale_updated_at}. Click to show only for-sale vehicles` : 'Show only for-sale vehicles'}
       />}
 
       {/* LIVE auctions */}
