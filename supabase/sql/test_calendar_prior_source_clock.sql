@@ -279,3 +279,63 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: each sale carries its census prior_sale; nothing else changed; permissions kept';
 END $$;
+
+-- 20261016275000: a house's lots and its listed count join on one key whatever the writer's spelling. Broad Arrow's
+-- events carry broad_arrow and its census the slug broad-arrow (production, 2026-10-15 18:37Z): one sale, with its lots
+-- and its listed count, and its roster opens under either spelling. Other sales are unchanged.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in this disposable dm_refinement_* PG17 database, never production.
+\ir ../migrations/20261016150000_market_venue_label.sql
+INSERT INTO public.observation_sources VALUES (md5('ba-source')::uuid, 'broad-arrow');
+INSERT INTO public.source_census VALUES
+  (md5('ba-source')::uuid, now() - interval '1 hour', 'house_roster_facet', '{"ba-sale": 3}'::jsonb,
+   jsonb_build_object('sales', jsonb_build_object('ba-sale', jsonb_build_object(
+     'name', 'Arrow sale', 'starts_on', (current_date + 15)::text, 'ends_on', (current_date + 15)::text))));
+INSERT INTO public.vehicles(id, is_public, deleted_at, year, make, model)
+SELECT md5('ba-' || n)::uuid, true, NULL, 1990 + n, 'Synthetic', 'Arrow ' || n FROM generate_series(1, 3) n;
+INSERT INTO public.vehicle_events(id, vehicle_id, source_platform, source_url, event_status, ended_at, created_at, updated_at, metadata)
+SELECT md5('ba-event-' || n)::uuid, md5('ba-' || n)::uuid, 'broad_arrow', 'https://example.test/ba-' || n, 'upcoming',
+       date_trunc('day', now()) + interval '15 days', now() - interval '1 day', now() - interval '1 hour',
+       jsonb_build_object('sale_key', 'ba-sale', 'auction_name', 'Arrow sale', 'lot_number', n::text)
+FROM generate_series(1, 3) n;
+REFRESH MATERIALIZED VIEW public.mv_auction_calendar_lots;
+SET ROLE anon;
+CREATE TEMP TABLE house_key_before AS SELECT public.auction_calendar_read(200) AS base;
+RESET ROLE;
+\ir ../migrations/20261016275000_auction_calendar_house_key.sql
+\ir ../migrations/20261016275000_auction_calendar_house_key.sql
+SET ROLE anon;
+CREATE TEMP TABLE house_key_after AS
+  SELECT public.auction_calendar_read(200) AS base,
+         public.auction_calendar_read(200, 'broad-arrow', 'ba-sale') AS by_slug,
+         public.auction_calendar_read(200, 'broad_arrow', 'ba-sale') AS by_platform;
+RESET ROLE;
+DO $$
+DECLARE vb jsonb; va record;
+BEGIN
+  SELECT base INTO vb FROM house_key_before; SELECT * INTO va FROM house_key_after;
+  IF (SELECT count(*) FROM jsonb_array_elements(vb->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 2 THEN
+    RAISE EXCEPTION 'Baseline must reproduce the split sale: %', vb->'sales';
+  END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 1
+     OR (SELECT s->>'lots' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> '3'
+     OR (SELECT s->>'lots_listed' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> '3'
+     OR (SELECT jsonb_array_length(s->'run_days') FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 1 THEN
+    RAISE EXCEPTION 'One Broad Arrow sale with its lots, listed count and run day: %', va.base->'sales';
+  END IF;
+  IF va.by_slug#>>'{roster,lots}' <> '3' OR jsonb_array_length(va.by_slug#>'{roster,rows}') <> 3
+     OR va.by_platform#>>'{roster,lots}' <> '3' OR jsonb_array_length(va.by_platform#>'{roster,rows}') <> 3 THEN
+    RAISE EXCEPTION 'The roster opens under either spelling: % %', va.by_slug->'roster', va.by_platform->'roster';
+  END IF;
+  IF (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(vb->'sales') s WHERE s->>'sale_key' <> 'ba-sale')
+     IS DISTINCT FROM (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' <> 'ba-sale')
+     OR va.base#>>'{population,houses}' <> '2' THEN
+    RAISE EXCEPTION 'Other sales unchanged and Broad Arrow counted as one house: %', va.base->'population';
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  RAISE NOTICE 'PASS: one house key joins lots and listed counts across spellings; roster opens under either; others unchanged';
+END $$;
