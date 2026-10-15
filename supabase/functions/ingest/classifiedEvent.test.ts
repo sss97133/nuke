@@ -18,3 +18,13 @@ Deno.test("the listing id is the numeric id in the path", () => {
   assertEquals(classifiedListingId("https://www.facebook.com/marketplace/item/2297460464372011/"), "2297460464372011");
   assertEquals(classifiedListingId("https://example.com/"), null);
 });
+
+import { sellerTypeFor } from "./classifiedEvent.ts";
+Deno.test("the seller class each classified source states", () => {
+  assertEquals(sellerTypeFor("ksl", "Private")?.value, "private");
+  assertEquals(sellerTypeFor("ksl", "Dealer")?.value, "dealer");
+  assertEquals(sellerTypeFor("ksl", null)?.value, "unknown");
+  assertEquals(sellerTypeFor("classiccars", "Private Seller")?.value, "private");
+  assertEquals(sellerTypeFor("classiccars", "Hobby Car Corvettes")?.value, "dealer");
+  assertEquals(sellerTypeFor("facebook_marketplace", "x"), null);
+});

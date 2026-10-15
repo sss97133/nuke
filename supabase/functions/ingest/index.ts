@@ -1012,6 +1012,8 @@ interface EnrichedData {
   listing_url?: string | null;
   /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
   posted_at?: string | null;
+  /** The seller class the source states (KSL sellerType, ClassicCars Listed By), as written. */
+  seller_type_raw?: string | null;
   /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
   capture?: CraigslistCapture | null;
 }
@@ -1223,6 +1225,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
         vehicle_id: writtenId || undefined,
         posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
+        seller_type_raw: typeof vehicle.seller_type === "string" ? vehicle.seller_type : null,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1444,6 +1447,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
     let enrichedPostedAt: string | null = null;
+    let enrichedSellerType: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
@@ -1456,6 +1460,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         }
         extractorVehicleId = enriched.vehicle_id;
         enrichedPostedAt = enriched.posted_at ?? null;
+        enrichedSellerType = enriched.seller_type_raw ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1781,7 +1786,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           const landed = await landClassifiedListing(supabaseAdmin, {
             vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
             price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
-            observedAt: new Date().toISOString(),
+            observedAt: new Date().toISOString(), sellerTypeRaw: enrichedSellerType,
           });
           if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
         } catch (e) {

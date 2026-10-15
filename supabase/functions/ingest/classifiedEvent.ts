@@ -11,6 +11,7 @@
  * live when read, and its ending is recorded by a removal read, never guessed here.
  */
 import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+import { recordSellerTypes, sellerTypeRow, type SellerType } from "../_shared/sellerType.ts";
 
 export type ClassifiedPlatform = "classiccars" | "ksl" | "facebook_marketplace";
 
@@ -31,16 +32,25 @@ export function classifiedListingId(url: string | null | undefined): string | nu
 
 type Client = { from: (table: string) => any };
 
+/** The class the source states for a lot: KSL sellerType (Private / dealer), ClassicCars "Listed By" (Private Seller / a company). */
+export function sellerTypeFor(platform: ClassifiedPlatform, raw: string | null | undefined): { value: SellerType; field: string; text: string | null } | null {
+  const text = (raw ?? "").trim() || null;
+  if (platform === "ksl") return { value: !text ? "unknown" : text.toLowerCase() === "private" ? "private" : "dealer", field: "sellerType", text };
+  if (platform === "classiccars") return { value: !text ? "unknown" : /^private( seller)?$/i.test(text) ? "private" : "dealer", field: "Listed By", text };
+  return null;
+}
+
 export interface ClassifiedLanding {
   event: VehicleEventWriteResult;
   for_sale: "set" | "already" | "error";
+  seller_type?: "written" | "skipped" | "error";
 }
 
 export async function landClassifiedListing(
   supabase: Client,
   a: {
     vehicleId: string; platform: ClassifiedPlatform; listingUrl: string; listingId: string;
-    price: number | null; postedAt: string | null; observedAt: string;
+    price: number | null; postedAt: string | null; observedAt: string; sellerTypeRaw?: string | null;
   },
 ): Promise<ClassifiedLanding> {
   const event = await writeVehicleEventByKey(supabase, {
@@ -64,5 +74,16 @@ export async function landClassifiedListing(
       .eq("id", a.vehicleId).not("is_for_sale", "is", true).select("id");
     for_sale = error ? "error" : data?.length ? "set" : "already";
   } catch { for_sale = "error"; }
-  return { event, for_sale };
+  let seller_type: ClassifiedLanding["seller_type"] = "skipped";
+  const st = sellerTypeFor(a.platform, a.sellerTypeRaw);
+  if (st && "id" in event && event.id) {
+    try {
+      await recordSellerTypes(supabase as any, [sellerTypeRow({
+        eventId: event.id, value: st.value, basis: "declared", field: st.field, text: st.text ?? undefined,
+        method: a.platform === "ksl" ? "extract-ksl" : "extract-classiccars",
+      })], "ingest");
+      seller_type = "written";
+    } catch { seller_type = "error"; }
+  }
+  return { event, for_sale, seller_type };
 }
