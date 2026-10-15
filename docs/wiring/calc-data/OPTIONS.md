@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 327 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 329 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | STEP-DCMD | Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test) | **candidate** |  | 0 | owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor |
@@ -74,15 +74,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 358 | 266 | 355 | 358 | 344 | 2 | 90 | m 0 · e 169 · u 178 |
-| composite (every option) | 390 | 270 | 382 | 390 | 374 | 2 | 90 | m 0 · e 172 · u 207 |
+| buildable (base + decided) | 360 | 268 | 357 | 360 | 346 | 2 | 90 | m 0 · e 169 · u 180 |
+| composite (every option) | 392 | 272 | 384 | 392 | 376 | 2 | 90 | m 0 · e 172 · u 209 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 327 | 247 | 324 | 327 | 313 | 2 | 90 | m 0 · e 155 · u 161 |
+| BASE | 329 | 249 | 326 | 329 | 315 | 2 | 90 | m 0 · e 155 · u 163 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -96,7 +96,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | body_convenience | 97 | 54 | 92 | 97 | 97 | 0 | 6 | m 0 · e 30 · u 67 |
-| dash_cabin | 54 | 36 | 54 | 54 | 52 | 1 | 13 | m 0 · e 13 · u 38 |
+| dash_cabin | 56 | 38 | 56 | 56 | 54 | 1 | 13 | m 0 · e 13 · u 40 |
 | engine | 122 | 117 | 119 | 122 | 117 | 1 | 52 | m 0 · e 97 · u 23 |
 | lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 8 · u 14 |
@@ -118,8 +118,8 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | PDM30 20 A outputs | 8 | 6 | 2 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM30 8 A outputs | 22 | 21 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM30 inputs | 16 | 14 | 2 (DIG8, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM15 20 A outputs | 8 | 7 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM15 8 A outputs | 7 | 3 | 4 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM15 20 A outputs | 8 | 8 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM15 8 A outputs | 7 | 2 | 5 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 inputs | 16 | 3 | 13 (DIG1, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | M130 pins | 60 | 52 | 8 (A14, A17, A23, A24, B6, B10, B11, B12) | M130 datasheet; registry pinout (kits_v5) |
 | door pass-through DOOR-L-PASS | 8 | 2 | 6 | catalog/endpoints.yaml wires (DT04-08PA 8-way) |
@@ -187,7 +187,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 22 AWG white/orange | 0 | 12.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG white/yellow | 0 | 15.0 | not recorded | not claimed by this scope |
 | M22759/32 20 AWG black | 8.0 | 50.0 | not recorded | covered; also PDM15_GND1, PDM15_GND2, IGN_SW_0V (length not measured yet) |
-| M22759/32 20 AWG red | 128.7 | 40.0 | not recorded | short by 88.7 ft; also 93_PT1, 93_PT2 (length not measured yet) |
+| M22759/32 20 AWG red | 123.4 | 40.0 | not recorded | short by 83.4 ft; also 93_PT1, 93_PT2, 23_PT1, 23_PT2 (length not measured yet) |
 | M22759/32 20 AWG green/blue | 42.3 | 0 | not recorded | short by 42.3 ft |
 | M22759/32 20 AWG gray | 45.2 | 0 | not recorded | short by 45.2 ft |
 | M22759/32 20 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
@@ -195,7 +195,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 20 AWG white/red | 5.5 | 10.0 | not recorded | covered |
 | M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft |
 | M22759/32 18 AWG brown/black | 18.4 | 0 | not recorded | short by 18.4 ft |
-| M22759/32 18 AWG red | 27.9 | 40.0 | not recorded | covered |
+| M22759/32 18 AWG red | 33.2 | 40.0 | not recorded | covered |
 | M22759/32 18 AWG violet | 15.9 | 20.0 | not recorded | covered |
 | M22759/32 18 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 18 AWG white/violet | 15.9 | 20.0 | not recorded | covered |

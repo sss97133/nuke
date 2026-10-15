@@ -1007,8 +1007,13 @@ D0927 = {
                   "(3 % drop over 18.4 ft) is past the Superseal contact's 24-16 AWG and MoTeC's 24#-20# for 8 A outputs (p.48), "
                   "so it moves to the free 20 A pair OUT5 (A9 + A17, PDM manual p.43) and takes the pigtail + M81824/1-3 "
                   "treatment of #21; OUT10 is free again (book review 2026-09-28); " + AGENT},
-    "23": {"frm": "PDM15:OUT11", "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
+    "23": {"frm": "PDM15:OUT8", "awg": 18, "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
            "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+           "conflict": ("decision: frm PDM15:OUT11 -> PDM15:OUT8, awg 20 -> 18 (RSI pass 24) — the Sanden SD7 clutch draws up to 4.2 A "
+                        "(SD7 service manual p.14), so the limit is ceil(1.25 x 4.2) = 6 A; 20 AWG at 100 C is 6 A (PDM manual p.48), "
+                        "0.85 x 6 = 5.1 A < 6. 18 AWG (9 A, 0.85 x 9 = 7.6 A) carries it, but MoTeC wants 24#-20# on an 8 A output "
+                        "(p.6, p.48), so the clutch moves to PDM15's free 20 A output OUT8 (B7 + B13, p.43): two 20 AWG pigtails into "
+                        "an M81824/1-2 and the 18 AWG run, the treatment #64 got in round 4. OUT11 is free again"),
            "why": "compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; " + AGENT},
     "64": {"frm": "PDM15:OUT7", "label": "LTCD power (+12 V)", "awg": 16, "spec": "M22759/32",
            "conflict": ("decision: awg 18 -> 16 — OUT12 needs ceil(1.25 x 6.1 A) = 8 A; 18# is 9 A at 100 C (PDM manual p.48), 0.85 x 9 = "
@@ -1782,7 +1787,7 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM15", 5): (5.1, "QFS P367 (HFP-367) web_snapshots/www.highflowfuel.com__fuel-pump-oem-replacement-hfp-367-qfs.md: 'Flow: 145LPH, Draws 5.1 Amps @ 60psi'"),
     ("PDM15", 9): (0.025, "Holley 197-400 pigtail, 560 ohm in line (holley_midmount_fitment.pdf p.15): 14 V / 560 ohm"),
     ("PDM15", 13): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too"),
-    ("PDM15", 11): (4.2, "Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23)"),
+    ("PDM15", 8): (4.2, "Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23)"),
     ("PDM15", 7): (6.1, "LTC manual p.31 + p.37: over 6.1 A cold for two sensors (a lower bound)"),
     ("PDM30", 1): (11.0, "CANDIDATE Nu-Relics 17383-1 ACI motor, 11 A high load (20 A stall); the base factory motor is absent"),
     ("PDM30", 2): (None, "needs the 4 Seasons 35587 blower current on HIGH (no published rating: measure)"),

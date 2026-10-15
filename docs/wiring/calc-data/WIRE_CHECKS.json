@@ -3077,8 +3077,8 @@
    "kind": "v5",
    "label": "A/C Compressor Clutch",
    "from": [
-    "PDM15",
-    "OUT11"
+    "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13)",
+    null
    ],
    "to": [
     "AC-CLUTCH",
@@ -3088,18 +3088,18 @@
     "engine bay",
     "engine bay"
    ],
-   "from_str": "PDM15:OUT11 (A6)",
+   "from_str": "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13)",
    "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
    "subsystem": "HVAC_AC",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM15:OUT11 -> AC-CLUTCH:T1 single lead, male bullet (clutch coil +)"
+     "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13):None -> AC-CLUTCH:T1 single lead, male bullet (clutch coil +)"
     ],
     "R9 pin": [
      "PASS",
-     "OUT11 8 A vs load 4.0 A"
+     "OUT8 20 A vs load 4.0 A"
     ],
     "R11 command": [
      "PASS",
@@ -11269,6 +11269,60 @@
     "R8 ends": [
      "PASS",
      "PDM15:A17 -> SPL-PDM15-OUT5 (pigtail side):splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "23_PT1",
+   "kind": "implied",
+   "label": "PDM15 OUT8 pigtail 1 of 2 (pin B7) to the #23 splice",
+   "from": [
+    "PDM15",
+    "B7"
+   ],
+   "to": [
+    "SPL-PDM15-OUT8 (pigtail side)",
+    "splice 1"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B7",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B7 -> SPL-PDM15-OUT8 (pigtail side):splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "23_PT2",
+   "kind": "implied",
+   "label": "PDM15 OUT8 pigtail 2 of 2 (pin B13) to the #23 splice",
+   "from": [
+    "PDM15",
+    "B13"
+   ],
+   "to": [
+    "SPL-PDM15-OUT8 (pigtail side)",
+    "splice 2"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B13",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B13 -> SPL-PDM15-OUT8 (pigtail side):splice 2"
     ]
    }
   },
