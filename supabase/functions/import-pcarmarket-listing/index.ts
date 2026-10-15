@@ -7,7 +7,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseSsrPage } from "./ssrPage.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { parseLocation } from "../_shared/parseLocation.ts";
-import { batchFromTargets, discoverTargets, revisePcm } from "./targets.ts";
+import { batchFromTargets, discoverTargets, readEnded, revisePcm } from "./targets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -794,12 +794,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    if (body.action === 'batch_from_targets' || body.action === 'discover_targets' || body.action === 'revise') {
+    if (body.action === 'batch_from_targets' || body.action === 'discover_targets' || body.action === 'revise' || body.action === 'read_ended') {
       const sb = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!, {
         global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
       });
       const out = body.action === 'discover_targets'
         ? await discoverTargets(sb)
+        : body.action === 'read_ended'
+          ? await readEnded(body)
         : body.action === 'revise'
           ? await revisePcm(sb, Deno.env.get('SUPABASE_URL')!, body)
           : await batchFromTargets(sb, Deno.env.get('SUPABASE_URL')!, body);
