@@ -104,8 +104,18 @@ function htmlToMarkdown(html: string): string {
     || html.match(/<article[^>]*>([\s\S]+?)<\/article>/i)
     || html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+)/i);
   const content = mainMatch ? mainMatch[1] : html;
-  const strip = content.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
-  let text = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  // The output is parsed as text and never rendered; tags are stripped until none remain.
+  let strip = content;
+  for (let prev = ""; prev !== strip; ) {
+    prev = strip;
+    strip = strip.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  }
+  strip = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n");
+  for (let prev = ""; prev !== strip; ) {
+    prev = strip;
+    strip = strip.replace(/<[^>]*>/g, " ");
+  }
+  let text = strip.replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   // Prepend h1 as markdown heading if not already present
   if (h1Title && !text.startsWith("# ")) text = `# ${h1Title}\n${text}`;
   return text;
@@ -319,11 +329,13 @@ Deno.serve(async (req) => {
     }
 
     const url = (body.url || "").trim().replace(/\/$/, "");
-    if (!url || !url.includes("barnfinds.com")) return json({ success: false, error: "url required (barnfinds.com)" }, 400);
+    let host = "";
+    try { host = new URL(url).hostname.toLowerCase(); } catch { /* not a URL */ }
+    if (host !== "barnfinds.com" && host !== "www.barnfinds.com") return json({ success: false, error: "url required (barnfinds.com)" }, 400);
     const out = await extractOne(supabase, url, body.use_firecrawl === true);
     return json(out.body, out.status);
   } catch (e: any) {
     console.error("[extract-barn-finds-listing]", e);
-    return json({ success: false, error: e?.message ?? String(e) }, 500);
+    return json({ success: false, error: "extraction failed; see function logs" }, 500);
   }
 });
