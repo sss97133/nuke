@@ -19,6 +19,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
@@ -687,15 +688,7 @@ Deno.serve(async (req) => {
 
       const extracted = await extractBHAuctionListing(url);
 
-      // Log API usage
-      await supabase.from('api_usage_logs').insert({
-        user_id: null,
-        provider: 'firecrawl',
-        function_name: 'extract-bh-auction',
-        cost_cents: 1,
-        success: true,
-        metadata: { url, lot_number: extracted.lot_number },
-      });
+      // api_usage_logs is the API-key usage table (no provider/cost columns); firecrawl spend is not recorded there.
 
       // Save to database if requested
       if (save_to_db && extracted.year && extracted.make) {
@@ -751,7 +744,8 @@ Deno.serve(async (req) => {
         }
 
         if (vehicleId) {
-          await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+          const { error: updErr } = await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+          if (updErr) throw new Error(`vehicles update failed: ${updErr.message}`);
           console.log(`[BH Auction] Updated vehicle: ${vehicleId}`);
         } else {
           const { data: newVehicle, error: vehicleError } = await supabase
@@ -803,7 +797,7 @@ Deno.serve(async (req) => {
           // Insert images (no unique constraint, just insert)
           const { error: imgError } = await supabase.from('vehicle_images').insert(imageRecords);
           if (imgError) {
-            console.error(`[BH Auction] Image save error: ${imgError.message}`);
+            throw new Error(`vehicle_images insert failed: ${imgError.message}`);
           } else {
             console.log(`[BH Auction] Saved ${imageRecords.length} images`);
           }
@@ -812,7 +806,7 @@ Deno.serve(async (req) => {
         // Create vehicle_events record
         if (vehicleId) {
           const listingUrlKey = normalizeListingUrlKey(extracted.url);
-          await supabase.from('vehicle_events').upsert({
+          const eventWrite = await writeVehicleEventByKey(supabase, {
             vehicle_id: vehicleId,
             source_platform: 'bh_auction',
             event_type: 'auction',
@@ -829,10 +823,9 @@ Deno.serve(async (req) => {
               estimate_low_jpy: extracted.estimate_low_jpy,
               estimate_high_jpy: extracted.estimate_high_jpy,
             },
-          }, {
-            onConflict: 'source_platform,source_listing_id',
           });
-          console.log(`[BH Auction] Created/updated vehicle_events record`);
+          if (eventWrite.action === 'error') throw new Error(`vehicle_events write failed: ${eventWrite.error}`);
+          console.log(`[BH Auction] vehicle_events ${eventWrite.action}`);
         }
       }
 
@@ -917,13 +910,15 @@ Deno.serve(async (req) => {
             if (resolvedId) vehicleId = resolvedId;
 
             if (vehicleId) {
-              await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+              const { error: updErr } = await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+              if (updErr) throw new Error(`vehicles update failed: ${updErr.message}`);
             } else {
-              const { data: newVehicle } = await supabase
+              const { data: newVehicle, error: insErr } = await supabase
                 .from('vehicles')
                 .insert(vehicleData)
                 .select('id')
                 .maybeSingle();
+              if (insErr) throw new Error(`vehicles insert failed: ${insErr.message}`);
               vehicleId = newVehicle?.id || null;
             }
 
@@ -940,7 +935,8 @@ Deno.serve(async (req) => {
               }));
 
               // Insert images (no unique constraint)
-              await supabase.from('vehicle_images').insert(imageRecords);
+              const { error: imgErr } = await supabase.from('vehicle_images').insert(imageRecords);
+              if (imgErr) throw new Error(`vehicle_images insert failed: ${imgErr.message}`);
             }
           }
 
@@ -968,22 +964,6 @@ Deno.serve(async (req) => {
           errorCount++;
         }
       }
-
-      // Log batch API usage
-      await supabase.from('api_usage_logs').insert({
-        user_id: null,
-        provider: 'firecrawl',
-        function_name: 'extract-bh-auction',
-        cost_cents: toProcess.length + 1, // +1 for the map call
-        success: true,
-        metadata: {
-          batch: true,
-          auction_slug: auction_slug || null,
-          lots_found: lotUrls.length,
-          lots_processed: toProcess.length,
-          success_count: successCount,
-        },
-      });
 
       return new Response(
         JSON.stringify({
