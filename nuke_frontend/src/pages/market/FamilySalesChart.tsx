@@ -6,7 +6,8 @@ import './FamilySalesChart.css';
 // One model family's market as a chart, the way classic.com draws a model: every confirmed sale of the last five years
 // as a dot (price against date, colored by venue) and a rolling median through them, so the trading range, the volume
 // and the outliers read at a glance (owner, 2026-10-15: show real examples of data expression; this is the model page
-// to build first). Reads treemap_family_sales (mv_family_sales, 20261015213000). A dot opens the sale's record.
+// to build first). Reads treemap_family_sales (mv_family_sales, 20261015213000) as one jsonb value (20261015234500): a
+// set would stop at the API's 1,000 rows, and the 911 alone has over 10,000 sales in five years. A dot opens its record.
 export type Sale = { vehicle_id: string; sale_date: string; usd: number; source: string | null; year: number | null; model: string | null };
 
 export const VENUES: { key: string; label: string; color: string; sources: string[] }[] = [
@@ -63,15 +64,32 @@ export function batMove(sales: Sale[], now = Date.now()): { last: number; prior:
   return last.length >= 5 && prior.length >= 5 ? { last: med(last), prior: med(prior), nLast: last.length, nPrior: prior.length } : null;
 }
 
+/** The reader's one value: n sales in the window, the newest `returned` of them as [vehicle_id, sale_date, usd, source,
+ *  year, model] rows, and whether it held back older ones. Anything else is not a read. */
+export function parseFamilySales(data: unknown): { sales: Sale[]; n: number; truncated: boolean } | null {
+  const v = data as { n?: unknown; truncated?: unknown; rows?: unknown } | null;
+  if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.n !== 'number' || !Array.isArray(v.rows)) return null;
+  const sales: Sale[] = [];
+  for (const r of v.rows) {
+    if (!Array.isArray(r) || r.length !== 6 || typeof r[0] !== 'string' || typeof r[1] !== 'string' || typeof r[2] !== 'number') return null;
+    sales.push({ vehicle_id: r[0], sale_date: r[1], usd: r[2], source: r[3] ?? null, year: r[4] ?? null, model: r[5] ?? null });
+  }
+  return { sales, n: v.n, truncated: v.truncated === true };
+}
+
 export function useFamilySales(brand: string | null, familyKey: string | null) {
-  const [state, setState] = useState<{ sales: Sale[] | null; failed: boolean }>({ sales: null, failed: false });
+  const [state, setState] = useState<{ sales: Sale[] | null; n: number; truncated: boolean; failed: boolean }>({ sales: null, n: 0, truncated: false, failed: false });
   useEffect(() => {
-    setState({ sales: null, failed: false });
+    setState({ sales: null, n: 0, truncated: false, failed: false });
     if (!brand || !familyKey || typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return;
     let live = true;
-    Promise.resolve(supabase.rpc('treemap_family_sales', { p_brand: brand, p_family_key: familyKey, p_limit: 5000 })).then(
-      ({ data, error }) => { if (live) setState({ sales: error || !Array.isArray(data) ? null : data as Sale[], failed: !!error || !Array.isArray(data) }); },
-      () => { if (live) setState({ sales: null, failed: true }); },
+    Promise.resolve(supabase.rpc('treemap_family_sales', { p_brand: brand, p_family_key: familyKey })).then(
+      ({ data, error }) => {
+        if (!live) return;
+        const v = error ? null : parseFamilySales(data);
+        setState(v ? { ...v, failed: false } : { sales: null, n: 0, truncated: false, failed: true });
+      },
+      () => { if (live) setState({ sales: null, n: 0, truncated: false, failed: true }); },
     );
     return () => { live = false; };
   }, [brand, familyKey]);
@@ -83,7 +101,7 @@ const M = { left: 60, right: 18, top: 16, bottom: 26 };
 export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen }: {
   brand: string; familyKey: string; family: string; width: number; height: number; onOpen: (vehicleId: string) => void;
 }) {
-  const { sales, failed } = useFamilySales(brand, familyKey);
+  const { sales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const plot = useMemo(() => {
@@ -125,7 +143,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
-        <Text role="caption">{plot.n.toLocaleString('en-US')} sales with a date since {plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} · one dot each · line = rolling median, 60 days either side</Text>
+        <Text role="caption">{truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US')} sales with a date since {plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} · one dot each · line = rolling median, 60 days either side</Text>
       </div>
       {move && <div className="family-sales__move">
         <Text role="measure">{money(move.last)}</Text>
