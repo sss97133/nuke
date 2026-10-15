@@ -37,6 +37,7 @@ import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEvent
 const EXTRACTOR_VERSION = "2.0.0";
 const TARGETS_TAG = "mecum-targets:1";
 const UPCOMING_TAG = "mecum-upcoming:1";
+const REVERIFY_TAG = "mecum-reverify:1";
 const ALGOLIA_APP = "U6CFCQ7V52";
 const ALGOLIA_INDEX = "wp_posts_lot";
 // The search-only key Mecum's own site ships (also in scripts/mecum-algolia-discovery.mjs); it can read, not write.
@@ -1213,6 +1214,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Queue re-reads of sales claimed by the orphan backfill ──────────────────────────────────
+    // vehicle_events rows with extraction_method orphan-backfill-v1 and event_status sold were written from snapshot run
+    // dates (Dec-Feb), not from a read of the lot's result. Each is queued (REVERIFY_TAG, priority 50, after the upcoming
+    // roster) so batch_from_targets re-reads the lot page and proves or refuses the sale. Cursor: the last queued event id.
+    if (action === "enqueue_reverify") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 300, 1), 500);
+      const { data: last } = await supabase.from("import_queue").select("raw_data").eq("extractor_version", REVERIFY_TAG).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const after = String(body.after_id || last?.raw_data?.event_id || "00000000-0000-0000-0000-000000000000");
+      const { data: evs, error: evErr } = await supabase
+        .from("vehicle_events")
+        .select("id, source_url, final_price, sold_at")
+        .eq("source_platform", "mecum")
+        .eq("extraction_method", "orphan-backfill-v1")
+        .eq("event_status", "sold")
+        .gt("id", after)
+        .order("id", { ascending: true })
+        .limit(n);
+      if (evErr) throw evErr;
+      let queued = 0, requeued = 0, lastId = after;
+      for (const ev of evs ?? []) {
+        lastId = ev.id;
+        const url = `https://www.${mecumLotKey(ev.source_url)}/`;
+        const raw = { event_id: ev.id, claim: { final_price: ev.final_price, sold_at: ev.sold_at } };
+        const { data: row } = await supabase.from("import_queue").select("id, status").eq("listing_url", url).maybeSingle();
+        if (row) {
+          if (row.status === "processing") continue;
+          await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id);
+          requeued++;
+        } else {
+          const { error } = await supabase.from("import_queue").insert({ listing_url: url, status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw });
+          if (!error) queued++;
+        }
+      }
+      return okJson({ success: true, examined: evs?.length ?? 0, queued, requeued, last_event_id: lastId });
+    }
+
     // ── Enumerate the calendar: upcoming lots from Mecum's public search index ──────────────────
     // Reads the index Mecum's own site search uses (Algolia app U6CFCQ7V52, index wp_posts_lot; the search-only key is the
     // one the site ships and scripts/mecum-algolia-discovery.mjs already carries). Sales are the facet values
@@ -1361,18 +1398,18 @@ Deno.serve(async (req) => {
       const budgetMs = 100_000;
       const started = Date.now();
 
-      type Work = { url: string; rowId?: string; targetId?: number; sale?: UpcomingSale };
+      type Work = { url: string; rowId?: string; targetId?: number; sale?: UpcomingSale; reverify?: { event_id: string; claim: Record<string, unknown> } };
       const work: Work[] = [];
 
       const { data: up } = await supabase
         .from("import_queue")
-        .select("id, listing_url, raw_data")
-        .in("extractor_version", [UPCOMING_TAG, TARGETS_TAG]) // pending TARGETS_TAG rows are re-reads of lots wrongly marked 404
+        .select("id, listing_url, raw_data, extractor_version")
+        .in("extractor_version", [UPCOMING_TAG, REVERIFY_TAG, TARGETS_TAG]) // pending TARGETS_TAG rows are re-reads of lots wrongly marked 404
         .eq("status", "pending")
         .order("priority", { ascending: false })
         .order("created_at", { ascending: true })
         .limit(limit);
-      for (const r of up ?? []) work.push({ url: r.listing_url, rowId: r.id, sale: r.raw_data?.sale });
+      for (const r of up ?? []) work.push({ url: r.listing_url, rowId: r.id, sale: r.raw_data?.sale, reverify: r.extractor_version === REVERIFY_TAG ? r.raw_data : undefined });
 
       let cursor = 0;
       if (work.length < limit && body.upcoming_only !== true) {
@@ -1419,7 +1456,7 @@ Deno.serve(async (req) => {
         for (const t of picked) work.push({ url: t.listing_url, targetId: t.id });
       }
 
-      const results = { picked: work.length, upcoming: 0, landed: 0, created: 0, updated: 0, gone: 0, failed: 0, stopped: null as string | null, errors: [] as string[] };
+      const results = { picked: work.length, upcoming: 0, reverified: 0, confirmed: 0, landed: 0, created: 0, updated: 0, gone: 0, failed: 0, stopped: null as string | null, errors: [] as string[] };
       let consecutiveFailures = 0;
       for (const w of work) {
         if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
@@ -1439,7 +1476,23 @@ Deno.serve(async (req) => {
         try {
           const vehicle = await fetchAndParse(w.url, { skipFirecrawl: true });
           if (!vehicle.year && !vehicle.make) throw new Error("Could not parse vehicle data");
+          if (w.reverify?.event_id) {
+            // Keep the backfill's claim on the event before the page's result replaces its state.
+            const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
+            if (ev && !ev.metadata?.orphan_claim) {
+              await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id);
+            }
+          }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle, undefined, w.sale);
+          if (w.reverify?.event_id) {
+            const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
+            const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
+            await supabase.from("vehicle_events").update({
+              metadata: { ...(ev?.metadata ?? {}), sale_reverified: confirmed ? "confirmed" : "refused", reverified_at: new Date().toISOString(), reverified_result: vehicle.status ?? null },
+            }).eq("id", w.reverify.event_id);
+            results.reverified++;
+            if (confirmed) results.confirmed++;
+          }
           const done: Record<string, unknown> = { status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
           if (w.sale) {
             const resultRead = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
