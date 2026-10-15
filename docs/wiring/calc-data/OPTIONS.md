@@ -6,15 +6,15 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 329 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 352 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | STEP-DCMD | Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test) | **candidate** |  | 0 | owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor |
 | STEP-RQ | Power steps on the PDM30 through one Roboteq SDC2160 dual H-bridge in the cab, no AMP controller | **candidate** |  | 0 | owner 2026-09-29 (above). Roboteq SDC2160 (web_snapshots/www.roboteq.com__sdc2160-detail.md: "Dual Channel, 2  |
 | STEP-SW | Step disable switch on the dash (steps stow and stay stowed), PDM30 DIG16 | **candidate** |  | 0 | agent 2026-09-30 (research/2026-09-30_power-step-bypass.md s8): holds the steps stowed off-road or while someo |
-| RC | Rear camera with mirror display | **decided** | 2026-09-27 | 6 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
+| RC | Rear camera with mirror display | **decided** | 2026-09-27 | 7 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
 | PW | Power windows, front doors (Nu-Relics 17383-2) | **candidate** |  | 14 | owner 2026-09-28 ("yet to decide if we do electric windows") supersedes owner 2026-09-27 ("we need power windo |
-| PL | Power door locks (AutoLoc AUTZT2000 actuators) | **candidate** |  | 6 | agent pick under delegation 2026-09-27 (endpoints.yaml doors block); the owner has not called locks |
+| PL | Power door locks (AutoLoc AUTZT2000 actuators) | **candidate** |  | 7 | agent pick under delegation 2026-09-27 (endpoints.yaml doors block); the owner has not called locks |
 | TG | Tailgate power window, Nu-Relics 17383-1 | **candidate** |  | 8 | lead 2026-09-28: the owner has no tailgate regulator; Nu-Relics 17383-1 option #100 (motor plug + terminals, n |
 | FC | Front camera | **candidate** |  | 0 | owner 2026-09-28 ("any other cameras we want") |
 | AS | Auto start (remote start) | **candidate** |  | 0 | owner 2026-09-28 ("auto start") |
@@ -74,20 +74,20 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 360 | 268 | 357 | 360 | 346 | 2 | 90 | m 0 · e 169 · u 180 |
-| composite (every option) | 392 | 272 | 384 | 392 | 376 | 2 | 90 | m 0 · e 172 · u 209 |
+| buildable (base + decided) | 384 | 292 | 381 | 384 | 370 | 1 | 90 | m 0 · e 193 · u 180 |
+| composite (every option) | 417 | 297 | 409 | 417 | 401 | 1 | 90 | m 0 · e 197 · u 209 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 329 | 249 | 326 | 329 | 315 | 2 | 90 | m 0 · e 155 · u 163 |
+| BASE | 352 | 272 | 349 | 352 | 338 | 1 | 90 | m 0 · e 178 · u 163 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
-| PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
+| PL | 7 | 1 | 7 | 7 | 7 | 0 | 0 | m 0 · e 2 · u 5 |
 | PW | 14 | 4 | 12 | 14 | 14 | 0 | 0 | m 0 · e 2 · u 12 |
-| RC | 6 | 3 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
+| RC | 7 | 4 | 7 | 7 | 7 | 0 | 0 | m 0 · e 2 · u 5 |
 | STEPS | 4 | 0 | 4 | 4 | 4 | 0 | 0 | m 0 · e 1 · u 3 |
 | TG | 8 | 0 | 5 | 8 | 8 | 0 | 0 | m 0 · e 0 · u 8 |
 
@@ -95,12 +95,12 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| body_convenience | 97 | 54 | 92 | 97 | 97 | 0 | 6 | m 0 · e 30 · u 67 |
-| dash_cabin | 56 | 38 | 56 | 56 | 54 | 1 | 13 | m 0 · e 13 · u 40 |
-| engine | 122 | 117 | 119 | 122 | 117 | 1 | 52 | m 0 · e 97 · u 23 |
-| lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
+| body_convenience | 102 | 59 | 97 | 102 | 102 | 0 | 6 | m 0 · e 35 · u 67 |
+| dash_cabin | 58 | 40 | 58 | 58 | 56 | 0 | 13 | m 0 · e 15 · u 40 |
+| engine | 133 | 128 | 130 | 133 | 128 | 1 | 52 | m 0 · e 108 · u 23 |
+| lighting_front | 35 | 19 | 35 | 35 | 35 | 0 | 10 | m 0 · e 22 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 8 · u 14 |
-| power_spine | 39 | 25 | 39 | 39 | 31 | 0 | 8 | m 0 · e 2 · u 32 |
+| power_spine | 40 | 26 | 40 | 40 | 32 | 0 | 8 | m 0 · e 3 · u 32 |
 | powertrain_chassis | 22 | 17 | 22 | 22 | 21 | 0 | 1 | m 0 · e 6 · u 16 |
 | unsectioned | 4 | 3 | 4 | 4 | 4 | 0 | 0 | m 0 · e 0 · u 4 |
 
@@ -187,9 +187,11 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 22 AWG white/orange | 0 | 12.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG white/yellow | 0 | 15.0 | not recorded | not claimed by this scope |
 | M22759/32 20 AWG black | 8.0 | 50.0 | not recorded | covered; also PDM15_GND1, PDM15_GND2, IGN_SW_0V (length not measured yet) |
-| M22759/32 20 AWG red | 123.4 | 40.0 | not recorded | short by 83.4 ft; also 93_PT1, 93_PT2, 23_PT1, 23_PT2 (length not measured yet) |
+| M22759/32 20 AWG red | 128.5 | 40.0 | not recorded | short by 88.5 ft; also 93_PT1, 93_PT2, 23_PT1, 23_PT2 (length not measured yet) |
+| M22759/32 20 AWG yellow | 0.6 | 0 | not recorded | short by 0.6 ft; also CAN_LTCD_H (length not measured yet) |
+| M22759/32 20 AWG green | 0.4 | 0 | not recorded | short by 0.4 ft; also CAN_LTCD_L (length not measured yet) |
 | M22759/32 20 AWG green/blue | 42.3 | 0 | not recorded | short by 42.3 ft |
-| M22759/32 20 AWG gray | 45.2 | 0 | not recorded | short by 45.2 ft |
+| M22759/32 20 AWG gray | 48.2 | 0 | not recorded | short by 48.2 ft |
 | M22759/32 20 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 20 AWG white/brown | 5.5 | 10.0 | not recorded | covered |
 | M22759/32 20 AWG white/red | 5.5 | 10.0 | not recorded | covered |
@@ -219,7 +221,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | STEP-RQ | 0 | 10 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | STEP-DCMD | Takes the PDM30 spares that exist only while PW (OUT3/OUT4) and PL (OUT21) are unfitted: STEP-RQ + PW + PL do not fit on the PDM30 unless another cab-side PDM appears (the PDM15 in the cab, mounts.yaml; or the front loads moving to a sealed bay PDM32, state 0ah, pending), which is an owner call. Door inputs stay local (DIG12/DIG13); speed over CAN (M1 General stream). Needs a short MicroBasic script (DIN to motor command; the DIN actions have no run-forward, user manual p.62), an external 1-10 kOhm pull-down on each DIN used (user manual p.48, Figure 3-4) and a pull-down on Power Control (value unknown). The I/O connector grounds are not wired to a ground bank (datasheet note 5) |
 | STEP-SW | 0 | 2 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |  | switch part open: match the dash switch family picked for the other dash switches. DIG16 is also wanted by AS and LO4 (options_v5 ledger); if CANKEY is fitted, a keypad button does this job with no PDM input and this option's wires drop out |
 | PW | 14 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |  |  |
-| PL | 6 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |  |  |
+| PL | 7 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |  |  |
 | TG | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  |  |
 | FC | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 0 | 0 |  | camera and display not picked; if the mirror display takes a second input, video only |
 | AS | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |  | receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads |

@@ -1642,6 +1642,9 @@ def pins_from_terminations(reg):
         if w.get("retired"):
             continue
         tl = ends.get(str(w["id"]), [])
+        # RSI pass 26: a wire that ends at the splice beside a pin reaches that pin through the splice's lead
+        tl = tl + [dict(t, endpoint=eps[t["endpoint"]]["pin_splice"]["plug"], cavity=eps[t["endpoint"]]["pin_splice"]["cavity"])
+                   for t in tl if (eps.get(t["endpoint"]) or {}).get("pin_splice")]
         frm = str(w.get("frm") or "")
         start = base(frm)
         far = [t for t in tl if not str(t["endpoint"]).startswith(_BOXES) and t["endpoint"] != start
