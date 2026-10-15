@@ -6,6 +6,9 @@ import { sourceLink, sourceName } from './useCapturedListings';
 import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 import { photoList, useListingPhotos } from './useListingPhotos';
+import { type PositionRead, headline, spreadLine } from './askPosition';
+import { type ListingRead, readLines, requestListingRead } from './analyzeListing';
+import { useAdminAccess } from '../../hooks/useAdminAccess';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -28,9 +31,12 @@ export function ageOf(value: string | null | undefined, now = Date.now()): strin
   return `${Math.floor(s / 86400)} d`;
 }
 // A listing's name as a reader expects to see it: a word typed in lower case gets its capital, a word with digits is a
-// code (SR5, F-150, K1500); a word already capitalised stays as the seller wrote it.
+// code (SR5, F-150, K1500), and so is a short word with no vowel (XLT, GT, SS); a word already capitalised stays as the
+// seller wrote it.
 export function tidyName(value: string | null | undefined): string {
   return (value ?? '').split(/(\s+)/).map((w) => /\d/.test(w) ? w.toUpperCase()
+    // a short word with no vowel is a trim code (xlt, gt, ss, ltz), not a word
+    : /^[b-df-hj-np-tv-xz]{2,4}$/.test(w) ? w.toUpperCase()
     : /^[a-z][a-z'.-]*$/.test(w) && w.length > 1 ? w[0].toUpperCase() + w.slice(1) : w).join('');
 }
 // The source as a small mark, not a word: the platform's own icon, kept in the repo, with its name for screen readers.
@@ -43,6 +49,16 @@ export function freshness(readAt: string | null | undefined, now = Date.now()): 
   if (!Number.isFinite(t) || t > now) return 'refresh';
   const age = ageOf(readAt, now);
   return age === 'now' ? 'read just now' : `read ${age} ago`;
+}
+// Live means our intake captured a listing within one cycle (poll-listing-feeds runs every 15 minutes): the reader's
+// newest_seen_at, the newest first sighting it can show (20261015150000), which is capture time, not posting time.
+// Owner, 2026-10-15: the board reads live, or how far behind it is, not a clock. Null when the reader has no capture
+// time; the control then states the read age.
+const LIVE_MS = 20 * 60_000;
+export function captureFreshness(seenAt: string | null | undefined, now = Date.now()): string | null {
+  const t = seenAt ? Date.parse(seenAt) : NaN;
+  if (!Number.isFinite(t) || t > now + 60_000) return null;
+  return now - t < LIVE_MS ? 'live' : `${ageOf(seenAt, now)} behind`;
 }
 // When a listing went up: the reader's listed_at (20261015070000), else the post time when it precedes the first
 // sighting, else the first sighting. Capture trails posting (median 6.5 h on 2026-10-15), so first seen is not age.
@@ -101,6 +117,57 @@ function ListingPhotos({ urls, to, label }: { urls: string[]; to: string; label:
   </div>;
 }
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
+const dollars = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`;
+
+// The ask on a price line: the middle half of the population it is placed by (p25 to p75), its median, and the ask.
+function PriceStrip({ ask, p25, p50, p75 }: { ask: number; p25: number; p50: number | null; p75: number }) {
+  const lo = Math.min(p25, ask), hi = Math.max(p75, ask);
+  const pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
+  const x = (v: number) => ((v - lo + pad) / (hi - lo + 2 * pad)) * 100;
+  return <svg className="market-ask__price" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
+    aria-label={`ask ${dollars(ask)}; middle half ${dollars(p25)} to ${dollars(p75)}${p50 != null ? `, median ${dollars(p50)}` : ''}`}>
+    <line x1="0" x2="100" y1="5" y2="5" className="market-ask__axis" />
+    <rect x={x(p25)} y="2" width={Math.max(0.5, x(p75) - x(p25))} height="6" className="market-ask__band" />
+    {p50 != null && <line x1={x(p50)} x2={x(p50)} y1="1" y2="9" className="market-ask__median" />}
+    <line x1={x(ask)} x2={x(ask)} y1="0" y2="10" className="market-ask__at" />
+  </svg>;
+}
+
+// Where the ask lands, under its price: a word, the price line, then a line per population, the one it is placed by
+// first. Nothing when the reader has no position for the row.
+// The owner's Analyze control: a photo read of this one listing on request, shown on the card once it returns. Only an
+// admin sees it; the route refuses everyone else and caps reads a day.
+function AnalyzeControl({ vehicleId }: { vehicleId: string }) {
+  const [state, setState] = useState<{ busy: boolean; read?: ListingRead; error?: string }>({ busy: false });
+  const run = async () => {
+    setState({ busy: true });
+    try { setState({ busy: false, read: await requestListingRead(vehicleId) }); }
+    catch (err) { setState({ busy: false, error: err instanceof Error ? err.message : String(err) }); }
+  };
+  if (state.read) return <div className="market-ask__read">{readLines(state.read).map(line => <Text key={line} role="caption" as="div">{line}</Text>)}</div>;
+  return <div className="market-ask__read">
+    <button type="button" className="market-control" aria-busy={state.busy} disabled={state.busy} onClick={() => void run()}
+      title="Read this listing's photos for condition (admins; YONO first, otherwise your connected provider pays)">
+      <Text role="label">{state.busy ? 'Reading photos…' : 'Analyze photos'}</Text></button>
+    {state.error && <Text role="caption" as="div">{state.error}</Text>}
+  </div>;
+}
+
+// The board's position and the seller's stated condition (classified_ask_board 20261015150000).
+type PlacedRow = AskRow & { position?: PositionRead | null; condition?: string | null };
+
+function AskPlacement({ ask, position }: { ask: number | null; position?: PositionRead | null }) {
+  const head = headline(position);
+  const lines = [spreadLine(position?.sold, 'sales'), spreadLine(position?.asked, 'asks')];
+  if (head?.basis === 'asks') lines.reverse();
+  if (!head && !lines.some(Boolean)) return null;
+  const basis = head ? (head.basis === 'sales' ? position?.sold : position?.asked) : null;
+  return <div className="market-ask__position">
+    {head && <Text role="label" as="div">{head.word}{head.span ? ` · ${head.span}` : ''}</Text>}
+    {ask != null && basis?.p25 != null && basis.p75 != null && <PriceStrip ask={ask} p25={basis.p25} p50={basis.p50} p75={basis.p75} />}
+    {lines.filter(Boolean).map(line => <Text key={line} role="caption" as="div">{line}</Text>)}
+  </div>;
+}
 
 export default function ClassifiedArrivals({ collection, sourcePicker }: { collection?: ReactNode; sourcePicker?: ReactNode }) {
   const [params, setParams] = useSearchParams();
@@ -142,6 +209,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
   const first = query.data?.pages[0];
   const population = first?.population;
   const rows = query.data?.pages.flatMap(page => page.rows) ?? [];
+  const { isAdmin } = useAdminAccess();
   const pageIds = useMemo(() => (query.data?.pages ?? []).map(page => page.rows.map(row => row.vehicle_id)), [query.data]);
   const photos = useListingPhotos(pageIds);
 
@@ -177,16 +245,19 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
     setArrived(arrivalsAfter(result.data?.pages[0]?.rows ?? [], shownAt.current)); setNow(Date.now());
     window.setTimeout(() => setArrived(null), 6_000);
   };
+  const capturedAt = (first as (typeof first & { newest_seen_at?: string | null }) | undefined)?.newest_seen_at ?? null;
   const control = query.isFetching ? '↻ reading…'
     : query.isError || pollFailed ? '↻ retry'
     : !first ? '↻ reading…'
     : polled?.waiting ? `↻ ${count(polled.waiting)}${polled.waiting >= 60 ? '+' : ''} new`
-    : `↻ ${freshness(first.as_of, Math.max(now, Date.now()))}`;
+    : `↻ ${captureFreshness(capturedAt, Math.max(now, Date.now())) ?? freshness(first.as_of, Math.max(now, Date.now()))}`;
 
   return <section aria-label="Classified arrivals" className="market-explorer">
     <Masthead result={<>
       <button type="button" className="market-control" aria-busy={query.isFetching} onClick={() => void refresh()}
-        title={pollFailed ? 'Latest check failed. Showing the last fetched listings; select to retry.' : 'Read the newest listings; the read clock does not establish source capture freshness.'}>
+        title={pollFailed ? 'Latest check failed. Showing the last fetched listings; select to retry.'
+          : capturedAt ? 'Live when our intake captured a listing in the last 20 minutes; otherwise how long since it last did. Select to read the newest.'
+          : 'Read the newest listings; the read clock does not establish source capture freshness.'}>
         <Text role="label">{control}</Text>
       </button>
       {arrived !== null && <Text role="caption" as="div">{arrived > 0 ? `${count(arrived)} new` : 'nothing new yet'}</Text>}
@@ -265,6 +336,8 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
           {row.asking_price == null ? <Text role="caption">Unpriced</Text>
             : <Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text>}
           <Text role="body" as="div">{place || 'Place unrecorded'}{row.distance_mi != null ? ` · ${row.distance_mi.toLocaleString('en-US')} mi away` : ''}</Text>
+          <AskPlacement ask={row.asking_price == null ? null : Number(row.asking_price)} position={(row as PlacedRow).position} />
+          {isAdmin && <AnalyzeControl vehicleId={row.vehicle_id} />}
         </div>
       </article>;
     })}</div>}
