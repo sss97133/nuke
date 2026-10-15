@@ -55,7 +55,7 @@ export async function applyCraigslistImagePlan(
       if (item.primary && item.replaces.length) await supabase.from("vehicle_images").update({ is_primary: false }).in("id", item.replaces);
       const { data, error } = await supabase.from("vehicle_images").insert({
         vehicle_id: args.vehicleId, image_url: item.url, is_primary: item.primary, position: item.position, display_order: item.position,
-        source: args.source, is_external: true, source_url: args.sourceUrl, ...(item.gate ? { vision_gate_status: item.gate } : {}),
+        source: args.source, is_external: true, ai_processing_status: "skipped", source_url: args.sourceUrl, ...(item.gate ? { vision_gate_status: item.gate } : {}),
       }).select("id").maybeSingle();
       if (error || !data?.id) { out.errors.push(error?.message ?? "no id"); continue; }
       out.inserted++;
