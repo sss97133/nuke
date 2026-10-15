@@ -36,15 +36,15 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
     { name: 'claude-opus-4-5', costPer1kTokens: 15.00, maxTokens: 200000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   google: [
-    { name: 'gemini-2.5-flash-lite', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
-    { name: 'gemini-2.5-flash', costPer1kTokens: 0.15, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'excellent' },
-    { name: 'gemini-2.5-pro', costPer1kTokens: 1.25, maxTokens: 1048576, supportsVision: true, speed: 'medium', quality: 'excellent' },
+    { name: 'gemini-flash-lite-latest', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
+    { name: 'gemini-flash-latest', costPer1kTokens: 0.15, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'excellent' },
+    { name: 'gemini-pro-latest', costPer1kTokens: 1.25, maxTokens: 1048576, supportsVision: true, speed: 'medium', quality: 'excellent' },
   ],
 };
 
 export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: string; description: string }> = {
-  tier1: { provider: 'google', model: 'gemini-2.5-flash-lite', description: 'Fast, free basic analysis' },
-  tier2: { provider: 'google', model: 'gemini-2.5-flash', description: 'Good quality, cheap' },
+  tier1: { provider: 'google', model: 'gemini-flash-lite-latest', description: 'Fast, free basic analysis' },
+  tier2: { provider: 'google', model: 'gemini-flash-latest', description: 'Good quality, cheap' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
   expert: { provider: 'anthropic', model: 'claude-sonnet-4-5', description: 'Highest quality, comprehensive analysis' },
 };

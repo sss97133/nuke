@@ -312,7 +312,7 @@ Be specific - give exact selectors or paths.`;
     if (googleKey) {
       // Use Google Gemini API (free tier)
       console.log('🔍 Using Google Gemini API for structure analysis...');
-      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${googleKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -492,7 +492,7 @@ Extract only fields that are clearly present. Use null for missing fields.`;
     if (googleKey) {
       // Use Google Gemini API (free tier)
       console.log('📥 Using Google Gemini API for extraction...');
-      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${googleKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -8,7 +8,7 @@
 // subscription" is a primary flow.
 //
 // The `system` env-key pool (Nuke's temporary bootstrap) is RETIRED (Skylar, 2026-09-28): every tier
-// in it had died — gemini-2.0-flash-lite 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
+// in it had died — gemini-flash-lite-latest 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
 // credits remaining", ~5,900 failed attempts each 2026-09-27 21:00–23:17Z, $0 billed, nothing analyzed.
 // getUserApiKey still falls back to env keys for other callers; this module takes only user keys.
 //
@@ -22,7 +22,7 @@ type Provider = "google" | "anthropic" | "openai";
 
 // Cheapest-first provider preference; each resolved BYOK-first via getUserApiKey.
 const PROVIDER_PREFS: Array<{ provider: Provider; model: string; env: string }> = [
-  { provider: "google", model: "gemini-2.0-flash-lite", env: "GOOGLE_AI_API_KEY" },
+  { provider: "google", model: "gemini-flash-lite-latest", env: "GOOGLE_AI_API_KEY" },
   { provider: "anthropic", model: "claude-haiku-4-5-20251001", env: "ANTHROPIC_API_KEY" },
   { provider: "openai", model: "gpt-4o-mini", env: "OPENAI_API_KEY" },
 ];

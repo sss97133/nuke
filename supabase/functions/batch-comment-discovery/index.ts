@@ -566,7 +566,7 @@ async function extractClaims(
       if (!content && googleKey) {
         try {
           const gemResp = await geminiFetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -579,7 +579,7 @@ async function extractClaims(
           if (gemResp.ok) {
             const gd = await gemResp.json();
             content = gd.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            modelUsed = "gemini-2.5-flash-lite";
+            modelUsed = "gemini-flash-lite-latest";
             costCents = 0;
           } else {
             const gemErr = await gemResp.text().catch(() => "");
@@ -733,7 +733,7 @@ ${questionBlock}`;
 
     try {
       const resp = await geminiFetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
