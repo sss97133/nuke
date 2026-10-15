@@ -146,3 +146,22 @@ test('fresh owned tab performs one source visit; installation preserves pending 
   const queued=core.initialState();core.enqueue(queued,packet());const restored=workerFixture(queued);await restored.installed();assert.equal(restored.getState().queue.length,1);assert.equal(restored.getState().enabled,false);
   assert.deepEqual(await restored.command('start',{id:extensionId,tab:{id:77},url:core.TARGET}),{refused:true});assert.equal(restored.effects.source,0);
 });
+test('targeting gate: cars and trucks 1964-1991 pass with tier; boats, trailers, off-era, placeholders rejected with reasons', () => {
+  const dom = page(); dom.window.eval(fs.readFileSync(new URL('./extension/classify.js', import.meta.url), 'utf8'));
+  const raw = dom.window.NukeClassify.classify, classify = card => JSON.parse(JSON.stringify(raw(card)));
+  const c = (title, price, parsed_year) => ({ title, price, parsed_year });
+  assert.deepEqual(classify(c('1965 Volkswagen beetle', 6800, 1965)), { accept: true, tier: 1, reasons: [] });
+  assert.deepEqual(classify(c('1982 Dodge ram 1500', 4500, 1982)), { accept: true, tier: 2, reasons: [] });
+  assert.equal(classify(c('1964 Chevrolet impala SS 2 door', 60000, 1964)).tier, 1);
+  assert.equal(classify(c('1991 Ford F250 camper special', 5000, 1991)).accept, true);
+  assert.equal(classify(c('1969 Triumph TR6', 9000, 1969)).accept, true);
+  assert.equal(classify(c('1989 Chevrolet dolphin', 6000, 1989)).reasons[0], 'boat');
+  assert.deepEqual(classify(c('1978 A-Liner na', 500, 1978)).reasons, ['rv_camper_trailer']);
+  assert.deepEqual(classify(c('2021 ICON golf cart', 6000, 2021)).reasons, ['year_after_1991', 'offroad_utility']);
+  assert.deepEqual(classify(c('2003 Acura rsx', 10, 2003)).reasons, ['year_after_1991', 'price_placeholder']);
+  assert.deepEqual(classify(c('1958 Chevrolet Apache', 9000, 1958)).reasons, ['year_before_1964']);
+  assert.deepEqual(classify(c('Vintage truck', 9000, null)).reasons, ['year_unknown']);
+  assert.equal(classify(c('1975 Honda CB550', 2500, 1975)).reasons[0], 'motorcycle');
+  assert.match(fs.readFileSync(new URL('./extension/content.js', import.meta.url), 'utf8'), new RegExp(core.TARGET.replace(/[?.]/g, '\\$&')));
+  dom.window.close();
+});
