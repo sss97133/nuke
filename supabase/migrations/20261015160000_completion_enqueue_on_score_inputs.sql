@@ -10,6 +10,13 @@
 -- drivetrain, sale_price, current_value (plus counts of timeline_events and vehicle_images, other tables). The list
 -- below keeps the trigger's existing superset of those columns; only the skip rule changes: an UPDATE whose input
 -- columns are all unchanged no longer enqueues, whatever else it changed. INSERT still always enqueues.
+--
+-- The score also counts timeline_events and vehicle_images for the vehicle. Those counts reached the queue only through
+-- side-effect UPDATEs on vehicles (image_count, has_photos, updated_at), which no longer enqueue (lane-depth's review).
+-- So the two tables enqueue directly: statement-level AFTER INSERT and AFTER DELETE triggers read the transition table
+-- and enqueue each affected vehicle once per statement (a 6,000-image re-fold enqueues one vehicle once), and a
+-- row-level AFTER UPDATE OF vehicle_id trigger, firing only when vehicle_id changes, enqueues both vehicles.
+-- app.skip_completion_enqueue = '1' (the drainer's writeback) is respected throughout.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
@@ -51,5 +58,65 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
+
+-- Enqueue the vehicles a statement touched (transition table rows carry vehicle_id).
+CREATE OR REPLACE FUNCTION public.enqueue_completion_from_rows()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF current_setting('app.skip_completion_enqueue', true) = '1' THEN
+    RETURN NULL;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO public.vehicle_completion_recompute_queue (vehicle_id)
+    SELECT DISTINCT vehicle_id FROM new_rows WHERE vehicle_id IS NOT NULL
+    ON CONFLICT (vehicle_id) DO NOTHING;
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO public.vehicle_completion_recompute_queue (vehicle_id)
+    SELECT DISTINCT o.vehicle_id FROM old_rows o
+    WHERE o.vehicle_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = o.vehicle_id)
+    ON CONFLICT (vehicle_id) DO NOTHING;
+  END IF;
+  RETURN NULL;
+END;
+$function$;
+
+-- A row moved to another vehicle changes both vehicles' counts.
+CREATE OR REPLACE FUNCTION public.enqueue_completion_on_vehicle_move()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF current_setting('app.skip_completion_enqueue', true) = '1' THEN
+    RETURN NULL;
+  END IF;
+  INSERT INTO public.vehicle_completion_recompute_queue (vehicle_id)
+  SELECT x.id FROM (VALUES (OLD.vehicle_id), (NEW.vehicle_id)) AS x(id)
+  WHERE x.id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = x.id)
+  ON CONFLICT (vehicle_id) DO NOTHING;
+  RETURN NULL;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS trg_completion_enqueue_images_ins ON public.vehicle_images;
+CREATE TRIGGER trg_completion_enqueue_images_ins AFTER INSERT ON public.vehicle_images
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.enqueue_completion_from_rows();
+DROP TRIGGER IF EXISTS trg_completion_enqueue_images_del ON public.vehicle_images;
+CREATE TRIGGER trg_completion_enqueue_images_del AFTER DELETE ON public.vehicle_images
+  REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.enqueue_completion_from_rows();
+DROP TRIGGER IF EXISTS trg_completion_enqueue_images_move ON public.vehicle_images;
+CREATE TRIGGER trg_completion_enqueue_images_move AFTER UPDATE OF vehicle_id ON public.vehicle_images
+  FOR EACH ROW WHEN (OLD.vehicle_id IS DISTINCT FROM NEW.vehicle_id) EXECUTE FUNCTION public.enqueue_completion_on_vehicle_move();
+
+DROP TRIGGER IF EXISTS trg_completion_enqueue_timeline_ins ON public.timeline_events;
+CREATE TRIGGER trg_completion_enqueue_timeline_ins AFTER INSERT ON public.timeline_events
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.enqueue_completion_from_rows();
+DROP TRIGGER IF EXISTS trg_completion_enqueue_timeline_del ON public.timeline_events;
+CREATE TRIGGER trg_completion_enqueue_timeline_del AFTER DELETE ON public.timeline_events
+  REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.enqueue_completion_from_rows();
+DROP TRIGGER IF EXISTS trg_completion_enqueue_timeline_move ON public.timeline_events;
+CREATE TRIGGER trg_completion_enqueue_timeline_move AFTER UPDATE OF vehicle_id ON public.timeline_events
+  FOR EACH ROW WHEN (OLD.vehicle_id IS DISTINCT FROM NEW.vehicle_id) EXECUTE FUNCTION public.enqueue_completion_on_vehicle_move();
 
 COMMIT;
