@@ -161,6 +161,12 @@ function L1_source(row) {
   if (src === 'craigslist') {
     return { verdict: 'approved', confidence: 0.9, reasoning: `L1: source=${src} — classified-listing gallery image, attribution by provenance` };
   }
+  // Barn Finds post photos: the image URL comes from one post's own article body (extract-barn-finds-listing reads the
+  // entry-content only, not related-post or comment images), written with that post's vehicle, so provenance is the
+  // attribution. Measured 2026-10-15: all 6,702 barnfinds images (611 vehicles) were 'pending'.
+  if (src === 'barnfinds') {
+    return { verdict: 'approved', confidence: 0.9, reasoning: `L1: source=${src} — article-body gallery image, attribution by provenance` };
+  }
   // GoPro timelapse: captured during shop sessions, vehicle-context by design.
   if (src === 'gopro_timelapse' || src === 'gopro') {
     return { verdict: 'approved', confidence: 0.88, reasoning: `L1: source=${src} — captured during shop work session` };
