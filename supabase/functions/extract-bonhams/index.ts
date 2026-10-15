@@ -557,6 +557,8 @@ interface ExtractionResult {
   raw_document?: unknown;
   /** Typesense page this lot came from; the lander's cursor reads it back from vehicle_events.metadata.ts_page. */
   ts_page?: number;
+  /** No chassis/frame/VIN line and no year in the title: the lot is an item, not a vehicle (set by the Typesense lander). */
+  non_vehicle_item?: boolean;
   /** Calendar and depth keys merged into the event metadata (session days, sale key, engine/registration numbers). */
   extra_metadata?: Record<string, unknown>;
 }
@@ -1154,7 +1156,7 @@ async function saveVehicle(
     if (error) throw new Error(`Vehicle update failed: ${error.message}`);
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   } else {
-    let ins = await supabase.from("vehicles").insert(vehicleData).select("id").maybeSingle();
+    let ins = await supabase.from("vehicles").insert(opts.fast && extracted.non_vehicle_item ? { ...vehicleData, listing_kind: "non_vehicle_item" } : vehicleData).select("id").maybeSingle();
     const other = ins.error ? vinClash(ins.error.message) : null;
     if (ins.error && other) {
       if (fullVin) {
