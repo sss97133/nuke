@@ -627,4 +627,70 @@ SELECT md5(pg_get_functiondef('public.supersede_vehicle_event_episode(uuid,jsonb
 SELECT pg_temp.ok('drifted body: migration refused, definition untouched',
   md5(pg_get_functiondef('public.supersede_vehicle_event_episode(uuid,jsonb,jsonb,text)'::regprocedure)) = :'drifted_fp');
 
+
+-- ====================================================================================================================
+-- source_url: 20261015070000 extends the writer (letter-case restoration of a listing URL, cited, kept in history).
+-- Applied last because the re-apply tests above need the original body; this migration replaces the drifted stub.
+\ir ../migrations/20261015070000_supersede_vehicle_event_episode_source_url.sql
+CREATE TRIGGER trg_guard_vehicle_event_clock_locks BEFORE UPDATE ON public.vehicle_events
+  FOR EACH ROW EXECUTE FUNCTION public.guard_vehicle_event_clock_locks();
+INSERT INTO public.vehicles(id, year, make, model) VALUES (pg_temp.u('a001', 13), 2000, 'Make', 'Model 13');
+INSERT INTO public.listing_page_snapshots(id, platform, listing_url, http_status, success) VALUES
+ (pg_temp.u('5001', 6), 'cars_and_bids', 'https://carsandbids.com/auctions/AbC123xY/2000-test-car', 200, true);
+INSERT INTO public.vehicle_events(id, vehicle_id, source_platform, source_url, source_listing_id, event_type, event_status,
+  final_price, metadata, extracted_at, extraction_method, created_at, updated_at) VALUES
+ (pg_temp.u('e001', 12), pg_temp.u('a001', 13), 'cars_and_bids', 'https://carsandbids.com/auctions/abc123xy/2000-test-car', NULL,
+  'auction', 'sold', 12000, '{}', '2026-02-06 10:00:00+00', 'lowercasing-writer',
+  '2026-02-06 10:00:00+00', '2026-02-06 10:00:00+00');
+SELECT pg_temp.refuses('source_url: a change beyond letter case is refused without the flag',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/other-slug", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
+     'URL differs by more than case')$c$, 'more than letter case');
+SELECT pg_temp.refuses('source_url: no captured document',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/2000-test-car", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "agent_reasoning", "ref": "memory", "basis": "exact_case_capture"}',
+     'URL case restored without a capture')$c$, 'must cite a captured document');
+SELECT pg_temp.refuses('source_url: no basis',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/2000-test-car", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006"}',
+     'URL case restored without a basis')$c$, 'must name its basis');
+SELECT pg_temp.refuses('source_url: the cited document spells the URL differently from the replacement',
+  $c$SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/ABC123XY/2000-test-car", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
+     'Guessed case that the capture does not carry')$c$, 'does not carry the replacement URL');
+SELECT pg_temp.ok('source_url: refusals wrote nothing',
+  (SELECT count(*) FROM public.vehicle_events WHERE id = pg_temp.u('e001', 12)) = 1
+  AND (SELECT source_url FROM public.vehicle_events WHERE id = pg_temp.u('e001', 12)) = 'https://carsandbids.com/auctions/abc123xy/2000-test-car');
+SELECT pg_temp.ok('source_url: a stale expected URL writes nothing',
+  (public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/2000-test-car", "expected": "https://carsandbids.com/auctions/Abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
+     'Stale expected URL') ->> 'status') = 'stale');
+SELECT public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/2000-test-car", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
+     'Lowercased id restored from the capture') AS res \gset
+SELECT pg_temp.ok('source_url: superseded, the prior URL kept whole in superseded_rows, the new row carries the exact spelling',
+  :'res'::jsonb ->> 'status' = 'superseded'
+  AND (SELECT count(*) FROM public.vehicle_events WHERE id = pg_temp.u('e001', 12)) = 0
+  AND (SELECT row_data ->> 'source_url' FROM public.superseded_rows WHERE row_id = pg_temp.u('e001', 12)) = 'https://carsandbids.com/auctions/abc123xy/2000-test-car'
+  AND (SELECT count(*) FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 13)
+        AND source_url = 'https://carsandbids.com/auctions/AbC123xY/2000-test-car'
+        AND created_at = '2026-02-06 10:00:00+00'
+        AND metadata -> 'clock_locked_by_supersession' -> 'fields' = '["source_url"]'::jsonb
+        AND metadata -> 'episode_supersessions' -> 0 -> 'corrections' -> 'source_url' ->> 'original' = 'https://carsandbids.com/auctions/abc123xy/2000-test-car') = 1);
+UPDATE public.vehicle_events SET source_url = 'https://carsandbids.com/auctions/abc123xy/2000-test-car' WHERE vehicle_id = pg_temp.u('a001', 13);
+SELECT pg_temp.ok('source_url: a lander writing the old spelling back is blocked and recorded',
+  (SELECT source_url FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 13)) = 'https://carsandbids.com/auctions/AbC123xY/2000-test-car'
+  AND (SELECT metadata -> 'clock_lock_hits' -> 0 -> 'fields' FROM public.vehicle_events WHERE vehicle_id = pg_temp.u('a001', 13)) = '["source_url"]'::jsonb);
+SELECT pg_temp.ok('source_url: a second call is already, not a second write',
+  (public.supersede_vehicle_event_episode('00000000-0000-0000-e001-00000000000c'::uuid,
+     '{"source_url": {"value": "https://carsandbids.com/auctions/AbC123xY/2000-test-car", "expected": "https://carsandbids.com/auctions/abc123xy/2000-test-car"}}',
+     '{"type": "listing_page_snapshots", "ref": "listing_page_snapshots/00000000-0000-0000-5001-000000000006", "snapshot_id": "00000000-0000-0000-5001-000000000006", "basis": "exact_case_capture"}',
+     'Lowercased id restored from the capture') ->> 'status') = 'already');
+
 SELECT 'vehicle-event episode supersession contract: all passed' AS result;
