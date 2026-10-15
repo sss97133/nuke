@@ -12,8 +12,8 @@ Deno.test("a fetch needs at least one credit of allowance; an unreadable allowan
   assertEquals(await firecrawlGate(rpcStub({}), "ksl").allow(), false);
 });
 
-Deno.test("every paid fetch is recorded with its source, credits, lots and lane", async () => {
+Deno.test("a paid fetch is recorded with its source, lots and lane; credits are metered where the scrape is sent", async () => {
   const calls: Array<[string, Record<string, unknown>]> = [];
   await firecrawlGate(rpcStub({ firecrawl_record_spend: { data: 1 } }, calls), "collecting-cars").record(1, 0, "extract-collecting-cars", "unusable page");
-  assertEquals(calls[0], ["firecrawl_record_spend", { p_source: "collecting-cars", p_credits: 1, p_lots: 0, p_lane: "extract-collecting-cars", p_note: "unusable page" }]);
+  assertEquals(calls[0], ["firecrawl_record_spend", { p_source: "collecting-cars", p_credits: 0, p_lots: 0, p_lane: "extract-collecting-cars", p_note: "unusable page" }]);
 });
