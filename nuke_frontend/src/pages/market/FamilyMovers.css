@@ -1,0 +1,12 @@
+/* The families that moved most on BaT, a strip under the brand map: risers marked green, fallers red, each one a way
+   into the map. */
+.map-movers { display: flex; align-items: center; gap: 10px; padding: 4px 16px; min-height: 32px; flex-shrink: 0;
+  border-top: 2px solid var(--border); background: var(--bg); color: var(--text); overflow: hidden; }
+.map-movers__title, .map-movers__base { flex-shrink: 0; }
+.map-movers__list { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.map-movers__item { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 2px 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.map-movers__item:hover, .map-movers__item:focus-visible { border-color: var(--text); }
+.map-movers__item--up { border-left: 3px solid var(--success); }
+.map-movers__item--down { border-left: 3px solid var(--error); }
+@media (max-width: 760px) { .map-movers { flex-wrap: wrap; } .map-movers__base { display: none; } }

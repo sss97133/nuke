@@ -11,6 +11,7 @@ import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
+import FamilyMovers from './market/FamilyMovers';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -1441,6 +1442,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── TOOLTIP ─── */}
       {tooltip && <TreemapTooltip {...tooltip} />}
+
+      {/* ─── WHAT MOVED: the families whose BaT market moved most, a pick drills the map to the family ─── */}
+      {levelType === 'brands' && <FamilyMovers onPick={(m) => {
+        recordInterest('make', m.brand);
+        setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
+      }} />}
 
       {/* ─── FOOTER ─── */}
       <div
