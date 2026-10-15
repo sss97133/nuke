@@ -154,6 +154,13 @@ export function mapCaption(level: MapLevel, levelCount: number, refresh: MapRefr
   return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${clause}${ledgerViewsClock(refresh.refreshedAt, now)}`;
 }
 
+/** The caption on a phone, where the full sentence does not fit: the count alone, the population still on the title. */
+export function mapCaptionShort(level: MapLevel, levelCount: number, refresh: MapRefresh): string {
+  const p = refresh.populations;
+  const n = level === 'brands' && p?.measure === 'confirmed_sale_v1' && Number.isFinite(p.mapped_sales) ? p.mapped_sales! : levelCount;
+  return `${n.toLocaleString('en-US')} ${level === 'vehicles' ? 'shown' : 'sold'}`;
+}
+
 /** How much of a brand's sales the family level names: the share of its sales in named families and how many there
  *  are; the rest sit in "Other models". Empty when the level holds no families. */
 export function familyCoverage(nodes: readonly TreemapNode[] | null): string {
@@ -1302,8 +1309,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
           {activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
-              {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
-                : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
+              {isNarrow ? mapCaptionShort(levelType, totalCount, refresh)
+                : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
+                  : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
