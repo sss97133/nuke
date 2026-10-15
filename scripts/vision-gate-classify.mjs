@@ -154,6 +154,13 @@ function L1_source(row) {
       src === 'external_import' || src === 'gaaclassiccars') {
     return { verdict: 'approved', confidence: 0.95, reasoning: `L1: source=${src} — auction-pipeline image, attribution by provenance` };
   }
+  // Craigslist listing photos: the image URL comes from one post's own gallery (ingest writes it with that post's
+  // vehicle), so provenance is the attribution, as for the auction sources. Measured 2026-10-15: every Craigslist image
+  // created since 2026-10-13 22:00Z was still 'pending', so the gallery (which admits pending rows only for BaT) showed
+  // one fallback photo per vehicle.
+  if (src === 'craigslist') {
+    return { verdict: 'approved', confidence: 0.9, reasoning: `L1: source=${src} — classified-listing gallery image, attribution by provenance` };
+  }
   // GoPro timelapse: captured during shop sessions, vehicle-context by design.
   if (src === 'gopro_timelapse' || src === 'gopro') {
     return { verdict: 'approved', confidence: 0.88, reasoning: `L1: source=${src} — captured during shop work session` };

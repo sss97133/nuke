@@ -574,6 +574,7 @@ async function pollFirecrawlHtmlFeed(
   //    request only. Other sources retain their configured renderer/fallback.
   let urls: string[] = [];
   let blockNote = "";
+  let confirmedEmptySearch = false;
 
   if (feed.search_criteria?.fetch_strategy === "rss_direct_ingest") {
     try {
@@ -611,6 +612,8 @@ async function pollFirecrawlHtmlFeed(
       const direct = await fetchCraigslistFeed(feed.feed_url, archiveFetch);
       if (!direct.html) return await failFeed(`fetch_failed: ${direct.error}`);
       html = direct.html;
+      // A configured parser still has to prove it works, even on a source-empty page.
+      confirmedEmptySearch = direct.confirmedEmpty === true && !feed.search_criteria?.listing_url_regex;
     } else {
       // Server-rendered sources (KSL, Hagerty, ClassicCars) carry their listing
       // links in plain HTML — fetching them through Firecrawl works but spends
@@ -703,7 +706,7 @@ async function pollFirecrawlHtmlFeed(
 
   result.items_found = urls.length;
 
-  if (urls.length === 0) {
+  if (urls.length === 0 && (!confirmedEmptySearch || blockNote)) {
     return await failFeed(`parsed_zero${blockNote}`);
   }
 

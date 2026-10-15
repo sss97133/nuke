@@ -282,6 +282,7 @@ function fixture(options = {}) {
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
         if(specifier==='./cachedProperties.ts')return load('cached');
         if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
+        if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;

@@ -25,6 +25,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +67,7 @@ interface SyncResult {
   new_count: number;
   updated_count: number;
   ended_count: number;
+  write_errors?: string[];
   error: string | null;
   duration_ms: number;
 }
@@ -608,8 +610,8 @@ async function syncToDatabase(
   supabase: ReturnType<typeof createClient>,
   auctions: LiveAuction[],
   platform: string
-): Promise<{ new_count: number; updated_count: number; ended_count: number }> {
-  const stats = { new_count: 0, updated_count: 0, ended_count: 0 };
+): Promise<{ new_count: number; updated_count: number; ended_count: number; write_errors: string[] }> {
+  const stats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
 
   if (auctions.length === 0) {
     return stats;
@@ -672,6 +674,7 @@ async function syncToDatabase(
         stats.new_count += typeof data === "number" ? data : chunk.length;
       } else {
         console.error(`[sync-live-auctions] upsert_live_auction_vehicles failed: ${error.message}`);
+        stats.write_errors.push(`upsert_live_auction_vehicles: ${error.message}`);
       }
     }
 
@@ -697,7 +700,10 @@ async function syncToDatabase(
       p_platform: platform,
       p_live_urls: auctions.map(a => a.url),
     });
-    if (endErr) console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+    if (endErr) {
+      console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+      stats.write_errors.push(`end_live_auctions_absent: ${endErr.message}`);
+    }
     else {
       stats.ended_count = Number(ended) || 0;
       if (stats.ended_count > 0) console.log(`[sync-live-auctions] ${platform}: ${stats.ended_count} live rows ended (absent from the live list)`);
@@ -790,10 +796,10 @@ async function updateSourceRegistry(
     updateData.last_successful_at = new Date().toISOString();
   }
 
-  await supabase
+  mustWrite('source_registry update', await supabase
     .from("source_registry")
     .update(updateData)
-    .eq("slug", slug);
+    .eq("slug", slug));
 }
 
 // ============================================
@@ -1004,7 +1010,7 @@ Deno.serve(async (req) => {
         }
 
         // Sync to database (skip during cron to avoid timeout — 355k+ active vehicles make this slow)
-        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0 };
+        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
         }
@@ -1014,8 +1020,9 @@ Deno.serve(async (req) => {
 
         results.push({
           platform: normalizedPlatform,
-          success: !syncResult.error,
+          success: !syncResult.error && dbStats.write_errors.length === 0,
           live_count: syncResult.auctions.length,
+          write_errors: dbStats.write_errors,
           new_count: dbStats.new_count,
           updated_count: dbStats.updated_count,
           ended_count: dbStats.ended_count,
@@ -1048,6 +1055,7 @@ Deno.serve(async (req) => {
       const totalUpdated = results.reduce((sum, r) => sum + r.updated_count, 0);
       const totalEnded = results.reduce((sum, r) => sum + r.ended_count, 0);
       const allSuccess = results.every(r => r.success);
+      const writeFailed = results.some(r => (r.write_errors?.length ?? 0) > 0);
 
       return okJson({
         success: allSuccess,
@@ -1059,7 +1067,7 @@ Deno.serve(async (req) => {
         },
         results,
         synced_at: new Date().toISOString(),
-      });
+      }, writeFailed ? 500 : 200);
     }
 
     return okJson({ error: "Invalid action. Use 'sync' or 'status'." }, 400);

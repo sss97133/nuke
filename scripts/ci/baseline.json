@@ -5,6 +5,7 @@
     "no-dead-asset-references": { "errors": 0, "note": "ghost-table refs on live paths. 12 = webhooks (pending strip, NEEDS_SKYLAR #2); 6 = vehicle_transactions (guarded crash-safe, half-built)." },
     "no-raw-fetch":             { "violations": 127, "note": "external fetches bypassing archiveFetch. Burn down opportunistically." },
     "no-raw-testimony-insert":  { "violations": 2, "note": "raw writes to testimony tables. Should trend to 0." },
+    "no-swallowed-write-errors": { "violations": 515, "note": "supabase-js writes in edge functions whose { error } is dropped or only logged (scripts/guardrails/no-swallowed-write-errors.mjs --all). Burn down; never raise." },
     "no-committed-secrets":     { "violations": 0, "note": "HARD zero — any hit blocks regardless of mode." },
     "no-schema-baked-labels":   { "violations": 284, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." },
     "design-system":            { "no-inline-style": 19819, "no-font-props": 18116, "no-hardcoded-colors": 1337, "no-border-radius": 37, "no-box-shadow": 4, "no-gradient": 2, "no-banned-fonts": 135, "note": "eslint design-system rules over nuke_frontend/src (src/kit exempt), counted by scripts/guardrails/design-violations.mjs, seeded 2026-10-12. Each rule ratchets on its own: lower it as pages move onto the kit, never raise it." }

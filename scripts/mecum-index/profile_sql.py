@@ -49,20 +49,21 @@ DO $$ DECLARE r text; o text := ''; BEGIN
     INSERT INTO vehicles (status, year, make, model, sale_price, sale_status, auction_outcome, sale_date, discovery_url, discovery_source, listing_source, source, extractor_version)
     SELECT 'active', x.year, x.make, x.model, x.sale_price, x.sale_status, x.sale_status, x.sale_date::date, x.discovery_url, 'mecum', 'mecum', 'mecum', 'mecum-index-v1'
     FROM jsonb_to_recordset({lit(vehicles)}) AS x(year int, make text, model text, sale_price numeric, sale_status text, sale_date text, discovery_url text)
+    WHERE NOT EXISTS (SELECT 1 FROM vehicles w WHERE w.discovery_url = public.canonicalize_vehicle_url(x.discovery_url))
   LOOP o := o || r || E'\\n'; END LOOP;
   o := o || E'\\n--- vehicle_events\\n';
   FOR r IN EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
     INSERT INTO vehicle_events (vehicle_id, source_platform, event_type, source_url, source_listing_id, final_price, event_status, extraction_method, extraction_source, extracted_at, metadata)
     SELECT v.id, 'mecum', 'auction', e.url, e.lot, e.price, e.status, 'mecum-index-v1', 'algolia U6CFCQ7V52/wp_posts_lot', now(), '{{"index_sourced":true}}'::jsonb
     FROM jsonb_to_recordset({lit(events)}) AS e(url text, lot text, price numeric, status text)
-    JOIN vehicles v ON v.discovery_url = e.url
+    JOIN vehicles v ON v.discovery_url = public.canonicalize_vehicle_url(e.url)
   LOOP o := o || r || E'\\n'; END LOOP;
   o := o || E'\\n--- auction_events\\n';
   FOR r IN EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
-    INSERT INTO auction_events (vehicle_id, source, source_url, outcome, lot_number, sale_price)
-    SELECT v.id, 'mecum', e.url, e.status, e.lot, CASE WHEN e.status = 'sold' THEN e.price END
+    INSERT INTO auction_events (vehicle_id, source, source_url, source_listing_id, outcome, lot_number, winning_bid, high_bid)
+    SELECT v.id, 'mecum', e.url, e.lot, CASE e.status WHEN 'sold' THEN 'sold' WHEN 'bid-goes-on' THEN 'bid_to' ELSE 'pending' END, e.lot, CASE WHEN e.status = 'sold' THEN e.price END, CASE WHEN e.status = 'bid-goes-on' THEN e.price END
     FROM jsonb_to_recordset({lit(events)}) AS e(url text, lot text, price numeric, status text)
-    JOIN vehicles v ON v.discovery_url = e.url
+    JOIN vehicles v ON v.discovery_url = public.canonicalize_vehicle_url(e.url)
   LOOP o := o || r || E'\\n'; END LOOP;
   RAISE EXCEPTION 'PROFILE%', E'\\n' || o;
 END $$;""")

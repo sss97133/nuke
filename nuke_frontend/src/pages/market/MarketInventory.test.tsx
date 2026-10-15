@@ -3,9 +3,12 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any }));
+const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any, photos: vi.fn(), photoMap: new Map() as Map<string, any[]>, admin: false, analyze: vi.fn() }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
 vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), readAskBoard: fixture.poll, useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
+vi.mock('./useListingPhotos', async original => ({ ...await original<typeof import('./useListingPhotos')>(), useListingPhotos: (pages: string[][]) => { fixture.photos(pages); return fixture.photoMap; } }));
+vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: fixture.admin, loading: false, refresh: () => {} }) }));
+vi.mock('./analyzeListing', async original => ({ ...await original<typeof import('./analyzeListing')>(), requestListingRead: fixture.analyze }));
 vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
 vi.mock('./AuctionCalendar', () => ({ default: ({ collection }: any) => <section>Calendar fixture{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
@@ -15,8 +18,13 @@ let container: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
-  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear();
+  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear(); fixture.photos.mockClear(); fixture.analyze.mockReset(); fixture.admin = false;
   fixture.poll.mockReset(); fixture.refresh.mockReset();
+  fixture.photoMap = new Map([['v1', [
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00a_fixtureA_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+  ]]]);
   fixture.boardQuery = { data: { pages: [{ as_of: '2026-10-13T23:30:00Z', since: '2026-10-12T23:30:00Z', window_hours: 24, band_min_taste: 60, matching: 3,
     population: { asks: 374, priced: 368, with_point: 3, in_band: 67, by_source: { craigslist: 374 }, by_tier: { under_5k: 120, '5k_15k': 140, '15k_40k': 80, '40k_100k': 25, '100k_plus': 3, unpriced: 6 } },
     rows: [
@@ -34,10 +42,10 @@ it('opens the existing explorer at Market and keeps unresolved source presentati
   await render('tab=market');
   expect(container.textContent).toContain('Existing BaT bid board');
   expect(fixture.source).not.toHaveBeenCalled();
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
   expect(fixture.source).not.toHaveBeenCalled();
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=listings&source=craigslist');
@@ -79,7 +87,7 @@ it('opens the auction calendar as a third collection and clears a chosen sale wh
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('calendar');
   expect(container.textContent).toContain('Calendar fixture');
-  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Just listed']));
+  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Classifieds']));
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=calendar&sale=mecum:fixture-2027');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
@@ -97,7 +105,7 @@ it('carries no lens from one collection into another: only the page params and t
   await render('tab=market&collection=auctions&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
   expect(kept()).toEqual(['collection', 'tab']);
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
   expect(kept()).toEqual(['collection', 'tab']);
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
 });
@@ -141,9 +149,9 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
 const button = (text: string) => [...container.querySelectorAll('button')].find(b => b.textContent?.startsWith(text))!;
 const lastQuery = () => fixture.board.mock.calls.at(-1)![0];
 
-it('opens classifieds as just listed: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
+it('opens classifieds: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
   await render('collection=listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
   expect(container.textContent).not.toContain('asks first seen');
   expect(button('↻')).toBeTruthy();
   expect(container.querySelector('details.market-filters')?.hasAttribute('open')).toBe(false);
@@ -162,6 +170,77 @@ it('opens classifieds as just listed: a refresh control instead of a clock, filt
   expect(lastQuery()).toEqual({ hours: 24, tier: null, band: false, sort: 'newest', point: null, radius: null });
   await act(async () => button('Load more').click());
   expect(fixture.more).toHaveBeenCalledOnce();
+});
+
+it('a card carries every photo the capture landed: the board image first, one read per page, the count in the corner', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].image = 'https://images.craigslist.org/00a_fixtureA_600x450.jpg';
+  await render('collection=listings');
+  expect(fixture.photos).toHaveBeenLastCalledWith([['v1', 'v2']]);
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  expect([...first.querySelectorAll('.market-ask__strip img')].map(img => img.getAttribute('src')))
+    .toEqual(['https://images.craigslist.org/00a_fixtureA_600x450.jpg', 'https://images.craigslist.org/00b_fixtureB_600x450.jpg']);
+  expect(first.querySelector('.market-ask__count')?.textContent).toBe('1 / 2');
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Previous photo"]')?.disabled).toBe(true);
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Next photo"]')?.disabled).toBe(false);
+  expect(first.querySelector('a[href="/vehicle/v1"] .market-ask__strip')).not.toBeNull();
+  // No photo at all: the blank frame, no count, no arrows.
+  expect(second.querySelector('.market-ask__blank')).not.toBeNull();
+  expect(second.querySelector('.market-ask__count')).toBeNull();
+  expect(second.querySelector('button[aria-label="Next photo"]')).toBeNull();
+});
+
+it('a photo list keeps web addresses only, once each, the lead first', async () => {
+  const { photoList } = await import('./useListingPhotos');
+  expect(photoList('https://a.example/1.jpg', [
+    { vehicle_id: 'v', image_url: 'https://a.example/2.jpg' }, { vehicle_id: 'v', image_url: 'https://a.example/1.jpg' },
+    { vehicle_id: 'v', image_url: 'javascript:alert(1)' }, { vehicle_id: 'v', image_url: 'https://user:pw@a.example/3.jpg' },
+    { vehicle_id: 'v', image_url: null }, { vehicle_id: 'v', image_url: 'storage/relative.jpg' },
+  ])).toEqual(['https://a.example/1.jpg', 'https://a.example/2.jpg']);
+  expect(photoList(null, undefined)).toEqual([]);
+});
+
+it('says where an ask lands: the word, the price line, then the counts it rests on; nothing without a position', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].position = {
+    family: 'Blazer', family_id: 'f-blazer', share: 40 / 43, basis: 'asked',
+    sold: { n: 16, year_from: 1983, year_to: 1985, thin: false, p25: 9000, p50: 12500, p75: 16000, at_or_below: 15, by_source: { bat: 12, mecum: 4 } },
+    asked: { n: 43, year_from: 1983, year_to: 1985, thin: false, p25: 8000, p50: 11000, p75: 15000, at_or_below: 40 },
+  };
+  await render('collection=listings');
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  const placed = first.querySelector('.market-ask__position')!;
+  expect(placed.querySelector('.k-label')?.textContent).toBe('top of the market · 1983–85 Blazer');
+  // Placed by the other asks (ten or more exist), so they come first; the sales follow.
+  expect([...placed.querySelectorAll('.k-caption')].map(n => n.textContent)).toEqual([
+    'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K']);
+  expect(placed.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toBe('ask $18,800; middle half $8,000 to $15,000, median $11,000');
+  expect(second.querySelector('.market-ask__position')).toBeNull();
+});
+
+it('only an admin sees Analyze; a read lands on the card and says what the photos showed', async () => {
+  await render('collection=listings');
+  expect(container.querySelector('.market-ask__read')).toBeNull();
+  await act(async () => root.unmount()); root = createRoot(container);
+  fixture.admin = true;
+  fixture.analyze.mockResolvedValue({ observation_id: 'o1', photos_requested: 12, photos_analyzed: 12, analyzer: 'anthropic/claude-sonnet-4-6',
+    cost_bearer: 'user', cost_usd: null, condition_score: 4, condition_scores_counted: 12, zones_seen: ['exterior', 'interior'],
+    damage_flags: [{ flag: 'paint_fade', photos: 2 }], modification_flags: [{ flag: 'aftermarket_wheels', photos: 3 }], interior_quality: 4 });
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  const analyze = [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!;
+  await act(async () => analyze.click());
+  expect(fixture.analyze).toHaveBeenCalledWith('v1');
+  expect([...first.querySelectorAll('.market-ask__read .k-caption')].map(n => n.textContent)).toEqual([
+    'photos: condition 4 of 5, 12 of 12 read by anthropic/claude-sonnet-4-6', 'damage seen: paint fade (2)', 'changes seen: aftermarket wheels (3)']);
+});
+
+it('a refused read says why and keeps the control', async () => {
+  fixture.admin = true;
+  fixture.analyze.mockRejectedValue(new Error('no analyzer available: connect your AI subscription'));
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  await act(async () => [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!.click());
+  expect(first.querySelector('.market-ask__read')?.textContent).toContain('no analyzer available: connect your AI subscription');
+  expect([...first.querySelectorAll('button')].some(b => b.textContent === 'Analyze photos')).toBe(true);
 });
 
 it('tier, band and window are lenses in the URL', async () => {
@@ -211,7 +290,10 @@ describe('how a listing is named', () => {
     const { tidyName } = await import('./ClassifiedArrivals');
     expect(tidyName('wrangler')).toBe('Wrangler');
     expect(tidyName('tacoma sr5')).toBe('Tacoma SR5');
-    expect(tidyName('f-150 xlt')).toBe('F-150 Xlt');
+    expect(tidyName('f-150 xlt')).toBe('F-150 XLT');
+    expect(tidyName('camaro ss')).toBe('Camaro SS');
+    expect(tidyName('ranger xlt 4x4')).toBe('Ranger XLT 4X4');
+    expect(tidyName('sky')).toBe('Sky');
     expect(tidyName('k1500')).toBe('K1500');
     expect(tidyName('Sonoma')).toBe('Sonoma');
     expect(tidyName('DeVille')).toBe('DeVille');
@@ -233,6 +315,15 @@ describe('how a feed says time', () => {
     expect(freshness(null, now)).toBe('refresh');
   });
 
+  it('says live when the intake captured a listing within a cycle, else how far behind, from capture time', async () => {
+    const { captureFreshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(captureFreshness('2026-10-15T01:50:00Z', now)).toBe('live');
+    expect(captureFreshness('2026-10-15T01:35:00Z', now)).toBe('25 min behind');
+    expect(captureFreshness('2026-10-14T23:00:00Z', now)).toBe('3 h behind');
+    expect(captureFreshness(null, now)).toBeNull();
+    expect(captureFreshness('2026-10-15T03:00:00Z', now)).toBeNull();
+  });
   it('states the read age without treating it as proof of source freshness', async () => {
     const { freshness } = await import('./ClassifiedArrivals');
     const now = Date.parse('2026-10-15T02:00:00Z');
@@ -282,5 +373,29 @@ describe('how a feed says time', () => {
     expect(arrivalsAfter(rows, '2026-10-15T01:40:00Z')).toBe(1);
     expect(arrivalsAfter(rows, '2026-10-15T01:45:00Z')).toBe(0);
     expect(arrivalsAfter(rows, null)).toBe(0);
+  });
+});
+
+describe('where an ask lands', () => {
+  it('places by the reader\'s share, else by asks when they are enough, else by sales, and counts a thin population without placing it', async () => {
+    const { headline, placement, spreadLine } = await import('./askPosition');
+    expect(placement(0.95)).toBe('top of the market');
+    expect(placement(0.75)).toBe('upper end');
+    expect(placement(0.5)).toBe('middle of the market');
+    expect(placement(0.2)).toBe('lower end');
+    expect(placement(0.05)).toBe('bottom of the market');
+    // The reader's share and basis lead when present.
+    expect(headline({ family: 'Wrangler', share: 0.52, basis: 'sold',
+      sold: { n: 214, year_from: 1997, year_to: 2001, thin: false, p25: 9000, p50: 13500, p75: 19000, at_or_below: 111 } }))
+      .toEqual({ word: 'middle of the market', basis: 'sales', span: '1997–01 Wrangler' });
+    const thinSold = { n: 6, year_from: 1965, year_to: 1965, thin: true, p25: null, p50: null, p75: null, at_or_below: null };
+    const asked = { n: 40, year_from: 1964, year_to: 1966, thin: false, p25: 12000, p50: 18000, p75: 24000, at_or_below: 3 };
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked })).toEqual({ word: 'bottom of the market', basis: 'asks', span: '1964–66 Barracuda' });
+    expect(spreadLine(thinSold, 'sales')).toBe('only 6 recorded sales');
+    expect(spreadLine({ ...thinSold, n: 1 }, 'sales')).toBe('only 1 recorded sale');
+    expect(spreadLine(asked, 'asks')).toBe('under 37 of 40 asks, median $18K');
+    expect(spreadLine(null, 'asks')).toBeNull();
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked: null })).toBeNull();
+    expect(headline(null)).toBeNull();
   });
 });

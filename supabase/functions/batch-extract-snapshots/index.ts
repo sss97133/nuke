@@ -40,6 +40,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
 import { orphanVehicleIds } from "./queueRows.ts";
 import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { judge, urlVariants, type LotPage } from "./snapshotCompare.ts";
 
 const corsHeaders = {
@@ -338,9 +339,9 @@ Deno.serve(async (req) => {
           noSnapshot++;
           // Mark queue item as failed if in queue mode
           if (useQueue) {
-            await supabase.from("snapshot_extraction_queue")
+            mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
               .update({ status: "failed", completed_at: new Date().toISOString() })
-              .eq("vehicle_id", vehicle.id);
+              .eq("vehicle_id", vehicle.id));
           }
           continue;
         }
@@ -458,14 +459,14 @@ Deno.serve(async (req) => {
         if (fieldsUpdated.length === 0) {
           skipped++;
           if (!dryRun) {
-            await supabase.from("vehicles").update({
+            mustWrite('vehicles update', await supabase.from("vehicles").update({
               extractor_version: VERSION,
               updated_at: new Date().toISOString(),
-            }).eq("id", vehicle.id);
+            }).eq("id", vehicle.id));
             if (useQueue) {
-              await supabase.from("snapshot_extraction_queue")
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
                 .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
-                .eq("vehicle_id", vehicle.id);
+                .eq("vehicle_id", vehicle.id));
             }
           }
           continue;
@@ -488,15 +489,15 @@ Deno.serve(async (req) => {
             if (vinIdx >= 0) fieldsUpdated.splice(vinIdx, 1);
 
             if (fieldsUpdated.length === 0) {
-              await supabase.from("vehicles").update({
+              mustWrite('vehicles update', await supabase.from("vehicles").update({
                 extractor_version: VERSION,
                 updated_at: new Date().toISOString(),
-              }).eq("id", vehicle.id);
+              }).eq("id", vehicle.id));
               skipped++;
               if (useQueue) {
-                await supabase.from("snapshot_extraction_queue")
+                mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
                   .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: 0 })
-                  .eq("vehicle_id", vehicle.id);
+                  .eq("vehicle_id", vehicle.id));
               }
               continue;
             }
@@ -514,9 +515,9 @@ Deno.serve(async (req) => {
               sampleResults.push({ id: vehicle.id, status: "error", error: uErr.message });
             }
             if (useQueue) {
-              await supabase.from("snapshot_extraction_queue")
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
                 .update({ status: "failed", completed_at: new Date().toISOString() })
-                .eq("vehicle_id", vehicle.id);
+                .eq("vehicle_id", vehicle.id));
             }
             continue;
           }
@@ -544,9 +545,9 @@ Deno.serve(async (req) => {
         }
 
         if (useQueue && !dryRun) {
-          await supabase.from("snapshot_extraction_queue")
+          mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
             .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
-            .eq("vehicle_id", vehicle.id);
+            .eq("vehicle_id", vehicle.id));
         }
         if (sampleResults.length < 10) {
           sampleResults.push({
@@ -563,9 +564,9 @@ Deno.serve(async (req) => {
           sampleResults.push({ id: vehicle.id, status: "error", error: e?.message });
         }
         if (useQueue) {
-          await supabase.from("snapshot_extraction_queue")
+          softWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
             .update({ status: "failed", completed_at: new Date().toISOString() })
-            .eq("vehicle_id", vehicle.id);
+            .eq("vehicle_id", vehicle.id));
         }
       }
     }

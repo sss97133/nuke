@@ -8,7 +8,7 @@ const AUCTION_LENS_PARAMS = ['view', 'lot', 'make', 'model', 'live', 'sort', 'bi
 const COLLECTIONS = [
   { key: 'auctions', label: 'BaT live auctions' },
   { key: 'calendar', label: 'Calendar' },
-  { key: 'listings', label: 'Just listed' },
+  { key: 'listings', label: 'Classifieds' },
 ] as const;
 type Collection = typeof COLLECTIONS[number]['key'];
 // The home page's own params (HomePage reads tab and force_treemap). Every other param belongs to one collection's

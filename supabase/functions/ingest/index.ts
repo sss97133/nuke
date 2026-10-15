@@ -25,6 +25,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
@@ -844,9 +845,12 @@ async function matchOrCreateVehicle(
     const imageRows = allImages.map((url: string, i: number) => ({
       vehicle_id: newVehicle.id,
       image_url: url,
+      position: i,
+      display_order: i,
       is_primary: i === 0,
       source: imageSourceFor(platform),
       is_external: true,
+      ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
     await supabaseAdmin.from("vehicle_images").insert(imageRows);
@@ -937,8 +941,18 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
     // Check which images already exist
     const { data: existingImages } = await supabaseAdmin
       .from("vehicle_images")
-      .select("image_url")
+      .select("id, image_url, is_primary, is_duplicate, vision_gate_status")
       .eq("vehicle_id", vehicleId);
+
+    if (platform === "craigslist") {
+      // The gallery at full size: add what is missing, supersede the 600x450 rows (never delete). See craigslistImages.ts.
+      const plan = planCraigslistImages(existingImages || [], allImages);
+      if (plan.insert.length > 0) {
+        const applied = await applyCraigslistImagePlan(supabaseAdmin, { vehicleId, sourceUrl: data.url || null, source: imageSourceFor(platform), plan });
+        if (applied.errors.length) console.error(`[ingest] craigslist images ${vehicleId}: ${applied.errors.slice(0, 3).join("; ")}`);
+      }
+      return;
+    }
 
     const existingUrls = new Set((existingImages || []).map((i: any) => i.image_url));
     const newImages = allImages.filter((url: string) => !existingUrls.has(url));
@@ -951,6 +965,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         is_primary: !hasPrimary && i === 0,
         source: imageSourceFor(platform),
         is_external: true,
+        ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
       await supabaseAdmin.from("vehicle_images").insert(imageRows);
@@ -1119,6 +1134,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     "bonhams.com": "extract-bonhams",
     "cars.bonhams.com": "extract-bonhams",
     "broadarrowauctions.com": "extract-broad-arrow",
+    "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
   };
   const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
   const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
@@ -1263,7 +1279,7 @@ interface IngestResult {
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
   // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
-  blip?: Record<string, unknown>;
+  blip?: { observation: string; observation_id?: string; errors: string[] };
 }
 
 /**

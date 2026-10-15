@@ -308,6 +308,15 @@ the model year that trades, and the last 12 months against the 12 before (color;
 Missing and next: model families (model strings are split by trim, so "what this brand trades" cannot be shown yet),
 and repeat-sale returns (the same car sold twice, and what it gained per year held).
 
+Delivered later that day: model families (mv_family_market, 20261015131500; a brand opens on its families, a family on
+its model names, each with the same measures, "Other models" holding the names not yet keyed). And a correction: the
+all-venue 12-month move mixed in venues whose intake is uneven between the two years. Against the complete local BaT
+archive it read Ferrari dollars -6% where BaT itself rose 93%, BMW sales -7% where BaT rose 2%, Chevrolet +30% / +51%
+against BaT's +17% / +22%. The move is now read on Bring a Trailer only, the venue held in full both years (252,399 of
+264,746 enumerated lots), and a tile is gray unless BaT holds at least half its sales. A move across every venue needs
+each venue's intake to be complete in both windows; until the coverage view can say so per venue and year, it is not
+shown.
+
 **The feed: why is this listing in front of me.** Serving cars newest first over a mixed pile is not an organizing
 method ("what am I doing here, why am I looking at this classified"). A listing earns its place the way social feeds
 measure virality, by a measured reason it is worth a look:
@@ -366,6 +375,52 @@ brand trades"), then each ask against its family's confirmed sales at its year, 
 Also delivered on October 15: what the listing says rides on each row (20261015080000): a disclosed broken odometer
 shows no number (38 of 621 listings that day), a rolled-over one says so (38), and a title other than clean is said
 (32); the rows are cards, photo first.
+
+### Classifieds: surface the deals — owner direction, October 15 (04:15Z)
+
+**The name is "Classifieds".** "Just listed" goes. What people care about is finding the deals; the benchmark is the
+deal posts Barn Finds used to write ("this is a good deal, snatch this up"): surface what someone would want, and say
+where each listing lands in our price analysis. That is the goal of the page, to teach people the market.
+
+**His read of the top three, the acceptance case for any position measure.** A 1965 Plymouth Barracuda at $29,500
+(vehicle eee88010-57c2-4290-baae-2d2088040f04): top dollar, maybe a little more, and it still needs investment. A 1999
+Jeep Wrangler at $14,000 with 178,000 miles (ddb3afc1-94be-4083-a0c1-7582a97a9dc3): retail, on the expensive side, it
+would have to prove it is special; it "lands right in the middle, and why is that not expressed". A 1995 GMC K1500 at
+$3,500 with 300,000 miles (e308f6cd-b29b-4bf0-bbd0-22ef9656c517): worn out. A position measure reproduces top, middle and
+low on these three, or says why it cannot. His pick among them weighed what he could do with the car (a build), the
+make's following, and the photos; the three have nothing in common, and that comparison is what the page should help.
+
+**Price follows condition, and condition is in the photos.** Image analysis is not good enough yet. For development,
+analyze the photos, or put an Analyze control on a listing so the analysis is paid for only where someone asks, not
+for every arrival. The detailed data model exists because of that analysis.
+
+**Read each listing the way he does.** Make, model and condition, then the car's character, its history, what is
+already known about it, and the market's measures. Cars in hard-to-reach regions sit longer on classifieds because
+demand there is thinner; time to exit is read by region.
+
+**Every photo.** He chose "based on one photo". Measured 2026-10-15 04:20Z: the intake held every photo the three
+listing pages showed (21 of 21, 7 of 7, 3 of 3) and the card showed one. Delivered: each card carries all of them (one
+read per page of 60 cards: 616 photos, 85 KB, 0.55 s cold, 0.17 s warm, logged out), a swipe on a phone, an arrow under
+a pointer, the count in the corner, and a larger photo on a wide screen. Capture order is not kept (vehicle_images
+position is 0 on every row), so the board's image leads.
+
+Owners: the position and merit fold (each ask against its family's sales at its year, asks against similar asks, exit
+outcomes) is the listing-merit lane; the card renders what it returns.
+
+**What exists for condition, measured 2026-10-15 04:30Z.** No classified photo has a condition read (0 of 690 photos on
+60 recent Craigslist cars; 0 of 100 recent classified cars carry a condition observation). The seller's declared
+condition is already captured (569 of 701 priced listing observations in the last 24 h: good 275, excellent 179, fair
+73, like new 32, salvage 10) and rides on the board as an attributed claim ("seller: like new"). A development read of
+the owner's three cars from their photos agreed with his order: the Barracuda a very nice driver (glossy paint,
+straight panels, redone interior, sound deadener over the floors), the Wrangler a lifted, tidy 4.0 driver showing its
+178,374 miles, the K1500 a weathered truck photographed in weeds, three exterior photos only.
+
+**The Analyze path.** One owner/admin control per listing card: api-v1-vision gains a listing route (requireWriteAuth
+then requireAdminOrService; a daily cap) that reads the listing's photos, tries YONO first (no model fee) and otherwise
+the caller's own connected provider (Nuke does not fund cloud inference; about $0.015 a photo on the owner's key, about
+$0.18 for 12 photos), and writes one condition observation through ingest-observation (source nuke-vision, agent
+inferred, so its confidence is capped at 0.6). The card shows the read beside the seller's claim; the position can then
+be read against cars in like condition. Pixels alone never set a value.
 
 ## The live auction board — owner direction, October 15
 

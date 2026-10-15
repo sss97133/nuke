@@ -31,6 +31,7 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -1057,14 +1058,14 @@ async function saveVehicle(
           .limit(1)
           .maybeSingle();
         if (!existingImg) {
-          await supabase.from("vehicle_images").insert({
+          mustWrite('vehicle_images insert', await supabase.from("vehicle_images").insert({
             vehicle_id: vehicleId,
             image_url: imgUrl,
             source: "external_import",
             source_url: imgUrl,
             is_external: true,
             position: idx,
-          });
+          }));
         }
       } catch (e) {
         console.warn(`[BJ] Image insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1084,7 +1085,7 @@ async function saveVehicle(
       .maybeSingle();
 
     if (!existingListing) {
-      await supabase.from("vehicle_events").insert({
+      mustWrite('vehicle_events insert', await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
         source_platform: "barrettjackson",
         event_type: "auction",
@@ -1104,7 +1105,7 @@ async function saveVehicle(
           extraction_method: vehicle.extraction_method,
           extractor_version: EXTRACTOR_VERSION,
         },
-      });
+      }));
     }
   } catch (e) {
     console.warn(`[BJ] External listing insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1122,14 +1123,14 @@ async function saveVehicle(
       .maybeSingle();
 
     if (!existingEvent) {
-      await supabase.from("auction_events").insert({
+      mustWrite('auction_events insert', await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "barrett-jackson",
         source_url: vehicle.url,
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
-      });
+      }));
     }
   } catch (e) {
     console.warn(`[BJ] Auction event insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1190,10 +1191,10 @@ Deno.serve(async (req) => {
 
       // Update queue entry if exists
       try {
-        await supabase
+        mustWrite('import_queue update', await supabase
           .from("import_queue")
           .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-          .eq("listing_url", url);
+          .eq("listing_url", url));
       } catch (e) {
         console.warn(`[BJ] Queue update failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -1242,10 +1243,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite('import_queue update', await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1262,20 +1263,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            mustWrite('import_queue update', await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id));
             results.failed++;
             continue;
           }
 
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          mustWrite('import_queue update', await supabase
             .from("import_queue")
             .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .eq("id", item.id));
 
           results.success++;
           if (isNew) results.created++;
@@ -1295,13 +1296,13 @@ Deno.serve(async (req) => {
             results.errors.push(`${item.listing_url}: ${msg.slice(0, 120)}`);
           }
 
-          await supabase
+          softWrite('import_queue update', await supabase
             .from("import_queue")
             .update({
               status: isRemoved ? "skipped" : "failed",
               error_message: (isRemoved ? "Page removed/404" : msg).slice(0, 500),
             })
-            .eq("id", item.id);
+            .eq("id", item.id));
         }
       }
 

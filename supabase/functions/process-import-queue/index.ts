@@ -3,6 +3,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { intakeThrottle, createIntakeBudget, readLandedBatch, readbackFor } from "../poll-listing-feeds/ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,14 +82,14 @@ Deno.serve(async (req) => {
         // Normalize URL for domain routing (strip protocol, www, trailing slash, query/hash)
         const normalizedUrl = normalizeListingUrlKey(url) || '';
         if (!url) {
-          await supabase.from('import_queue').update({
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
             status: 'failed',
             error_message: 'listing_url is required',
             failure_category: 'bad_data',
             attempts: item.attempts || 0,
             locked_at: null,
             locked_by: null,
-          }).eq('id', item.id);
+          }).eq('id', item.id));
           results.push({ id: item.id, status: 'failed', url: null, error: 'listing_url is required' });
           continue;
         }
@@ -198,7 +199,7 @@ Deno.serve(async (req) => {
             }).catch((e: any) => console.warn(`[process-import-queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
           }
 
-          await supabase.from('import_queue').update({
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
             status: queueStatus,
             processed_at: new Date().toISOString(),
             attempts: item.attempts,
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
             error_message: queueStatus === 'pending_review' ? `Low quality score: ${qualityScore}` : null,
             locked_at: null,
             locked_by: null,
-          }).eq('id', item.id);
+          }).eq('id', item.id));
           results.push({
             id: item.id,
             status: queueStatus,
@@ -223,14 +224,14 @@ Deno.serve(async (req) => {
             errorMsg.includes('Missing required fields');
 
           if (isNonVehicle) {
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: 'skipped',
               error_message: `Non-vehicle page: ${errorMsg.slice(0, 200)}`,
               attempts: item.attempts,
               failure_category: null,
               locked_at: null,
               locked_by: null,
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             results.push({ id: item.id, status: 'skipped', url, error: errorMsg });
           } else {
             // Auto-categorize failures
@@ -255,7 +256,7 @@ Deno.serve(async (req) => {
             const maxAttempts = isTransient ? 8 : 5;
             const shouldFail = attempts >= maxAttempts;
 
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: shouldFail ? 'failed' : 'pending',
               error_message: errorMsg,
               attempts: item.attempts,
@@ -267,7 +268,7 @@ Deno.serve(async (req) => {
                 : new Date(
                     Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
                   ).toISOString(),
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url, error: errorMsg, retry_scheduled: !shouldFail });
           }
         }
@@ -288,7 +289,7 @@ Deno.serve(async (req) => {
         const maxAttempts = isTransient ? 8 : 5;
         const shouldFail = attempts >= maxAttempts;
 
-        await supabase.from('import_queue').update({
+        mustWrite('import_queue update', await supabase.from('import_queue').update({
           status: shouldFail ? 'failed' : 'pending',
           error_message: errMsg.slice(0, 500),
           attempts: item.attempts || 0,
@@ -300,7 +301,7 @@ Deno.serve(async (req) => {
             : new Date(
                 Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
               ).toISOString(),
-        }).eq('id', item.id);
+        }).eq('id', item.id));
         results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url: item.listing_url, error: errMsg, retry_scheduled: !shouldFail });
       }
     }

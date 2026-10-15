@@ -681,6 +681,8 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
     // number as current. One hour keeps the re-poll cheap without going stale.
     maxAgeSec: 3600,
     waitForJs: 3000,
+    // Server-side direct fetches of hagerty.com are refused ("Blocked by site", every poll since 10-10); a laptop gets 200.
+    firecrawlOnBlock: true,
   });
 
   if (!result.html) {
