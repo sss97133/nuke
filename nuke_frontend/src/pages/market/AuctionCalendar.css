@@ -19,3 +19,8 @@
 .auction-lot { overflow: hidden; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .auction-lot .vehicle-identity__model { font: inherit; }
 .auction-lot__prior { list-style: none; margin: 2px 0 0; padding: 0; }
+/* A phone has no room for the axis: the sale rows keep their timer, sale and roster, and the roster fits the screen. */
+@media (max-width: 640px) {
+  .auction-calendar { min-width: 0; }
+  .auction-calendar .auction-calendar__axis { display: none; }
+}

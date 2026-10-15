@@ -144,7 +144,7 @@ function Roster({ sale, now }: { sale: CalendarSale; now: number }) {
   if (query.isError) return <p role="status" className="k-body">The roster could not be read. <button type="button" className="market-control"
     onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>;
   return <div className="auction-roster" aria-label={`${sale.sale_name} roster`}>
-    <CoverageView c={{ n: rows.length, of: roster?.lots ?? sale.lots, grain: 'lots listed by the house', as_of: pages[0]?.as_of ?? null }} />
+    <CoverageView c={{ n: rows.length, of: roster?.lots ?? sale.lots, grain: 'lots landed for this sale', as_of: pages[0]?.as_of ?? null }} />
     {[...days.entries()].map(([day, lots]) => <Fragment key={day}>
       <div className="auction-roster__day">
         <Text role="label">{dayLabel(day)}</Text>
@@ -175,7 +175,7 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
 
   return <section aria-label="Auction calendar" className="market-explorer">
     <Masthead result={<>
-      <Text role="measure" as="div">{population ? `${count(population.lots)} lots` : '…'}</Text>
+      <Text role="measure" as="div">{population ? `${count(population.lots)} ${population.lots === 1 ? 'lot' : 'lots'}` : '…'}</Text>
       <Text role="caption" as="div">{data && population
         ? `on ${count(population.sales)} scheduled ${population.sales === 1 ? 'sale' : 'sales'} from ${count(population.houses)} ${population.houses === 1 ? 'house' : 'houses'}, today to ${data.horizon_days} days out · ${count(population.seen_before)} with an earlier record on Nuke · as of ${clock(data.as_of)}`
         : 'reading the calendar…'}</Text>
@@ -214,7 +214,7 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
               <Text role="label" as="div">{houseName(sale.house)}</Text>
               <Text role="entity" dense as="div">{sale.sale_name}</Text>
               {sale.location && <Text role="caption" as="div">{sale.location}</Text>}</button></td>
-            <td><Text role="measure" dense as="div">{count(sale.lots)} lots</Text>
+            <td><Text role="measure" dense as="div">{count(sale.lots)} {sale.lots === 1 ? 'lot' : 'lots'}</Text>
               <Text role="caption" as="div">{count(sale.first_seen_7d)} first seen in the last 7 days</Text>
               <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text></td>
             <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>

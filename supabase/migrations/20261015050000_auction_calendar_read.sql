@@ -4,7 +4,7 @@
 -- 3-6 month lead times"). Online auctions (BaT) end within 7 days and run on the live board; a scheduled sale (Mecum,
 -- Barrett-Jackson, RM, Gooding, Bonhams, Broad Arrow) publishes its roster months ahead and runs each lot on a day.
 --
--- Grain: one row per upcoming lot = a vehicle_events row with event_status 'upcoming' (Mecum's writer, contract agreed
+-- Grain: one row per upcoming lot = a vehicle in a sale, from vehicle_events rows with event_status 'upcoming' (Mecum's writer, contract agreed
 -- with the Mecum intake lane 2026-10-15) or 'pending' (extract-gooding), a run day from today to p_days ahead, not
 -- withdrawn (metadata.withdrawn_at), on a public vehicle. Reads only what anon can already read: vehicle_events and
 -- public vehicles. SECURITY INVOKER, so RLS applies to the caller.
@@ -18,6 +18,7 @@
 --     basis 'unconfirmed': that backfill labeled any priced row sold without reading the result. Gooding and
 --     Barrett-Jackson keep basis 'source', as vehicle_sale_basis() accepts their published prices as sales.
 -- Every count comes with its population: lots, sales, houses, seen before, no reserve, first seen in the last 7 days.
+-- A car with two events in one sale (a renamed lot URL) is one lot: the newest event, its earliest first-seen time.
 SET lock_timeout = '5s';
 SET statement_timeout = '30s';
 
@@ -39,8 +40,8 @@ DECLARE
   v_offset integer := GREATEST(COALESCE(p_offset, 0), 0);
   v_result jsonb;
 BEGIN
-  WITH lots AS (
-    SELECT e.id AS event_id, e.vehicle_id, e.source_platform AS house, e.source_url, e.metadata AS m,
+  WITH raw AS (
+    SELECT e.id AS event_id, e.vehicle_id, e.source_platform AS house, e.source_url, e.metadata AS m, e.updated_at,
            COALESCE((e.metadata->>'roster_first_seen_at')::timestamptz, e.created_at) AS first_seen_at,
            COALESCE((e.metadata->'auction_session_days'->>0)::date, e.ended_at::date) AS run_on,
            COALESCE(NULLIF(e.metadata->>'sale_key', ''),
@@ -60,6 +61,13 @@ BEGIN
       AND e.ended_at >= date_trunc('day', now())
       AND e.ended_at < now() + make_interval(days => v_days)
       AND e.metadata->>'withdrawn_at' IS NULL
+  ), lots AS (
+    -- One lot per vehicle per sale: a house that renames a lot URL leaves two events for one car (Gooding Geneva,
+    -- 2026-10-15: 15 events, 12 cars). Keep the newest event and the earliest time the car was first seen.
+    SELECT DISTINCT ON (house, sale_key, vehicle_id) *,
+           min(first_seen_at) OVER (PARTITION BY house, sale_key, vehicle_id) AS roster_first_seen
+    FROM raw
+    ORDER BY house, sale_key, vehicle_id, updated_at DESC NULLS LAST, event_id
   ), seen AS (
     SELECT l.event_id, count(p.id) AS prior_n
     FROM lots l
@@ -74,8 +82,8 @@ BEGIN
            COALESCE(min(sale_starts_on), min(run_on)) AS starts_on, COALESCE(max(sale_ends_on), max(run_on)) AS ends_on,
            count(*) AS lots, count(*) FILTER (WHERE prior_n > 0) AS seen_before,
            count(*) FILTER (WHERE has_reserve IS FALSE) AS no_reserve,
-           min(first_seen_at) AS first_seen_at,
-           count(*) FILTER (WHERE first_seen_at >= now() - interval '7 days') AS first_seen_7d
+           min(roster_first_seen) AS first_seen_at,
+           count(*) FILTER (WHERE roster_first_seen >= now() - interval '7 days') AS first_seen_7d
     FROM lot GROUP BY house, sale_key
   ), run_days AS (
     SELECT house, sale_key, jsonb_agg(jsonb_build_object('day', run_on, 'lots', n) ORDER BY run_on) AS days
@@ -94,7 +102,7 @@ BEGIN
     'population', (SELECT jsonb_build_object(
         'lots', count(*), 'sales', count(DISTINCT (house, sale_key)), 'houses', count(DISTINCT house),
         'seen_before', count(*) FILTER (WHERE prior_n > 0), 'no_reserve', count(*) FILTER (WHERE has_reserve IS FALSE),
-        'first_seen_7d', count(*) FILTER (WHERE first_seen_at >= now() - interval '7 days'))
+        'first_seen_7d', count(*) FILTER (WHERE roster_first_seen >= now() - interval '7 days'))
       FROM lot),
     'sales', COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'house', s.house, 'sale_key', s.sale_key, 'sale_name', s.sale_name, 'location', s.location,
@@ -112,7 +120,7 @@ BEGIN
           'year', pk.year, 'make', pk.make, 'model', pk.model, 'image', pk.image, 'vin_present', pk.vin_present,
           'has_reserve', pk.has_reserve,
           'estimate_low', (pk.m->>'estimate_low')::numeric, 'estimate_high', (pk.m->>'estimate_high')::numeric,
-          'currency', NULLIF(pk.m->>'currency', ''), 'first_seen_at', pk.first_seen_at,
+          'currency', NULLIF(pk.m->>'currency', ''), 'first_seen_at', pk.roster_first_seen,
           'prior', COALESCE((SELECT jsonb_agg(jsonb_build_object(
               'house', p.source_platform, 'on', COALESCE(p.ended_at, p.sold_at, p.created_at)::date,
               'outcome', CASE WHEN p.event_status = 'sold' THEN 'sold'
