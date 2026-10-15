@@ -28,6 +28,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
@@ -640,11 +641,18 @@ async function pollFirecrawlHtmlFeed(
         }
       }
 
-      if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+      // KSL refuses the server's address, so its search page costs a Firecrawl credit per poll. Ask first, record after:
+      // the "ksl-search" allowance (not the lot allowance, which is paused) covers it, and rawHtml keeps the page's
+      // script payload so the search cards can be read (./kslCards.ts).
+      const kslGate = feed.source_slug === "ksl" ? firecrawlGate(supabase, "ksl-search") : null;
+      const kslDeferred = !html && kslGate !== null && !(await kslGate.allow());
+      if (kslDeferred) fetchErrors.push(ALLOWANCE_EXHAUSTED);
+
+      if (!html && !kslDeferred && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
         try {
           const scrape = await firecrawlScrape({
             url: feed.feed_url,
-            formats: ["html", "markdown"],
+            formats: kslGate ? ["rawHtml"] : ["html", "markdown"],
             onlyMainContent: false,
             // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
             // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
@@ -657,6 +665,7 @@ async function pollFirecrawlHtmlFeed(
           });
           html = scrape.data.html;
           markdown = scrape.data.markdown;
+          if (kslGate) await kslGate.record(1, 0, "poll-listing-feeds", "ksl search page");
           if (scrape.blocked) {
             blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
           }
@@ -689,6 +698,14 @@ async function pollFirecrawlHtmlFeed(
       }
     }
 
+    if (!html && !markdown && fetchErrors.includes(ALLOWANCE_EXHAUSTED)) {
+      // A deferral, not a failure: nothing to count against the feed; read again next window.
+      const { error: deferError } = await supabase.from("listing_feeds")
+        .update({ last_polled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", feed.id);
+      result.deferred_reason = "allowance_deferred";
+      if (deferError) result.error = `defer_stamp_failed: ${deferError.message.slice(0, 120)}`;
+      return result;
+    }
     if (!html && !markdown) {
       return await failFeed(
         `fetch_failed: ${fetchErrors.join(" | ") || "empty payload"}`
