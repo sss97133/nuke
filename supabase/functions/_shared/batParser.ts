@@ -7,7 +7,7 @@
  * Version: 1.0.0
  */
 import { chassisFromListItemText } from "./batChassis.ts";
-import { countdownEndDate } from "./batAuctionRecord.ts";
+import { readOwnAuctionEnd } from "./batAuctionRecord.ts";
 
 export const BAT_PARSER_VERSION = "batParser:1.0.0";
 
@@ -491,22 +491,11 @@ export function extractEssentials(html: string): BatEssentials {
   if (/\bReserve Met\b/i.test(reserveScope)) reserve_status = "reserve_met";
   if (statsHasReserveNotMet) reserve_status = "reserve_not_met";
 
-  // Auction end date
-  let auction_end_date: string | null = null;
-  let auction_end_at: string | null = null;
-  const endsMatch = h.match(/data-ends="(\d+)"/i);
-  if (endsMatch?.[1]) {
-    const ts = parseInt(endsMatch[1], 10);
-    if (Number.isFinite(ts) && ts > 0) {
-      const dt = new Date(ts * 1000);
-      auction_end_at = dt.toISOString();
-      auction_end_date = auction_end_at.split("T")[0];
-    }
-  }
-  if (!auction_end_date) {
-    const cd = countdownEndDate(h); // null on a closed page: its sidebar countdowns belong to other lots
-    if (cd) auction_end_date = cd;
-  }
+  // Auction end: the lot's own countdown, else its closed page's result stamp; never another lot's countdown from
+  // the page's "Current BaT Auctions" widget (readOwnAuctionEnd, batAuctionRecord.ts).
+  const ownEnd = readOwnAuctionEnd(h);
+  const auction_end_at: string | null = ownEnd.endsAt ?? ownEnd.closedAt;
+  const auction_end_date: string | null = auction_end_at ? auction_end_at.slice(0, 10) : ownEnd.endsDate;
 
   // Counts
   const bidCountMatch = h.match(/"type":"bat-bid"/g);
