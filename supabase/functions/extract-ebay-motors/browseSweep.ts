@@ -41,18 +41,18 @@ export interface Report {
   by_class: Record<string, number>; landed: number; blips: number; rejected: number; ingest_created: number; ingest_matched: number;
   errors: string[];
 }
-const emptyReport = (action: string): Report => ({
+export const emptyReport = (action: string): Report => ({
   action, ok: true, stopped: null, calls: 0, remaining_before: null, remaining_after: null, year_aspect: null, per_tier: {}, by_class: {},
   landed: 0, blips: 0, rejected: 0, ingest_created: 0, ingest_matched: 0, errors: [],
 });
 
 const itemUrl = (key: string) => `https://www.ebay.com/itm/${key}`;
 
-async function heldKeys(supabase: any, keys: string[]): Promise<Set<string>> {
+export async function heldKeys(supabase: any, keys: string[]): Promise<Set<string>> {
   const held = new Set<string>();
   if (!keys.length) return held;
   const r = mustWrite("held snapshots read", await supabase.from("listing_page_snapshots").select("listing_url")
-    .eq("platform", PLATFORM).in("listing_url", keys.map(itemUrl)).limit(1000));
+    .eq("platform", PLATFORM).eq("success", true).in("listing_url", keys.map(itemUrl)).limit(1000));
   for (const row of r.data ?? []) held.add(String(row.listing_url).split("/").pop()!);
   return held;
 }
@@ -67,19 +67,32 @@ async function callIngest(input: Record<string, unknown>): Promise<{ status: str
 }
 
 /** Land one fetched item. Returns what happened; throws only on a write the run must not continue past. */
-export async function landItem(supabase: any, raw: any, rep: Report, now = new Date().toISOString()): Promise<"landed" | "blip" | "rejected" | "skipped"> {
-  const landing = toLanding(raw, htmlToText);
+export interface LandOpts {
+  /** The capture is already stored (archiveFetch wrote the Firecrawl response): link it instead of inserting a getItem snapshot. */
+  snapshotId?: string | null;
+  /** Provenance label on the listing episode: 'ebay-browse-api' (default) or 'ebay-firecrawl'. */
+  source?: string;
+  /** Extra attributed facts for the observation's raw data and the episode's metadata (card text, listed label, ...). */
+  extra?: Record<string, unknown>;
+  method?: string;
+}
+
+export async function landItem(supabase: any, raw: any, rep: Report, now = new Date().toISOString(), opts: LandOpts = {}): Promise<"landed" | "blip" | "rejected" | "skipped"> {
+  const landing = toLanding(raw, htmlToText, opts.source);
   if (!landing) { rep.errors.push(`item without a numeric id: ${String(raw?.itemId).slice(0, 40)}`); return "skipped"; }
 
-  // 1. the capture: the raw getItem JSON, kept whole
-  const body = JSON.stringify(raw);
-  const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const snap = await supabase.from("listing_page_snapshots").insert({
-    platform: PLATFORM, listing_url: landing.url, fetched_at: now, fetch_method: "ebay_browse_getItem", http_status: 200, success: true,
-    html: body, html_sha256: sha, content_length: body.length, metadata: { api: "buy/browse/v1/item", marketplace: raw.listingMarketplaceId ?? null, caller: "extract-ebay-motors" },
-  }).select("id").maybeSingle();
-  let snapshotId: string | null = snap.data?.id ?? null;
-  if (snap.error && String(snap.error.code) !== "23505") mustWrite(`snapshot ${landing.listingKey}`, snap);
+  // 1. the capture: the raw getItem JSON, kept whole (the Firecrawl door has already stored its page and passes the id)
+  let snapshotId: string | null = opts.snapshotId ?? null;
+  if (!opts.snapshotId) {
+    const body = JSON.stringify(raw);
+    const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const snap = await supabase.from("listing_page_snapshots").insert({
+      platform: PLATFORM, listing_url: landing.url, fetched_at: now, fetch_method: "ebay_browse_getItem", http_status: 200, success: true,
+      html: body, html_sha256: sha, content_length: body.length, metadata: { api: "buy/browse/v1/item", marketplace: raw.listingMarketplaceId ?? null, caller: "extract-ebay-motors" },
+    }).select("id").maybeSingle();
+    snapshotId = snap.data?.id ?? null;
+    if (snap.error && String(snap.error.code) !== "23505") mustWrite(`snapshot ${landing.listingKey}`, snap);
+  }
 
   // 2. the vehicle, through ingest (identity gate, VIN/URL duplicate matching, photos)
   let vehicleId: string | null = null;
@@ -101,13 +114,13 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   const obs = await writeObservation(supabase, {
     vehicleId, unresolved: vehicleId === null,
     source: { platform: PLATFORM, url: landing.url, sourceIdentifier: landing.listingKey },
-    fields: landing.obsFields, observationKind: "listing", extractionMethod: METHOD, observedAt: now,
+    fields: landing.obsFields, observationKind: "listing", extractionMethod: opts.method ?? METHOD, observedAt: now,
     contentText: landing.descriptionText || raw.title,
     rawData: {
       snapshot_id: snapshotId, item_id: raw.itemId, title: raw.title, category_path: raw.categoryPath ?? null, condition: raw.condition ?? null,
       price: landing.price, location: raw.itemLocation ?? null, seller: raw.seller ?? null, seller_class_claim: landing.seller,
       buying_options: raw.buyingOptions ?? [], listing_posted_at: landing.postedAt, listing_ends_at: landing.endsAt,
-      image_urls: landing.images, specifics: raw.localizedAspects ?? [], listing_vin: landing.vin,
+      image_urls: landing.images, specifics: raw.localizedAspects ?? [], listing_vin: landing.vin, ...(opts.extra ?? {}),
     },
   } as any);
   if (obs.errors?.length) rep.errors.push(`observation ${landing.listingKey}: ${obs.errors.slice(0, 2).join("; ")}`);
@@ -117,7 +130,7 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
     const ev = await writeVehicleEventByKey(supabase, {
       vehicle_id: vehicleId, source_platform: PLATFORM, source_listing_id: landing.listingKey, source_url: landing.url,
       event_type: "listing", event_status: "active", ...(landing.price.amount != null ? { current_price: landing.price.amount } : {}),
-      metadata: { ...landing.eventMetadata, observation_id: obs.observationId, snapshot_id: snapshotId, source_observed_at: now, last_checked_at: now },
+      metadata: { ...landing.eventMetadata, ...(opts.extra ? { page: opts.extra } : {}), observation_id: obs.observationId, snapshot_id: snapshotId, source_observed_at: now, last_checked_at: now },
     }, { preserveEventStatus: true, sourceObservedAt: now });
     if (ev.action === "error") rep.errors.push(`listing event ${landing.listingKey}: ${ev.error}`);
     if (landing.price.amount != null) {
@@ -133,7 +146,7 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   return outcome;
 }
 
-async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
+export async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
 }
