@@ -131,13 +131,13 @@ struct LiveAnalysisStream: View {
         }
     }
 
-    /// Initial backfill, then poll every 4s with the cursor — newer verdicts
-    /// prepend in front of the owner (the pour is the show).
+    /// Initial backfill, then poll every 15 s with the cursor while the app is in front — newer
+    /// verdicts prepend in front of the owner. A 4 s poll kept the cellular radio from ever idling.
     private func runLoop() async {
         await poll(reset: true)
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(4))
-            await poll(reset: false)
+            try? await Task.sleep(for: .seconds(15))
+            if UIApplication.shared.applicationState == .active { await poll(reset: false) }
         }
     }
 

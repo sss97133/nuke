@@ -34,6 +34,7 @@
 import CoreGraphics
 import Photos
 import SwiftUI
+import UIKit
 import Vision
 
 @MainActor
@@ -132,6 +133,16 @@ final class LibraryIngest: ObservableObject {
         await walk(startIndex: start, positionEnd: total, workBudget: budget, advanceCursor: true, mode: .full)
     }
 
+    /// The album review reads originals with accurate OCR, seconds of Neural Engine per photo.
+    /// With the app open it runs only on a charger at a nominal temperature; otherwise the
+    /// charging background job (runBackfillBatch) carries it.
+    static var mayReviewInForeground: Bool {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let state = UIDevice.current.batteryState
+        let p = ProcessInfo.processInfo
+        return (state == .charging || state == .full) && p.thermalState == .nominal && !p.isLowPowerModeEnabled
+    }
+
     static var albumMethodVersion: String {
         let os = ProcessInfo.processInfo.operatingSystemVersion
         return "album-vision-v1:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
@@ -171,11 +182,16 @@ final class LibraryIngest: ObservableObject {
         var pendingReasons: [String: Int] = [:]
         do {
             for step in 0..<photos.count {
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, !SyncEngine.deviceTooHotOrLow else { break }
                 let index = (start + step) % photos.count
                 let photo = photos[index]
                 let prior = try await Task.detached { try LocalStore.shared.albumImageReview(for: photo, methodVersion: method) }.value
-                if prior != nil { cached += 1; continue }
+                if prior != nil {
+                    cached += 1
+                    // Step the resume point past read photos too, or each call re-walks them all.
+                    UserDefaults.standard.set((index + 1) % photos.count, forKey: key)
+                    continue
+                }
                 guard attempted < budget else { break }
                 attempted += 1
                 let result = await Task.detached(priority: .utility) { await Self.reviewAlbumPhoto(photo, method: method) }.value
@@ -297,7 +313,7 @@ final class LibraryIngest: ObservableObject {
         var i = startIndex
         var processed = 0   // assets we actually attempted to load (the budget unit)
 
-        while i < end && processed < workBudget && !Task.isCancelled {
+        while i < end && processed < workBudget && !Task.isCancelled && !SyncEngine.deviceTooHotOrLow {
             let batchEnd = min(i + batchSize, end)
 
             // Snapshot this batch off the live PHFetchResult (main-actor read).
@@ -363,7 +379,9 @@ final class LibraryIngest: ObservableObject {
     /// network. Returns whether the EXIF row was written. `nonisolated` so the
     /// task-group child runs off the main actor; LocalStore is thread-safe.
     private nonisolated static func processOne(_ item: Item, mode: Mode) async -> Bool {
-        guard let data = try? await SyncEngine.requestOriginalData(for: item.asset) else {
+        // The head pass (EXIF only, run with the app open) reads what is on the phone; only the
+        // deep pass, hosted by the charging job, may download an original from iCloud.
+        guard let data = try? await SyncEngine.requestOriginalData(for: item.asset, allowNetwork: mode == .full) else {
             return false   // iCloud unavailable / threw → stays out of the skip-set, retried later
         }
         let date = CameraEXIF.captureDate(from: data)

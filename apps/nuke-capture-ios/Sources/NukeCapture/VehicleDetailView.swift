@@ -1960,6 +1960,9 @@ struct VehicleDetailView: View {
                                             table: "vehicle_pulse", filter: "vehicle_id=eq.\(vehicleId)")
         await channel.subscribe()
         for await _ in stream { await loadPulse() }   // already-arbitrated truth; refetch the row
+        // The view left (its task was cancelled): close the channel, or every vehicle ever opened
+        // keeps one subscribed on the socket.
+        await SupabaseService.client.removeChannel(channel)
     }
 
     @MainActor private func applyPulse(_ p: VehiclePulse?) {

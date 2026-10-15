@@ -386,7 +386,7 @@ struct LiveBoardView: View {
         }
         .task {
             while !Task.isCancelled {
-                await load()
+                if board == nil || UIApplication.shared.applicationState == .active { await load() }
                 try? await Task.sleep(for: .seconds(60))
             }
         }

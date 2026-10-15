@@ -23,6 +23,7 @@
 import Foundation
 import ImageIO
 import Photos
+import UIKit
 
 /// One on-device T0 detection — what Apple Vision read off a just-captured frame,
 /// on-device, in milliseconds. A DETECTION (a label + confidence), never a claim
@@ -176,6 +177,12 @@ final class SyncEngine: ObservableObject {
     private var powerObserver: NSObjectProtocol?
 
     /// True when the device should not be doing bulk photo work right now.
+    /// Warm already (fair or above) or Low Power Mode: a foreground backfill slice waits for the
+    /// background job instead of adding heat while the owner holds the phone.
+    static var deviceWarm: Bool {
+        let p = ProcessInfo.processInfo
+        return p.thermalState.rawValue >= ProcessInfo.ThermalState.fair.rawValue || p.isLowPowerModeEnabled
+    }
     static var deviceTooHotOrLow: Bool {
         let p = ProcessInfo.processInfo
         return p.thermalState == .serious || p.thermalState == .critical || p.isLowPowerModeEnabled
@@ -482,7 +489,10 @@ final class SyncEngine: ObservableObject {
 
         // Silent-failure law (same as the daemon): advance the watermark ONLY
         // when nothing failed — a failed asset must be retried next pass.
-        advanceWatermark(to: runStarted, failures: failed)
+        // A full page (fetchLimit) means more photos sit past the last one read: move the watermark
+        // only to that photo, or the rest of the window would be skipped for good.
+        let reachedTo = assets.count >= Config.maxPerRun ? (assets.last?.creationDate ?? runStarted) : runStarted
+        advanceWatermark(to: reachedTo, failures: failed)
 
         NSLog("NukeCapture sync: %d uploaded (%d metadata-only), %d off-shop skipped, %d held(private), %d deduped, %d failed",
               uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
@@ -545,7 +555,9 @@ final class SyncEngine: ObservableObject {
         queue.append(contentsOf: assetIdentifiers.filter { known.insert($0).inserted })
         defaults.set(queue, forKey: Key.backfillQueue)
         backfillRemaining = queue.count
-        await drainBackfill()
+        // Ignition runs with the app open: the same bounded slice as any foreground pass; the
+        // charging + Wi-Fi background job carries the rest.
+        await drainBackfill(foregroundBudget: Config.foregroundBackfillBudget)
     }
 
     /// Resume a persisted queue (after relaunch or un-pause). No-op when
@@ -563,6 +575,7 @@ final class SyncEngine: ObservableObject {
         guard !isSyncing, !isPaused else { return }
         refreshThermalHold()
         if thermalHold { return }                       // the queue persists; thermalOrPowerChanged resumes it
+        if foregroundBudget != nil, Self.deviceWarm { return }   // the background job carries it
         foregroundBudgetReached = false
         var attemptedInPass = 0
         guard let userId = SupabaseService.currentUserId else {
@@ -816,9 +829,9 @@ final class SyncEngine: ObservableObject {
         let filename = Self.originalFilename(for: asset)
         let data: Data
         do {
-            // The ORIGINAL bytes. iCloud downloads only on an unmetered link: on cellular an
-            // optimized-away original waits for Wi-Fi instead of downloading in the foreground.
-            data = try await Self.requestOriginalData(for: asset, allowNetwork: NetworkMonitor.shared.isUnmetered)
+            // The ORIGINAL bytes. An original that lives only in iCloud downloads in the background
+            // job on an unmetered link, never while the app is open: it waits (.deferred) instead.
+            data = try await Self.requestOriginalData(for: asset, allowNetwork: Self.mayDownloadOriginals)
         } catch is OriginalInCloud {
             return .deferred
         } catch {
@@ -888,6 +901,11 @@ final class SyncEngine: ObservableObject {
             return .failed(retry: false)
         }
         return .failed(retry: true)
+    }
+
+    /// iCloud downloads of originals: background (the charging job, a refresh wake) on Wi-Fi only.
+    private static var mayDownloadOriginals: Bool {
+        NetworkMonitor.shared.isUnmetered && UIApplication.shared.applicationState == .background
     }
 
     private func markAssetSeen(_ id: String) {

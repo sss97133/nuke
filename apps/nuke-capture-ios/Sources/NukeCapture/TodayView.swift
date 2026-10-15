@@ -327,7 +327,7 @@ private struct UnderstandingPanel: View {
     /// so the counters climb and new rows appear in front of the owner.
     private func poll() async {
         while !Task.isCancelled {
-            await fetch()
+            if UIApplication.shared.applicationState == .active { await fetch() }
             try? await Task.sleep(for: .seconds(30))
         }
     }
@@ -487,7 +487,7 @@ private struct LiveMetricsStrip: View {
             // refreshed on app-foreground / after sync — so opening Today showed
             // stale "…" with no poll. This loads them now + every 30s while open.
             while !Task.isCancelled {
-                await engine.refreshAnalyzedCount()
+                if UIApplication.shared.applicationState == .active { await engine.refreshAnalyzedCount() }
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
             }
         }

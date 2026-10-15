@@ -422,7 +422,10 @@ struct ProfileView: View {
             await loadPhotoEvidence()
             await LibraryStore.shared.refreshAlbums()
             await loadPhotoEvidence()
-            await libraryIngest.runAlbumReview(budget: 24)
+            // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
+            if LibraryIngest.mayReviewInForeground {
+                await libraryIngest.runAlbumReview(budget: 24)
+            }
             await libraryIngest.syncNativeAlbums()
             await loadPhotoEvidence()
         }

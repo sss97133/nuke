@@ -247,7 +247,7 @@ struct LibraryAlbumsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
             .task { await reloadEvidence(); await store.refreshAlbums(); await reloadEvidence(); await ingest.syncNativeAlbums() }
-            .refreshable { await store.refreshAlbums(); await reloadEvidence(); await ingest.syncNativeAlbums() }
+            .refreshable { await store.refreshAlbums(force: true); await reloadEvidence(); await ingest.syncNativeAlbums() }
             .onChange(of: ingest.running) { _, running in if !running { Task { await reloadEvidence() } } }
         }
     }
@@ -490,6 +490,9 @@ struct LibraryCell: View {
                 }
                 loader.load(index: index, allowNetwork: !localOnly)
             }
-            .onDisappear { loader.cancel() }
+            .onDisappear {
+                loader.cancel()
+                if let lid = localID { overlay.forget(lid) }
+            }
     }
 }
