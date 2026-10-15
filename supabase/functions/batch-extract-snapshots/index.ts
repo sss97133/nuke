@@ -41,6 +41,7 @@ import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGat
 import { orphanVehicleIds } from "./queueRows.ts";
 import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { identityConflict } from '../_shared/identityMatch.ts';
 import { judge, pickBjLotPrice, urlVariants, type LotPage } from "./snapshotCompare.ts";
 
 const corsHeaders = {
@@ -232,6 +233,7 @@ Deno.serve(async (req) => {
     let errors = 0;
     let fieldsTotal = 0;
     let salePriceWithheld = 0; // parsed prices not written because the vehicle is not marked sold (writeRules.ts)
+    let identityRefused = 0; // snapshots whose car is not the vehicle's (identity_match / different_car / relink): nothing written
     let vinConflicts = 0; // parsed VINs not written because another vehicle already holds them (writeRules.ts)
     const sampleResults: any[] = [];
 
@@ -389,6 +391,25 @@ Deno.serve(async (req) => {
         if (!parsed.primary_image_url && snapshotHtml) {
           const img = extractPrimaryImage(snapshotHtml, platform);
           if (img) parsed.primary_image_url = img;
+        }
+
+        // Identity guard: a snapshot of a different car must not fill, or force-overwrite, this vehicle. The row is left for a
+        // relink (revision item: missing identity_match, reason different_car), counted, and its queue row marked failed.
+        if (platform === "barrett-jackson") {
+          const conflict = identityConflict(
+            { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin },
+            { year: parsed.year, make: parsed.make, model: parsed.model, vin: parsed.vin },
+          );
+          if (conflict) {
+            identityRefused++;
+            if (sampleResults.length < 5) sampleResults.push({ id: vehicle.id, status: "identity_refused", error: conflict });
+            if (!dryRun && useQueue) {
+              mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
+                .update({ status: "failed", completed_at: new Date().toISOString() })
+                .eq("vehicle_id", vehicle.id));
+            }
+            continue;
+          }
         }
 
         // Build update payload — only fill missing fields (unless force mode)
@@ -590,6 +611,7 @@ Deno.serve(async (req) => {
       no_snapshot: noSnapshot,
       sale_price_withheld: salePriceWithheld,
       vin_conflicts: vinConflicts,
+      identity_refused: identityRefused,
       errors,
       fields_filled: fieldsTotal,
       sample_results: sampleResults,
