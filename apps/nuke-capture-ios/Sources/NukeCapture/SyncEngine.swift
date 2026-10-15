@@ -23,6 +23,7 @@
 import Foundation
 import ImageIO
 import Photos
+import Supabase
 import UIKit
 
 /// One on-device T0 detection — what Apple Vision read off a just-captured frame,
@@ -185,6 +186,11 @@ final class SyncEngine: ObservableObject {
     static var deviceWarm: Bool {
         let p = ProcessInfo.processInfo
         return p.thermalState.rawValue >= ProcessInfo.ThermalState.fair.rawValue || p.isLowPowerModeEnabled
+    }
+    /// Seriously hot: nothing reads originals, not even the newest photos.
+    static var deviceTooHot: Bool {
+        let t = ProcessInfo.processInfo.thermalState
+        return t == .serious || t == .critical
     }
     static var deviceTooHotOrLow: Bool {
         let p = ProcessInfo.processInfo
@@ -395,7 +401,11 @@ final class SyncEngine: ObservableObject {
     /// setTaskCompleted(success:)).
     @discardableResult
     func sync() async -> Bool {
-        guard !isSyncing, !authorizationDenied, !isPaused else { return false }
+        guard !isSyncing else { return false }
+        guard !authorizationDenied, !isPaused else {
+            report("ios_sync_skipped", [:], extra: ["reason": isPaused ? "paused" : "photos_denied"])
+            return false
+        }
         guard let userId = SupabaseService.currentUserId else {
             lastError = "Not signed in"
             return false
@@ -466,18 +476,29 @@ final class SyncEngine: ObservableObject {
         // Originals only in iCloud go to the backfill queue, which the background job drains with
         // network; they no longer hold the watermark (a window of them used to stall it for good).
         var deferredIDs: [String] = []
+        var gates: [String: Int] = [:]      // why photos were skipped, for the pass report
+        var stopReason: String?
 
         for asset in ordered {
             // iOS: BGAppRefreshTask expiration cancels this task — stop
             // cleanly; un-processed assets retry next pass because the
             // watermark below only advances on failures == 0.
             if Task.isCancelled { failed += 1; break }
-            // A hot or low-power device stops here; the watermark does not advance past
-            // this pass (failures > 0), so the remainder is re-found when it cools.
-            if Self.deviceTooHotOrLow { refreshThermalHold(); failed += 1; break }
-            if foreground, byteWork >= Config.foregroundBackfillBudget {
+            // A seriously hot device stops here; the watermark does not advance past this pass
+            // (failures > 0), so the remainder is re-found when it cools.
+            if Self.deviceTooHot { refreshThermalHold(); failed += 1; stopReason = "hot"; break }
+            // Low Power Mode is a battery choice the owner may keep on all day: it used to stop
+            // every upload (build 116 sent nothing). Now the last three days still upload, in a
+            // smaller slice; the older window waits until it is off.
+            let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+            if lowPower, !recentIDs.contains(asset.localIdentifier) {
+                failed += 1; stopReason = "low_power_window"; break
+            }
+            let budget = lowPower ? Config.lowPowerRecentBudget : Config.foregroundBackfillBudget
+            if foreground, byteWork >= budget {
                 foregroundBudgetReached = true
                 failed += 1   // holds the watermark; settled photos are skipped cheaply next pass
+                stopReason = "budget"
                 break
             }
 
@@ -505,14 +526,18 @@ final class SyncEngine: ObservableObject {
                         self.addLiveT0(atom)
                     }
                 }
-            case .offSite, .notOwnCamera:
+            case .offSite(let reason):
                 skipped += 1
+                gates[reason, default: 0] += 1
+            case .notOwnCamera:
+                skipped += 1
+                gates["not_own_camera", default: 0] += 1
             case .heldPrivate:
                 heldPrivate += 1
             case .deduped:
                 deduped += 1
             case .gaveUp:
-                break   // failed Config.maxAttemptsPerAsset times; counted in gaveUpCount, holds nothing back
+                gates["gave_up", default: 0] += 1   // failed Config.maxAttemptsPerAsset times; holds nothing back
             case .deferred:
                 // In iCloud only: the background job downloads it on Wi-Fi. Not an attempt against
                 // the photo, and not a failure that holds the watermark.
@@ -521,13 +546,24 @@ final class SyncEngine: ObservableObject {
             case .authFailed:
                 failed += 1
                 stop = true
+                stopReason = "auth"
             case .failed(let retry):
                 if retry { failed += 1 }
+                gates["failed", default: 0] += 1
             }
             if stop { break }
         }
+        report("ios_sync_pass", [
+            "uploaded": uploaded, "metadata_only": metadataOnly, "deduped": deduped, "deferred": deferred,
+            "held_private": heldPrivate, "failed": failed, "recent": recent.count, "window": assets.count,
+        ], extra: ["gates": gates, "stop": stopReason ?? "end",
+                   "watermark": ISO8601DateFormatter().string(from: watermark)])
         lastPassSummary = [
-            "\(uploaded) uploaded", "\(deduped) already up", "\(skipped) off-site or not this camera",
+            "\(uploaded) uploaded", "\(deduped) already up",
+            gates.isEmpty ? nil : "skipped: " + gates.sorted { $0.key < $1.key }
+                .map { "\($0.value) \($0.key.replacingOccurrences(of: "_", with: " "))" }.joined(separator: ", "),
+            stopReason == "low_power_window" ? "Low Power Mode: older photos wait" : nil,
+            stopReason == "hot" ? "phone hot: paused" : nil,
             deferred > 0 ? "\(deferred) in iCloud, wait for the charging job" : nil,
             heldPrivate > 0 ? "\(heldPrivate) held private" : nil,
             failed > 0 ? "\(failed) failed or left for the next pass" : nil,
@@ -550,6 +586,37 @@ final class SyncEngine: ObservableObject {
               uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
         await refreshAnalyzedCount()
         return failed == 0
+    }
+
+    // ─── Pass report ────────────────────────────────────────────────────────────
+    //
+    // One app_events row per sync pass (insert-only for signed-in clients): the counts, why photos
+    // were skipped, what stopped the pass, the device state. Build 113 and 116 uploaded nothing on
+    // the owner's phone and the server could not tell why; this is the thing that notices. No
+    // coordinates, file names or photo ids leave the phone in it. At most one row a minute.
+    private var lastReportAt: Date?
+    private func report(_ event: String, _ counts: [String: Int], extra: [String: Any]) {
+        if let last = lastReportAt, Date().timeIntervalSince(last) < 60 { return }
+        lastReportAt = Date()
+        let p = ProcessInfo.processInfo
+        var props: [String: AnyJSON] = counts.mapValues { .integer($0) }
+        props["build"] = .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")
+        props["foreground"] = .bool(UIApplication.shared.applicationState != .background)
+        props["thermal"] = .integer(p.thermalState.rawValue)
+        props["low_power"] = .bool(p.isLowPowerModeEnabled)
+        props["paused"] = .bool(isPaused)
+        props["sites"] = .integer(SiteStore.shared.sites.count)
+        props["backfill_queue"] = .integer(backfillRemaining)
+        for (k, v) in extra {
+            if let s = v as? String { props[k] = .string(s) }
+            else if let d = v as? [String: Int] { props[k] = .object(d.mapValues { .integer($0) }) }
+        }
+        struct Row: Encodable { let event: String; let props: [String: AnyJSON]; let user_id: String?; let path: String }
+        let row = Row(event: event, props: props, user_id: SupabaseService.currentUserId, path: "ios/sync")
+        Task.detached {
+            do { try await SupabaseService.client.from("app_events").insert(row).execute() }
+            catch { NSLog("NukeCapture pass report failed: %@", String(describing: error)) }
+        }
     }
 
     /// Adds assets to the persisted backfill queue (deduplicated), for the background job.
@@ -829,7 +896,7 @@ final class SyncEngine: ObservableObject {
 
     enum AssetOutcome {
         case uploaded(pixels: Bool)
-        case offSite          // no GPS, off every site, not user-originated, or a screenshot
+        case offSite(reason: String)   // no_location, off_site, not_library or screenshot
         case notOwnCamera     // no Apple camera EXIF (received, edited elsewhere)
         case heldPrivate      // contributor firewall
         case deduped
@@ -871,12 +938,11 @@ final class SyncEngine: ObservableObject {
         // Confirmed ignition sites; falls back to the hardcoded
         // Config.shopLocations when none are confirmed (migration).
         // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
-        guard let loc = asset.location,
-              SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
-                                        longitude: loc.coordinate.longitude),
-              asset.sourceType == .typeUserLibrary,
-              !asset.mediaSubtypes.contains(.photoScreenshot) else {
-            return .offSite
+        guard asset.sourceType == .typeUserLibrary else { return .offSite(reason: "not_library") }
+        guard !asset.mediaSubtypes.contains(.photoScreenshot) else { return .offSite(reason: "screenshot") }
+        guard let loc = asset.location else { return .offSite(reason: "no_location") }
+        guard SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude) else {
+            return .offSite(reason: "off_site")
         }
         // Settled before: skip without reading the original again. The 3-day overlap re-finds
         // every recent photo on each pass, and re-reading those originals was most of a pass.
