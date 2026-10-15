@@ -178,7 +178,7 @@ export function toLanding(item: EbayItem, htmlToText: (h: string) => string, sou
   const obsFields: Record<string, unknown> = {};
   const put = (k: string, v: unknown) => { if (v != null && v !== "") obsFields[k] = v; };
   put("year", year); put("make", make); put("model", model); put("trim", trim);
-  if (vin.vin && /^[A-Z0-9]{8,17}$/.test(vin.vin)) put("vin", vin.vin);   // seller-typed: gap-filled by the writer, never creation identity
+  if (vin.vin && /^[A-Z0-9]{8,17}$/.test(vin.vin)) put("vin", vin.vin);   // seller-typed: gap-filled by the writer, never creation identity (ingest's make cross-check rejected 22 of ~560 tier-2 pages on a typed VIN, 2026-10-15)
   put("mileage", mileage); put("color", color); put("interior_color", a["interior color"]);
   put("transmission", transmission); put("drivetrain", a["drive type"] ?? a["drivetrain"]);
   put("engine_size", engine); put("body_style", a["body type"] ?? a["body style"]); put("fuel_type", a["fuel type"]);
@@ -187,7 +187,7 @@ export function toLanding(item: EbayItem, htmlToText: (h: string) => string, sou
     ? {
       url, year, make, model, enrich: false,
       price: price.amount ?? undefined, description: description || item.title || "(no description)",
-      image_urls: images, vin: vin.modern ? vin.vin : undefined, mileage: mileage ?? undefined,
+      image_urls: images, mileage: mileage ?? undefined,
       engine: engine ?? undefined, transmission: transmission ?? undefined, color: color ?? undefined,
       body_style: a["body type"] ?? undefined, title_status: a["vehicle title"] ?? undefined,
       location: location ?? undefined, seller_name: item.seller?.username ?? undefined,
