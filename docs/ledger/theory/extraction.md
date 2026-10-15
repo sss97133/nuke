@@ -41,8 +41,10 @@ the USD 99 Standard plan is taken. Owner tiers: model years 1964-1973 above 1974
   there is no seller-type field on `vehicles` or `vehicle_events`, so it stays unknown until one is recorded. It is the first gap to
   close for the owner's non-dealer-first rule.
 - *Gap* (lots): for a historical source the known population minus landed lots (the whole-source `source_census` row and
-  `mv_source_target_landed`; no population, no gap); for a live source the new supply per day (events created in the last 14 days)
-  times `live_horizon_days`.
+  `mv_source_target_landed`; no population, no gap); for a live source the new supply per day times `live_horizon_days`.
+  New supply counts the lots that ENDED in the last 14 days where events carry an end time (at least 20% of the sample), because
+  `created_at` is the landing clock and a backfill looks like new supply; a purely live classified source falls back to `created_at`,
+  and the clock used is recorded in the inputs.
 - *Cost* (credits per full lot): `firecrawl_source_params.credits_per_lot` with its basis, replaced by the observed credits per lot
   in `firecrawl_spend_log` once 50 lots are logged. A source with no Firecrawl cost is scored with the floor cost 0.01, so it ranks
   but receives 0 credits.
@@ -56,12 +58,44 @@ verified ownership (`vehicle_ownerships` verified_owner/current, or `vehicle_use
 merely recorded under the owner's account counts 0.1 (ownership there is unclear). The owner's user id is
 `firecrawl_params.owner_user_id`; unset, the input is unknown.
 
-**Allocation.** Sources that consume Firecrawl credits, by score, each capped at its gap in credits and at `max_source_share` (0.5) of
+**Allocation.** Sources that consume Firecrawl credits, by value per credit (the score ranks the size of the opportunity; a credit goes
+first where it buys the most value), each capped at its gap in credits and at `max_source_share` (0.5) of
 the allocatable credits (the monthly credits less `reserve_fraction`, 0.15). Within an allocated source, credits split across the top
 20 groups in proportion to group score. `firecrawl_allowance` spreads a source's period allocation over the days left in the
 billing period (it resets on `period_start_day`, now the 4th) and subtracts today's spend, so an unspent day rolls forward.
 
-**Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`;
+### best_v1: what a landed lot is worth, and the loop that improves it (owner, 2026-10-15)
+
+The owner: "best is a metric we have yet to fully develop." So the ranking is a metric that is measured, tested on real spend and
+revised, not a one-off table. `best_v1` scores each landed lot from 0 to 1 and is stored with its components in
+`firecrawl_lot_score` (metric_version `best_v1`):
+
+    best_v1 = ( 2 x tier + complete + outcome + unique + group ) / 6, an unknown component counts 0
+    tier      model year 1964-1973 = 1, 1974-1991 = 0.6, other = 0.2
+    complete  (description + VIN + a photo + a location) / 4
+    outcome   a realized price = 1; the outcome known without a price (reserve not met, no sale, ended) = 0.5; an ask = 0
+    unique    1 when no other platform holds an event for the same vehicle, else 0
+    group     the lot's model family x year band score over the best group score (`firecrawl_group_score`); an illiquid
+              or unmatched family = 0
+    not in v1 non-dealer seller: the data model has no field for it, so it is listed as unknown on every source
+
+The weights are rows in `firecrawl_params` (`best_w_*`, the tier weights). Unknown counts 0 because no evidence of value is not value.
+
+- **Source value** is the mean best_v1 of the source's landed lots (a sample, same sampling as above), blended with the owner's own
+  rating when he gave one (`firecrawl_source_params.owner_judgment`: rating, his words, date; the lots count 2, the rating
+  `owner_judgment_weight`). eBay carries "ebay is low quality" (2026-10-15).
+- **Observed return** is best_v1 summed over the lots a Firecrawl fetch landed in the last 30 days, per credit spent. Credits are
+  the Firecrawl fetches in `listing_page_snapshots` (fetch_method = firecrawl), failed ones included, or the spend log if larger, so
+  a gone page, a thin capture and a blocked fetch cost credits and add nothing. `firecrawl_backtest(since, until)` returns it per
+  source. Once a source has 30 scored lots its observed best_v1 per credit replaces its prior (mean best_v1 over the cost).
+- **Allocation** follows best_v1 per credit, by source and then vehicle group, capped by the gap and the share. A source whose
+  landed lots score low loses budget on the next run without anyone changing a parameter. A paused source
+  (`firecrawl_source_params.paused`) is ranked and shows `would_allocate`, gets no credits, and `firecrawl_allowance` returns 0.
+- **The loop.** Weekly the job rescored the lots and recomputes. As outcomes arrive (eBay endings, Craigslist removals,
+  Cars & Bids results) realized value is added to the metric as `best_v2`, published beside `best_v1` in `firecrawl_lot_score`
+  (the key is event and version) with its diff against v1 per source. v2 is not built yet: the first outcome feed is the gap.
+
+**Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
-`firecrawl_record_spend`; migration `20261017010000_firecrawl_target_allocation.sql`. Read the ranking with
+`firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_backtest`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`. Read the ranking with
 `select * from firecrawl_target_allocation where computed_at = (select max(computed_at) from firecrawl_target_allocation) and vehicle_group = '*'`.

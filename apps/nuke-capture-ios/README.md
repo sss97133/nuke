@@ -64,11 +64,16 @@ Standing rules the code carries:
   camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
   `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
   stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
-- **The phone suggests; the owner files.** Nothing in the app writes `vehicle_images.vehicle_id`. A VIN read and a
-  session inheritance are suggestions (`auto_suggested_vehicle_id`, confidence, reasons); the owner files a session
-  in the confirm sheet through `attribute_image_session` → `attribute_testimony` (audited). The VIN matcher
-  (`VisionEngine.matchSerial`, `UnitTests/SerialMatchTests.swift`) reads every era's serial (17-character VINs and the
-  8–16-character chassis numbers before 1981) against vehicles the account holds by `user_id` or `owner_id`.
+- **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
+  after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
+  its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
+  photo through the server (`device_file_images` → `attribute_testimony`, audited) on a serial read matching one of
+  the owner's vehicles (every era's serial, `VisionEngine.matchSerial`) or on the owner's album mapped to a vehicle
+  (`album_sync_map`). A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
+  named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
+  `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
+  owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
+  same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
 - **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
   original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
   holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June

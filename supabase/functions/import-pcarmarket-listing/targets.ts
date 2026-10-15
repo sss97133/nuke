@@ -6,6 +6,7 @@
 // Stops at the limit, at the time budget, after 3 failures in a row, and at once on a 403/429.
 
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
+import { parseSsrPage } from "./ssrPage.ts";
 import { classifyFailure, recordRevision, reviseRetained } from "../_shared/revisionWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -170,4 +171,25 @@ export async function revisePcm(supabase: any, supabaseUrl: string, body: Record
       return { ok: true, whole: true, detail: { vehicle_id: out.vehicle_id } };
     },
   });
+}
+
+/**
+ * Read the end date and result of lots we already hold, from their /results/ page, archived through archiveFetch (the capture is
+ * retained and its snapshot id returned for the citation). Writes nothing to any vehicle: a correction cites this snapshot.
+ */
+export async function readEnded(body: Record<string, any>) {
+  const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string" && /pcarmarket\.com\/auction\//.test(u)).slice(0, 12);
+  const out: Record<string, unknown>[] = [];
+  for (const u of urls) {
+    const bare = bareSlug(slugOf(u));
+    const page = await archiveFetch(`${SITE}/results/${bare}`, { platform: "pcarmarket", useFirecrawl: false, callerName: "import-pcarmarket-listing", directFetchOptions: { publicOnly: true, timeout: 25_000 } });
+    if (page.statusCode === 403 || page.statusCode === 429) { out.push({ url: u, stopped: "blocked_by_source", status: page.statusCode }); break; }
+    const parsed = page.html ? parseSsrPage(page.html) : null;
+    out.push({
+      url: u, status: page.statusCode, snapshot_id: page.snapshotId, cached: page.cached,
+      ended_at: parsed?.auctionEndDate ?? null, outcome: parsed?.auctionOutcome ?? null, price: parsed?.salePrice ?? null,
+    });
+    await sleep(2000);
+  }
+  return { success: true, results: out };
 }
