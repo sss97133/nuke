@@ -45,3 +45,21 @@ it('stays away when the reader fails', async () => {
   await act(async () => root.render(<Fresh onPick={() => {}} />));
   expect(container.querySelector('.map-movers')).toBeNull();
 });
+
+it('draws each mover\'s two years as 24 bars when the monthly read answers, and none when it does not', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  const bins = [2, 3, 4, 4, 3, 5, 4, 4, 3, 4, 5, 5, 6, 7, 6, 8, 7, 9, 8, 9, 7, 8, 9, 8];
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_movers'
+    ? { data: rows, error: null }
+    : { data: { anchor: '2026-10-15', window_days: 730, families: [{ brand: 'Ferrari', family_key: 'f360', bins }] }, error: null }));
+  await act(async () => root.render(<Fresh onPick={() => {}} />));
+  await act(async () => { await Promise.resolve(); });
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_monthly',
+    { p_families: [{ brand: 'Ferrari', family_key: 'f360' }, { brand: 'Acura', family_key: 'fint' }] });
+  const items = [...container.querySelectorAll('button.map-movers__item')];
+  expect(items[0].querySelectorAll('svg.map-movers__spark rect')).toHaveLength(24);
+  expect(items[0].querySelectorAll('rect.map-movers__bar--recent')).toHaveLength(12);
+  expect(Number(items[0].querySelectorAll('rect')[17].getAttribute('height'))).toBe(13);
+  expect(items[1].querySelector('svg')).toBeNull();
+  expect(items[0].textContent).toBe('Ferrari 360▲184%46→92 sold');
+});
