@@ -39,7 +39,7 @@ MIL = {"black": "0", "brown": "1", "red": "2", "orange": "3", "yellow": "4", "gr
        "blue": "6", "violet": "7", "gray": "8", "grey": "8", "white": "9"}
 MIL_NAME = {v: k for k, v in MIL.items() if k != "grey"}
 PAD_ENGINE, PAD_BODY = 1.20, 1.15            # state row 33: 20 % engine bay, 15 % body
-CMA = {24: 404, 22: 642, 20: 1020, 18: 1620, 16: 2580, 14: 4110, 12: 6530}   # AWG circular mils
+CMA = {24: 404, 22: 642, 20: 1020, 18: 1620, 16: 2580, 14: 4110, 12: 6530, 10: 10380}   # AWG circular mils
 MINISEAL = [("D-609-03", 26, 20), ("D-609-04", 20, 16), ("D-609-05", 16, 12)]  # prowire 3137ct cavities
 ENGINE_ONLY_OFF = {"23", "50", "73", "83", "84", "87", "88", "80", "82"}     # state row 50 (Dave, 2026-06-18)
 # chassis circuits the June build sheet listed as 61-pin overflow; they cross in the body crossing instead (state row 50)
@@ -112,7 +112,9 @@ def awg_equiv(cma):
 def splice_for(awgs):
     """MiniSeal colour by the combined area of the wires entering one side (engineering rule:
     total circular mils → equivalent AWG → the 3137CT cavity range that holds it)."""
-    eq = awg_equiv(sum(CMA.get(a, 0) for a in awgs))
+    if not awgs or any(a not in CMA for a in awgs):
+        return None, None          # a gauge the table does not hold is not sized as zero area (RSI pass 18)
+    eq = awg_equiv(sum(CMA[a] for a in awgs))
     for code, lo, hi in MINISEAL:
         if hi <= eq <= lo:
             return code, eq
@@ -298,7 +300,7 @@ def attach(reg):
     # ------------------------------------------------ resolve endpoints → wires
     resolved, terms, need = OrderedDict(), [], Counter()
     replaced = {}
-    splices, unresolved_pins = [], []
+    splices, unresolved_pins, device_splices = [], [], []
     for eid, ep in eps.items():
         spec = ep.get("wires") or []
         wl, cav_of = [], {}
@@ -492,6 +494,20 @@ def attach(reg):
                 terms.append(OrderedDict(wire=w, endpoint=eid, where=ep.get("where"), cavity=cv_, factory_circuit=fac_,
                                          part=pe["part"], family=fid,
                                          doubled=(w in doubled) or None))
+        # RSI pass 18: wires that share one named terminal of a device the design marks as a splice point meet in one
+        # splice whose lead takes the terminal, sized like the pin splices by the wires' combined area. Listed after the
+        # ECU/PDM pin splices so their S-numbers hold. A miniseal end already counts its group splice in the BOM.
+        if ep.get("splice_point") and fid != "ssc":
+            by_cv = OrderedDict()
+            for t in terms:
+                if t["endpoint"] == eid and t["cavity"] and not re.match(r"(?i)^(splice|stud|ring)", str(t["cavity"])):
+                    by_cv.setdefault(t["cavity"], []).append(t["wire"])
+            for cv, ws in by_cv.items():
+                if len(ws) > 1:
+                    code, eq = splice_for([wires[x].get("awg") for x in ws])
+                    device_splices.append({"at": f"{eid} {cv}", "wires": ws, "splice": code, "equiv_awg": eq})
+                    if code and fid != "miniseal":
+                        need[code] += 1
         for code in (ep.get("replaces_cart") or []):
             replaced[str(code)] = eid
         resolved[eid] = OrderedDict(
@@ -636,7 +652,7 @@ def attach(reg):
     )
     reg["endpoints"] = resolved
     reg["terminations"] = terms
-    reg["splices"] = splices
+    reg["splices"] = splices + device_splices
     reg["bom"] = OrderedDict(parts={k: (math.ceil(v - 1e-9)) for k, v in sorted(need.items())},
                              wire_ft={key_label(k): round(v, 1) for k, v in sorted(feet.items())})
     reg["carts"] = [{k: c[k] for k in ("vendor", "captured", "status", "line_count", "total") if k in c} for c in carts]
@@ -1003,7 +1019,7 @@ def write_report(reg, parts, tools):
             opn = f"{ep['branch_wires_missing']} branch wire(s) not in registry · " + opn
         P(f"| {eid} | {ep['where']} | {kit} | {len(ep['wires'])} | {rc} | {opn} |")
     P("")
-    P("## Splices at shared ECU/PDM pins")
+    P("## Splices at shared pins and terminals")
     P("")
     P("| At | Wires | Splice | Equivalent AWG |")
     P("|---|---|---|---|")

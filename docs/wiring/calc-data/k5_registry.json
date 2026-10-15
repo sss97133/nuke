@@ -41354,6 +41354,115 @@
    "equiv_awg": 16
   },
   {
+   "at": "TG-SW-DASH 4 FEED",
+   "wires": [
+    "TG_KEY_FEED",
+    "TG_FEED"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "TG-SW-KEY CLOSE terminal",
+   "wires": [
+    "TG_CUT_IN",
+    "TG_BUS_UP"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "TG-SW-KEY OPEN terminal",
+   "wires": [
+    "TG_BUS_DN",
+    "TG_MOT_B"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "VSS-SENDER white lead (signal)",
+   "wires": [
+    "VSS_DAK",
+    "100"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 16
+  },
+  {
+   "at": "BLOWER-MOTOR + blade terminal",
+   "wires": [
+    "BLOWER_MOT",
+    "BLOWER_HI"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "FLOOR-DIMMER 10 feed cavity",
+   "wires": [
+    "85",
+    "86"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 16
+  },
+  {
+   "at": "FLOOR-DIMMER 12 LOW cavity",
+   "wires": [
+    "85a",
+    "86a"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
+   "at": "FLOOR-DIMMER 11 HIGH cavity",
+   "wires": [
+    "85b",
+    "86b",
+    "121"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
+   "at": "DOOR-JAMB-L switch terminal",
+   "wires": [
+    "42",
+    "STEP_DOOR_L"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 16
+  },
+  {
+   "at": "DOOR-JAMB-R switch terminal",
+   "wires": [
+    "43",
+    "STEP_DOOR_R"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 16
+  },
+  {
+   "at": "SUB + push terminal",
+   "wires": [
+    "30a",
+    "SUB_JMP_P"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "SUB - push terminal",
+   "wires": [
+    "30b",
+    "SUB_JMP_N"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
    "at": "SPL-FUEL-SND",
    "wires": [
     "98",
@@ -41759,8 +41868,8 @@
    "CPA-100-3/4-BK": 1,
    "CPA-100-3/8-RED": 1,
    "D-609-03": 53,
-   "D-609-04": 20,
-   "D-609-05": 32,
+   "D-609-04": 23,
+   "D-609-05": 34,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -43221,21 +43330,21 @@
    "kind": "splice",
    "item": "D-609-04",
    "name": "MiniSeal stub splice, blue (20–16)",
-   "need": 20,
+   "need": 23,
    "cart": 25,
    "inside": [],
    "vendor": "prowire",
-   "status": "covered (+5 spare)"
+   "status": "covered (+2 spare)"
   },
   {
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 32,
+   "need": 34,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 12"
+   "status": "short by 14"
   },
   {
    "kind": "housing",
@@ -44521,10 +44630,10 @@
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 32,
+    "need": 34,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 12"
+    "status": "short by 14"
    },
    {
     "code": "DL438",
