@@ -94,10 +94,20 @@ const MIN_GAP_MS = 2000; // <= 1 request per 2 s to barnfinds.com
 const BATCH_BUDGET_MS = 110_000;
 const BATCH_MAX = 50;
 
+/** Remove tags until none remain, so a nested fragment cannot reassemble one. */
+function stripTags(input: string): string {
+  let out = input;
+  for (let prev = ""; prev !== out; ) {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, " ");
+  }
+  return out;
+}
+
 function htmlToMarkdown(html: string): string {
   // Extract h1 title separately (it's outside entry-content on Barn Finds)
   const h1Match = html.match(/<h1[^>]*class="entry-title"[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const h1Title = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").replace(/[<>]/g, "").trim() : "";
+  const h1Title = h1Match ? stripTags(h1Match[1]).replace(/[<>]/g, "").trim() : "";
   // Match entry-content first (Barn Finds WordPress structure), then fallback
   const mainMatch = html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+?)<\/div>\s*(?:<div class="(?:author|post-tags|sharing)|<\/article)/i)
     || html.match(/<main[^>]*>([\s\S]+?)<\/main>/i)
@@ -111,10 +121,7 @@ function htmlToMarkdown(html: string): string {
     strip = strip.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
   }
   strip = strip.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "# $1\n").replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n").replace(/<p[^>]*>/gi, "\n").replace(/<li[^>]*>/gi, "\n- ").replace(/<\/p>|<\/li>/gi, "\n");
-  for (let prev = ""; prev !== strip; ) {
-    prev = strip;
-    strip = strip.replace(/<[^>]*>/g, " ");
-  }
+  strip = stripTags(strip);
   let text = strip.replace(/&\#8217;/g, "'").replace(/&\#8220;|&\#8221;/g, '"').replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   // Prepend h1 as markdown heading if not already present
   if (h1Title && !text.startsWith("# ")) text = `# ${h1Title}\n${text}`;
