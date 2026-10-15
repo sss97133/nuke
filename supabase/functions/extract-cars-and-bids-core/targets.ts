@@ -62,6 +62,18 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
   const started = Date.now();
 
   const { count: tried } = await supabase.from("import_queue").select("id", { count: "exact", head: true }).eq("extractor_version", TARGETS_TAG);
+  // Credit floor: the account is shared across lanes (FIRECRAWL-BUDGET.md). Stop when the balance is at or under min_balance.
+  const minBalance = Math.floor(Number(body.min_balance)) || 0;
+  if (minBalance > 0) {
+    const cu = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", { headers: { Authorization: `Bearer ${firecrawlApiKey}` }, signal: AbortSignal.timeout(15_000) }).then((r) => r.json()).catch(() => null); // guardrail-allow: raw-fetch
+    const remaining = Number(cu?.data?.remaining_credits);
+    if (!Number.isFinite(remaining)) return { success: false, stopped: "credit_balance_unreadable" };
+    if (remaining <= minBalance) return { success: true, stopped: "credit_floor_reached", remaining, min_balance: minBalance };
+  }
+  // Year window from the slug (/auctions/<id>/<year>-...): 1964-1991 first, per the owner's tiers.
+  const yearMin = Math.floor(Number(body.year_min)) || 0;
+  const yearMax = Math.floor(Number(body.year_max)) || 0;
+  const yearRe = yearMin && yearMax ? `/auctions/[^/]+/(${Array.from({ length: yearMax - yearMin + 1 }, (_, i) => yearMin + i).join("|")})-` : null;
   if ((tried ?? 0) >= maxTotal) return { success: true, stopped: "max_total_reached", tried, max_total: maxTotal };
 
   const { data: last } = await supabase.from("import_queue").select("raw_data").eq("extractor_version", TARGETS_TAG).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -70,7 +82,9 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
   const picked: { id: number; listing_url: string }[] = [];
   // Candidates beyond `limit`: a lot another run already claimed (unique import_queue.listing_url) is skipped for free.
   for (let page = 0; page < 10 && picked.length < limit * 3; page++) {
-    const { data: targets, error } = await supabase.from("source_targets").select("id, listing_url").eq("source_slug", "cars-and-bids").gt("id", cursor).order("id", { ascending: true }).limit(200);
+    let tq = supabase.from("source_targets").select("id, listing_url").eq("source_slug", "cars-and-bids").gt("id", cursor);
+    if (yearRe) tq = tq.filter("listing_url", "match", yearRe);
+    const { data: targets, error } = await tq.order("id", { ascending: true }).limit(200);
     if (error) throw error;
     if (!targets?.length) break;
     cursor = targets[targets.length - 1].id;
