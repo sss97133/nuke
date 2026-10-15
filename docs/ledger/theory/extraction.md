@@ -149,6 +149,18 @@ Seller type is proposed in `docs/proposals/2026-10-15-seller-type-observation.md
   scoped census window's ids per day. The observed return counts only fetches and lots since `slice_since`, so the old practice
   does not judge the new one.
 
+### The pipeline runs bounded, behind the IO gate (owner-lead, 2026-10-15)
+
+A one-shot recompute that read from disk for about 11 minutes made pg_cron fail to start 9 jobs, because on this instance a saturated
+disk stalls new connections. The recompute is therefore a pipeline of bounded steps, run by `firecrawl_pipeline_step()` from a cron
+tick every 5 minutes with a 60 s ceiling, each step behind `firecrawl_io_gate()` (no more than 3 client queries on DataFileRead,
+no lock waits, no PostgREST query slower than 2 s; closed gate = do nothing). The steps: the vehicle-group scores weekly
+(`firecrawl_refresh_groups`), one stale source sample at a time (`firecrawl_sample_source`: at most `sample_rows_per_source` =
+1,500 events joined to vehicles, best_v1 and best_v1.1 per lot, an exact event count), the lots Firecrawl landed since the last
+scored lot (`firecrawl_score_lots`, daily), then the allocation (`refresh_firecrawl_target_allocation`), which reads only stored
+samples, group scores, census rows, lot scores and credit counts and scans neither `vehicle_events` nor `vehicles`. Samples older
+than 6 days are taken again. Runtimes are in `firecrawl_pipeline_log`.
+
 **Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
 `firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_best_v1_1`, `firecrawl_backtest`, `record_lot_quality_signals`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`, `20261017030000_firecrawl_best_v1_1_lot_quality.sql`. Read the ranking with
