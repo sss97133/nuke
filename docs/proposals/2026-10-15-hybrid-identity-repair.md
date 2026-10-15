@@ -1,9 +1,39 @@
 # Hybrid vehicle rows: a lot's own sale under another car's identity (proposal, 2026-10-15)
 
-Status: plan. Nothing has been written. The population count comes from `mv_family_year_prices.conflicts` after its
-first build (cron `refresh-family-year-prices`, 09:40 UTC). Owner of the plan: lane skylar-08. Readers affected:
-skylar-83 (mv_treemap_outcomes, mv_family_market, the brand map). Writer bugs: the Barrett-Jackson resolver (routed to the intake lane by skylar-83) and the extract-mecum page path
-(fixed in #1468).
+Status (2026-10-15 14:25Z): prevention landed, so the first rows have been repaired.
+- **Prevention:** extract-barrett-jackson refuses a different car and fills identity only (#1438); the Mecum page path
+  was fixed in #1468.
+- **Repaired:** the five acceptance rows. See "Executed" below.
+- **Next:** the 30 Conceptcarz rows and the fleet count. The count comes from `mv_family_year_prices.conflicts` after
+  the fold's first build (cron `refresh-family-year-prices`, 18:40 UTC).
+
+Owner: lane skylar-08. Readers affected: skylar-83's mv_treemap_outcomes, mv_family_market and the brand map.
+
+## Executed (2026-10-15, sanctioned writers only, verified logged out)
+
+The finding that shapes the recipe: every Barrett-Jackson docket car checked already has its own vehicle row. Each
+was created by B-J intake with the docket URL as `discovery_url`, carries the same photos and lot, and is public
+with its own price. So no stub is needed. The hybrid's B-J testimony moves to that row, and the hybrid goes back to
+its own lot.
+
+| Hybrid | Own lot (identity restored) | Docket car's own row |
+|---|---|---|
+| 50caf39a | BaT Custom Sport Truck, $3,450, chassis CE147J125019 | e36c3a39 (Scottsdale 2017 #200665) |
+| 5ffec173 | BaT C10 Pickup 3-Speed, $10,999, CE147S177336 | 55293150 (#116242), 1b0aa807 (#132768), ed4cd723 (#232190) |
+| 14f36621 | BaT Chevelle SS 396, $58,000, 138177A178138 | 85c9e395 (Scottsdale 2019 #221963) |
+| d3727d2e | BaT Buick Special, $106,000, VIN unknown (the lot's chassis field is description text) | ec2798fd (Palm Beach 2007 #49226) |
+| ec816aa9 | Mecum lot 132893 Chevelle, $16,000, VIN unknown | 0dbb2abc (Las Vegas 2009 #79129) |
+
+Per row, in order:
+1. `correct_vehicle_sale_provenance_batch`: model, `discovery_url` (back to the own lot), `auction_source`,
+   `normalized_model` and `normalized_series`. The source is the retained lot capture.
+2. `correct_vehicle_vin`: the own lot's chassis number, or NULL with the finding stated.
+3. `correct_vehicle_vin` with `fill_empty`: the docket car's row gets the VIN its own lot page names. All five
+   docket rows had none; the VIN had been laid on the hybrid.
+4. `correct_auction_event_link` (new, #1546): the hybrid's B-J auctions go to the docket rows. All 8 were
+   duplicates of a lot the docket row already held, so they were retired with their full rows in `superseded_rows`.
+5. `reattribute_observation` (onto-existing-copy branch, #1553): each B-J photo on the hybrid is superseded onto the
+   docket row's identical copy. Nothing is duplicated.
 
 ## What is wrong
 
