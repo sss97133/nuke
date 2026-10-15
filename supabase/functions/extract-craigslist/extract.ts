@@ -77,7 +77,7 @@ function parseYearMakeModel(makeModelStr: string): { make: string | null; model:
 }
 
 function textOf(raw: string | undefined): string | null {
-  const t = (raw ?? "").replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+  const t = (raw ?? "").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   return t || null;
 }
 
