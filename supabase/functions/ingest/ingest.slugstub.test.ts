@@ -140,7 +140,7 @@ const OPENAI_NO_CREDITS =
   '{"success":false,"error":"OpenAI API error: 429 - {\\n \\"error\\": {\\n \\"message\\": \\"You have no credits remaining. Add credits to continue using the API';
 
 const SLUG_VENUES: Array<{ platform: string; url: string; extractor: string }> = [
-  { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-vehicle-data-ai" },
+  { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-classiccars" },
   { platform: "mecum", url: "https://www.mecum.com/lots/1177355/2005-hummer-h2", extractor: "extract-mecum" },
   { platform: "barrett_jackson", url: "https://www.barrett-jackson.com/2026-columbus/docket/vehicle/1951-plymouth-cranbrook-300183", extractor: "extract-barrett-jackson" },
   { platform: "hagerty", url: "https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/ce62f601-14d5-4090-9489-2287744182ee", extractor: "extract-hagerty-listing" },
