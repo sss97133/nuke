@@ -46,6 +46,8 @@ export interface ArchiveFetchOptions {
   useFirecrawl?: boolean;
   /** Direct fetch first; when the site blocks it (403/429/challenge, "Blocked by site"), fetch the page with Firecrawl. */
   firecrawlOnBlock?: boolean;
+  /** Asked before every paid Firecrawl scrape; when it resolves false the scrape is skipped (error firecrawl_allowance_exhausted). */
+  firecrawlAllowed?: () => Promise<boolean>;
   /** Firecrawl waitFor in ms */
   waitForJs?: number;
   /** Request markdown from Firecrawl in addition to HTML */
@@ -301,6 +303,8 @@ export async function archiveFetch(
     if (batResult.costCents > 0) {
       await logFetchCost(supabase, options?.callerName ?? "archiveFetch", url, batResult).catch(() => {});
     }
+  } else if (useFirecrawl && options?.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+    result.error = "firecrawl_allowance_exhausted";
   } else if (useFirecrawl) {
     // Firecrawl for JS-rendered sites
     const formats = ["html"];
@@ -338,7 +342,9 @@ export async function archiveFetch(
 
     // The site refused our server's address: one Firecrawl scrape, only for callers that opted in.
     const refused = !result.html && (/blocked|forbidden|captcha|challenge|auth_required|login page/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
-    if (options?.firecrawlOnBlock && refused) {
+    if (options?.firecrawlOnBlock && refused && options.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+      result.error = "firecrawl_allowance_exhausted";
+    } else if (options?.firecrawlOnBlock && refused) {
       const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
         url,
         formats: ["rawHtml"], // the extractors that opt in read script payloads, which "html" strips

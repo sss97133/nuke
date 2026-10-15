@@ -5,6 +5,9 @@
 
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { projectSecretKey } from '../_shared/supabaseKeys.ts';
+import { ALLOWANCE_EXHAUSTED, firecrawlGate } from '../_shared/firecrawlGate.ts';
 import { extractFromHtml } from './extract.ts';
 
 const corsHeaders = {
@@ -24,7 +27,10 @@ Deno.serve(async (req) => {
     if (typeof url !== 'string' || !/^https:\/\/collectingcars\.com\/for-sale\/[a-z0-9-]+/.test(url)) {
       return json({ error: 'Invalid Collecting Cars lot URL' }, 400);
     }
+    // Ask first, record after: a paid scrape needs a credit in today's allowance and is written to the spend log.
+    const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'collecting-cars');
     const fetched = await archiveFetch(url, {
+      firecrawlAllowed: () => gate.allow(),
       platform: 'collectingcars',
       callerName: 'extract-collecting-cars',
       useFirecrawl: false,
@@ -33,10 +39,19 @@ Deno.serve(async (req) => {
       // collectingcars.com refuses the server's datacenter address; the fallback is one Firecrawl rawHtml scrape (1 credit).
       firecrawlOnBlock: true,
     });
+    if (fetched.error === 'firecrawl_allowance_exhausted') throw new Error(ALLOWANCE_EXHAUSTED);
     if (!fetched.html || fetched.html.length < 5000) {
+      if (fetched.source === 'firecrawl') await gate.record(1, 0, 'extract-collecting-cars', `unusable page ${url}`);
       throw new Error(`Failed to fetch: ${fetched.error || `HTTP ${fetched.statusCode}, ${fetched.html?.length || 0} bytes`}`);
     }
-    const extracted = extractFromHtml(fetched.html, url);
+    let extracted: ReturnType<typeof extractFromHtml>;
+    try {
+      extracted = extractFromHtml(fetched.html, url);
+    } catch (e) {
+      if (fetched.source === 'firecrawl') await gate.record(1, 0, 'extract-collecting-cars', `page did not parse ${url}`);
+      throw e;
+    }
+    if (fetched.source === 'firecrawl') await gate.record(1, 1, 'extract-collecting-cars', url);
     if (extracted.lot_type && extracted.lot_type !== 'car') {
       return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url });
     }
