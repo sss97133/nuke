@@ -1119,6 +1119,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     "bonhams.com": "extract-bonhams",
     "cars.bonhams.com": "extract-bonhams",
     "broadarrowauctions.com": "extract-broad-arrow",
+    "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
   };
   const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
   const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
