@@ -86,6 +86,7 @@ export interface IngestOutcome {
   enrichment_error?: string | null;
   reason?: string | null;
   error?: string | null;
+  blip?: { observation?: string; observation_id?: string } | null;
   listing_capture?: {
     post_id?: string | null;
     capture_landing?: {
@@ -348,6 +349,11 @@ export function isIdentityInsufficientReject(ingest: IngestOutcome): boolean {
 }
 
 /** Rejections that will not change on a retry; the poller ledgers them `skipped`. */
+/** A Craigslist post kept as an unresolved listing observation (no model stated). Nothing to retry: the post is retained. */
+export function isUnresolvedBlip(ingest: IngestOutcome): boolean {
+  return ingest.status === "unresolved";
+}
+
 export function isStructuralReject(ingest: IngestOutcome): boolean {
   return (
     ingest.status === "rejected" &&
@@ -361,6 +367,7 @@ export function shouldLedger(ingest: IngestOutcome): boolean {
   return (
     ["created", "matched", "duplicate"].includes(ingest.status ?? "") ||
     isStructuralReject(ingest) ||
+    isUnresolvedBlip(ingest) ||
     isEnrichmentFailedReject(ingest) ||
     isIdentityInsufficientReject(ingest)
   );
@@ -397,7 +404,7 @@ export function ledgerWriteFor(input: {
     outcome = { status: "failed", message, failure_category: failureCategoryFor(extractorError || message), landed: null };
   } else if (isIdentityInsufficientReject(ingest)) {
     outcome = { status: "failed", message: String(ingest.reason), failure_category: "identity_insufficient", landed: null };
-  } else if (isStructuralReject(ingest)) {
+  } else if (isUnresolvedBlip(ingest) || isStructuralReject(ingest)) {
     outcome = null;
   } else {
     outcome = ledgerOutcomeForIngest(ingest, readbackFor(ingest.vehicle_id, batch));
@@ -417,6 +424,7 @@ export function ledgerWriteFor(input: {
       ...(landed ? { landed } : {}),
       ...(ingest.enrichment_error ? { enrichment_error: String(ingest.enrichment_error).slice(0, 200) } : {}),
       ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
+      ...(ingest.blip?.observation_id ? { blip_observation_id: ingest.blip.observation_id } : {}),
     },
   };
 

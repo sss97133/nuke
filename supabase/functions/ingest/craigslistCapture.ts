@@ -65,6 +65,8 @@ export interface CaptureLanding {
   observation_id?: string;
   listing_event?: VehicleEventWriteResult;
   place?: "written" | "duplicate" | "error";
+  /** The asking price: first reading logged, a changed one applied, an unchanged one left alone. */
+  price?: "logged" | "changed" | "unchanged" | "error";
 }
 
 /** Craigslist says "gas"; the column's dominant spelling (93,571 + 61,487 rows, 2026-10-06) is "gasoline". "other" is not a fuel. */
@@ -168,6 +170,39 @@ export function placeObservationRow(
   };
 }
 
+/**
+ * The post's asking price against the vehicle row. vehicle_price_history is the change log of vehicles.asking_price:
+ * a trigger writes a row on every UPDATE of the column, but nothing writes the first reading on INSERT, and the
+ * observation writer quarantines a different price instead of applying it. So here:
+ *   - a vehicle this page just created: log the first reading, with the source, the page's own observed_at and the URL;
+ *   - a vehicle already holding a different price (or none): apply the new price; the trigger logs the change.
+ * A page read is newer than every earlier read of the same post, so the later reading is the current claim; the
+ * earlier ones stay in the observations and the log. Never throws.
+ */
+async function landAskingPrice(
+  supabase: any,
+  args: { vehicleId: string; listingUrl: string; price: number; observedAt: string; postId: string | null; isNewVehicle: boolean },
+): Promise<"logged" | "changed" | "unchanged" | "error"> {
+  try {
+    if (args.isNewVehicle) {
+      const { error } = await supabase.from("vehicle_price_history").insert({
+        vehicle_id: args.vehicleId, price_type: "asking", value: args.price, source: "craigslist", as_of: args.observedAt,
+        confidence: 80, proof_type: "listing", proof_url: args.listingUrl,
+        notes: args.postId ? `craigslist post ${args.postId}` : null,
+      });
+      return error ? "error" : "logged";
+    }
+    const { data, error } = await supabase.from("vehicles").select("asking_price").eq("id", args.vehicleId).maybeSingle();
+    if (error || !data) return "error";
+    if (data.asking_price !== null && Number(data.asking_price) === args.price) return "unchanged";
+    const { error: upErr } = await supabase.from("vehicles").update({ asking_price: args.price, price: Math.round(args.price) })
+      .eq("id", args.vehicleId);
+    return upErr ? "error" : "changed";
+  } catch {
+    return "error";
+  }
+}
+
 /** Write the place once per (vehicle, post, place). Never throws. */
 async function landPlace(supabase: any, row: Record<string, unknown>): Promise<"written" | "duplicate" | "error"> {
   try {
@@ -232,6 +267,8 @@ export async function landCraigslistCapture(
     written: WrittenColumns;
     /** True when ingest created the vehicle from this page a moment ago. Then the columns it wrote are not re-confirmed. */
     isNewVehicle?: boolean;
+    /** The span of the post's text the model was read from, when the page's attributes named none. */
+    modelCitation?: { value: string; span: { start: number; end: number; text: string }; rule: string } | null;
     timeoutMs?: number;
   },
 ): Promise<CaptureLanding> {
@@ -264,7 +301,7 @@ export async function landCraigslistCapture(
         extractionMethod: "html_parse",
         ...(capture.source_capture ? { observedAt: capture.source_capture.observed_at } : {}),
         // The verbatim block, so the observation stands on its own if the page is gone.
-        rawData: { ...ledgerFields(capture), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
+        rawData: { ...ledgerFields(capture), ...(args.modelCitation ? { model_from_text: args.modelCitation } : {}), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
       }),
       args.timeoutMs ?? 8000,
     );
@@ -306,6 +343,14 @@ export async function landCraigslistCapture(
         landing.listing_event = { action: "error", error: e instanceof Error ? e.message : String(e), code: null };
         landing.errors.push(`listing event: ${landing.listing_event.error}`);
       }
+    }
+    if (result.observationId && capture.asking_price != null && capture.asking_price > 0) {
+      landing.price = await withTimeout(landAskingPrice(deps.supabase, {
+        vehicleId, listingUrl, price: capture.asking_price,
+        observedAt: capture.source_capture?.observed_at ?? new Date().toISOString(),
+        postId: capture.post_id ?? null, isNewVehicle: !!args.isNewVehicle,
+      }), args.timeoutMs ?? 8000).catch(() => "error" as const);
+      if (landing.price === "error") landing.errors.push("price: not applied");
     }
     const placeRow = result.observationId ? placeObservationRow(vehicleId, listingUrl, capture, result.observationId) : null;
     if (placeRow) {
