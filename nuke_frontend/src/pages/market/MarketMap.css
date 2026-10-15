@@ -58,3 +58,15 @@
   .map-legend__swatch { width: 20px; }
   .map-legend__receipt { font-size: 11px; }
 }
+
+/* The callouts above the map (annotation layer): counted facts, one line, each a way into its tile. */
+.map-callouts { display: flex; flex-wrap: wrap; gap: 4px 22px; padding: 6px 16px; border-bottom: 2px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.map-callouts__item { display: inline-flex; align-items: baseline; gap: 6px; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; font: inherit; font-family: Arial, sans-serif; font-size: 12px; text-align: left; }
+.map-callouts__item:hover .map-callouts__name, .map-callouts__item:focus-visible .map-callouts__name { text-decoration: underline; }
+.map-callouts__label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.map-callouts__name { font-weight: 700; }
+.map-callouts__move { font-weight: 700; font-variant-numeric: tabular-nums; }
+.map-callouts__item--gain .map-callouts__move { color: var(--success); }
+.map-callouts__item--loss .map-callouts__move { color: var(--error); }
+.map-callouts__n { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
+@media (max-width: 640px) { .map-callouts { gap: 2px 14px; padding: 4px 12px; } .map-callouts__n { display: none; } }

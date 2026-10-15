@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batBaseline, fitName, moveFill, moveText, pct, relativeMove, tileClass, tileName } from './mapScale';
+import { batBaseline, callouts, fitName, moveFill, moveText, pct, relativeMove, tileClass, tileName } from './mapScale';
 
 const brands = [
   { count: 28_480, dated: 20_000, sold_12m: 4_506, sold_prior_12m: 3_817 },
@@ -95,5 +95,22 @@ describe('a move printed', () => {
     expect(pct(-0.004)).toBe('0%');
     expect(pct(0.05)).toBe('▲5%');
     expect(pct(-0.1)).toBe('▼10%');
+  });
+});
+
+describe('the map\'s callouts', () => {
+  const base = { sold: 1000, prior: 1000, move: 0 };
+  const node = (name: string, sold: number, prior: number, usd_12m: number) => ({ name, count: sold * 4, dated: sold * 4, sold_12m: sold, sold_prior_12m: prior, usd_12m });
+  it('names the clearest gain and loss against BaT and the largest tile, each with its counts', () => {
+    const c = callouts([node('Porsche', 4506, 4290, 462e6), node('Ferrari', 856, 588, 231e6), node('BMW', 2786, 3100, 82e6),
+      node('Lotus', 30, 20, 2e6)], base);
+    expect(c.map((x) => `${x.kind} ${x.name} ${x.prior}→${x.sold}`)).toEqual(['gain Ferrari 588→856', 'loss BMW 3100→2786', 'largest Porsche 4290→4506']);
+  });
+  it('leaves out a move inside its noise, however large it looks', () => {
+    // Lotus 20 -> 30 is +50%, but on 20 and 30 sales that is under 2 standard errors.
+    expect(callouts([node('Lotus', 30, 20, 2e6)], base).filter((x) => x.kind !== 'largest')).toEqual([]);
+  });
+  it('does not repeat the largest tile when it is already the gain or the loss', () => {
+    expect(callouts([node('Ferrari', 856, 588, 231e6), node('Kia', 25, 24, 1e6)], base).map((x) => x.kind)).toEqual(['gain']);
   });
 });
