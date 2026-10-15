@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -828,16 +829,36 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
+    // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
+      if (conflict) {
+        await supabase.rpc("record_revision_item", {
+          p_url: listingUrlCanonical, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: "extract-cars-and-bids-core", p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: "different_car", vehicle_id: vehicleId, detail: conflict }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+
     // Upsert vehicle
     let created = false;
     if (vehicleId) {
       // Update existing
       const { error: updateError } = await supabase
         .from("vehicles")
-        .update({
+        .update(fillOnly({
           ...vehicleData,
           updated_at: new Date().toISOString(),
-        })
+        }, vehicleId, existingIdentity))
         .eq("id", vehicleId);
 
       if (updateError) {
@@ -871,7 +892,7 @@ Deno.serve(async (req) => {
             vehicleId = dupVehicle.id;
             await supabase
               .from("vehicles")
-              .update({ ...vehicleData, updated_at: new Date().toISOString() })
+              .update(fillOnly({ ...vehicleData, updated_at: new Date().toISOString() }, vehicleId, await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle().then((r: any) => r.data ?? null)))
               .eq("id", vehicleId);
             console.log(`✅ C&B: Updated existing vehicle via fallback: ${vehicleId}`);
           } else {
@@ -933,8 +954,19 @@ Deno.serve(async (req) => {
       // NOTE: Do NOT include user_id field - omitting it allows the constraint to pass
       // The attribution check requires either user_id OR (source='*_import' with specific fields)
       const photoKey = (u: string) => u.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "").split("?")[0];
-      const { data: heldImgs } = await supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
-      const held = new Set((heldImgs ?? []).map((r: { image_url: string }) => photoKey(r.image_url)));
+      const { data: heldImgs } = await supabase.from("vehicle_images").select("id, image_url, exif_data").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
+      const fullRes = (u: string) => /width=2080[,/]/.test(u);
+      const current = new Set(extracted.images.map(photoKey));
+      const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
+      // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
+      // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
+      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      if (stale.length) {
+        const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
+        if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);
+      }
+      const staleSet = new Set(stale);
+      const held = new Set((heldImgs ?? []).filter((r: { id: string }) => !staleSet.has(r.id)).map((r: { image_url: string }) => photoKey(r.image_url)));
       const imageRows = extracted.images.filter((u) => !held.has(photoKey(u))).slice(0, 200).map((url, idx) => ({
         vehicle_id: vehicleId,
         image_url: url,
@@ -1005,7 +1037,8 @@ Deno.serve(async (req) => {
 
     // Upsert vehicle_event
     const vehicleEventData: Record<string, any> = {
-      source_platform: "carsandbids",
+      source_platform: "cars_and_bids", // the 18,7k events already held use this spelling
+      source_listing_id: extracted.lotNumber,
       event_type: "auction",
       source_url: listingUrlCanonical,
       vehicle_id: vehicleId,
@@ -1046,12 +1079,16 @@ Deno.serve(async (req) => {
       }
     });
 
-    const { error: listingError } = await supabase
-      .from("vehicle_events")
-      .upsert(vehicleEventData, { onConflict: "source_platform,source_url" });
+    // No unique index on (source_platform, source_url), so ON CONFLICT cannot be used (that upsert never wrote):
+    // find this vehicle's event, then update or insert.
+    const { data: heldEvent } = await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+      .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const { error: listingError } = heldEvent?.id
+      ? await supabase.from("vehicle_events").update({ ...vehicleEventData, updated_at: new Date().toISOString() }).eq("id", heldEvent.id)
+      : await supabase.from("vehicle_events").insert(vehicleEventData);
 
     if (listingError) {
-      console.warn(`⚠️ C&B: Vehicle event upsert failed: ${listingError.message}`);
+      console.warn(`⚠️ C&B: Vehicle event write failed: ${listingError.message}`);
     }
 
     // Link to Cars & Bids organization

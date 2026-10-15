@@ -167,7 +167,7 @@ export function parseCabDepth(html: string, fetchedAt: Date): CabDepth {
   if (gAt >= 0 && gEnd > gAt) {
     const seen = new Set<string>();
     for (const m of html.slice(gAt, gEnd).matchAll(/<img[^>]+src="(https:\/\/media\.carsandbids\.com\/[^"]+)"/g)) {
-      const url = decode(m[1]).replace(/\?.*$/, "").replace(/\/cdn-cgi\/image\/[^/]*\//, "/cdn-cgi/image/width=2080,quality=80/");
+      const url = decode(m[1]).replace(/\?.*$/, "").replace(/\/cdn-cgi\/image\/[^/]*\//, "/cdn-cgi/image/width=2080,quality=70/");
       const id = url.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "");
       if (!seen.has(id)) { seen.add(id); photos.push(url); }
     }
