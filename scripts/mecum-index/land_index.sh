@@ -8,7 +8,7 @@
 set -u
 DIR=$1; LOG=$2; MAX=${3:-100000}; SLEEP=${4:-5}; QMAX=${QMAX:-2000}
 U=${SUPABASE_URL:?}; KEY=${SUPABASE_SERVICE_ROLE_KEY:?}
-ANON=${SUPABASE_ANON_KEY:-${VITE_SUPABASE_ANON_KEY:?}}
+ANON=${PUBKEY:-$(cat "$(dirname "$0")/.pubkey")}
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 q() { (cd "$HERE" && ./scripts/data/q.sh "$1"); }
 log() { echo "$(date -u +%FT%TZ) $*" >&2; }
@@ -37,7 +37,14 @@ for f in "$DIR"/batch_*.json; do
     log "batch $f failed: http $code ${resp:0:300}"; echo "{\"batch\":\"$(basename "$f")\",\"http\":\"$code\"}" >> "$LOG"; exit 3
   fi
   echo "$resp" | jq -c --arg b "$(basename "$f")" --arg at "$(date -u +%FT%TZ)" --argjson ms "$ms" '{batch:$b, at:$at, ms:$ms, received, already_landed, linked_to_existing_vehicle, vehicles_created, events_created, auction_events_created, observations, observation_errors, rejected_by_gate, skipped, errors}' >> "$LOG"
-  if [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then log "batch $f returned errors: $(echo "$resp" | jq -c .errors)"; exit 3; fi
+  if [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then
+    # A batch-level error (a lock timeout on the bulk insert) is handled by the action's row-by-row fallback. The batch is not
+    # done until a second pass, which skips every landed lot, comes back clean; two bad passes in a row stop the run.
+    log "batch $f returned errors: $(echo "$resp" | jq -c .errors); retrying once after 60 s"; echo "$resp" | jq -c --arg b "$(basename "$f")" '{retry_of: $b, errors}' >> "$LOG"
+    sleep 60
+    resp=$(curl -s --max-time 150 -X POST "$U/functions/v1/extract-mecum" -H "Authorization: Bearer $KEY" -H "apikey: $KEY" -H "Content-Type: application/json" -d "$(jq -c '{action: "land_index_lots", lots: .lots, pulled_at: .pulled_at}' "$f")")
+    if [ "$(echo "$resp" | jq -r '.success // false')" != "true" ] || [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then log "batch $f failed again: ${resp:0:300}"; exit 3; fi
+  fi
   touch "$f.done"; log "$(tail -1 "$LOG")"; sleep "$SLEEP"
 done
 log "DONE through $n batches"
