@@ -4,8 +4,8 @@
 # Run it as dotenvx run -- land_index.sh ... (needs SUPABASE_URL and a service key in the environment; nothing is printed).
 # Before every batch the gate checks REST (200, under 2 s), vehicle_completion_recompute_queue (under QMAX) and lock waiters. It
 # closes only when REST does not answer, or lock waiters show on two checks 15 s apart together with a slow REST or a queue
-# over QMAX. A closed gate waits 60 s; 30 closed checks in a row stop the run (exit 2). A batch that returns errors in the
-# response or a non-200 stops the run (exit 3). Resumable: a batch with a .done marker is skipped. No request goes to Mecum.
+# over QMAX. A closed gate waits 60 s; 30 closed checks in a row stop the run (exit 2). A batch that returns errors is retried once;
+# if the retry also errs (or the call fails) the batch moves to held/ and the run goes on, stopping (exit 3) only after 3 held in a row. Resumable: a batch with a .done marker is skipped. No request goes to Mecum.
 set -u
 DIR=$1; LOG=$2; MAX=${3:-100000}; SLEEP=${4:-5}; QMAX=${QMAX:-2000}
 U=${SUPABASE_URL:?}; KEY=${SUPABASE_SERVICE_ROLE_KEY:?}
@@ -38,7 +38,7 @@ gate() {
   done
 }
 
-n=0
+n=0; held=0
 for f in "$DIR"/batch_*.json; do
   [ -f "$f" ] || continue; [ -f "$f.done" ] && continue
   n=$((n+1)); [ "$n" -gt "$MAX" ] && break
@@ -47,7 +47,10 @@ for f in "$DIR"/batch_*.json; do
   out=$(curl -s --max-time 150 -w '\n%{http_code}' -X POST "$U/functions/v1/extract-mecum" -H "Authorization: Bearer $KEY" -H "apikey: $KEY" -H "Content-Type: application/json" -d "$(jq -c '{action: "land_index_lots", lots: .lots, pulled_at: .pulled_at}' "$f")")
   code=${out##*$'\n'}; resp=${out%$'\n'*}; ms=$(( ($(date +%s) - s0)*1000 ))
   if [ "$code" != "200" ] || [ "$(echo "$resp" | jq -r '.success // false')" != "true" ]; then
-    log "batch $f failed: http $code ${resp:0:300}"; echo "{\"batch\":\"$(basename "$f")\",\"http\":\"$code\"}" >> "$LOG"; exit 3
+    mkdir -p "$DIR/held"; mv "$f" "$DIR/held/"; held=$((held+1))
+    echo "{\"held\":\"$(basename "$f")\",\"http\":\"$code\"}" >> "$LOG"; log "batch $f HELD: http $code ${resp:0:300}"
+    [ "$held" -ge 3 ] && { log "3 batches held in a row; STOPPING"; exit 3; }
+    sleep 30; continue
   fi
   echo "$resp" | jq -c --arg b "$(basename "$f")" --arg at "$(date -u +%FT%TZ)" --argjson ms "$ms" '{batch:$b, at:$at, ms:$ms, received, already_landed, linked_to_existing_vehicle, vehicles_created, events_created, auction_events_created, observations, observation_errors, rejected_by_gate, skipped, errors}' >> "$LOG"
   if [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then
@@ -56,8 +59,16 @@ for f in "$DIR"/batch_*.json; do
     log "batch $f returned errors: $(echo "$resp" | jq -c .errors); retrying once after 60 s"; echo "$resp" | jq -c --arg b "$(basename "$f")" '{retry_of: $b, errors}' >> "$LOG"
     sleep 60
     resp=$(curl -s --max-time 150 -X POST "$U/functions/v1/extract-mecum" -H "Authorization: Bearer $KEY" -H "apikey: $KEY" -H "Content-Type: application/json" -d "$(jq -c '{action: "land_index_lots", lots: .lots, pulled_at: .pulled_at}' "$f")")
-    if [ "$(echo "$resp" | jq -r '.success // false')" != "true" ] || [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then log "batch $f failed again: ${resp:0:300}"; exit 3; fi
+    if [ "$(echo "$resp" | jq -r '.success // false')" != "true" ] || [ "$(echo "$resp" | jq '(.errors|length) + .observation_errors')" != "0" ]; then
+      # One bad batch never stops the line: hold it (moved to held/, logged) and go on; stop only after 3 held in a row.
+      mkdir -p "$DIR/held"; mv "$f" "$DIR/held/"; held=$((held+1))
+      echo "{\"held\":\"$(basename "$f")\",\"errors\":$(echo "$resp" | jq -c '.errors // .error // "no response"')}" >> "$LOG"
+      log "batch $f HELD (second pass also returned errors): ${resp:0:300}"
+      [ "$held" -ge 3 ] && { log "3 batches held in a row; STOPPING"; exit 3; }
+      sleep "$SLEEP"; continue
+    fi
   fi
+  held=0
   touch "$f.done"; log "$(tail -1 "$LOG")"; sleep "$SLEEP"
 done
 log "DONE through $n batches"
