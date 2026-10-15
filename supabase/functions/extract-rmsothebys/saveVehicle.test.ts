@@ -191,3 +191,19 @@ Deno.test("RM's events, resolver lookups and observations use the canonical slug
     equal(observations.map((o) => o.source.platform), [RM_PLATFORM], `${label}: observation source:`);
   }
 });
+
+Deno.test('an upcoming London lot lands the calendar keys and a numeric estimate on its episode', async () => {
+  const { client } = stubClient({ 'vehicles.insert': { data: { id: 'v-new' } } });
+  const { d, events } = deps();
+  await saveVehicle(client, lot({
+    url: 'https://rmsothebys.com/auctions/lf26/lots/r0010-1962-jaguar-e-type/', auction_code: 'LF26', auction_name: 'The London Auction 2026',
+    sold: false, sold_price: null, sold_price_text: null, is_still_for_sale: true, auctioned: false, currency: 'GBP',
+    estimate_text: '£500,000 - £800,000 GBP',
+  }), d);
+  const e = events[0];
+  equal(e.sold_at, null);
+  equal(e.ended_at, '2026-10-31T12:00:00.000Z');
+  equal([e.metadata.sale_key, e.metadata.sale_starts_on, e.metadata.sale_ends_on, e.metadata.auction_session_days, e.metadata.sale_location],
+    ['lf26', '2026-10-31', '2026-10-31', ['2026-10-31'], 'London']);
+  equal([e.metadata.estimate_low, e.metadata.estimate_high, e.metadata.estimate_currency, e.metadata.lot_number], [500000, 800000, 'GBP', '7']);
+});
