@@ -218,6 +218,10 @@ jobs:
         run: createdb dm_refinement_stack_coverage_snapshots_ci
       - name: Verify the stack coverage time series (append-only keyed table with checks, one reading per clock with a receipt, same-clock replay a no-op, series view, service_role only, re-apply a no-op)
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_stack_coverage_snapshots_ci -f supabase/sql/test_stack_coverage_snapshots.sql
+      - name: Create disposable stack dominoes database
+        run: createdb dm_refinement_stack_dominoes_ci
+      - name: Verify the stack domino map (append-only input support and cohort depth tables, exact and estimated source counts, depth per pair with measured zeros, sources under the floor not read, domino and source views, six hypotheses with their support rules, service_role only, daily job, re-apply a no-op)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_stack_dominoes_ci -f supabase/sql/test_stack_dominoes.sql
 
       - name: Create disposable vin timeout database
         run: createdb dm_refinement_vin_timeout_ci
