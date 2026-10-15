@@ -35,9 +35,9 @@ describe('a tile’s move', () => {
   });
   it('says too few under 20 sales in either year, or when BaT holds under half the sales, and shows the count', () => {
     expect(relativeMove(brands[2], base)).toEqual({ kind: 'few', sold: 7, prior: 30, why: 'count' });
-    expect(moveText(relativeMove(brands[2], base))).toBe('n 7');
+    expect(moveText(relativeMove(brands[2], base))).toBe('few BaT sales');
     expect(relativeMove(brands[3], base, true)).toMatchObject({ kind: 'few', why: 'share' });
-    expect(moveText(relativeMove(brands[3], base, true))).toBe('other venues');
+    expect(moveText(relativeMove(brands[3], base, true))).toBe('mostly sold elsewhere');
   });
   it('sized by BaT itself, a tile is BaT\'s, so the share of other venues does not gate it', () => {
     expect(relativeMove(brands[3], base).kind).toBe('move');
