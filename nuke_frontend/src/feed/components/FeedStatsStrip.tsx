@@ -146,7 +146,7 @@ export function FeedStatsStrip({
   const valueIsCurrent = Number.isFinite(valueAge) && valueAge < 3 * 86_400_000;
   const forSaleAge = stats.for_sale_updated_at ? Date.now() - Date.parse(stats.for_sale_updated_at) : Infinity;
   const forSaleIsCurrent = Number.isFinite(forSaleAge) && forSaleAge < 3 * 3_600_000;
-  const approx = stats.total_is_estimate ? '~' : '';
+  const totalLabel = stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)} (estimate)` : formatCompact(stats.total_vehicles);
 
   return (
     <div
@@ -164,13 +164,22 @@ export function FeedStatsStrip({
       {/* SHOWING: filtered / total */}
       <Stat
         label={filteredStats ? 'LOADED' : 'ALL RECORDS'}
-        value={!filteredStats ? `${approx}${formatCompact(stats.total_vehicles)}` : isFiltered
-          ? `${formatCompact(filtered.count)} / ${formatCompact(stats.total_vehicles)}`
+        value={!filteredStats ? totalLabel : isFiltered
+          ? `${formatCompact(filtered.count)} / ${stats.total_is_estimate ? `about ${formatCompact(stats.total_vehicles)}` : formatCompact(stats.total_vehicles)}`
           : formatCompact(filtered.count)}
         onClick={() => onMetricClick?.('vehicles')}
         active={activeMetric === 'vehicles'}
         hoverHint={stats.total_is_estimate ? `Estimate of public records, ${stats.counts_updated_at ?? 'time unknown'}. Click to reset to all vehicles` : 'Reset to all vehicles'}
       />
+
+      {/* The estimated population, always visible beside the loaded count so the two are not read as one number. */}
+      {filteredStats && !isFiltered && stats.total_is_estimate && (
+        <Stat
+          label="ALL RECORDS"
+          value={totalLabel}
+          hoverHint={`Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}. The map's All sales view shows an exact count that is counted differently.`}
+        />
+      )}
 
       {/* VALUE: filtered set total */}
       {(isFiltered || valueIsCurrent) && <Stat
