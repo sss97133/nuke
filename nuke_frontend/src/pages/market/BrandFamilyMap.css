@@ -13,3 +13,8 @@
 .map-view-switch__option { padding: 3px 10px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; }
 .map-view-switch__option[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .map-view-switch__option[aria-pressed="true"] .k-label { color: var(--bg); }
+
+/* 2026-10-15: family tiles are market tiles (MarketTile: the brand map's colors, hatch and fitted names); the brand
+   header prints its name and dollars whole, or the name alone, or nothing. */
+.brand-family-map .market-tile { border-width: 1px; border-color: var(--bg); }
+.brand-family-map__head { font: 700 11px Arial, sans-serif; letter-spacing: 0.02em; color: var(--bg); white-space: nowrap; }

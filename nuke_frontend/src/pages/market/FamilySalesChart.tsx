@@ -96,80 +96,176 @@ export function useFamilySales(brand: string | null, familyKey: string | null) {
   return state;
 }
 
-const M = { left: 60, right: 18, top: 16, bottom: 26 };
 // The price axis starts at $500. A sale recorded under it (27 of 169,682 dated sales in five years on 2026-10-15, the
 // lowest $1; for the 911 a 1989 Carrera 4 at $320) is counted in the caption and not drawn: it fell below the axis,
 // and stretching the axis to it would flatten every real price.
 export const PRICE_FLOOR = 500;
-// Under this width the head stacks (title over the BaT move) and the legend takes short venue names (a 390 px phone
+// Under this width the head stacks (title over the headline) and the legend takes short venue names (a 390 px phone
 // wrapped the one-line head over the legend and the dots, 2026-10-15).
 const NARROW = 640;
+
+/** A sale's model-year band. Generation bounds are not in the data yet (canonical_models holds whole-model year ranges),
+ *  so bands are decades, labeled as years, never with generation names. */
+export function eraOf(year: number | null | undefined): string {
+  return year && year >= 1886 && year <= 2100 ? `${Math.floor(year / 10) * 10}s` : 'year unknown';
+}
+
+export function quantile(sorted: readonly number[], q: number): number {
+  if (!sorted.length) return NaN;
+  const i = (sorted.length - 1) * q;
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/** The rolling 25th, 50th and 75th percentiles: every 14 days, of the sales within 60 days either side, where at
+ *  least `min` stand. Points sorted by date. */
+export function rollingBand(points: { t: number; usd: number }[], stepDays = 14, halfDays = 60, min = 8) {
+  const out: { t: number; p25: number; p50: number; p75: number }[] = [];
+  if (!points.length) return out;
+  const t0 = points[0].t, t1 = points[points.length - 1].t;
+  let lo = 0, hi = 0;
+  for (let t = t0; t <= t1; t += stepDays * DAY) {
+    while (lo < points.length && points[lo].t < t - halfDays * DAY) lo++;
+    while (hi < points.length && points[hi].t <= t + halfDays * DAY) hi++;
+    if (hi - lo < min) continue;
+    const w = points.slice(lo, hi).map((p) => p.usd).sort((a, b) => a - b);
+    out.push({ t, p25: quantile(w, 0.25), p50: quantile(w, 0.5), p75: quantile(w, 0.75) });
+  }
+  return out;
+}
+
+export interface EraMove { era: string; last: number; prior: number; nLast: number; nPrior: number }
+/** Each band's BaT median, last 12 months against the 12 before, where both years hold at least `min` sales. */
+export function eraMoves(sales: Sale[], now = Date.now(), min = 15): EraMove[] {
+  const med = (xs: number[]) => quantile([...xs].sort((a, b) => a - b), 0.5);
+  const by = new Map<string, { last: number[]; prior: number[] }>();
+  for (const s of sales) {
+    if (s.source !== 'Bring a Trailer' || !(s.usd >= PRICE_FLOOR)) continue;
+    const age = (now - Date.parse(s.sale_date)) / DAY;
+    const era = eraOf(s.year);
+    if (era === 'year unknown') continue;
+    const b = by.get(era) ?? { last: [], prior: [] };
+    if (age >= 0 && age < 365) b.last.push(s.usd); else if (age >= 365 && age < 730) b.prior.push(s.usd);
+    by.set(era, b);
+  }
+  return [...by.entries()].filter(([, b]) => b.last.length >= min && b.prior.length >= min)
+    .map(([era, b]) => ({ era, last: med(b.last), prior: med(b.prior), nLast: b.last.length, nPrior: b.prior.length }))
+    .sort((a, b) => a.era.localeCompare(b.era));
+}
+
+/** The family's price move with its mix of bands held at last year's: each band's median ratio, weighted by its sales
+ *  the year before. Null under two bands, where holding the mix says nothing the raw median does not. */
+export function mixFixed(moves: EraMove[]): { change: number; nLast: number; nPrior: number; eras: number } | null {
+  if (moves.length < 2) return null;
+  const w = moves.reduce((a, m) => a + m.nPrior, 0);
+  if (w <= 0) return null;
+  const change = moves.reduce((a, m) => a + (m.nPrior / w) * (m.last / m.prior), 0) - 1;
+  return { change, nLast: moves.reduce((a, m) => a + m.nLast, 0), nPrior: w, eras: moves.length };
+}
+
+const signed = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '▲' : '▼'}${Math.abs(Math.round(v * 100))}%`);
+const P = { left: 50, right: 8, top: 18, bottom: 18 };
+const MIN_BAND = 8;
 
 export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen }: {
   brand: string; familyKey: string; family: string; width: number; height: number; onOpen: (vehicleId: string) => void;
 }) {
   const { sales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
-  const [hover, setHover] = useState<number | null>(null);
-  // Venues the reader hid from the legend: their dots and their share of the median line go, the axis stays, so one
-  // venue's prices read against the same scale as the rest (Mecum against BaT, say). A new family shows every venue.
+  const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
+  // Venues hidden from the legend: their dots and their share of the medians go, the axes stay.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => { setHidden(new Set()); }, [brand, familyKey]);
   const toggle = (key: string) => setHidden((h) => { const next = new Set(h); if (!next.delete(key)) next.add(key); return next; });
-  const svgRef = useRef<SVGSVGElement>(null);
+  const narrow = width < NARROW;
   const plot = useMemo(() => {
     if (!sales?.length || width < 200 || height < 160) return null;
     const dated = sales.map((s) => ({ ...s, t: Date.parse(s.sale_date) })).filter((s) => Number.isFinite(s.t) && s.usd > 0).sort((a, b) => a.t - b.t);
     const pts = dated.filter((s) => s.usd >= PRICE_FLOOR);
     if (!pts.length) return null;
-    const head = width < NARROW ? 96 : 54;
-    const w = width - M.left - M.right, h = height - head - M.top - M.bottom;
+    // One price axis for every panel, from the family's 1st to its 99th percentile: a few sales at the extremes no
+    // longer squeeze the middle (the 911's middle 80% used 24% of the height, 2026-10-15). Sales past it sit on the
+    // panel's edge as marks and are counted.
+    const sorted = pts.map((p) => p.usd).sort((a, b) => a - b);
+    const lo = Math.max(PRICE_FLOOR, quantile(sorted, 0.01) * 0.9), hi = quantile(sorted, 0.99) * 1.1;
     const t0 = Math.min(pts[0].t, Date.now() - 1826 * DAY), t1 = Date.now();
-    const usd = pts.map((p) => p.usd);
-    const lo = Math.max(PRICE_FLOOR, Math.min(...usd) * 0.85), hi = Math.max(...usd) * 1.15;
-    const x = (t: number) => M.left + ((t - t0) / (t1 - t0)) * w;
-    const y = (v: number) => head + M.top + h - ((Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))) * h;
     const shown = hidden.size ? pts.filter((p) => !hidden.has(venueOf(p.source).key)) : pts;
-    const dots = shown.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color }));
-    const line = rollingMedian(shown).map((p) => `${x(p.t).toFixed(1)},${y(p.usd).toFixed(1)}`);
+    // Bands with at least MIN_BAND sales get a panel; the rest share one.
+    const groups = new Map<string, typeof shown>();
+    for (const p of shown) { const e = eraOf(p.year); groups.set(e, [...(groups.get(e) ?? []), p]); }
+    let bands = [...groups.entries()].filter(([e, g]) => e !== 'year unknown' && g.length >= MIN_BAND).sort((a, b) => a[0].localeCompare(b[0]));
+    const rest = shown.filter((p) => !bands.some(([e]) => e === eraOf(p.year)));
+    // The rest (a decade with under MIN_BAND sales, or no model year) get a panel of their own only when they fill one;
+    // a family with no decade that fills a panel is drawn as one panel of all its years.
+    let unpanelled = 0;
+    if (!bands.length) bands = [['all years', shown]];
+    else if (rest.length >= MIN_BAND) bands = [...bands, ['other years', rest]];
+    else unpanelled = rest.length;
+    const head = narrow ? 96 : 54;
+    const cols = narrow ? 1 : Math.min(4, bands.length);
+    const rows = Math.ceil(bands.length / cols);
+    const pw = Math.floor((width - (cols - 1) * 6) / cols);
+    const ph = narrow ? 150 : Math.max(120, Math.floor((height - head - (rows - 1) * 6) / rows));
+    const w = pw - P.left - P.right, h = ph - P.top - P.bottom;
+    const x = (t: number) => P.left + ((t - t0) / (t1 - t0)) * w;
+    const y = (v: number) => P.top + h - ((Math.log10(Math.min(hi, Math.max(lo, v))) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))) * h;
     const years: { x: number; label: string }[] = [];
-    for (let yr = new Date(t0).getUTCFullYear() + 1; yr <= new Date(t1).getUTCFullYear(); yr++) years.push({ x: x(Date.UTC(yr, 0, 1)), label: String(yr) });
+    for (let yr = new Date(t0).getUTCFullYear() + 1; yr <= new Date(t1).getUTCFullYear(); yr++) years.push({ x: x(Date.UTC(yr, 0, 1)), label: `’${String(yr).slice(2)}` });
     const ticks = logTicks(lo, hi).map((v) => ({ y: y(v), label: money(v) }));
+    const moves = new Map(eraMoves(sales).map((m) => [m.era, m]));
+    const panels = bands.map(([era, g], i) => {
+      const dots = g.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color, out: p.usd < lo ? -1 : p.usd > hi ? 1 : 0 }));
+      const band = rollingBand(g);
+      const mid = band.map((b) => `${x(b.t).toFixed(1)},${y(b.p50).toFixed(1)}`);
+      const area = band.length > 1 ? 'M' + band.map((b) => `${x(b.t).toFixed(1)},${y(b.p75).toFixed(1)}`).join('L')
+        + 'L' + [...band].reverse().map((b) => `${x(b.t).toFixed(1)},${y(b.p25).toFixed(1)}`).join('L') + 'Z' : '';
+      return { era, dots, line: mid.length > 1 ? 'M' + mid.join('L') : '', area, move: moves.get(era) ?? null,
+        firstCol: i % cols === 0, lastRow: cols === 1 || Math.floor(i / cols) === rows - 1, n: g.length };
+    });
     const counts = VENUES.map((v) => ({ ...v, n: pts.filter((p) => venueOf(p.source).key === v.key).length })).filter((v) => v.n > 0);
-    return { dots, line: line.length > 1 ? 'M' + line.join('L') : '', years, ticks, counts, head, w, h, n: dated.length,
-      under: dated.length - pts.length, shown: shown.length, since: new Date(dated[0].t) };
-  }, [sales, width, height, hidden]);
+    const outside = shown.filter((p) => p.usd < lo || p.usd > hi).length;
+    return { panels, years, ticks, counts, head, cols, pw, ph, n: dated.length, under: dated.length - pts.length,
+      shown: shown.length, outside, unpanelled, lo, hi, since: new Date(dated[0].t) };
+  }, [sales, width, height, hidden, narrow]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
+  const held = useMemo(() => (sales ? mixFixed(eraMoves(sales)) : null), [sales]);
 
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!plot || !svgRef.current) return;
-    const r = svgRef.current.getBoundingClientRect();
+  const onMove = (band: number) => (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!plot) return;
+    const r = e.currentTarget.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
     let best = -1, bestD = 14 * 14;
-    plot.dots.forEach((d, i) => { const dd = (d.cx - mx) ** 2 + (d.cy - my) ** 2; if (dd < bestD) { bestD = dd; best = i; } });
-    setHover(best >= 0 ? best : null);
+    plot.panels[band].dots.forEach((d, i) => { const dd = (d.cx - mx) ** 2 + (d.cy - my) ** 2; if (dd < bestD) { bestD = dd; best = i; } });
+    setHover(best >= 0 ? { band, dot: best } : null);
   };
 
   if (failed) return <div className="family-sales__empty"><Text role="caption">The sales of this family could not be read.</Text></div>;
   if (!sales) return <div className="family-sales__empty"><Text role="caption">Reading sales…</Text></div>;
   if (!plot) return <div className="family-sales__empty"><Text role="caption">No dated sales of this family in the last five years.</Text></div>;
-  const hd = hover != null ? plot.dots[hover] : null;
-  const pct = move ? Math.round((move.last / move.prior - 1) * 100) : null;
-  const narrow = width < NARROW;
+  const hp = hover ? plot.panels[hover.band] : null;
+  const hd = hp && hover ? hp.dots[hover.dot] : null;
   const since = plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   const count = truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US');
+  const raw = move ? `${money(move.last)} vs ${money(move.prior)} (${signed(move.last / move.prior - 1)})` : '';
   return <div className={narrow ? 'family-sales family-sales--narrow' : 'family-sales'}>
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
-        <Text role="caption">{(narrow ? `${count} sales since ${since} · line = rolling median`
-          : `${count} sales with a date since ${since} · one dot each · line = rolling median, 60 days either side`)
+        <Text role="caption">{(narrow ? `${count} sales since ${since}` : `${count} sales with a date since ${since} · one dot each · panels by model-year decade · line = rolling median, band = middle half`)
           + (plot.under ? ` · ${plot.under.toLocaleString('en-US')} under ${money(PRICE_FLOOR)} not drawn` : '')
+          + (plot.outside ? ` · ${plot.outside.toLocaleString('en-US')} outside ${money(plot.lo)}–${money(plot.hi)} on the edge` : '')
+          + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {move && <div className="family-sales__move">
-        <Text role="measure">{money(move.last)}</Text>
-        <Text role="caption">{narrow ? `BaT median, 12 mo · ${money(move.prior)} the 12 before · ${pct! >= 0 ? '▲' : '▼'}${Math.abs(pct!)}%`
-          : `BaT median, last 12 mo (${move.nLast}) · ${money(move.prior)} the 12 before (${move.nPrior}) · ${pct! >= 0 ? '▲' : '▼'}${Math.abs(pct!)}%`}</Text>
+      {(held || move) && <div className="family-sales__move">
+        {held ? <>
+          <Text role="measure">{signed(held.change)}</Text>
+          <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`
+            : `BaT price, last 12 mo against the 12 before, each decade's median weighted by its sales a year earlier (${held.nPrior.toLocaleString('en-US')} → ${held.nLast.toLocaleString('en-US')} in ${held.eras} decades) · raw median ${raw}`}</Text>
+        </> : move && <>
+          <Text role="measure">{money(move.last)}</Text>
+          <Text role="caption">{narrow ? `BaT median, 12 mo · ${money(move.prior)} the 12 before · ${signed(move.last / move.prior - 1)}`
+            : `BaT median, last 12 mo (${move.nLast}) · ${money(move.prior)} the 12 before (${move.nPrior}) · ${signed(move.last / move.prior - 1)}`}</Text>
+        </>}
       </div>}
     </div>
     <div className="family-sales__legend">
@@ -178,23 +274,31 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         <svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg>
         <Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></button>)}
     </div>
-    <svg ref={svgRef} className="family-sales__plot" width={width} height={height - plot.head} viewBox={`0 ${plot.head} ${width} ${height - plot.head}`}
-      role="img" aria-label={`${family}: ${plot.n} sales over five years, price against date`}
-      onMouseMove={onMove} onMouseLeave={() => setHover(null)} onClick={() => { if (hd) onOpen(hd.vehicle_id); }}>
-      {plot.ticks.map((t) => <g key={t.label}>
-        <line x1={M.left} x2={width - M.right} y1={t.y} y2={t.y} className="family-sales__grid" />
-        <text x={M.left - 8} y={t.y + 3} textAnchor="end" className="family-sales__axis">{t.label}</text>
-      </g>)}
-      {plot.years.map((t) => <g key={t.label}>
-        <line x1={t.x} x2={t.x} y1={plot.head + M.top} y2={height - M.bottom} className="family-sales__grid" />
-        <text x={t.x + 4} y={height - 8} className="family-sales__axis">{t.label}</text>
-      </g>)}
-      {plot.dots.map((d) => <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={plot.n > 2500 ? (narrow ? 1.3 : 2) : 2.8} fill={d.color} fillOpacity={narrow && plot.n > 2500 ? 0.4 : 0.55} />)}
-      {plot.line && <path d={plot.line} className="family-sales__median-halo" />}
-      {plot.line && <path d={plot.line} className="family-sales__median" />}
-      {hd && <circle cx={hd.cx} cy={hd.cy} r={6} className="family-sales__hit" />}
-    </svg>
-    {hd && <div className="family-sales__tip" style={{ left: Math.min(hd.cx + 12, width - 240), top: hd.cy + 12 }}>
+    <div className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
+      {plot.panels.map((pn, bi) => <svg key={pn.era} className="family-sales__plot" width={plot.pw} height={plot.ph}
+        role="img" aria-label={`${family} ${pn.era}: ${pn.n} sales over five years, price against date`}
+        onMouseMove={onMove(bi)} onMouseLeave={() => setHover(null)} onClick={() => { if (hd && hover?.band === bi) onOpen(hd.vehicle_id); }}>
+        <text x={P.left} y={12} className="family-sales__panel-title">{pn.era} · {pn.n.toLocaleString('en-US')}
+          {pn.move ? ` · BaT median ${money(pn.move.last)} ${signed(pn.move.last / pn.move.prior - 1)} (${pn.move.nPrior}→${pn.move.nLast})` : ''}</text>
+        {plot.ticks.map((t) => <g key={t.label}>
+          <line x1={P.left} x2={plot.pw - P.right} y1={t.y} y2={t.y} className="family-sales__grid" />
+          {pn.firstCol && <text x={P.left - 6} y={t.y + 3} textAnchor="end" className="family-sales__axis">{t.label}</text>}
+        </g>)}
+        {plot.years.map((t) => <g key={t.label}>
+          <line x1={t.x} x2={t.x} y1={P.top} y2={plot.ph - P.bottom} className="family-sales__grid" />
+          {pn.lastRow && <text x={t.x + 3} y={plot.ph - 5} className="family-sales__axis">{t.label}</text>}
+        </g>)}
+        {pn.area && <path d={pn.area} className="family-sales__iqr" />}
+        {pn.dots.map((d) => d.out
+          ? <path key={d.vehicle_id} d={d.out > 0 ? `M${d.cx - 3} ${d.cy + 4}L${d.cx} ${d.cy - 1}L${d.cx + 3} ${d.cy + 4}Z` : `M${d.cx - 3} ${d.cy - 4}L${d.cx} ${d.cy + 1}L${d.cx + 3} ${d.cy - 4}Z`} className="family-sales__edge" />
+          : <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={pn.n > 1500 ? 1.4 : pn.n > 400 ? 2 : 2.6} fill={d.color} fillOpacity={pn.n > 1500 ? 0.35 : 0.55} />)}
+        {pn.line && <path d={pn.line} className="family-sales__median-halo" />}
+        {pn.line && <path d={pn.line} className="family-sales__median" />}
+        {hd && hover?.band === bi && <circle cx={hd.cx} cy={hd.cy} r={6} className="family-sales__hit" />}
+      </svg>)}
+    </div>
+    {hd && hover && <div className="family-sales__tip" style={{ left: Math.min((hover.band % plot.cols) * (plot.pw + 6) + hd.cx + 12, width - 240),
+      top: plot.head + Math.floor(hover.band / plot.cols) * (plot.ph + 6) + hd.cy + 12 }}>
       <Text role="label" as="div">{[hd.year, hd.model].filter(Boolean).join(' ') || family}</Text>
       <Text role="measure" as="div">${hd.usd.toLocaleString('en-US')}</Text>
       <Text role="caption" as="div">{venueOf(hd.source).key === 'other' ? hd.source ?? 'venue unrecorded' : hd.source} · {new Date(hd.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · click to open</Text>

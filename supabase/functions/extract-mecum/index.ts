@@ -33,7 +33,7 @@ import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
-import { indexLot, parseSaleFacet, type IndexLot } from "./indexLot.ts";
+import { indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
 import { fillOnlyIdentity } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
@@ -1611,7 +1611,8 @@ Deno.serve(async (req) => {
         .map(([value, count]) => ({ value, count, end: Number(value.split("|")[2]) }))
         .filter((x) => Number.isFinite(x.end) && x.end >= nowEpoch);
       const census: Record<string, number> = {};
-      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string }> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string; prior_sale?: unknown }> = {};
+      const saleValueByKey: Record<string, string> = {};
       const seen = new Set<string>();
       const report: Record<string, { stated: number; read: number; queued: number; requeued: number }> = {};
 
@@ -1690,7 +1691,28 @@ Deno.serve(async (req) => {
             }
           }
         }
-        if (key) { census[key] = sale.count; report[key] = stat; }
+        if (key) { census[key] = sale.count; report[key] = stat; saleValueByKey[key] = sale.value; }
+      }
+
+      // Each series' previous sale (matched by series, not slug: Dallas became Dallas/Fort Worth), read from the same index:
+      // vehicle lots (everything but Road Art), sold, bid-goes-on and the median of sold lots with a stated price.
+      for (const [saleKey, value] of Object.entries(saleValueByKey)) {
+        try {
+          const priorValue = priorSaleFacet(value, Object.keys(facet));
+          if (!priorValue) continue;
+          const days = Object.keys((await algolia(`hitsPerPage=0&filters=${encodeURIComponent(`taxonomies.auction_tax.name:"${priorValue}"`)}&facets=${encodeURIComponent('["taxonomies.run_date.name"]')}`)).facets?.["taxonomies.run_date.name"] ?? {});
+          const hits: any[] = [];
+          for (const day of days.length ? days : [null]) {
+            const filters = `taxonomies.auction_tax.name:"${priorValue}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
+            const r = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["sold","bid_goes_on","highest_bid_or_price","taxonomies.lot_type","taxonomies.auction_tax"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
+            hits.push(...(r.hits ?? []));
+          }
+          const [, , priorEnd] = priorValue.split("|");
+          const priorSlug = hits[0]?.taxonomies?.auction_tax?.[0]?.slug ?? null;
+          salesMeta[saleKey].prior_sale = summarizePriorSale(hits, priorSlug, saleDay(Number(priorEnd)));
+        } catch (e: any) {
+          console.warn(`[MECUM] prior sale of ${saleKey} not read: ${e?.message}`);
+        }
       }
 
       // Withdrawn: queued for a sale in this read, run day not yet past, absent from the roster now.

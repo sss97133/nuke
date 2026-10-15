@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/batAuctionRecord.test.ts
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
+import { countdownEndDate, readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
 
 // Shapes copied from real lot pages (2026-09-27): each comment carries nested channels/likers/images
 // arrays, which is what defeats a lazy "comments":[...] regex.
@@ -190,4 +190,63 @@ Deno.test("replay with no fresh rows never touches the identity store", async ()
     insertMissing: async () => { throw new Error("No writes expected"); },
   });
   assertEquals(linked, []);
+});
+
+// 2026-10-15: a closed "-2" repeat lot (1970-porsche-914-6-110-2, sold 10/14/26) was stamped with 2026-10-15, the
+// end of a LIVE lot in its sidebar (data-auction-ends="2026-10-15-17-00-00"), because the closed page has no countdown.
+const sidebar = `<div data-auction-ends="2026-10-15-17-00-00" data-layout="{hn}"></div>`;
+Deno.test("countdownEndDate: a closed '-2' relist page ignores a sidebar lot's countdown", () => {
+  const closed = page([bid("m1959", 61000, 1792009000), record("bat-bid-reserve", "m1959", "Sold on 10/14/26 for $67,000 to m1959", 1792009681)]) + sidebar;
+  assertEquals(summarizeAuction(closed).recordAt, "2026-10-14T20:28:01.000Z");
+  assertEquals(countdownEndDate(closed), null);
+});
+
+Deno.test("countdownEndDate: a live page reads its own countdown", () => {
+  const live = page([bid("a", 100, 1792000000)]) + `<div data-auction-ends="2026-10-17-19-08-57"></div>` + sidebar;
+  assertEquals(countdownEndDate(live), "2026-10-17");
+});
+
+// Shapes copied from two lot pages read 2026-10-15: a running GT2 RS (post 121897619) and a closed 911 C4S
+// cabriolet that sold 2026-05-26 (post 113602346). Both carry the "Current BaT Auctions" widget.
+const widget = `<div class="widget bat-listings-widget-current-auctions"><div class="current-auctions group">
+  <div class="current-auction-data-time">Ends in:<br /><span data-auction-ends-id="121897619" data-auction-ends="2026-10-15-17-00-00" data-layout="{hn} {hl}, {mn} {ml}"></span></div>
+  <div class="current-auction-data-time">Ends in:<br /><span data-auction-ends-id="122860945" data-auction-ends="2026-10-15-17-05-00" data-layout="{hn} {hl}, {mn} {ml}"></span></div>
+</div></div>`;
+const runningPage = `<head><link rel='shortlink' href='https://bringatrailer.com/?p=121897619' /></head>
+<div class="listing-available-info">
+  <span data-listing-currently="121897619"><span class="info-label">Current Bid:</span> <strong class="info-value">USD $601,000</strong></span><span class="info-label">Ends in</span><strong class="info-value noborder-tiny"><span class="listing-available-countdown" data-countdown="121897619" data-until="1792083600"></span><span class="listing-end-processing-notice">Checking for last second bids...</span></strong><a class="comments-anchor-link" href="#comments-anchor"></a>
+</div>
+<td class="listing-stats-value"><span class="listing-end-time date-localize" data-auction-ends-id="121897619" data-auction-ends="2026-10-15-17-00-00" data-timestamp="1792083600" data-format="L"></span></td>
+<td class="listing-stats-value"><span class="date-localize" data-ends="1792083600" data-ends-id="121897619" data-timestamp="1792083600"></span></td>
+${widget}`;
+const closedPage = `<head><link rel='shortlink' href='https://bringatrailer.com/?p=113602346' /></head>
+${widget}
+<div class="listing-available-info">
+  <span data-listing-currently="113602346"></span><span class="info-value noborder-tiny">Sold for <strong>USD $100,000</strong> <span class="date date-localize" data-timestamp="1779828177" data-format="L">on 5/26/26</span></span><a class="comments-anchor-link" href="#comments-anchor"></a>
+</div>`;
+
+Deno.test("own end: a running lot's own countdown, not the widget's first entry", () => {
+  assertEquals(readOwnAuctionEnd(runningPage), {
+    postId: "121897619", endsAt: "2026-10-15T17:00:00.000Z", endsDate: "2026-10-15", endsFrom: "data-ends", closedAt: null,
+  });
+});
+
+Deno.test("own end: a closed page has no countdown of its own; its result stamp is the close", () => {
+  // the first data-auction-ends on this page is another lot's (2026-10-15); the lot sold 2026-05-26
+  assertEquals(readOwnAuctionEnd(closedPage), {
+    postId: "113602346", endsAt: null, endsDate: null, endsFrom: null, closedAt: "2026-05-26T20:42:57.000Z",
+  });
+});
+
+Deno.test("own end: the countdown fallback counts only with the page's own id", () => {
+  const ownCountdownOnly = runningPage.replace(/<td class="listing-stats-value"><span class="date-localize" data-ends[^\n]*\n/, "");
+  assertEquals(readOwnAuctionEnd(ownCountdownOnly).endsFrom, "countdown");
+  assertEquals(readOwnAuctionEnd(ownCountdownOnly).endsAt, "2026-10-15T17:00:00.000Z");
+  // no shortlink and no result line: no post id, so no countdown is anyone's own
+  assertEquals(readOwnAuctionEnd(widget), { postId: null, endsAt: null, endsDate: null, endsFrom: null, closedAt: null });
+  // the closed "-2" relist of #1574: a sidebar countdown with no id is nobody's own
+  assertEquals(readOwnAuctionEnd(sidebar).endsDate, null);
+  // another lot's data-ends (an id that is not the page's) is not this lot's end
+  const foreign = closedPage + `<span data-ends="1792083600" data-ends-id="121897619"></span>`;
+  assertEquals(readOwnAuctionEnd(foreign).endsAt, null);
 });

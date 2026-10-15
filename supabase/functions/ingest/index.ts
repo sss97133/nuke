@@ -30,6 +30,7 @@ import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craig
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { vinMakeCheckApplies } from "./vinGate.ts";
 import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
@@ -1628,7 +1629,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const suggestions: Record<string, string> = {};
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
-      if (decoded.make && candidateData.make) {
+      // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
+      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
         const claimedMake = normalizeMake(candidateData.make);
         if (vinMake && claimedMake && vinMake !== claimedMake) {

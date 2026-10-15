@@ -216,9 +216,14 @@ export interface FeedStats {
   sales_volume_today: number;
   /** total_vehicles is a planner estimate (refresh_feed_rollups), not an exact count. */
   total_is_estimate?: boolean;
+  /** When the map refresh that supplied the exact total ran. */
+  total_as_of?: string | null;
   counts_updated_at?: string | null;
   /** When total_value, for_sale_count and the sales figures were last computed. */
   value_updated_at?: string | null;
+  /** When for_sale_count was last computed from live listings, and what it counts. */
+  for_sale_updated_at?: string | null;
+  for_sale_definition?: string | null;
 }
 
 // ---------------------------------------------------------------------------

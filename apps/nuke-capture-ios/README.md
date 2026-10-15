@@ -69,6 +69,12 @@ Standing rules the code carries:
   in the confirm sheet through `attribute_image_session` → `attribute_testimony` (audited). The VIN matcher
   (`VisionEngine.matchSerial`, `UnitTests/SerialMatchTests.swift`) reads every era's serial (17-character VINs and the
   8–16-character chassis numbers before 1981) against vehicles the account holds by `user_id` or `owner_id`.
+- **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
+  original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
+  holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
+  photos and the morning's measurement shots never uploaded. Pixels follow the device rule of record
+  (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
+  on the phone as metadata only; everything else, a part close-up included, uploads.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits

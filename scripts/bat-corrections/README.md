@@ -33,3 +33,9 @@ that started them, and the reboot then wiped the scratchpad holding their logs.
 by created_at day) and `drive_valuation.sh` (force-recompute estimates for a listed set of vehicles, gated
 on REST and host load1) were recovered from the 2026-09-27 session transcript; their working dir is `$BATW`
 (default `~/nuke-logs/bat-corrections`).
+
+End events written for running lots (2026-10-15): `supersede-live-end-events.mjs` retires the `auction_ended`
+timeline rows extract-bat-core wrote before 4.5.0 while a lot was still running (dated its scheduled end, priced at
+the bid of that read) through `supersede_timeline_events` (migration 20261016203000), each kept whole in
+`superseded_rows`. Dry run by default (`--inline` plans with the migration's own query before it is deployed);
+`--apply` only after extract-bat-core 4.5.0 is deployed. Logs: `~/nuke-logs/bat-ended-20261015/`.

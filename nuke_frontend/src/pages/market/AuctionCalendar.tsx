@@ -4,8 +4,8 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { CoverageView, Masthead, Text } from '../../kit';
 import {
-  type CalendarSale, type PriorResult, type RosterLot, daysUntil, houseLink, houseName, runTimer, saleTimer, updatedAgo,
-  useAuctionCalendar, useSaleRoster,
+  type CalendarSale, type PriorResult, type RosterLot, daysUntil, houseLink, houseName, priorSaleLine, runTimer, saleTimer,
+  updatedAgo, useAuctionCalendar, useSaleRoster,
 } from './useAuctionCalendar';
 import './RecordedSalesComparison.css';
 import './AuctionEvidence.css';
@@ -213,6 +213,7 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
             <td><Text role="measure" dense as="div">{sale.lots_listed != null && sale.lots_listed !== sale.lots
                 ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
               {sale.lots_listed != null && <Text role="caption" as="div">{houseName(sale.house)} lists {count(sale.lots_listed)}, {updatedAgo(sale.listed_at, now).replace('updated', 'read')}</Text>}
+              {priorSaleLine(sale.house, sale.prior_sale) && <Text role="caption" as="div">{priorSaleLine(sale.house, sale.prior_sale)}</Text>}
               {/* A sale with no lot landed has nothing to count beyond what the house lists. */}
               {sale.lots > 0 && <Text role="caption" as="div">{count(sale.first_seen_7d)} first seen in the last 7 days · {updatedAgo(sale.updated_at, now)}</Text>}
               {sale.lots > 0 && <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text>}</td>

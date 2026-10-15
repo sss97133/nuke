@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Wrench, DollarSign, Truck, ShoppingCart } from 'lucide-react';
 import { useLinkedOrganizations } from '../../hooks/useLinkedOrganizations';
+import { Text } from '../../kit';
 
 interface LinkedOrganizationsProps {
   vehicleId: string;
@@ -138,6 +139,9 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
                           Auto-linked
                         </span>
+                      )}
+                      {org.status === 'pending' && (
+                        <Text role="caption" title="Not confirmed by the vehicle's owner">unconfirmed</Text>
                       )}
                     </div>
 

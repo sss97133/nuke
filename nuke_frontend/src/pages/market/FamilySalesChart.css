@@ -26,3 +26,12 @@
 .family-sales--narrow .family-sales__head { height: 50px; padding: 4px 12px 0 12px; flex-direction: column; align-items: flex-start; gap: 2px; }
 .family-sales--narrow .family-sales__legend { left: 12px; right: 12px; top: 52px; gap: 8px; }
 .family-sales--narrow .family-sales__plot { top: 96px; }
+
+/* Small multiples by model-year decade (2026-10-15): panels share one price axis (the family's 1st to 99th percentile)
+   and one five-year time axis; each draws its sales, its rolling median and the band of its middle half. */
+.family-sales__panels { position: absolute; left: 0; right: 0; top: 54px; bottom: 0; display: grid; gap: 6px; overflow-y: auto; align-content: start; }
+.family-sales__panels .family-sales__plot { position: static; display: block; }
+.family-sales__panel-title { font: 700 11px Arial, sans-serif; fill: var(--text); }
+.family-sales__iqr { fill: var(--text); fill-opacity: 0.08; stroke: none; }
+.family-sales__edge { fill: var(--text-secondary); }
+.family-sales--narrow .family-sales__panels { top: 96px; }

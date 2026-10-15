@@ -283,7 +283,9 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   `source_census` row per house with `census_method` 'house_roster_facet' (the Mecum lane writes one per index read,
   keyed by sale_key; read through `house_roster_census()`, since `observation_sources` is not readable logged out).
   A listed sale with no lot landed and no recorded days is shown under the table, not on the axis. Last year's final
-  roster as a baseline is still owed.
+  roster is the baseline: the census meta's `prior_sale` (the same series' previous sale from the house's index, matched by
+  series and location because houses rename sales) reads "Mecum ran 1,459 lots at Dallas 2025 · 71% of its vehicles
+  sold" beside the roster count.
 - **Non-vehicle lots** (`listing_kind` 'non_vehicle_item', e.g. Mecum road art) are not lots on the calendar, as on the map.
 - **A backfilled sale stops reading unconfirmed** once a sale correction on the vehicle cites that lot among its
   `source.lots` (the house's own result was read and applied).
@@ -296,6 +298,25 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   never a source occurrence date. This date correction does not qualify an earlier record's price or sale outcome.
 - **Not claimed.** The calendar is the lots Nuke has landed, not the house's full roster, until the stated count is held
   beside it; an estimate is the house's; "no reserve" is the house's flag.
+- **Read model.** The lots come from `mv_auction_calendar_lots` (one row per public vehicle lot, its earlier-event count),
+  refreshed at :07 and :37 (job `refresh-auction-calendar`); a roster's earlier records are read live for the page's lots.
+  `population.lots_built_at` is the read model's build time. Measured 2026-10-15 14:4xZ: reading lots from
+  `vehicle_events` and `vehicles` on every call timed out at 16 s for anon while intake loaded the disk; from the read
+  model the call answers in 0.13 to 0.5 s.
+
+### Which house a sale belongs to
+
+A confirmed sale's house on the map (`mv_treemap_outcomes.source_name`, and through it the family folds and their venue
+toggles) is `market_venue_label(auction_source, canonical_platform)`: the source string stripped to `[a-z0-9]`, matched to
+one house label (`Bring a Trailer`, `Mecum`, `Barrett-Jackson`, `RM Sotheby's`, `Gooding & Co`, `Bonhams`, `Broad Arrow`,
+`Cars & Bids`, `PCarMarket`, `Collecting Cars`, `SBX Cars`, `Classic.com`), `auction_source` first, `canonical_platform`
+second; null when neither names a house ("venue unrecorded"). The labels are the strings `FamilySalesChart` matches. A
+house's share is quoted with the no-house count beside it. Measured 2026-10-15: the map's earlier CASE missed the slugs the
+rows hold (`cars_and_bids`, `barrett-jackson`, `rm-sothebys`), so 37,688 of 286,610 confirmed sales had no house and Cars &
+Bids, Barrett-Jackson and RM counted zero; with the function 3,532 have none (3,182 more are Barrett-Jackson by their
+listing URL, being filled into `canonical_platform` from that URL). A row whose two fields name different houses is a
+merged record, repaired at the record (241 Mecum lots carrying a Barrett-Jackson docket identity, 2026-10-15), not by a
+precedence rule in the label.
 
 ## The feed and the brand map — owner direction, October 15
 

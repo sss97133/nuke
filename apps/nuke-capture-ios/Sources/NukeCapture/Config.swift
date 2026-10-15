@@ -85,6 +85,8 @@ enum Config {
     // ─── Sync tuning (identical to Mac) ──────────────────────────────────────
     /// Safety valve per sync pass (mirrors the daemon's MAX_PER_RUN).
     static let maxPerRun = 200
+    /// Photos newer than this lead every sync pass, newest first, ahead of the watermark window.
+    static let recentFirstWindow: TimeInterval = 3 * 24 * 3600
     /// Dedupe seen-set cap in UserDefaults.
     static let seenSetCap = 1000
     /// Assets already settled (uploaded, or definitively not this camera's), by PHAsset

@@ -5,13 +5,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import FamilyMovers, { move } from './FamilyMovers';
+import FamilyMovers, { axisX, move, parseShareMovers } from './FamilyMovers';
 
-const bat = { bat_sold_12m: 39001, bat_sold_prior_12m: 34827, bat_usd_12m: 1270, bat_usd_prior_12m: 1000, eligible: 160, families: 1137 };
-const rows = [
-  { direction: 'up', brand: 'Ferrari', family_key: 'f360', family: '360', sold_12m: 92, sold_prior_12m: 46, usd_12m: 16_000_000, usd_prior_12m: 5_633_803, ...bat },
-  { direction: 'down', brand: 'Acura', family_key: 'fint', family: 'Integra', sold_12m: 36, sold_prior_12m: 49, usd_12m: 800_000, usd_prior_12m: 1_428_571, ...bat },
-];
+// The share reader's value (treemap_family_share_movers), shaped as production answers.
+const value = {
+  as_of: '2026-10-15T09:50:00Z', min_sales: 30, families: 1186, eligible: 150, significant: 61,
+  bat: { sold_12m: 38879, sold_prior_12m: 34598, usd_12m: 1_980_000_000, usd_prior_12m: 1_560_000_000 },
+  gaining: [{ brand: 'Lexus', family_key: 'gx', family: 'GX', sold_12m: 109, sold_prior_12m: 38, usd_12m: 4_796_000,
+    usd_prior_12m: 1_900_000, share_move: 1.5501, share_lo: 0.7, share_hi: 2.8, se: 0.188, avg_price_move: -0.12 }],
+  losing: [{ brand: 'Acura', family_key: 'fint', family: 'Integra', sold_12m: 36, sold_prior_12m: 49, usd_12m: 800_000,
+    usd_prior_12m: 1_428_571, share_move: -0.3462, share_lo: -0.55, share_hi: -0.05, se: 0.22, avg_price_move: -0.24 }],
+};
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,41 +29,60 @@ it('says a move the way the map does: up or down and how much', () => {
   expect(move(5, 0)).toBe('');
 });
 
-it('lists the families that moved most on BaT, beside BaT overall, and a pick drills the map', async () => {
-  fixture.rpc.mockResolvedValue({ data: rows, error: null });
+it('reads the share reader\'s value and refuses anything else', () => {
+  expect(parseShareMovers(value)?.gaining[0].family).toBe('GX');
+  expect(parseShareMovers({ ...value, bat: { sold_12m: 1, sold_prior_12m: 0 } })).toBeNull();
+  expect(parseShareMovers([value])).toBeNull();
+  expect(parseShareMovers(null)).toBeNull();
+  expect(parseShareMovers({ ...value, gaining: [{ brand: 'X' }] })?.gaining).toEqual([]);
+});
+
+it('puts a halving and a doubling at equal distances from no change, and clamps beyond them', () => {
+  expect(axisX(0, 120)).toBeCloseTo(60, 6);
+  expect(axisX(-0.5, 120)).toBeCloseTo(0, 6);
+  expect(axisX(1, 120)).toBeCloseTo(120, 6);
+  expect(axisX(4, 120)).toBe(120);
+  expect(axisX(-0.9, 120)).toBe(0);
+});
+
+it('lists families gaining and losing share of BaT, volume apart from the average sale, and a pick drills the map', async () => {
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_share_movers'
+    ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
   const onPick = vi.fn();
   await act(async () => root.render(<FamilyMovers onPick={onPick} />));
-  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_movers', { p_limit: 8 });
-  const items = [...container.querySelectorAll('button.map-movers__item')];
-  expect(items.map((b) => b.textContent)).toEqual(['Ferrari 360▲184%46→92 sold', 'Acura Integra▼44%49→36 sold']);
-  expect(items[0].className).toContain('--up'); expect(items[1].className).toContain('--down');
-  expect(container.querySelector('.map-movers__base')?.textContent)
-    .toContain('BaT overall: sales ▲12%, $ ▲27% · 160 of 1,137 families with 30+ BaT sales each year');
-  await act(async () => (items[0] as HTMLButtonElement).click());
-  expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Ferrari', family_key: 'f360', family: '360' }));
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_share_movers', { p_limit: 5 });
+  const rows = [...container.querySelectorAll('button.map-movers2__row')];
+  expect(rows).toHaveLength(2);
+  expect(rows[0].querySelector('.map-movers2__name')?.textContent).toBe('Lexus GX');
+  expect(rows[0].querySelector('.map-movers2__move')?.textContent).toBe('▲155%');
+  expect(rows[0].querySelector('.map-movers2__counts')?.textContent).toBe('38 → 109 sold');
+  expect(rows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg sale ▼12%');
+  expect(rows[0].querySelector('path.map-movers2__mark')).not.toBeNull();
+  expect(rows[1].querySelector('circle.map-movers2__mark')).not.toBeNull();
+  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('relative to BaT overall (▲12%, 34,598 → 38,879)');
+  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ BaT sales in each year moved clearly');
+  await act(async () => (rows[1] as HTMLButtonElement).click());
+  expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Acura', family_key: 'fint', family: 'Integra' }));
 });
 
 it('stays away when the reader fails', async () => {
   const { default: Fresh } = await import('./FamilyMovers');
   fixture.rpc.mockResolvedValue({ data: null, error: { message: 'function not found' } });
   await act(async () => root.render(<Fresh onPick={() => {}} />));
-  expect(container.querySelector('.map-movers')).toBeNull();
+  expect(container.querySelector('.map-movers2')).toBeNull();
 });
 
-it('draws each mover\'s two years as 24 bars when the monthly read answers, and none when it does not', async () => {
+it('draws a mover\'s two years as 24 bars when the monthly read answers', async () => {
   const { default: Fresh } = await import('./FamilyMovers');
   const bins = [2, 3, 4, 4, 3, 5, 4, 4, 3, 4, 5, 5, 6, 7, 6, 8, 7, 9, 8, 9, 7, 8, 9, 8];
-  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_movers'
-    ? { data: rows, error: null }
-    : { data: { anchor: '2026-10-15', window_days: 730, families: [{ brand: 'Ferrari', family_key: 'f360', bins }] }, error: null }));
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_share_movers'
+    ? { data: value, error: null }
+    : { data: { anchor: '2026-10-15', window_days: 730, families: [{ brand: 'Lexus', family_key: 'gx', bins }] }, error: null }));
   await act(async () => root.render(<Fresh onPick={() => {}} />));
   await act(async () => { await Promise.resolve(); });
   expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_monthly',
-    { p_families: [{ brand: 'Ferrari', family_key: 'f360' }, { brand: 'Acura', family_key: 'fint' }] });
-  const items = [...container.querySelectorAll('button.map-movers__item')];
-  expect(items[0].querySelectorAll('svg.map-movers__spark rect')).toHaveLength(24);
-  expect(items[0].querySelectorAll('rect.map-movers__bar--recent')).toHaveLength(12);
-  expect(Number(items[0].querySelectorAll('rect')[17].getAttribute('height'))).toBe(13);
-  expect(items[1].querySelector('svg')).toBeNull();
-  expect(items[0].textContent).toBe('Ferrari 360▲184%46→92 sold');
+    { p_families: [{ brand: 'Lexus', family_key: 'gx' }, { brand: 'Acura', family_key: 'fint' }] });
+  const rows = [...container.querySelectorAll('button.map-movers2__row')];
+  expect(rows[0].querySelectorAll('svg.map-movers__spark rect')).toHaveLength(24);
+  expect(rows[1].querySelector('svg.map-movers__spark')).toBeNull();
 });

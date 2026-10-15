@@ -149,7 +149,81 @@ export function summarizeAuction(input: string | any[] | null): BatAuctionRecord
   return out;
 }
 
+// ─── the lot's own end ─────────────────────────────────────────────
+// A running lot's page states its end on its own countdown: data-ends="<unix>" data-ends-id="<post id>" in the stats
+// table, and data-auction-ends="YYYY-MM-DD-hh-mm-ss" data-auction-ends-id="<post id>" beside it. A closed page has no
+// countdown of its own; its "Sold for USD $X on 5/26/26" / "Bid to … on …" line stamps the close (data-timestamp).
+// Every page also carries the "Current BaT Auctions" widget, one data-auction-ends per OTHER running lot (50 on a
+// closed page read 2026-10-15). Taking the first data-auction-ends on the page dated lots sold in April and May 2026
+// as ending 2026-10-15. So a countdown counts only when it carries the page's own post id (the shortlink ?p=).
+
+export interface BatOwnAuctionEnd {
+  /** the page's post id: the shortlink's ?p=, else the result line's data-listing-currently */
+  postId: string | null;
+  /** a running lot's end from its own countdown (moves as late bids extend it), ISO UTC; null on a closed page */
+  endsAt: string | null;
+  /** the day of endsAt, or the countdown's day when its time is not readable */
+  endsDate: string | null;
+  /** which own countdown gave the end: the stats table's data-ends, or the data-auction-ends countdown */
+  endsFrom: "data-ends" | "countdown" | null;
+  /** a closed page's result stamp ("Sold for … on 5/26/26"), ISO UTC; null while the lot runs */
+  closedAt: string | null;
+}
+
+const attrOf = (tag: string, name: string): string | null =>
+  tag.match(new RegExp(`\\s${name}=["']([^"']*)["']`, "i"))?.[1] ?? null;
+
+/** The lot's own end on a BaT listing page; never another lot's countdown. */
+export function readOwnAuctionEnd(html: string): BatOwnAuctionEnd {
+  const h = String(html || "");
+  const info = h.match(/<div class="listing-available-info">([\s\S]{0,2000}?)<\/div>/i)?.[1] ?? "";
+  const postId =
+    h.match(/<link[^>]*rel=['"]shortlink['"][^>]*href=['"][^'"]*[?&]p=(\d+)/i)?.[1] ??
+    h.match(/<link[^>]*href=['"][^'"]*[?&]p=(\d+)['"][^>]*rel=['"]shortlink['"]/i)?.[1] ??
+    info.match(/data-listing-currently="(\d+)"/i)?.[1] ??
+    null;
+  const own = (id: string | null) => id === null || postId === null || id === postId;
+
+  let endsAt: string | null = null;
+  let endsDate: string | null = null;
+  let endsFrom: BatOwnAuctionEnd["endsFrom"] = null;
+  for (const m of h.matchAll(/<[^>]*\sdata-ends="(\d+)"[^>]*>/gi)) {
+    if (!own(attrOf(m[0], "data-ends-id"))) continue;
+    endsAt = isoOf(m[1]);
+    if (endsAt) { endsFrom = "data-ends"; break; }
+  }
+  // the countdown fallback: only the one keyed to this page (the widget's entries carry other lots' ids)
+  if (!endsAt && postId) {
+    for (const m of h.matchAll(/<[^>]*\sdata-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"[^>]*>/gi)) {
+      if (attrOf(m[0], "data-auction-ends-id") !== postId) continue;
+      endsAt = isoOf(attrOf(m[0], "data-timestamp"));
+      endsDate = m[1];
+      endsFrom = "countdown";
+      break;
+    }
+  }
+  if (endsAt) endsDate = endsAt.slice(0, 10);
+
+  const infoId = info.match(/data-listing-currently="(\d+)"/i)?.[1] ?? null;
+  const closedAt = info && !/\sdata-until=/i.test(info) && own(infoId)
+    ? isoOf(info.match(/<span[^>]*\sclass="date[^"]*"[^>]*\sdata-timestamp="(\d+)"/i)?.[1])
+    : null;
+  return { postId, endsAt, endsDate, endsFrom, closedAt };
+}
+
 /** ISO 3779 check digit for a 17-character VIN (pre-1981 VINs have none and are not judged here). */
+/**
+ * The countdown end date ("2025-12-16-19-08-57" -> "2025-12-16") of a LIVE lot page, or null.
+ * A closed page has no countdown of its own, but its sidebar lists other live lots with data-auction-ends: the first
+ * match there is another lot's end (2026-10-15: repeat "-2" lots sold on 10/14 were stamped with a sidebar lot's date).
+ * A page that carries a closing record is closed, so it never reads a countdown.
+ */
+export function countdownEndDate(html: string): string | null {
+  if (summarizeAuction(html).recordAt) return null;
+  const m = html.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
+  return m?.[1] ?? null;
+}
+
 export function vinCheckDigitOk(vin: string | null | undefined): boolean | null {
   const v = String(vin ?? "").trim().toUpperCase();
   if (v.length !== 17) return null;

@@ -18,15 +18,17 @@ gate() {
   # completion queue is over the ceiling). A single brief lock waiter, mostly another writer's, does not close it.
   local waits=0
   while :; do
-    local pr code t qd lw lw2 slow=0 over=0 closed=0 why=""
+    local pr code t qd lw lw2 io slow=0 over=0 closed=0 why=""
     pr=$(curl -s -o /dev/null --max-time 10 -w "%{http_code} %{time_total}" "$U/rest/v1/vehicles?select=id&limit=1" -H "apikey: $ANON")
     code=${pr% *}; t=${pr#* }
     qd=$(q "set statement_timeout='5s'; select count(*) n from vehicle_completion_recompute_queue" | jq -r 'if type=="array" then (.[0].n // "x") else "x" end')
     lw=$(q "set statement_timeout='5s'; select count(*) n from pg_stat_activity where wait_event_type='Lock'" | jq -r 'if type=="array" then (.[0].n // "x") else "x" end')
+    io=$(q "set statement_timeout='5s'; select count(*) n from pg_stat_activity where backend_type='client backend' and state='active' and wait_event_type='IO' and wait_event='DataFileRead'" | jq -r 'if type=="array" then (.[0].n // "x") else "x" end')
     [ "$(echo "$t >= 2" | bc -l)" = "1" ] && slow=1
     { [ "$qd" = "x" ] || [ "$qd" -ge "$QMAX" ]; } && over=1
     if [ "$code" != "200" ]; then closed=1; why="rest $code"
     elif [ "$lw" = "x" ]; then closed=1; why="lock waiters unreadable"
+    elif [ "$io" = "x" ] || [ "$io" -gt 3 ]; then closed=1; why="client queries waiting on disk reads: $io"
     elif [ "$lw" != "0" ] && { [ "$slow" = "1" ] || [ "$over" = "1" ]; }; then
       sleep 15
       lw2=$(q "set statement_timeout='5s'; select count(*) n from pg_stat_activity where wait_event_type='Lock'" | jq -r 'if type=="array" then (.[0].n // "x") else "x" end')
@@ -72,6 +74,8 @@ for f in "$DIR"/batch_*.json; do
     fi
   fi
   held=0
-  touch "$f.done"; log "$(tail -1 "$LOG")"; sleep "$SLEEP"
+  touch "$f.done"; log "$(tail -1 "$LOG")"
+  # US daytime (13:00-03:00Z): 60 s after every batch so live feeds keep the disk; overnight: SLEEP
+  hr=$((10#$(date -u +%H))); if [ "$hr" -ge 13 ] || [ "$hr" -lt 3 ]; then sleep 60; else sleep "$SLEEP"; fi
 done
 log "DONE through $n batches"
