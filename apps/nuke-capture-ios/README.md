@@ -74,6 +74,14 @@ Standing rules the code carries:
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
   owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
   same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
+- **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
+  a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
+  stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
+  `relation_weight` (2^(-age/6 h) of the last contribution): live, stalling, or dormant a day after the last one.
+  Contributions are passive (photos at the organization's locations, its images, timeline events, contractor work),
+  because nobody at work spends a minute in the app. Reads: `user_org_relations` (the profile's list) and
+  `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. Membership still decides
+  permissions and the contributor gate (`fetchActiveOrgMemberships`).
 - **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
   original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
   holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
