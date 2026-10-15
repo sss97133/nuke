@@ -215,6 +215,26 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * A lot that did not land whole goes to the revision queue (record_revision_item) with what is missing and the next action,
+ * instead of staying a counter. next_action is one of reparse_retained, refetch, relink, classify_non_vehicle, retry.
+ */
+async function raiseRevision(
+  supabase: any,
+  url: string,
+  missing: string[],
+  reason: string,
+  nextAction: "reparse_retained" | "refetch" | "relink" | "classify_non_vehicle" | "retry",
+  detail: Record<string, unknown> = {},
+  snapshotId?: string,
+) {
+  const { error } = await supabase.rpc("record_revision_item", {
+    p_url: url, p_missing: missing, p_reason: reason, p_next_action: nextAction, p_raised_by: "extract-mecum",
+    p_snapshot_id: snapshotId ?? null, p_detail: detail, p_vehicle_id: null,
+  });
+  if (error) softWrite("record_revision_item", { error }, writeErrors);
+}
+
 /** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
 let writeErrors: string[] = [];
 
@@ -1282,14 +1302,21 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(pulledAt)) return okJson({ success: false, error: "pulled_at (ISO time of the index pull) is required" }, 400);
       const pulledIso = new Date(pulledAt).toISOString();
       const dryRun = body.dry_run === true;
-      const out = { received: lotsIn.length, skipped: {} as Record<string, number>, already_landed: 0, linked_to_existing_vehicle: 0, vehicles_created: 0, events_created: 0, auction_events_created: 0, observations: 0, observation_errors: 0, rejected_by_gate: 0, errors: [] as string[], dry_run: dryRun };
+      const out = { received: lotsIn.length, revisions_raised: 0, skipped: {} as Record<string, number>, already_landed: 0, linked_to_existing_vehicle: 0, vehicles_created: 0, events_created: 0, auction_events_created: 0, observations: 0, observation_errors: 0, rejected_by_gate: 0, errors: [] as string[], dry_run: dryRun };
       const bump = (k: string) => { out.skipped[k] = (out.skipped[k] ?? 0) + 1; };
 
       const lots: IndexLot[] = [];
       const seenIds = new Set<string>();
       for (const hit of lotsIn) {
         const r = indexLot(hit);
-        if ("skip" in r) { bump(r.skip); continue; }
+        if ("skip" in r) {
+          bump(r.skip);
+          if (r.skip === "no_year_make" && r.url && !dryRun) {
+            await raiseRevision(supabase, r.url, ["year", "make"], "the public lot index states no year or make", "refetch", { title: r.title ?? null, index_pulled_at: pulledIso });
+            out.revisions_raised++;
+          }
+          continue;
+        }
         if (seenIds.has(r.lot.lot_id)) { bump("duplicate_in_batch"); continue; }
         seenIds.add(r.lot.lot_id);
         lots.push(r.lot);
@@ -1439,6 +1466,44 @@ Deno.serve(async (req) => {
       return okJson({ ...out, success: true });
     }
 
+    // ── Revision worker: reparse retained pages for Mecum items that did not land whole ──────────
+    // claim_revision_items('mecum', ..., actions [reparse_retained]) hands back import_queue rows with a retained snapshot.
+    // Each is parsed from the stored page and saved through saveVehicle (no request to Mecum); resolved when the lot has a
+    // year and make, released with next_action refetch when the snapshot is missing or holds no lot.
+    if (action === "work_revision_items") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 10, 1), 50);
+      const worker = "extract-mecum:reparse";
+      const { data: items, error: cErr } = await supabase.rpc("claim_revision_items", { p_source_slug: "mecum", p_worker: worker, p_limit: n, p_actions: ["reparse_retained"] });
+      if (cErr) throw new Error(`claim_revision_items failed: ${cErr.message}`);
+      const out = { claimed: items?.length ?? 0, resolved: 0, released: 0, failed: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          let html: string | null = null;
+          if (it.snapshot_id) {
+            const { data: snap } = await supabase.from("listing_page_snapshots").select("html, html_storage_path").eq("id", it.snapshot_id).maybeSingle();
+            if (snap?.html_storage_path) {
+              const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+              if (blob) html = await blob.text();
+            }
+            html = html ?? snap?.html ?? null;
+          }
+          const vehicle = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
+          if (!vehicle || !(vehicle.year && vehicle.make)) {
+            mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
+            out.released++;
+            continue;
+          }
+          const { vehicleId } = await saveVehicle(supabase, vehicle);
+          mustWrite("resolve_revision_item", await supabase.rpc("resolve_revision_item", { p_id: it.id, p_outcome: "landed_whole", p_detail: { vehicle_id: vehicleId, reparsed_by: worker } }));
+          out.resolved++;
+        } catch (err: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
+        }
+      }
+      return okJson({ ...out, success: true });
+    }
+
     // ── Re-fold retained page snapshots into vehicles (zero requests to Mecum) ──────────────────
     // listing_page_snapshots holds Mecum lot pages from older writers (platform mecum, success). This reads up to `limit`
     // (max 100) of them in id order from the last folded one, skips a lot that already has an event under any URL spelling
@@ -1491,8 +1556,8 @@ Deno.serve(async (req) => {
           }
           if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
           const vehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
-          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); continue; }
-          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); continue; }
+          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "the retained page has no lot object", "refetch", {}, snap.id); continue; }
+          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "the retained page states no year or make", "classify_non_vehicle", {}, snap.id); continue; }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
           softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
@@ -1777,6 +1842,8 @@ Deno.serve(async (req) => {
         } catch (err: any) {
           const msg = String(err?.message || err);
           const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
+          if (msg === "NOT_A_VEHICLE") await raiseRevision(supabase, w.url, ["year", "make"], "the lot page states no year or make", "classify_non_vehicle");
+          else if (msg === "SKIP_NO_NEXT_DATA") await raiseRevision(supabase, w.url, ["lot_object"], "the free parse found no lot object on the page", "refetch");
           softWrite("import_queue outcome", await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId), writeErrors);
           if (gone) { results.gone++; consecutiveFailures = 0; }
           else {
