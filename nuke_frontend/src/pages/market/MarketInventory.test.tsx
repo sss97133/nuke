@@ -3,9 +3,10 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any }));
+const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any, photos: vi.fn(), photoMap: new Map() as Map<string, any[]> }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
 vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), readAskBoard: fixture.poll, useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
+vi.mock('./useListingPhotos', async original => ({ ...await original<typeof import('./useListingPhotos')>(), useListingPhotos: (pages: string[][]) => { fixture.photos(pages); return fixture.photoMap; } }));
 vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
 vi.mock('./AuctionCalendar', () => ({ default: ({ collection }: any) => <section>Calendar fixture{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
@@ -15,8 +16,13 @@ let container: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
-  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear();
+  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear(); fixture.photos.mockClear();
   fixture.poll.mockReset(); fixture.refresh.mockReset();
+  fixture.photoMap = new Map([['v1', [
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00a_fixtureA_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+  ]]]);
   fixture.boardQuery = { data: { pages: [{ as_of: '2026-10-13T23:30:00Z', since: '2026-10-12T23:30:00Z', window_hours: 24, band_min_taste: 60, matching: 3,
     population: { asks: 374, priced: 368, with_point: 3, in_band: 67, by_source: { craigslist: 374 }, by_tier: { under_5k: 120, '5k_15k': 140, '15k_40k': 80, '40k_100k': 25, '100k_plus': 3, unpriced: 6 } },
     rows: [
@@ -34,10 +40,10 @@ it('opens the existing explorer at Market and keeps unresolved source presentati
   await render('tab=market');
   expect(container.textContent).toContain('Existing BaT bid board');
   expect(fixture.source).not.toHaveBeenCalled();
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
   expect(fixture.source).not.toHaveBeenCalled();
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=listings&source=craigslist');
@@ -79,7 +85,7 @@ it('opens the auction calendar as a third collection and clears a chosen sale wh
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('calendar');
   expect(container.textContent).toContain('Calendar fixture');
-  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Just listed']));
+  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Classifieds']));
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=calendar&sale=mecum:fixture-2027');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
@@ -97,7 +103,7 @@ it('carries no lens from one collection into another: only the page params and t
   await render('tab=market&collection=auctions&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
   expect(kept()).toEqual(['collection', 'tab']);
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
   expect(kept()).toEqual(['collection', 'tab']);
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
 });
@@ -141,9 +147,9 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
 const button = (text: string) => [...container.querySelectorAll('button')].find(b => b.textContent?.startsWith(text))!;
 const lastQuery = () => fixture.board.mock.calls.at(-1)![0];
 
-it('opens classifieds as just listed: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
+it('opens classifieds: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
   await render('collection=listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Just listed');
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
   expect(container.textContent).not.toContain('asks first seen');
   expect(button('↻')).toBeTruthy();
   expect(container.querySelector('details.market-filters')?.hasAttribute('open')).toBe(false);
@@ -162,6 +168,33 @@ it('opens classifieds as just listed: a refresh control instead of a clock, filt
   expect(lastQuery()).toEqual({ hours: 24, tier: null, band: false, sort: 'newest', point: null, radius: null });
   await act(async () => button('Load more').click());
   expect(fixture.more).toHaveBeenCalledOnce();
+});
+
+it('a card carries every photo the capture landed: the board image first, one read per page, the count in the corner', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].image = 'https://images.craigslist.org/00a_fixtureA_600x450.jpg';
+  await render('collection=listings');
+  expect(fixture.photos).toHaveBeenLastCalledWith([['v1', 'v2']]);
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  expect([...first.querySelectorAll('.market-ask__strip img')].map(img => img.getAttribute('src')))
+    .toEqual(['https://images.craigslist.org/00a_fixtureA_600x450.jpg', 'https://images.craigslist.org/00b_fixtureB_600x450.jpg']);
+  expect(first.querySelector('.market-ask__count')?.textContent).toBe('1 / 2');
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Previous photo"]')?.disabled).toBe(true);
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Next photo"]')?.disabled).toBe(false);
+  expect(first.querySelector('a[href="/vehicle/v1"] .market-ask__strip')).not.toBeNull();
+  // No photo at all: the blank frame, no count, no arrows.
+  expect(second.querySelector('.market-ask__blank')).not.toBeNull();
+  expect(second.querySelector('.market-ask__count')).toBeNull();
+  expect(second.querySelector('button[aria-label="Next photo"]')).toBeNull();
+});
+
+it('a photo list keeps web addresses only, once each, the lead first', async () => {
+  const { photoList } = await import('./useListingPhotos');
+  expect(photoList('https://a.example/1.jpg', [
+    { vehicle_id: 'v', image_url: 'https://a.example/2.jpg' }, { vehicle_id: 'v', image_url: 'https://a.example/1.jpg' },
+    { vehicle_id: 'v', image_url: 'javascript:alert(1)' }, { vehicle_id: 'v', image_url: 'https://user:pw@a.example/3.jpg' },
+    { vehicle_id: 'v', image_url: null }, { vehicle_id: 'v', image_url: 'storage/relative.jpg' },
+  ])).toEqual(['https://a.example/1.jpg', 'https://a.example/2.jpg']);
+  expect(photoList(null, undefined)).toEqual([]);
 });
 
 it('tier, band and window are lenses in the URL', async () => {

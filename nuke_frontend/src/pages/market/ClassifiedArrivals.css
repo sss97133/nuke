@@ -1,19 +1,37 @@
-/* Just listed: each listing a card. A row on a wide screen (photo, what it is and says, what it asks and where);
+/* Classifieds: each listing a card. A row on a wide screen (photo, what it is and says, what it asks and where);
    on a phone the photo across the screen, then the same, the way a marketplace feed reads. */
 .market-asks { display: grid; }
-.market-ask { display: grid; grid-template-columns: 168px minmax(0, 1fr) 220px; gap: 14px; align-items: center;
+.market-ask { display: grid; grid-template-columns: 240px minmax(0, 1fr) 220px; gap: 14px; align-items: center;
   padding: 10px 12px; border-bottom: 2px solid var(--border); background: var(--bg); color: var(--text); }
 .market-ask a { color: inherit; }
 .market-ask__image { display: block; }
-.market-ask__image img, .market-ask__blank { display: block; width: 168px; height: 112px; object-fit: cover; background: var(--surface); }
+.market-ask__image img, .market-ask__blank { display: block; width: 240px; height: 160px; object-fit: cover; background: var(--surface); }
+/* Every photo of the listing in one frame: a swipe on a phone, an arrow under a pointer, the count in the corner. */
+.market-ask__photos { position: relative; }
+.market-ask__strip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  scrollbar-width: none; width: 240px; }
+.market-ask__strip::-webkit-scrollbar { display: none; }
+.market-ask__strip img { flex: 0 0 100%; scroll-snap-align: start; }
+.market-ask__step { position: absolute; top: 50%; transform: translateY(-50%); width: 24px; height: 32px; padding: 0;
+  display: grid; place-items: center; border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  cursor: pointer; opacity: 0; transition: opacity 120ms; }
+.market-ask__step--back { left: 4px; }
+.market-ask__step--next { right: 4px; }
+.market-ask__photos:hover .market-ask__step:not(:disabled), .market-ask__step:focus-visible { opacity: 0.92; }
+.market-ask__step:disabled { cursor: default; }
+.market-ask__count { position: absolute; right: 4px; bottom: 4px; padding: 0 4px; background: var(--bg); color: var(--text);
+  pointer-events: none; }
+/* A finger swipes; the arrows are for a pointer. */
+@media (hover: none) { .market-ask__step { display: none; } }
 .market-ask__identity { display: grid; gap: 4px; min-width: 0; }
 .market-ask__identity > a { overflow-wrap: anywhere; text-decoration: none; }
 .market-ask__identity > a:hover, .market-ask__identity > a:focus-visible { text-decoration: underline; }
 .market-ask__deal { display: grid; gap: 4px; justify-items: end; text-align: right; }
 @media (max-width: 760px) {
   .market-ask { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "image image" "identity identity" "deal deal"; gap: 8px; padding: 12px 8px; }
-  .market-ask__image { grid-area: image; }
+  .market-ask__photos { grid-area: image; }
   .market-ask__image img, .market-ask__blank { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+  .market-ask__photos, .market-ask__strip { width: 100%; }
   .market-ask__identity { grid-area: identity; }
   .market-ask__deal { grid-area: deal; grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: baseline; text-align: left; }
 }

@@ -5,6 +5,7 @@ import { Masthead, Text } from '../../kit';
 import { sourceLink, sourceName } from './useCapturedListings';
 import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
+import { photoList, useListingPhotos } from './useListingPhotos';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -72,9 +73,32 @@ export function listingFacts(row: Pick<AskRow, 'mileage' | 'listing_mileage' | '
   const title = row.title_status && row.title_status !== 'clean' ? `${row.title_status} title` : null;
   return { miles, title };
 }
-function vehicleImage(value?: string | null) {
-  try { const url = new URL(value ?? ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; }
-  catch { return null; }
+// The listing's photos on its card: the board's image first, the rest a swipe (phone) or an arrow (pointer) away, and
+// how many there are. Owner, 2026-10-15, choosing between three cards: "based on one photo here… you're not pulling
+// all the pictures". The photo still opens the record; a photo that fails to load drops out of the count.
+function ListingPhotos({ urls, to, label }: { urls: string[]; to: string; label: string }) {
+  const strip = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState(0);
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const shown = urls.filter(src => !failed.has(src));
+  const step = (by: number) => { const el = strip.current; if (el) el.scrollBy({ left: by * el.clientWidth, behavior: 'smooth' }); };
+  const onScroll = () => { const el = strip.current; if (el?.clientWidth) setAt(Math.round(el.scrollLeft / el.clientWidth)); };
+  return <div className="market-ask__photos">
+    <PrefetchLink to={to} className="market-ask__image" aria-label={label} tabIndex={-1}>
+      {shown.length ? <div className="market-ask__strip" ref={strip} onScroll={onScroll}>
+        {shown.map(src => <img key={src} src={src} width="240" height="160" loading="lazy" alt=""
+          onError={() => setFailed(prev => new Set(prev).add(src))} />)}
+      </div> : <span className="market-ask__blank" />}
+    </PrefetchLink>
+    {shown.length > 1 && <>
+      <button type="button" className="market-ask__step market-ask__step--back" aria-label="Previous photo" disabled={at <= 0}
+        onClick={() => step(-1)}><Text role="measure">‹</Text></button>
+      <button type="button" className="market-ask__step market-ask__step--next" aria-label="Next photo" disabled={at >= shown.length - 1}
+        onClick={() => step(1)}><Text role="measure">›</Text></button>
+      <Text role="caption" className="market-ask__count" aria-label={`photo ${Math.min(at + 1, shown.length)} of ${shown.length}`}>
+        {Math.min(at + 1, shown.length)} / {shown.length}</Text>
+    </>}
+  </div>;
 }
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
 
@@ -118,6 +142,8 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
   const first = query.data?.pages[0];
   const population = first?.population;
   const rows = query.data?.pages.flatMap(page => page.rows) ?? [];
+  const pageIds = useMemo(() => (query.data?.pages ?? []).map(page => page.rows.map(row => row.vehicle_id)), [query.data]);
+  const photos = useListingPhotos(pageIds);
 
   // Refresh in place: the control sits top right, shows that it is reading, then says what arrived. The list keeps the
   // reader's place (the newest arrive above it), unlike a pull that jumps. Every two minutes, while the tab is shown,
@@ -165,7 +191,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
       </button>
       {arrived !== null && <Text role="caption" as="div">{arrived > 0 ? `${count(arrived)} new` : 'nothing new yet'}</Text>}
     </>}>
-      <Text role="entity" as="h1">Just listed</Text>
+      <Text role="entity" as="h1">Classifieds</Text>
     </Masthead>
     <div className="k-section k-strip market-scope" role="group" aria-label="Market view">
       <div role="group" aria-label="Market view" className="market-scope__views">{collection}</div>
@@ -213,10 +239,10 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
     {query.isError && <p role="status" className="k-body">Arrivals could not be read. <button type="button" className="market-control" onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
     {first && !rows.length && <p role="status" className="k-body">{located && population?.with_point === 0
       ? 'No ask in this window has a recorded place yet.' : 'No ask in this window matches these lenses.'}</p>}
-    {rows.length > 0 && <div className="market-asks" role="list" aria-label="Just listed">{rows.map(row => {
+    {rows.length > 0 && <div className="market-asks" role="list" aria-label="Classifieds">{rows.map(row => {
       const href = sourceLink(row.source, row.url);
       const identity = [row.year, tidyName(row.make), tidyName(row.model)].filter(Boolean).join(' ');
-      const image = vehicleImage(row.image);
+      const urls = photoList(row.image, photos.get(row.vehicle_id));
       // The photo says the body and drive; the card says what it cannot: what the listing states about its miles and
       // title, where it is, what it asks, and how long it has been up.
       const said = listingFacts(row);
@@ -225,10 +251,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
       const mark = SOURCE_MARKS[row.source];
       const place = [row.city, row.region].filter(Boolean).join(', ');
       return <article key={row.event_id} role="listitem" className="market-ask">
-        <PrefetchLink to={`/vehicle/${row.vehicle_id}`} className="market-ask__image" aria-label={identity || 'Vehicle identity unrecorded'} tabIndex={-1}>
-          {image ? <img src={image} width="168" height="112" loading="lazy" alt="" onError={event => { event.currentTarget.hidden = true; }} />
-            : <span className="market-ask__blank" />}
-        </PrefetchLink>
+        <ListingPhotos urls={urls} to={`/vehicle/${row.vehicle_id}`} label={identity || 'Vehicle identity unrecorded'} />
         <div className="market-ask__identity">
           <PrefetchLink to={`/vehicle/${row.vehicle_id}`}><Text role="entity">{identity || 'Vehicle identity unrecorded'}</Text></PrefetchLink>
           {(said.miles || said.title) && <Text role="body" as="div">{said.miles}{said.miles && said.title ? ' · ' : ''}{said.title && <strong>{said.title}</strong>}</Text>}
