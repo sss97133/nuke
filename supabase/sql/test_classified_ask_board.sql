@@ -96,6 +96,7 @@ CREATE TABLE public.mv_family_year_prices (family_id uuid, year integer, basis t
   n integer, offered integer, conflicts integer, thin boolean, p10 integer, p25 integer, p50 integer, p75 integer,
   p90 integer, prices integer[], dated integer, first_on date, last_on date, n_24m integer, by_source jsonb,
   as_of timestamptz, n_miles integer NOT NULL DEFAULT 0, miles integer[] NOT NULL DEFAULT '{}', miles_p50 integer,
+  venues jsonb NOT NULL DEFAULT '{}',
   PRIMARY KEY (family_id, year, basis));
 CREATE TABLE public.listing_exit_models (version text PRIMARY KEY, active boolean NOT NULL DEFAULT false,
   horizon_days integer NOT NULL, label text NOT NULL, intercept double precision NOT NULL, features jsonb NOT NULL,
@@ -289,6 +290,9 @@ UPDATE public.mv_family_year_prices SET n_miles = 20, miles_p50 = 100000,
   WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'sold';
 UPDATE public.mv_family_year_prices SET n_miles = 3, miles = ARRAY[50000, 90000, 150000]
   WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'asked';
+-- Venues (20261015215000): the Blazer's sales by source with their medians.
+UPDATE public.mv_family_year_prices SET venues = '{"Bring a Trailer": {"n": 14, "p50": 60000}, "Mecum": {"n": 6, "p50": 35000}}'
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'sold';
 UPDATE public.mv_family_year_prices SET n_miles = 12, miles_p50 = 60000,
   miles = (SELECT array_agg(g * 10000 ORDER BY g) FROM generate_series(1, 12) g)
   WHERE family_id = '00000000-0000-4000-c000-000000000002' AND basis = 'sold';
@@ -311,6 +315,9 @@ BEGIN
     (r->'position'->'asked'->>'n')::int = 11 AND (r->'position'->'asked'->>'at_or_below')::int = 5
     AND (r->'position'->'asked'->>'thin')::boolean IS FALSE);
   PERFORM pg_temp.ok('Blazer: no merit without an active model', r->'merit' = 'null'::jsonb);
+  PERFORM pg_temp.ok('Blazer venues travel with the sold position',
+    r->'position'->'sold'->'venues' = '{"Bring a Trailer": {"n": 14, "p50": 60000}, "Mecum": {"n": 6, "p50": 35000}}'::jsonb
+    AND r->'position'->'asked'->'venues' = '{}'::jsonb);
   PERFORM pg_temp.ok('Blazer miles: its stated 88,000 sits above 8 of 20 recorded sales'' readings (median 100,000); 3 ask readings place nothing',
     (r->>'read_miles')::int = 88000 AND r->'position'->'sold'->'miles' = '{"n": 20, "p50": 100000, "at_or_below": 8}'::jsonb
     AND r->'position'->'asked'->'miles' = '{"n": 3, "p50": null, "at_or_below": null}'::jsonb);

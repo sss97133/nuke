@@ -40,6 +40,8 @@ export type AskPricePopulation = {
   // The odometer (20261015160000): n readings among the same rows, their median, and how many read at or below this
   // listing's miles (null under 10 readings, or when the seller disclosed a broken or rolled-over odometer).
   miles?: { n: number; p50: number | null; at_or_below: number | null };
+  // Each source's count and median in the window (20261015215000; median from 5 prices): the venue being compared.
+  venues?: Record<string, { n: number; p50: number | null }>;
 };
 export type AskPosition = {
   family: string; family_id: string;
