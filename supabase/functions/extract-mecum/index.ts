@@ -1232,7 +1232,6 @@ Deno.serve(async (req) => {
       const census: Record<string, number> = {};
       const seen = new Set<string>();
       const report: Record<string, { stated: number; read: number; queued: number; requeued: number }> = {};
-      const keysBySale = new Map<string, string>();
 
       for (const sale of sales) {
         const runDays = Object.keys(
@@ -1245,6 +1244,7 @@ Deno.serve(async (req) => {
           const filters = `taxonomies.auction_tax.name:"${sale.value}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
           const res = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["permalink","lot_number_meta","auction_day_start_meta","taxonomies"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
           if ((res.nbHits ?? 0) > 1000) console.warn(`[MECUM] ${sale.value} ${day}: ${res.nbHits} lots, only 1000 readable`);
+          const infos: { url: string; info: UpcomingSale }[] = [];
           for (const hit of res.hits ?? []) {
             const term = hit.taxonomies?.auction_tax?.[0];
             const parsed = term ? parseSaleFacet(sale.value, term.slug) : null;
@@ -1252,32 +1252,48 @@ Deno.serve(async (req) => {
             key = parsed.sale_key;
             const url = `https://www.mecum.com${hit.permalink}`;
             seen.add(url);
-            keysBySale.set(url, parsed.sale_key);
             stat.read++;
-            const info: UpcomingSale = {
-              sale_key: parsed.sale_key,
-              auction_name: parsed.auction_name,
-              sale_starts_on: parsed.sale_starts_on,
-              sale_ends_on: parsed.sale_ends_on,
-              run_day: hit.taxonomies?.run_date?.[0]?.name ?? day,
-              lot_number: hit.lot_number_meta ?? null,
-              lot_statuses: (hit.taxonomies?.lot_status ?? []).map((x: any) => x.slug).filter(Boolean),
-              roster_first_seen_at: startedAt.toISOString(),
-            };
-            const { data: row } = await supabase.from("import_queue").select("id, status, processed_at, raw_data").eq("listing_url", url).maybeSingle();
-            if (!row) {
-              const { error } = await supabase.from("import_queue").insert({ listing_url: url, status: "pending", priority: 100, extractor_version: UPCOMING_TAG, raw_data: { sale: info } });
-              if (!error) stat.queued++;
-              continue;
+            infos.push({
+              url,
+              info: {
+                sale_key: parsed.sale_key,
+                auction_name: parsed.auction_name,
+                sale_starts_on: parsed.sale_starts_on,
+                sale_ends_on: parsed.sale_ends_on,
+                run_day: hit.taxonomies?.run_date?.[0]?.name ?? day,
+                lot_number: hit.lot_number_meta ?? null,
+                lot_statuses: (hit.taxonomies?.lot_status ?? []).map((x: any) => x.slug).filter(Boolean),
+                roster_first_seen_at: startedAt.toISOString(),
+              },
+            });
+          }
+          // locked_by is set on every row this writes: the table's insert trigger posts any pending, unlocked row to
+          // continuous-queue-processor (which would run extract-mecum without the free-path limit), and this job lands
+          // its own lots. The pool query below reads status, not locked_by.
+          for (let i = 0; i < infos.length; i += 100) {
+            const chunk = infos.slice(i, i + 100);
+            const { data: existing, error: exErr } = await supabase.from("import_queue").select("id, listing_url, status, processed_at, raw_data").in("listing_url", chunk.map((c) => c.url));
+            if (exErr) throw new Error(`roster lookup failed: ${exErr.message}`);
+            const byUrl = new Map((existing ?? []).map((r: any) => [r.listing_url, r]));
+            const fresh = chunk.filter((c) => !byUrl.has(c.url)).map((c) => ({
+              listing_url: c.url, status: "pending", priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { sale: c.info },
+            }));
+            if (fresh.length) {
+              const { error } = await supabase.from("import_queue").insert(fresh);
+              if (error) throw new Error(`roster insert failed: ${error.message}`);
+              stat.queued += fresh.length;
             }
-            const first = row.raw_data?.sale?.roster_first_seen_at ?? info.roster_first_seen_at;
-            const daysToRun = info.run_day ? (Date.parse(info.run_day) - Date.parse(todayUtc())) / 86400000 : 99;
-            const ageH = row.processed_at ? (Date.now() - Date.parse(row.processed_at)) / 3600000 : 1e9;
-            const neverReadAsUpcoming = !row.raw_data?.sale;
-            const due = neverReadAsUpcoming || (daysToRun <= 7 && ageH >= 24) || (daysToRun <= 30 && ageH >= 168);
-            const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, raw_data: { ...(row.raw_data ?? {}), sale: { ...info, roster_first_seen_at: first } } };
-            if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
-            await supabase.from("import_queue").update(patch).eq("id", row.id);
+            for (const c of chunk) {
+              const row: any = byUrl.get(c.url);
+              if (!row) continue;
+              const first = row.raw_data?.sale?.roster_first_seen_at ?? c.info.roster_first_seen_at;
+              const daysToRun = c.info.run_day ? (Date.parse(c.info.run_day) - Date.parse(todayUtc())) / 86400000 : 99;
+              const ageH = row.processed_at ? (Date.now() - Date.parse(row.processed_at)) / 3600000 : 1e9;
+              const due = !row.raw_data?.sale || (daysToRun <= 7 && ageH >= 24) || (daysToRun <= 30 && ageH >= 168);
+              const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
+              if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
+              await supabase.from("import_queue").update(patch).eq("id", row.id);
+            }
           }
         }
         if (key) { census[key] = sale.count; report[key] = stat; }
