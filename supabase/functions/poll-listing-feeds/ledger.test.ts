@@ -537,3 +537,9 @@ Deno.test("planIngests: a complete row past the revisit age is asked again after
   equal(plan.settled, 2);
   equal(planIngests(["old1"], new Set(), ledger, NOW, 20).toIngest, []);
 });
+
+Deno.test("an unresolved Craigslist blip is ledgered skipped with its observation id, and is not retried", () => {
+  const w = ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "unresolved", reason: "insufficient identity", blip: { observation: "written", observation_id: "obs-1" } }, batch: { rows: new Map(), error: null }, now: NOW })!;
+  equal(w.status, "skipped");
+  equal((w.row.raw_data as any).blip_observation_id, "obs-1");
+});

@@ -25,6 +25,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
 import { slugStubRejection } from "./slugStub.ts";
@@ -346,6 +347,8 @@ interface ParsedVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  /** Set to "listing_text" when the model was read from the post's own text (craigslistBlip.modelFromText). */
+  modelSource?: string | null;
 }
 
 // Models/sub-brands that unambiguously identify a make when the title omits it.
@@ -790,6 +793,11 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
+  // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
+  // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
+  if (platform === "craigslist") vehicleData.is_for_sale = true;
+  // A model read from the post's own text (craigslistBlip.modelFromText) says so; the span is on the observation.
+  if (parsed.modelSource) vehicleData.model_source = parsed.modelSource;
 
   // Populate everything we have (real vehicles columns only — the table has
   // engine_type, not engine, and no condition_notes column)
@@ -1231,7 +1239,7 @@ interface IngestInput {
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview";
+  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
   discovery_id?: string | null;
   is_new_vehicle?: boolean;
@@ -1254,6 +1262,8 @@ interface IngestResult {
   // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
+  // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
+  blip?: Record<string, unknown>;
 }
 
 /**
@@ -1482,6 +1492,28 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         external_id: externalId,
       };
     }
+    // Craigslist: a blank model may be stated in the post's own text. Read it with its citation, or keep the post.
+    let modelCitation: ModelCitation | null = null;
+    if (platform === "craigslist" && capture && parsed.year && parsed.make && !parsed.model) {
+      modelCitation = modelFromText(input.description || input.notes, parsed.year, parsed.make);
+      if (modelCitation) { parsed.model = modelCitation.value; (parsed as any).modelSource = "listing_text"; }
+    }
+    if ((!parsed.year || !parsed.make || !parsed.model) && platform === "craigslist" && capture) {
+      // A blip: the post, its text, photos, place and clocks, retained with no vehicle (AGENTS.md).
+      const blip = await landCraigslistBlip(
+        { supabase: supabaseAdmin, writeObservation },
+        { listingUrl: listingUrl ?? input.url ?? "", capture, year: parsed.year ?? null, make: parsed.make ?? null,
+          description: input.description || input.notes, imageUrls: input.image_urls ?? (input.image_url ? [input.image_url] : null) },
+      );
+      return {
+        status: "unresolved",
+        reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — kept as an unresolved listing`,
+        blip,
+        source: platform,
+        external_id: externalId,
+        ...captureAnswer(),
+      };
+    }
     if (!parsed.year || !parsed.make || !parsed.model) {
       return {
         status: "rejected",
@@ -1642,7 +1674,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       year: gateResult.cleaned.year ?? parsed.year,
       make: gateResult.cleaned.make ?? parsed.make,
       model: gateResult.cleaned.model ?? parsed.model,
-    };
+      ...((parsed as any).modelSource ? { modelSource: (parsed as any).modelSource } : {}),
+    } as typeof parsed;
     if (gateResult.cleaned.vin) input.vin = gateResult.cleaned.vin;
     if (gateResult.cleaned.transmission) input.transmission = gateResult.cleaned.transmission;
     if (gateResult.cleaned.color) input.color = gateResult.cleaned.color;
@@ -1689,6 +1722,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           listingUrl: listingUrl ?? input.url ?? "",
           capture,
           isNewVehicle: match.isNew,
+          modelCitation,
           written: {
             mileage: input.mileage,
             title_status: input.title_status,
