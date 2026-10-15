@@ -60,10 +60,10 @@ CREATE UNIQUE INDEX harness_splices_live_code ON public.harness_splices (vehicle
 CREATE INDEX harness_splices_pin ON public.harness_splices (endpoint_id, cavity) WHERE NOT is_superseded;
 COMMENT ON TABLE public.harness_splices IS 'Grain: one splice part in one vehicle''s harness design: where it sits (beside a pin, or a splice node on the route), which part, and the design''s own gauge sum. Its conductors are harness_splice_members. Written by load_harness_splices from the registry; a changed splice is superseded (superseded_by), never edited. RSI pass 16, case ledger 13.12.3.';
 COMMENT ON COLUMN public.harness_splices.splice_code IS 'Stable name: plug, cavity and the splice''s number at that pin for a splice at a pin (M130-B B16 #2); the splice node''s code otherwise (SPL-PDM30-OUT7).';
-COMMENT ON COLUMN public.harness_splices.placement IS 'at_pin: a stub splice beside a plug''s pin, joining several wires and a lead into the pin; in_line: a butt splice with two sides; stub: a stub splice on the route.';
+COMMENT ON COLUMN public.harness_splices.placement IS 'at_pin: a stub splice beside one pin or terminal of a plug or device (the design''s "at" is the plug code, then the cavity), joining several wires and a lead into it; in_line: a butt splice with two sides; stub: a stub splice on the route (the "at" is a splice node''s code).';
 COMMENT ON COLUMN public.harness_splices.at_label IS 'Where the design puts it, verbatim (registry "at").';
 COMMENT ON COLUMN public.harness_splices.endpoint_id IS 'The plug (at_pin) or the splice node (in_line, stub); null when the design names a plug the model does not hold.';
-COMMENT ON COLUMN public.harness_splices.cavity IS 'For at_pin: the pin cavity, normalised like v_harness_pin_occupancy (leading zeros and an underscore dropped; case kept).';
+COMMENT ON COLUMN public.harness_splices.cavity IS 'For at_pin: the pin or terminal as the design names it after the plug code (B16, or words on a device: 10 feed cavity), normalised like v_harness_pin_occupancy (leading zeros and an underscore dropped; case kept).';
 COMMENT ON COLUMN public.harness_splices.part_number IS 'The splice part the design names (D-609-05, M81824/1-3).';
 COMMENT ON COLUMN public.harness_splices.part_id IS 'The catalog_parts row for part_number, when exactly one row has it (RSI pass 6 rule).';
 COMMENT ON COLUMN public.harness_splices.design_equiv_awg IS 'The design''s own equivalent gauge for the splice (one per side on a butt splice): testimony, kept to compare; v_harness_splice_check computes its own.';
@@ -123,7 +123,7 @@ BEGIN
               WHEN r.k > 1 THEN r.plug || ' #' || r.n ELSE r.plug END
   FROM (SELECT p.*, row_number() OVER (PARTITION BY p.plug, p.cavity ORDER BY p.ord) AS n, count(*) OVER (PARTITION BY p.plug, p.cavity) AS k
         FROM (SELECT x.ord::int AS ord, x.value AS v, split_part(btrim(x.value->>'at'), ' ', 1) AS plug,
-                     CASE WHEN btrim(x.value->>'at') ~ '^\S+\s+\S+$'
+                     CASE WHEN btrim(x.value->>'at') ~ '^\S+\s+\S'
                           THEN regexp_replace(regexp_replace(btrim(x.value->>'at'), '^\S+\s+', ''), '^([A-Za-z]+)_?0*([0-9]+)$', '\1\2') END AS cavity
               FROM jsonb_array_elements(p_rows) WITH ORDINALITY x(value, ord)
               WHERE btrim(coalesce(x.value->>'at', '')) <> '') p) r;

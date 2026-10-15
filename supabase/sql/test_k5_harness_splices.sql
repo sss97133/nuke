@@ -22,10 +22,11 @@ BEGIN
     {"at": "PDM30-A A02", "wires": ["TP1", "TP2", "20 AWG pin lead"], "splice": "D-609-04", "equiv_awg": 16},
     {"at": "SPL-X", "wires": ["L0", "L1", "L2"], "splice": "M81824/1-2", "type": "in-line", "sides": [["L0"], ["L1", "L2"]], "equiv_awg": [20, 17]},
     {"at": "NOPE-PLUG B01", "wires": ["GHOST"], "splice": "D-609-99", "equiv_awg": 22},
-    {"at": "PDM30-A A24", "wires": ["87", "BB1", "D1"], "splice": "D-609-04", "equiv_awg": 14}
+    {"at": "PDM30-A A24", "wires": ["87", "BB1", "D1"], "splice": "D-609-04", "equiv_awg": 14},
+    {"at": "LAMP-1 park filament lead", "wires": ["L1", "TR1"], "splice": "D-609-04", "equiv_awg": 18}
   ]';
   r := public.load_harness_splices('e08bf694-970f-4cbe-8a74-8715158a0f2e', rows_, 'fixture registry @ test');
-  IF (r->>'splices_written')::int <> 4 OR (r->>'members')::int <> 10 OR (r->>'members_keyed')::int <> 8
+  IF (r->>'splices_written')::int <> 5 OR (r->>'members')::int <> 12 OR (r->>'members_keyed')::int <> 10
      OR r->'members_not_a_wire' IS DISTINCT FROM '["20 AWG pin lead", "GHOST"]'::jsonb
      OR r->'places_not_in_the_model' IS DISTINCT FROM '["NOPE-PLUG B01"]'::jsonb THEN
     RAISE EXCEPTION 'load: %', r;
@@ -33,7 +34,7 @@ BEGIN
 
   SELECT string_agg(splice_code || '=' || placement || '/' || coalesce(cavity, '-') || '/' || (part_id IS NOT NULL), ' ' ORDER BY splice_code COLLATE "C") INTO got
   FROM public.harness_splices WHERE NOT is_superseded;
-  IF got IS DISTINCT FROM 'NOPE-PLUG B1 #1=at_pin/B1/false PDM30-A A2 #1=at_pin/A2/true PDM30-A A24 #1=at_pin/A24/true SPL-X=in_line/-/true' THEN
+  IF got IS DISTINCT FROM 'LAMP-1 park filament lead #1=at_pin/park filament lead/true NOPE-PLUG B1 #1=at_pin/B1/false PDM30-A A2 #1=at_pin/A2/true PDM30-A A24 #1=at_pin/A24/true SPL-X=in_line/-/true' THEN
     RAISE EXCEPTION 'splices: %', got;
   END IF;
   SELECT string_agg(m.member_label || ':' || coalesce(m.side::text, '-'), ' ' ORDER BY m.ordinal) INTO got
@@ -55,7 +56,7 @@ BEGIN
   -- Fill: A2 fits (2 x 22 + a 20 AWG lead in a 20-16 splice); A24 is over on 87 and BB1 alone (18 + 18; D1's gauge unknown);
   -- SPL-X side 1 fits, side 2 waits on L1's gauge.
   SELECT string_agg(splice_code || '/' || side || '=' || status, ' ' ORDER BY splice_code COLLATE "C", side) INTO got FROM public.v_harness_splice_check;
-  IF got IS DISTINCT FROM 'NOPE-PLUG B1 #1/0=part range unknown PDM30-A A2 #1/0=fits PDM30-A A24 #1/0=over the crimp range SPL-X/1=fits SPL-X/2=gauge unknown' THEN
+  IF got IS DISTINCT FROM 'LAMP-1 park filament lead #1/0=gauge unknown NOPE-PLUG B1 #1/0=part range unknown PDM30-A A2 #1/0=fits PDM30-A A24 #1/0=over the crimp range SPL-X/1=fits SPL-X/2=gauge unknown' THEN
     RAISE EXCEPTION 'fill: %', got;
   END IF;
   SELECT conductors_named || ' = ' || circular_mils INTO got FROM public.v_harness_splice_check WHERE splice_code = 'PDM30-A A2 #1';
@@ -64,7 +65,7 @@ BEGIN
   SELECT string_agg(measure || '=' || numerator || '/' || denominator, '; ' ORDER BY measure COLLATE "C") INTO got FROM public.v_harness_coverage
   WHERE measure IN ('splice members keyed to a live wire', 'pin cavities shared by several wires with no splice the design names (must be 0)',
                     'spliced pins whose lead into the pin the design names', 'splice sides outside the part''s crimp range (must be 0)');
-  IF got IS DISTINCT FROM 'pin cavities shared by several wires with no splice the design names (must be 0)=1/2; splice members keyed to a live wire=8/10; splice sides outside the part''s crimp range (must be 0)=1/3; spliced pins whose lead into the pin the design names=1/3' THEN
+  IF got IS DISTINCT FROM 'pin cavities shared by several wires with no splice the design names (must be 0)=1/2; splice members keyed to a live wire=10/12; splice sides outside the part''s crimp range (must be 0)=1/3; spliced pins whose lead into the pin the design names=1/4' THEN
     RAISE EXCEPTION 'splice measures: %', got;
   END IF;
   SELECT count(*) INTO n FROM public.v_harness_coverage;
@@ -75,13 +76,13 @@ BEGIN
 
   -- Idempotent.
   r := public.load_harness_splices('e08bf694-970f-4cbe-8a74-8715158a0f2e', rows_, 'fixture registry @ test');
-  IF (r->>'splices_written')::int <> 0 OR (r->>'splices_kept')::int <> 4 OR (r->'nets'->>'nets_superseded')::int <> 0 THEN RAISE EXCEPTION 'not idempotent: %', r; END IF;
+  IF (r->>'splices_written')::int <> 0 OR (r->>'splices_kept')::int <> 5 OR (r->'nets'->>'nets_superseded')::int <> 0 THEN RAISE EXCEPTION 'not idempotent: %', r; END IF;
 
   -- The design takes D1 off A24's splice and drops the place the model lacks: one splice superseded, one retired, D1 splits off.
   SELECT id INTO old_id FROM public.harness_splices WHERE splice_code = 'PDM30-A A24 #1' AND NOT is_superseded;
   rows_ := jsonb_set(rows_ - 2, '{2,wires}', '["87", "BB1"]');
   r := public.load_harness_splices('e08bf694-970f-4cbe-8a74-8715158a0f2e', rows_, 'fixture registry @ test');
-  IF (r->>'splices_written')::int <> 1 OR (r->>'splices_changed')::int <> 1 OR (r->>'splices_retired')::int <> 1 OR (r->>'splices_kept')::int <> 2 THEN
+  IF (r->>'splices_written')::int <> 1 OR (r->>'splices_changed')::int <> 1 OR (r->>'splices_retired')::int <> 1 OR (r->>'splices_kept')::int <> 3 THEN
     RAISE EXCEPTION 'change: %', r;
   END IF;
   SELECT is_superseded::text || '/' || (superseded_by = (SELECT id FROM public.harness_splices WHERE splice_code = 'PDM30-A A24 #1' AND NOT is_superseded))::text INTO got
