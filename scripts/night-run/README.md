@@ -11,15 +11,28 @@ wake-up while allowance remains. A completed objective is archived; the next wak
 objective while daily allowance remains. Existing old nightly PRs/worktrees are not deleted or automatically adopted.
 The work order tells the agent to inspect those PRs before choosing duplicate work.
 
-- `active`: authorized work remains. Budget/backoff may defer the next invocation.
+- `active`: authorized work remains. A nonempty `ready_actions` array keeps the objective active even
+  when the agent reports a review gate or blocker on other steps. Budget/backoff may defer invocation.
 - `waiting_review`: linked PR metadata is checked without inference. A change in head, checks, review
-  or merge state resumes the same objective. The explicit unattended no-merge hold remains.
+  or merge state resumes the same objective. This waits only when no independent ready actions remain.
+  The explicit unattended no-merge hold remains.
 - `blocked`: an external/authorization dependency, three controller failures, or three identical
   active handoffs. The saved reason explains what must change. After resolving it, use `--resume`.
 - `complete`: the agent supplied acceptance receipts, linked PRs are merged (or closed with
-  recorded merged replacements), and the worktree is clean.
+  recorded merged replacements), the worktree is clean, and no ready actions remain.
   Receipt existence is mechanically checked; semantic correctness and public readiness remain agent
   claims supported by those receipts, not independently certified by the controller.
+
+`ready_actions` contains descriptions of concrete, already authorized independent steps; it is never
+executed as shell commands and cannot authorize held dependent work. Blocker/unblock conditions remain
+in the handoff. Three identical handoffs still block even when a review/blocked handoff contains ready
+work. A legacy waiting or agent-blocked checkpoint missing the field initiates one readiness reassessment
+in the same session/worktree and existing daily allowance. Before launch, the controller records that
+initiation and makes the scheduler active while preserving the handoff's blocker and holds. A timeout or
+crash leaves unfinished assessment active for ordinary continuation within the current or next budget
+window; it does not initiate another migration. Subscription limits retain the existing six-hour backoff.
+A valid checkpoint with an empty ready list restores its declared wait/block. Controller failure and
+stagnation stops remain enforced. No live state edit or timer replacement is needed for this migration.
 
 Subscription-limit responses defer for six hours and retry automatically. Other errors back off before
 blocking after three consecutive failures. Nothing switches to API billing or discards context to evade

@@ -56,8 +56,9 @@ from that evidence. Do not launch extra agents or paid inference for routine ins
   `git push -u origin night/<date>-<slug>`. Never main, force-push, merge, deploy, hand-apply, or load/unload
   launchd jobs. The unattended runner's explicit no-merge hold remains despite general repo merge rules.
   Open PRs are unfinished work waiting on review, not delivered improvements. The controller rechecks
-  their state without inference and resumes you when it changes. Inspect actual CI and reviews; an empty
-  check list is not a pass. Failed CI is work to repair, not a reason to abandon the objective.
+  their state without inference after independent authorized work is exhausted, and resumes you when it
+  changes. Inspect actual CI and reviews; an empty check list is not a pass. Failed CI is work to repair,
+  not a reason to abandon the objective.
 - Migration proposals: one migration per PR, timestamp later than all origin/main migrations and active
   lane announcements, BEGIN/COMMIT, bounded statement/lock timeouts where locks can wait, no custom-GUC
   header SET. `schema_proposals` additions require evidence[]. Do not claim a PG contract ran locally
@@ -81,6 +82,14 @@ is a proposed checkpoint, not permission to stop pursuing the objective. Return 
   `blocked` only for an actual external/authorization dependency; `complete` only when every acceptance
   criterion has evidence and linked PRs are merged (or closed as superseded by a recorded merged
   replacement). A time/usage limit is not completion.
+- `ready_actions`: an array of concrete, nonempty descriptions of already authorized steps that can
+  proceed independently of the recorded blocker or review gate. Exhaust these steps before waiting.
+  A pending PR does not block inspection, tests or other authorized work for an unmet criterion when
+  those steps do not depend on its merge. Keep dependent work in `next_action`/`blocker` until its gate
+  resolves; do not place held merges, production writes, or unapproved work in this array. An empty
+  array means no independently ready step was identified, not that the objective is complete.
+  The controller keeps an objective active when this array is nonempty even if `status` says
+  `waiting_review` or `blocked`. Completion requires an empty array. Readiness never grants authority.
 - `next_action`: the concrete next step, not "continue work". The controller passes this back to you.
 - `progress`: what changed since the last checkpoint, with evidence and limits.
 - `blocker` and `unblock_condition`: exact dependency and what would resolve it; empty when none.
@@ -94,3 +103,5 @@ The controller checks structure, receipt existence, clean working tree and linke
 checks DO NOT independently prove your claims. You remain responsible for honest acceptance evidence.
 Do not mistake `claude -p` returning successfully for finishing the objective. If a tool is unavailable,
 name the precise blocked step; complete independent authorized work before returning a blocker.
+For a legacy checkpoint without `ready_actions`, reassess readiness once, preserve the exact objective,
+acceptance and holds, and return the new field. Do not treat a controller-requested reassessment as approval.
