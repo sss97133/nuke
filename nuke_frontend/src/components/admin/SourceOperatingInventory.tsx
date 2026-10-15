@@ -114,6 +114,7 @@ export default function SourceOperatingInventory({ reading, failed, loading }: {
       <h3 id="status-reporting-title">Which sources show recent activity?</h3></div></div>
     <p>Platforms, scrape targets, feed targets and forums overlap. Their counts are separate inventories, not one total of sources or vehicles.</p>
     <p className="status-basis">Activity markers are compared with each row's configured cadence at the reading time.
+      {' '}Enabled means the inventory flag; worker schedules, pauses and retry backoff can prevent a visit.
       {' '}A completed check can find zero new items; use <a href="#status-jobs">job checks and source intake receipts</a> for execution and delivery evidence.</p>
     <div className="status-source-inventories">{owners.map(owner => {
       const inventory = reading?.inventories[owner];
