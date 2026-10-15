@@ -1140,12 +1140,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: embedded ? '72vh' : '100vh',
-        minHeight: embedded ? 440 : undefined,
+        // Embedded, the map keeps its own height and what explains it (movers, legend) flows below it in the page.
+        height: embedded ? 'auto' : '100vh',
         background: 'var(--bg)',
         color: 'var(--text)',
         fontFamily: 'Arial, sans-serif',
-        overflow: 'hidden',
+        overflow: embedded ? 'visible' : 'hidden',
       }}
     >
       {/* ─── HEADER BAR (the page's own; the app header stands in for it when embedded) ─── */}
@@ -1417,7 +1417,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       <div
         ref={containerRef}
         style={{
-          flex: 1,
+          flex: embedded ? 'none' : 1,
+          height: embedded ? 'clamp(440px, 64vh, 820px)' : undefined,
           position: 'relative',
           overflow: 'hidden',
           background: 'var(--bg)',
