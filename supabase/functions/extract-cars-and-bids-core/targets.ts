@@ -198,10 +198,18 @@ export async function recaptureCab(supabase: any, supabaseUrl: string, key: stri
   }
   const results: Record<string, unknown>[] = [];
   for (const url of urls) {
-    const fc = await firecrawlScrape(
+    let fc = await firecrawlScrape(
       { url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500, actions: DEEP_ACTIONS },
       { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
     );
+    // A lot with no comment filter or gallery link fails the click actions ("Element not found"): the sale facts are still on
+    // the page, so take it without actions (one more credit) rather than lose the lot.
+    if (/ActionError|Element not found/i.test(String(fc.error)) && !(fc.data?.html && fc.data.html.length > 1000)) {
+      fc = await firecrawlScrape(
+        { url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500 },
+        { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
+      );
+    }
     if (fc.httpStatus === 404) {
       await recordRevision(supabase, { url, missing: ["result"], reason: "not_found", next: "none", raisedBy: "extract-cars-and-bids-core:recapture", detail: { http: 404 } });
       results.push({ url, fetched: true, status: 404 });
