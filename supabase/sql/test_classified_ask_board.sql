@@ -16,7 +16,7 @@
 -- (20261015080000_classified_ask_board_listing_odometer.sql) what the listing says about its miles, odometer and title:
 -- broken wins over rolled over, the title is lower-cased, an observation of another vehicle is not read, and an owner's
 -- private correction stays hidden from anon (the live garage_correction_private_read policy); and
--- (20261017030000_classified_ask_board_position.sql) the family and position: sales and asks at or below the ask, the
+-- (20261017050000_classified_ask_board_position.sql) the family and position: sales and asks at or below the ask, the
 -- listing's own ask taken out of the asks, thin families without a band, years outside the family and names without a
 -- family unplaced, newest_seen_at, merit from the active exit model by hand, the merit sort, no imputation, an unknown
 -- feature, and the same position for anon.
@@ -88,7 +88,7 @@ AS $$ SELECT CASE WHEN lower(p_parsed_make) = 'chevrolet' THEN 70 ELSE 10 END::s
 \ir ../migrations/20261015080000_classified_ask_board_listing_odometer.sql
 \ir ../migrations/20261015080000_classified_ask_board_listing_odometer.sql
 
--- The family key, the family price fold and the exit models (20261017030000 reads them), as tables with the columns it
+-- The family key, the family price fold and the exit models (20261017050000 reads them), as tables with the columns it
 -- reads and the live grants.
 CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles bigint, make text, family_id uuid,
   family text, matched text, year_start integer, year_end integer, PRIMARY KEY (make_l, model_l));
@@ -103,8 +103,8 @@ CREATE TABLE public.listing_exit_models (version text PRIMARY KEY, active boolea
   base_rate double precision NOT NULL, trained_on jsonb NOT NULL, evaluated_on jsonb NOT NULL, receipt text NOT NULL,
   trained_at timestamptz NOT NULL DEFAULT now());
 GRANT SELECT ON public.mv_model_family_names, public.mv_family_year_prices, public.listing_exit_models TO anon, authenticated;
-\ir ../migrations/20261017030000_classified_ask_board_position.sql
-\ir ../migrations/20261017030000_classified_ask_board_position.sql
+\ir ../migrations/20261017050000_classified_ask_board_position.sql
+\ir ../migrations/20261017050000_classified_ask_board_position.sql
 RESET ROLE;
 
 -- Vehicles: 1 Blazer (Phoenix), 2 H3T (St George), 3 M1010 (Las Vegas), 4 Ford (no price, no place),
@@ -191,7 +191,7 @@ BEGIN
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer';
   PERFORM pg_temp.ok('a clean listing: its miles and title, no odometer flag',
     r->'odometer' = 'null'::jsonb AND r->>'title_status' = 'clean' AND (r->>'listing_mileage')::int = 88000);
-  PERFORM pg_temp.ok('the seller''s declared condition, as stated, lower-cased (20261017030000)', r->>'condition' = 'like new');
+  PERFORM pg_temp.ok('the seller''s declared condition, as stated, lower-cased (20261017050000)', r->>'condition' = 'like new');
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'f250';
   PERFORM pg_temp.ok('an observation of another vehicle is not read',
     r->'listing_mileage' = 'null'::jsonb AND r->'odometer' = 'null'::jsonb AND r->'title_status' = 'null'::jsonb
@@ -255,7 +255,7 @@ SELECT pg_temp.ok('page size and offset',
   jsonb_array_length(public.classified_ask_board(p_limit => 2)->'rows') = 2
   AND (public.classified_ask_board(p_limit => 2, p_offset => 2)->'rows'->0->>'model') = 'pickup');
 
--- 20261017030000: what each listing is and where its ask sits.
+-- 20261017050000: what each listing is and where its ask sits.
 -- Families: the Blazer (1969..1994), the H3T (2009..2010), the Toyota pickup (1979..1995); the F250's family starts in
 -- 1999, so a 1979 F250 is not claimed; the M1010 has no family.
 INSERT INTO public.mv_model_family_names (make_l, model_l, vehicles, make, family_id, family, matched, year_start, year_end) VALUES
