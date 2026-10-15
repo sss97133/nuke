@@ -12,7 +12,7 @@
  */
 import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
 
-export type ClassifiedPlatform = "classiccars" | "ksl";
+export type ClassifiedPlatform = "classiccars" | "ksl" | "facebook_marketplace";
 
 export function classifiedPlatform(url: string | null | undefined): ClassifiedPlatform | null {
   try {
@@ -20,12 +20,13 @@ export function classifiedPlatform(url: string | null | undefined): ClassifiedPl
     const host = u.hostname.toLowerCase().replace(/^www\./, "");
     if (host === "classiccars.com" && /^\/listings\/view\/\d+/.test(u.pathname)) return "classiccars";
     if (host === "cars.ksl.com" && /^\/listing\/\d+/.test(u.pathname)) return "ksl";
+    if ((host === "facebook.com" || host === "m.facebook.com") && /^\/marketplace\/item\/\d+/.test(u.pathname)) return "facebook_marketplace";
   } catch { /* not a URL */ }
   return null;
 }
 
 export function classifiedListingId(url: string | null | undefined): string | null {
-  return String(url ?? "").match(/\/listings\/view\/(\d+)|\/listing\/(\d+)/)?.slice(1).find(Boolean) ?? null;
+  return String(url ?? "").match(/\/listings\/view\/(\d+)|\/listing\/(\d+)|\/marketplace\/item\/(\d+)/)?.slice(1).find(Boolean) ?? null;
 }
 
 type Client = { from: (table: string) => any };
