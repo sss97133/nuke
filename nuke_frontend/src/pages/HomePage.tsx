@@ -411,19 +411,36 @@ function momentumToColor(m: number | null): string {
 }
 
 /** The brand tile's lines, most important first; the cell shows as many as fit. Each is a measured fact of the brand's
- *  confirmed sales, or absent. */
-export function brandLines(n: TreemapNode): string[] {
+ *  confirmed sales, or absent. Each line comes in forms from longest to shortest; a tile `maxChars` wide shows the
+ *  longest form that fits and leaves out a line none of whose forms fits, so no line is cut mid-word (2026-10-15 small
+ *  tiles read "$156.3M · 1,1…", "81% of offere…", "BaT 12 mo: s…"). */
+export function brandLines(n: TreemapNode, maxChars = Infinity): string[] {
   // What a brand's market is, in three lines: its dollars and sales, how often what is offered sells, and how the last
   // twelve months compare with the twelve before, in sales and in dollars (owner, 2026-10-15: the price band is
   // irrelevant; sell-through and the 12-month move are the interest, said clearly).
-  const lines: string[] = [];
-  if (n.usd) lines.push(`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`);
-  if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% of offered sold`);
+  const forms: string[][] = [];
+  if (n.usd) {
+    const money = fmtMoneyShort(n.usd);
+    forms.push([`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`, `${money} · ${fmtCountShort(n.count)} sold`, money]);
+  }
+  if (n.offered && n.offered >= 20 && n.sold_any != null) {
+    const share = Math.round((100 * n.sold_any) / n.offered);
+    forms.push([`${share}% of offered sold`, `${share}% sold`]);
+  }
   const m = brandMomentum(n);
   const d = brandDollarMomentum(n);
-  if (m !== null) lines.push(`BaT 12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
-  return lines;
+  if (m !== null) {
+    forms.push([...(d !== null ? [`BaT 12 mo: sales ${signedPct(m)}, $ ${signedPct(d)}`] : []),
+      `BaT 12 mo: sales ${signedPct(m)}`, `12 mo ${signedPct(m)}`]);
+  }
+  return forms.map(f => f.find(line => lineChars(line) <= maxChars)).filter((line): line is string => line !== undefined);
 }
+
+/** Characters a tile line takes in the cell's monospace face; the arrows fall back to a wider face, so they count two. */
+export const lineChars = (line: string) => line.length + (line.match(/[▲▼]/g)?.length ?? 0);
+const fmtMoneyShort = (n: number) => n >= 1_000_000_000 ? `$${(n / 1_000_000_000).toFixed(1)}B`
+  : n >= 1_000_000 ? `$${Math.round(n / 1_000_000)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
+const fmtCountShort = (n: number) => n >= 10_000 ? `${Math.round(n / 1_000)}K` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
 // ────────────────────────────────────────────────────────────
 // TREEMAP CELL COMPONENT
@@ -472,7 +489,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
   const textSecondary = onDark ? 'rgba(255, 255, 255, 0.82)' : 'var(--text-secondary)';
   const lineHeightPx = dataFontSize * 1.3;
   const marketLines = isBrandMarket && canShowCount
-    ? brandLines(node).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
+    ? brandLines(node, Math.floor((w - 12) / (dataFontSize * 0.6))).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
     : [];
 
   return (
