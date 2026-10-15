@@ -10,14 +10,17 @@ Deterministic. No network, no DB. Re-run any time; output is overwritten.
 
 Sources (all rows keep file:line provenance):
   V42  docs/wiring/output/K5_cut_list_v4_2.txt      174 wires, newest decisions (Jun 10).
-       Parsed with lego-book/build_ch1.parse_cut_list (reused, not re-implemented).
-  CH1  docs/wiring/output/lego-book/ch1_wire_index.csv  Dave-convention colors,
-       printed labels, engine-running flags (Sep 25).
-  APR  docs/wiring/build-plan/MASTER_CUT_LIST.csv   332 wires, whole vehicle, both
+       Parsed with calc-data/cut_list_v42.parse_cut_list (lego-book/build_ch1's parser, copied verbatim).
+  CH1  calc-data/inputs/ch1_wire_index.csv            Dave-convention colors,
+       printed labels, engine-running flags (Sep 25). Written by lego-book/build_ch1.py.
+  APR  calc-data/inputs/MASTER_CUT_LIST.csv           332 wires, whole vehicle, both
        ends + terminals (Apr 17). Pre-dates the Tefzel lock (2026-05-11) and the
        6L90/PCS, EV1, Quantum-pump, engine-only-firewall decisions.
-  DEV  /Users/skylar/k5-harness-pull/devices.json   141-device manifest.
+  DEV  calc-data/inputs/devices.json                  141-device manifest (k5-harness-pull, May 3).
   SUB  docs/wiring/calc-data/subsystems.json         wire -> subsystem (v3 era).
+  The three inputs/ files are copies, made 2026-10-15, of files that lived off main (build-plan/ and lego-book/ are
+  git-ignored CSV; devices.json was outside the repo), so the registry rebuilds from a clean checkout. Row
+  citations keep their original paths (build-plan/MASTER_CUT_LIST.csv:<line>); the line numbers hold in the copies.
 
 Outputs:
   docs/wiring/calc-data/k5_registry.json   the master (v5.0-draft)
@@ -26,7 +29,6 @@ Outputs:
 import csv
 import importlib.util
 import json
-import os
 import re
 from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
@@ -34,27 +36,22 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]   # the checkout this file lives in (was hard-coded /Users/skylar/nuke)
 WD = REPO / "docs/wiring"
 CD = WD / "calc-data"
-LEGO = WD / "output/lego-book"
-APR_CSV = WD / "build-plan/MASTER_CUT_LIST.csv"
-CH1_CSV = LEGO / "ch1_wire_index.csv"
-DEV_JSON = Path("/Users/skylar/k5-harness-pull/devices.json")
+INPUTS = CD / "inputs"
+APR_CSV = INPUTS / "MASTER_CUT_LIST.csv"
+CH1_CSV = INPUTS / "ch1_wire_index.csv"
+DEV_JSON = INPUTS / "devices.json"
 SUB_JSON = CD / "subsystems.json"
 OUT_REG = CD / "k5_registry.json"
 OUT_REP = CD / "RECONCILE_REPORT.md"
 
 # ---------------------------------------------------------------- V42 via the existing parser
 def load_v42():
-    here = os.getcwd()
-    os.chdir(LEGO)  # build_ch1 runs its twin-geometry step at import; it expects its own dir
-    try:
-        spec = importlib.util.spec_from_file_location("build_ch1", LEGO / "build_ch1.py")
-        b1 = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(b1)
-        wires = b1.parse_cut_list()
-        V42_ECU["M130"] = [[pin, code, name] for pin, (code, name) in b1.M130.items()]
-        V42_ECU["rail_pins"] = sorted(b1.RAIL_PINS)
-    finally:
-        os.chdir(here)
+    spec = importlib.util.spec_from_file_location("cut_list_v42", CD / "cut_list_v42.py")
+    b1 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(b1)
+    wires = b1.parse_cut_list()
+    V42_ECU["M130"] = [[pin, code, name] for pin, (code, name) in b1.M130.items()]
+    V42_ECU["rail_pins"] = sorted(b1.RAIL_PINS)
     return wires
 
 

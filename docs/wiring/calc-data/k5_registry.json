@@ -3800,6 +3800,7 @@
    "conflicts": [
     "gauge: v4.2 22 AWG vs April 20 AWG",
     "April superseded — insulation TXL/GXL — superseded by the Tefzel-only lock (state §1, 2026-05-11)",
+    "decision: length_ft 3.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm ECU -> PDM30:OUT13 — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
     "decision: label Headlight Switch -> Park/tail feed -> Dakota VHX DIM (+) night dimming — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
     "decision: to {'device': 'Dakota_VHX_Control_Box', 'pin': 'DIMMER_IN', 'terminal': 'DT04_socket'} -> {'device': 'DAKOTA-VHX', 'pin': 'DIM (+)', 'terminal': 'screw terminal'} — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
@@ -3811,7 +3812,7 @@
     "build-plan/MASTER_CUT_LIST.csv:134"
    ],
    "control": "headlight switch PARK on PDM30 DIG2",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -5855,6 +5856,7 @@
    "april": null,
    "conflicts": [
     "decision: awg 22 -> 18 — Dakota 650314:P p.6: ACC. POWER 18 AWG",
+    "decision: length_ft 3.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm PDM30 -> PDM30:OUT29 — Dakota 650314:P p.6: ACC. POWER 18 AWG",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'ACC. POWER', 'terminal': 'screw terminal'} — Dakota 650314:P p.6: ACC. POWER 18 AWG",
     "pin text from the termination rows (one home for pins, review A3): frm 'PDM30:OUT29' -> 'PDM30:OUT29 (B16)'"
@@ -5863,7 +5865,7 @@
     "output/K5_cut_list_v4_2.txt:98"
    ],
    "control": "PDM30 DIG1 ignition RUN",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "18 AWG",
    "route": {
     "sides": [
@@ -9101,6 +9103,7 @@
    "notes": "Dash-side splice on #80; color follows parent circuit (see v4 receipt)",
    "april": null,
    "conflicts": [
+    "decision: length_ft 1.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm TAP #80 DASH -> PDM30:OUT27 — None",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'L TURN', 'terminal': 'screw terminal'} — None",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
@@ -9112,7 +9115,7 @@
    ],
    "control": "tap of the left turn output: the PDM flashes OUT27 from the turn switch input DIG4 (channel plan)",
    "subsystem_basis": "Dakota VHX dual-sender wires (receipt 2026-05-14 acceptance)",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -9147,6 +9150,7 @@
    "notes": "Dash-side splice on #82; color follows parent circuit (see v4 receipt)",
    "april": null,
    "conflicts": [
+    "decision: length_ft 1.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm TAP #82 DASH -> PDM30:OUT28 — None",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'R TURN', 'terminal': 'screw terminal'} — None",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
@@ -9158,7 +9162,7 @@
    ],
    "control": "tap of the right turn output: the PDM flashes OUT28 from the turn switch input DIG5 (channel plan)",
    "subsystem_basis": "Dakota VHX dual-sender wires (receipt 2026-05-14 acceptance)",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -41837,7 +41841,7 @@
    "M22759/16 22 AWG green/violet": 4.0,
    "M22759/16 22 AWG green/gray": 4.0,
    "M22759/16 22 AWG green/white": 9.2,
-   "M22759/16 22 AWG gray": 39.5,
+   "M22759/16 22 AWG gray": 39.6,
    "M22759/16 22 AWG white": 68.2,
    "M22759/16 22 AWG white/orange": 19.8,
    "M22759/16 22 AWG white/blue": 14.6,
@@ -41901,9 +41905,9 @@
    "kind": "wire",
    "item": "M22759/16 22 AWG red",
    "codes": [],
-   "need_ft": 193.8,
+   "need_ft": 198.8,
    "cart_ft": 0,
-   "status": "short by 193.8 ft"
+   "status": "short by 198.8 ft"
   },
   {
    "kind": "wire",
@@ -42021,9 +42025,9 @@
    "kind": "wire",
    "item": "M22759/16 22 AWG gray",
    "codes": [],
-   "need_ft": 39.3,
+   "need_ft": 39.6,
    "cart_ft": 0,
-   "status": "short by 39.3 ft"
+   "status": "short by 39.6 ft"
   },
   {
    "kind": "wire",
@@ -42491,7 +42495,7 @@
    "codes": [
     "M22759/32-18-2"
    ],
-   "need_ft": 27.7,
+   "need_ft": 27.9,
    "cart_ft": 40.0,
    "status": "covered"
   },
@@ -44060,8 +44064,8 @@
    {
     "code": "M22759/16-22-2",
     "qty": 400,
-    "need_ft": 193.8,
-    "why": "need 193.8 ft"
+    "need_ft": 198.8,
+    "why": "need 198.8 ft"
    },
    {
     "code": "M22759/16-22-3",
@@ -44150,8 +44154,8 @@
    {
     "code": "M22759/16-22-8",
     "qty": 165,
-    "need_ft": 39.3,
-    "why": "need 39.3 ft"
+    "need_ft": 39.6,
+    "why": "need 39.6 ft"
    },
    {
     "code": "M22759/16-22-9",
@@ -51345,7 +51349,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "46": {
@@ -51678,7 +51682,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": true,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "72": {
@@ -52182,7 +52186,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "120": {
@@ -52191,7 +52195,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "121": {
@@ -54576,8 +54580,8 @@
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 159,
-     "twin": 7,
+     "estimated": 155,
+     "twin": 11,
      "unknown": 161
     }
    },
@@ -54693,7 +54697,8 @@
     "L5 material": 1,
     "crossings": 13,
     "length": {
-     "estimated": 16,
+     "estimated": 13,
+     "twin": 3,
      "unknown": 38
     }
    },
@@ -54733,7 +54738,8 @@
     "L5 material": 0,
     "crossings": 0,
     "length": {
-     "estimated": 9,
+     "twin": 1,
+     "estimated": 8,
      "unknown": 14
     }
    },
@@ -54787,8 +54793,8 @@
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 173,
-     "twin": 7,
+     "estimated": 169,
+     "twin": 11,
      "unknown": 178
     }
    }
@@ -54803,8 +54809,8 @@
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 176,
-     "twin": 7,
+     "estimated": 172,
+     "twin": 11,
      "unknown": 207
     }
    }
@@ -58814,10 +58820,10 @@
      },
      {
       "item": "M22759/16 22 AWG red",
-      "need_ft": 193.8,
+      "need_ft": 198.8,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 193.8 ft"
+      "status": "short by 198.8 ft"
      },
      {
       "item": "M22759/16 22 AWG orange",
@@ -58912,10 +58918,10 @@
      },
      {
       "item": "M22759/16 22 AWG gray",
-      "need_ft": 39.3,
+      "need_ft": 39.6,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 39.3 ft"
+      "status": "short by 39.6 ft"
      },
      {
       "item": "M22759/16 22 AWG white",
@@ -59241,7 +59247,7 @@
      },
      {
       "item": "M22759/32 18 AWG red",
-      "need_ft": 27.7,
+      "need_ft": 27.9,
       "cart_ft": 40.0,
       "on_hand_ft": null,
       "status": "covered"
