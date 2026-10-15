@@ -1,0 +1,19 @@
+/* Just listed: each listing a card. A row on a wide screen (photo, what it is and says, what it asks and where);
+   on a phone the photo across the screen, then the same, the way a marketplace feed reads. */
+.market-asks { display: grid; }
+.market-ask { display: grid; grid-template-columns: 168px minmax(0, 1fr) 220px; gap: 14px; align-items: center;
+  padding: 10px 12px; border-bottom: 2px solid var(--border); background: var(--bg); color: var(--text); }
+.market-ask a { color: inherit; }
+.market-ask__image { display: block; }
+.market-ask__image img, .market-ask__blank { display: block; width: 168px; height: 112px; object-fit: cover; background: var(--surface); }
+.market-ask__identity { display: grid; gap: 4px; min-width: 0; }
+.market-ask__identity > a { overflow-wrap: anywhere; text-decoration: none; }
+.market-ask__identity > a:hover, .market-ask__identity > a:focus-visible { text-decoration: underline; }
+.market-ask__deal { display: grid; gap: 4px; justify-items: end; text-align: right; }
+@media (max-width: 760px) {
+  .market-ask { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "image image" "identity identity" "deal deal"; gap: 8px; padding: 12px 8px; }
+  .market-ask__image { grid-area: image; }
+  .market-ask__image img, .market-ask__blank { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+  .market-ask__identity { grid-area: identity; }
+  .market-ask__deal { grid-area: deal; grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: baseline; text-align: left; }
+}

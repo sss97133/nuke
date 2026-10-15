@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
-import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Masthead, Text } from '../../kit';
 import { sourceLink, sourceName } from './useCapturedListings';
+import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
@@ -198,33 +198,33 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
     {query.isError && <p role="status" className="k-body">Arrivals could not be read. <button type="button" className="market-control" onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
     {first && !rows.length && <p role="status" className="k-body">{located && population?.with_point === 0
       ? 'No ask in this window has a recorded place yet.' : 'No ask in this window matches these lenses.'}</p>}
-    {rows.length > 0 && <div className="market-listings__scroll"><table className="market-listings">
-      <thead><tr><th scope="col"><Text role="label">Listing / vehicle</Text></th><th scope="col"><Text role="label">Asking</Text></th>
-        <th scope="col"><Text role="label">Place</Text></th></tr></thead>
-      <tbody>{rows.map(row => {
-        const href = sourceLink(row.source, row.url);
-        const identity = [row.year, row.make, row.model].filter(Boolean).join(' ');
-        const image = vehicleImage(row.image);
-        // The photo says the body and drive; the row carries what it cannot: miles, and how old the listing is.
-        const said = listingFacts(row);
-        const age = ageOf(listedAt(row), now);
-        const seen = [sourceName(row.source), age && (age === 'now' ? 'just now' : `${age} ago`)].filter(Boolean).join(' · ');
-        return <tr key={row.event_id}>
-          <td>{image && <img className="market-listing__image" src={image} width="80" height="60" loading="lazy" alt="Vehicle record image" onError={event => { event.currentTarget.hidden = true; }} />}
-            <Text role="entity" dense as="div"><PrefetchLink to={`/vehicle/${row.vehicle_id}`} aria-label={identity || 'Vehicle identity unrecorded'}>
-              {row.make && row.model ? <VehicleIdentity year={row.year} make={row.make} model={row.model} />
-                : row.make ? <>{row.year ?? ''} <MakeIdentity make={row.make} /></> : identity || 'Vehicle identity unrecorded'}
-            </PrefetchLink></Text>
-            {(said.miles || said.title) && <Text role="caption" as="div">{said.miles}{said.miles && said.title ? ' · ' : ''}{said.title && <strong>{said.title}</strong>}</Text>}
-            <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{seen}</a> : seen}</Text></td>
-          <td>{row.asking_price == null ? <Text role="caption">Unpriced</Text>
-            : <><Text role="measure" dense>${Number(row.asking_price).toLocaleString('en-US')}</Text> <Text role="caption">· asking</Text></>}
-          </td>
-          <td>{row.city || row.region ? <Text role="body" as="div">{[row.city, row.region].filter(Boolean).join(', ')}</Text> : <Text role="caption" as="div">Place unrecorded</Text>}
-            {row.distance_mi != null && <Text role="caption" as="div">{row.distance_mi.toLocaleString('en-US')} mi away</Text>}</td>
-        </tr>;
-      })}</tbody>
-    </table></div>}
+    {rows.length > 0 && <div className="market-asks" role="list" aria-label="Just listed">{rows.map(row => {
+      const href = sourceLink(row.source, row.url);
+      const identity = [row.year, row.make, row.model].filter(Boolean).join(' ');
+      const image = vehicleImage(row.image);
+      // The photo says the body and drive; the card says what it cannot: what the listing states about its miles and
+      // title, where it is, what it asks, and how long it has been up.
+      const said = listingFacts(row);
+      const age = ageOf(listedAt(row), now);
+      const seen = [sourceName(row.source), age && (age === 'now' ? 'just now' : `${age} ago`)].filter(Boolean).join(' · ');
+      const place = [row.city, row.region].filter(Boolean).join(', ');
+      return <article key={row.event_id} role="listitem" className="market-ask">
+        <PrefetchLink to={`/vehicle/${row.vehicle_id}`} className="market-ask__image" aria-label={identity || 'Vehicle identity unrecorded'} tabIndex={-1}>
+          {image ? <img src={image} width="168" height="112" loading="lazy" alt="" onError={event => { event.currentTarget.hidden = true; }} />
+            : <span className="market-ask__blank" />}
+        </PrefetchLink>
+        <div className="market-ask__identity">
+          <PrefetchLink to={`/vehicle/${row.vehicle_id}`}><Text role="entity">{identity || 'Vehicle identity unrecorded'}</Text></PrefetchLink>
+          {(said.miles || said.title) && <Text role="body" as="div">{said.miles}{said.miles && said.title ? ' · ' : ''}{said.title && <strong>{said.title}</strong>}</Text>}
+          <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{seen}</a> : seen}</Text>
+        </div>
+        <div className="market-ask__deal">
+          {row.asking_price == null ? <Text role="caption">Unpriced</Text>
+            : <span><Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text> <Text role="caption">· asking</Text></span>}
+          <Text role="body" as="div">{place || 'Place unrecorded'}{row.distance_mi != null ? ` · ${row.distance_mi.toLocaleString('en-US')} mi away` : ''}</Text>
+        </div>
+      </article>;
+    })}</div>}
     {query.hasNextPage && <button type="button" className="market-control" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
       <Text role="label">{query.isFetchingNextPage ? 'Reading more…' : `Load more (${count(rows.length)} of ${count(first?.matching)})`}</Text></button>}
   </section>;
