@@ -39,7 +39,7 @@ the 3137CT crimp tool's colour bands, which differ from the maker's own figures 
   - PDM30-B B8, five 20 AWG wires: 4 + 1. Five 20 AWG wires and the lead come to 7,296 CMA against 6,755.
 - The two-wire CAN, 5 V and 0 V pins move from D-609-04 to D-609-05: two 22 AWG wires and the lead are 2,724 CMA, past
   the D-609-04's 2,680.
-- BOM: D-609-04 goes from 23 to 15 and D-609-05 from 32 to 46.
+- BOM: D-609-04 goes from 23 to 15 and D-609-05 from 34 to 46.
 - The device-terminal splices (pass 18) keep their parts. They still have no lead into the terminal, because the
   factory terminals' ranges are open in the registry.
 
