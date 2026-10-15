@@ -532,20 +532,26 @@ Deno.serve(async (req) => {
           hammer_price: hammer,
           hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
           // The source document is retained on the observation (raw_data); the page is stamped for the cursor.
-          raw_document: { ...doc, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo, sort: SORT } },
+          raw_document: { ...doc, styledDescription: undefined, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo, sort: SORT } },
         };
       });
 
-      const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
-        body: JSON.stringify({ action: "land_lots", lots, observed_at: observedAt }),
-      });
-      const landed = await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` }));
+      // Two calls of 50: one 100-lot call hit WORKER_RESOURCE_LIMIT (2026-10-15 01:41Z).
+      const landed: Record<string, unknown>[] = [];
+      let landOk = true;
+      for (let i = 0; i < lots.length; i += 50) {
+        const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ action: "land_lots", lots: lots.slice(i, i + 50), observed_at: observedAt }),
+        });
+        landOk = landOk && landRes.ok;
+        landed.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
+      }
 
       // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
       return okJson({
-        success: landRes.ok, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
+        success: landOk, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
         next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
       });
     }

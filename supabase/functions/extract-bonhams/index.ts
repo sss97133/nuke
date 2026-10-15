@@ -1051,7 +1051,9 @@ async function saveVehicle(
   // Fire-and-forget observation write
   {
     const obsFields: Record<string, any> = {};
-    const obsSkip = new Set(["discovery_url", "discovery_source", "source", "listing_source", "profile_origin", "status", "is_public", "origin_metadata", "extractor_version"]);
+    // Fast path: the vehicles row keeps the full description; on the observation it rides as content_text, because
+    // idx_vobs_specs_covering includes structured_data and a btree entry over 2.7 KB is refused.
+    const obsSkip = new Set([...(opts.fast ? ["description"] : []), "discovery_url", "discovery_source", "source", "listing_source", "profile_origin", "status", "is_public", "origin_metadata", "extractor_version"]);
     for (const [k, v] of Object.entries(vehicleData)) {
       if (v != null && !obsSkip.has(k)) obsFields[k] = v;
     }
@@ -1063,6 +1065,7 @@ async function saveVehicle(
       extractionMethod: opts.method ?? "json_ld_parse",
       observedAt: opts.observedAt,
       rawData: extracted.raw_document,
+      contentText: opts.fast ? (vehicleData.description ?? undefined) : undefined,
     }).catch((e: any) => {
       console.warn(`[BONHAMS] observationWriter error for ${targetId}: ${e?.message}`);
       return null;
