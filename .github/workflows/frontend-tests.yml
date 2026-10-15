@@ -526,6 +526,8 @@ jobs:
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
       - name: Verify RM Sotheby's writes only vehicles, reads each lot once, finds a vehicle before writing it again, and calls an unheld lot upcoming
         run: deno test supabase/functions/extract-rmsothebys/
+      - name: Verify JamesEdition title and detail identity agree before intake
+        run: deno test supabase/functions/extract-jamesedition/
 
   profile-fold-contract:
     runs-on: ubuntu-latest
