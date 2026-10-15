@@ -1225,13 +1225,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         </button>
       </div>}
 
-      {/* ─── BREADCRUMB / NAVIGATION BAR ─── */}
+      {/* ─── BREADCRUMB / NAVIGATION BAR ─── (one row on a desktop; on a phone the caption and the view switch wrap
+          to a second row instead of being clipped) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '0 16px',
-          height: 32,
+          flexWrap: 'wrap',
+          padding: '2px 16px',
+          minHeight: 32,
           borderBottom: '2px solid var(--border)',
           background: 'var(--surface)',
           flexShrink: 0,
@@ -1275,8 +1277,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           );
         })}
 
-        {/* Level indicator + feed shortcut */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        {/* Level indicator + feed shortcut; wraps under itself on a phone rather than pushing the caption off screen */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
           {activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
