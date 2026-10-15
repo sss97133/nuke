@@ -793,6 +793,8 @@ def main():
         # ends are keyed to their terminal and tool parts (key_harness_wire_ends, RSI pass 6)
         print(f"segment ends: {api._req('POST', 'rpc/fill_harness_segment_ends', {'p_vehicle_id': K5})}")
         print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
+        print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
