@@ -19,6 +19,20 @@ const DEEP_ACTIONS = [
   { type: "click", selector: ".gallery-preview .all" }, { type: "wait", milliseconds: 2500 },
 ];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * A retained, successful capture of an ENDED auction page is final: the result will not change, so re-fetching it only spends a
+ * credit (daily-capture-master found 91 paid re-fetches of URLs that already had a successful snapshot in 7 days). The
+ * extractor's own cache lookup reads it for free. A live-auction capture is stale by definition and does not count.
+ */
+export async function retainedEndedCapture(supabase: any, url: string): Promise<string | null> {
+  const base = url.replace(/\/+$/, "");
+  const { data, error } = await supabase.from("listing_page_snapshots").select("id")
+    .in("listing_url", [base, `${base}/`]).eq("success", true).like("html", "%bid-bar  ended%")
+    .order("fetched_at", { ascending: false }).limit(1);
+  if (error) return null; // unreadable cache: fall through to a fetch, never block the lot
+  return data?.[0]?.id ?? null;
+}
+
 export const auctionId = (url: string) => url.match(/\/auctions\/([^/?#]+)/)?.[1] ?? null;
 
 export async function discoverTargets(supabase: any, firecrawlApiKey: string) {
@@ -102,7 +116,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
     for (const t of targets) if (picked.length < limit * 3 && !done.has(t.listing_url)) picked.push(t);
   }
 
-  const results = { candidates: picked.length, landed: 0, failed: 0, credits: 0, stopped: null as string | null, errors: [] as string[] };
+  const results = { candidates: picked.length, landed: 0, failed: 0, credits: 0, cache_hits: 0, stopped: null as string | null, errors: [] as string[] };
   let streak = 0;
   let claimed = 0;
   for (const t of picked) {
@@ -117,23 +131,31 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
     const finish = async (status: string, error?: string, vehicleId?: string) =>
       softWrite("import_queue update", await supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id), results.errors);
     try {
-      const fc = await firecrawlScrape(
-        {
-          url: t.listing_url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500,
-          // Same 1 credit as a bare scrape (measured 2026-10-15): comments filtered to Newest show the whole thread, and
-          // "All Photos" opens the full gallery. Without these a sold page shows 19 of 51 comments and 9 of 75 photos.
-          actions: DEEP_ACTIONS,
-        },
-        { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
-      );
-      results.credits += Number(fc.raw?.data?.metadata?.creditsUsed ?? 1);
-      if (fc.httpStatus === 404) { await finish("skipped", "PAGE_NOT_FOUND"); await supabase.rpc("resolve_revision_item", { p_id: row.id, p_outcome: "dead_page", p_detail: { http: 404 } }); streak = 0; await sleep(delayMs); continue; }
-      const html = fc.data?.html ?? "";
-      if (!html || html.length < 1000) throw new Error(fc.error || `insufficient html (${html.length}) status ${fc.httpStatus}`);
+      const retained = await retainedEndedCapture(supabase, t.listing_url);
+      let html = "";
+      let markdown = "";
+      if (retained) {
+        results.cache_hits++; // free: the extractor reads its cached snapshot, no Firecrawl
+      } else {
+        const fc = await firecrawlScrape(
+          {
+            url: t.listing_url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500,
+            // Same 1 credit as a bare scrape (measured 2026-10-15): comments filtered to Newest show the whole thread, and
+            // "All Photos" opens the full gallery. Without these a sold page shows 19 of 51 comments and 9 of 75 photos.
+            actions: DEEP_ACTIONS,
+          },
+          { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
+        );
+        results.credits += Number(fc.raw?.data?.metadata?.creditsUsed ?? 1);
+        if (fc.httpStatus === 404) { await finish("skipped", "PAGE_NOT_FOUND"); await supabase.rpc("resolve_revision_item", { p_id: row.id, p_outcome: "dead_page", p_detail: { http: 404 } }); streak = 0; await sleep(delayMs); continue; }
+        html = fc.data?.html ?? "";
+        markdown = fc.data?.markdown ?? "";
+        if (!html || html.length < 1000) throw new Error(fc.error || `insufficient html (${html.length}) status ${fc.httpStatus}`);
+      }
       const res = await fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-core`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-        body: JSON.stringify({ url: t.listing_url, html, markdown: fc.data?.markdown ?? "" }),
+        body: JSON.stringify(retained ? { url: t.listing_url } : { url: t.listing_url, html, markdown }),
         signal: AbortSignal.timeout(90_000),
       });
       const out = await res.json().catch(() => ({}));
@@ -199,6 +221,8 @@ export async function recaptureCab(supabase: any, supabaseUrl: string, key: stri
   }
   const results: Record<string, unknown>[] = [];
   for (const url of urls) {
+    const retained = await retainedEndedCapture(supabase, url);
+    if (retained) { results.push({ url, fetched: false, cache_hit: true, snapshot_id: retained }); continue; } // an ended capture is final: no credit
     let fc = await firecrawlScrape(
       { url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500, actions: DEEP_ACTIONS },
       { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
