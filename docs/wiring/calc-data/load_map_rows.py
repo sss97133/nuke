@@ -199,6 +199,14 @@ PIN_SPLICE = {}     # RSI pass 26: pin splice node -> its plug and cavity (set b
 # RSI pass 31: boxes the design record has placed (catalog/mounts.yaml `position`, twin frame): anchor code -> (box, position)
 _MOUNTS = yaml.safe_load((Path(__file__).with_name("catalog") / "mounts.yaml").read_text()) or {}
 PLACED = {b["position"]["node"]: (b, b["position"]) for b in (_MOUNTS.get("boxes") or []) if b.get("position")}
+# RSI pass 35: plugs the design record places on a point of their own (mounts.yaml `ends` position): code -> (end, position)
+END_POS = {e["id"]: (e, e["position"]) for e in (_MOUNTS.get("ends") or []) if e.get("position")}
+
+
+def end_source(code):
+    e, pos = END_POS[code]
+    return (f"digital-twin anchor {pos['point']}: {e['where']} ({e['status']}, confidence {pos['confidence']}; {pos['method']}; "
+            f"{pos['source']})")
 
 
 def placed_source(a):
@@ -214,6 +222,12 @@ def position(code):
         # the plug's own source first: the route graph keys a node by the twin anchor its pos_source starts with (RSI pass 28)
         return dict(at, pos_source=at["pos_source"] + f" — beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the "
                                                       "plug on its lead") if at else {}
+    if code in END_POS and END_POS[code][1]["point"] not in PLACED:   # the end's own placed point (RSI pass 35)
+        pos = END_POS[code][1]
+        return {"pos_x_m": pos["x"], "pos_y_m": pos["y"], "pos_z_m": pos["z"], "pos_source": end_source(code)}
+    if code in END_POS:   # an end placed on a box's point keys through that box (e.g. the PDM30's own pigtail splices)
+        a = END_POS[code][1]["point"]
+        return {"pos_x_m": PLACED[a][1]["x"], "pos_y_m": PLACED[a][1]["y"], "pos_z_m": PLACED[a][1]["z"], "pos_source": placed_source(a)}
     a = NODE_ANCHOR.get(code)
     if a in PLACED:     # the design record's placement overtakes the twin anchor (RSI pass 31)
         pos = PLACED[a][1]
@@ -833,6 +847,18 @@ def main():
         # the boxes the design record places land on the route graph first (RSI pass 31), then each plug keys to its point
         points = [{"node_code": a, "kind": "device", "x": pos["x"], "y": pos["y"], "z": pos["z"], "pos_source": placed_source(a),
                    "method": "placement decision record (catalog/mounts.yaml)", "trust": b["status"]} for a, (b, pos) in PLACED.items()]
+        # each point the ends sit on, once (a shared point takes its first end's words); a box's point stays the box's
+        seen_pts = set(PLACED)
+        for code, (e, pos) in sorted(END_POS.items()):
+            if pos["point"] in seen_pts:
+                continue
+            seen_pts.add(pos["point"])
+            et = endpoint_type(code, str((eps.get(code) or {}).get("device") or ""))
+            kind = ("splice" if et == "splice" else "ground" if et == "ground"
+                    else "bulkhead" if re.search(r"FIREWALL|BULKHEAD|PASS", code) else "device")
+            points.append({"node_code": pos["point"], "kind": kind, "x": pos["x"], "y": pos["y"], "z": pos["z"],
+                           "pos_source": f"{pos['point']}: {e['where']} (confidence {pos['confidence']}; {pos['method']}; {pos['source']})",
+                           "method": "placement decision record (catalog/mounts.yaml ends)", "trust": e["status"]})
         print(f"route points: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
         # the route graph's branches and their junctions from the design record, then every segment between standing
