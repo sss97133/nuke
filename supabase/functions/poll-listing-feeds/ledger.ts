@@ -518,6 +518,8 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
 export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, clock = Date.now) {
   let attempted = 0;
   let sourceShare = 20;
+  // Revisits (a landed post asked again) may take at most a quarter of an invocation's ingests: new posts come first.
+  let revisitsLeft = Math.floor(throttle.max_ingests / 4);
   const sources = new Map<string, { attempted: number; estimate_ms: number; hold: string | null }>();
   const state = (source: string) => {
     if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: 15_000, hold: null });
@@ -534,6 +536,9 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
     return null;
   };
   return {
+    /** How many revisits this feed page may still plan; spendRevisits() takes them off after planning. */
+    revisitAllowance() { return revisitsLeft; },
+    spendRevisits(n: number) { revisitsLeft = Math.max(0, revisitsLeft - n); },
     shareAcrossSources(count: number) { sourceShare = Math.max(1, Math.ceil(throttle.max_ingests / Math.max(1, count))); },
     // A source's fair share is still too large for one busy target to spend
     // before the other selected feeds get a turn. Recompute from unspent

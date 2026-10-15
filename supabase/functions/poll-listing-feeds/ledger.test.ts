@@ -569,3 +569,12 @@ Deno.test("an unresolved Craigslist blip is ledgered skipped with its observatio
   equal(w.status, "skipped");
   equal((w.row.raw_data as any).blip_observation_id, "obs-1");
 });
+
+Deno.test("revisits take at most a quarter of an invocation's ingests, spent across feed pages", () => {
+  const b = createIntakeBudget(intakeThrottle({ max_ingests: 40 }), Date.now());
+  equal(b.revisitAllowance(), 10);
+  b.spendRevisits(4);
+  equal(b.revisitAllowance(), 6);
+  b.spendRevisits(50);
+  equal(b.revisitAllowance(), 0);
+});
