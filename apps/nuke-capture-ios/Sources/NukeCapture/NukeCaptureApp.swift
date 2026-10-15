@@ -117,6 +117,9 @@ struct NukeCaptureApp: App {
                     if SyncEngine.shared.backfillRemaining > 0 {
                         Self.scheduleBackgroundBackfill()
                     }
+                    // File what the owner's albums already say (no image reading, so it is cheap
+                    // enough for the foreground); serial reads wait for the charging job.
+                    await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
                 }
                 // Freshen the local store from the newest photos' true EXIF so the day
                 // receipt renders offline. DEFERRED + low-priority + small: the head pass
@@ -262,7 +265,7 @@ struct NukeCaptureApp: App {
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
-            await AttributionEngine.shared.run()
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.
