@@ -69,16 +69,33 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     /// space), so a day's photos (ordered by EXIF takenAt) can drive the existing
     /// global-index pager + cell. The grid sorts by creationDate, the day by takenAt,
     /// so a day's photos are NOT contiguous here — map per id. Ids no longer in the
-    /// library (deleted) drop out (NSNotFound), never a phantom. Main-actor read.
-    func indexMap(forLocalIdentifiers lids: [String]) -> [String: Int] {
+    /// library (deleted) drop out, never a phantom.
+    ///
+    /// One pass over the library builds an id → position table, off the main thread, cached until
+    /// the library changes. The old version called `PHFetchResult.index(of:)` once per photo, a
+    /// linear search of the whole library each time, on the main thread: opening a day or an
+    /// album held the main thread past the 10 s watchdog and iOS killed the app (crash reports
+    /// 2026-10-13 16:15 and 2026-10-15 10:13 on the owner's phone).
+    func indexMap(forLocalIdentifiers lids: [String]) async -> [String: Int] {
         guard !lids.isEmpty else { return [:] }
-        let fetched = PHAsset.fetchAssets(withLocalIdentifiers: lids, options: nil)
+        let table = await positionTable()
         var out: [String: Int] = [:]
-        fetched.enumerateObjects { asset, _, _ in
-            let i = self.assets.index(of: asset)
-            if i != NSNotFound { out[asset.localIdentifier] = i }
-        }
+        for lid in lids { if let i = table[lid] { out[lid] = i } }
         return out
+    }
+
+    private var positionCache: (result: PHFetchResult<PHAsset>, table: [String: Int])?
+    private func positionTable() async -> [String: Int] {
+        let current = assets
+        if let c = positionCache, c.result === current { return c.table }
+        let table = await Task.detached(priority: .userInitiated) { () -> [String: Int] in
+            var t: [String: Int] = [:]
+            t.reserveCapacity(current.count)
+            current.enumerateObjects { asset, i, _ in t[asset.localIdentifier] = i }
+            return t
+        }.value
+        if assets === current { positionCache = (current, table) }
+        return table
     }
 
     /// Metadata-only human pass. No parsing album titles into vehicle IDs, no

@@ -1398,7 +1398,7 @@ private struct PhotoFullScreenView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
-            AsyncImage(url: (photo.url ?? photo.thumb).flatMap(URL.init)) { image in
+            CachedAsyncImage(url: NukeImage.thumb(photo.url ?? photo.thumb, width: 2048)) { image in
                 image
                     .resizable()
                     .scaledToFit()
