@@ -39,8 +39,15 @@ MIL = {"black": "0", "brown": "1", "red": "2", "orange": "3", "yellow": "4", "gr
        "blue": "6", "violet": "7", "gray": "8", "grey": "8", "white": "9"}
 MIL_NAME = {v: k for k, v in MIL.items() if k != "grey"}
 PAD_ENGINE, PAD_BODY = 1.20, 1.15            # state row 33: 20 % engine bay, 15 % body
-CMA = {24: 404, 22: 642, 20: 1020, 18: 1620, 16: 2580, 14: 4110, 12: 6530, 10: 10380}   # AWG circular mils
-MINISEAL = [("D-609-03", 26, 20), ("D-609-04", 20, 16), ("D-609-05", 16, 12)]  # prowire 3137ct cavities
+# Splice sizing on the splice maker's figures (RSI pass 21): TE/Raychem SCD D-436-60/-61 (issue 1, 5 Dec 2000; same
+# barrels as D-609-04/-05) counts 26 = 304, 24 = 475, 22 = 754, 20 = 1216, 18 = 1900, 16 = 2426 CMA; 14, 12 and 10 AWG
+# are not in that table and keep the AWG nominal. The D-609 ranges are TE/Raychem SCD D-609-03/-04/-05 (issue 1,
+# 31 Jan 2001), in CMA. Copies: reference_documents/component_drawings/te_raychem_D-*.pdf (local library).
+CMA = {26: 304, 24: 475, 22: 754, 20: 1216, 18: 1900, 16: 2426, 14: 4110, 12: 6530, 10: 10380}
+MINISEAL = [("D-609-03", 300, 1510), ("D-609-04", 779, 2680), ("D-609-05", 1900, 6755)]
+# The lead from a pin splice into its Superseal contact: MoTeC wants 24-20 AWG on 8 A PDM outputs (PDM manual p.6,
+# p.48) and ProWire's SSC-N takes 16-24 AWG; 20 AWG is also what the design's B16 group leads already were.
+PIN_LEAD = 20
 ENGINE_ONLY_OFF = {"23", "50", "73", "83", "84", "87", "88", "80", "82"}     # state row 50 (Dave, 2026-06-18)
 # chassis circuits the June build sheet listed as 61-pin overflow; they cross in the body crossing instead (state row 50)
 CHASSIS_OFF = {"100": "speed sender (Dakota SEN-01-5 on the NP205) is a chassis circuit: crossing = bulkhead C, cavity OPEN "
@@ -110,15 +117,15 @@ def awg_equiv(cma):
 
 
 def splice_for(awgs):
-    """MiniSeal colour by the combined area of the wires entering one side (engineering rule:
-    total circular mils → equivalent AWG → the 3137CT cavity range that holds it)."""
+    """The smallest MiniSeal stub splice whose CMA range holds the combined area of the conductors entering it
+    (TE/Raychem's ranges and CMA per gauge, RSI pass 21), and the equivalent AWG of that area."""
     if not awgs or any(a not in CMA for a in awgs):
         return None, None          # a gauge the table does not hold is not sized as zero area (RSI pass 18)
-    eq = awg_equiv(sum(CMA[a] for a in awgs))
+    tot = sum(CMA[a] for a in awgs)
     for code, lo, hi in MINISEAL:
-        if hi <= eq <= lo:
-            return code, eq
-    return None, eq
+        if lo <= tot <= hi:
+            return code, awg_equiv(tot)
+    return None, awg_equiv(tot)
 
 
 def wire_keys(w):
@@ -381,21 +388,32 @@ def attach(reg):
                 need["4-1437284-3"] += max(0, empty)
             for cv, ws in sorted(by_cav.items()):
                 if len(ws) > 1:
+                    # RSI pass 21: the splice beside a Superseal pin takes its wires and the lead into the contact
                     awgs = [wires[x]["awg"] for x in ws if isinstance(wires[x]["awg"], int)]
-                    code, eq = splice_for(awgs)
+                    code, eq = splice_for(awgs + [PIN_LEAD])
                     if code:
-                        splices.append({"at": f"{eid} {cv}", "wires": ws, "splice": code, "equiv_awg": eq})
+                        splices.append({"at": f"{eid} {cv}", "wires": ws + [f"{PIN_LEAD} AWG pin lead"], "splice": code, "equiv_awg": eq})
                         need[code] += 1
                         continue
-                    # too big for one MiniSeal: groups that fit D-609-05 with a 20 AWG lead out, then one join
-                    per = max(1, (CMA[12] - CMA[20]) // max(CMA.get(a, 642) for a in awgs))
-                    groups = [ws[i:i + per] for i in range(0, len(ws), per)]
+                    # too big for one MiniSeal: wires packed in order into groups that each fit D-609-05 with a group
+                    # lead out, then one join of the group leads and the pin lead
+                    cap = MINISEAL[-1][2] - CMA[PIN_LEAD]
+                    groups, cur, tot = [], [], 0
+                    for x in ws:
+                        a = CMA.get(wires[x]["awg"], CMA[22])
+                        if cur and tot + a > cap:
+                            groups.append(cur)
+                            cur, tot = [], 0
+                        cur.append(x)
+                        tot += a
+                    groups.append(cur)
                     for g in groups:
-                        gc, ge = splice_for([wires[x]["awg"] for x in g] + [20])
-                        splices.append({"at": f"{eid} {cv}", "wires": g + ["20 AWG lead"], "splice": gc, "equiv_awg": ge})
+                        gc, ge = splice_for([wires[x]["awg"] for x in g if isinstance(wires[x]["awg"], int)] + [PIN_LEAD])
+                        splices.append({"at": f"{eid} {cv}", "wires": g + [f"{PIN_LEAD} AWG group lead"], "splice": gc, "equiv_awg": ge})
                         need[gc] += 1
-                    jc, je = splice_for([20] * (len(groups) + 1))
-                    splices.append({"at": f"{eid} {cv}", "wires": [f"{len(groups)} group leads", "pin lead"], "splice": jc, "equiv_awg": je})
+                    jc, je = splice_for([PIN_LEAD] * (len(groups) + 1))
+                    splices.append({"at": f"{eid} {cv}", "wires": [f"{PIN_LEAD} AWG group lead"] * len(groups) + [f"{PIN_LEAD} AWG pin lead"],
+                                    "splice": jc, "equiv_awg": je})
                     need[jc] += 1
             per_end = [{"cavity": cv, "wires": ws, "part": "SSC-N"} for cv, ws in sorted(by_cav.items())]
         elif fid == "d38999_20":
