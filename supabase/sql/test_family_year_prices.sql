@@ -10,6 +10,7 @@
 --     sale whose own page names its model year but not its family is another car: not pooled, counted in conflicts;
 --   * asks: Facebook listings and classified events in the 365 days before today, one per vehicle (its latest), never a
 --     duplicate or blocked listing, never a private or deleted vehicle, never pooled with sales;
+--   * (20261015218000) badge twins pool by canonical_models.platform, one row per family naming the platform;
 --   * (20261015215000) venues: each source's count and its median from 5 prices, within the row's window;
 --   * (20261015160000) the odometer: sorted readings, n_miles and the median over the same window and rows, zero and
 --     out-of-range readings unknown, an ask carrying its own or its vehicle's reading; replacing the unbuilt view and
@@ -51,7 +52,7 @@ CREATE TABLE public.mv_treemap_outcomes (id uuid PRIMARY KEY, brand_name text, m
   outcome text, sale_basis text, sold_amount numeric, bat_bids integer, bat_watchers integer);
 CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles bigint, make text, family_id uuid,
   family text, matched text, year_start integer, year_end integer, PRIMARY KEY (make_l, model_l));
-CREATE TABLE public.canonical_models (id uuid PRIMARY KEY, make text, canonical_model text, aliases text[]);
+CREATE TABLE public.canonical_models (id uuid PRIMARY KEY, make text, canonical_model text, aliases text[], platform text);
 CREATE TABLE public.marketplace_listings (id uuid PRIMARY KEY, vehicle_id uuid, price integer, status text,
   first_seen_at timestamptz, mileage integer);
 CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY, vehicle_id uuid, source_platform text, current_price numeric,
@@ -63,9 +64,15 @@ INSERT INTO public.mv_model_family_names (make_l, model_l, vehicles, make, famil
   ('chevrolet', 'corvette', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000a', 'Corvette', 'corvette', 1953, NULL),
   ('chevrolet', 'corvette stingray', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000a', 'Corvette', 'corvette stingray', 1953, NULL),
   ('buick', 'electra 225', 1, 'Buick', '00000000-0000-4000-c000-00000000000b', 'Electra', 'electra 225', 1959, 1976),
-  ('buick', 'mystery', 1, 'Buick', NULL, NULL, NULL, NULL, NULL);
+  ('buick', 'mystery', 1, 'Buick', NULL, NULL, NULL, NULL, NULL),
+  -- Badge twins (20261015218000): the GMC K1500 (family C) and the Chevrolet K1500 (family D), one platform.
+  ('gmc', 'k1500', 1, 'GMC', '00000000-0000-4000-c000-00000000000c', 'K1500', 'k1500', 1988, 1998),
+  ('chevrolet', 'k1500', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000d', 'K1500', 'k1500', 1988, 1998);
 -- The families' canonical rows: family A's own row (its id is the family_id) and a duplicate spelled "CHEVROLET" whose
 -- alias "stingray" belongs to the same family; family B's row. A two-letter alias is too short to name anything.
+INSERT INTO public.canonical_models (id, make, canonical_model, aliases, platform) VALUES
+  ('00000000-0000-4000-c000-00000000000c', 'GMC', 'K1500', '{k1500}', 'gm-k1500'),
+  ('00000000-0000-4000-c000-00000000000d', 'Chevrolet', 'K1500', '{k1500}', 'gm-k1500');
 INSERT INTO public.canonical_models (id, make, canonical_model, aliases) VALUES
   ('00000000-0000-4000-c000-00000000000a', 'Chevrolet', 'Corvette', '{corvette,vette,"sting ray",cv}'),
   ('00000000-0000-4000-c000-0000000000aa', 'CHEVROLET', 'Corvette', '{stingray}'),
@@ -111,6 +118,14 @@ INSERT INTO public.mv_treemap_outcomes (id, year, source_name, outcome, sold_amo
   ('00000000-0000-4000-a067-000000000101', 1967, 'Bring a Trailer', 'sold', 1000),
   ('00000000-0000-4000-a067-000000000102', 1967, 'Mecum', 'sold', 500000),
   ('00000000-0000-4000-a067-000000000103', 1967, 'Bring a Trailer', 'sold', 2000);
+-- Twins: 2 GMC K1500 sales (1995, 3,000 and 4,000, Mecum) and 12 Chevrolet K1500 sales (1995, 1,000 .. 12,000, BaT).
+INSERT INTO public.vehicles (id, make, model, year)
+SELECT ('00000000-0000-4000-d095-' || lpad(g::text, 12, '0'))::uuid, CASE WHEN g <= 2 THEN 'GMC' ELSE 'Chevrolet' END,
+       'K1500', 1995 FROM generate_series(1, 14) g;
+INSERT INTO public.mv_treemap_outcomes (id, year, source_name, outcome, sold_amount)
+SELECT ('00000000-0000-4000-d095-' || lpad(g::text, 12, '0'))::uuid, 1995,
+       CASE WHEN g <= 2 THEN 'Mecum' ELSE 'Bring a Trailer' END, 'sold',
+       CASE WHEN g <= 2 THEN 2000 + g * 1000 ELSE (g - 2) * 1000 END FROM generate_series(1, 14) g;
 -- A 1966: 4 sales at 1,000 .. 4,000 (Mecum).
 INSERT INTO public.vehicles (id, make, model, year)
 SELECT ('00000000-0000-4000-a066-' || lpad(g::text, 12, '0'))::uuid, 'Chevrolet', 'Corvette', 1966 FROM generate_series(1, 4) g;
@@ -156,6 +171,9 @@ INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_pric
 -- 20261015215000 replaces it again with venues (each source's count and median); applied twice.
 \ir ../migrations/20261015215000_family_year_prices_venues.sql
 \ir ../migrations/20261015215000_family_year_prices_venues.sql
+-- 20261015218000 replaces it again, pooling badge twins by canonical_models.platform; applied twice.
+\ir ../migrations/20261015218000_family_year_prices_platforms.sql
+\ir ../migrations/20261015218000_family_year_prices_platforms.sql
 SELECT pg_temp.ok('created empty: the deploy reads nothing; the first build is the refresh',
   NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
 SELECT public.refresh_family_year_prices();
@@ -184,10 +202,17 @@ SELECT pg_temp.ok('A 1968 (no sales of its own) borrows 1967: 1967..1969, 12 sal
   (SELECT year_from = 1967 AND year_to = 1969 AND n = 12 FROM pg_temp.r('a', 1968, 'sold')));
 SELECT pg_temp.ok('B 1971: 9 sales even at 1966..1976, thin, no percentiles; the 1990 Electra and the Mystery are not claimed',
   (SELECT year_from = 1966 AND year_to = 1976 AND n = 9 AND thin AND p50 IS NULL AND p10 IS NULL FROM pg_temp.r('b', 1971, 'sold'))
-  AND NOT EXISTS (SELECT 1 FROM public.mv_family_year_prices WHERE year >= 1985));
+  AND NOT EXISTS (SELECT 1 FROM public.mv_family_year_prices WHERE family_id = '00000000-0000-4000-c000-00000000000b' AND year >= 1985));
 SELECT pg_temp.ok('A 1967 asked: 10 asks, one per vehicle, a1 at its latest (Craigslist 6,000); never pooled with sales',
   (SELECT n = 10 AND offered IS NULL AND prices = ARRAY[6000,10000,15000,20000,25000,30000,35000,40000,45000,50000]
       AND by_source = '{"Craigslist": 1, "Facebook Marketplace": 9}'::jsonb FROM pg_temp.r('a', 1967, 'asked')));
+SELECT pg_temp.ok('twins pool: the GMC K1500 row holds 14 sales (its 2 and the Chevrolet''s 12), names gm-k1500, venues by badge',
+  (SELECT n = 14 AND platform = 'gm-k1500' AND year_from = 1995 AND year_to = 1995
+      AND venues = '{"Bring a Trailer": {"n": 12, "p50": 6500}, "Mecum": {"n": 2, "p50": null}}'::jsonb
+   FROM pg_temp.r('c', 1995, 'sold'))
+  AND (SELECT n = 14 AND platform = 'gm-k1500' FROM pg_temp.r('d', 1995, 'sold')));
+SELECT pg_temp.ok('a family without a platform pools alone and names none',
+  (SELECT platform IS NULL AND n = 12 FROM pg_temp.r('a', 1967, 'sold')));
 SELECT pg_temp.ok('A 1967 sold venues: Bring a Trailer 8 (median 45,000), Mecum 4 (under 5 prices, no median)',
   (SELECT venues = '{"Bring a Trailer": {"n": 8, "p50": 45000}, "Mecum": {"n": 4, "p50": null}}'::jsonb
    FROM pg_temp.r('a', 1967, 'sold')));
@@ -230,6 +255,7 @@ SELECT pg_temp.ok('refreshes concurrently through refresh_family_year_prices(), 
 -- After the first build, 20261015160000 and 20261015215000 apply again without dropping or emptying the built view.
 \ir ../migrations/20261015160000_family_year_prices_miles.sql
 \ir ../migrations/20261015215000_family_year_prices_venues.sql
+\ir ../migrations/20261015218000_family_year_prices_platforms.sql
 SELECT pg_temp.ok('re-applying the odometer migration after the build keeps the built view',
   (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass)
   AND (SELECT n_miles FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
