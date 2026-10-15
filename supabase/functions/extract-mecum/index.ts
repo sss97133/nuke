@@ -236,6 +236,13 @@ async function raiseRevision(
   if (error) softWrite("record_revision_item", { error }, writeErrors);
 }
 
+/** Whether a lot's year, make or VIN is the vehicle's own, ignoring case, spacing and punctuation. */
+function sameIdentityValue(field: string, have: unknown, lot: unknown): boolean {
+  const norm = (v: unknown) => String(v).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (field === "year") return Number(have) === Number(lot);
+  return norm(have) === norm(lot);
+}
+
 /** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
 let writeErrors: string[] = [];
 
@@ -1053,7 +1060,7 @@ async function saveVehicle(
   if (existingId) {
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("year,make,model,vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
       .eq("id", existingId)
       .maybeSingle();
 
@@ -1066,6 +1073,28 @@ async function saveVehicle(
 
     // Strip identity/source fields that should only be set on insert
     const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
+
+    // Identity is fill-only: a resolved vehicle keeps its own year, make, model and VIN. A lot that states a different year,
+    // make or VIN is another vehicle (or a wrong link), never an overwrite: it goes to the revision queue to be relinked, and
+    // nothing of it (vehicle fields, event, observation) is written against this vehicle. This update used to write the lot's
+    // whole payload, the defect that made vehicles carrying one platform's truck and another's VIN.
+    const disagree: string[] = [];
+    for (const k of ["year", "make", "model", "vin"] as const) {
+      const have = (existing as any)?.[k];
+      if (have === null || have === undefined || have === "") continue; // empty: the lot may fill it
+      const lot = (updateData as any)[k];
+      if (lot !== null && lot !== undefined && lot !== "" && k !== "model" && !sameIdentityValue(k, have, lot)) disagree.push(k);
+      delete (updateData as any)[k];
+    }
+    if (disagree.length) {
+      await raiseRevision(supabase, vehicle.url, disagree, "quality_gate", "relink", {
+        vehicle_id: existingId,
+        vehicle_has: Object.fromEntries(disagree.map((k) => [k, (existing as any)[k]])),
+        lot_states: Object.fromEntries(disagree.map((k) => [k, (updateData as any)[k] ?? (cleanData as any)[k]])),
+        raised_in: "extract-mecum saveVehicle",
+      });
+      throw new Error(`IDENTITY_MISMATCH: lot states a different ${disagree.join(", ")} than vehicle ${existingId}`);
+    }
 
     const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     const updateErr = updateRes.error;
