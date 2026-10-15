@@ -3,6 +3,8 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { daysUntil, houseLink, runTimer, saleTimer, updatedAgo } from './useAuctionCalendar';
 
 const fixture = vi.hoisted(() => ({ calendar: {} as any, roster: {} as any, rosterFor: vi.fn(), more: vi.fn() }));
@@ -13,6 +15,15 @@ vi.mock('./useAuctionCalendar', async original => ({
 }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import AuctionCalendar from './AuctionCalendar';
+
+it('exercises every full calendar reader replacement in the database source-clock contract', () => {
+  const migrations = resolve(__dirname, '../../../../supabase/migrations');
+  const contract = readFileSync(resolve(migrations, '../sql/test_calendar_prior_source_clock.sql'), 'utf8');
+  const replacements = readdirSync(migrations).filter(name => name.endsWith('.sql') &&
+    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.auction_calendar_read\s*\(/i.test(readFileSync(resolve(migrations, name), 'utf8')));
+  expect(replacements.length).toBeGreaterThanOrEqual(3);
+  for (const name of replacements) expect(contract).toContain(`\\ir ../migrations/${name}`);
+});
 
 // Synthetic sales and lots. Local noon on 2026-10-15, so day arithmetic is the same in every time zone.
 const NOW = new Date(2026, 9, 15, 12, 0, 0);
