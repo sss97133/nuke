@@ -38,6 +38,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { parseTitle } from "./titleParse.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -51,21 +52,6 @@ const DEPARTMENT_FILTER = "department.code:MOT-CAR";
 
 const EXTRACTOR_VERSION = "bonhams-typesense-v1";
 const MAX_PER_PAGE = 250; // Typesense max
-
-// ─── Known multi-word makes for title parsing ─────────────────────────────────
-
-const KNOWN_MAKES = [
-  "Alfa Romeo", "Aston Martin", "Austin-Healey", "Mercedes-Benz", "Rolls-Royce",
-  "Land Rover", "De Tomaso", "Facel Vega", "Hispano-Suiza", "Brough Superior",
-  "Pierce-Arrow", "De Dion-Bouton", "Isotta Fraschini", "Invicta",
-  "AC", "BMW", "Bentley", "Bugatti", "Cadillac", "Chevrolet", "Chrysler",
-  "Citroën", "Daimler", "Delage", "Delahaye", "Dodge", "Ferrari", "Fiat",
-  "Ford", "Jaguar", "Jensen", "Lamborghini", "Lancia", "Lincoln", "Lotus",
-  "Maserati", "McLaren", "MG", "Morgan", "Oldsmobile", "Packard", "Peugeot",
-  "Plymouth", "Pontiac", "Porsche", "Renault", "Riley", "Rover", "Shelby",
-  "Singer", "Studebaker", "Sunbeam", "Talbot", "Toyota", "Triumph",
-  "TVR", "Vauxhall", "Volvo", "Volkswagen",
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,94 +70,6 @@ function stripHtml(html: string): string {
     .replace(/&[a-z]+;/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-// ─── Title parser: "1966 Ferrari 330 GT Chassis no. 8023 Engine no. 8023" ─────
-
-interface ParsedTitle {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  chassis: string | null;
-}
-
-function parseTitle(title: string): ParsedTitle {
-  const result: ParsedTitle = { year: null, make: null, model: null, chassis: null };
-  if (!title) return result;
-
-  // Extract chassis/VIN from title
-  // Patterns: "Chassis no. XXXXX", "Chassis no XXXXX", "VIN XXXXX"
-  const chassisPatterns = [
-    /Chassis\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
-    /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-    /Frame\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
-  ];
-  for (const pat of chassisPatterns) {
-    const m = title.match(pat);
-    if (m) {
-      result.chassis = m[1].trim().replace(/[./-]+$/, "").toUpperCase();
-      break;
-    }
-  }
-
-  // Strip chassis/engine suffixes for cleaner parsing
-  let clean = title
-    .replace(/\s*Chassis\s+no\.?\s+.*/i, "")
-    .replace(/\s*Engine\s+no\.?\s+.*/i, "")
-    .replace(/\s*Frame\s+no\.?\s+.*/i, "")
-    .replace(/\s*VIN[:\s]+.*/i, "")
-    .trim();
-
-  // Year: leading 4-digit year (1886-2030)
-  const yearMatch = clean.match(/^(\d{4})\s+/);
-  if (yearMatch) {
-    const y = parseInt(yearMatch[1], 10);
-    if (y >= 1886 && y <= 2030) {
-      result.year = y;
-      clean = clean.slice(yearMatch[0].length).trim();
-    }
-  }
-  // Fallback: "c.1960" or "Circa 1960"
-  if (!result.year) {
-    const circaMatch = clean.match(/(?:c\.?\s*|circa\s+)(\d{4})/i);
-    if (circaMatch) {
-      const y = parseInt(circaMatch[1], 10);
-      if (y >= 1886 && y <= 2030) {
-        result.year = y;
-        clean = clean.replace(circaMatch[0], "").trim();
-      }
-    }
-  }
-
-  // Make: check multi-word makes first, then take first word
-  const lowerClean = clean.toLowerCase();
-  let foundMake: string | null = null;
-  for (const make of KNOWN_MAKES) {
-    if (lowerClean.startsWith(make.toLowerCase())) {
-      foundMake = make;
-      clean = clean.slice(make.length).trim();
-      break;
-    }
-  }
-  if (!foundMake && clean.length > 0) {
-    // Hyphenated makes: "Harley-Davidson", unknown compound
-    const firstWordMatch = clean.match(/^([A-Za-zÀ-ÿ][\w-]*(?:\s[A-Za-zÀ-ÿ][\w-]*)?)\s/);
-    if (firstWordMatch) {
-      foundMake = firstWordMatch[1];
-      clean = clean.slice(firstWordMatch[0].length).trim();
-    } else {
-      foundMake = clean;
-      clean = "";
-    }
-  }
-  result.make = foundMake;
-
-  // Model: everything remaining (strip trailing punctuation)
-  if (clean.length > 0) {
-    result.model = clean.replace(/[,;]+$/, "").trim() || null;
-  }
-
-  return result;
 }
 
 // ─── Map Bonhams Typesense doc → our standard vehicle format ──────────────────
@@ -290,6 +188,7 @@ function mapDocument(doc: BonhamsDoc): MappedVehicle {
       bonhams_lot_item_id: doc.lotItemId,
       lot_number: doc.lotNo?.full || doc.lotId,
       chassis: parsed.chassis,
+      title_year_range: parsed.year_range ?? null,
       description,
       image_url: imageUrl,
       currency,
@@ -420,6 +319,7 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
       country_code: doc.country?.code ?? null,
       lot_unique_id: doc.lotUniqueId ?? null,
       has_reserve: !doc.flags?.isWithoutReserve,
+      ...(raw.title_year_range ? { title_year_range: raw.title_year_range } : {}),
       currency: doc.currency?.iso_code ?? null,
       roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
       engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
@@ -587,6 +487,28 @@ Deno.serve(async (req) => {
         success: landOk, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
         next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
       });
+    }
+
+    // ─── MODE: reland ───────────────────────────────────────────────────
+    // Land named lots again (up to 50, one search-index request): a repair after a landing resolved or parsed a lot wrongly.
+    // The lots are fetched by id and go through the same mapping and land_lots as the walk; the identity guard applies.
+    if (mode === "reland") {
+      const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+(-[0-9]+)?$/.test(x)).slice(0, 50);
+      if (!ids.length) return okJson({ success: false, error: "ids required" }, 400);
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams({
+        q: "*", query_by: "title", per_page: "50", filter_by: `id:=[${ids.join(",")}]`,
+      })}`, { headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" } });
+      if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}` }, 502);
+      const found = (await res.json() as TypesenseResponse).hits ?? [];
+      const observedAt = new Date().toISOString();
+      const lots = found.filter((h) => h.document?.title).map((h) => lotToExtraction(h.document, { observedAt }));
+      const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+        body: JSON.stringify({ action: "land_lots", lots, observed_at: observedAt }),
+      });
+      return okJson({ success: landRes.ok, mode: "reland", asked: ids.length, found: found.length, lander: await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })) });
     }
 
     // ─── MODE: upcoming ─────────────────────────────────────────────────

@@ -70,10 +70,11 @@ The owner: "best is a metric we have yet to fully develop." So the ranking is a 
 revised, not a one-off table. `best_v1` scores each landed lot from 0 to 1 and is stored with its components in
 `firecrawl_lot_score` (metric_version `best_v1`):
 
-    best_v1 = ( 2 x tier + complete + outcome + unique + group ) / 6, an unknown component counts 0
+    best_v1 = ( 2 x tier + complete + 2 x outcome + unique + group ) / 7, an unknown component counts 0
     tier      model year 1964-1973 = 1, 1974-1991 = 0.6, other = 0.2
     complete  (description + VIN + a photo + a location) / 4
-    outcome   a realized price = 1; the outcome known without a price (reserve not met, no sale, ended) = 0.5; an ask = 0
+    outcome   (weight 2 since 2026-10-15: the owner's core product is what sold, for how much and how fast, so an ask with no
+              observable outcome is half a data point) a realized price = 1; the outcome known without a price (reserve not met, no sale, ended) = 0.5; an ask = 0
     unique    1 when no other platform holds an event for the same vehicle, else 0
     group     the lot's model family x year band score over the best group score (`firecrawl_group_score`); an illiquid
               or unmatched family = 0
@@ -90,12 +91,40 @@ The weights are rows in `firecrawl_params` (`best_w_*`, the tier weights). Unkno
   source. Once a source has 30 scored lots its observed best_v1 per credit replaces its prior (mean best_v1 over the cost).
 - **Allocation** follows best_v1 per credit, by source and then vehicle group, capped by the gap and the share. A source whose
   landed lots score low loses budget on the next run without anyone changing a parameter. A paused source
-  (`firecrawl_source_params.paused`) is ranked and shows `would_allocate`, gets no credits, and `firecrawl_allowance` returns 0.
+  (`firecrawl_source_params.paused`) is ranked, takes no credits (they flow down the ranking by the formula), shows what it
+  would receive if unpaused as `would_allocate`, and `firecrawl_allowance` returns 0.
 - **The loop.** Weekly the job rescored the lots and recomputes. As outcomes arrive (eBay endings, Craigslist removals,
   Cars & Bids results) realized value is added to the metric as `best_v2`, published beside `best_v1` in `firecrawl_lot_score`
   (the key is event and version) with its diff against v1 per source. v2 is not built yet: the first outcome feed is the gap.
 
+### best_v1.1: the lot-level quality component (owner, 2026-10-15)
+
+The owner called eBay "low quality"; lane-ebay's 0-credit audit measured what that means on 1,121 landed lots (no observable
+outcome, 29% of the "private" listings use dealer wording, 17% parts or project wording, typed VINs that are not 17 characters,
+relists). Those are properties of a lot and apply to every source, so they are lot-level signals in `lot_quality_signal`
+(event, signal, value, method, evidence), and `best_v1_1` adds a quality component:
+
+    quality    = checks passed / checks known, over: no dealer wording, no parts or project wording, VIN not noisy
+                 (a 1981-or-later VIN that is not 17 characters, a masked VIN, or a typed-VIN conflict), not a relist,
+                 and, when recorded, seller_type = private. No check known = unknown, which counts 0.
+    best_v1_1  = ( 2 x tier + complete + 2 x outcome + unique + group + quality ) / 8
+
+Method `lexicon_v1` derives the four checks from the stored description, year, VIN and events for every scored lot (the
+lexicons are `firecrawl_params` rows `lexicon_dealer` and `lexicon_parts_project`, from the terms lane-ebay used). A lane that
+reads the lot better writes the signal with its own method through `record_lot_quality_signals()` and its value overrides the
+derived one. v1 and v1.1 are both scored for every lot; `firecrawl_backtest(since, until, 'best_v1_1')` returns either.
+Seller type is proposed in `docs/proposals/2026-10-15-seller-type-observation.md`.
+
+**Target classes found by the backtest.**
+- *Cars & Bids recapture* (re-fetching a lot whose only snapshot is old, to read its result) is a negative example: lane-online
+  measured about 85% of the recapture spend landing on lots that no longer exist (C&B serves its not-found shell with HTTP 200),
+  roughly 10-17 credits per real result. Cars & Bids returns 0.291 best_v1 per credit over 30 days, dragged down by it, against
+  0.531 for the landing batch alone. A lot whose only snapshot is old and which has no result is the worst target class.
+- *Collecting Cars is a trial*, capped at 50 credits (`firecrawl_source_params.credit_cap`): 1964-1991 lots, public listing pages
+  only (never the search index), at most 15 a day through daily-capture-master. After 30 scored lots its observed return replaces
+  the prior.
+
 **Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
-`firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_backtest`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`. Read the ranking with
+`firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_best_v1_1`, `firecrawl_backtest`, `record_lot_quality_signals`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`, `20261017030000_firecrawl_best_v1_1_lot_quality.sql`. Read the ranking with
 `select * from firecrawl_target_allocation where computed_at = (select max(computed_at) from firecrawl_target_allocation) and vehicle_group = '*'`.

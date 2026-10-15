@@ -12,10 +12,19 @@ boxes:
   - id: M130
     what: Engine computer (MoTeC M130)
     nodes: [M130-A]
-    where: Cab side, close to the 61-pin, which now goes at the driver-side fuse-box hole. The exact spot waits on Dave.
+    where: Under the dash, driver side, left of the steering column, lid down on the dash underside with both plugs facing the centre of the truck; the plug faces sit 0.25 m from the 61-pin.
     zone: cab
-    status: open
+    status: proposed
     decision: k5-m130-location
+    position:
+      node: M130
+      frame: twin
+      x: 0.55
+      y: -1.22
+      z: 0.987
+      orientation: lid down on the dash underside (z 1.02-1.03), plugs toward the centreline (-x)
+      confidence: medium-low
+      source: docs/wiring/research/2026-10-15_m130-pdm30-cab-placement.md (twin free-space study, recommendation M1)
     why:
       - text: "Owner call: the ECU and PDMs go \"somewhere awesome and safe\". The 61-pin moves to the original fuse-box hole (driver side), so the ECU moves with it; the passenger-side spot below is superseded."
         source: owner, 2026-09-29, in the pieces window (relayed by the pieces lane)
@@ -27,21 +36,34 @@ boxes:
         source: K5_WIRING_STATE.md §1 row 46
       - text: Leave 60–80 mm clear below both plug faces for the Superseal plugs and their boots.
         source: receipts/2026-06-09_as-built-photo-survey-corrections.md
+      - text: "In the twin, only the dash underside left of the column fits a 107.5 x 127.5 x 38.7 mm case plus 80 mm of plug room: the pedal and column assembly fills the firewall face up to 8 cm below the dash (a box needs 10.8 cm). This spot clears every twin mesh by 10 mm or more and is 0.25 m from the 61-pin, inside the 300 mm figure above."
+        source: docs/wiring/research/2026-10-15_m130-pdm30-cab-placement.md (sections 2-4; MoTeC M130 datasheet pp.2-3 for the case)
     instead:
+      - where: Driver kick panel wall
+        why_not: It fits, but 0.44 m from the 61-pin (past the 300 mm figure), at the driver's left foot and the door's water path. The fallback.
       - where: Under the dash, centre
         why_not: The Four-Season duct and the radio fill that space, and every engine wire gets longer.
       - where: Engine bay
         why_not: Header heat passes the 85 °C ceiling, it gets splashed, and the pedal adds 6 crossings.
     open:
-      - What is behind the gold panel on the passenger firewall (asked 2026-09-29)? It decides whether the M130's plate can bolt there.
-      - The bracket needs rubber isolators, not bare sheet metal.
+      - The twin has no heater box, fuse box, pedal arms or real 61-pin hole; check the spot on the truck before the bracket is cut (a foot or knee can reach the lid).
+      - The bracket needs rubber isolators, not bare sheet metal (the study assumes a 15 mm standoff).
 
   - id: PDM30
     what: Body power box (MoTeC PDM30), which feeds the lights, blower, wipers, windows and locks
     nodes: [PDM30-A]
-    where: Cab, in open air on its own plate near the M130, with an air gap between them. The spot follows the M130 (now open).
+    where: Under the dash, driver side, in line with the M130 toward the column, lid down on the dash underside, plugs toward the centre; 37 mm of air between its end and the M130's plug room; 0.33 m from the 61-pin.
     zone: cab
-    status: open
+    status: proposed
+    position:
+      node: PDM30
+      frame: twin
+      x: 0.30
+      y: -1.30
+      z: 0.997
+      orientation: lid down on the dash underside (z 1.02-1.03), plugs toward the centreline (-x)
+      confidence: medium-low
+      source: docs/wiring/research/2026-10-15_m130-pdm30-cab-placement.md (twin free-space study, recommendation P1)
     why:
       - text: MoTeC says a PDM "may get very hot"; mount it where air moves and never against a hot surface.
         source: MoTeC PDM manual p.3 (Mounting)
@@ -57,7 +79,8 @@ boxes:
       - where: Under the passenger seat
         why_not: Longer runs to every load, and heat builds up under carpet.
     open:
-      - Run it for 30 minutes and log its inside temperature over CAN before you call the spot final.
+      - Run it for 30 minutes and log its inside temperature over CAN before you call the spot final. Here only its mounting face meets air moving in the footwell, and the dash closes it from above.
+      - Room for the M6 power stud's lug (2 AWG or 2 x 4 AWG) to leave the side is not in the study's box.
 
   - id: PDM15
     what: Engine power box (MoTeC PDM15), which feeds the fan, injector and coil rails, starter, fuel pump, A/C clutch and lambda box
@@ -1156,9 +1179,9 @@ ends:
       - Nothing but the 61-pin goes through the firewall (Dave), so the big cables need a ruled exception or another path.
   - id: M130-A
     what: Engine computer (MoTeC M130), plug A
-    where: Cab side, close to the 61-pin
+    where: Under the dash, driver side, with the M130
     zone: cab
-    status: open
+    status: proposed
     follows: M130
     why:
       - text: See the M130 box.
@@ -1167,9 +1190,9 @@ ends:
       - The spot follows the M130 box.
   - id: M130-B
     what: Engine computer (MoTeC M130), plug B
-    where: Cab side, close to the 61-pin
+    where: Under the dash, driver side, with the M130
     zone: cab
-    status: open
+    status: proposed
     follows: M130
     why:
       - text: See the M130 box.
@@ -1178,9 +1201,9 @@ ends:
       - The spot follows the M130 box.
   - id: PDM30-A
     what: Body power box (MoTeC PDM30), plug A
-    where: Cab, in open air on its own plate near the M130
+    where: Under the dash, driver side, with the PDM30
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: See the PDM30 box.
@@ -1189,9 +1212,9 @@ ends:
       - The spot follows the PDM30 box.
   - id: PDM30-B
     what: Body power box (MoTeC PDM30), plug B
-    where: Cab, in open air on its own plate near the M130
+    where: Under the dash, driver side, with the PDM30
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: See the PDM30 box.
@@ -2027,3 +2050,245 @@ ends:
     why:
       - text: The 6L90's only external connector carries the solenoids and sensors.
         source: docs/wiring/calc-data/catalog/endpoints.yaml TRANS-CASE
+  - id: SPL-M130-A-A02
+    what: Stub splice beside M130-A pin A02, on its 20 AWG lead
+    where: Behind M130-A pin A02, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B15
+    what: Stub splice beside M130-B pin B15, on its 20 AWG lead
+    where: Behind M130-B pin B15, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B16-G1
+    what: Stub splice beside M130-B pin B16, on its 20 AWG lead
+    where: Behind M130-B pin B16, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B16-G2
+    what: Stub splice beside M130-B pin B16, on its 20 AWG lead
+    where: Behind M130-B pin B16, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B16
+    what: Stub splice beside M130-B pin B16, on its 20 AWG lead
+    where: Behind M130-B pin B16, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B19
+    what: Stub splice beside M130-B pin B19, on its 20 AWG lead
+    where: Behind M130-B pin B19, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-M130-B-B21
+    what: Stub splice beside M130-B pin B21, on its 20 AWG lead
+    where: Behind M130-B pin B21, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: M130
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A11
+    what: Stub splice beside PDM30-A pin A11, on its 20 AWG lead
+    where: Behind PDM30-A pin A11, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A15
+    what: Stub splice beside PDM30-A pin A15, on its 20 AWG lead
+    where: Behind PDM30-A pin A15, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A24-G1
+    what: Stub splice beside PDM30-A pin A24, on its 20 AWG lead
+    where: Behind PDM30-A pin A24, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A24-G2
+    what: Stub splice beside PDM30-A pin A24, on its 20 AWG lead
+    where: Behind PDM30-A pin A24, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A24
+    what: Stub splice beside PDM30-A pin A24, on its 20 AWG lead
+    where: Behind PDM30-A pin A24, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-A-A28
+    what: Stub splice beside PDM30-A pin A28, on its 20 AWG lead
+    where: Behind PDM30-A pin A28, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B1
+    what: Stub splice beside PDM30-B pin B1, on its 20 AWG lead
+    where: Behind PDM30-B pin B1, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B12
+    what: Stub splice beside PDM30-B pin B12, on its 20 AWG lead
+    where: Behind PDM30-B pin B12, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B14
+    what: Stub splice beside PDM30-B pin B14, on its 20 AWG lead
+    where: Behind PDM30-B pin B14, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B16
+    what: Stub splice beside PDM30-B pin B16, on its 20 AWG lead
+    where: Behind PDM30-B pin B16, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B25
+    what: Stub splice beside PDM30-B pin B25, on its 20 AWG lead
+    where: Behind PDM30-B pin B25, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B26
+    what: Stub splice beside PDM30-B pin B26, on its 20 AWG lead
+    where: Behind PDM30-B pin B26, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B8-G1
+    what: Stub splice beside PDM30-B pin B8, on its 20 AWG lead
+    where: Behind PDM30-B pin B8, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B8-G2
+    what: Stub splice beside PDM30-B pin B8, on its 20 AWG lead
+    where: Behind PDM30-B pin B8, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM30-B-B8
+    what: Stub splice beside PDM30-B pin B8, on its 20 AWG lead
+    where: Behind PDM30-B pin B8, 4 to 6 in up its lead
+    zone: cab
+    status: proposed
+    follows: PDM30
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+  - id: SPL-PDM15-A-A28
+    what: Stub splice beside PDM15-A pin A28, on its 20 AWG lead
+    where: Behind PDM15-A pin A28, 4 to 6 in up its lead
+    zone: engine
+    status: flag
+    follows: PDM15
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+    open:
+      - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+  - id: SPL-PDM15-B-B25
+    what: Stub splice beside PDM15-B pin B25, on its 20 AWG lead
+    where: Behind PDM15-B pin B25, 4 to 6 in up its lead
+    zone: engine
+    status: flag
+    follows: PDM15
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+    open:
+      - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+  - id: SPL-PDM15-B-B26
+    what: Stub splice beside PDM15-B pin B26, on its 20 AWG lead
+    where: Behind PDM15-B pin B26, 4 to 6 in up its lead
+    zone: engine
+    status: flag
+    follows: PDM15
+    why:
+      - text: The splice sits on the lead into its pin; the leads alternate 4 and 6 in so the splices on one plug stagger.
+        source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
+    open:
+      - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+  - id: SPL-PDM15-OUT8
+    what: Pigtail splice at the engine power box (OUT8, the A/C clutch feed)
+    where: At the engine power box's plug
+    zone: engine
+    status: open
+    follows: PDM15
+    why:
+      - text: The splice sits a hand-width from the plug it serves.
+        source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT8
+    open:
+      - It moves with the engine power box.

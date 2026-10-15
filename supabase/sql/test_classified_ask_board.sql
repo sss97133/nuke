@@ -15,7 +15,11 @@
 -- lenses ignored, the same for anon) and the hash guard that lets the newer migration apply again; and
 -- (20261015080000_classified_ask_board_listing_odometer.sql) what the listing says about its miles, odometer and title:
 -- broken wins over rolled over, the title is lower-cased, an observation of another vehicle is not read, and an owner's
--- private correction stays hidden from anon (the live garage_correction_private_read policy).
+-- private correction stays hidden from anon (the live garage_correction_private_read policy); and
+-- (20261017050000_classified_ask_board_position.sql) the family and position: sales and asks at or below the ask, the
+-- listing's own ask taken out of the asks, thin families without a band, years outside the family and names without a
+-- family unplaced, newest_seen_at, merit from the active exit model by hand, the merit sort, no imputation, an unknown
+-- feature, and the same position for anon.
 -- Not covered: the real taste scorer; the live query's cost (measured on production with the same plan shape:
 -- 54 ms warm, 638 ms cold over 374 asks, 2026-10-13).
 \set ON_ERROR_STOP on
@@ -83,6 +87,24 @@ AS $$ SELECT CASE WHEN lower(p_parsed_make) = 'chevrolet' THEN 70 ELSE 10 END::s
 \ir ../migrations/20261015070000_classified_ask_board_listed_at.sql
 \ir ../migrations/20261015080000_classified_ask_board_listing_odometer.sql
 \ir ../migrations/20261015080000_classified_ask_board_listing_odometer.sql
+
+-- The family key, the family price fold and the exit models (20261017050000 reads them), as tables with the columns it
+-- reads and the live grants.
+CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles bigint, make text, family_id uuid,
+  family text, matched text, year_start integer, year_end integer, PRIMARY KEY (make_l, model_l));
+CREATE TABLE public.mv_family_year_prices (family_id uuid, year integer, basis text, year_from integer, year_to integer,
+  n integer, offered integer, conflicts integer, thin boolean, p10 integer, p25 integer, p50 integer, p75 integer,
+  p90 integer, prices integer[], dated integer, first_on date, last_on date, n_24m integer, by_source jsonb,
+  as_of timestamptz, n_miles integer NOT NULL DEFAULT 0, miles integer[] NOT NULL DEFAULT '{}', miles_p50 integer,
+  venues jsonb NOT NULL DEFAULT '{}',
+  PRIMARY KEY (family_id, year, basis));
+CREATE TABLE public.listing_exit_models (version text PRIMARY KEY, active boolean NOT NULL DEFAULT false,
+  horizon_days integer NOT NULL, label text NOT NULL, intercept double precision NOT NULL, features jsonb NOT NULL,
+  base_rate double precision NOT NULL, trained_on jsonb NOT NULL, evaluated_on jsonb NOT NULL, receipt text NOT NULL,
+  trained_at timestamptz NOT NULL DEFAULT now());
+GRANT SELECT ON public.mv_model_family_names, public.mv_family_year_prices, public.listing_exit_models TO anon, authenticated;
+\ir ../migrations/20261017050000_classified_ask_board_position.sql
+\ir ../migrations/20261017050000_classified_ask_board_position.sql
 RESET ROLE;
 
 -- Vehicles: 1 Blazer (Phoenix), 2 H3T (St George), 3 M1010 (Las Vegas), 4 Ford (no price, no place),
@@ -126,7 +148,7 @@ INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, sourc
 -- rolled over: broken wins); the pickup's only observation is an owner's private correction. The F250's event points
 -- at the Blazer's observation, which is not about the F250.
 INSERT INTO public.vehicle_observations (id, vehicle_id, structured_data, extraction_method) VALUES
-  ('00000000-0000-4000-9000-000000000001', '00000000-0000-4000-8000-000000000001', '{"mileage":"88000","title_status":"clean"}', 'listing_v1'),
+  ('00000000-0000-4000-9000-000000000001', '00000000-0000-4000-8000-000000000001', '{"mileage":"88000","title_status":"clean","condition":" Like New "}', 'listing_v1'),
   ('00000000-0000-4000-9000-000000000002', '00000000-0000-4000-8000-000000000002', '{"mileage":"123456","odometer_rolled_over":true,"title_status":" Salvage "}', 'listing_v1'),
   ('00000000-0000-4000-9000-000000000003', '00000000-0000-4000-8000-000000000003', '{"mileage":"10","odometer_broken":true,"odometer_rolled_over":true}', 'listing_v1'),
   ('00000000-0000-4000-9000-000000000009', '00000000-0000-4000-8000-000000000009', '{"mileage":"5","odometer_broken":true}', 'garage_owner_correction_v1');
@@ -169,9 +191,11 @@ BEGIN
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer';
   PERFORM pg_temp.ok('a clean listing: its miles and title, no odometer flag',
     r->'odometer' = 'null'::jsonb AND r->>'title_status' = 'clean' AND (r->>'listing_mileage')::int = 88000);
+  PERFORM pg_temp.ok('the seller''s declared condition, as stated, lower-cased (20261017050000)', r->>'condition' = 'like new');
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'f250';
   PERFORM pg_temp.ok('an observation of another vehicle is not read',
-    r->'listing_mileage' = 'null'::jsonb AND r->'odometer' = 'null'::jsonb AND r->'title_status' = 'null'::jsonb);
+    r->'listing_mileage' = 'null'::jsonb AND r->'odometer' = 'null'::jsonb AND r->'title_status' = 'null'::jsonb
+    AND r->'condition' = 'null'::jsonb);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'pickup';
   PERFORM pg_temp.ok('as owner, the private correction is readable', r->>'odometer' = 'broken');
 END $$;
@@ -231,6 +255,130 @@ SELECT pg_temp.ok('page size and offset',
   jsonb_array_length(public.classified_ask_board(p_limit => 2)->'rows') = 2
   AND (public.classified_ask_board(p_limit => 2, p_offset => 2)->'rows'->0->>'model') = 'pickup');
 
+-- 20261017050000: what each listing is and where its ask sits.
+-- Families: the Blazer (1969..1994), the H3T (2009..2010), the Toyota pickup (1979..1995); the F250's family starts in
+-- 1999, so a 1979 F250 is not claimed; the M1010 has no family.
+INSERT INTO public.mv_model_family_names (make_l, model_l, vehicles, make, family_id, family, matched, year_start, year_end) VALUES
+  ('chevrolet', 'blazer', 1, 'Chevrolet', '00000000-0000-4000-c000-000000000001', 'Blazer', 'blazer', 1969, 1994),
+  ('hummer', 'h3t', 1, 'Hummer', '00000000-0000-4000-c000-000000000002', 'H3T', 'h3t', 2009, 2010),
+  ('toyota', 'pickup', 1, 'Toyota', '00000000-0000-4000-c000-000000000003', 'Pickup', 'pickup', 1979, 1995),
+  ('ford', 'f250', 1, 'Ford', '00000000-0000-4000-c000-000000000004', 'F-250', 'f250', 1999, NULL),
+  ('chevrolet', 'm1010', 1, 'Chevrolet', NULL, NULL, NULL, NULL, NULL);
+-- Blazer 1984: 20 recorded sales at 5,000 .. 100,000 (1983..1985); 12 asks at 10,000 .. 32,000 including this Blazer's
+-- own 18,800, from a refresh dated tomorrow (so today's listing is in it and is taken out). H3T 2009: 6 sales (thin).
+-- Pickup 1985: exactly 10 sales at 1,000 .. 10,000. A sold row for the F250 that must not be read.
+INSERT INTO public.mv_family_year_prices (family_id, year, basis, year_from, year_to, n, offered, conflicts, thin, p25, p50, p75,
+  prices, dated, first_on, last_on, n_24m, by_source, as_of) VALUES
+  ('00000000-0000-4000-c000-000000000001', 1984, 'sold', 1983, 1985, 20, 25, 2, false, 28750, 52500, 76250,
+   (SELECT array_agg(g * 5000 ORDER BY g) FROM generate_series(1, 20) g), 18, '2014-01-24', '2026-09-30', 7,
+   '{"Bring a Trailer": 14, "Mecum": 6}', now()),
+  ('00000000-0000-4000-c000-000000000001', 1984, 'asked', 1984, 1984, 12, NULL, NULL, false, 15500, 19400, 25500,
+   ARRAY[10000,12000,14000,16000,18000,18800,20000,22000,24000,26000,28000,30000], 12, '2026-03-01', '2026-10-14', 12,
+   '{"Craigslist": 3, "Facebook Marketplace": 9}', now() + interval '1 day'),
+  ('00000000-0000-4000-c000-000000000002', 2009, 'sold', 2004, 2014, 6, 6, 0, true, NULL, NULL, NULL,
+   ARRAY[20000,21000,22000,23000,24000,25000], 6, '2022-01-01', '2026-01-01', 2, '{"Bring a Trailer": 6}', now()),
+  ('00000000-0000-4000-c000-000000000003', 1985, 'sold', 1985, 1985, 10, 10, 0, false, 3250, 5500, 7750,
+   (SELECT array_agg(g * 1000 ORDER BY g) FROM generate_series(1, 10) g), 10, '2020-01-01', '2026-01-01', 4,
+   '{"Bring a Trailer": 10}', now()),
+  ('00000000-0000-4000-c000-000000000004', 1979, 'sold', 1979, 1979, 10, 10, 0, false, 1, 1, 1,
+   ARRAY[1,1,1,1,1,1,1,1,1,1], 10, NULL, NULL, 0, '{}', now());
+-- Odometers (20261015160000): the Blazer's 20 sales read 10,000 .. 200,000 (median 100,000) and its asks 3 readings;
+-- the H3T's sales 12 readings, but the H3T discloses a rolled-over odometer.
+-- (fixture table, not testimony)
+UPDATE public.mv_family_year_prices SET n_miles = 20, miles_p50 = 100000,
+  miles = (SELECT array_agg(g * 10000 ORDER BY g) FROM generate_series(1, 20) g)
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'sold';
+UPDATE public.mv_family_year_prices SET n_miles = 3, miles = ARRAY[50000, 90000, 150000]
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'asked';
+-- Venues (20261015215000): the Blazer's sales by source with their medians.
+UPDATE public.mv_family_year_prices SET venues = '{"Bring a Trailer": {"n": 14, "p50": 60000}, "Mecum": {"n": 6, "p50": 35000}}'
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'sold';
+UPDATE public.mv_family_year_prices SET n_miles = 12, miles_p50 = 60000,
+  miles = (SELECT array_agg(g * 10000 ORDER BY g) FROM generate_series(1, 12) g)
+  WHERE family_id = '00000000-0000-4000-c000-000000000002' AND basis = 'sold';
+
+DO $$
+DECLARE b jsonb := public.classified_ask_board();
+  r jsonb;
+BEGIN
+  PERFORM pg_temp.ok('population: 3 keyed (Blazer, H3T, pickup), 2 placed among sales, 1 among asks, none with merit',
+    (b->'population'->>'keyed')::int = 3 AND (b->'population'->>'positioned_sold')::int = 2
+    AND (b->'population'->>'positioned_asked')::int = 1 AND (b->'population'->>'with_merit')::int = 0
+    AND b->'merit_model' = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer';
+  PERFORM pg_temp.ok('Blazer: family, 3 of 20 recorded 1983-85 sales at or below 18,800, the sold band and its venues',
+    r->'position'->>'family' = 'Blazer' AND (r->'position'->'sold'->>'n')::int = 20
+    AND (r->'position'->'sold'->>'at_or_below')::int = 3 AND (r->'position'->'sold'->>'year_from')::int = 1983
+    AND (r->'position'->'sold'->>'p50')::int = 52500 AND (r->'position'->'sold'->>'conflicts')::int = 2
+    AND r->'position'->'sold'->'by_source' = '{"Bring a Trailer": 14, "Mecum": 6}'::jsonb);
+  PERFORM pg_temp.ok('Blazer: its own ask is taken out of the asks: 5 of 11 at or below',
+    (r->'position'->'asked'->>'n')::int = 11 AND (r->'position'->'asked'->>'at_or_below')::int = 5
+    AND (r->'position'->'asked'->>'thin')::boolean IS FALSE);
+  PERFORM pg_temp.ok('Blazer: no merit without an active model', r->'merit' = 'null'::jsonb);
+  PERFORM pg_temp.ok('Blazer venues travel with the sold position',
+    r->'position'->'sold'->'venues' = '{"Bring a Trailer": {"n": 14, "p50": 60000}, "Mecum": {"n": 6, "p50": 35000}}'::jsonb
+    AND r->'position'->'asked'->'venues' = '{}'::jsonb);
+  PERFORM pg_temp.ok('Blazer miles: its stated 88,000 sits above 8 of 20 recorded sales'' readings (median 100,000); 3 ask readings place nothing',
+    (r->>'read_miles')::int = 88000 AND r->'position'->'sold'->'miles' = '{"n": 20, "p50": 100000, "at_or_below": 8}'::jsonb
+    AND r->'position'->'asked'->'miles' = '{"n": 3, "p50": null, "at_or_below": null}'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'h3t';
+  PERFORM pg_temp.ok('H3T miles: a disclosed rolled-over odometer places nothing, though 12 readings exist',
+    r->'read_miles' = 'null'::jsonb AND r->'position'->'sold'->'miles'->'at_or_below' = 'null'::jsonb
+    AND (r->'position'->'sold'->'miles'->>'n')::int = 12);
+  PERFORM pg_temp.ok('H3T: 6 recorded sales are thin: no band, no at_or_below; no asks',
+    (r->'position'->'sold'->>'thin')::boolean AND r->'position'->'sold'->'at_or_below' = 'null'::jsonb
+    AND (r->'position'->'sold'->>'n')::int = 6 AND r->'position'->'asked' = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'pickup';
+  PERFORM pg_temp.ok('pickup: exactly 10 sales place it: 4 at or below 4,500',
+    (r->'position'->'sold'->>'at_or_below')::int = 4);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'f250';
+  PERFORM pg_temp.ok('a 1979 F250 is outside its family''s years: no position', r->'position' = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'm1010';
+  PERFORM pg_temp.ok('a name without a family: no position', r->'position' = 'null'::jsonb);
+  PERFORM pg_temp.ok('newest_seen_at is the newest first sighting (capture time)',
+    (b->>'newest_seen_at')::timestamptz = (SELECT created_at FROM public.vehicle_events
+                                           WHERE vehicle_id = '00000000-0000-4000-8000-000000000003'));
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer';
+  PERFORM pg_temp.ok('share: asks when there are 10 (Blazer 5 of 11), else sales (pickup 4 of 10)',
+    (r->'position'->>'share')::numeric = 0.455 AND r->'position'->>'basis' = 'asked'
+    AND (SELECT (x->'position'->>'share')::numeric = 0.4 AND x->'position'->>'basis' = 'sold'
+         FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'pickup'));
+  PERFORM pg_temp.ok('position sort: lowest share first, unplaced rows after, newest first among them',
+    (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(public.classified_ask_board(p_sort => 'position')->'rows')
+       WITH ORDINALITY y(x, o)) = ARRAY['pickup', 'blazer', 'm1010', 'h3t', 'f250']);
+  PERFORM pg_temp.ok('merit sort with no model keeps newest first',
+    (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(public.classified_ask_board(p_sort => 'merit')->'rows')
+       WITH ORDINALITY y(x, o))
+    = (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY y(x, o)));
+END $$;
+
+-- An active model on two features: logit = -3 + 1 * ln(p50 / ask) + 0.5 * ln(n) (coef 1 over sd 2). Blazer: -3 +
+-- ln(52500/18800) + 0.5 ln 20 = -0.4752, chance 0.383; pickup: -3 + ln(5500/4500) + 0.5 ln 10 = -1.6480, chance 0.161.
+INSERT INTO public.listing_exit_models (version, active, horizon_days, label, intercept, features, base_rate, trained_on, evaluated_on, receipt)
+VALUES ('test_v1', true, 7, 'gone within 7 days of first sight', -3,
+  '[{"name": "log_sold_p50_over_ask", "mean": 0, "sd": 1, "coef": 1}, {"name": "log_sold_n", "mean": 0, "sd": 2, "coef": 1}]',
+  0.07, '{}', '{}', 'test');
+DO $$
+DECLARE b jsonb := public.classified_ask_board(p_sort => 'merit');
+BEGIN
+  PERFORM pg_temp.ok('merit: the model''s chance per placed row, by hand (Blazer 0.383, pickup 0.161); the model is named',
+    (SELECT (x->'merit'->>'exit7')::numeric FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'blazer') = 0.383
+    AND (SELECT (x->'merit'->>'exit7')::numeric FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'pickup') = 0.161
+    AND b->'merit_model'->>'version' = 'test_v1' AND (b->'population'->>'with_merit')::int = 2);
+  PERFORM pg_temp.ok('merit sort: highest chance first, rows without merit after, newest first among them',
+    (SELECT array_agg(x->>'model' ORDER BY o) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY y(x, o))
+    = ARRAY['blazer', 'pickup', 'm1010', 'h3t', 'f250']);
+  PERFORM pg_temp.ok('merit is not imputed: the thin H3T has none',
+    (SELECT x->'merit' = 'null'::jsonb FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'h3t'));
+END $$;
+-- A model naming a feature the board does not compute gives no merit at all.
+UPDATE public.listing_exit_models SET active = false WHERE version = 'test_v1';
+INSERT INTO public.listing_exit_models (version, active, horizon_days, label, intercept, features, base_rate, trained_on, evaluated_on, receipt)
+VALUES ('test_v2', true, 7, 'l', 0, '[{"name": "colour", "mean": 0, "sd": 1, "coef": 1}]', 0.07, '{}', '{}', 'test');
+SELECT pg_temp.ok('an unknown feature: no merit on any row',
+  (public.classified_ask_board()->'population'->>'with_merit')::int = 0);
+UPDATE public.listing_exit_models SET active = false WHERE version = 'test_v2';
+
 DO $$
 DECLARE bad text[] := ARRAY[
   'SELECT public.classified_ask_board(p_lat => 36)',
@@ -273,5 +421,8 @@ BEGIN
     = (SELECT created_at FROM public.vehicle_events WHERE vehicle_id = '00000000-0000-4000-8000-000000000003'));
   PERFORM pg_temp.ok('anon: a low-confidence place stays hidden', (b->'population'->>'with_point')::int = 3
     AND (SELECT r->'city' = 'null'::jsonb FROM jsonb_array_elements(b->'rows') r WHERE r->>'model' = 'pickup'));
+  PERFORM pg_temp.ok('anon: the same position (family, sales and asks)',
+    (SELECT (r->'position'->'sold'->>'at_or_below')::int = 3 AND (r->'position'->'asked'->>'at_or_below')::int = 5
+     FROM jsonb_array_elements(b->'rows') r WHERE r->>'model' = 'blazer'));
 END $$;
 RESET ROLE;

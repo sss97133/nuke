@@ -196,6 +196,15 @@ TWIN_POS = json.load(open(_TC)) if _TC.exists() else {}
 
 
 PIN_SPLICE = {}     # RSI pass 26: pin splice node -> its plug and cavity (set by main from the registry)
+# RSI pass 31: boxes the design record has placed (catalog/mounts.yaml `position`, twin frame): anchor code -> (box, position)
+_MOUNTS = yaml.safe_load((Path(__file__).with_name("catalog") / "mounts.yaml").read_text()) or {}
+PLACED = {b["position"]["node"]: (b, b["position"]) for b in (_MOUNTS.get("boxes") or []) if b.get("position")}
+
+
+def placed_source(a):
+    b, pos = PLACED[a]
+    return (f"digital-twin anchor {a}: {b['where']} ({b['status']}, confidence {pos['confidence']}; {pos['orientation']}; "
+            f"{pos['source']})")
 
 
 def position(code):
@@ -206,6 +215,9 @@ def position(code):
         return dict(at, pos_source=at["pos_source"] + f" — beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the "
                                                       "plug on its lead") if at else {}
     a = NODE_ANCHOR.get(code)
+    if a in PLACED:     # the design record's placement overtakes the twin anchor (RSI pass 31)
+        pos = PLACED[a][1]
+        return {"pos_x_m": pos["x"], "pos_y_m": pos["y"], "pos_z_m": pos["z"], "pos_source": placed_source(a)}
     if not a and TWIN_OBJ.get(code) in TWIN_POS:
         x, y, z = TWIN_POS[TWIN_OBJ[code]]
         return {"pos_x_m": x, "pos_y_m": y, "pos_z_m": z,
@@ -811,11 +823,36 @@ def main():
         # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
         print(f"segments: {api._req('POST', 'rpc/conform_harness_segments', {'p_vehicle_id': K5})}")
         print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # and every segment to its wire's catalog part and its plugs' option couplings (RSI pass 30: the reshape's and pass
+        # 1's rules, re-runnable)
+        print(f"segment keys: {api._req('POST', 'rpc/key_harness_segments', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
         print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
         # citations on a wire end this run re-inserted at the same plug and cavity follow it (RSI pass 28)
         print(f"evidence carried: {api._req('POST', 'rpc/carry_harness_termination_evidence', {'p_vehicle_id': K5})}")
+        # the boxes the design record places land on the route graph first (RSI pass 31), then each plug keys to its point
+        points = [{"node_code": a, "kind": "device", "x": pos["x"], "y": pos["y"], "z": pos["z"], "pos_source": placed_source(a),
+                   "method": "placement decision record (catalog/mounts.yaml)", "trust": b["status"]} for a, (b, pos) in PLACED.items()]
+        print(f"route points: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        # the route graph's branches and their junctions from the design record, then every segment between standing
+        # points routed over them (RSI pass 33)
+        rb = yaml.safe_load((CD / "catalog" / "route_branches.yaml").read_text()) if (CD / "catalog" / "route_branches.yaml").exists() else {}
+        junctions = [{"node_code": j["code"], "kind": j.get("kind") or "breakout", "x": j["x"], "y": j["y"], "z": j["z"],
+                      "pos_source": f"route junction {j['code']}: {j.get('note') or 'where bundles split'} (catalog/route_branches.yaml)",
+                      "method": "route study (catalog/route_branches.yaml)", "trust": j.get("trust") or "proposed"}
+                     for j in (rb.get("junctions") or [])]
+        if junctions:
+            print(f"route junctions: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': junctions, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        branches = [{"code": b_["code"], "from": b_["from"], "to": b_["to"], "polyline_m": b_["polyline_m"], "length_in": b_["length_in"],
+                     "description": b_.get("follows"), "method": rb.get("method") or "route study",
+                     "assumptions": "; ".join(x for x in (b_.get("rule_notes"), f"min clearance {b_.get('min_clearance_mm')} mm"
+                                                          if b_.get("min_clearance_mm") is not None else None,
+                                                          f"confidence {b_.get('confidence')}" if b_.get("confidence") else None) if x)}
+                    for b_ in (rb.get("branches") or [])]
+        if branches:
+            print(f"route branches: {api._req('POST', 'rpc/load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        print(f"routing: {api._req('POST', 'rpc/route_harness_segments', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
         print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")

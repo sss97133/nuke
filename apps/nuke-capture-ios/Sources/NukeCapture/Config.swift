@@ -88,6 +88,8 @@ enum Config {
     /// An unmapped album named "year make model" needs this many uploaded photos before the phone
     /// asks the server to resolve or create its vehicle profile (the server enforces it too).
     static let albumProfileMinPhotos = 12
+    /// In Low Power Mode a pass still uploads this many of the newest photos, then stops.
+    static let lowPowerRecentBudget = 10
     /// Photos newer than this lead every sync pass, newest first, ahead of the watermark window.
     static let recentFirstWindow: TimeInterval = 3 * 24 * 3600
     /// Dedupe seen-set cap in UserDefaults.
