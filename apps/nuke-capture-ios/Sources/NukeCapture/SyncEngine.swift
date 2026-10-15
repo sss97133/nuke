@@ -246,7 +246,8 @@ final class SyncEngine: ObservableObject {
     func start() async {
         if started {
             await sync()
-            await resumeBackfillIfNeeded()
+            // One open spends one foreground budget: when the live pass used it, the queue waits.
+            if !foregroundBudgetReached { await resumeBackfillIfNeeded() }
             return
         }
 
@@ -439,6 +440,12 @@ final class SyncEngine: ObservableObject {
         var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (personal/sensitive — alibi metadata only)
         var t0Fired = 0   // cap on-device T0 per sync — never thrash the ANE on a bulk catch-up
         var deferred = 0  // originals in iCloud, left for the background job
+        // With the app open, a pass reads and uploads at most the foreground budget, paced, and
+        // leaves the rest to the next pass or the background job. A phone months behind (its
+        // watermark stuck since June) would otherwise push ~200 originals on the first open.
+        let foreground = UIApplication.shared.applicationState != .background
+        var byteWork = 0
+        foregroundBudgetReached = false
 
         for asset in assets {
             // iOS: BGAppRefreshTask expiration cancels this task — stop
@@ -448,9 +455,21 @@ final class SyncEngine: ObservableObject {
             // A hot or low-power device stops here; the watermark does not advance past
             // this pass (failures > 0), so the remainder is re-found when it cools.
             if Self.deviceTooHotOrLow { refreshThermalHold(); failed += 1; break }
+            if foreground, byteWork >= Config.foregroundBackfillBudget {
+                foregroundBudgetReached = true
+                failed += 1   // holds the watermark; settled photos are skipped cheaply next pass
+                break
+            }
 
             var stop = false
-            switch await processAsset(asset, userId: userId) {
+            let outcome = await processAsset(asset, userId: userId)
+            switch outcome {
+            case .uploaded, .notOwnCamera, .failed:
+                byteWork += 1
+                if foreground { try? await Task.sleep(for: .milliseconds(Config.foregroundBackfillPaceMs)) }
+            default: break
+            }
+            switch outcome {
             case .uploaded(let pixels):
                 uploaded += 1
                 if !pixels { metadataOnly += 1 }
