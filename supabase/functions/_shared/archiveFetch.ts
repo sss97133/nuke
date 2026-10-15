@@ -334,7 +334,7 @@ export async function archiveFetch(
     if (options?.firecrawlOnBlock && refused) {
       const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
         url,
-        formats: ["html"],
+        formats: ["rawHtml"], // the extractors that opt in read script payloads, which "html" strips
         onlyMainContent: false,
         waitFor: options?.waitForJs ?? 3000,
       });
