@@ -65,6 +65,8 @@ async function getPortfolioStats(supabaseClient: any): Promise<any> {
       total_is_estimate: cacheRow.total_is_estimate === true,
       counts_updated_at: cacheRow.counts_updated_at ?? null,
       value_updated_at: cacheRow.value_updated_at ?? cacheRow.updated_at ?? null,
+      for_sale_updated_at: cacheRow.for_sale_updated_at ?? null,
+      for_sale_definition: cacheRow.for_sale_definition ?? null,
     };
   } else {
     cachedPortfolioStats = {
