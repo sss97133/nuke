@@ -1139,7 +1139,7 @@ Deno.serve(async (req) => {
       const n = Math.min(Number(body.limit) || 20, 25);
       const { data: snaps, error: snapErr } = await supabase
         .from('listing_page_snapshots')
-        .select('id, listing_url, fetched_at, html')
+        .select('id, listing_url, fetched_at, html, html_storage_path')
         .eq('platform', 'gooding')
         .eq('success', true)
         .gt('id', body.after_id || '00000000-0000-0000-0000-000000000000')
@@ -1154,7 +1154,14 @@ Deno.serve(async (req) => {
             .from('listing_page_snapshots').select('id').eq('listing_url', snap.listing_url).gt('fetched_at', snap.fetched_at).limit(1);
           if (newer && newer.length > 0) { out.skipped_newer++; continue; }
           let pageData: GoodingPageData;
-          try { pageData = JSON.parse(snap.html); } catch { out.skipped_unparsed++; continue; }
+          // Captures moved out of Postgres keep their body in the listing-snapshots bucket.
+          let body: string | null = snap.html ?? null;
+          if (!body && snap.html_storage_path) {
+            const { data: blob } = await supabase.storage.from('listing-snapshots').download(snap.html_storage_path);
+            body = blob ? await blob.text() : null;
+          }
+          if (!body) { out.skipped_unparsed++; continue; }
+          try { pageData = JSON.parse(body); } catch { out.skipped_unparsed++; continue; }
           if (!pageData?.result?.data?.contentfulLot) { out.skipped_unparsed++; continue; }
           const extracted = extractFromPageData(pageData, snap.listing_url);
           if (!extracted.year && !extracted.make) { out.skipped_not_vehicle++; continue; }
