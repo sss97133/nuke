@@ -2,6 +2,44 @@
 
 This supersedes the price-histogram-first presentation. The owner wants market movement made visible through measured commentary, bidding, sales, supply and attention. No hypothetical numbers, invented trend or quote wall. This is a design/reader request, not authorization for database writes or scoring/model spend.
 
+## Historical asking evidence: US AutoTrader pilot
+
+The owner authorized a bounded US-first intake on October 14, 2026. A printed ad is
+an attributed asking-price observation, not a completed sale or a resolved physical car.
+The profile `autotrader_us_historical_v1` uses the existing `autotrader` source and
+`listing` kind through the service-only historical mode of `ingest-observation`.
+It does not use generic year/make matching or attach a magazine page to one vehicle.
+
+Preserve the original JPEG privately in `masters` under its SHA-256, with source URL,
+dimensions and pixel coordinates. Unknown original retrieval time stays unknown.
+Publication period, reading time, retention time and database ingest time are separate.
+A month or printed multi-day interval must not become an invented exact listing day.
+A forum-associated issue date remains an interpretation and does not qualify a price point.
+Keep raw print readings, normalized values, uncertainties, method/version and per-field
+checks together. AI rereads must not be labeled human verification; a second pass is
+independent only when it read the source before seeing the first interpretation.
+
+Capture, reading and withdrawal envelopes are append-only observations. Successors cite
+the earlier reading, and documented issue-context corrections preserve the old context.
+The writer and fold validate these JSON citations; a database-enforced lineage FK is
+not implemented. Existing vehicle-owned supersession RPCs do not handle these NULL-vehicle
+records and must not be bypassed with raw updates. Concurrent sibling readings withhold
+the ad rather than winning by arrival time. Withdrawal cannot resurrect an older reading.
+
+The operator reader reconciles every ID in a bounded private manifest before reporting
+that batch as complete. It folds knowledge-time cutoffs using database ingest clocks,
+retains all exclusions, and qualifies a point only with directly supported publication
+period, USD asking amount, year/make/model evidence and documented passing field checks.
+An inferred make/model or clipped year remains evidence but is withheld pending review.
+Different models and publication periods do not form a price trend merely by joining dots.
+Repeated readings of one ad count once; separate issue appearances are asking exposures,
+with unresolved cross-issue vehicle duplication stated explicitly.
+
+This pilot does not change public access, feed `classified_ask_board`, establish a full
+AutoTrader archive, or quantify US market coverage. Its denominator is the retained
+manifest; the complete historical publication/ad population remains unknown. Raw images
+and contact details stay outside the public repository. No seller outreach is performed.
+
 ## Public experience
 
 **Owner steering, October 10 — market rows and inspection.** A row answers what the vehicle is,
