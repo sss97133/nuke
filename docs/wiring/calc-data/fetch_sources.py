@@ -338,6 +338,8 @@ URLS = [
     "https://www.bosch-motorsport.com/products/brake/antilock-braking-systems-abs/abs-m5-kit/",
     "https://www.customconnectorkits.com/products/dtm04-3p",
     "https://www.customconnectorkits.com/products/dtm06-3s",
+    # the Deutsch solid-contact crimp tool tools.yaml cites (RSI pass 41)
+    "https://www.prowireusa.com/deutsch-hdt-48-00-solid-barrel-crimp-tool.html",
 ]
 
 

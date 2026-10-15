@@ -45,10 +45,10 @@ def main():
     api = L.API()
     segs = api.get("harness_segments", f"vehicle_id=eq.{L.K5}&is_superseded=eq.false&select=id,"
                                        "circuit:vehicle_custom_circuits(circuit_code,design_status,is_superseded)&limit=5000")
-    routes = api.get("v_harness_route_length_check", f"vehicle_id=eq.{L.K5}&select=segment_id,route_in,branches&limit=5000")
+    routes = api.get("v_harness_route_length_check", f"vehicle_id=eq.{L.K5}&select=segment_id,route_in,branches&order=segment_id&limit=5000")
     by_seg = {r["segment_id"]: r for r in routes}
     ends = {g["segment_id"]: (g["from_plug"], g["to_plug"]) for g in
-            api.get("v_harness_segment_geometry", f"vehicle_id=eq.{L.K5}&select=segment_id,from_plug,to_plug&limit=5000")}
+            api.get("v_harness_segment_geometry", f"vehicle_id=eq.{L.K5}&select=segment_id,from_plug,to_plug&order=segment_id&limit=5000")}
     wires = defaultdict(lambda: {"route_in": 0.0, "branches": 0, "segments": 0, "routed": 0})
     hops = defaultdict(list)
     for s in segs:

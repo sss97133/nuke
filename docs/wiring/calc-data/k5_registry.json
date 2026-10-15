@@ -52794,7 +52794,7 @@
     {
      "field": "tool",
      "value": "MiniSeal splice crimper (ProWire 3137CT = Raychem AD-1377) (3137CT) — to_buy",
-     "source": "prowire 3137ct page + Nuke catalog_parts name \"BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)\"",
+     "source": "prowire 3137ct page + Nuke catalog_parts name \"BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)\", fetched 2026-09-26",
      "state": "cited"
     },
     {
