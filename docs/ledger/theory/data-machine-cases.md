@@ -2297,3 +2297,55 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   images.
 - The other 589 wire ends' cavities: GM blade, DT, rings and kit terminals each need a cited layout.
 - Measured lengths (the outcome).
+
+### Recursive refinement: the original request must cross admission and readers (2026-10-11)
+
+**Owner direction, in substance.** Discussion must in parallel shape PostgreSQL, documentation and the
+Markdown methodology guiding the next agent. Artist, buyer and researcher are descriptions arising
+from behavior, not fixed audience categories. A progress function or proposal is not the completed model.
+
+**Bounded implemented case.** The existing engine-family proposal had a deterministic witness but no
+supported admission path. The prepared migration `20261011230939_retained_engine_family_intake.sql`
+extends existing PostgreSQL witness, tuple-validation and insertion functions, plus provenance output.
+The Edge selector accepts only the retained source ID and derives its claim from that source. The
+property must belong to the existing approved proposal and be ratified core vocabulary. A publisher's
+label stays separate from `engine_code`, with literal quote, source fingerprint, microsecond clocks
+and unknown engine identity/configuration/event time. No new table, stack entry, worker or replay is created.
+
+**Local evidence.** `scripts/test-engine-family-intake.sh` uses PostgreSQL 17 and the actual Edge handler
+with a narrow test transport. Both source and child enter through that handler. The unchanged selector
+fails before registration, still fails after synthetic curator review against old SQL, then succeeds
+after migration. Ten integrated steps verify actual anonymous provenance/canonical readers, same-ID
+retry, withdrawal/supersession/visibility refusal, error refusal, twenty SQL/TypeScript witness cases,
+preserved function attributes and idempotent reapplication. The existing intake suite reports 330
+passing tests; the enforced local repository gate passes. This is not deployed HTTP/PostgREST proof.
+
+**What the iteration corrected.** One reader called the inner value predicate, so the new registration
+gate moved to the shared predicate. Duplicate lookup bypassed insertion checks, so success now calls
+the existing result validator. Provenance output omitted identity/capture qualifiers, so those now
+survive that reader too. Questions, general-model assertions and engine labels in another part of a
+sentence were excluded from the family grammar. These observed failures refined code and methodology together.
+
+**Delivery and population boundary.** Implemented and locally tested; production approval, merge,
+deployment and runtime verification remain outstanding. The live proposal was still open on the
+dated read. This pass changes production coverage by zero; total eligibility and fleet gain were not
+measured. Automatic schema repair and the cross-domain behavior-to-role model remain unfinished.
+
+**Integration refresh, 2026-10-15 UTC.** PR #976 was resumed against current main. Live definitions
+showed newer native make/model admission and provenance qualifiers; the migration and disposable
+baseline now preserve them. The real-handler contract tests make admission before the migration,
+then make replay and model admission afterwards. Its service-call tests use the current secret-key
+contract and refuse publishable keys, legacy HS256 tokens and authenticated users. A local attack
+also showed that changing the family property's unit left one canonical claim readable; the shared
+predicate now refuses unit, parent and discriminator changes, and duplicate intake rechecks that
+same predicate. Existing testimony remains intact.
+
+The PostgreSQL 17 integration passes twelve steps, and the intake suite passes 351 tests with its
+opt-in integration test separately exercised. The enforced local gate passes. Read-only rechecking
+the proposal's four original source IDs at 00:35 UTC retains one M50 candidate and three refusals;
+these are original controls, not independent held-out accuracy or admitted production claims.
+
+Population boundary: the live atlas at 00:28 UTC estimates 1,014,519 stored vehicle records; public
+and engine-family-eligible totals remain unmeasured. Four source controls do not establish fleet
+coverage. Net newly usable production answers from this refresh: zero. The production proposal is
+still open; merge/deployment authorization and curator ratification remain separate held steps.
