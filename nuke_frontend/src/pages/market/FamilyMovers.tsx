@@ -158,7 +158,7 @@ export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'bran
   const row = (m: ShareMover, dir: 'up' | 'down') => {
     const key = `${m.brand}|${m.family_key}`;
     return <button key={key} type="button" className="map-movers2__row" onClick={() => onPick(m)}
-      title={`${m.brand} ${m.family} on Bring a Trailer: ${m.sold_prior_12m} sold in the 12 months before, ${m.sold_12m} in the last 12; against BaT overall ${pct(m.share_move)} (±2 SE ${pct(m.share_lo)} to ${pct(m.share_hi)})`}>
+      title={`${m.brand} ${m.family} on Bring a Trailer: ${m.sold_prior_12m} sold the year before, ${m.sold_12m} this year; ${pct(m.share_move)} after taking out BaT's own growth (likely range ${pct(m.share_lo)} to ${pct(m.share_hi)})`}>
       <span className="map-movers2__name">{m.brand} {m.family}</span>
       <MoveDot m={m} />
       <span className={`map-movers2__move map-movers2__move--${dir}`}>{pct(m.share_move)}</span>
@@ -169,19 +169,20 @@ export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'bran
   };
   const side = (title: string, list: ShareMover[], dir: 'up' | 'down') => <div className="map-movers2__side">
     <div className="map-movers2__title">{title}</div>
-    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">none moved clearly</div>}
+    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">no real changes</div>}
   </div>;
-  return <div className="map-movers2" role="group" aria-label="Families gaining and losing share of Bring a Trailer sales">
+  return <div className="map-movers2" role="group" aria-label="Model families selling more and less on Bring a Trailer">
     <div className="map-movers2__sides">
-      {side('Gaining share of BaT', data.gaining, 'up')}
-      {side('Losing share of BaT', data.losing, 'down')}
+      {side('Selling more on Bring a Trailer', data.gaining, 'up')}
+      {side('Selling less on Bring a Trailer', data.losing, 'down')}
     </div>
     <div className="map-movers2__base">
-      Sales on Bring a Trailer, last 12 months against the 12 before, relative to BaT overall ({pct(batMove)},{' '}
-      {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). Listed when the move is at
-      least 2 standard errors; the bar is that ±2 SE range on a log axis from −50% to +100%. {data.significant.toLocaleString('en-US')} of
-      {' '}{data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ BaT sales in each year moved clearly
-      ({data.families.toLocaleString('en-US')} families read). Avg sale = BaT dollars over sales, which moves with what sold.
+      Bring a Trailer sales this year against last year, after taking out BaT's own growth ({pct(batMove)},{' '}
+      {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). A family is listed only when its
+      change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
+      {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ BaT sales each
+      year changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = BaT dollars divided by cars sold, so it
+      moves with which cars sold.
     </div>
   </div>;
 }
